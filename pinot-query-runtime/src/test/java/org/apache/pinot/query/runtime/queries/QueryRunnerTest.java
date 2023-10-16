@@ -20,21 +20,16 @@ package org.apache.pinot.query.runtime.queries;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.DispatchablePlanFragment;
-import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.table.TableType;
@@ -43,9 +38,8 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
-import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -128,8 +122,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService.start();
 
     QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
-    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
     server1.start();
+    // Start server1 to ensure the next server will have a different port.
+    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
     // this is only use for test identifier purpose.
@@ -157,8 +152,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    */
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
-    List<Object[]> resultRows = queryRunner(sql, null);
-    Assert.assertEquals(resultRows.size(), expectedRows);
+    ResultTable resultTable = queryRunner(sql, null);
+    Assert.assertEquals(resultTable.getRows().size(), expectedRows);
   }
 
   /**
@@ -170,10 +165,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
-    List<Object[]> resultRows = queryRunner(sql, null);
+    ResultTable resultTable = queryRunner(sql, null);
     // query H2 for data
     List<Object[]> expectedRows = queryH2(sql);
-    compareRowEquals(resultRows, expectedRows);
+    compareRowEquals(resultTable, expectedRows);
   }
 
   /**
@@ -181,34 +176,21 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    */
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
   public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
-    long requestId = REQUEST_ID_GEN.getAndIncrement();
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
-    QueryEnvironment.QueryPlannerResult queryPlannerResult =
-        _queryEnvironment.planQuery(sql, sqlNodeAndOptions, requestId);
-    DispatchableSubPlan dispatchableSubPlan = queryPlannerResult.getQueryPlan();
-    Map<String, String> requestMetadataMap = new HashMap<>();
-    requestMetadataMap.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, String.valueOf(requestId));
-    Long timeoutMsInQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
-    long timeoutMs =
-        timeoutMsInQueryOption != null ? timeoutMsInQueryOption : CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS;
-    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, String.valueOf(timeoutMs));
-    requestMetadataMap.put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true");
-    requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
-    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
-    for (int stageId = 1; stageId < stagePlans.size(); stageId++) {
-      processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
-    }
     try {
-      QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(), null,
-          _mailboxService);
-      Assert.fail("Should have thrown exception!");
-    } catch (RuntimeException e) {
+      // query pinot
+      ResultTable resultTable = queryRunner(sql, null);
+      Assert.fail("Expected error with message '" + exceptionMsg + "'. But instead rows were returned: "
+          + JsonUtils.objectToPrettyString(resultTable));
+    } catch (Exception e) {
       // NOTE: The actual message is (usually) something like:
       //   Received error query execution result block: {200=QueryExecutionError:
       //   Query execution error on: Server_localhost_12345
       //     java.lang.IllegalArgumentException: Illegal Json Path: $['path'] does not match document
       String exceptionMessage = e.getMessage();
-      Assert.assertTrue(exceptionMessage.startsWith("Received error query execution result block: "));
+      Assert.assertTrue(
+          exceptionMessage.startsWith("Received error query execution result block: ") || exceptionMessage.startsWith(
+              "Error occurred during stage submission"),
+          "Exception message didn't start with proper heading: " + exceptionMessage);
       Assert.assertTrue(exceptionMessage.contains(exceptionMsg),
           "Exception should contain: " + exceptionMsg + ", but found: " + exceptionMessage);
     }

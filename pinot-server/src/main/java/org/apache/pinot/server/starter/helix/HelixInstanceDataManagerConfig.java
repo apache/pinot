@@ -95,11 +95,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = "segment.stream.download.untar";
   private static final boolean DEFAULT_ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = false;
 
-  // Key of whether to enable split commit
-  private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
-  // Key of whether to enable split commit end with segment metadata files.
-  private static final String ENABLE_SPLIT_COMMIT_END_WITH_METADATA = "enable.commitend.metadata";
-
   // Whether memory for realtime consuming segments should be allocated off-heap.
   private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
   // And whether the allocation should be direct (default is to allocate via mmap)
@@ -207,16 +202,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getSegmentFormatVersion() {
     return _instanceDataManagerConfiguration.getProperty(SEGMENT_FORMAT_VERSION);
-  }
-
-  @Override
-  public boolean isEnableSplitCommit() {
-    return _instanceDataManagerConfiguration.getProperty(ENABLE_SPLIT_COMMIT, true);
-  }
-
-  @Override
-  public boolean isEnableSplitCommitEndWithMetadata() {
-    return _instanceDataManagerConfiguration.getProperty(ENABLE_SPLIT_COMMIT_END_WITH_METADATA, true);
   }
 
   @Override

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.clearspring.analytics.stream.cardinality.RegisterSet;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -57,12 +58,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.datasketches.common.ArrayOfStringsSerDe;
+import org.apache.datasketches.frequencies.ItemsSketch;
+import org.apache.datasketches.frequencies.LongsSketch;
 import org.apache.datasketches.kll.KllDoublesSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
@@ -132,9 +137,13 @@ public class ObjectSerDeUtils {
     CovarianceTuple(32),
     VarianceTuple(33),
     PinotFourthMoment(34),
-    ArgMinMaxObject(35),
+    ExprMinMaxObject(35),
     KllDataSketch(36),
-    IntegerTupleSketch(37);
+    IntegerTupleSketch(37),
+    FrequentStringsSketch(38),
+    FrequentLongsSketch(39),
+    HyperLogLogPlus(40);
+
 
     private final int _value;
 
@@ -225,7 +234,13 @@ public class ObjectSerDeUtils {
       } else if (value instanceof org.apache.datasketches.tuple.Sketch) {
         return ObjectType.IntegerTupleSketch;
       } else if (value instanceof ExprMinMaxObject) {
-        return ObjectType.ArgMinMaxObject;
+        return ObjectType.ExprMinMaxObject;
+      } else if (value instanceof ItemsSketch) {
+        return ObjectType.FrequentStringsSketch;
+      } else if (value instanceof LongsSketch) {
+        return ObjectType.FrequentLongsSketch;
+      } else if (value instanceof HyperLogLogPlus) {
+        return ObjectType.HyperLogLogPlus;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -554,6 +569,34 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<HyperLogLogPlus> HYPER_LOG_LOG_PLUS_SER_DE = new ObjectSerDe<HyperLogLogPlus>() {
+
+    @Override
+    public byte[] serialize(HyperLogLogPlus hyperLogLogPlus) {
+      try {
+        return hyperLogLogPlus.getBytes();
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+      }
+    }
+
+    @Override
+    public HyperLogLogPlus deserialize(byte[] bytes) {
+      try {
+        return HyperLogLogPlus.Builder.build(bytes);
+      } catch (IOException e) {
+        throw new RuntimeException("Caught exception while serializing HyperLogLogPlus", e);
+      }
+    }
+
+    @Override
+    public HyperLogLogPlus deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return deserialize(bytes);
+    }
+  };
+
   public static final ObjectSerDe<DistinctTable> DISTINCT_TABLE_SER_DE = new ObjectSerDe<DistinctTable>() {
 
     @Override
@@ -656,7 +699,7 @@ public class ObjectSerDeUtils {
     @Override
     public HashMap<Object, Object> deserialize(ByteBuffer byteBuffer) {
       int size = byteBuffer.getInt();
-      HashMap<Object, Object> map = new HashMap<>(size);
+      HashMap<Object, Object> map = new HashMap<>(HashUtil.getHashMapCapacity(size));
       if (size == 0) {
         return map;
       }
@@ -1285,6 +1328,46 @@ public class ObjectSerDeUtils {
         }
       };
 
+  public static final ObjectSerDe<ItemsSketch<String>> FREQUENT_STRINGS_SKETCH_SER_DE =
+      new ObjectSerDe<>() {
+        @Override
+        public byte[] serialize(ItemsSketch<String> sketch) {
+          return sketch.toByteArray(new ArrayOfStringsSerDe());
+        }
+
+        @Override
+        public ItemsSketch<String> deserialize(byte[] bytes) {
+          return ItemsSketch.getInstance(Memory.wrap(bytes), new ArrayOfStringsSerDe());
+        }
+
+        @Override
+        public ItemsSketch<String> deserialize(ByteBuffer byteBuffer) {
+          byte[] arr = new byte[byteBuffer.remaining()];
+          byteBuffer.get(arr);
+          return ItemsSketch.getInstance(Memory.wrap(arr), new ArrayOfStringsSerDe());
+        }
+      };
+
+  public static final ObjectSerDe<LongsSketch> FREQUENT_LONGS_SKETCH_SER_DE =
+      new ObjectSerDe<>() {
+        @Override
+        public byte[] serialize(LongsSketch sketch) {
+          return sketch.toByteArray();
+        }
+
+        @Override
+        public LongsSketch deserialize(byte[] bytes) {
+          return LongsSketch.getInstance(Memory.wrap(bytes));
+        }
+
+        @Override
+        public LongsSketch deserialize(ByteBuffer byteBuffer) {
+          byte[] arr = new byte[byteBuffer.remaining()];
+          byteBuffer.get(arr);
+          return LongsSketch.getInstance(Memory.wrap(arr));
+        }
+      };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -1326,6 +1409,9 @@ public class ObjectSerDeUtils {
       ARG_MIN_MAX_OBJECT_SER_DE,
       KLL_SKETCH_SER_DE,
       DATA_SKETCH_INT_TUPLE_SER_DE,
+      FREQUENT_STRINGS_SKETCH_SER_DE,
+      FREQUENT_LONGS_SKETCH_SER_DE,
+      HYPER_LOG_LOG_PLUS_SER_DE,
   };
   //@formatter:on
 

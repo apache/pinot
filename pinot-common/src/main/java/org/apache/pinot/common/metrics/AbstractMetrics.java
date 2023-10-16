@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -27,6 +28,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.Utils;
@@ -285,9 +287,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public PinotMeter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
       PinotMeter reusedMeter) {
-    String meterName = meter.getMeterName();
-    final String fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
+    return addValueToMeter(getTableFullMeterName(tableName, meter), meter.getUnit(), unitCount, reusedMeter);
   }
 
   /**
@@ -331,12 +331,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   public PinotMeter getMeteredTableValue(final String tableName, final M meter) {
-    final String fullMeterName;
-    String meterName = meter.getMeterName();
-    fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
+    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz,
+        getTableFullMeterName(tableName, meter));
 
     return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+  }
+
+  private String getTableFullMeterName(final String tableName, final M meter) {
+    String meterName = meter.getMeterName();
+    return _metricPrefix + getTableName(tableName) + "." + meterName;
   }
 
   /**
@@ -657,6 +660,34 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Like {@link #setOrUpdateGauge(String, Supplier)}
+   */
+  public void setOrUpdateGauge(final String metricName, final LongSupplier valueSupplier) {
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
+        PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.getAsLong()));
+    pinotGauge.setValueSupplier((Supplier<Long>) () -> (Long) valueSupplier.getAsLong());
+  }
+
+  /**
+   * Like {@link #setOrUpdateGauge(String, Supplier)} but using a global gauge
+   * @throws IllegalArgumentException if the gauge is not global
+   */
+  public void setOrUpdateGlobalGauge(final G gauge, final Supplier<Long> valueSupplier) {
+    Preconditions.checkArgument(gauge.isGlobal(), "Only global gauges should be sent to this method");
+    setOrUpdateGauge(gauge.getGaugeName(), valueSupplier);
+  }
+
+  /**
+   * Like {@link #setOrUpdateGauge(String, LongSupplier)} but using a global gauge
+   * @throws IllegalArgumentException if the gauge is not global
+   */
+  public void setOrUpdateGlobalGauge(final G gauge, final LongSupplier valueSupplier) {
+    Preconditions.checkArgument(gauge.isGlobal(), "Only global gauges should be sent to this method");
+    setOrUpdateGauge(gauge.getGaugeName(), valueSupplier);
+  }
+
+  /**
    * Removes a global gauge given the key and the gauge
    * @param key the key associated with the gauge
    * @param gauge the gauge to be removed
@@ -721,6 +752,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void removeGauge(final String gaugeName) {
     _gaugeValues.remove(gaugeName);
     removeGaugeFromMetricRegistry(gaugeName);
+  }
+
+  public void removeTableMeter(final String tableName, final M meter) {
+    PinotMetricUtils.removeMetric(_metricsRegistry,
+        PinotMetricUtils.makePinotMetricName(_clazz, getTableFullMeterName(tableName, meter)));
   }
 
   /**

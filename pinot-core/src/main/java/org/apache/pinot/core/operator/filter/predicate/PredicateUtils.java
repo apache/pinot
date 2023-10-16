@@ -32,7 +32,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.TimestampUtils;
 
 
@@ -145,23 +145,35 @@ public class PredicateUtils {
         }
         break;
       case STRING:
-        if (queryContext == null || values.size() <= Integer.parseInt(queryContext.getQueryOptions()
-            .getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.IN_PREDICATE_SORT_THRESHOLD,
-                CommonConstants.Broker.Request.QueryOptionValue.DEFAULT_IN_PREDICATE_SORT_THRESHOLD))) {
-          for (String value : values) {
-            int dictId = dictionary.indexOf(value);
-            if (dictId >= 0) {
-              dictIdSet.add(dictId);
-            }
+        if (queryContext == null || values.size() <= 1) {
+          dictionary.getDictIds(values, dictIdSet);
+          break;
+        }
+        Dictionary.SortedBatchLookupAlgorithm lookupAlgorithm =
+            Dictionary.SortedBatchLookupAlgorithm.DIVIDE_BINARY_SEARCH;
+        String inPredicateLookupAlgorithm =
+            queryContext.getQueryOptions().get(QueryOptionKey.IN_PREDICATE_LOOKUP_ALGORITHM);
+        if (inPredicateLookupAlgorithm != null) {
+          try {
+            lookupAlgorithm = Dictionary.SortedBatchLookupAlgorithm.valueOf(inPredicateLookupAlgorithm.toUpperCase());
+          } catch (Exception e) {
+            throw new IllegalArgumentException("Illegal IN predicate lookup algorithm: " + inPredicateLookupAlgorithm);
           }
+        }
+        if (lookupAlgorithm == Dictionary.SortedBatchLookupAlgorithm.PLAIN_BINARY_SEARCH) {
+          dictionary.getDictIds(values, dictIdSet);
+          break;
+        }
+        if (Boolean.parseBoolean(queryContext.getQueryOptions().get(QueryOptionKey.IN_PREDICATE_PRE_SORTED))) {
+          dictionary.getDictIds(values, dictIdSet, lookupAlgorithm);
         } else {
-          List<String> sortedValues =
+          //noinspection unchecked
+          dictionary.getDictIds(
               queryContext.getOrComputeSharedValue(List.class, Equivalence.identity().wrap(inPredicate), k -> {
-                List<String> copyValues = new ArrayList<>(values);
-                copyValues.sort(null);
-                return copyValues;
-              });
-          dictionary.getDictIds(sortedValues, dictIdSet);
+                List<String> sortedValues = new ArrayList<>(values);
+                sortedValues.sort(null);
+                return sortedValues;
+              }), dictIdSet, lookupAlgorithm);
         }
         break;
       case BYTES:

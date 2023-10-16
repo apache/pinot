@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.query;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -36,7 +37,9 @@ import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountHLLPlusAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLPlusAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
@@ -50,8 +53,8 @@ import org.apache.pinot.spi.utils.ByteArray;
  * Aggregation operator that utilizes dictionary or column metadata for serving aggregation queries to avoid scanning.
  * The scanless operator is selected in the plan maker, if the query is of aggregation type min, max, minmaxrange,
  * distinctcount, distinctcounthll, distinctcountrawhll, segmentpartitioneddistinctcount, distinctcountsmarthll,
- * and the column has a dictionary, or has column metadata with min and max value defined. It also supports count(*) if
- * the query has no filter.
+ * distinctcounthllplus, distinctcountrawhllplus, and the column has a dictionary, or has column metadata with min and
+ * max value defined. It also supports count(*) if the query has no filter.
  * We don't use this operator if the segment has star tree,
  * as the dictionary will have aggregated values for the metrics, and dimensions will have star node value.
  *
@@ -117,6 +120,17 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
         case DISTINCTCOUNTRAWHLLMV:
           result = getDistinctCountHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
               ((DistinctCountRawHLLAggregationFunction) aggregationFunction).getDistinctCountHLLAggregationFunction());
+          break;
+        case DISTINCTCOUNTHLLPLUS:
+        case DISTINCTCOUNTHLLPLUSMV:
+          result = getDistinctCountHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
+              (DistinctCountHLLPlusAggregationFunction) aggregationFunction);
+          break;
+        case DISTINCTCOUNTRAWHLLPLUS:
+        case DISTINCTCOUNTRAWHLLPLUSMV:
+          result = getDistinctCountHLLPlusResult(Objects.requireNonNull(dataSource.getDictionary()),
+              ((DistinctCountRawHLLPlusAggregationFunction) aggregationFunction)
+                  .getDistinctCountHLLPlusAggregationFunction());
           break;
         case SEGMENTPARTITIONEDDISTINCTCOUNT:
           result = (long) Objects.requireNonNull(dataSource.getDictionary()).length();
@@ -215,6 +229,15 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     return hll;
   }
 
+  private static HyperLogLogPlus getDistinctValueHLLPlus(Dictionary dictionary, int p, int sp) {
+    HyperLogLogPlus hllPlus = new HyperLogLogPlus(p, sp);
+    int length = dictionary.length();
+    for (int i = 0; i < length; i++) {
+      hllPlus.offer(dictionary.get(i));
+    }
+    return hllPlus;
+  }
+
   private static HyperLogLog getDistinctCountHLLResult(Dictionary dictionary,
       DistinctCountHLLAggregationFunction function) {
     if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
@@ -231,6 +254,25 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
       }
     } else {
       return getDistinctValueHLL(dictionary, function.getLog2m());
+    }
+  }
+
+  private static HyperLogLogPlus getDistinctCountHLLPlusResult(Dictionary dictionary,
+      DistinctCountHLLPlusAggregationFunction function) {
+    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+      // Treat BYTES value as serialized HyperLogLogPlus
+      try {
+        HyperLogLogPlus hllplus = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(0));
+        int length = dictionary.length();
+        for (int i = 1; i < length; i++) {
+          hllplus.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(dictionary.getBytesValue(i)));
+        }
+        return hllplus;
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging HyperLogLogPluses", e);
+      }
+    } else {
+      return getDistinctValueHLLPlus(dictionary, function.getP(), function.getSp());
     }
   }
 

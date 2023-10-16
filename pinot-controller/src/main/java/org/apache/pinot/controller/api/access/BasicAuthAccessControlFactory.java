@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
@@ -88,7 +89,10 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
 
     @Override
     public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders).isPresent();
+      if (getPrincipal(httpHeaders).isEmpty()) {
+        throw new NotAuthorizedException("Basic");
+      }
+      return true;
     }
 
     private Optional<BasicAuthPrincipal> getPrincipal(HttpHeaders headers) {
@@ -101,7 +105,8 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
         return Optional.empty();
       }
 
-      return authHeaders.stream().map(BasicAuthUtils::normalizeBase64Token).map(_token2principal::get)
+      return authHeaders.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
+          .map(_token2principal::get)
           .filter(Objects::nonNull).findFirst();
     }
 

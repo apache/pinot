@@ -83,7 +83,7 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
     _avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload the schema and table config with reduced number of columns and partition config
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(getSchemaName())
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(getTableName())
         .addSingleValueDimension(PARTITION_COLUMN, DataType.STRING)
         .addDateTime("DaysSinceEpoch", DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
     addSchema(schema);

@@ -25,8 +25,8 @@ import java.util.SplittableRandom;
 import java.util.UUID;
 import java.util.function.LongSupplier;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -138,7 +138,7 @@ public class BenchmarkRawForwardIndexWriter {
   public void writeV4(BytesCounter counter)
       throws IOException {
     try (
-        VarByteChunkSVForwardIndexWriterV4 writer = new VarByteChunkSVForwardIndexWriterV4(_file, _chunkCompressionType,
+        VarByteChunkForwardIndexWriterV4 writer = new VarByteChunkForwardIndexWriterV4(_file, _chunkCompressionType,
             _maxChunkSize)) {
       for (int i = 0; i < _records; i++) {
         writer.putBytes(_bytes[i]);
@@ -151,7 +151,7 @@ public class BenchmarkRawForwardIndexWriter {
   @BenchmarkMode(Mode.SingleShotTime)
   public void writeV3(BytesCounter counter)
       throws IOException {
-    try (VarByteChunkSVForwardIndexWriter writer = new VarByteChunkSVForwardIndexWriter(_file, _chunkCompressionType,
+    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(_file, _chunkCompressionType,
         _records, _maxChunkSize / _maxLength, _maxLength, 3)) {
       for (int i = 0; i < _records; i++) {
         writer.putBytes(_bytes[i]);

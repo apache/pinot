@@ -52,15 +52,11 @@ public class KafkaPartitionLevelStreamConfigTest {
       String populateRowMetadata) {
     Map<String, String> streamConfigMap = new HashMap<>();
     String streamType = "kafka";
-    String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
     String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
     String tableNameWithType = "tableName_REALTIME";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        consumerType);
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
         StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClassName);
     streamConfigMap.put(

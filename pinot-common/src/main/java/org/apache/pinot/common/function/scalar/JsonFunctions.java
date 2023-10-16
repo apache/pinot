@@ -76,7 +76,7 @@ public class JsonFunctions {
   /**
    * Convert object to Json String
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(names = {"jsonFormat", "json_format"})
   public static String jsonFormat(Object object)
       throws JsonProcessingException {
     return JsonUtils.objectToString(object);
@@ -85,7 +85,7 @@ public class JsonFunctions {
   /**
    * Extract object based on Json path
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"jsonPath", "json_path"})
   public static Object jsonPath(Object object, String jsonPath) {
     if (object instanceof String) {
       return PARSE_CONTEXT.parse((String) object).read(jsonPath, NO_PREDICATES);
@@ -96,7 +96,7 @@ public class JsonFunctions {
   /**
    * Extract object array based on Json path
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"jsonPathArray", "json_path_array"})
   public static Object[] jsonPathArray(Object object, String jsonPath) {
     if (object instanceof String) {
       return convertObjectToArray(PARSE_CONTEXT.parse((String) object).read(jsonPath, NO_PREDICATES));
@@ -104,7 +104,7 @@ public class JsonFunctions {
     return convertObjectToArray(PARSE_CONTEXT.parse(object).read(jsonPath, NO_PREDICATES));
   }
 
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, names = {"jsonPathArrayDefaultEmpty", "json_path_array_default_empty"})
   public static Object[] jsonPathArrayDefaultEmpty(@Nullable Object object, String jsonPath) {
     try {
       Object[] result = object == null ? null : jsonPathArray(object, jsonPath);
@@ -129,7 +129,7 @@ public class JsonFunctions {
    * Extract from Json with path to String
    */
   @Nullable
-  @ScalarFunction
+  @ScalarFunction(names = {"jsonPathString", "json_path_string"})
   public static String jsonPathString(Object object, String jsonPath)
       throws JsonProcessingException {
     Object jsonValue = jsonPath(object, jsonPath);
@@ -142,7 +142,7 @@ public class JsonFunctions {
   /**
    * Extract from Json with path to String
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, names = {"jsonPathString", "json_path_string"})
   public static String jsonPathString(@Nullable Object object, String jsonPath, String defaultValue) {
     try {
       Object jsonValue = jsonPath(object, jsonPath);
@@ -158,7 +158,7 @@ public class JsonFunctions {
   /**
    * Extract from Json with path to Long
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"jsonPathLong", "json_path_long"})
   public static long jsonPathLong(Object object, String jsonPath) {
     return jsonPathLong(object, jsonPath, Long.MIN_VALUE);
   }
@@ -166,7 +166,7 @@ public class JsonFunctions {
   /**
    * Extract from Json with path to Long
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, names = {"jsonPathLong", "json_path_long"})
   public static long jsonPathLong(@Nullable Object object, String jsonPath, long defaultValue) {
     try {
       Object jsonValue = jsonPath(object, jsonPath);
@@ -185,7 +185,7 @@ public class JsonFunctions {
   /**
    * Extract from Json with path to Double
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"jsonPathDouble", "json_path_double"})
   public static double jsonPathDouble(Object object, String jsonPath) {
     return jsonPathDouble(object, jsonPath, Double.NaN);
   }
@@ -193,7 +193,7 @@ public class JsonFunctions {
   /**
    * Extract from Json with path to Double
    */
-  @ScalarFunction(nullableParameters = true)
+  @ScalarFunction(nullableParameters = true, names = {"jsonPathDouble", "json_path_double"})
   public static double jsonPathDouble(@Nullable Object object, String jsonPath, double defaultValue) {
     try {
       Object jsonValue = jsonPath(object, jsonPath);

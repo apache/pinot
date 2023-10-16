@@ -22,7 +22,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**
@@ -34,8 +34,7 @@ public interface FlushThresholdUpdater {
   /**
    * Updates the flush threshold for the given segment ZK metadata
    */
-  void updateFlushThreshold(PartitionLevelStreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
-      CommittingSegmentDescriptor committingSegmentDescriptor,
-      @Nullable SegmentZKMetadata committingSegmentZKMetadata, int maxNumPartitionsPerInstance,
-      List<PartitionGroupMetadata> partitionGroupMetadataList);
+  void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
+      CommittingSegmentDescriptor committingSegmentDescriptor, @Nullable SegmentZKMetadata committingSegmentZKMetadata,
+      int maxNumPartitionsPerInstance, List<PartitionGroupMetadata> partitionGroupMetadataList);
 }

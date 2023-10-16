@@ -119,11 +119,11 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.TRUNCATE, TruncateDecimalTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.CAST, CastTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.JSONEXTRACTSCALAR, JsonExtractScalarTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.JSONEXTRACTKEY, JsonExtractKeyTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.TIMECONVERT, TimeConversionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DATETIMECONVERT, DateTimeConversionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DATETRUNC, DateTruncTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR, JsonExtractScalarTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_KEY, JsonExtractKeyTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.TIME_CONVERT, TimeConversionTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT, DateTimeConversionTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.DATE_TRUNC, DateTruncTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.YEAR, DateTimeTransformFunction.Year.class);
     typeToImplementation.put(TransformFunctionType.YEAR_OF_WEEK, DateTimeTransformFunction.YearOfWeek.class);
     typeToImplementation.put(TransformFunctionType.QUARTER, DateTimeTransformFunction.Quarter.class);
@@ -136,12 +136,12 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.MINUTE, DateTimeTransformFunction.Minute.class);
     typeToImplementation.put(TransformFunctionType.SECOND, DateTimeTransformFunction.Second.class);
     typeToImplementation.put(TransformFunctionType.MILLISECOND, DateTimeTransformFunction.Millisecond.class);
-    typeToImplementation.put(TransformFunctionType.ARRAYLENGTH, ArrayLengthTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.VALUEIN, ValueInTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.MAPVALUE, MapValueTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.INIDSET, InIdSetTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_LENGTH, ArrayLengthTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VALUE_IN, ValueInTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.MAP_VALUE, MapValueTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.IN_ID_SET, InIdSetTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.CLPDECODE, CLPDecodeTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.CLP_DECODE, CLPDecodeTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.EXTRACT, ExtractTransformFunction.class);
 
@@ -149,10 +149,10 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.REGEXP_EXTRACT, RegexpExtractTransformFunction.class);
 
     // Array functions
-    typeToImplementation.put(TransformFunctionType.ARRAYAVERAGE, ArrayAverageTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAYMAX, ArrayMaxTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAYMIN, ArrayMinTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAYSUM, ArraySumTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_AVERAGE, ArrayAverageTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_MAX, ArrayMaxTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_MIN, ArrayMinTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.ARRAY_SUM, ArraySumTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.ARRAY_VALUE_CONSTRUCTOR, ArrayLiteralTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
@@ -196,7 +196,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.ST_WITHIN, StWithinFunction.class);
 
     // geo indexing
-    typeToImplementation.put(TransformFunctionType.GEOTOH3, GeoToH3Function.class);
+    typeToImplementation.put(TransformFunctionType.GEO_TO_H3, GeoToH3Function.class);
 
     // tuple selection
     typeToImplementation.put(TransformFunctionType.LEAST, LeastTransformFunction.class);
@@ -236,7 +236,8 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.VECTOR_DIMS, VectorDimsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.VECTOR_NORM, VectorNormTransformFunction.class);
 
-    Map<String, Class<? extends TransformFunction>> registry = new HashMap<>(typeToImplementation.size());
+    Map<String, Class<? extends TransformFunction>> registry
+        = new HashMap<>(HashUtil.getHashMapCapacity(typeToImplementation.size()));
     for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry : typeToImplementation.entrySet()) {
       for (String alias : entry.getKey().getAlternativeNames()) {
         registry.put(canonicalize(alias), entry.getValue());

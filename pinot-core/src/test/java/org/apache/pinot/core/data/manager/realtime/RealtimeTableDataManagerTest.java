@@ -29,7 +29,6 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.HLCSegmentName;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -214,12 +213,6 @@ public class RealtimeTableDataManagerTest {
   public void testAllowDownload() {
     RealtimeTableDataManager mgr = new RealtimeTableDataManager(null);
 
-    String groupId = "myTable_REALTIME_1234567_0";
-    String partitionRange = "ALL";
-    String sequenceNumber = "1234567";
-    HLCSegmentName hlc = new HLCSegmentName(groupId, partitionRange, sequenceNumber);
-    assertFalse(mgr.allowDownload(hlc.getSegmentName(), null));
-
     LLCSegmentName llc = new LLCSegmentName("tbl01", 0, 1000000, System.currentTimeMillis());
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
     when(zkmd.getStatus()).thenReturn(Status.IN_PROGRESS);
@@ -262,7 +255,7 @@ public class RealtimeTableDataManagerTest {
   private static TableConfig setupTableConfig(ZkHelixPropertyStore propertyStore)
       throws Exception {
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setSchemaName(TABLE_NAME).build();
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
     ZNRecord tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
     when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(TABLE_NAME_WITH_TYPE), null,
         AccessOption.PERSISTENT)).thenReturn(tableConfigZNRecord);

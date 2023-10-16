@@ -46,7 +46,6 @@ import static org.testng.Assert.assertEquals;
 
 
 public class VarByteChunkSVForwardIndexWriterTest {
-
   private static final File OUTPUT_DIR =
       new File(FileUtils.getTempDirectory(), VarByteChunkSVForwardIndexWriterTest.class.getSimpleName());
 
@@ -67,33 +66,28 @@ public class VarByteChunkSVForwardIndexWriterTest {
     int[] numbersOfDocs = {10, 1000};
     int[][] entryLengths = {{1, 1}, {0, 10}, {0, 100}, {100, 100}, {900, 1000}};
     int[] versions = {2, 3};
-    return Arrays.stream(ChunkCompressionType.values())
-        .flatMap(chunkCompressionType -> IntStream.of(versions).boxed().flatMap(
-            version -> IntStream.of(numbersOfDocs).boxed()
-                .flatMap(totalDocs -> IntStream.of(numDocsPerChunks).boxed().flatMap(
-                    numDocsPerChunk -> Arrays.stream(entryLengths).map(
-                        lengths -> new Object[]{
-                            chunkCompressionType, totalDocs, numDocsPerChunk,
-                            lengths, version
-                        })))))
-        .toArray(Object[][]::new);
+    return Arrays.stream(ChunkCompressionType.values()).flatMap(chunkCompressionType -> IntStream.of(versions).boxed()
+        .flatMap(version -> IntStream.of(numbersOfDocs).boxed().flatMap(
+            totalDocs -> IntStream.of(numDocsPerChunks).boxed()
+                .flatMap(numDocsPerChunk -> Arrays.stream(entryLengths).map(lengths -> new Object[]{
+                    chunkCompressionType, totalDocs, numDocsPerChunk, lengths, version
+                }))))).toArray(Object[][]::new);
   }
 
   @Test(dataProvider = "params")
-  public void testPutStrings(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk,
-      int[] lengths, int version)
+  public void testPutStrings(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk, int[] lengths,
+      int version)
       throws IOException {
     String column = "testCol-" + UUID.randomUUID();
     File file = new File(OUTPUT_DIR, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     List<String[]> arrays = generateStringArrays(totalDocs, lengths, 50);
-    int maxEntryLengthInBytes =
-        arrays.stream().mapToInt(array -> Integer.BYTES + Arrays.stream(array).mapToInt(
-            str -> Integer.BYTES + str.getBytes(UTF_8).length).sum()).max().orElse(0);
-    try (
-        VarByteChunkSVForwardIndexWriter writer = new VarByteChunkSVForwardIndexWriter(file, compressionType, totalDocs,
-            numDocsPerChunk, maxEntryLengthInBytes, version)) {
+    int maxEntryLengthInBytes = arrays.stream().mapToInt(
+            array -> Integer.BYTES + Arrays.stream(array).mapToInt(
+                str -> Integer.BYTES + str.getBytes(UTF_8).length).sum()).max().orElse(0);
+    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs,
+        numDocsPerChunk, maxEntryLengthInBytes, version)) {
       for (String[] array : arrays) {
-        writer.putStrings(array);
+        writer.putStringMV(array);
       }
     }
     try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(
@@ -116,20 +110,19 @@ public class VarByteChunkSVForwardIndexWriterTest {
   }
 
   @Test(dataProvider = "params")
-  public void testPutBytes(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk,
-      int[] lengths, int version)
+  public void testPutBytes(ChunkCompressionType compressionType, int totalDocs, int numDocsPerChunk, int[] lengths,
+      int version)
       throws IOException {
     String column = "testCol-" + UUID.randomUUID();
     File file = new File(OUTPUT_DIR, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     List<String[]> arrays = generateStringArrays(totalDocs, lengths, 50);
-    int maxEntryLengthInBytes = arrays.stream()
-        .mapToInt(array -> Integer.BYTES
-            + Arrays.stream(array).mapToInt(str -> Integer.BYTES + str.getBytes(UTF_8).length).sum())
-        .max().orElse(0);
-    try (VarByteChunkSVForwardIndexWriter writer = new VarByteChunkSVForwardIndexWriter(file, compressionType,
-        totalDocs, numDocsPerChunk, maxEntryLengthInBytes, version)) {
+    int maxEntryLengthInBytes = arrays.stream().mapToInt(
+            array -> Integer.BYTES + Arrays.stream(array).mapToInt(
+                str -> Integer.BYTES + str.getBytes(UTF_8).length).sum()).max().orElse(0);
+    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file, compressionType, totalDocs,
+        numDocsPerChunk, maxEntryLengthInBytes, version)) {
       for (String[] array : arrays) {
-        writer.putByteArrays(Arrays.stream(array).map(str -> str.getBytes(UTF_8)).toArray(byte[][]::new));
+        writer.putBytesMV(Arrays.stream(array).map(str -> str.getBytes(UTF_8)).toArray(byte[][]::new));
       }
     }
     try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(
@@ -167,17 +160,16 @@ public class VarByteChunkSVForwardIndexWriterTest {
 
   private static Iterator<String> generateStrings(int minLength, int maxLength) {
     SplittableRandom random = new SplittableRandom();
-    return IntStream.generate(() -> random.nextInt(minLength, maxLength + 1))
-        .mapToObj(length -> {
-          char[] string = new char[length];
-          Arrays.fill(string, 'b');
-          if (string.length > 0) {
-            string[0] = 'a';
-          }
-          if (string.length > 1) {
-            string[string.length - 1] = 'c';
-          }
-          return new String(string);
-        }).iterator();
+    return IntStream.generate(() -> random.nextInt(minLength, maxLength + 1)).mapToObj(length -> {
+      char[] string = new char[length];
+      Arrays.fill(string, 'b');
+      if (string.length > 0) {
+        string[0] = 'a';
+      }
+      if (string.length > 1) {
+        string[string.length - 1] = 'c';
+      }
+      return new String(string);
+    }).iterator();
   }
 }

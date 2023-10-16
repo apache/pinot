@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -152,14 +153,14 @@ public class QueryRunner {
   public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadata) {
     long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    Map<String, String> opChainMetadata = consolidateMetadata(
+        distributedStagePlan.getStageMetadata().getCustomProperties(), requestMetadata);
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
-
-    setStageCustomProperties(distributedStagePlan.getStageMetadata().getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, distributedStagePlan,
-            requestMetadata, requestId, deadlineMs);
+            opChainMetadata, requestId, deadlineMs);
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -188,7 +189,7 @@ public class QueryRunner {
     // run OpChain
     OpChainExecutionContext executionContext =
         new OpChainExecutionContext(_mailboxService, requestId, distributedStagePlan.getStageId(),
-            distributedStagePlan.getServer(), deadlineMs, requestMetadata, distributedStagePlan.getStageMetadata(),
+            distributedStagePlan.getServer(), deadlineMs, opChainMetadata, distributedStagePlan.getStageMetadata(),
             pipelineBreakerResult);
     OpChain opChain;
     if (DistributedStagePlan.isLeafStage(distributedStagePlan)) {
@@ -199,39 +200,47 @@ public class QueryRunner {
     _opChainScheduler.register(opChain);
   }
 
-  private void setStageCustomProperties(Map<String, String> customProperties, Map<String, String> requestMetadata) {
-    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(requestMetadata);
+  private Map<String, String> consolidateMetadata(Map<String, String> customProperties,
+      Map<String, String> requestMetadata) {
+    Map<String, String> opChainMetadata = new HashMap<>();
+    // 1. put all request level metadata
+    opChainMetadata.putAll(requestMetadata);
+    // 2. put all stageMetadata.customProperties.
+    opChainMetadata.putAll(customProperties);
+    // 3. add all overrides from config if anything is still empty.
+    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
     if (numGroupsLimit == null) {
       numGroupsLimit = _numGroupsLimit;
     }
     if (numGroupsLimit != null) {
-      customProperties.put(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(numGroupsLimit));
+      opChainMetadata.put(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(numGroupsLimit));
     }
 
-    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(requestMetadata);
+    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(opChainMetadata);
     if (maxInitialResultHolderCapacity == null) {
       maxInitialResultHolderCapacity = _maxInitialResultHolderCapacity;
     }
     if (maxInitialResultHolderCapacity != null) {
-      customProperties.put(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
+      opChainMetadata.put(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
           Integer.toString(maxInitialResultHolderCapacity));
     }
 
-    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(requestMetadata);
+    Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(opChainMetadata);
     if (maxRowsInJoin == null) {
       maxRowsInJoin = _maxRowsInJoin;
     }
     if (maxRowsInJoin != null) {
-      customProperties.put(QueryOptionKey.MAX_ROWS_IN_JOIN, Integer.toString(maxRowsInJoin));
+      opChainMetadata.put(QueryOptionKey.MAX_ROWS_IN_JOIN, Integer.toString(maxRowsInJoin));
     }
 
-    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(requestMetadata);
+    JoinOverFlowMode joinOverflowMode = QueryOptionsUtils.getJoinOverflowMode(opChainMetadata);
     if (joinOverflowMode == null) {
       joinOverflowMode = _joinOverflowMode;
     }
     if (joinOverflowMode != null) {
-      customProperties.put(QueryOptionKey.JOIN_OVERFLOW_MODE, joinOverflowMode.name());
+      opChainMetadata.put(QueryOptionKey.JOIN_OVERFLOW_MODE, joinOverflowMode.name());
     }
+    return opChainMetadata;
   }
 
   public void cancel(long requestId) {
@@ -255,7 +264,7 @@ public class QueryRunner {
             _leafQueryExecutor, _executorService);
     MailboxSendOperator mailboxSendOperator =
         new MailboxSendOperator(executionContext, leafStageOperator, sendNode.getDistributionType(),
-            sendNode.getPartitionKeySelector(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
+            sendNode.getDistributionKeys(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
             sendNode.isSortOnSender(), sendNode.getReceiverStageId());
     return new OpChain(executionContext, mailboxSendOperator);
   }

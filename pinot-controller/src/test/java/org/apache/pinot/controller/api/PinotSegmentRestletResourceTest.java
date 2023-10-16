@@ -59,6 +59,7 @@ public class PinotSegmentRestletResourceTest {
       throws Exception {
     // Adding table
     String rawTableName = "lineageTestTable";
+    TEST_INSTANCE.addDummySchema(rawTableName);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1).build();
@@ -116,6 +117,7 @@ public class PinotSegmentRestletResourceTest {
       throws Exception {
     // Adding table
     String rawTableName = "crcTestTable";
+    TEST_INSTANCE.addDummySchema(rawTableName);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1).build();
@@ -171,6 +173,7 @@ public class PinotSegmentRestletResourceTest {
       throws Exception {
     // Adding table and segment
     String rawTableName = "deleteWithTimeWindowTestTable";
+    TEST_INSTANCE.addDummySchema(rawTableName);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1)

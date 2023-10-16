@@ -84,18 +84,6 @@ public class PreparedStatementTest {
       return CompletableFuture.completedFuture(executeQuery(brokerAddress, query));
     }
 
-    @Override
-    public BrokerResponse executeQuery(String brokerAddress, Request request)
-        throws PinotClientException {
-      return executeQuery(brokerAddress, request.getQuery());
-    }
-
-    @Override
-    public CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-        throws PinotClientException {
-      return executeQueryAsync(brokerAddress, request.getQuery());
-    }
-
     public String getLastQuery() {
       return _lastQuery;
     }

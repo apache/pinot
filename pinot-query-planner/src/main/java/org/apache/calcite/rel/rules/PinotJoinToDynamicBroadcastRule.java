@@ -118,7 +118,6 @@ import org.apache.zookeeper.common.StringUtils;
 public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
   public static final PinotJoinToDynamicBroadcastRule INSTANCE =
       new PinotJoinToDynamicBroadcastRule(PinotRuleUtils.PINOT_REL_FACTORY);
-  private static final String DYNAMIC_BROADCAST_HINT_OPTION_VALUE = "dynamic_broadcast";
 
   public PinotJoinToDynamicBroadcastRule(RelBuilderFactory factory) {
     super(operand(LogicalJoin.class, any()), factory, null);
@@ -134,9 +133,9 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
         PinotHintOptions.JOIN_HINT_OPTIONS, PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
     List<String> joinStrategies = joinStrategyString != null ? StringUtils.split(joinStrategyString, ",")
         : Collections.emptyList();
-    if (!joinStrategies.contains(DYNAMIC_BROADCAST_HINT_OPTION_VALUE)) {
-      return false;
-    }
+    boolean explicitOtherStrategy = joinStrategies.size() > 0
+        && !joinStrategies.contains(PinotHintOptions.JoinHintOptions.DYNAMIC_BROADCAST_JOIN_STRATEGY);
+
     JoinInfo joinInfo = join.analyzeCondition();
     RelNode left = join.getLeft() instanceof HepRelVertex ? ((HepRelVertex) join.getLeft()).getCurrentRel()
         : join.getLeft();
@@ -144,7 +143,8 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
         : join.getRight();
     return left instanceof Exchange && right instanceof Exchange
         && PinotRuleUtils.noExchangeInSubtree(left.getInput(0))
-        && (join.getJoinType() == JoinRelType.SEMI && joinInfo.nonEquiConditions.isEmpty());
+        // default enable dynamic broadcast for SEMI join unless other join strategy were specified
+        && (!explicitOtherStrategy && join.getJoinType() == JoinRelType.SEMI && joinInfo.nonEquiConditions.isEmpty());
   }
 
   @Override

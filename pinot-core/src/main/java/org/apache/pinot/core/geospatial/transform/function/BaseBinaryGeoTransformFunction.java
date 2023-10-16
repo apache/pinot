@@ -46,6 +46,7 @@ public abstract class BaseBinaryGeoTransformFunction extends BaseTransformFuncti
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions.checkArgument(arguments.size() == 2, "2 arguments are required for transform function: %s",
         getName());
     TransformFunction transformFunction = arguments.get(0);

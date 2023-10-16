@@ -39,7 +39,6 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
@@ -122,7 +121,7 @@ public class ServerPlanRequestUtils {
     long requestId = (executionContext.getRequestId() << 16) + ((long) stagePlan.getStageId() << 8) + (
         tableType == TableType.REALTIME ? 1 : 0);
     PinotQuery pinotQuery = new PinotQuery();
-    Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(executionContext.getRequestMetadata());
+    Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(executionContext.getOpChainMetadata());
     if (leafNodeLimit != null) {
       pinotQuery.setLimit(leafNodeLimit);
     } else {
@@ -174,7 +173,7 @@ public class ServerPlanRequestUtils {
    * Helper method to update query options.
    */
   private static void updateQueryOptions(PinotQuery pinotQuery, OpChainExecutionContext executionContext) {
-    Map<String, String> queryOptions = new HashMap<>(executionContext.getRequestMetadata());
+    Map<String, String> queryOptions = new HashMap<>(executionContext.getOpChainMetadata());
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(executionContext.getDeadlineMs() - System.currentTimeMillis()));
     pinotQuery.setQueryOptions(queryOptions);
@@ -207,12 +206,12 @@ public class ServerPlanRequestUtils {
    */
   static void attachDynamicFilter(PinotQuery pinotQuery, JoinNode.JoinKeys joinKeys, List<Object[]> dataContainer,
       DataSchema dataSchema) {
-    FieldSelectionKeySelector leftSelector = (FieldSelectionKeySelector) joinKeys.getLeftJoinKeySelector();
-    FieldSelectionKeySelector rightSelector = (FieldSelectionKeySelector) joinKeys.getRightJoinKeySelector();
+    List<Integer> leftJoinKeys = joinKeys.getLeftKeys();
+    List<Integer> rightJoinKeys = joinKeys.getRightKeys();
     List<Expression> expressions = new ArrayList<>();
-    for (int i = 0; i < leftSelector.getColumnIndices().size(); i++) {
-      Expression leftExpr = pinotQuery.getSelectList().get(leftSelector.getColumnIndices().get(i));
-      int rightIdx = rightSelector.getColumnIndices().get(i);
+    for (int i = 0; i < leftJoinKeys.size(); i++) {
+      Expression leftExpr = pinotQuery.getSelectList().get(leftJoinKeys.get(i));
+      int rightIdx = rightJoinKeys.get(i);
       Expression inFilterExpr = RequestUtils.getFunctionExpression(FilterKind.IN.name());
       List<Expression> operands = new ArrayList<>(dataContainer.size() + 1);
       operands.add(leftExpr);
@@ -256,7 +255,11 @@ public class ServerPlanRequestUtils {
         }
         Arrays.sort(arrFloat);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
-          expressions.add(RequestUtils.getLiteralExpression(arrFloat[rowIdx]));
+          // TODO: Create float literal when it is supported
+          // NOTE: We cannot directly cast float to double here because we want to preserve the exact value. E.g. 0.05f
+          //       will be casted to 0.05000000074505806. Predicate evaluation uses string format to match the values,
+          //       so here we need to create the double value based on the string format of the float value.
+          expressions.add(RequestUtils.getLiteralExpression(Double.parseDouble(Float.toString(arrFloat[rowIdx]))));
         }
         break;
       case DOUBLE:

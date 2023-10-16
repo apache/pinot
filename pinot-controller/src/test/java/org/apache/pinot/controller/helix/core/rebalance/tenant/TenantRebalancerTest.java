@@ -29,13 +29,13 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
@@ -79,6 +79,10 @@ public class TenantRebalancerTest extends ControllerTest {
     // tag all servers and brokers to test tenant
     addTenantTagToInstances(TENANT_NAME);
 
+    // create 2 schemas
+    addDummySchema(RAW_TABLE_NAME_A);
+    addDummySchema(RAW_TABLE_NAME_B);
+
     // create 2 tables, one on each of test tenant and default tenant
     createTableWithSegments(RAW_TABLE_NAME_A, DEFAULT_TENANT_NAME);
     createTableWithSegments(RAW_TABLE_NAME_B, TENANT_NAME);
@@ -93,10 +97,10 @@ public class TenantRebalancerTest extends ControllerTest {
         _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME_B).getRecord().getMapFields();
 
     // rebalance the tables on test tenant
-    TenantRebalanceContext context = new TenantRebalanceContext();
-    context.setTenantName(TENANT_NAME);
-    context.setVerboseResult(true);
-    TenantRebalanceResult result = tenantRebalancer.rebalance(context);
+    TenantRebalanceConfig config = new TenantRebalanceConfig();
+    config.setTenantName(TENANT_NAME);
+    config.setVerboseResult(true);
+    TenantRebalanceResult result = tenantRebalancer.rebalance(config);
     RebalanceResult rebalanceResult = result.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_B);
     Map<String, Map<String, String>> rebalancedAssignment = rebalanceResult.getSegmentAssignment();
     // assignment should not change, with a NO_OP status as no now server is added to test tenant
@@ -104,8 +108,8 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(oldSegmentAssignment, rebalancedAssignment);
 
     // rebalance the tables on default tenant
-    context.setTenantName(DEFAULT_TENANT_NAME);
-    result = tenantRebalancer.rebalance(context);
+    config.setTenantName(DEFAULT_TENANT_NAME);
+    result = tenantRebalancer.rebalance(config);
     // rebalancing default tenant should distribute the segment of table A over 6 servers
     rebalanceResult = result.getRebalanceTableResults().get(OFFLINE_TABLE_NAME_A);
     InstancePartitions partitions = rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.OFFLINE);
@@ -148,7 +152,8 @@ public class TenantRebalancerTest extends ControllerTest {
     if (controllerJobZKMetadata == null) {
       return null;
     }
-    return JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceConfigConstants.REBALANCE_PROGRESS_STATS),
+    return JsonUtils.stringToObject(
+        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
         TenantRebalanceProgressStats.class);
   }
 

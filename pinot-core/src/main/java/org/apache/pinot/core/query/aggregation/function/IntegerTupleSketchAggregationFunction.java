@@ -63,12 +63,11 @@ public class IntegerTupleSketchAggregationFunction
     _expressionContext = arguments.get(0);
     _setOps = new IntegerSummarySetOperations(mode, mode);
     if (arguments.size() == 2) {
-      FieldSpec.DataType dataType = arguments.get(1).getLiteral().getType();
-      Preconditions.checkArgument(dataType == FieldSpec.DataType.LONG || dataType == FieldSpec.DataType.INT,
-          "Tuple Sketch Aggregation Function expected the second argument to be a number of entries to keep, but it "
-              + "was of type %s",
-          dataType.toString());
-      _entries = ((Long) arguments.get(1).getLiteral().getValue()).intValue();
+      ExpressionContext secondArgument = arguments.get(1);
+      Preconditions.checkArgument(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+          "Tuple Sketch Aggregation Function expects the second argument to be a literal (number of entries to keep),"
+              + " but got: ", secondArgument.getType());
+      _entries = secondArgument.getLiteral().getIntValue();
     } else {
       _entries = (int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
     }

@@ -121,11 +121,6 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
   }
 
   @Override
-  protected String getSchemaName() {
-    return "upsertSchema";
-  }
-
-  @Override
   protected String getAvroTarFileName() {
     return "upsert_upload_segment_test.tar.gz";
   }
@@ -196,7 +191,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
       assertEquals(instanceStateMap.size(), 1);
       Map.Entry<String, String> instanceIdAndState = instanceStateMap.entrySet().iterator().next();
       String state = instanceIdAndState.getValue();
-      if (LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+      if (LLCSegmentName.isLLCSegment(segmentName)) {
         assertEquals(state, SegmentStateModel.CONSUMING);
       } else {
         assertEquals(state, SegmentStateModel.ONLINE);

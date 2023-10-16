@@ -19,8 +19,12 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +43,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
@@ -67,6 +72,13 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT = 100;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT = 100_000;
+  private static final List<String> EXTENSIONS = Lists.newArrayList(
+      V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION
+  );
 
   protected ForwardIndexType() {
     super(StandardIndexes.FORWARD_ID);
@@ -144,24 +156,35 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Override
   public ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
     // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
-    ColumnConfigDeserializer<ForwardIndexConfig> fromFieldConfig = IndexConfigDeserializer.fromCollection(
-        TableConfig::getFieldConfigList,
-        (accum, fieldConfig) -> {
+    ColumnConfigDeserializer<ForwardIndexConfig> fromOld = (tableConfig, schema) -> {
+      Map<String, DictionaryIndexConfig> dictConfigs = StandardIndexes.dictionary().getConfig(tableConfig, schema);
+
+      Map<String, ForwardIndexConfig> fwdConfig = Maps.newHashMapWithExpectedSize(
+          Math.max(dictConfigs.size(), schema.size()));
+
+      Collection<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
+      if (fieldConfigs != null) {
+        for (FieldConfig fieldConfig : fieldConfigs) {
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
-            accum.put(fieldConfig.getName(), ForwardIndexConfig.DISABLED);
-          } else if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
-            accum.put(fieldConfig.getName(), createConfigFromFieldConfig(fieldConfig));
+            fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.DISABLED);
+          } else {
+            DictionaryIndexConfig dictConfig = dictConfigs.get(fieldConfig.getName());
+            if (dictConfig != null && dictConfig.isDisabled()) {
+              fwdConfig.put(fieldConfig.getName(), createConfigFromFieldConfig(fieldConfig));
+            }
+            // On other case encoding is DICTIONARY. We create the default forward index by default. That means that if
+            // field config indicates for example a compression while using encoding dictionary, the compression is
+            // ignored.
+            // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
+            // the default `fromIndexes` deserializer.
           }
-          // On other case encoding is DICTIONARY. We create the default forward index by default. That means that if
-          // field config indicates for example a compression while using encoding dictionary, the compression is
-          // ignored.
-          // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
-          // the default `fromIndexes` deserializer.
         }
-    );
+      }
+      return fwdConfig;
+    };
     return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative(fromFieldConfig);
+        .withExclusiveAlternative(fromOld);
   }
 
   private boolean isDisabled(Map<String, String> props) {
@@ -206,10 +229,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   protected IndexReaderFactory<ForwardIndexReader> createReaderFactory() {
-    return ForwardIndexReaderFactory.INSTANCE;
+    return ForwardIndexReaderFactory.getInstance();
   }
 
-  @Override
   public String getFileExtension(ColumnMetadata columnMetadata) {
     if (columnMetadata.isSingleValue()) {
       if (!columnMetadata.hasDictionary()) {
@@ -224,6 +246,14 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
     } else {
       return V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION;
     }
+  }
+
+  @Override
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    if (columnMetadata == null) {
+      return EXTENSIONS;
+    }
+    return Collections.singletonList(getFileExtension(columnMetadata));
   }
 
   /**

@@ -36,7 +36,7 @@ public class ResultRewriterRegressionTest {
     public void setupRewriter()
         throws Exception {
       QueryRewriterFactory.init(String.join(",", QueryRewriterFactory.DEFAULT_QUERY_REWRITERS_CLASS_NAMES)
-          + ",org.apache.pinot.sql.parsers.rewriter.ArgMinMaxRewriter");
+          + ",org.apache.pinot.sql.parsers.rewriter.ExprMinMaxRewriter");
       ResultRewriterFactory
           .init("org.apache.pinot.core.query.utils.rewriter.ParentAggregationResultRewriter");
     }
@@ -48,7 +48,7 @@ public class ResultRewriterRegressionTest {
     public void setupRewriter()
         throws Exception {
       QueryRewriterFactory.init(String.join(",", QueryRewriterFactory.DEFAULT_QUERY_REWRITERS_CLASS_NAMES)
-          + ",org.apache.pinot.sql.parsers.rewriter.ArgMinMaxRewriter");
+          + ",org.apache.pinot.sql.parsers.rewriter.ExprMinMaxRewriter");
       ResultRewriterFactory
           .init("org.apache.pinot.core.query.utils.rewriter.ParentAggregationResultRewriter");
     }
@@ -61,7 +61,7 @@ public class ResultRewriterRegressionTest {
     public void setupRewriter()
         throws Exception {
       QueryRewriterFactory.init(String.join(",", QueryRewriterFactory.DEFAULT_QUERY_REWRITERS_CLASS_NAMES)
-          + ",org.apache.pinot.sql.parsers.rewriter.ArgMinMaxRewriter");
+          + ",org.apache.pinot.sql.parsers.rewriter.ExprMinMaxRewriter");
       ResultRewriterFactory
           .init("org.apache.pinot.core.query.utils.rewriter.ParentAggregationResultRewriter");
     }

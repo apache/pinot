@@ -32,14 +32,6 @@ public interface PinotClientTransport<METRICS> {
   CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, String query)
       throws PinotClientException;
 
-  @Deprecated
-  BrokerResponse executeQuery(String brokerAddress, Request request)
-      throws PinotClientException;
-
-  @Deprecated
-  CompletableFuture<BrokerResponse> executeQueryAsync(String brokerAddress, Request request)
-      throws PinotClientException;
-
   void close()
       throws PinotClientException;
 

@@ -30,8 +30,8 @@ import org.apache.pinot.common.datablock.RowDataBlock;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
+import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 
@@ -84,6 +84,13 @@ public class TransferableBlock implements Block {
   }
 
   /**
+   * Returns whether the container is already constructed.
+   */
+  public boolean isContainerConstructed() {
+    return _container != null;
+  }
+
+  /**
    * Retrieve the extracted {@link TransferableBlock#_container} of the transferable block.
    * If not already constructed. It will use {@link DataBlockUtils} to extract the row/columnar data from the
    * binary-packed format.
@@ -94,7 +101,7 @@ public class TransferableBlock implements Block {
     if (_container == null) {
       switch (_type) {
         case ROW:
-          _container = DataBlockUtils.extractRows(_dataBlock, ObjectSerDeUtils::deserialize);
+          _container = DataBlockExtractUtils.extractRows(_dataBlock);
           break;
         case COLUMNAR:
         case METADATA:
@@ -103,6 +110,13 @@ public class TransferableBlock implements Block {
       }
     }
     return _container;
+  }
+
+  /**
+   * Returns whether the data block is already constructed.
+   */
+  public boolean isDataBlockConstructed() {
+    return _dataBlock != null;
   }
 
   /**

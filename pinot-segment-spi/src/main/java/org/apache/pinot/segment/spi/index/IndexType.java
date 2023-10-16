@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.index;
 
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -37,6 +38,12 @@ import org.apache.pinot.spi.data.Schema;
  * @param <IC> the {@link IndexCreator} subclass that should be used to create indexes of this type.
  */
 public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC extends IndexCreator> {
+  /**
+   * Returns the {@link BuildLifecycle} for this index type. This is used to determine when the index should be built.
+   */
+  default BuildLifecycle getIndexBuildLifecycle() {
+    return BuildLifecycle.DURING_SEGMENT_CREATION;
+  }
 
   /**
    * The unique id that identifies this index type.
@@ -94,7 +101,13 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
     return indexContainer.getIndex(this);
   }
 
-  String getFileExtension(ColumnMetadata columnMetadata);
+  /**
+   * Returns the possible file extensions for this index type.
+   *
+   * @param columnMetadata an optional filter. In case it is provided, the index type will do its best to try to filter
+   *                      which extensions are valid. See ForwardIndexType.
+   */
+  List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata);
 
   IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
       @Nullable Schema schema, @Nullable TableConfig tableConfig);
@@ -119,5 +132,24 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
   @Nullable
   default MutableIndex createMutableIndex(MutableIndexContext context, C config) {
     return null;
+  }
+
+  enum BuildLifecycle {
+    /**
+     * The index will be built during segment creation, using the {@link IndexCreator#add} call for each of the column
+     * values being added.
+     */
+    DURING_SEGMENT_CREATION,
+
+    /**
+     * The index will be build post the segment file has been created, using the {@link IndexHandler#updateIndices} call
+     * This is useful for indexes that may need the entire prebuilt segment to be available before they can be built.
+     */
+    POST_SEGMENT_CREATION,
+
+    /**
+     * The index's built lifecycle is managed in a custom manner.
+     */
+    CUSTOM
   }
 }

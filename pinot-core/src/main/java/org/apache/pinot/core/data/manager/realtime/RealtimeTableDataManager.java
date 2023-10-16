@@ -42,7 +42,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -247,6 +246,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doShutdown() {
+    // Make sure we do metric cleanup when we shut down the table.
+    // Do this first, so we do not show ingestion lag during shutdown.
+    _ingestionDelayTracker.shutdown();
     if (_tableUpsertMetadataManager != null) {
       // Stop the upsert metadata manager first to prevent removing metadata when destroying segments
       _tableUpsertMetadataManager.stop();
@@ -262,12 +264,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (_leaseExtender != null) {
       _leaseExtender.shutDown();
     }
-    // Make sure we do metric cleanup when we shut down the table.
-    _ingestionDelayTracker.shutdown();
   }
 
   /*
-   * Method used by LLRealtimeSegmentManagers to update their partition delays
+   * Method used by RealtimeSegmentManagers to update their partition delays
    *
    * @param ingestionTimeMs Ingestion delay being reported.
    * @param partitionGroupId Partition ID for which delay is being updated.
@@ -400,17 +400,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     TableConfig tableConfig = indexLoadingConfig.getTableConfig();
     Schema schema = indexLoadingConfig.getSchema();
     assert schema != null;
-    boolean isHLCSegment = SegmentName.isHighLevelConsumerSegmentName(segmentName);
-    if (isHLCSegment) {
-      throw new UnsupportedOperationException("Adding high level consumer segment " + segmentName + " is not allowed");
-    }
     if (segmentZKMetadata.getStatus().isCompleted()) {
       if (tryLoadExistingSegment(segmentName, indexLoadingConfig, segmentZKMetadata)) {
         // The existing completed segment has been loaded successfully
         return;
       } else {
         // For LLC and uploaded segments, delete the local copy and download a new copy
-        _logger.error("Failed to load LLC segment: {}, downloading a new copy", segmentName);
+        _logger.info("Unable to load local LLC segment: {}, downloading a new copy", segmentName);
         FileUtils.deleteQuietly(segmentDir);
       }
       // Local segment doesn't exist or cannot load, download a new copy
@@ -440,12 +436,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         _tableDedupMetadataManager != null ? _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId)
             : null;
-    LLRealtimeSegmentDataManager llRealtimeSegmentDataManager =
-        new LLRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
+    RealtimeSegmentDataManager realtimeSegmentDataManager =
+        new RealtimeSegmentDataManager(segmentZKMetadata, tableConfig, this, _indexDir.getAbsolutePath(),
             indexLoadingConfig, schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
             partitionDedupMetadataManager, _isTableReadyToConsumeData);
-    llRealtimeSegmentDataManager.startConsumption();
-    segmentDataManager = llRealtimeSegmentDataManager;
+    realtimeSegmentDataManager.startConsumption();
+    segmentDataManager = realtimeSegmentDataManager;
 
     _logger.info("Initialized RealtimeSegmentDataManager - " + segmentName);
     registerSegment(segmentName, segmentDataManager);
@@ -549,8 +545,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {
-    // Cannot download HLC segment or consuming segment
-    if (SegmentName.isHighLevelConsumerSegmentName(segmentName) || zkMetadata.getStatus() == Status.IN_PROGRESS) {
+    // Cannot download consuming segment
+    if (zkMetadata.getStatus() == Status.IN_PROGRESS) {
       return false;
     }
     // TODO: may support download from peer servers as well.

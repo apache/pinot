@@ -33,7 +33,6 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.partitioning.FieldSelectionKeySelector;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -71,10 +70,8 @@ public class HashJoinOperatorTest {
     _mocks.close();
   }
 
-  private static JoinNode.JoinKeys getJoinKeys(List<Integer> leftIdx, List<Integer> rightIdx) {
-    FieldSelectionKeySelector leftSelect = new FieldSelectionKeySelector(leftIdx);
-    FieldSelectionKeySelector rightSelect = new FieldSelectionKeySelector(rightIdx);
-    return new JoinNode.JoinKeys(leftSelect, rightSelect);
+  private static JoinNode.JoinKeys getJoinKeys(List<Integer> leftKeys, List<Integer> rightKeys) {
+    return new JoinNode.JoinKeys(leftKeys, rightKeys);
   }
 
   private static List<RelHint> getJoinHints(Map<String, String> hintsMap) {
@@ -649,6 +646,7 @@ public class HashJoinOperatorTest {
         new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
+    Mockito.verify(_rightOperator).earlyTerminate();
     Assert.assertFalse(result.isErrorBlock());
     Assert.assertEquals(result.getNumRows(), 1);
     Assert.assertTrue(result.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)

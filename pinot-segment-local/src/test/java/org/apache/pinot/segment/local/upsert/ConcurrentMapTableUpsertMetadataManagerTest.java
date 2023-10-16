@@ -29,20 +29,15 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.PropertyKey;
-import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -53,7 +48,6 @@ import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -117,21 +111,35 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
   @Test
   public void testPreloadOnlineSegments()
       throws Exception {
+    String instanceId = "server01";
+    Map<String, Map<String, String>> segmentAssignment = new HashMap<>();
     Set<String> preloadedSegments = new HashSet<>();
     AtomicBoolean wasPreloading = new AtomicBoolean(false);
     ConcurrentMapTableUpsertMetadataManager mgr = new ConcurrentMapTableUpsertMetadataManager() {
+
       @Override
-      protected IndexLoadingConfig createIndexLoadingConfig() {
+      String getInstanceId() {
+        return instanceId;
+      }
+
+      @Override
+      IndexLoadingConfig createIndexLoadingConfig() {
         return mock(IndexLoadingConfig.class);
       }
 
       @Override
-      protected void preloadSegmentWithSnapshot(String segmentName, IndexLoadingConfig indexLoadingConfig,
+      Map<String, Map<String, String>> getSegmentAssignment() {
+        return segmentAssignment;
+      }
+
+      @Override
+      void preloadSegmentWithSnapshot(String segmentName, IndexLoadingConfig indexLoadingConfig,
           SegmentZKMetadata zkMetadata) {
         wasPreloading.set(isPreloading());
         preloadedSegments.add(segmentName);
       }
     };
+
     // Setup mocks for TableConfig and Schema.
     String tableNameWithType = "myTable_REALTIME";
     TableConfig tableConfig = mock(TableConfig.class);
@@ -146,38 +154,16 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
 
     // Setup mocks for HelixManager.
     HelixManager helixManager = mock(HelixManager.class);
-    IdealState idealState = mock(IdealState.class);
-    HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
-    PropertyKey.Builder keyBuilder = mock(PropertyKey.Builder.class);
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
-    PropertyKey propKey = mock(PropertyKey.class);
-    when(helixManager.getHelixDataAccessor()).thenReturn(dataAccessor);
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
-    when(dataAccessor.keyBuilder()).thenReturn(keyBuilder);
-    when(keyBuilder.idealStates(anyString())).thenReturn(propKey);
-    when(dataAccessor.getProperty(propKey)).thenReturn(idealState);
 
-    // Setup mocks to return the instanceId.
-    String instanceId = "server01";
-    TableDataManager tableDataManager = mock(TableDataManager.class);
-    TableDataManagerConfig tdmc = mock(TableDataManagerConfig.class);
-    InstanceDataManagerConfig idmc = mock(InstanceDataManagerConfig.class);
-    when(tableDataManager.getTableDataManagerConfig()).thenReturn(tdmc);
-    when(tdmc.getInstanceDataManagerConfig()).thenReturn(idmc);
-    when(idmc.getInstanceId()).thenReturn(instanceId);
-
-    // Only ONLINE segments are preloaded.
-    Map<String, Map<String, String>> segStates = new HashMap<>();
-    segStates.put("consuming_seg01", ImmutableMap.of(instanceId, "CONSUMING"));
-    segStates.put("consuming_seg02", ImmutableMap.of(instanceId, "CONSUMING"));
-    segStates.put("online_seg01", ImmutableMap.of(instanceId, "ONLINE"));
-    segStates.put("online_seg02", ImmutableMap.of(instanceId, "ONLINE"));
-    segStates.put("offline_seg01", ImmutableMap.of(instanceId, "OFFLINE"));
-    segStates.put("offline_seg02", ImmutableMap.of(instanceId, "OFFLINE"));
-    when(idealState.getPartitionSet()).thenReturn(segStates.keySet());
-    for (String segName : segStates.keySet()) {
-      when(idealState.getInstanceStateMap(segName)).thenReturn(segStates.get(segName));
-    }
+    // Setup segment assignment. Only ONLINE segments are preloaded.
+    segmentAssignment.put("consuming_seg01", ImmutableMap.of(instanceId, "CONSUMING"));
+    segmentAssignment.put("consuming_seg02", ImmutableMap.of(instanceId, "CONSUMING"));
+    segmentAssignment.put("online_seg01", ImmutableMap.of(instanceId, "ONLINE"));
+    segmentAssignment.put("online_seg02", ImmutableMap.of(instanceId, "ONLINE"));
+    segmentAssignment.put("offline_seg01", ImmutableMap.of(instanceId, "OFFLINE"));
+    segmentAssignment.put("offline_seg02", ImmutableMap.of(instanceId, "OFFLINE"));
 
     // Setup mocks to get file path to validDocIds snapshot.
     SegmentZKMetadata realtimeSegmentZKMetadata = new SegmentZKMetadata("online_seg01");
@@ -192,6 +178,7 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
         anyInt())).thenReturn(realtimeSegmentZKMetadata.toZNRecord());
 
     // No snapshot file for online_seg01, so it's skipped.
+    TableDataManager tableDataManager = mock(TableDataManager.class);
     File seg01IdxDir = new File(TEMP_DIR, "online_seg01");
     FileUtils.forceMkdir(seg01IdxDir);
     when(tableDataManager.getSegmentDataDir("online_seg01", null, tableConfig)).thenReturn(seg01IdxDir);

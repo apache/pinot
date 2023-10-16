@@ -20,11 +20,10 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
@@ -33,14 +32,13 @@ import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,8 +49,8 @@ import org.slf4j.LoggerFactory;
  * TODO: Add support to sort the data prior to sending if sorting is enabled
  */
 public class MailboxSendOperator extends MultiStageOperator {
-  public static final Set<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
-      ImmutableSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
+  public static final EnumSet<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
+      EnumSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
           RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
@@ -65,11 +63,11 @@ public class MailboxSendOperator extends MultiStageOperator {
   private final boolean _isSortOnSender;
 
   public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
-      RelDistribution.Type exchangeType, KeySelector<Object[], Object[]> keySelector,
+      RelDistribution.Type distributionType, @Nullable List<Integer> distributionKeys,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender, int receiverStageId) {
-    this(context, sourceOperator, getBlockExchange(context, exchangeType, keySelector, receiverStageId), collationKeys,
-        collationDirections, isSortOnSender);
+    this(context, sourceOperator, getBlockExchange(context, distributionType, distributionKeys, receiverStageId),
+        collationKeys, collationDirections, isSortOnSender);
   }
 
   @VisibleForTesting
@@ -84,10 +82,10 @@ public class MailboxSendOperator extends MultiStageOperator {
     _isSortOnSender = isSortOnSender;
   }
 
-  private static BlockExchange getBlockExchange(OpChainExecutionContext context, RelDistribution.Type exchangeType,
-      KeySelector<Object[], Object[]> keySelector, int receiverStageId) {
-    Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(exchangeType), "Unsupported exchange type: %s",
-        exchangeType);
+  private static BlockExchange getBlockExchange(OpChainExecutionContext context, RelDistribution.Type distributionType,
+      @Nullable List<Integer> distributionKeys, int receiverStageId) {
+    Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
+        distributionType);
     MailboxService mailboxService = context.getMailboxService();
     long requestId = context.getRequestId();
     long deadlineMs = context.getDeadlineMs();
@@ -101,7 +99,8 @@ public class MailboxSendOperator extends MultiStageOperator {
       sendingMailboxes.add(mailboxService.getSendingMailbox(mailboxMetadata.getVirtualAddress(i).hostname(),
           mailboxMetadata.getVirtualAddress(i).port(), sendingMailboxIds.get(i), deadlineMs));
     }
-    return BlockExchange.getExchange(sendingMailboxes, exchangeType, keySelector, TransferableBlockUtils::splitBlock);
+    return BlockExchange.getExchange(sendingMailboxes, distributionType, distributionKeys,
+        TransferableBlockUtils::splitBlock);
   }
 
   @Override
@@ -124,14 +123,16 @@ public class MailboxSendOperator extends MultiStageOperator {
         // and the receiving opChain will not be able to access the stats from the previous opChain
         TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
             OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+        // no need to check early terminate signal b/c the current block is already EOS
         sendTransferableBlock(eosBlockWithStats);
       } else {
-        sendTransferableBlock(block);
+        if (sendTransferableBlock(block)) {
+          earlyTerminate();
+        }
       }
       return block;
-    } catch (EarlyTerminationException e) {
-      // TODO: Query stats are not sent when opChain is early terminated
-      LOGGER.debug("Early terminating opChain: {}", _context.getId());
+    } catch (QueryCancelledException e) {
+      LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } catch (TimeoutException e) {
       LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
@@ -148,12 +149,13 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
-  private void sendTransferableBlock(TransferableBlock block)
+  private boolean sendTransferableBlock(TransferableBlock block)
       throws Exception {
-    _exchange.send(block);
+    boolean isEarlyTerminated = _exchange.send(block);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
+    return isEarlyTerminated;
   }
 
   /**

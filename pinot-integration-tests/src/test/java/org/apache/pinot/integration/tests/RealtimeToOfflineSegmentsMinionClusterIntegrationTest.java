@@ -137,6 +137,8 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     taskConfigsWithMetadata.put(
         BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.METADATA.toString());
     String tableWithMetadataPush = "myTable2";
+    schema.setSchemaName(tableWithMetadataPush);
+    addSchema(schema);
     TableConfig realtimeMetadataTableConfig = createRealtimeTableConfig(avroFiles.get(0), tableWithMetadataPush,
         new TableTaskConfig(Collections.singletonMap(
             MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfigsWithMetadata)));
@@ -191,7 +193,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
 
   private TableConfig createOfflineTableConfig(String tableName, @Nullable TableTaskConfig taskConfig,
       @Nullable SegmentPartitionConfig partitionConfig) {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
         .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
@@ -203,14 +205,14 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
 
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile, String tableName, TableTaskConfig taskConfig) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setSchemaName(getSchemaName())
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
         .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
         .setLoadMode(getLoadMode()).setTaskConfig(taskConfig).setBrokerTenant(getBrokerTenant())
         .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
-        .setLLC(useLlc()).setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
   }
 
 

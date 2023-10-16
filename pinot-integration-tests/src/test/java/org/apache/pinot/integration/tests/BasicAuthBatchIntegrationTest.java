@@ -104,7 +104,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
         sendPostRequest("http://localhost:" + getRandomBrokerPort() + "/query/sql", "{\"sql\":\"SELECT now()\"}");
     } catch (IOException e) {
       HttpErrorStatusException httpErrorStatusException = (HttpErrorStatusException) e.getCause();
-      Assert.assertEquals(httpErrorStatusException.getStatusCode(), 403, "must return 403");
+      Assert.assertEquals(httpErrorStatusException.getStatusCode(), 401, "must return 401");
     }
   }
 
@@ -134,7 +134,7 @@ public class BasicAuthBatchIntegrationTest extends ClusterTest {
       // NOTE: the endpoint is protected implicitly (without annotation) by BasicAuthAccessControlFactory
       sendGetRequest("http://localhost:" + getControllerPort() + "/tables");
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage().contains("403"));
+      Assert.assertTrue(e.getMessage().contains("401"));
     }
   }
 

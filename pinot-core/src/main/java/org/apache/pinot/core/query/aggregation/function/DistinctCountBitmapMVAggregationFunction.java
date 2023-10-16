@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -36,8 +37,8 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class DistinctCountBitmapMVAggregationFunction extends DistinctCountBitmapAggregationFunction {
 
-  public DistinctCountBitmapMVAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  public DistinctCountBitmapMVAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifySingleArgument(arguments, "DISTINCT_COUNT_BITMAP_MV"));
   }
 
   @Override

@@ -35,6 +35,7 @@ import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -320,8 +321,31 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    // invalid filter config since Groovy is disabled
+    // Using peer download scheme with replication of 1
     ingestionConfig.setTransformConfigs(null);
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
+    segmentsValidationAndRetentionConfig.setReplication("1");
+    segmentsValidationAndRetentionConfig.setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL);
+    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail when peer download scheme is used with replication of 1");
+    } catch (IllegalStateException e) {
+      // expected
+      Assert.assertEquals(e.getMessage(), "peerSegmentDownloadScheme can't be used when replication is < 2");
+    }
+
+    segmentsValidationAndRetentionConfig.setReplication("2");
+    tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      // expected
+      Assert.fail("Should not fail when peer download scheme is used with replication of > 1");
+    }
+
+    // invalid filter config since Groovy is disabled
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({timestamp > 0}, timestamp)"));
     try {
       TableConfigUtils.validate(tableConfig, schema, null, true);
@@ -519,6 +543,24 @@ public class TableConfigUtilsTest {
     aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "distinct_count_hll(s1)"),
         new AggregationConfig("d2", "DISTINCTCOUNTHLL(s1)"), new AggregationConfig("d3", "distinctcounthll(s1)"),
         new AggregationConfig("d4", "DISTINCTCOUNT_HLL(s1)"), new AggregationConfig("d5", "DISTINCT_COUNT_HLL(s1)"));
+
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.fail("Should not fail due to valid aggregation function", e);
+    }
+
+    // distinctcounthllplus, expect that the function name in various forms still validates
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "distinct_count_hll_plus(s1)"),
+        new AggregationConfig("d2", "DISTINCTCOUNTHLLPLUS(s1)"),
+        new AggregationConfig("d3", "distinctcounthllplus(s1)"),
+        new AggregationConfig("d4", "DISTINCTCOUNT_HLL_PLUS(s1)"),
+        new AggregationConfig("d5", "DISTINCT_COUNT_HLL_PLUS(s1)"));
 
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
@@ -1858,6 +1900,14 @@ public class TableConfigUtilsTest {
     validAggConfig.put("myCol.aggregationType", "distinctCountHLL");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
         ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAggConfig, "SegmentGenerationAndPushTask",
+            segmentGenerationAndPushTaskConfig))).build();
+    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
+
+    // valid agg
+    HashMap<String, String> validAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
+    validAgg2Config.put("myCol.aggregationType", "distinctCountHLLPlus");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAgg2Config, "SegmentGenerationAndPushTask",
             segmentGenerationAndPushTaskConfig))).build();
     TableConfigUtils.validateTaskConfigs(tableConfig, schema);
   }

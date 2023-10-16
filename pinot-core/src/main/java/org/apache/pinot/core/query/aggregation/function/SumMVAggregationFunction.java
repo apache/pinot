@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -28,8 +29,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 public class SumMVAggregationFunction extends SumAggregationFunction {
 
-  public SumMVAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  public SumMVAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifySingleArgument(arguments, "SUM_MV"), false);
   }
 
   @Override

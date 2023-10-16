@@ -62,6 +62,7 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -77,10 +78,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final MailboxService _mailboxService;
   private final QueryDispatcher _queryDispatcher;
 
-  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      BrokerMetrics brokerMetrics) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics);
+
+  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, BrokerMetrics brokerMetrics,
+      BrokerQueryEventListener brokerQueryEventListener) {
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        brokerMetrics, brokerQueryEventListener);
     LOGGER.info("Using Multi-stage BrokerRequestHandler.");
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
@@ -138,8 +142,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       throw e;
     } catch (RuntimeException e) {
       String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(e);
-      LOGGER.info("Caught exception compiling request {}: {}, {}", requestId, query, consolidatedMessage);
+      LOGGER.warn("Caught exception planning request {}: {}, {}", requestId, query, consolidatedMessage);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+      if (e.getMessage().matches(".* Column .* not found in any table'")) {
+        requestContext.setErrorCode(QueryException.UNKNOWN_COLUMN_ERROR_CODE);
+        return new BrokerResponseNative(
+            QueryException.getException(QueryException.UNKNOWN_COLUMN_ERROR, consolidatedMessage));
+      }
       requestContext.setErrorCode(QueryException.QUERY_PLANNING_ERROR_CODE);
       return new BrokerResponseNative(
           QueryException.getException(QueryException.QUERY_PLANNING_ERROR, consolidatedMessage));
@@ -147,6 +156,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
     Set<String> tableNames = queryPlanResult.getTableNames();
+    requestContext.setTableNames(List.copyOf(tableNames));
 
     // Compilation Time. This includes the time taken for parsing, compiling, create stage plans and assigning workers.
     long compilationEndTimeNs = System.nanoTime();
@@ -227,6 +237,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         sqlNodeAndOptions.getParseTimeNs() + (executionEndTimeNs - compilationStartTimeNs));
     brokerResponse.setTimeUsedMs(totalTimeMs);
     requestContext.setQueryProcessingTime(totalTimeMs);
+    requestContext.setTraceInfo(brokerResponse.getTraceInfo());
     augmentStatistics(requestContext, brokerResponse);
 
     // Log query and stats

@@ -23,11 +23,11 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -121,7 +121,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _intValuesSV[i] = (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+        _intValuesSV[i] = NullValuePlaceHolder.INT;
       }
     }
     return _intValuesSV;
@@ -151,7 +151,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _longValuesSV[i] = (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+        _longValuesSV[i] = NullValuePlaceHolder.LONG;
       }
     }
     return _longValuesSV;
@@ -181,7 +181,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _floatValuesSV[i] = (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+        _floatValuesSV[i] = NullValuePlaceHolder.FLOAT;
       }
     }
     return _floatValuesSV;
@@ -211,7 +211,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _doubleValuesSV[i] = (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+        _doubleValuesSV[i] = NullValuePlaceHolder.DOUBLE;
       }
     }
     return _doubleValuesSV;
@@ -241,7 +241,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _bigDecimalValuesSV[i] = (BigDecimal) DataSchema.ColumnDataType.BIG_DECIMAL.getNullPlaceholder();
+        _bigDecimalValuesSV[i] = NullValuePlaceHolder.BIG_DECIMAL;
       }
     }
     return _bigDecimalValuesSV;
@@ -271,7 +271,7 @@ public class CoalesceTransformFunction extends BaseTransformFunction {
         break;
       }
       if (!hasNonNullValue) {
-        _stringValuesSV[i] = (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+        _stringValuesSV[i] = NullValuePlaceHolder.STRING;
       }
     }
     return _stringValuesSV;

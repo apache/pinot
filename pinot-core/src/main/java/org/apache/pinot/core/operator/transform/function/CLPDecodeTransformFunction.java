@@ -71,11 +71,12 @@ public class CLPDecodeTransformFunction extends BaseTransformFunction {
 
   @Override
   public String getName() {
-    return TransformFunctionType.CLPDECODE.getName();
+    return TransformFunctionType.CLP_DECODE.getName();
   }
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     int numArgs = arguments.size();
     Preconditions.checkArgument(3 == numArgs || 4 == numArgs,
         "Syntax error: clpDecode takes 3 or 4 arguments - "

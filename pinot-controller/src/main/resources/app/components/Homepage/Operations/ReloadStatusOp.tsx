@@ -75,8 +75,8 @@ export default function ReloadStatusOp({
   hideModal
 }: Props) {
   const classes = useStyles();
-  const segmentNames = reloadStatusData && Object.keys(reloadStatusData);
-  const indexes = reloadStatusData && reloadStatusData[segmentNames[0]]?.indexes;
+  const reloadStatusKey = "columnToIndexesCount"
+  const indexes = reloadStatusData && reloadStatusData[reloadStatusKey];
   const indexesKeys = indexes && Object.keys(indexes);
   const indexObjKeys = indexes && indexes[indexesKeys[0]] && Object.keys(indexes[indexesKeys[0]]) || [];
   const [activeTab, setActiveTab] = useState(0);
@@ -230,12 +230,10 @@ export default function ReloadStatusOp({
                           </StyledTableCell>
                           {indexObjKeys.map((o, i)=>{
                             let iconElement = null;
-                            if(indexObj[o].toLowerCase() === 'yes'){
-                              iconElement = <CheckIcon className={classes.greenColor}/>;
-                            } else if(indexObj[o].toLowerCase() === 'no'){
+                            if(indexObj[o] === 0){
                               iconElement = <CloseIcon className={classes.redColor}/>;
                             } else {
-                              iconElement = indexObj[o];
+                              iconElement = <CheckIcon className={classes.greenColor}/>;
                             }
                             return (
                               <StyledTableCell align="center" key={i}>
@@ -250,7 +248,7 @@ export default function ReloadStatusOp({
                 </Table>
               </TableContainer>
             :
-              <DialogContentText>No segment found in table.</DialogContentText>
+              <DialogContentText>No reload status found in table.</DialogContentText>
             }
           </TabPanel>
           <CustomDialog 

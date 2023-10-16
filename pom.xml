@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.13.0-SNAPSHOT</version>
+  <version>1.1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -121,11 +121,11 @@
       See also: the surefire plugin section and the profiles section.-->
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
-    <avro.version>1.9.2</avro.version>
+    <avro.version>1.10.2</avro.version>
     <parquet.version>1.12.3</parquet.version>
-    <helix.version>1.0.4</helix.version>
+    <helix.version>1.3.1</helix.version>
     <zkclient.version>0.7</zkclient.version>
-    <jackson.version>2.12.7</jackson.version>
+    <jackson.version>2.12.7.20221012</jackson.version>
     <zookeeper.version>3.6.3</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
     <jersey.version>2.39</jersey.version>
@@ -148,10 +148,10 @@
     <commons-net.version>3.1</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
-    <snappy-java.version>1.1.10.1</snappy-java.version>
+    <snappy-java.version>1.1.10.4</snappy-java.version>
     <zstd-jni.version>1.5.2-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
-    <log4j.version>2.17.1</log4j.version>
+    <log4j.version>2.20.0</log4j.version>
     <netty.version>4.1.94.Final</netty.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
@@ -162,15 +162,11 @@
     <stax2-api.version>4.1</stax2-api.version>
     <aws.sdk.version>2.20.94</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
+    <testng.version>7.8.0</testng.version>
+
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
-
-    <!-- handle kafka imports
-    kafka dependency is still explicitly defined in pinot-integration-tests, pinot-tools and pinot-perf pom files.
-    To change kafka connector dependency, we only need to update this version number config.
-    TODO: figure out a way to inject kafka dependency instead of explicitly setting the kafka module dependency -->
-    <kafka.version>2.0</kafka.version>
-    <protobuf.version>3.22.0</protobuf.version>
+    <protobuf.version>3.24.3</protobuf.version>
     <grpc.version>1.53.0</grpc.version>
     <confluent.version>5.5.3</confluent.version>
 
@@ -180,9 +176,33 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
+    <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
+    <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
+    <surefire.version>3.1.2</surefire.version>
+
+    <!-- Configuration for Scala -->
+    <scala.version>2.12.18</scala.version>
+    <scala.compat.version>2.12</scala.compat.version>
+
+    <flink.version>1.12.0</flink.version>
+    <commons-configuration2.version>2.9.0</commons-configuration2.version>
   </properties>
 
   <profiles>
+    <profile>
+      <id>not-java-21</id>
+      <activation>
+        <jdk>!21</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.diffplug.spotless</groupId>
+            <artifactId>spotless-maven-plugin</artifactId>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>github-actions</id>
       <activation>
@@ -226,6 +246,17 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+
+    <profile>
+      <id>scala-2.13</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <scala.version>2.13.3</scala.version>
+        <scala.compat.version>2.13</scala.compat.version>
+      </properties>
     </profile>
   </profiles>
   <dependencyManagement>
@@ -388,7 +419,7 @@
       <dependency>
         <groupId>org.testng</groupId>
         <artifactId>testng</artifactId>
-        <version>6.11</version>
+        <version>${testng.version}</version>
       </dependency>
       <dependency>
         <groupId>org.roaringbitmap</groupId>
@@ -446,10 +477,17 @@
         <artifactId>commons-collections</artifactId>
         <version>3.2.2</version>
       </dependency>
+
+      <!-- commons-configuration1.10, will be deleted after the upgrade. -->
       <dependency>
         <groupId>commons-configuration</groupId>
         <artifactId>commons-configuration</artifactId>
         <version>1.10</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-configuration2</artifactId>
+        <version>${commons-configuration2.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-io</groupId>
@@ -575,7 +613,7 @@
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>1.7.25</version>
+        <version>2.0.9</version>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
@@ -589,8 +627,19 @@
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-slf4j2-impl</artifactId>
+        <version>${log4j.version}</version>
+      </dependency>
+      <dependency>
+        <!--
+         We don't use slf4j but slf4j2, so we can just ignore this dependency.
+         Instead of just remove this dependency, we set the scope as provided.
+         We cannot just remove the dependency because that would create conflicts in the enforcer
+        -->
+        <groupId>org.apache.logging.log4j</groupId>
         <artifactId>log4j-slf4j-impl</artifactId>
         <version>${log4j.version}</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
@@ -702,10 +751,6 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.yetus</groupId>
             <artifactId>audience-annotations</artifactId>
           </exclusion>
@@ -716,6 +761,14 @@
           <exclusion>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-configuration2</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-text</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -792,10 +845,6 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -877,12 +926,6 @@
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
         <version>1.5.9</version>
-        <exclusions>
-          <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -935,16 +978,8 @@
         <version>${calcite.version}</version>
         <exclusions>
           <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.calcite.avatica</groupId>
             <artifactId>avatica-metrics</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.apache.httpcomponents</groupId>
@@ -1116,7 +1151,7 @@
       <dependency>
         <groupId>org.apache.maven.surefire</groupId>
         <artifactId>surefire-testng</artifactId>
-        <version>3.0.0-M5</version>
+        <version>${surefire.versino}</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -1133,7 +1168,7 @@
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-csv</artifactId>
-        <version>1.0</version>
+        <version>1.10.0</version>
       </dependency>
       <dependency>
         <groupId>com.h2database</groupId>
@@ -1248,10 +1283,10 @@
         </exclusions>
       </dependency>
       <dependency>
-        <!-- Older versions fail with Java >= 16 -->
+        <!-- starting from 1.18.30, JDK21 is supported -->
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
-        <version>1.18.28</version>
+        <version>1.18.30</version>
       </dependency>
 
       <dependency>
@@ -1296,6 +1331,24 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
+      <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-library</artifactId>
+        <version>${scala.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-clients_${scala.compat.version}</artifactId>
+        <version>${flink.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
+        <version>${flink.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>
@@ -1309,6 +1362,31 @@
     </extensions>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <groupId>com.diffplug.spotless</groupId>
+          <artifactId>spotless-maven-plugin</artifactId>
+          <version>2.28.0</version>
+          <executions>
+            <execution>
+              <phase>verify</phase>
+              <goals>
+                <goal>check</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <java>
+              <includes>
+                <include>src/main/java/**/*.java</include>
+                <include>src/test/java/**/*.java</include>
+              </includes>
+              <importOrder>
+                <order>,\#</order>
+              </importOrder>
+              <removeUnusedImports/>
+            </java>
+          </configuration>
+        </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>appassembler-maven-plugin</artifactId>
@@ -1391,7 +1469,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
-          <version>3.2.0</version>
+          <version>${maven-jar-plugin.version}</version>
           <executions>
             <execution>
               <goals>
@@ -1415,7 +1493,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
-          <version>3.0.0-M5</version>
+          <version>${surefire.version}</version>
           <configuration>
             <forkCount>1</forkCount>
             <reuseForks>false</reuseForks>
@@ -1437,12 +1515,20 @@
               --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
             </argLine>
           </configuration>
+          <!-- Explicitly select the test provider, instead of relying on the classpath -->
+          <dependencies>
+            <dependency>
+              <groupId>org.apache.maven.surefire</groupId>
+              <artifactId>surefire-testng</artifactId>
+              <version>${surefire.version}</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
           <!-- Note that 3.0.0, while newer, has bugs w/provided transitive dependencies -->
-          <version>3.2.1</version>
+          <version>${maven-enforcer-plugin.version}</version>
           <executions>
             <execution>
               <id>enforce-dependency-convergence</id>
@@ -1509,6 +1595,63 @@
             <target>${jdk.version}</target>
             <fork>true</fork>
             <encoding>${project.build.sourceEncoding}</encoding>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>net.alchim31.maven</groupId>
+          <artifactId>scala-maven-plugin</artifactId>
+          <version>3.2.2</version>
+          <executions>
+            <execution>
+              <id>add-source</id>
+              <phase>generate-sources</phase>
+              <goals>
+                <goal>add-source</goal>
+              </goals>
+              <configuration>
+                <sourceDir>src/main/java</sourceDir>
+              </configuration>
+            </execution>
+            <execution>
+              <id>scala-compile-first</id>
+              <phase>process-resources</phase>
+              <goals>
+                <goal>compile</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>scala-test-compile-first</id>
+              <phase>process-test-resources</phase>
+              <goals>
+                <goal>testCompile</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>attach-scaladocs</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>doc-jar</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <scalaVersion>${scala.version}</scalaVersion>
+            <args>
+              <arg>-unchecked</arg>
+              <arg>-deprecation</arg>
+              <arg>-feature</arg>
+            </args>
+            <jvmArgs>
+              <jvmArg>-Xms1024m</jvmArg>
+              <jvmArg>-Xmx1024m</jvmArg>
+            </jvmArgs>
+            <javacArgs>
+              <javacArg>-source</javacArg>
+              <javacArg>${jdk.version}</javacArg>
+              <javacArg>-target</javacArg>
+              <javacArg>${jdk.version}</javacArg>
+              <javacArg>-Xlint:all,-serial,-path</javacArg>
+            </javacArgs>
           </configuration>
         </plugin>
       </plugins>
@@ -1637,103 +1780,91 @@
         <version>2.7.1</version>
       </plugin>
       <plugin>
-        <groupId>com.diffplug.spotless</groupId>
-        <artifactId>spotless-maven-plugin</artifactId>
-        <version>2.28.0</version>
-        <executions>
-          <execution>
-            <phase>verify</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <java>
-            <includes>
-              <include>src/main/java/**/*.java</include>
-              <include>src/test/java/**/*.java</include>
-            </includes>
-            <importOrder>
-              <order>,\#</order>
-            </importOrder>
-            <removeUnusedImports/>
-          </java>
-        </configuration>
-      </plugin>
-      <plugin>
         <groupId>com.mycila</groupId>
         <artifactId>license-maven-plugin</artifactId>
         <version>4.2</version>
         <configuration>
-          <header>${pinot.root}/HEADER</header>
-          <headerDefinitions>
-            <headerDefinition>${pinot.root}/headerdefinition.xml</headerDefinition>
-          </headerDefinitions>
-          <excludes>
-            <!-- Text and log files -->
-            <exclude>**/*.txt</exclude>
-            <exclude>**/*.log</exclude>
-            <exclude>**/*.list</exclude>
-            <exclude>**/*.out</exclude>
-            <exclude>**/*.generated</exclude>
-            <exclude>**/*.json</exclude>
-            <exclude>**/*.schema</exclude>
-            <exclude>**/*.sql</exclude>
+          <licenseSets>
+            <licenseSet>
+              <header>${pinot.root}/HEADER</header>
+              <headerDefinitions>
+                <headerDefinition>${pinot.root}/headerdefinition.xml</headerDefinition>
+              </headerDefinitions>
+              <excludes>
+                <!-- Text and log files -->
+                <exclude>**/*.txt</exclude>
+                <exclude>**/*.log</exclude>
+                <exclude>**/*.list</exclude>
+                <exclude>**/*.out</exclude>
+                <exclude>**/*.generated</exclude>
+                <exclude>**/*.json</exclude>
+                <exclude>**/*.schema</exclude>
+                <exclude>**/*.sql</exclude>
 
-            <!-- JDBC Drivers -->
-            <exclude>**/java.sql.*</exclude>
+                <!-- JDBC Drivers -->
+                <exclude>**/java.sql.*</exclude>
 
-            <!-- Spark datasource register -->
-            <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
+                <!-- Spark datasource register -->
+                <exclude>**/org.apache.spark.sql.sources.DataSourceRegister</exclude>
 
-            <!-- Binary files -->
-            <exclude>**/*.avro</exclude>
-            <exclude>**/*.avsc</exclude>
-            <exclude>**/*.csv</exclude>
-            <exclude>**/*.desc</exclude>
-            <exclude>**/*.fst</exclude>
-            <exclude>**/*.parquet</exclude>
-            <exclude>**/*.gz</exclude>
-            <exclude>**/*.orc</exclude>
-            <exclude>**/*.dict</exclude>
-            <exclude>**/*.raw</exclude>
-            <exclude>**/*.mapping</exclude>
-            <exclude>**/*.ser</exclude>
-            <exclude>**/*.v1</exclude>
-            <exclude>**/*.v2</exclude>
+                <!-- Binary files -->
+                <exclude>**/*.avro</exclude>
+                <exclude>**/*.avsc</exclude>
+                <exclude>**/*.csv</exclude>
+                <exclude>**/*.desc</exclude>
+                <exclude>**/*.fst</exclude>
+                <exclude>**/*.parquet</exclude>
+                <exclude>**/*.gz</exclude>
+                <exclude>**/*.gzip</exclude>
+                <exclude>**/*.orc</exclude>
+                <exclude>**/*.dict</exclude>
+                <exclude>**/*.raw</exclude>
+                <exclude>**/*.mapping</exclude>
+                <exclude>**/*.ser</exclude>
+                <exclude>**/*.v1</exclude>
+                <exclude>**/*.v2</exclude>
+                <exclude>**/*.parq</exclude>
+                <exclude>**/*.parquet.encrypted</exclude>
 
-            <!-- Auto-generated target directories -->
-            <exclude>target/**</exclude>
-            <exclude>pinot-*/target/**</exclude>
+                <!-- Pinot index files -->
+                <exclude>**/index_map</exclude>
+                <exclude>**/star_tree_index</exclude>
+                <exclude>**/star_tree_index_map</exclude>
 
-            <!-- Docker and Kubernetes (not part of the distribution) -->
-            <exclude>kubernetes/**</exclude>
-            <exclude>docker/**</exclude>
+                <!-- Auto-generated target directories -->
+                <exclude>target/**</exclude>
+                <exclude>pinot-*/target/**</exclude>
 
-            <!-- Pinot-Druid Benchmark (not part of the distribution) -->
-            <exclude>contrib/**</exclude>
+                <!-- Docker and Kubernetes (not part of the distribution) -->
+                <exclude>docker/**</exclude>
+                <exclude>helm/**</exclude>
 
-            <!-- Top level files -->
-            <exclude>HEADER</exclude>
-            <exclude>LICENSE*</exclude>
-            <exclude>NOTICE*</exclude>
-            <exclude>.trivyignore</exclude>
+                <!-- Pinot-Druid Benchmark (not part of the distribution) -->
+                <exclude>contrib/**</exclude>
 
-            <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
-            be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
-            -->
-            <exclude>**/node_modules/**</exclude>
-            <exclude>**/dist/**</exclude>
-            <exclude>**/src/main/resources/*.*rc</exclude>
+                <!-- Top level files -->
+                <exclude>HEADER</exclude>
+                <exclude>LICENSE*</exclude>
+                <exclude>NOTICE*</exclude>
+                <exclude>.trivyignore</exclude>
+                <exclude>doap_Pinot.rdf</exclude>
 
-            <!-- files from Eclipse -->
-            <exclude>**/maven-eclipse.xml</exclude>
-            <exclude>**/.settings/**</exclude>
-            <exclude>**/.project</exclude>
-            <exclude>**/.classpath</exclude>
-            <exclude>.externalToolBuilders/**</exclude>
-          </excludes>
+                <!-- js, css files that are exact copies of the third-party works. In this case, the original header has to
+                be kept. Please refer to 'Treatment of Third-party works' in https://www.apache.org/legal/src-headers.html
+                -->
+                <exclude>**/node_modules/**</exclude>
+                <exclude>**/dist/**</exclude>
+                <exclude>**/src/main/resources/*.*rc</exclude>
+
+                <!-- files from Eclipse -->
+                <exclude>**/maven-eclipse.xml</exclude>
+                <exclude>**/.settings/**</exclude>
+                <exclude>**/.project</exclude>
+                <exclude>**/.classpath</exclude>
+                <exclude>.externalToolBuilders/**</exclude>
+              </excludes>
+            </licenseSet>
+          </licenseSets>
           <mapping>
             <java>JAVADOC_STYLE</java>
             <scala>JAVADOC_STYLE</scala>
@@ -1748,6 +1879,7 @@
             <ftl>FTL_STYLE</ftl>
             <MockMaker>SCRIPT_STYLE</MockMaker>
             <appAssemblerScriptTemplate>SCRIPT_STYLE</appAssemblerScriptTemplate>
+            <inc>SCRIPT_STYLE</inc>
             <sql>SCRIPT_STYLE</sql>
             <conf>DOUBLESLASH_STYLE</conf>
             <cfg>DOUBLESLASH_STYLE</cfg>
@@ -1836,7 +1968,7 @@
             <exclude>.externalToolBuilders/**</exclude>
 
             <!-- Docker and Kubernetes (not part of the distribution) -->
-            <exclude>kubernetes/**</exclude>
+            <exclude>helm/**</exclude>
             <exclude>docker/**</exclude>
             <exclude>.trivyignore</exclude>
 

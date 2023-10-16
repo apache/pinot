@@ -102,7 +102,8 @@ public class GcsPinotFS extends BasePinotFS {
       if (existsDirectoryOrBucket(gcsUri)) {
         return true;
       }
-      Blob blob = getBucket(gcsUri).create(directoryPath, new byte[0]);
+      Blob blob =
+          _storage.create(BlobInfo.newBuilder(BlobId.of(gcsUri.getBucketName(), directoryPath)).build(), new byte[0]);
       return blob.exists();
     } catch (Exception e) {
       throw new IOException(e);
@@ -274,7 +275,7 @@ public class GcsPinotFS extends BasePinotFS {
   private Blob getBlob(GcsUri gcsUri)
       throws IOException {
     try {
-      return getBucket(gcsUri).get(gcsUri.getPath());
+      return _storage.get(BlobId.of(gcsUri.getBucketName(), gcsUri.getPath()));
     } catch (StorageException e) {
       throw new IOException(e);
     }
@@ -306,7 +307,7 @@ public class GcsPinotFS extends BasePinotFS {
     if (prefix.isEmpty()) {
       return true;
     }
-    Blob blob = getBucket(gcsUri).get(prefix);
+    Blob blob = _storage.get(BlobId.of(gcsUri.getBucketName(), prefix));
     if (existsBlob(blob)) {
       return true;
     }
@@ -314,7 +315,8 @@ public class GcsPinotFS extends BasePinotFS {
     try {
       // Return true if folder was not explicitly created but is a prefix of one or more files.
       // Use lazy iterable iterateAll() and verify that the iterator has elements.
-      return getBucket(gcsUri).list(Storage.BlobListOption.prefix(prefix)).iterateAll().iterator().hasNext();
+      return _storage.list(gcsUri.getBucketName(), Storage.BlobListOption.prefix(prefix)).iterateAll().iterator()
+          .hasNext();
     } catch (Exception t) {
       throw new IOException(t);
     }
@@ -331,7 +333,7 @@ public class GcsPinotFS extends BasePinotFS {
     if (prefix.equals(GcsUri.DELIMITER)) {
       page = getBucket(gcsUri).list();
     } else {
-      page = getBucket(gcsUri).list(Storage.BlobListOption.prefix(prefix));
+      page = _storage.list(gcsUri.getBucketName(), Storage.BlobListOption.prefix(prefix));
     }
     for (Blob blob : page.iterateAll()) {
       if (blob.getName().equals(prefix)) {
@@ -387,7 +389,7 @@ public class GcsPinotFS extends BasePinotFS {
         if (prefix.equals(GcsUri.DELIMITER)) {
           page = getBucket(segmentUri).list();
         } else {
-          page = getBucket(segmentUri).list(Storage.BlobListOption.prefix(prefix));
+          page = _storage.list(segmentUri.getBucketName(), Storage.BlobListOption.prefix(prefix));
         }
         return batchDelete(page);
       } else {
@@ -426,7 +428,8 @@ public class GcsPinotFS extends BasePinotFS {
   private boolean copyFile(GcsUri srcUri, GcsUri dstUri)
       throws IOException {
     Blob blob = getBlob(srcUri);
-    Blob newBlob = getBucket(dstUri).create(dstUri.getPath(), new byte[0]);
+    Blob newBlob =
+        _storage.create(BlobInfo.newBuilder(BlobId.of(dstUri.getBucketName(), dstUri.getPath())).build(), new byte[0]);
     CopyWriter copyWriter = blob.copyTo(newBlob.getBlobId());
     copyWriter.getResult();
     return copyWriter.isDone() && blob.exists();

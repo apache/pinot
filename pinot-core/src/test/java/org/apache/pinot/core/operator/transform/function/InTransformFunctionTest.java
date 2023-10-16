@@ -25,9 +25,9 @@ import java.util.stream.Collectors;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.Test;
 
@@ -241,7 +241,7 @@ public class InTransformFunctionTest extends BaseTransformFunctionTest {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     int[] expectedIntValues = new int[NUM_ROWS];
-    Arrays.fill(expectedIntValues, (int) DataSchema.ColumnDataType.INT.getNullPlaceholder());
+    Arrays.fill(expectedIntValues, NullValuePlaceHolder.INT);
 
     assertEquals(transformFunction.transformToIntValuesSV(_projectionBlock), expectedIntValues);
   }

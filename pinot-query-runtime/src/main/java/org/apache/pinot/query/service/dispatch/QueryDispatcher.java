@@ -37,13 +37,12 @@ import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
+import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.DispatchablePlanFragment;
@@ -248,7 +247,7 @@ public class QueryDispatcher {
       int numRows = dataBlock.getNumberOfRows();
       if (numRows > 0) {
         resultRows.ensureCapacity(resultRows.size() + numRows);
-        List<Object[]> rawRows = DataBlockUtils.extractRows(dataBlock, ObjectSerDeUtils::deserialize);
+        List<Object[]> rawRows = DataBlockExtractUtils.extractRows(dataBlock);
         for (Object[] rawRow : rawRows) {
           Object[] row = new Object[numColumns];
           for (int i = 0; i < numColumns; i++) {
@@ -264,8 +263,7 @@ public class QueryDispatcher {
       block = receiveOperator.nextBlock();
     }
     if (block.isErrorBlock()) {
-      throw new RuntimeException(
-          "Received error query execution result block: " + block.getDataBlock().getExceptions());
+      throw new RuntimeException("Received error query execution result block: " + block.getExceptions());
     }
 
     return new ResultTable(resultDataSchema, resultRows);

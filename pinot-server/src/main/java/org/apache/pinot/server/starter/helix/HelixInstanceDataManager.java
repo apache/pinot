@@ -53,7 +53,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
@@ -448,14 +447,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
               tableNameWithType);
           return;
         }
-        // TODO: Support force committing HLC consuming segment
-        if (!(segmentDataManager instanceof LLRealtimeSegmentDataManager)) {
-          LOGGER.warn("Cannot reload non-LLC consuming segment: {} in table: {}", segmentName, tableNameWithType);
-          return;
+        if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+          LOGGER.info("Reloading (force committing) consuming segment: {} in table: {}", segmentName,
+              tableNameWithType);
+          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
         }
-        LOGGER.info("Reloading (force committing) LLC consuming segment: {} in table: {}", segmentName,
-            tableNameWithType);
-        ((LLRealtimeSegmentDataManager) segmentDataManager).forceCommit();
         return;
       } finally {
         tableDataManager.releaseSegment(segmentDataManager);
@@ -604,9 +600,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
         if (segmentDataManager != null) {
           try {
-            if (segmentDataManager instanceof LLRealtimeSegmentDataManager) {
-              LLRealtimeSegmentDataManager llSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
-              llSegmentDataManager.forceCommit();
+            if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+              ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
             }
           } finally {
             tableDataManager.releaseSegment(segmentDataManager);

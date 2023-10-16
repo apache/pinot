@@ -20,7 +20,9 @@
 package org.apache.pinot.segment.local.segment.index.forward;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -32,7 +34,9 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertSame;
 
 
 public class ForwardIndexTypeTest {
@@ -101,6 +105,51 @@ public class ForwardIndexTypeTest {
     }
 
     @Test
+    public void oldConfNoDictionaryConfig()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setNoDictionaryConfig(
+          JsonUtils.stringToObject("{\"dimInt\": \"RAW\"}",
+              new TypeReference<Map<String, String>>() {
+              })
+      );
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"compressionCodec\": \"SNAPPY\"\n"
+          + " }"
+      );
+
+      assertEquals(
+          new ForwardIndexConfig.Builder()
+              .withCompressionType(ChunkCompressionType.SNAPPY)
+              .withDeriveNumDocsPerChunk(false)
+              .withRawIndexWriterVersion(2)
+              .build()
+      );
+    }
+
+    @Test
+    public void oldConfNoDictionaryColumns()
+        throws IOException {
+      _tableConfig.getIndexingConfig().setNoDictionaryColumns(
+          JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"compressionCodec\": \"SNAPPY\"\n"
+          + " }"
+      );
+
+      assertEquals(
+          new ForwardIndexConfig.Builder()
+              .withCompressionType(ChunkCompressionType.SNAPPY)
+              .withDeriveNumDocsPerChunk(false)
+              .withRawIndexWriterVersion(2)
+              .build()
+      );
+    }
+
+    @Test
     public void oldConfEnableDict()
         throws IOException {
       addFieldIndexConfig(""
@@ -152,7 +201,7 @@ public class ForwardIndexTypeTest {
           new ForwardIndexConfig.Builder()
               .withCompressionType(null)
               .withDeriveNumDocsPerChunk(false)
-              .withRawIndexWriterVersion(2)
+              .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
               .build()
       );
     }
@@ -174,7 +223,7 @@ public class ForwardIndexTypeTest {
             new ForwardIndexConfig.Builder()
                 .withCompressionType(compression == null ? null : ChunkCompressionType.valueOf(compression))
                 .withDeriveNumDocsPerChunk(false)
-                .withRawIndexWriterVersion(2)
+                .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
                 .build()
       );
     }
@@ -195,7 +244,7 @@ public class ForwardIndexTypeTest {
       assertEquals(new ForwardIndexConfig.Builder()
           .withCompressionType(null)
           .withDeriveNumDocsPerChunk(true)
-          .withRawIndexWriterVersion(2)
+          .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
           .build());
     }
 

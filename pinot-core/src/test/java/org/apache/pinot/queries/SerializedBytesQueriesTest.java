@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import java.io.File;
@@ -82,6 +83,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   private static final String DISTINCT_COUNT_HLL_COLUMN = "distinctCountHLLColumn";
   // Use non-default log2m
   private static final int DISTINCT_COUNT_HLL_LOG2M = 9;
+  private static final String DISTINCT_COUNT_HLL_PLUS_COLUMN = "distinctCountHLLPlusColumn";
+  private static final int DISTINCT_COUNT_HLL_PLUS_P = 14;
   private static final String MIN_MAX_RANGE_COLUMN = "minMaxRangeColumn";
   private static final String PERCENTILE_EST_COLUMN = "percentileEstColumn";
   // Use non-default max error
@@ -101,6 +104,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
   private final int[][] _valuesArray = new int[NUM_ROWS][MAX_NUM_VALUES_TO_PRE_AGGREGATE];
   private final AvgPair[] _avgPairs = new AvgPair[NUM_ROWS];
   private final HyperLogLog[] _hyperLogLogs = new HyperLogLog[NUM_ROWS];
+  private final HyperLogLogPlus[] _hyperLogLogPluses = new HyperLogLogPlus[NUM_ROWS];
   private final MinMaxRangePair[] _minMaxRangePairs = new MinMaxRangePair[NUM_ROWS];
   private final QuantileDigest[] _quantileDigests = new QuantileDigest[NUM_ROWS];
   private final TDigest[] _tDigests = new TDigest[NUM_ROWS];
@@ -193,6 +197,14 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       _tDigests[i] = tDigest;
       valueMap.put(PERCENTILE_TDIGEST_COLUMN, ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest));
 
+      HyperLogLogPlus hyperLogLogPlus = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
+      for (int value : values) {
+        hyperLogLogPlus.offer(value);
+      }
+      _hyperLogLogPluses[i] = hyperLogLogPlus;
+      valueMap.put(DISTINCT_COUNT_HLL_PLUS_COLUMN,
+          ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus));
+
       GenericRow genericRow = new GenericRow();
       genericRow.init(valueMap);
       rows.add(genericRow);
@@ -201,8 +213,9 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addSingleValueDimension(GROUP_BY_SV_COLUMN, DataType.STRING)
         .addMultiValueDimension(GROUP_BY_MV_COLUMN, DataType.STRING).addMetric(AVG_COLUMN, DataType.BYTES)
-        .addMetric(DISTINCT_COUNT_HLL_COLUMN, DataType.BYTES).addMetric(MIN_MAX_RANGE_COLUMN, DataType.BYTES)
-        .addMetric(PERCENTILE_EST_COLUMN, DataType.BYTES).addMetric(PERCENTILE_TDIGEST_COLUMN, DataType.BYTES).build();
+        .addMetric(DISTINCT_COUNT_HLL_COLUMN, DataType.BYTES).addMetric(DISTINCT_COUNT_HLL_PLUS_COLUMN, DataType.BYTES)
+        .addMetric(MIN_MAX_RANGE_COLUMN, DataType.BYTES).addMetric(PERCENTILE_EST_COLUMN, DataType.BYTES)
+        .addMetric(PERCENTILE_TDIGEST_COLUMN, DataType.BYTES).build();
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
 
@@ -224,7 +237,7 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     AggregationOperator aggregationOperator = getOperator(getAggregationQuery());
     List<Object> aggregationResult = aggregationOperator.nextBlock().getResults();
     assertNotNull(aggregationResult);
-    assertEquals(aggregationResult.size(), 5);
+    assertEquals(aggregationResult.size(), 6);
 
     // Avg
     AvgPair avgPair = (AvgPair) aggregationResult.get(0);
@@ -277,13 +290,24 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       expectedTDigest.add(_tDigests[i]);
     }
     assertEquals(tDigest.quantile(0.5), expectedTDigest.quantile(0.5), PERCENTILE_TDIGEST_DELTA);
+
+    // DistinctCountHLLPlus
+    HyperLogLogPlus hyperLogLogPlus = (HyperLogLogPlus) aggregationResult.get(5);
+    HyperLogLogPlus expectedHyperLogLogPlus = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
+    for (int value : _valuesArray[0]) {
+      expectedHyperLogLogPlus.offer(value);
+    }
+    for (int i = 1; i < NUM_ROWS; i++) {
+      expectedHyperLogLogPlus.addAll(_hyperLogLogPluses[i]);
+    }
+    assertEquals(hyperLogLogPlus.cardinality(), expectedHyperLogLogPlus.cardinality());
   }
 
   @Test
   public void testInterSegmentsAggregation()
       throws Exception {
     Object[] aggregationResults = getBrokerResponse(getAggregationQuery()).getResultTable().getRows().get(0);
-    assertEquals(aggregationResults.length, 5);
+    assertEquals(aggregationResults.length, 6);
 
     // Simulate the process of server side merge and broker side merge
 
@@ -372,11 +396,31 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     tDigest1.add(tDigest2);
     double expectedPercentileTDigestResult = tDigest1.quantile(0.5);
 
+    // DistinctCountHLLPlus
+    HyperLogLogPlus hyperLogLogPlus1 = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
+    HyperLogLogPlus hyperLogLogPlus2 = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
+    for (int value : _valuesArray[0]) {
+      hyperLogLogPlus1.offer(value);
+      hyperLogLogPlus2.offer(value);
+    }
+    for (int i = 1; i < NUM_ROWS; i++) {
+      hyperLogLogPlus1.addAll(_hyperLogLogPluses[i]);
+      hyperLogLogPlus2.addAll(_hyperLogLogPluses[i]);
+    }
+    hyperLogLogPlus1.addAll(hyperLogLogPlus2);
+    hyperLogLogPlus1 = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(
+        ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus1));
+    hyperLogLogPlus2 = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(
+        ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus1));
+    hyperLogLogPlus1.addAll(hyperLogLogPlus2);
+    long expectedDistinctCountHllPlusResult = hyperLogLogPlus1.cardinality();
+
     assertEquals((Double) aggregationResults[0], expectedAvgResult, 1e-5);
     assertEquals((long) aggregationResults[1], expectedDistinctCountHllResult);
     assertEquals((Double) aggregationResults[2], expectedMinMaxRangeResult, 1e-5);
     assertEquals((long) aggregationResults[3], expectedPercentileEstResult);
     assertEquals((Double) aggregationResults[4], expectedPercentileTDigestResult, PERCENTILE_TDIGEST_DELTA);
+    assertEquals((long) aggregationResults[5], expectedDistinctCountHllPlusResult);
   }
 
   @Test
@@ -442,6 +486,17 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
         expectedTDigest.add(_tDigests[i]);
       }
       assertEquals(tDigest.quantile(0.5), expectedTDigest.quantile(0.5), PERCENTILE_TDIGEST_DELTA);
+
+      // DistinctCountHLLPlus
+      HyperLogLogPlus hyperLogLogPlus = (HyperLogLogPlus) groupByResult.getResultForGroupId(5, groupKey._groupId);
+      HyperLogLogPlus expectedHyperLogLogPlus = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
+      for (int value : _valuesArray[groupId]) {
+        expectedHyperLogLogPlus.offer(value);
+      }
+      for (int i = groupId + NUM_GROUPS; i < NUM_ROWS; i += NUM_GROUPS) {
+        expectedHyperLogLogPlus.addAll(_hyperLogLogPluses[i]);
+      }
+      assertEquals(hyperLogLogPlus.cardinality(), expectedHyperLogLogPlus.cardinality());
     }
   }
 
@@ -539,12 +594,32 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       tDigest1.add(tDigest2);
       double expectedPercentileTDigestResult = tDigest1.quantile(0.5);
 
+      // DistinctCountHLLPlus
+      HyperLogLogPlus hyperLogLogPlus1 = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
+      HyperLogLogPlus hyperLogLogPlus2 = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
+      for (int value : _valuesArray[groupId]) {
+        hyperLogLogPlus1.offer(value);
+        hyperLogLogPlus2.offer(value);
+      }
+      for (int i = groupId + NUM_GROUPS; i < NUM_ROWS; i += NUM_GROUPS) {
+        hyperLogLogPlus1.addAll(_hyperLogLogPluses[i]);
+        hyperLogLogPlus2.addAll(_hyperLogLogPluses[i]);
+      }
+      hyperLogLogPlus1.addAll(hyperLogLogPlus2);
+      hyperLogLogPlus1 = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(
+          ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus1));
+      hyperLogLogPlus2 = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(
+          ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus1));
+      hyperLogLogPlus1.addAll(hyperLogLogPlus2);
+      long expectedDistinctCountHllPlusResult = hyperLogLogPlus1.cardinality();
+
       Object[] row = rows.get(groupId);
       assertEquals((Double) row[0], expectedAvgResult, 1e-5);
       assertEquals((long) row[1], expectedDistinctCountHllResult);
       assertEquals((Double) row[2], expectedMinMaxRangeResult, 1e-5);
       assertEquals((long) row[3], expectedPercentileEstResult);
       assertEquals((Double) row[4], expectedPercentileTDigestResult, PERCENTILE_TDIGEST_DELTA);
+      assertEquals((long) row[5], expectedDistinctCountHllPlusResult);
     }
   }
 
@@ -595,6 +670,15 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       expectedTDigest.add(_tDigests[i]);
     }
 
+    // DistinctCountHLL
+    HyperLogLogPlus expectedHyperLogLogPlus = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
+    for (int value : _valuesArray[0]) {
+      expectedHyperLogLogPlus.offer(value);
+    }
+    for (int i = 1; i < NUM_ROWS; i++) {
+      expectedHyperLogLogPlus.addAll(_hyperLogLogPluses[i]);
+    }
+
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
     while (groupKeyIterator.hasNext()) {
       GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
@@ -620,6 +704,10 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       // PercentileTDigest
       TDigest tDigest = (TDigest) groupByResult.getResultForGroupId(4, groupKey._groupId);
       assertEquals(tDigest.quantile(0.5), expectedTDigest.quantile(0.5), PERCENTILE_TDIGEST_DELTA);
+
+      // DistinctCountHLLPlus
+      HyperLogLogPlus hyperLogLogPlus = (HyperLogLogPlus) groupByResult.getResultForGroupId(5, groupKey._groupId);
+      assertEquals(hyperLogLogPlus.cardinality(), expectedHyperLogLogPlus.cardinality());
     }
   }
 
@@ -716,20 +804,41 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
     tDigest1.add(tDigest2);
     double expectedPercentileTDigestResult = tDigest1.quantile(0.5);
 
+    // DistinctCountHLL
+    HyperLogLogPlus hyperLogLogPlus1 = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
+    HyperLogLogPlus hyperLogLogPlus2 = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
+    for (int value : _valuesArray[0]) {
+      hyperLogLogPlus1.offer(value);
+      hyperLogLogPlus2.offer(value);
+    }
+    for (int i = 1; i < NUM_ROWS; i++) {
+      hyperLogLogPlus1.addAll(_hyperLogLogPluses[i]);
+      hyperLogLogPlus2.addAll(_hyperLogLogPluses[i]);
+    }
+    hyperLogLogPlus1.addAll(hyperLogLogPlus2);
+    hyperLogLogPlus1 = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(
+        ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus1));
+    hyperLogLogPlus2 = ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(
+        ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus1));
+    hyperLogLogPlus1.addAll(hyperLogLogPlus2);
+    long expectedDistinctCountHllPlusResult = hyperLogLogPlus1.cardinality();
+
     for (Object[] row : rows) {
       assertEquals((Double) row[0], expectedAvgResult, 1e-5);
       assertEquals((long) row[1], expectedDistinctCountHllResult);
       assertEquals((Double) row[2], expectedMinMaxRangeResult, 1e-5);
       assertEquals((long) row[3], expectedPercentileEstResult);
       assertEquals((Double) row[4], expectedPercentileTDigestResult, PERCENTILE_TDIGEST_DELTA);
+      assertEquals((long) row[5], expectedDistinctCountHllPlusResult);
     }
   }
 
   private String getAggregationQuery() {
     return String.format(
-        "SELECT AVG(%s), DISTINCTCOUNTHLL(%s), MINMAXRANGE(%s), PERCENTILEEST50(%s), PERCENTILETDIGEST50(%s) FROM %s",
+        "SELECT AVG(%s), DISTINCTCOUNTHLL(%s), MINMAXRANGE(%s), PERCENTILEEST50(%s), PERCENTILETDIGEST50(%s), "
+            + "DISTINCTCOUNTHLLPLUS(%s) FROM %s",
         AVG_COLUMN, DISTINCT_COUNT_HLL_COLUMN, MIN_MAX_RANGE_COLUMN, PERCENTILE_EST_COLUMN, PERCENTILE_TDIGEST_COLUMN,
-        RAW_TABLE_NAME);
+        DISTINCT_COUNT_HLL_PLUS_COLUMN, RAW_TABLE_NAME);
   }
 
   private String getGroupBySVQuery() {

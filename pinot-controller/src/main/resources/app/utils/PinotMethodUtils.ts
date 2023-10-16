@@ -267,13 +267,21 @@ const getQueryResults = (params) => {
   return getQueryResult(params).then(({ data }) => {
     let queryResponse = getAsObject(data);
 
-    let exceptions: SqlException[] | string = [];
+    let exceptions: SqlException[] = [];
     let dataArray = [];
     let columnList = [];
     // if sql api throws error, handle here
     if(typeof queryResponse === 'string'){
-      exceptions = queryResponse;
-    } 
+      exceptions.push({errorCode: null, message: queryResponse});
+    }
+    // if sql api returns a structured error with a `code`, handle here
+    if (queryResponse && queryResponse.code) {
+      if (queryResponse.error) {
+        exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " and error: " + queryResponse.error});
+      } else {
+        exceptions.push({errorCode: null, message: "Query failed with error code: " + queryResponse.code + " but no logs. Please see controller logs for error."});
+      }
+    }
     if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
       exceptions = queryResponse.exceptions as SqlException[];
     } 

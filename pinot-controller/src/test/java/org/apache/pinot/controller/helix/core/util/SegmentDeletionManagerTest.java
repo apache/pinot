@@ -244,11 +244,11 @@ public class SegmentDeletionManagerTest {
     deletionManager.removeAgedDeletedSegments(leadControllerManager);
 
     // Create dummy directories and files
-    File dummyDir1 = new File(deletedDirectoryPath + File.separator + "dummy1");
+    File dummyDir1 = new File(deletedDirectoryPath + File.separator + "dummy1 %");
     dummyDir1.mkdir();
-    File dummyDir2 = new File(deletedDirectoryPath + File.separator + "dummy2");
+    File dummyDir2 = new File(deletedDirectoryPath + File.separator + "dummy2 %");
     dummyDir2.mkdir();
-    File dummyDir3 = new File(deletedDirectoryPath + File.separator + "dummy3");
+    File dummyDir3 = new File(deletedDirectoryPath + File.separator + "dummy3 %");
     dummyDir3.mkdir();
 
     // Test delete when there is no files but some directories exist
@@ -264,13 +264,15 @@ public class SegmentDeletionManagerTest {
 
     // Create dummy files
     for (int i = 0; i < 3; i++) {
-      createTestFileWithAge(dummyDir1.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, i, 1), i);
+      createTestFileWithAge(dummyDir1.getAbsolutePath() + File.separator + genDeletedSegmentName("file %" + i, i, 1),
+          i);
     }
     for (int i = 2; i < 5; i++) {
-      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + genDeletedSegmentName("file" + i, i, 1), i);
+      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator + genDeletedSegmentName("file %" + i, i, 1),
+          i);
     }
     for (int i = 6; i < 9; i++) {
-      createTestFileWithAge(dummyDir3.getAbsolutePath() + File.separator + "file" + i, i);
+      createTestFileWithAge(dummyDir3.getAbsolutePath() + File.separator + "file %" + i, i);
     }
 
     // Sleep 1 second to ensure the clock moves.

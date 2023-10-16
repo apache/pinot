@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -123,6 +124,24 @@ public class DataGenerator {
             values[k] = serializeIfMultiValue(next);
           }
           writer.append(StringUtils.join(values, ",")).append('\n');
+        }
+      }
+    }
+  }
+
+  public void generateJson(long totalDocs, int numFiles)
+      throws IOException {
+    final int numPerFiles = (int) (totalDocs / numFiles);
+    final ObjectMapper mapper = new ObjectMapper();
+    for (int i = 0; i < numFiles; i++) {
+      try (FileWriter writer = new FileWriter(new File(_outDir, String.format("output_%d.json", i)))) {
+        for (int j = 0; j < numPerFiles; j++) {
+          Map<String, Object> row = new HashMap<>();
+          for (int k = 0; k < _genSpec.getColumns().size(); k++) {
+            String key = _genSpec.getColumns().get(k);
+            row.put(key, _generators.get(key).next());
+          }
+          writer.append(mapper.writeValueAsString(row)).append('\n');
         }
       }
     }

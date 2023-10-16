@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -65,8 +64,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -81,10 +78,10 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -95,6 +92,8 @@ import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
@@ -115,7 +114,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.zookeeper.data.Stat;
@@ -350,7 +348,14 @@ public class PinotTableRestletResource {
     NAME, CREATIONTIME, LASTMODIFIEDTIME
   }
 
-  private String listTableConfigs(String tableName, @Nullable String tableTypeStr) {
+  @GET
+  @Path("/tables/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIG)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Lists the table configs")
+  public String listTableConfigs(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
       ObjectNode ret = JsonUtils.newObjectNode();
 
@@ -368,94 +373,6 @@ public class PinotTableRestletResource {
         ret.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }
       return ret.toString();
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
-  }
-
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @ManualAuthorization
-  @Path("/tables/{tableName}")
-  @ApiOperation(value = "Lists the table configs")
-  public String alterTableStateOrListTableConfig(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "enable|disable|drop") @QueryParam("state") String stateStr,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders httpHeaders,
-      @Context Request request) {
-    try {
-      if (StringUtils.isBlank(stateStr)) {
-        if (!_accessControlFactory.create()
-            .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.GET_TABLE_CONFIG)) {
-          throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-        }
-        return listTableConfigs(tableName, tableTypeStr);
-      }
-
-      // TODO: DO NOT allow toggling state with GET request
-
-      StateType stateType = Constants.validateState(stateStr);
-      TableType tableType = Constants.validateTableType(tableTypeStr);
-
-      // validate if user has permission to change the table state
-      String endpointUrl = request.getRequestURL().toString();
-      AccessControlUtils.validatePermission(tableName, AccessType.UPDATE, httpHeaders, endpointUrl,
-          _accessControlFactory.create());
-
-      // Check access for different state types
-      AccessControl accessControl = _accessControlFactory.create();
-      switch (stateType) {
-        case ENABLE:
-          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.ENABLE_TABLE)) {
-            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-          }
-          break;
-        case DISABLE:
-          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DISABLE_TABLE)) {
-            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-          }
-          break;
-        case DROP:
-          if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.DELETE_TABLE)) {
-            throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-          }
-          break;
-        default:
-          throw new ControllerApplicationException(LOGGER, "Invalid state type: " + stateType,
-              Response.Status.BAD_REQUEST);
-      }
-
-      ArrayNode ret = JsonUtils.newArrayNode();
-      boolean tableExists = false;
-
-      if (tableType != TableType.REALTIME && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-        String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-        ObjectNode offline = JsonUtils.newObjectNode();
-        tableExists = true;
-
-        offline.put("tableName", offlineTableName);
-        offline.set("state",
-            JsonUtils.objectToJsonNode(_pinotHelixResourceManager.toggleTableState(offlineTableName, stateType)));
-        ret.add(offline);
-      }
-
-      if (tableType != TableType.OFFLINE && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-        ObjectNode realtime = JsonUtils.newObjectNode();
-        tableExists = true;
-
-        realtime.put("tableName", realtimeTableName);
-        realtime.set("state",
-            JsonUtils.objectToJsonNode(_pinotHelixResourceManager.toggleTableState(realtimeTableName, stateType)));
-        ret.add(realtime);
-      }
-
-      if (tableExists) {
-        return ret.toString();
-      } else {
-        throw new ControllerApplicationException(LOGGER, "Table '" + tableName + "' does not exist",
-            Response.Status.BAD_REQUEST);
-      }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -703,37 +620,35 @@ public class PinotTableRestletResource {
 
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
 
-    Configuration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, reassignInstances);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, includeConsuming);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.BOOTSTRAP, bootstrap);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, downtime);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME, minAvailableReplicas);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, bestEfforts);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-        externalViewCheckIntervalInMs);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-        externalViewStabilizationTimeoutInMs);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.UPDATE_TARGET_TIER, updateTargetTier);
-    rebalanceConfig.addProperty(RebalanceConfigConstants.JOB_ID, TableRebalancer.createUniqueRebalanceJobIdentifier());
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setDryRun(dryRun);
+    rebalanceConfig.setReassignInstances(reassignInstances);
+    rebalanceConfig.setIncludeConsuming(includeConsuming);
+    rebalanceConfig.setBootstrap(bootstrap);
+    rebalanceConfig.setDowntime(downtime);
+    rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
+    rebalanceConfig.setBestEfforts(bestEfforts);
+    rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
+    rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
+    rebalanceConfig.setUpdateTargetTier(updateTargetTier);
+    String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
 
     try {
       if (dryRun || downtime) {
         // For dry-run or rebalance with downtime, directly return the rebalance result as it should return immediately
-        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, false);
+        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
       } else {
         // Make a dry-run first to get the target assignment
-        rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, true);
+        rebalanceConfig.setDryRun(true);
         RebalanceResult dryRunResult =
-            _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, false);
+            _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
 
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
-          rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, false);
+          rebalanceConfig.setDryRun(false);
           _executorService.submit(() -> {
             try {
-              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, true);
+              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, true);
             } catch (Throwable t) {
               LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
             }
@@ -826,13 +741,12 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
           Response.Status.NOT_FOUND);
     }
-    TableRebalanceProgressStats tableRebalanceProgressStats =
-        JsonUtils.stringToObject(controllerJobZKMetadata.get(RebalanceConfigConstants.REBALANCE_PROGRESS_STATS),
-            TableRebalanceProgressStats.class);
+    TableRebalanceProgressStats tableRebalanceProgressStats = JsonUtils.stringToObject(
+        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
+        TableRebalanceProgressStats.class);
     long timeSinceStartInSecs = 0L;
-    if (!tableRebalanceProgressStats.getStatus().equals(RebalanceResult.Status.DONE)) {
-      timeSinceStartInSecs =
-          (System.currentTimeMillis() - tableRebalanceProgressStats.getStartTimeMs()) / 1000;
+    if (!RebalanceResult.Status.DONE.toString().equals(tableRebalanceProgressStats.getStatus())) {
+      timeSinceStartInSecs = (System.currentTimeMillis() - tableRebalanceProgressStats.getStartTimeMs()) / 1000;
     }
 
     ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse = new ServerRebalanceJobStatusResponse();
@@ -962,6 +876,73 @@ public class PinotTableRestletResource {
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("tables/{tableName}/indexes")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the aggregate index details of all segments for a table", notes = "Get the aggregate "
+      + "index details of all segments for a table")
+  public String getTableIndexes(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+    LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+
+    String tableIndexMetadata;
+    try {
+      JsonNode segmentsMetadataJson = getAggregateIndexMetadataFromServer(tableNameWithType);
+      tableIndexMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, ioe);
+    }
+    return tableIndexMetadata;
+  }
+
+  private JsonNode getAggregateIndexMetadataFromServer(String tableNameWithType)
+      throws InvalidConfigException, JsonProcessingException {
+    final Map<String, List<String>> serverToSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+
+    BiMap<String, String> serverEndPoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+
+    List<String> serverUrls = new ArrayList<>();
+    BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
+    for (String endpoint : endpointsToServers.keySet()) {
+      String segmentIndexesEndpoint = endpoint + String.format("/tables/%s/indexes", tableNameWithType);
+      serverUrls.add(segmentIndexesEndpoint);
+    }
+
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
+
+    int totalSegments = 0;
+    Map<String, Map<String, Integer>> columnToIndexCountMap = new HashMap<>();
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      String responseString = streamResponse.getValue();
+      TableIndexMetadataResponse response = JsonUtils.stringToObject(responseString, TableIndexMetadataResponse.class);
+      totalSegments += response.getTotalOnlineSegments();
+      response.getColumnToIndexesCount().forEach((col, indexToCount) -> {
+        Map<String, Integer> indexCountMap = columnToIndexCountMap.computeIfAbsent(col, c -> new HashMap<>());
+        indexToCount.forEach((indexName, count) -> {
+          indexCountMap.merge(indexName, count, Integer::sum);
+        });
+      });
+    }
+
+    TableIndexMetadataResponse tableIndexMetadataResponse =
+        new TableIndexMetadataResponse(totalSegments, columnToIndexCountMap);
+
+    return JsonUtils.objectToJsonNode(tableIndexMetadataResponse);
   }
 
   /**

@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -34,8 +35,8 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.ConfigUtils;
@@ -73,15 +74,71 @@ public class ZKMetadataProvider {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
   }
 
-  public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
+  @Deprecated
+  public static void setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
       ZNRecord znRecord) {
-    propertyStore.set(constructPropertyStorePathForResourceConfig(realtimeTableName), znRecord,
+    propertyStore.set(constructPropertyStorePathForResourceConfig(tableNameWithType), znRecord,
         AccessOption.PERSISTENT);
   }
 
+  /**
+   * Create table config, fail if existed.
+   *
+   * @return true if creation is successful.
+   */
+  public static boolean createTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
+    String tableConfigPath = constructPropertyStorePathForResourceConfig(tableNameWithType);
+    ZNRecord tableConfigZNRecord;
+    try {
+      tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
+      return false;
+    }
+    return propertyStore.create(tableConfigPath, tableConfigZNRecord, AccessOption.PERSISTENT);
+  }
+
+  /**
+   * Full override table config.
+   *
+   * @return true if update is successful.
+   */
+  public static boolean setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig) {
+    return setTableConfig(propertyStore, tableConfig, -1);
+  }
+
+  /**
+   * Update table config with an expected version. This is to avoid race condition for table config update issued by
+   * multiple clients, especially when update configs in a programmatic way.
+   * The typical usage is to read table config, apply some changes, then update it.
+   *
+   * @return true if update is successful.
+   */
+  public static boolean setTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, TableConfig tableConfig,
+      int expectedVersion) {
+    String tableNameWithType = tableConfig.getTableName();
+    ZNRecord tableConfigZNRecord;
+    try {
+      tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
+      return false;
+    }
+    return propertyStore.set(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigZNRecord,
+        expectedVersion, AccessOption.PERSISTENT);
+  }
+
+  @Deprecated
+  public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
+      ZNRecord znRecord) {
+    setTableConfig(propertyStore, realtimeTableName, znRecord);
+  }
+
+  @Deprecated
   public static void setOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String offlineTableName,
       ZNRecord znRecord) {
-    propertyStore.set(constructPropertyStorePathForResourceConfig(offlineTableName), znRecord, AccessOption.PERSISTENT);
+    setTableConfig(propertyStore, offlineTableName, znRecord);
   }
 
   public static void setInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -310,6 +367,22 @@ public class ZKMetadataProvider {
         AccessOption.PERSISTENT));
   }
 
+  /**
+   * @return a pair of table config and current version from znRecord, null if table config does not exist.
+   */
+  @Nullable
+  public static ImmutablePair<TableConfig, Integer> getTableConfigWithVersion(
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+    Stat tableConfigStat = new Stat();
+    TableConfig tableConfig = toTableConfig(
+        propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigStat,
+            AccessOption.PERSISTENT));
+    if (tableConfig == null) {
+      return null;
+    }
+    return ImmutablePair.of(tableConfig, tableConfigStat.getVersion());
+  }
+
   @Nullable
   public static TableConfig getOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
     return getTableConfig(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
@@ -503,7 +576,7 @@ public class ZKMetadataProvider {
     if (propertyStore.exists(segmentsPath, AccessOption.PERSISTENT)) {
       List<String> segments = propertyStore.getChildNames(segmentsPath, AccessOption.PERSISTENT);
       for (String segment : segments) {
-        if (SegmentName.isLowLevelConsumerSegmentName(segment)) {
+        if (LLCSegmentName.isLLCSegment(segment)) {
           llcRealtimeSegments.add(segment);
         }
       }

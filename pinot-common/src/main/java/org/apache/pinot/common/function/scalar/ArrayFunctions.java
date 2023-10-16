@@ -25,8 +25,8 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 
 
 /**
@@ -72,6 +72,55 @@ public class ArrayFunctions {
   @ScalarFunction
   public static int arrayIndexOfString(String[] values, String valueToFind) {
     return ArrayUtils.indexOf(values, valueToFind);
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexesOfInt(int[] value, int valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexesOfLong(long[] value, long valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexesOfFloat(float[] value, float valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexesOfDouble(double[] value, double valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
+  }
+
+  @ScalarFunction
+  public static int[] arrayIndexesOfString(String[] value, String valueToFind) {
+    return ArrayUtils.indexesOf(value, valueToFind).stream().toArray();
+  }
+
+  /**
+   * Assume values1, and values2 are monotonous increasing indices of MV cols.
+   * Here is the common usage:
+   * col1: ["a", "b", "a", "b"]
+   * col2: ["c", "d", "d", "c"]
+   * The user want to get the first index called idx, s.t. col1[idx] == "b" && col2[idx] == "d"
+   * arrayElementAtInt(0, intersectIndices(arrayIndexOfAllString(col1, "b"), arrayIndexOfAllString(col2, "d")))
+   */
+  @ScalarFunction
+  public static int[] intersectIndices(int[] values1, int[] values2) {
+    // TODO: if values1.length << values2.length. Use binary search can speed up the query
+    int i = 0;
+    int j = 0;
+    IntArrayList indices = new IntArrayList();
+    while (i < values1.length && j < values2.length) {
+      if (values1[i] == values2[j]) {
+        indices.add(values1[i]);
+        j++;
+      }
+      i++;
+    }
+    return indices.toIntArray();
   }
 
   @ScalarFunction
@@ -155,26 +204,26 @@ public class ArrayFunctions {
 
   @ScalarFunction
   public static int arrayElementAtInt(int[] arr, int idx) {
-    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (int) DataSchema.ColumnDataType.INT.getNullPlaceholder();
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.INT;
   }
 
   @ScalarFunction
   public static long arrayElementAtLong(long[] arr, int idx) {
-    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (long) DataSchema.ColumnDataType.LONG.getNullPlaceholder();
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.LONG;
   }
 
   @ScalarFunction
   public static float arrayElementAtFloat(float[] arr, int idx) {
-    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (float) DataSchema.ColumnDataType.FLOAT.getNullPlaceholder();
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.FLOAT;
   }
 
   @ScalarFunction
   public static double arrayElementAtDouble(double[] arr, int idx) {
-    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (double) DataSchema.ColumnDataType.DOUBLE.getNullPlaceholder();
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.DOUBLE;
   }
 
   @ScalarFunction
   public static String arrayElementAtString(String[] arr, int idx) {
-    return idx > 0 && idx <= arr.length ? arr[idx - 1] : (String) DataSchema.ColumnDataType.STRING.getNullPlaceholder();
+    return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.STRING;
   }
 }

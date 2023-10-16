@@ -42,7 +42,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.utils.SegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.core.segment.processing.lifecycle.PinotSegmentLifecycleEventListenerManager;
@@ -216,10 +215,6 @@ public class SegmentDeletionManager {
 
   protected void removeSegmentFromStore(String tableNameWithType, String segmentId,
       @Nullable Long deletedSegmentsRetentionMs) {
-    // Ignore HLC segments as they are not stored in Pinot FS
-    if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
-      return;
-    }
     if (_dataDir != null) {
       long retentionMs = deletedSegmentsRetentionMs == null
           ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
@@ -296,13 +291,14 @@ public class SegmentDeletionManager {
         for (String tableNameDir : tableNameDirs) {
           String tableName = URIUtils.getLastPart(tableNameDir);
           if (leadControllerManager.isLeaderForTable(tableName)) {
-            URI tableNameURI = URIUtils.getUri(tableNameDir);
+            URI tableNameURI = URIUtils.getUri(deletedDirURI.toString(), URIUtils.encode(tableName));
             // Get files that are aged
             final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
             int numFilesDeleted = 0;
             for (String targetFile : targetFiles) {
-              URI targetURI = URIUtils.getUri(targetFile);
-              long deletionTimeMs = getDeletionTimeMsFromFile(targetFile, pinotFS.lastModified(targetURI));
+              URI targetURI =
+                  URIUtils.getUri(tableNameURI.toString(), URIUtils.encode(URIUtils.getLastPart(targetFile)));
+              long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), pinotFS.lastModified(targetURI));
               if (System.currentTimeMillis() >= deletionTimeMs) {
                 if (!pinotFS.delete(targetURI, true)) {
                   LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI);

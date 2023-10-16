@@ -49,6 +49,8 @@ public class ReceivingMailbox {
   // TODO: Revisit if this is the correct way to apply back pressure
   private final BlockingQueue<TransferableBlock> _blocks = new ArrayBlockingQueue<>(DEFAULT_MAX_PENDING_BLOCKS);
   private final AtomicReference<TransferableBlock> _errorBlock = new AtomicReference<>();
+  private volatile boolean _isEarlyTerminated = false;
+
   @Nullable
   private volatile Reader _reader;
 
@@ -78,7 +80,7 @@ public class ReceivingMailbox {
     TransferableBlock errorBlock = _errorBlock.get();
     if (errorBlock != null) {
       LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
-      return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.EARLY_TERMINATED
+      return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.CANCELLED
           : ReceivingMailboxStatus.ERROR;
     }
     if (timeoutMs <= 0) {
@@ -95,11 +97,11 @@ public class ReceivingMailbox {
             LOGGER.debug("==[MAILBOX]== Block " + block + " ready to read from mailbox: " + _id);
           }
           notifyReader();
-          return ReceivingMailboxStatus.SUCCESS;
+          return _isEarlyTerminated ? ReceivingMailboxStatus.EARLY_TERMINATED : ReceivingMailboxStatus.SUCCESS;
         } else {
           LOGGER.debug("Mailbox: {} is already cancelled or errored out, ignoring the late block", _id);
           _blocks.clear();
-          return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.EARLY_TERMINATED
+          return errorBlock == CANCELLED_ERROR_BLOCK ? ReceivingMailboxStatus.CANCELLED
               : ReceivingMailboxStatus.ERROR;
         }
       } else {
@@ -137,6 +139,13 @@ public class ReceivingMailbox {
   }
 
   /**
+   * Early terminate the mailbox, called when upstream doesn't expect any more data block.
+   */
+  public void earlyTerminate() {
+    _isEarlyTerminated = true;
+  }
+
+  /**
    * Cancels the mailbox. No more blocks are accepted after calling this method. Should only be called by the receive
    * operator to clean up the remaining blocks.
    */
@@ -166,6 +175,6 @@ public class ReceivingMailbox {
   }
 
   public enum ReceivingMailboxStatus {
-    SUCCESS, ERROR, TIMEOUT, EARLY_TERMINATED
+    SUCCESS, ERROR, TIMEOUT, CANCELLED, EARLY_TERMINATED
   }
 }

@@ -62,6 +62,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
@@ -83,6 +84,8 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
@@ -93,6 +96,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -283,6 +287,51 @@ public class TablesResource {
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
             totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
+  }
+
+  @GET
+  @Encoded
+  @Path("/tables/{tableName}/indexes")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Provide index metadata", notes = "Provide index details for the table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
+      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
+      ErrorInfo.class)
+  })
+  public String getTableIndexes(
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName)
+      throws Exception {
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    List<SegmentDataManager> allSegments = tableDataManager.acquireAllSegments();
+    try {
+      int totalSegmentCount = 0;
+      Map<String, Map<String, Integer>> columnToIndexesCount = new HashMap<>();
+      for (SegmentDataManager segmentDataManager : allSegments) {
+        if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+          // REALTIME segments may not have indexes since not all indexes have mutable implementations
+          continue;
+        }
+        totalSegmentCount++;
+        IndexSegment segment = segmentDataManager.getSegment();
+        segment.getColumnNames().forEach(col -> {
+          columnToIndexesCount.putIfAbsent(col, new HashMap<>());
+          DataSource colDataSource = segment.getDataSource(col);
+          IndexService.getInstance().getAllIndexes().forEach(idxType -> {
+            int count = colDataSource.getIndex(idxType) != null ? 1 : 0;
+            columnToIndexesCount.get(col).merge(idxType.getId(), count, Integer::sum);
+          });
+        });
+      }
+      TableIndexMetadataResponse tableIndexMetadataResponse =
+          new TableIndexMetadataResponse(totalSegmentCount, columnToIndexesCount);
+      return JsonUtils.objectToString(tableIndexMetadataResponse);
+    } finally {
+      for (SegmentDataManager segmentDataManager : allSegments) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
   }
 
   @GET
@@ -565,7 +614,7 @@ public class TablesResource {
     }
 
     // Check the segment is low level consumer segment
-    if (!LLCSegmentName.isLowLevelConsumerSegmentName(segmentName)) {
+    if (!LLCSegmentName.isLLCSegment(segmentName)) {
       throw new WebApplicationException(String.format("Segment %s is not a low level consumer segment", segmentName),
           Response.Status.BAD_REQUEST);
     }

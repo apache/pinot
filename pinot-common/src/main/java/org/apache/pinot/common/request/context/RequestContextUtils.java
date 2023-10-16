@@ -350,6 +350,9 @@ public class RequestContextUtils {
     }
   }
 
+  // TODO: Pass the literal context into the Predicate so that we can read the value based on the data type. Currently
+  //       literal context doesn't support float, and we cannot differentiate explicit string literal and literal
+  //       without explicit type, so we always convert the literal into string.
   private static String getStringValue(ExpressionContext expressionContext) {
     if(expressionContext.getType() != ExpressionContext.Type.LITERAL){
       throw new BadQueryRequestException(

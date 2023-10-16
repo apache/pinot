@@ -18,14 +18,15 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -36,65 +37,66 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
-import org.apache.pinot.spi.utils.BooleanUtils;
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
  * Class that executes the group by aggregations for the multistage AggregateOperator.
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class MultistageGroupByExecutor {
-  private final AggType _aggType;
-  // The identifier operands for the aggregation function only store the column name. This map contains mapping
-  // between column name to their index which is used in v2 engine.
-  private final Map<String, Integer> _colNameToIndexMap;
-  private final DataSchema _resultSchema;
-
-  private final List<ExpressionContext> _groupSet;
+  private final int[] _groupKeyIds;
   private final AggregationFunction[] _aggFunctions;
-  private final int[] _filterArgIndices;
+  private final int[] _filterArgIds;
+  private final int _maxFilterArgId;
+  private final AggType _aggType;
+  private final DataSchema _resultSchema;
+  private final int _numGroupsLimit;
 
   // Group By Result holders for each mode
   private final GroupByResultHolder[] _aggregateResultHolders;
-  private final Map<Integer, Object[]> _mergeResultHolder;
+  private final List<Object[]> _mergeResultHolder;
 
   // Mapping from the row-key to a zero based integer index. This is used when we invoke the v1 aggregation functions
   // because they use the zero based integer indexes to store results.
-  private final Map<Key, Integer> _groupKeyToIdMap;
+  private final Object2IntOpenHashMap<Object> _groupKeyToIdMap;
 
-  private final int _numGroupsLimit;
-  private final int _maxInitialResultHolderCapacity;
-
-  private boolean _numGroupsLimitReached;
-
-  public MultistageGroupByExecutor(List<ExpressionContext> groupByExpr, AggregationFunction[] aggFunctions,
-      @Nullable int[] filterArgIndices, AggType aggType, Map<String, Integer> colNameToIndexMap,
-      DataSchema resultSchema, Map<String, String> customProperties, @Nullable AbstractPlanNode.NodeHint nodeHint) {
-    _aggType = aggType;
-    _colNameToIndexMap = colNameToIndexMap;
-    _groupSet = groupByExpr;
+  public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
+      int maxFilterArgId, AggType aggType, DataSchema resultSchema, Map<String, String> opChainMetadata,
+      @Nullable AbstractPlanNode.NodeHint nodeHint) {
+    _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
-    _filterArgIndices = filterArgIndices;
+    _filterArgIds = filterArgIds;
+    _maxFilterArgId = maxFilterArgId;
+    _aggType = aggType;
     _resultSchema = resultSchema;
+    int maxInitialResultHolderCapacity = getMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
+    _numGroupsLimit = getNumGroupsLimit(opChainMetadata, nodeHint);
 
-    _aggregateResultHolders = new GroupByResultHolder[_aggFunctions.length];
-    _mergeResultHolder = new HashMap<>();
-
-    _groupKeyToIdMap = new HashMap<>();
-
-    _numGroupsLimit = getNumGroupsLimit(customProperties, nodeHint);
-    _maxInitialResultHolderCapacity = getMaxInitialResultHolderCapacity(customProperties, nodeHint);
-
-    for (int i = 0; i < _aggFunctions.length; i++) {
-      _aggregateResultHolders[i] =
-          _aggFunctions[i].createGroupByResultHolder(_maxInitialResultHolderCapacity, _numGroupsLimit);
+    int numFunctions = aggFunctions.length;
+    if (!aggType.isInputIntermediateFormat()) {
+      _aggregateResultHolders = new GroupByResultHolder[numFunctions];
+      for (int i = 0; i < numFunctions; i++) {
+        _aggregateResultHolders[i] =
+            _aggFunctions[i].createGroupByResultHolder(maxInitialResultHolderCapacity, _numGroupsLimit);
+      }
+      _mergeResultHolder = null;
+    } else {
+      _mergeResultHolder = new ArrayList<>(maxInitialResultHolderCapacity);
+      _aggregateResultHolders = null;
     }
+
+    _groupKeyToIdMap = new Object2IntOpenHashMap<>();
+    _groupKeyToIdMap.defaultReturnValue(GroupKeyGenerator.INVALID_ID);
   }
 
-  private int getNumGroupsLimit(Map<String, String> customProperties, @Nullable AbstractPlanNode.NodeHint nodeHint) {
+  private int getNumGroupsLimit(Map<String, String> opChainMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> aggregateOptions = nodeHint._hintOptions.get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
       if (aggregateOptions != null) {
@@ -104,11 +106,11 @@ public class MultistageGroupByExecutor {
         }
       }
     }
-    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(customProperties);
+    Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(opChainMetadata);
     return numGroupsLimit != null ? numGroupsLimit : InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
   }
 
-  private int getMaxInitialResultHolderCapacity(Map<String, String> customProperties,
+  private int getMaxInitialResultHolderCapacity(Map<String, String> opChainMetadata,
       @Nullable AbstractPlanNode.NodeHint nodeHint) {
     if (nodeHint != null) {
       Map<String, String> aggregateOptions = nodeHint._hintOptions.get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
@@ -120,7 +122,7 @@ public class MultistageGroupByExecutor {
         }
       }
     }
-    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(customProperties);
+    Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(opChainMetadata);
     return maxInitialResultHolderCapacity != null ? maxInitialResultHolderCapacity
         : InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
   }
@@ -132,9 +134,9 @@ public class MultistageGroupByExecutor {
   /**
    * Performs group-by aggregation for the data in the block.
    */
-  public void processBlock(TransferableBlock block, DataSchema inputDataSchema) {
+  public void processBlock(TransferableBlock block) {
     if (!_aggType.isInputIntermediateFormat()) {
-      processAggregate(block, inputDataSchema);
+      processAggregate(block);
     } else {
       processMerge(block);
     }
@@ -148,101 +150,144 @@ public class MultistageGroupByExecutor {
       return Collections.emptyList();
     }
     List<Object[]> rows = new ArrayList<>(_groupKeyToIdMap.size());
-    int numKeys = _groupSet.size();
+    int numKeys = _groupKeyIds.length;
     int numFunctions = _aggFunctions.length;
     int numColumns = numKeys + numFunctions;
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
-    for (Map.Entry<Key, Integer> entry : _groupKeyToIdMap.entrySet()) {
-      Object[] row = new Object[numColumns];
-      Object[] keyValues = entry.getKey().getValues();
-      System.arraycopy(keyValues, 0, row, 0, numKeys);
-      int groupId = entry.getValue();
-      for (int i = 0; i < numFunctions; i++) {
-        AggregationFunction func = _aggFunctions[i];
-        int index = numKeys + i;
-        Object value;
-        switch (_aggType) {
-          case LEAF:
-            value = func.extractGroupByResult(_aggregateResultHolders[i], groupId);
-            break;
-          case INTERMEDIATE:
-            value = _mergeResultHolder.get(groupId)[i];
-            break;
-          case FINAL:
-            value = func.extractFinalResult(_mergeResultHolder.get(groupId)[i]);
-            break;
-          case DIRECT:
-            Object intermediate = _aggFunctions[i].extractGroupByResult(_aggregateResultHolders[i], groupId);
-            value = func.extractFinalResult(intermediate);
-            break;
-          default:
-            throw new UnsupportedOperationException("Unsupported aggTyp: " + _aggType);
+    if (numKeys == 1) {
+      for (Object2IntMap.Entry<Object> entry : _groupKeyToIdMap.object2IntEntrySet()) {
+        Object[] row = new Object[numColumns];
+        row[0] = entry.getKey();
+        int groupId = entry.getIntValue();
+        for (int i = 0; i < numFunctions; i++) {
+          row[i + 1] = getResultValue(i, groupId);
         }
-        row[index] = value;
+        // Convert the results from AggregationFunction to the desired type
+        TypeUtils.convertRow(row, resultStoredTypes);
+        rows.add(row);
       }
-      // Convert the results from AggregationFunction to the desired type
-      TypeUtils.convertRow(row, resultStoredTypes);
-      rows.add(row);
+    } else {
+      for (Object2IntMap.Entry<Object> entry : _groupKeyToIdMap.object2IntEntrySet()) {
+        Object[] row = new Object[numColumns];
+        Object[] keyValues = ((Key) entry.getKey()).getValues();
+        System.arraycopy(keyValues, 0, row, 0, numKeys);
+        int groupId = entry.getIntValue();
+        for (int i = 0; i < numFunctions; i++) {
+          row[numKeys + i] = getResultValue(i, groupId);
+        }
+        // Convert the results from AggregationFunction to the desired type
+        TypeUtils.convertRow(row, resultStoredTypes);
+        rows.add(row);
+      }
     }
     return rows;
   }
 
-  public boolean isNumGroupsLimitReached() {
-    return _numGroupsLimitReached;
+  private Object getResultValue(int functionId, int groupId) {
+    AggregationFunction aggFunction = _aggFunctions[functionId];
+    switch (_aggType) {
+      case LEAF:
+        return aggFunction.extractGroupByResult(_aggregateResultHolders[functionId], groupId);
+      case INTERMEDIATE:
+        return _mergeResultHolder.get(groupId)[functionId];
+      case FINAL:
+        return aggFunction.extractFinalResult(_mergeResultHolder.get(groupId)[functionId]);
+      case DIRECT:
+        Object intermediate = aggFunction.extractGroupByResult(_aggregateResultHolders[functionId], groupId);
+        return aggFunction.extractFinalResult(intermediate);
+      default:
+        throw new IllegalStateException("Unsupported aggType: " + _aggType);
+    }
   }
 
-  private void processAggregate(TransferableBlock block, DataSchema inputDataSchema) {
-    if (_filterArgIndices == null) {
-      int[] intKeys = generateGroupByKeys(block.getContainer());
+  public boolean isNumGroupsLimitReached() {
+    return _groupKeyToIdMap.size() == _numGroupsLimit;
+  }
+
+  private void processAggregate(TransferableBlock block) {
+    if (_maxFilterArgId < 0) {
+      // No filter for any aggregation function
+      int[] intKeys = generateGroupByKeys(block);
       for (int i = 0; i < _aggFunctions.length; i++) {
-        AggregationFunction aggregationFunction = _aggFunctions[i];
-        Map<ExpressionContext, BlockValSet> blockValSetMap =
-            AggregateOperator.getBlockValSetMap(aggregationFunction, block, inputDataSchema, _colNameToIndexMap, -1);
+        AggregationFunction aggFunction = _aggFunctions[i];
+        Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(aggFunction, block);
         GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
         groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
-        aggregationFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
+        aggFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
       }
     } else {
+      // Some aggregation functions have filter, cache the matching rows
+      int[] intKeys = null;
+      RoaringBitmap[] matchedBitmaps = new RoaringBitmap[_maxFilterArgId + 1];
+      int[] numMatchedRowsArray = new int[_maxFilterArgId + 1];
+      int[][] filteredIntKeysArray = new int[_maxFilterArgId + 1][];
       for (int i = 0; i < _aggFunctions.length; i++) {
-        AggregationFunction aggregationFunction = _aggFunctions[i];
-        int filterArgIdx = _filterArgIndices[i];
-        int[] intKeys = generateGroupByKeys(block.getContainer(), filterArgIdx);
-        Map<ExpressionContext, BlockValSet> blockValSetMap =
-            AggregateOperator.getBlockValSetMap(aggregationFunction, block, inputDataSchema, _colNameToIndexMap,
-                filterArgIdx);
-        int numRows = AggregateOperator.computeBlockNumRows(block, filterArgIdx);
-        GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
-        groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
-        aggregationFunction.aggregateGroupBySV(numRows, intKeys, groupByResultHolder, blockValSetMap);
+        AggregationFunction aggFunction = _aggFunctions[i];
+        int filterArgId = _filterArgIds[i];
+        if (filterArgId < 0) {
+          // No filter for this aggregation function
+          if (intKeys == null) {
+            intKeys = generateGroupByKeys(block);
+          }
+          Map<ExpressionContext, BlockValSet> blockValSetMap = AggregateOperator.getBlockValSetMap(aggFunction, block);
+          GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
+          groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
+          aggFunction.aggregateGroupBySV(block.getNumRows(), intKeys, groupByResultHolder, blockValSetMap);
+        } else {
+          // Need to filter the block before aggregation
+          RoaringBitmap matchedBitmap = matchedBitmaps[filterArgId];
+          if (matchedBitmap == null) {
+            matchedBitmap = AggregateOperator.getMatchedBitmap(block, filterArgId);
+            matchedBitmaps[filterArgId] = matchedBitmap;
+            int numMatchedRows = matchedBitmap.getCardinality();
+            numMatchedRowsArray[filterArgId] = numMatchedRows;
+            filteredIntKeysArray[filterArgId] = generateGroupByKeys(block, numMatchedRows, matchedBitmap);
+          }
+          int numMatchedRows = numMatchedRowsArray[filterArgId];
+          int[] filteredIntKeys = filteredIntKeysArray[filterArgId];
+          Map<ExpressionContext, BlockValSet> blockValSetMap =
+              AggregateOperator.getFilteredBlockValSetMap(aggFunction, block, numMatchedRows, matchedBitmap);
+          GroupByResultHolder groupByResultHolder = _aggregateResultHolders[i];
+          groupByResultHolder.ensureCapacity(_groupKeyToIdMap.size());
+          aggFunction.aggregateGroupBySV(numMatchedRows, filteredIntKeys, groupByResultHolder, blockValSetMap);
+        }
       }
     }
   }
 
   private void processMerge(TransferableBlock block) {
-    List<Object[]> container = block.getContainer();
-    int[] intKeys = generateGroupByKeys(container);
-
-    for (int i = 0; i < _aggFunctions.length; i++) {
-      for (int j = 0; j < container.size(); j++) {
-        Object[] row = container.get(j);
-        int rowKey = intKeys[j];
-        if (!_mergeResultHolder.containsKey(rowKey)) {
-          _mergeResultHolder.put(rowKey, new Object[_aggFunctions.length]);
-        }
-        Object intermediateResultToMerge =
-            AggregateOperator.extractValueFromRow(_aggFunctions[i], row, _colNameToIndexMap);
-
-        // Not all V1 aggregation functions have null-handling. So handle null values and call merge only if necessary.
-        if (intermediateResultToMerge == null) {
+    int[] groupByKeys = generateGroupByKeys(block);
+    int numRows = groupByKeys.length;
+    int numFunctions = _aggFunctions.length;
+    Object[][] intermediateResults = new Object[numFunctions][numRows];
+    for (int i = 0; i < numFunctions; i++) {
+      intermediateResults[i] = AggregateOperator.getIntermediateResults(_aggFunctions[i], block);
+    }
+    for (int i = 0; i < numRows; i++) {
+      int groupByKey = groupByKeys[i];
+      if (groupByKey == GroupKeyGenerator.INVALID_ID) {
+        continue;
+      }
+      Object[] mergedResults;
+      if (_mergeResultHolder.size() == groupByKey) {
+        mergedResults = new Object[numFunctions];
+        _mergeResultHolder.add(mergedResults);
+      } else {
+        mergedResults = _mergeResultHolder.get(groupByKey);
+      }
+      for (int j = 0; j < numFunctions; j++) {
+        AggregationFunction aggFunction = _aggFunctions[j];
+        Object intermediateResult = intermediateResults[j][i];
+        // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
+        // TODO: Fix it
+        if (intermediateResult == null) {
           continue;
         }
-        Object mergedIntermediateResult = _mergeResultHolder.get(rowKey)[i];
-        if (mergedIntermediateResult == null) {
-          _mergeResultHolder.get(rowKey)[i] = intermediateResultToMerge;
-          continue;
+        if (mergedResults[j] == null) {
+          mergedResults[j] = intermediateResult;
+        } else {
+          mergedResults[j] = aggFunction.merge(mergedResults[j], intermediateResult);
         }
-
-        _mergeResultHolder.get(rowKey)[i] = _aggFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge);
       }
     }
   }
@@ -250,70 +295,101 @@ public class MultistageGroupByExecutor {
   /**
    * Creates the group by key for each row. Converts the key into a 0-index based int value that can be used by
    * GroupByAggregationResultHolders used in v1 aggregations.
-   * <p>
-   * Returns the int key for each row.
    */
+  private int[] generateGroupByKeys(TransferableBlock block) {
+    return block.isContainerConstructed() ? generateGroupByKeys(block.getContainer())
+        : generateGroupByKeys(block.getDataBlock());
+  }
+
   private int[] generateGroupByKeys(List<Object[]> rows) {
     int numRows = rows.size();
-    int[] rowIntKeys = new int[numRows];
-    int numKeys = _groupSet.size();
-    for (int i = 0; i < numRows; i++) {
-      Object[] row = rows.get(i);
-      Object[] keyValues = new Object[numKeys];
-      for (int j = 0; j < numKeys; j++) {
-        keyValues[j] = row[_colNameToIndexMap.get(_groupSet.get(j).getIdentifier())];
+    int[] intKeys = new int[numRows];
+    int numKeys = _groupKeyIds.length;
+    if (numKeys == 1) {
+      int groupKeyId = _groupKeyIds[0];
+      for (int i = 0; i < numRows; i++) {
+        intKeys[i] = getGroupId(rows.get(i)[groupKeyId]);
       }
-      rowIntKeys[i] = getGroupId(new Key(keyValues));
+    } else {
+      for (int i = 0; i < numRows; i++) {
+        Object[] row = rows.get(i);
+        Object[] keyValues = new Object[numKeys];
+        for (int j = 0; j < numKeys; j++) {
+          keyValues[j] = row[_groupKeyIds[j]];
+        }
+        intKeys[i] = getGroupId(new Key(keyValues));
+      }
     }
-    return rowIntKeys;
+    return intKeys;
+  }
+
+  private int[] generateGroupByKeys(DataBlock dataBlock) {
+    Object[] keys;
+    if (_groupKeyIds.length == 1) {
+      keys = DataBlockExtractUtils.extractColumn(dataBlock, _groupKeyIds[0]);
+    } else {
+      keys = DataBlockExtractUtils.extractKeys(dataBlock, _groupKeyIds);
+    }
+    int numRows = keys.length;
+    int[] intKeys = new int[numRows];
+    for (int i = 0; i < numRows; i++) {
+      intKeys[i] = getGroupId(keys[i]);
+    }
+    return intKeys;
   }
 
   /**
    * Creates the group by key for each row. Converts the key into a 0-index based int value that can be used by
    * GroupByAggregationResultHolders used in v1 aggregations.
-   * <p>
-   * Returns the int key for each row.
    */
-  private int[] generateGroupByKeys(List<Object[]> rows, int filterArgIndex) {
-    int numRows = rows.size();
-    int[] rowIntKeys = new int[numRows];
-    int numKeys = _groupSet.size();
-    if (filterArgIndex == -1) {
-      for (int rowId = 0; rowId < numRows; rowId++) {
+  private int[] generateGroupByKeys(TransferableBlock block, int numMatchedRows, RoaringBitmap matchedBitmap) {
+    return block.isContainerConstructed() ? generateGroupByKeys(block.getContainer(), numMatchedRows, matchedBitmap)
+        : generateGroupByKeys(block.getDataBlock(), numMatchedRows, matchedBitmap);
+  }
+
+  private int[] generateGroupByKeys(List<Object[]> rows, int numMatchedRows, RoaringBitmap matchedBitmap) {
+    int[] intKeys = new int[numMatchedRows];
+    int numKeys = _groupKeyIds.length;
+    PeekableIntIterator iterator = matchedBitmap.getIntIterator();
+    if (numKeys == 1) {
+      int groupKeyId = _groupKeyIds[0];
+      for (int i = 0; i < numMatchedRows; i++) {
+        intKeys[i] = getGroupId(rows.get(iterator.next())[groupKeyId]);
+      }
+    } else {
+      for (int i = 0; i < numMatchedRows; i++) {
+        int rowId = iterator.next();
         Object[] row = rows.get(rowId);
         Object[] keyValues = new Object[numKeys];
         for (int j = 0; j < numKeys; j++) {
-          keyValues[j] = row[_colNameToIndexMap.get(_groupSet.get(j).getIdentifier())];
+          keyValues[j] = row[_groupKeyIds[j]];
         }
-        rowIntKeys[rowId] = getGroupId(new Key(keyValues));
+        intKeys[i] = getGroupId(new Key(keyValues));
       }
-      return rowIntKeys;
-    } else {
-      int outRowId = 0;
-      for (int inRowId = 0; inRowId < numRows; inRowId++) {
-        Object[] row = rows.get(inRowId);
-        if (BooleanUtils.fromNonNullInternalValue(row[filterArgIndex])) {
-          Object[] keyValues = new Object[numKeys];
-          for (int j = 0; j < numKeys; j++) {
-            keyValues[j] = row[_colNameToIndexMap.get(_groupSet.get(j).getIdentifier())];
-          }
-          rowIntKeys[outRowId++] = getGroupId(new Key(keyValues));
-        }
-      }
-      return Arrays.copyOfRange(rowIntKeys, 0, outRowId);
     }
+    return intKeys;
   }
 
-  private int getGroupId(Key key) {
-    Integer groupKey = _groupKeyToIdMap.computeIfAbsent(key, k -> {
-      int numGroupKeys = _groupKeyToIdMap.size();
-      if (numGroupKeys == _numGroupsLimit) {
-        _numGroupsLimitReached = true;
-        return null;
-      } else {
-        return numGroupKeys;
-      }
-    });
-    return groupKey != null ? groupKey : GroupKeyGenerator.INVALID_ID;
+  private int[] generateGroupByKeys(DataBlock dataBlock, int numMatchedRows, RoaringBitmap matchedBitmap) {
+    Object[] keys;
+    if (_groupKeyIds.length == 1) {
+      keys = DataBlockExtractUtils.extractColumn(dataBlock, _groupKeyIds[0], numMatchedRows, matchedBitmap);
+    } else {
+      keys = DataBlockExtractUtils.extractKeys(dataBlock, _groupKeyIds, numMatchedRows, matchedBitmap);
+    }
+    int[] intKeys = new int[numMatchedRows];
+    for (int i = 0; i < numMatchedRows; i++) {
+      intKeys[i] = getGroupId(keys[i]);
+    }
+    return intKeys;
+  }
+
+  private int getGroupId(Object key) {
+    int numGroups = _groupKeyToIdMap.size();
+    if (numGroups < _numGroupsLimit) {
+      return _groupKeyToIdMap.computeIntIfAbsent(key, k -> numGroups);
+    } else {
+      return _groupKeyToIdMap.getInt(key);
+    }
   }
 }

@@ -53,8 +53,14 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
     }
   }
 
+  /**
+   * For fields that are not set, we want to populate a null, instead of proto default.
+   */
   private Object getFieldValue(Descriptors.FieldDescriptor fieldDescriptor, Message message) {
-    if (fieldDescriptor.isRepeated() || !fieldDescriptor.hasOptionalKeyword() || message.hasField(fieldDescriptor)) {
+    // In order to support null, the field needs to support _field presence_
+    // See https://github.com/protocolbuffers/protobuf/blob/main/docs/field_presence.md
+    // or FieldDescriptor#hasPresence()
+    if (!fieldDescriptor.hasPresence() || message.hasField(fieldDescriptor)) {
       return message.getField(fieldDescriptor);
     } else {
       return null;

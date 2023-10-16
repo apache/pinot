@@ -36,11 +36,17 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironment;
@@ -57,14 +63,17 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.h2.jdbc.JdbcArray;
-import org.testng.Assert;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
 
 
 public abstract class QueryRunnerTestBase extends QueryTestSet {
@@ -92,7 +101,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
    * Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
    * ser/de dispatches.
    */
-  protected List<Object[]> queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
+  protected ResultTable queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     QueryEnvironment.QueryPlannerResult queryPlannerResult =
@@ -112,33 +121,49 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
     }
 
+    // Submission Stub logic are mimic {@link QueryServer}
     List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+    List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
     for (int stageId = 0; stageId < stagePlans.size(); stageId++) {
       if (stageId != 0) {
-        processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap);
+        submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap));
       }
       if (executionStatsAggregatorMap != null) {
         executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
-    ResultTable resultTable =
-        QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
-            executionStatsAggregatorMap, _mailboxService);
-    return resultTable.getRows();
+    try {
+      CompletableFuture.allOf(submissionStubs.toArray(new CompletableFuture[0])).get(timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      // wrap and throw the exception here is for assert purpose on dispatch-time error
+      throw new RuntimeException("Error occurred during stage submission: " + QueryException.getTruncatedStackTrace(e));
+    } finally {
+      // Cancel all ongoing submission
+      for (CompletableFuture<?> future : submissionStubs) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
+    }
+    // exception will be propagated through for assert purpose on runtime error
+    return QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
+        executionStatsAggregatorMap, _mailboxService);
   }
 
-  protected void processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan, int stageId,
-      Map<String, String> requestMetadataMap) {
+  protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,
+      int stageId, Map<String, String> requestMetadataMap) {
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
         dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap();
+    List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverInstanceToWorkerIdMap.entrySet()) {
       QueryServerInstance server = entry.getKey();
       for (int workerId : entry.getValue()) {
         DistributedStagePlan distributedStagePlan =
             constructDistributedStagePlan(dispatchableSubPlan, stageId, new VirtualServerAddress(server, workerId));
-        _servers.get(server).processQuery(distributedStagePlan, requestMetadataMap);
+        submissionStubs.add(_servers.get(server).processQuery(distributedStagePlan, requestMetadataMap));
       }
     }
+    return submissionStubs;
   }
 
   protected static DistributedStagePlan constructDistributedStagePlan(DispatchableSubPlan dispatchableSubPlan,
@@ -172,167 +197,198 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     return result;
   }
 
-  protected void compareRowEquals(List<Object[]> resultRows, List<Object[]> expectedRows) {
-    compareRowEquals(resultRows, expectedRows, false);
+  protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows) {
+    compareRowEquals(resultTable, expectedRows, false);
   }
 
-  protected void compareRowEquals(List<Object[]> resultRows, List<Object[]> expectedRows,
-      boolean keepOutputRowsInOrder) {
-    Assert.assertEquals(resultRows.size(), expectedRows.size(),
-        String.format("Mismatched number of results. expected: %s, actual: %s",
-            expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
-            resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n"))));
+  protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows, boolean keepOutputRowsInOrder) {
+    List<Object[]> resultRows = resultTable.getRows();
+    int numRows = resultRows.size();
+    assertEquals(numRows, expectedRows.size(), String.format("Mismatched number of results. expected: %s, actual: %s",
+        expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
+        resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n"))));
 
-    Comparator<Object> valueComp = (l, r) -> {
-      if (l == null && r == null) {
+    DataSchema dataSchema = resultTable.getDataSchema();
+    resultRows.forEach(row -> canonicalizeRow(dataSchema, row));
+    expectedRows.forEach(row -> canonicalizeRow(dataSchema, row));
+    if (!keepOutputRowsInOrder) {
+      sortRows(resultRows);
+      sortRows(expectedRows);
+    }
+    for (int i = 0; i < numRows; i++) {
+      Object[] resultRow = resultRows.get(i);
+      Object[] expectedRow = expectedRows.get(i);
+      assertEquals(resultRow.length, expectedRow.length,
+          String.format("Unexpected row size mismatch. Expected: %s, Actual: %s", Arrays.toString(expectedRow),
+              Arrays.toString(resultRow)));
+      for (int j = 0; j < resultRow.length; j++) {
+        assertTrue(typeCompatibleFuzzyEquals(dataSchema.getColumnDataType(j), resultRow[j], expectedRow[j]),
+            "Not match at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow) + " Actual: "
+                + Arrays.toString(resultRow));
+      }
+    }
+  }
+
+  protected static void canonicalizeRow(DataSchema dataSchema, Object[] row) {
+    for (int i = 0; i < row.length; i++) {
+      row[i] = canonicalizeValue(dataSchema.getColumnDataType(i), row[i]);
+    }
+  }
+
+  protected static Object canonicalizeValue(ColumnDataType columnDataType, Object value) {
+    if (value == null) {
+      return null;
+    }
+    switch (columnDataType) {
+      case INT:
+        return ((Number) value).intValue();
+      case LONG:
+        return ((Number) value).longValue();
+      case FLOAT:
+        return ((Number) value).floatValue();
+      case DOUBLE:
+        return ((Number) value).doubleValue();
+      case BIG_DECIMAL:
+        if (value instanceof String) {
+          return new BigDecimal((String) value);
+        }
+        assertTrue(value instanceof BigDecimal, "Got unexpected value type: " + value.getClass()
+            + " for BIG_DECIMAL column, expected: String or BigDecimal");
+        return value;
+      case BOOLEAN:
+        assertTrue(value instanceof Boolean,
+            "Got unexpected value type: " + value.getClass() + " for BOOLEAN column, expected: Boolean");
+        return value;
+      case TIMESTAMP:
+        if (value instanceof String) {
+          return Timestamp.valueOf((String) value);
+        }
+        assertTrue(value instanceof Timestamp,
+            "Got unexpected value type: " + value.getClass() + " for TIMESTAMP column, expected: String or Timestamp");
+        return value;
+      case STRING:
+        assertTrue(value instanceof String,
+            "Got unexpected value type: " + value.getClass() + " for STRING column, expected: String");
+        return value;
+      case BYTES:
+        if (value instanceof byte[]) {
+          return BytesUtils.toHexString((byte[]) value);
+        }
+        assertTrue(value instanceof String,
+            "Got unexpected value type: " + value.getClass() + " for BYTES column, expected: String or byte[]");
+        return value;
+      case INT_ARRAY:
+        if (value instanceof JdbcArray) {
+          try {
+            Object[] array = (Object[]) ((JdbcArray) value).getArray();
+            int[] intArray = new int[array.length];
+            for (int i = 0; i < array.length; i++) {
+              intArray[i] = ((Number) array[i]).intValue();
+            }
+            return intArray;
+          } catch (SQLException e) {
+            throw new RuntimeException(e);
+          }
+        }
+        assertTrue(value instanceof int[],
+            "Got unexpected value type: " + value.getClass() + " for INT_ARRAY column, expected: int[] or JdbcArray");
+        return value;
+      case STRING_ARRAY:
+        if (value instanceof List) {
+          return ((List) value).toArray(new String[0]);
+        }
+        if (value instanceof JdbcArray) {
+          try {
+            Object[] array = (Object[]) ((JdbcArray) value).getArray();
+            String[] stringArray = new String[array.length];
+            for (int i = 0; i < array.length; i++) {
+              stringArray[i] = (String) array[i];
+            }
+            return stringArray;
+          } catch (SQLException e) {
+            throw new RuntimeException(e);
+          }
+        }
+        assertTrue(value instanceof String[], "Got unexpected value type: " + value.getClass()
+            + " for STRING_ARRAY column, expected: String[], List or JdbcArray");
+        return value;
+      default:
+        throw new UnsupportedOperationException("Unsupported ColumnDataType: " + columnDataType);
+    }
+  }
+
+  protected static void sortRows(List<Object[]> rows) {
+    Comparator<Object> valueComparator = (v1, v2) -> {
+      if (v1 == null && v2 == null) {
         return 0;
-      } else if (l == null) {
+      } else if (v1 == null) {
         return -1;
-      } else if (r == null) {
+      } else if (v2 == null) {
         return 1;
       }
-      if (l instanceof Integer) {
-        return Integer.compare((Integer) l, ((Number) r).intValue());
-      } else if (l instanceof Long) {
-        return Long.compare((Long) l, ((Number) r).longValue());
-      } else if (l instanceof Float) {
-        float lf = (Float) l;
-        float rf = ((Number) r).floatValue();
-        if (DoubleMath.fuzzyEquals(lf, rf, DOUBLE_CMP_EPSILON)) {
-          return 0;
-        }
-        float maxf = Math.max(Math.abs(lf), Math.abs(rf));
-        if (DoubleMath.fuzzyEquals(lf / maxf, rf / maxf, DOUBLE_CMP_EPSILON)) {
-          return 0;
-        }
-        return Float.compare(lf, rf);
-      } else if (l instanceof Double) {
-        double ld = (Double) l;
-        double rd = ((Number) r).doubleValue();
-        if (DoubleMath.fuzzyEquals(ld, rd, DOUBLE_CMP_EPSILON)) {
-          return 0;
-        }
-        double maxd = Math.max(Math.abs(ld), Math.abs(rd));
-        if (DoubleMath.fuzzyEquals(ld / maxd, rd / maxd, DOUBLE_CMP_EPSILON)) {
-          return 0;
-        }
-        return Double.compare(ld, rd);
-      } else if (l instanceof String) {
-        if (r instanceof byte[]) {
-          return ((String) l).compareTo(BytesUtils.toHexString((byte[]) r));
-        } else if (r instanceof Timestamp) {
-          return ((String) l).compareTo((r).toString());
-        }
-        return ((String) l).compareTo((String) r);
-      } else if (l instanceof Boolean) {
-        return ((Boolean) l).compareTo((Boolean) r);
-      } else if (l instanceof BigDecimal) {
-        if (r instanceof BigDecimal) {
-          return ((BigDecimal) l).compareTo((BigDecimal) r);
-        } else {
-          return ((BigDecimal) l).compareTo(new BigDecimal((String) r));
-        }
-      } else if (l instanceof byte[]) {
-        if (r instanceof byte[]) {
-          return ByteArray.compare((byte[]) l, (byte[]) r);
-        } else {
-          return ByteArray.compare((byte[]) l, ((ByteArray) r).getBytes());
-        }
-      } else if (l instanceof ByteArray) {
-        if (r instanceof ByteArray) {
-          return ((ByteArray) l).compareTo((ByteArray) r);
-        } else {
-          return ByteArray.compare(((ByteArray) l).getBytes(), (byte[]) r);
-        }
-      } else if (l instanceof Timestamp) {
-        return ((Timestamp) l).compareTo((Timestamp) r);
-      } else if (l instanceof int[]) {
-        int[] larray = (int[]) l;
-        try {
-          if (r instanceof JdbcArray) {
-            Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
-            for (int idx = 0; idx < larray.length; idx++) {
-              Number relement = (Number) rarray[idx];
-              if (larray[idx] != relement.intValue()) {
-                return -1;
-              }
-            }
-          } else {
-            int[] rarray = (int[]) r;
-            for (int idx = 0; idx < larray.length; idx++) {
-              if (larray[idx] != rarray[idx]) {
-                return -1;
-              }
-            }
-          }
-        } catch (SQLException e) {
-          throw new RuntimeException(e);
-        }
-        return 0;
-      } else if (l instanceof String[]) {
-        String[] larray = (String[]) l;
-        try {
-          if (r instanceof JdbcArray) {
-            Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
-            for (int idx = 0; idx < larray.length; idx++) {
-              if (!larray[idx].equals(rarray[idx])) {
-                return -1;
-              }
-            }
-          } else {
-            String[] rarray = (r instanceof List) ? ((List<String>) r).toArray(new String[0]) : (String[]) r;
-            for (int idx = 0; idx < larray.length; idx++) {
-              if (!larray[idx].equals(rarray[idx])) {
-                return -1;
-              }
-            }
-          }
-        } catch (SQLException e) {
-          throw new RuntimeException(e);
-        }
-        return 0;
-      } else if (l instanceof JdbcArray) {
-        try {
-          Object[] larray = (Object[]) ((JdbcArray) l).getArray();
-          Object[] rarray = (Object[]) ((JdbcArray) r).getArray();
-          for (int idx = 0; idx < larray.length; idx++) {
-            if (!larray[idx].equals(rarray[idx])) {
-              return -1;
-            }
-          }
-        } catch (SQLException e) {
-          throw new RuntimeException(e);
-        }
-        return 0;
-      } else {
-        throw new RuntimeException("non supported type " + l.getClass());
+      if (v1 instanceof Comparable) {
+        return ((Comparable) v1).compareTo(v2);
       }
+      if (v1 instanceof int[]) {
+        return Arrays.compare((int[]) v1, (int[]) v2);
+      }
+      if (v1 instanceof String[]) {
+        return Arrays.compare((String[]) v1, (String[]) v2);
+      }
+      throw new UnsupportedOperationException("Unsupported class: " + v1.getClass());
     };
-    Comparator<Object[]> rowComp = (l, r) -> {
-      int cmp = 0;
-      for (int i = 0; i < l.length; i++) {
-        cmp = valueComp.compare(l[i], r[i]);
+    rows.sort((r1, r2) -> {
+      for (int i = 0; i < r1.length; i++) {
+        int cmp = valueComparator.compare(r1[i], r2[i]);
         if (cmp != 0) {
           return cmp;
         }
       }
       return 0;
-    };
-    if (!keepOutputRowsInOrder) {
-      resultRows.sort(rowComp);
-      expectedRows.sort(rowComp);
+    });
+  }
+
+  protected static boolean typeCompatibleFuzzyEquals(ColumnDataType columnDataType, @Nullable Object actual,
+      @Nullable Object expected) {
+    if (actual == null || expected == null) {
+      return actual == expected;
     }
-    for (int i = 0; i < resultRows.size(); i++) {
-      Object[] resultRow = resultRows.get(i);
-      Object[] expectedRow = expectedRows.get(i);
-      Assert.assertEquals(expectedRow.length, resultRow.length,
-          String.format("Unexpected row size mismatch. Expected: %s, Actual: %s", Arrays.toString(expectedRow),
-              Arrays.toString(resultRow)));
-      for (int j = 0; j < resultRow.length; j++) {
-        Assert.assertEquals(valueComp.compare(resultRow[j], expectedRow[j]), 0,
-            "Not match at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow) + " Actual: "
-                + Arrays.toString(resultRow));
-      }
+
+    switch (columnDataType) {
+      case INT:
+        return (int) actual == ((Number) expected).intValue();
+      case LONG:
+        return (long) actual == ((Number) expected).longValue();
+      case FLOAT:
+        float actualFloat = (float) actual;
+        float expectedFloat = ((Number) expected).floatValue();
+        if (DoubleMath.fuzzyEquals(actualFloat, expectedFloat, DOUBLE_CMP_EPSILON)) {
+          return true;
+        }
+        float maxFloat = Math.max(Math.abs(actualFloat), Math.abs(expectedFloat));
+        return DoubleMath.fuzzyEquals(actualFloat / maxFloat, expectedFloat / maxFloat, DOUBLE_CMP_EPSILON);
+      case DOUBLE:
+        double actualDouble = (double) actual;
+        double expectedDouble = ((Number) expected).doubleValue();
+        if (DoubleMath.fuzzyEquals(actualDouble, expectedDouble, DOUBLE_CMP_EPSILON)) {
+          return true;
+        }
+        double maxDouble = Math.max(Math.abs(actualDouble), Math.abs(expectedDouble));
+        return DoubleMath.fuzzyEquals(actualDouble / maxDouble, expectedDouble / maxDouble, DOUBLE_CMP_EPSILON);
+      case BIG_DECIMAL:
+        // Use compare to handle different scale
+        return ((BigDecimal) actual).compareTo((BigDecimal) expected) == 0;
+      case BOOLEAN:
+      case TIMESTAMP:
+      case STRING:
+      case BYTES:
+        return actual.equals(expected);
+      case INT_ARRAY:
+        return Arrays.equals((int[]) actual, (int[]) expected);
+      case STRING_ARRAY:
+        return Arrays.equals((String[]) actual, (String[]) expected);
+      default:
+        throw new UnsupportedOperationException("Unsupported ColumnDataType: " + columnDataType);
     }
   }
 
@@ -377,13 +433,13 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected Connection _h2Connection;
 
   protected Connection getH2Connection() {
-    Assert.assertNotNull(_h2Connection, "H2 Connection has not been initialized");
+    assertNotNull(_h2Connection, "H2 Connection has not been initialized");
     return _h2Connection;
   }
 
   protected void setH2Connection()
       throws Exception {
-    Assert.assertNull(_h2Connection);
+    assertNull(_h2Connection);
     Class.forName("org.h2.Driver");
     _h2Connection = DriverManager.getConnection("jdbc:h2:mem:");
   }

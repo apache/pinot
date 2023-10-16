@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * Highlights:
  * 1-An object of this class is hosted by each RealtimeTableDataManager.
  * 2-The object tracks ingestion delays for all partitions hosted by the current server for the given Realtime table.
- * 3-Partition delays are updated by all LLRealtimeSegmentDataManager objects hosted in the corresponding
+ * 3-Partition delays are updated by all RealtimeSegmentDataManager objects hosted in the corresponding
  *   RealtimeTableDataManager.
  * 4-Individual metrics are associated with each partition being tracked.
  * 5-Delays for partitions that do not have events to consume are reported as zero.
@@ -58,12 +58,12 @@ import org.slf4j.LoggerFactory;
  *     (CONSUMING -> ONLINE state change)
  *             |
  *      markPartitionForConfirmation(partitionId)
- *            |                         |<-updateIngestionDelay()-{LLRealtimeSegmentDataManager(Partition 0}}
+ *            |                         |<-updateIngestionDelay()-{RealtimeSegmentDataManager(Partition 0}}
  *            |                         |
  * ___________V_________________________V_
- * |           (Table X)                |<-updateIngestionDelay()-{LLRealtimeSegmentDataManager(Partition 1}}
+ * |           (Table X)                |<-updateIngestionDelay()-{RealtimeSegmentDataManager(Partition 1}}
  * | IngestionDelayTracker              |           ...
- * |____________________________________|<-updateIngestionDelay()-{LLRealtimeSegmentDataManager (Partition n}}
+ * |____________________________________|<-updateIngestionDelay()-{RealtimeSegmentDataManager (Partition n}}
  *              ^                      ^
  *              |                       \
  *   timeoutInactivePartitions()    stopTrackingPartitionIngestionDelay(partitionId)
@@ -202,7 +202,7 @@ public class IngestionDelayTracker {
   }
 
   /*
-   * Called by LLRealTimeSegmentDataManagers to post ingestion time updates to this tracker class.
+   * Called by RealTimeSegmentDataManagers to post ingestion time updates to this tracker class.
    *
    * @param ingestionTimeMs ingestion time being recorded.
    * @param firstStreamIngestionTimeMs time the event was ingested in the first stage of the ingestion pipeline.
@@ -210,8 +210,9 @@ public class IngestionDelayTracker {
    */
   public void updateIngestionDelay(long ingestionTimeMs, long firstStreamIngestionTimeMs, int partitionGroupId) {
     // Store new measure and wipe old one for this partition
-    if (!_isServerReadyToServeQueries.get()) {
+    if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
+      // or once the table data manager has been shutdown.
       return;
     }
     if ((ingestionTimeMs < 0) && (firstStreamIngestionTimeMs < 0)) {
@@ -331,8 +332,8 @@ public class IngestionDelayTracker {
   }
 
   /*
-   * We use this method to clean up when a table is being removed. No updates are expected at this time
-   * as all LLRealtimeSegmentManagers should be down now.
+   * We use this method to clean up when a table is being removed. No updates are expected at this time as all
+   * RealtimeSegmentManagers should be down now.
    */
   public void shutdown() {
     // Now that segments can't report metric, destroy metric for this table

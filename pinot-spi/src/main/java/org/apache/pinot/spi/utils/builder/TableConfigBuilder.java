@@ -62,10 +62,8 @@ public class TableConfigBuilder {
   private final TableType _tableType;
   private String _tableName;
   private boolean _isDimTable;
-  private boolean _isLLC;
 
   // Segments config related
-  private String _schemaName;
   private String _numReplicas = DEFAULT_NUM_REPLICAS;
   private String _timeColumnName;
   private String _timeType;
@@ -141,14 +139,10 @@ public class TableConfigBuilder {
     return this;
   }
 
+  @Deprecated
   public TableConfigBuilder setLLC(boolean isLLC) {
     Preconditions.checkState(_tableType == TableType.REALTIME);
-    _isLLC = isLLC;
-    return this;
-  }
-
-  public TableConfigBuilder setSchemaName(String schemaName) {
-    _schemaName = schemaName;
+    Preconditions.checkArgument(isLLC, "Real-time table must use LLC");
     return this;
   }
 
@@ -434,12 +428,8 @@ public class TableConfigBuilder {
     validationConfig.setSegmentAssignmentStrategy(_segmentAssignmentStrategy);
     validationConfig.setReplicaGroupStrategyConfig(_replicaGroupStrategyConfig);
     validationConfig.setCompletionConfig(_completionConfig);
-    validationConfig.setSchemaName(_schemaName);
     validationConfig.setReplication(_numReplicas);
     validationConfig.setPeerSegmentDownloadScheme(_peerSegmentDownloadScheme);
-    if (_isLLC) {
-      validationConfig.setReplicasPerPartition(_numReplicas);
-    }
     validationConfig.setCrypterClassName(_crypterClassName);
 
     // Tenant config

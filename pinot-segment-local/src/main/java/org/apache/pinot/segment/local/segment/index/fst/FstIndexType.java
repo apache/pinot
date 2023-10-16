@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.fst;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +63,8 @@ import org.apache.pinot.spi.data.Schema;
 public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator>
     implements ConfigurableFromIndexLoadingConfig<FstIndexConfig> {
   public static final String INDEX_DISPLAY_NAME = "fst";
+  private static final List<String> EXTENSIONS =
+      Collections.singletonList(V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
 
   protected FstIndexType() {
     super(StandardIndexes.FST_ID);
@@ -172,8 +175,8 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   }
 
   @Override
-  public String getFileExtension(ColumnMetadata columnMetadata) {
-    return V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+  public List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata) {
+    return EXTENSIONS;
   }
 
   private static class ReaderFactory extends IndexReaderFactory.Default<FstIndexConfig, TextIndexReader> {

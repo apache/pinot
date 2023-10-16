@@ -65,7 +65,7 @@ public class BasicAuthAccessFactory implements AccessControlFactory {
     public boolean hasDataAccess(RequesterIdentity requesterIdentity, String tableName) {
       Collection<String> tokens = getTokens(requesterIdentity);
       return tokens.stream()
-          .map(BasicAuthUtils::normalizeBase64Token)
+          .map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
           .map(_token2principal::get)
           .filter(Objects::nonNull)
           .findFirst()

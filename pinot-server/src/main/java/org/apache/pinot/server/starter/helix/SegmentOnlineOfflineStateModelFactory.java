@@ -30,7 +30,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableType;
@@ -107,15 +107,14 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
 
       // TODO: https://github.com/apache/pinot/issues/10049
       try {
-        if (!(acquiredSegment instanceof LLRealtimeSegmentDataManager)) {
+        if (!(acquiredSegment instanceof RealtimeSegmentDataManager)) {
           // We found an LLC segment that is not consuming right now, must be that we already swapped it with a
           // segment that has been built. Nothing to do for this state transition.
-          _logger.info(
-              "Segment {} not an instance of LLRealtimeSegmentDataManager. Reporting success for the transition",
+          _logger.info("Segment {} not an instance of RealtimeSegmentDataManager. Reporting success for the transition",
               acquiredSegment.getSegmentName());
           return;
         }
-        LLRealtimeSegmentDataManager segmentDataManager = (LLRealtimeSegmentDataManager) acquiredSegment;
+        RealtimeSegmentDataManager segmentDataManager = (RealtimeSegmentDataManager) acquiredSegment;
         SegmentZKMetadata segmentZKMetadata =
             ZKMetadataProvider.getSegmentZKMetadata(_instanceDataManager.getPropertyStore(), realtimeTableName,
                 segmentName);

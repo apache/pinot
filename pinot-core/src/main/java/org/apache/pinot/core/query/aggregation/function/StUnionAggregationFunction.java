@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -35,13 +36,8 @@ import org.locationtech.jts.geom.Geometry;
 
 public class StUnionAggregationFunction extends BaseSingleInputAggregationFunction<Geometry, ByteArray> {
 
-  /**
-   * Constructor for the class.
-   *
-   * @param expression Expression to aggregate on.
-   */
-  public StUnionAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  public StUnionAggregationFunction(List<ExpressionContext> arguments) {
+    super(verifySingleArgument(arguments, "ST_UNION"));
   }
 
   @Override

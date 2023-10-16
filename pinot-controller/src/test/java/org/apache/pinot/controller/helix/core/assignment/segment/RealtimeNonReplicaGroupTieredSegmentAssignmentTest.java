@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
@@ -33,13 +32,13 @@ import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -122,8 +121,8 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
-            .setTierConfigList(tierConfigList).setLLC(true).setStreamConfigs(streamConfigs).build();
-    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig);
+            .setTierConfigList(tierConfigList).setStreamConfigs(streamConfigs).build();
+    _segmentAssignment = SegmentAssignmentFactory.getSegmentAssignment(null, tableConfig, null);
 
     _instancePartitionsMap = new TreeMap<>();
     // CONSUMING instances:
@@ -184,8 +183,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
 
     // Rebalance without tier instancePartitions moves all instances to COMPLETED
     Map<String, Map<String, String>> newAssignment =
-        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null,
-            new BaseConfiguration());
+        _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, null, null, new RebalanceConfig());
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       if (segmentId < NUM_SEGMENTS - NUM_PARTITIONS) { // ONLINE segments
@@ -208,7 +206,7 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     int expectedOnTierB = 20;
     int expectedOnCompleted = NUM_SEGMENTS - NUM_PARTITIONS - expectedOnTierA - expectedOnTierB;
     newAssignment = _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
-        _tierInstancePartitionsMap, new BaseConfiguration());
+        _tierInstancePartitionsMap, new RebalanceConfig());
     assertEquals(newAssignment.size(), NUM_SEGMENTS);
     for (int segmentId = 0; segmentId < NUM_SEGMENTS; segmentId++) {
       if (segmentId < NUM_SEGMENTS - NUM_PARTITIONS) {
@@ -259,8 +257,8 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     }
 
     // Rebalance with including CONSUMING should give the same assignment
-    BaseConfiguration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.setProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, true);
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setIncludeConsuming(true);
     assertEquals(_segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
         _tierInstancePartitionsMap, rebalanceConfig), newAssignment);
 
@@ -270,13 +268,13 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     noRelocationInstancePartitionsMap.put(InstancePartitionsType.CONSUMING,
         _instancePartitionsMap.get(InstancePartitionsType.CONSUMING));
     assertEquals(_segmentAssignment.rebalanceTable(newAssignment, noRelocationInstancePartitionsMap, null, null,
-        new BaseConfiguration()), currentAssignment);
+        new RebalanceConfig()), currentAssignment);
 
     // Rebalance without COMPLETED instance partitions and with tierInstancePartitions should move ONLINE segments to
     // Tiers and CONSUMING segments to CONSUMING tenant.
     newAssignment =
         _segmentAssignment.rebalanceTable(currentAssignment, noRelocationInstancePartitionsMap, _sortedTiers,
-            _tierInstancePartitionsMap, new BaseConfiguration());
+            _tierInstancePartitionsMap, new RebalanceConfig());
 
     numSegmentsAssignedPerInstance =
         SegmentAssignmentUtils.getNumSegmentsAssignedPerInstance(newAssignment, INSTANCES_TIER_A);
@@ -299,8 +297,8 @@ public class RealtimeNonReplicaGroupTieredSegmentAssignmentTest {
     assertEquals(numSegmentsAssignedPerInstance.length, NUM_CONSUMING_INSTANCES);
 
     // Bootstrap
-    rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.setProperty(RebalanceConfigConstants.BOOTSTRAP, true);
+    rebalanceConfig = new RebalanceConfig();
+    rebalanceConfig.setBootstrap(true);
     newAssignment = _segmentAssignment.rebalanceTable(currentAssignment, _instancePartitionsMap, _sortedTiers,
         _tierInstancePartitionsMap, rebalanceConfig);
     int index = 0;

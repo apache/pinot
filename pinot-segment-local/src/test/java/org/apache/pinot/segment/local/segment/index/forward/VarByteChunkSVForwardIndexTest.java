@@ -27,8 +27,7 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang.StringUtils;
-import org.apache.pinot.segment.local.io.writer.impl.BaseChunkSVForwardIndexWriter;
-import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkSVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
@@ -44,7 +43,7 @@ import static org.testng.Assert.fail;
 
 
 /**
- * Unit test for {@link VarByteChunkSVForwardIndexReader} and {@link VarByteChunkSVForwardIndexWriter} classes.
+ * Unit test for {@link VarByteChunkSVForwardIndexReader} and {@link VarByteChunkForwardIndexWriter} classes.
  */
 public class VarByteChunkSVForwardIndexTest {
   private static final int NUM_ENTRIES = 5003;
@@ -77,7 +76,7 @@ public class VarByteChunkSVForwardIndexTest {
   }
 
   /**
-   * This test writes {@link #NUM_ENTRIES} using {@link VarByteChunkSVForwardIndexWriter}. It then reads
+   * This test writes {@link #NUM_ENTRIES} using {@link VarByteChunkForwardIndexWriter}. It then reads
    * the strings & bytes using {@link VarByteChunkSVForwardIndexReader}, and asserts that what was written is the
    * same as
    * what was read in.
@@ -105,12 +104,10 @@ public class VarByteChunkSVForwardIndexTest {
     }
 
     // test both formats (4-byte chunk offsets and 8-byte chunk offsets)
-    try (VarByteChunkSVForwardIndexWriter fourByteOffsetWriter = new VarByteChunkSVForwardIndexWriter(outFileFourByte,
-        compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes,
-        BaseChunkSVForwardIndexWriter.DEFAULT_VERSION);
-        VarByteChunkSVForwardIndexWriter eightByteOffsetWriter = new VarByteChunkSVForwardIndexWriter(outFileEightByte,
-            compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes,
-            BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+    try (VarByteChunkForwardIndexWriter fourByteOffsetWriter = new VarByteChunkForwardIndexWriter(outFileFourByte,
+        compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes, 2);
+        VarByteChunkForwardIndexWriter eightByteOffsetWriter = new VarByteChunkForwardIndexWriter(outFileEightByte,
+            compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes, 3)) {
       // NOTE: No need to test BYTES explicitly because STRING is handled as UTF-8 encoded bytes
       for (int i = 0; i < NUM_ENTRIES; i++) {
         fourByteOffsetWriter.putString(expected[i]);
@@ -120,12 +117,10 @@ public class VarByteChunkSVForwardIndexTest {
 
     try (VarByteChunkSVForwardIndexReader fourByteOffsetReader = new VarByteChunkSVForwardIndexReader(
         PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.STRING);
-        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader
-            .createContext();
+        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader.createContext();
         VarByteChunkSVForwardIndexReader eightByteOffsetReader = new VarByteChunkSVForwardIndexReader(
             PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.STRING);
-        ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader
-            .createContext()) {
+        ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader.createContext()) {
       for (int i = 0; i < NUM_ENTRIES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getString(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getString(i, eightByteOffsetReaderContext), expected[i]);
@@ -230,8 +225,8 @@ public class VarByteChunkSVForwardIndexTest {
     }
 
     int numDocsPerChunk = SingleValueVarByteRawIndexCreator.getNumDocsPerChunk(maxStringLengthInBytes);
-    try (VarByteChunkSVForwardIndexWriter writer = new VarByteChunkSVForwardIndexWriter(outFile, compressionType,
-        numDocs, numDocsPerChunk, maxStringLengthInBytes, BaseChunkSVForwardIndexWriter.CURRENT_VERSION)) {
+    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(outFile, compressionType, numDocs,
+        numDocsPerChunk, maxStringLengthInBytes, 3)) {
       // NOTE: No need to test BYTES explicitly because STRING is handled as UTF-8 encoded bytes
       for (int i = 0; i < numDocs; i++) {
         writer.putString(expected[i]);
@@ -274,7 +269,7 @@ public class VarByteChunkSVForwardIndexTest {
     file.deleteOnExit();
     int docSize = 21475;
     byte[] value = StringUtils.repeat("a", docSize).getBytes(UTF_8);
-    try (VarByteChunkSVForwardIndexWriter writer = new VarByteChunkSVForwardIndexWriter(file,
+    try (VarByteChunkForwardIndexWriter writer = new VarByteChunkForwardIndexWriter(file,
         ChunkCompressionType.PASS_THROUGH, 100_001, 1000, docSize, 2)) {
       try {
         for (int i = 0; i < 100_000; i++) {

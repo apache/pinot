@@ -20,7 +20,7 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import org.apache.pinot.spi.stream.PartitionLevelStreamConfig;
+import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**
@@ -36,7 +36,7 @@ public class FlushThresholdUpdateManager {
    * If flush size <= 0, create new SegmentSizeBasedFlushThresholdUpdater if not already created. Create only 1 per
    * table because we want to maintain tuning information for the table in the updater.
    */
-  public FlushThresholdUpdater getFlushThresholdUpdater(PartitionLevelStreamConfig streamConfig) {
+  public FlushThresholdUpdater getFlushThresholdUpdater(StreamConfig streamConfig) {
     String realtimeTableName = streamConfig.getTableNameWithType();
     int flushThresholdRows = streamConfig.getFlushThresholdRows();
 
@@ -44,8 +44,8 @@ public class FlushThresholdUpdateManager {
       _flushThresholdUpdaterMap.remove(realtimeTableName);
       return new DefaultFlushThresholdUpdater(flushThresholdRows);
     } else {
-      return _flushThresholdUpdaterMap
-          .computeIfAbsent(realtimeTableName, k -> new SegmentSizeBasedFlushThresholdUpdater());
+      return _flushThresholdUpdaterMap.computeIfAbsent(realtimeTableName,
+          k -> new SegmentSizeBasedFlushThresholdUpdater());
     }
   }
 

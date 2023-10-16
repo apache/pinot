@@ -90,6 +90,9 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
             .forCluster(helixResourceManager.getHelixClusterName()).build(), properties);
 
     // Add 3 offline tables, where 2 of them have TestTask enabled
+    addDummySchema(TABLE_NAME_1);
+    addDummySchema(TABLE_NAME_2);
+    addDummySchema(TABLE_NAME_3);
     TableTaskConfig taskConfig = new TableTaskConfig(Collections.singletonMap(TASK_TYPE, Collections.emptyMap()));
     addTableConfig(
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME_1).setTaskConfig(taskConfig).build());

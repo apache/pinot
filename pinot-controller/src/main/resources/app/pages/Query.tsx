@@ -166,6 +166,7 @@ const QueryPage = () => {
     columns: [],
     records: [],
   });
+  const [showException, setShowException] = useState<boolean>(false);
 
   const [tableSchema, setTableSchema] = useState<TableData>({
     columns: [],
@@ -184,7 +185,7 @@ const QueryPage = () => {
 
   const [outputResult, setOutputResult] = useState('');
 
-  const [resultError, setResultError] = useState<SqlException[] | string>([]);
+  const [resultError, setResultError] = useState<SqlException[]>([]);
 
   const [queryStats, setQueryStats] = useState<TableData>({
     columns: [],
@@ -552,25 +553,39 @@ const QueryPage = () => {
                 }
         
                 {/* Sql result errors */}
-                {resultError && typeof resultError === "string" && (
-                  <Alert severity="error" className={classes.sqlError}>
-                    {resultError}
-                  </Alert>
-                )}
+                {resultError && resultError.length > 0 && (
+                    <>
+                      <Alert 
+                        className={classes.sqlError} 
+                        severity="error" 
+                        action={
+                          <FormControlLabel
+                            control={<Switch color="primary" checked={showException} onChange={(e) => setShowException(e.target.checked)} name="checkedA" />}
+                            label={<Typography variant='body2'>Show Exceptions</Typography>}
+                          />
+                        }
+                      >
+                        {
+                          resultData.columns.length > 0 ? (
+                            <Typography variant='body2'>Partial results due to exceptions. Please toggle the switch to view details.</Typography>
+                          ) : (
+                            <Typography variant='body2'>Query failed with exceptions. Please toggle the switch to view details.</Typography>
+                          )
+                        }
+                      </Alert>
+                      <Box m={"16px"}></Box>
 
-                {resultError && typeof resultError === "object" && resultError.length > 0 && (
-                  <>
-                    {
-                      resultError.map((error) => (
-                        <Box style={{paddingBottom: "16px"}}>
-                          <Alert className={classes.sqlError} severity="error">
-                            <Typography variant="body2">Error Code: {error.errorCode}</Typography>
-                            {error.message}
-                          </Alert>
-                        </Box>
-                      ))
-                    }
-                  </>
+                      {
+                        showException && resultError.map((error) => (
+                          <Box style={{paddingBottom: "10px"}}>
+                            <Alert className={classes.sqlError} severity="error">
+                              {error.errorCode && <Typography variant="body2">Error Code: {error.errorCode}</Typography>}
+                              {error.message}
+                            </Alert>
+                          </Box>
+                        ))
+                      }
+                    </>
                   )
                 }
         

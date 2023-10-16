@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.planner.partitioning;
 
+import javax.annotation.Nullable;
+
 
 /**
  * The {@code KeySelector} provides a partitioning function to encode a specific input data type into a key.
@@ -26,20 +28,24 @@ package org.apache.pinot.query.planner.partitioning;
  *
  * <p>Key selector should always produce the same selection hash key when the same input is provided.
  */
-public interface KeySelector<IN, OUT> {
+public interface KeySelector<T> {
+  String DEFAULT_HASH_ALGORITHM = "absHashCode";
 
   /**
-   * Extract the key out of an input data construct.
-   *
-   * @param input input data.
-   * @return the key of the input data.
+   * Extracts the key out of the given row.
    */
-  OUT getKey(IN input);
-
-  int computeHash(IN input);
+  @Nullable
+  T getKey(Object[] row);
 
   /**
-   * @return the hash-algorithm used for distributing rows
+   * Computes the hash of the given row.
    */
-  String hashAlgorithm();
+  int computeHash(Object[] input);
+
+  /**
+   * Returns the hash algorithm used to compute the hash.
+   */
+  default String hashAlgorithm() {
+    return DEFAULT_HASH_ALGORITHM;
+  }
 }

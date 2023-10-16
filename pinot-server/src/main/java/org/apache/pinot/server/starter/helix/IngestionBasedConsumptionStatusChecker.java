@@ -23,7 +23,7 @@ import java.util.HashSet;
 import java.util.Set;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableType;
@@ -66,15 +66,15 @@ public abstract class IngestionBasedConsumptionStatusChecker {
               segName);
           continue;
         }
-        if (!(segmentDataManager instanceof LLRealtimeSegmentDataManager)) {
+        if (!(segmentDataManager instanceof RealtimeSegmentDataManager)) {
           // There's a possibility that a consuming segment has converted to a committed segment. If that's the case,
-          // segment data manager will not be of type LLRealtime.
+          // segment data manager will not be of type RealtimeSegmentDataManager.
           _logger.info("Segment {} is already committed and is considered caught up.", segName);
           _caughtUpSegments.add(segName);
           continue;
         }
 
-        LLRealtimeSegmentDataManager rtSegmentDataManager = (LLRealtimeSegmentDataManager) segmentDataManager;
+        RealtimeSegmentDataManager rtSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
         if (isSegmentCaughtUp(segName, rtSegmentDataManager)) {
           _caughtUpSegments.add(segName);
         }
@@ -87,7 +87,7 @@ public abstract class IngestionBasedConsumptionStatusChecker {
     return _consumingSegments.size() - _caughtUpSegments.size();
   }
 
-  protected abstract boolean isSegmentCaughtUp(String segmentName, LLRealtimeSegmentDataManager rtSegmentDataManager);
+  protected abstract boolean isSegmentCaughtUp(String segmentName, RealtimeSegmentDataManager rtSegmentDataManager);
 
   private TableDataManager getTableDataManager(String segmentName) {
     LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);

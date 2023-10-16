@@ -66,4 +66,20 @@ public class SegmentUtils {
     }
     return null;
   }
+
+  /**
+   * Returns the creation time of a segment based on its ZK metadata. This is the time when the segment is created in
+   * the cluster, instead of when the segment file is created.
+   * - For uploaded segments, creation time in ZK metadata is the time when the segment file is created, use push time
+   * instead. Push time is the first time a segment being uploaded. When a segment is refreshed, push time won't change.
+   * - For real-time segments (not uploaded), push time does not exist, use creation time.
+   */
+  public static long getSegmentCreationTimeMs(SegmentZKMetadata segmentZKMetadata) {
+    // Check push time first, then creation time
+    long pushTimeMs = segmentZKMetadata.getPushTime();
+    if (pushTimeMs > 0) {
+      return pushTimeMs;
+    }
+    return segmentZKMetadata.getCreationTime();
+  }
 }

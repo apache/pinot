@@ -82,6 +82,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.quartz.CronScheduleBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,7 +110,7 @@ public final class TableConfigUtils {
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
   private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
-      EnumSet.of(SUM, MIN, MAX, COUNT, DISTINCTCOUNTHLL, SUMPRECISION);
+      EnumSet.of(SUM, MIN, MAX, COUNT, DISTINCTCOUNTHLL, SUMPRECISION, DISTINCTCOUNTHLLPLUS);
 
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
@@ -143,6 +144,7 @@ public final class TableConfigUtils {
 
     // skip all validation if skip type ALL is selected.
     if (!skipTypes.contains(ValidationType.ALL)) {
+      validateTableSchemaConfig(tableConfig);
       validateValidationConfig(tableConfig, schema);
 
       StreamConfig streamConfig = null;
@@ -199,6 +201,20 @@ public final class TableConfigUtils {
     }
     if (StringUtils.containsWhitespace(tableName)) {
       throw new IllegalStateException("Table name: '" + tableName + "' containing space is not allowed");
+    }
+  }
+
+  /**
+   * Validates the table name with the following rule:
+   * - Schema name should either be null or match the raw table name
+   */
+  private static void validateTableSchemaConfig(TableConfig tableConfig) {
+    // Ensure that table is not created if schema is not present
+    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
+    String schemaName = tableConfig.getValidationConfig().getSchemaName();
+    if (schemaName != null && !schemaName.equals(rawTableName)) {
+      throw new IllegalStateException(
+          "Schema name: " + schemaName + " does not match table name: " + rawTableName);
     }
   }
 
@@ -276,6 +292,10 @@ public final class TableConfigUtils {
           && !CommonConstants.HTTPS_PROTOCOL.equalsIgnoreCase(peerSegmentDownloadScheme)) {
         throw new IllegalStateException("Invalid value '" + peerSegmentDownloadScheme
             + "' for peerSegmentDownloadScheme. Must be one of http or https");
+      }
+
+      if (tableConfig.getReplication() < 2) {
+        throw new IllegalStateException("peerSegmentDownloadScheme can't be used when replication is < 2");
       }
     }
 
@@ -412,6 +432,30 @@ public final class TableConfigUtils {
               Preconditions.checkState(dataType == DataType.BYTES,
                   "Result type for DISTINCT_COUNT_HLL must be BYTES: %s", aggregationConfig);
             }
+          } else if (functionType == DISTINCTCOUNTHLLPLUS) {
+            Preconditions.checkState(numArguments >= 1 && numArguments <= 3,
+                "DISTINCT_COUNT_HLL_PLUS can have at most three arguments: %s", aggregationConfig);
+            if (numArguments == 2) {
+              ExpressionContext secondArgument = arguments.get(1);
+              Preconditions.checkState(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+                  "Second argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
+              String literal = secondArgument.getLiteral().getStringValue();
+              Preconditions.checkState(StringUtils.isNumeric(literal),
+                  "Second argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
+            }
+            if (numArguments == 3) {
+              ExpressionContext thirdArgument = arguments.get(2);
+              Preconditions.checkState(thirdArgument.getType() == ExpressionContext.Type.LITERAL,
+                  "Third argument of DISTINCT_COUNT_HLL_PLUS must be literal: %s", aggregationConfig);
+              String literal = thirdArgument.getLiteral().getStringValue();
+              Preconditions.checkState(StringUtils.isNumeric(literal),
+                  "Third argument of DISTINCT_COUNT_HLL_PLUS must be a number: %s", aggregationConfig);
+            }
+            if (fieldSpec != null) {
+              DataType dataType = fieldSpec.getDataType();
+              Preconditions.checkState(dataType == DataType.BYTES,
+                  "Result type for DISTINCT_COUNT_HLL_PLUS must be BYTES: %s", aggregationConfig);
+            }
           } else if (functionType == SUMPRECISION) {
             Preconditions.checkState(numArguments >= 2 && numArguments <= 3,
                 "SUM_PRECISION must specify precision (required), scale (optional): %s", aggregationConfig);
@@ -532,7 +576,7 @@ public final class TableConfigUtils {
   public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
       EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
           DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
-          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH);
+          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTRAWHLLPLUS);
 
   @VisibleForTesting
   static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
@@ -1160,53 +1204,16 @@ public final class TableConfigUtils {
   }
 
   /**
-   * TODO: After deprecating "replicasPerPartition", we can change this function's behavior to always overwrite
-   * config to "replication" only.
-   *
    * Ensure that the table config has the minimum number of replicas set as per cluster configs.
-   * If is doesn't, set the required amount of replication in the table config
    */
   public static void ensureMinReplicas(TableConfig tableConfig, int defaultTableMinReplicas) {
-    // For self-serviced cluster, ensure that the tables are created with at least min replication factor irrespective
-    // of table configuration value
-    SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
-    boolean verifyReplicasPerPartition;
-    boolean verifyReplication;
-
-    try {
-      verifyReplicasPerPartition = ReplicationUtils.useReplicasPerPartition(tableConfig);
-      verifyReplication = ReplicationUtils.useReplication(tableConfig);
-    } catch (Exception e) {
-      throw new IllegalStateException(String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage()), e);
-    }
-
-    if (verifyReplication) {
-      int requestReplication;
-      try {
-        requestReplication = tableConfig.getReplication();
-        if (requestReplication < defaultTableMinReplicas) {
-          LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
-              defaultTableMinReplicas, requestReplication);
-          segmentsConfig.setReplication(String.valueOf(defaultTableMinReplicas));
-        }
-      } catch (NumberFormatException e) {
-        throw new IllegalStateException("Invalid replication number", e);
-      }
-    }
-
-    if (verifyReplicasPerPartition) {
-      int replicasPerPartition;
-      try {
-        replicasPerPartition = tableConfig.getReplication();
-        if (replicasPerPartition < defaultTableMinReplicas) {
-          LOGGER.info(
-              "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
-              defaultTableMinReplicas, replicasPerPartition);
-          segmentsConfig.setReplicasPerPartition(String.valueOf(defaultTableMinReplicas));
-        }
-      } catch (NumberFormatException e) {
-        throw new IllegalStateException("Invalid replicasPerPartition number", e);
-      }
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    int replication = tableConfig.getReplication();
+    if (replication < defaultTableMinReplicas) {
+      LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
+          defaultTableMinReplicas, replication);
+      validationConfig.setReplicasPerPartition(null);
+      validationConfig.setReplication(String.valueOf(defaultTableMinReplicas));
     }
   }
 

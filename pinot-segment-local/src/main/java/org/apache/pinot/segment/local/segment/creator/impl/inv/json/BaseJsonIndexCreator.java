@@ -168,6 +168,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
         CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
         cleaner.freeBuffer(docIdMappingBuffer);
       }
+      indexFileChannel.force(true);
     }
   }
 

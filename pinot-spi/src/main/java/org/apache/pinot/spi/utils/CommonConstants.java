@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils;
 
 import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.List;
 import org.apache.pinot.spi.config.instance.InstanceType;
 
@@ -42,8 +43,11 @@ public class CommonConstants {
 
   public static final String UNKNOWN = "unknown";
   public static final String CONFIG_OF_METRICS_FACTORY_CLASS_NAME = "factory.className";
+  public static final String CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME = "factory.className";
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
+  public static final String DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME =
+      "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.1.0/";
@@ -91,6 +95,8 @@ public class CommonConstants {
 
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
+    public static final int DEFAULT_HYPERLOGLOG_PLUS_P = 14;
+    public static final int DEFAULT_HYPERLOGLOG_PLUS_SP = 0;
 
     // 2 to the power of 16, for tradeoffs see datasketches library documentation:
     // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
@@ -106,7 +112,6 @@ public class CommonConstants {
     public static final int NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE = 24;
     public static final int LEAD_CONTROLLER_RESOURCE_REPLICA_COUNT = 1;
     public static final int MIN_ACTIVE_REPLICAS = 0;
-    public static final int REBALANCE_DELAY_MS = 300_000; // 5 minutes.
 
     // Instance tags
     public static final String CONTROLLER_INSTANCE = "controller";
@@ -203,6 +208,7 @@ public class CommonConstants {
     public static final String ROUTING_TABLE_CONFIG_PREFIX = "pinot.broker.routing.table";
     public static final String ACCESS_CONTROL_CONFIG_PREFIX = "pinot.broker.access.control";
     public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
+    public static final String EVENT_LISTENER_CONFIG_PREFIX = "pinot.broker.event.listener";
     public static final String CONFIG_OF_METRICS_NAME_PREFIX = "pinot.broker.metrics.prefix";
     public static final String DEFAULT_METRICS_NAME_PREFIX = "pinot.broker.";
 
@@ -305,8 +311,8 @@ public class CommonConstants {
         "pinot.broker.instance.enableThreadAllocatedBytesMeasurement";
     public static final boolean DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT = false;
     public static final boolean DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT = false;
-    public static final String CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES
-        = "pinot.broker.result.rewriter.class.names";
+    public static final String CONFIG_OF_BROKER_RESULT_REWRITER_CLASS_NAMES =
+        "pinot.broker.result.rewriter.class.names";
 
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
@@ -344,8 +350,8 @@ public class CommonConstants {
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
 
-        // Handle IN predicate evaluation for big IN lists
-        public static final String IN_PREDICATE_SORT_THRESHOLD = "inPredicateSortThreshold";
+        public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
+        public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
 
         public static final String DROP_RESULTS = "dropResults";
 
@@ -366,7 +372,6 @@ public class CommonConstants {
       }
 
       public static class QueryOptionValue {
-        public static final String DEFAULT_IN_PREDICATE_SORT_THRESHOLD = "1000";
         public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
     }
@@ -526,9 +531,6 @@ public class CommonConstants {
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
-    public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";
-    public static final String CONFIG_OF_ENABLE_COMMIT_END_WITH_METADATA =
-        "pinot.server.instance.enable.commitend.metadata";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION =
         "pinot.server.instance.realtime.alloc.offheap.direct";
@@ -1066,5 +1068,22 @@ public class CommonConstants {
     public enum JoinOverFlowMode {
       THROW, BREAK
     }
+  }
+
+  public static class NullValuePlaceHolder {
+    public static final int INT = 0;
+    public static final long LONG = 0L;
+    public static final float FLOAT = 0f;
+    public static final double DOUBLE = 0d;
+    public static final BigDecimal BIG_DECIMAL = BigDecimal.ZERO;
+    public static final String STRING = "";
+    public static final byte[] BYTES = new byte[0];
+    public static final ByteArray INTERNAL_BYTES = new ByteArray(BYTES);
+    public static final int[] INT_ARRAY = new int[0];
+    public static final long[] LONG_ARRAY = new long[0];
+    public static final float[] FLOAT_ARRAY = new float[0];
+    public static final double[] DOUBLE_ARRAY = new double[0];
+    public static final String[] STRING_ARRAY = new String[0];
+    public static final byte[][] BYTES_ARRAY = new byte[0][];
   }
 }
