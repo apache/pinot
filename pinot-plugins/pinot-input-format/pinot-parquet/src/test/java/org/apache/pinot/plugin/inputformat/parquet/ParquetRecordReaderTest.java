@@ -39,10 +39,6 @@ import org.testng.annotations.Test;
 
 
 public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
-  private final File _testParquetFileWithInt96AndDecimal =
-      new File(getClass().getClassLoader().getResource("test-file-with-int96-and-decimal.snappy.parquet").getFile());
-
-  private static final int NUM_RECORDS_TEST_PARQUET_WITH_INT96 = 1965;
 
   @Override
   protected RecordReader createRecordReader(File file)
@@ -99,8 +95,13 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   public void testParquetNativeRecordReader()
       throws IOException {
     ParquetNativeRecordReader nativeRecordReader = new ParquetNativeRecordReader();
-    nativeRecordReader.init(_testParquetFileWithInt96AndDecimal, ImmutableSet.of(), new ParquetRecordReaderConfig());
+    nativeRecordReader.init(
+        new File(getClass().getClassLoader().getResource("test-file-with-int96-and-decimal.snappy.parquet").getFile()),
+        ImmutableSet.of(), new ParquetRecordReaderConfig());
     testReadParquetFile(nativeRecordReader, 1965);
+    nativeRecordReader.init(new File(getClass().getClassLoader().getResource("airlineStats.zstd.parquet").getFile()),
+        ImmutableSet.of(), new ParquetRecordReaderConfig());
+    testReadParquetFile(nativeRecordReader, 19492);
     nativeRecordReader.init(_dataFile, ImmutableSet.of(), new ParquetRecordReaderConfig());
     testReadParquetFile(nativeRecordReader, SAMPLE_RECORDS_SIZE);
   }
@@ -129,6 +130,7 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
     testComparison(new File(getClass().getClassLoader().getResource("test-comparison.gz.parquet").getFile()), 363667);
     testComparison(new File(getClass().getClassLoader().getResource("test-comparison.snappy.parquet").getFile()), 2870);
     testComparison(new File(getClass().getClassLoader().getResource("baseballStats.snappy.parquet").getFile()), 97889);
+    testComparison(new File(getClass().getClassLoader().getResource("baseballStats.zstd.parquet").getFile()), 97889);
     testComparison(new File(getClass().getClassLoader().getResource("githubEvents.snappy.parquet").getFile()), 10000);
     testComparison(new File(getClass().getClassLoader().getResource("starbucksStores.snappy.parquet").getFile()), 6443);
     testComparison(new File(getClass().getClassLoader().getResource("airlineStats.snappy.parquet").getFile()), 19492);
