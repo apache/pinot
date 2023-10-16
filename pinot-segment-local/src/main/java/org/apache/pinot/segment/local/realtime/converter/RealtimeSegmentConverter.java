@@ -43,6 +43,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
+import static org.apache.pinot.spi.stream.StreamConfigProperties.SEGMENT_FLUSH_ENABLE_COLUMN_MAJOR;
+
 
 public class RealtimeSegmentConverter {
   private final MutableSegmentImpl _realtimeSegmentImpl;
@@ -77,7 +79,7 @@ public class RealtimeSegmentConverter {
     try {
       // TODO(Erich): move this so that the code does not directly reference the flag name
       String str = _tableConfig.getIndexingConfig()
-              .getStreamConfigs().get("realtime.segment.flush.enable_column_major");
+              .getStreamConfigs().get(SEGMENT_FLUSH_ENABLE_COLUMN_MAJOR);
       if (str != null) {
         _enableColumnMajor = Boolean.parseBoolean(str);
       } else {
