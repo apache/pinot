@@ -2972,9 +2972,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testReset()
-      throws Exception {
-    super.testReset(TableType.OFFLINE);
+  public void testReset() {
+    testReset(TableType.OFFLINE);
   }
 
   @Test
