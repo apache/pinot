@@ -618,7 +618,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         resetTable(rawTableName, tableType, null);
         return true;
       } catch (IOException e) {
-        assertTrue(e.toString().contains("pending message"));
+        assertTrue(e.toString().contains("pending message"), "Got unexpected exception: " + e);
         return false;
       }
     }, 30_000L, "Failed to reset table: " + tableNameWithType);
