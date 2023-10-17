@@ -61,7 +61,7 @@ public class RealtimeSegmentConverter {
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
-      ColumnIndicesForRealtimeTable cdc, boolean nullHandlingEnabled) {
+      ColumnIndicesForRealtimeTable cdc, boolean nullHandlingEnabled, boolean enableColumnMajorSegmentBuilder) {
     _realtimeSegmentImpl = realtimeSegment;
     _segmentZKPropsConfig = segmentZKPropsConfig;
     _outputPath = outputPath;
@@ -74,20 +74,7 @@ public class RealtimeSegmentConverter {
     _tableConfig = tableConfig;
     _segmentName = segmentName;
     _nullHandlingEnabled = nullHandlingEnabled;
-
-    // Check if column major mode should be enabled
-    try {
-      // TODO(Erich): move this so that the code does not directly reference the flag name
-      String str = _tableConfig.getIndexingConfig()
-              .getStreamConfigs().get(SEGMENT_FLUSH_ENABLE_COLUMN_MAJOR);
-      if (str != null) {
-        _enableColumnMajor = Boolean.parseBoolean(str);
-      } else {
-        _enableColumnMajor = false;
-      }
-    } catch (Exception ex) {
-      _enableColumnMajor = false;
-    }
+    _enableColumnMajor = enableColumnMajorSegmentBuilder;
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)

@@ -138,7 +138,7 @@ public class RealtimeSegmentConverterTest {
         indexingConfig.getNoDictionaryColumns(), indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
+            tableNameWithType, tableConfig, segmentName, cdc, false, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);
