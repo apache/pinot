@@ -2651,29 +2651,8 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Returns a map from server instance to list of online segments it serves for the given table.
-   */
-  public Map<String, List<String>> getServerToOnlineSegmentsMap(String tableNameWithType) {
-    Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
-    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-    if (idealState == null) {
-      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
-    }
-    for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
-      String segmentName = entry.getKey();
-      for (Map.Entry<String, String> e : entry.getValue().entrySet()) {
-        String server = e.getKey();
-        String status = e.getValue();
-        if (status.equals(SegmentStateModel.CONSUMING) || status.equals(SegmentStateModel.ONLINE)) {
-          serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
-        }
-      }
-    }
-    return serverToSegmentsMap;
-  }
-
-  /**
-   * Returns a map from server instance to list of segments it serves for the given table.
+   * Returns a map from server instance to list of segments it serves for the given table. Ignore OFFLINE segments from
+   * the ideal state because they are not supposed to be served.
    */
   public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
     Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
@@ -2683,15 +2662,18 @@ public class PinotHelixResourceManager {
     }
     for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
       String segmentName = entry.getKey();
-      for (String server : entry.getValue().keySet()) {
-        serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
+      for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
+        if (!instanceStateEntry.getValue().equals(SegmentStateModel.OFFLINE)) {
+          serverToSegmentsMap.computeIfAbsent(instanceStateEntry.getKey(), key -> new ArrayList<>()).add(segmentName);
+        }
       }
     }
     return serverToSegmentsMap;
   }
 
   /**
-   * Returns a set of server instances for a given table and segment
+   * Returns a set of server instances for a given table and segment. Ignore OFFLINE segments from the ideal state
+   * because they are not supposed to be served.
    */
   public Set<String> getServers(String tableNameWithType, String segmentName) {
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
@@ -2701,7 +2683,13 @@ public class PinotHelixResourceManager {
     Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
     Preconditions.checkState(instanceStateMap != null, "Segment: {} does not exist in the ideal state of table: {}",
         segmentName, tableNameWithType);
-    return instanceStateMap.keySet();
+    Set<String> servers = new TreeSet<>();
+    for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
+      if (!entry.getValue().equals(SegmentStateModel.OFFLINE)) {
+        servers.add(entry.getKey());
+      }
+    }
+    return servers;
   }
 
   /**
@@ -2722,15 +2710,9 @@ public class PinotHelixResourceManager {
     return consumingSegments;
   }
 
-  /**
-   * Utility function to return set of servers corresponding to a given segment.
-   */
+  @Deprecated
   public Set<String> getServersForSegment(String tableNameWithType, String segmentName) {
-    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
-    if (idealState == null) {
-      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
-    }
-    return new HashSet<>(idealState.getInstanceStateMap(segmentName).keySet());
+    return getServers(tableNameWithType, segmentName);
   }
 
   public synchronized Map<String, String> getSegmentsCrcForTable(String tableNameWithType) {
