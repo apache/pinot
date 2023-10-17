@@ -226,6 +226,32 @@ public class AggregationFunctionFactory {
                 throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
             }
           }
+          case ARRAYAGG: {
+            Preconditions.checkArgument(numArguments == 2,
+                "ARRAY_AGG expects 2 arguments, got: %s. The function can be used as "
+                    + "arrayAgg(dataColumn, 'dataType')", numArguments);
+            ExpressionContext dataTypeExp = arguments.get(1);
+            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
+                "ARRAY_AGG expects the 2nd argument to be literal, got: %s. The function can be used as "
+                    + "arrayAgg(dataColumn, 'dataType')", dataTypeExp.getType());
+            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
+            switch (dataType) {
+              case BOOLEAN:
+              case INT:
+                return new ArrayAggIntFunction(firstArgument, dataType, nullHandlingEnabled);
+              case LONG:
+              case TIMESTAMP:
+                return new ArrayAggLongFunction(firstArgument, dataType, nullHandlingEnabled);
+              case FLOAT:
+                return new ArrayAggFloatFunction(firstArgument, nullHandlingEnabled);
+              case DOUBLE:
+                return new ArrayAggDoubleFunction(firstArgument, nullHandlingEnabled);
+              case STRING:
+                return new ArrayAggStringFunction(firstArgument, nullHandlingEnabled);
+              default:
+                throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
+            }
+          }
           case LASTWITHTIME: {
             Preconditions.checkArgument(numArguments == 3,
                 "LAST_WITH_TIME expects 3 arguments, got: %s. The function can be used as "
@@ -368,7 +394,6 @@ public class AggregationFunctionFactory {
             return new DistinctCountCPCSketchAggregationFunction(arguments);
           case DISTINCTCOUNTRAWCPCSKETCH:
             return new DistinctCountRawCPCSketchAggregationFunction(arguments);
-
           default:
             throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);
         }
