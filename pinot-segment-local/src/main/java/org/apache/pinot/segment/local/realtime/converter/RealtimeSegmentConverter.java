@@ -43,9 +43,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
-import static org.apache.pinot.spi.stream.StreamConfigProperties.SEGMENT_FLUSH_ENABLE_COLUMN_MAJOR;
-
-
 public class RealtimeSegmentConverter {
   private final MutableSegmentImpl _realtimeSegmentImpl;
   private final SegmentZKPropsConfig _segmentZKPropsConfig;
@@ -56,7 +53,7 @@ public class RealtimeSegmentConverter {
   private final String _segmentName;
   private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
   private final boolean _nullHandlingEnabled;
-  private boolean _enableColumnMajor;
+  private final boolean _enableColumnMajor;
   private int _totalDocs = 0;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
