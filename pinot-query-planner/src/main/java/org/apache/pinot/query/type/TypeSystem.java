@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.type;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeSystemImpl;
@@ -30,7 +31,8 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
  */
 public class TypeSystem extends RelDataTypeSystemImpl {
   private static final int MAX_DECIMAL_SCALE = 1000;
-  private static final int MAX_DECIMAL_PRECISION = 1000;
+  @VisibleForTesting
+  static final int MAX_DECIMAL_PRECISION = 1000;
 
   /**
    * Default precision for derived arithmetic decimal types(plus/multiply/divide/mod). We won't allow the return

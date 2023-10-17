@@ -18,7 +18,11 @@
  */
 package org.apache.pinot.query.type;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import org.apache.calcite.adapter.java.JavaTypeFactory;
+import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.sql.type.ArraySqlType;
@@ -27,12 +31,155 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
 public class TypeFactoryTest {
-  private static final TypeSystem TYPE_SYSTEM = new TypeSystem() {
-  };
+  private static final TypeSystem TYPE_SYSTEM = new TypeSystem();
+
+  @DataProvider(name = "relDataTypeConversion")
+  public Iterator<Object[]> relDataTypeConversion() {
+    ArrayList<Object[]> cases = new ArrayList<>();
+
+    JavaTypeFactory javaTypeFactory = new JavaTypeFactoryImpl(TYPE_SYSTEM);
+
+    for (FieldSpec.DataType dataType : FieldSpec.DataType.values()) {
+      switch (dataType) {
+        case INT: {
+          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.INTEGER);
+          cases.add(new Object[]{dataType, basicType, basicType});
+          break;
+        }
+        case LONG: {
+          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.BIGINT);
+          cases.add(new Object[]{dataType, basicType, basicType});
+          break;
+        }
+        // Map float and double to the same RelDataType so that queries like
+        // `select count(*) from table where aFloatColumn = 0.05` works correctly in multi-stage query engine.
+        //
+        // If float and double are mapped to different RelDataType,
+        // `select count(*) from table where aFloatColumn = 0.05` will be converted to
+        // `select count(*) from table where CAST(aFloatColumn as "DOUBLE") = 0.05`. While casting
+        // from float to double does not always produce the same double value as the original float value, this leads to
+        // wrong query result.
+        //
+        // With float and double mapped to the same RelDataType, the behavior in multi-stage query engine will be the
+        // same as the query in v1 query engine.
+        case FLOAT: {
+          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.DOUBLE);
+          RelDataType arrayType = javaTypeFactory.createSqlType(SqlTypeName.REAL);
+          cases.add(new Object[]{dataType, basicType, arrayType});
+          break;
+        }
+        case DOUBLE: {
+          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.DOUBLE);
+          cases.add(new Object[]{dataType, basicType, basicType});
+          break;
+        }
+        case BOOLEAN: {
+          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.BOOLEAN);
+          cases.add(new Object[]{dataType, basicType, basicType});
+          break;
+        }
+        case TIMESTAMP: {
+          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.TIMESTAMP);
+          cases.add(new Object[]{dataType, basicType, basicType});
+          break;
+        }
+        case STRING: {
+          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.VARCHAR);
+          cases.add(new Object[]{dataType, basicType, basicType});
+          break;
+        }
+        case BYTES: {
+          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.VARBINARY);
+          cases.add(new Object[]{dataType, basicType, basicType});
+          break;
+        }
+        case BIG_DECIMAL: {
+          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.DECIMAL);
+          cases.add(new Object[]{dataType, basicType, basicType});
+          break;
+        }
+        case JSON: {
+          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.VARCHAR);
+          cases.add(new Object[]{dataType, basicType, basicType});
+          break;
+        }
+        case LIST:
+        case STRUCT:
+        case MAP:
+        case UNKNOWN:
+          break;
+        default:
+          String message = String.format("Unsupported type: %s ", dataType);
+          throw new UnsupportedOperationException(message);
+      }
+    }
+    return cases.iterator();
+  }
+
+  @Test(dataProvider = "relDataTypeConversion")
+  public void testScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
+    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    Schema testSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("col", dataType)
+        .build();
+    RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
+    List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
+    RelDataTypeField field = fieldList.get(0);
+    Assert.assertEquals(field.getType(), scalarType);
+  }
+
+  @Test(dataProvider = "relDataTypeConversion")
+  public void testNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
+    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    Schema testSchema = new Schema.SchemaBuilder()
+        .addSingleValueDimension("col", dataType, true)
+        .build();
+    RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
+    List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
+    RelDataTypeField field = fieldList.get(0);
+
+    RelDataType expectedType = typeFactory.createTypeWithNullability(scalarType, true);
+
+    Assert.assertEquals(field.getType(), expectedType);
+  }
+
+  @Test(dataProvider = "relDataTypeConversion")
+  public void testArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
+    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    Schema testSchema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("col", dataType)
+        .build();
+    RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
+    List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
+    RelDataTypeField field = fieldList.get(0);
+
+    RelDataType expectedType = typeFactory.createArrayType(arrayType, -1);
+
+    Assert.assertEquals(field.getType(), expectedType);
+  }
+
+  @Test(dataProvider = "relDataTypeConversion")
+  public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
+    TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
+    Schema testSchema = new Schema.SchemaBuilder()
+        .addMultiValueDimension("col", dataType, true)
+        .build();
+    RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
+    List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
+    RelDataTypeField field = fieldList.get(0);
+
+    RelDataType expectedType = typeFactory.createTypeWithNullability(
+        typeFactory.createArrayType(arrayType, -1),
+        true
+    );
+
+    Assert.assertEquals(field.getType(), expectedType);
+  }
 
   @Test
   public void testRelDataTypeConversion() {
