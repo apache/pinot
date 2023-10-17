@@ -297,6 +297,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
   private final boolean _nullHandlingEnabled;
+  private final boolean _enableColumnMajorSegmentBuilder;
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _rateLimiter;
 
@@ -938,7 +939,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
               _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _columnIndicesForRealtimeTable, _nullHandlingEnabled);
+              _columnIndicesForRealtimeTable, _nullHandlingEnabled, _enableColumnMajorSegmentBuilder);
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1413,6 +1414,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+    _enableColumnMajorSegmentBuilder = indexingConfig.isColumnMajorSegmentBuilderEnabled();
+
 
     _columnIndicesForRealtimeTable = new ColumnIndicesForRealtimeTable(sortedColumn,
         new ArrayList<>(indexLoadingConfig.getInvertedIndexColumns()),

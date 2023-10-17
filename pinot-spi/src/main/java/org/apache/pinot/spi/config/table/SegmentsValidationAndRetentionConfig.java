@@ -51,6 +51,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
 
+  // TODO(ERICH): put the column major mode flag here?
+
   public String getSegmentAssignmentStrategy() {
     return _segmentAssignmentStrategy;
   }
