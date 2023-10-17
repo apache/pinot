@@ -76,7 +76,6 @@ public class RealtimeSegmentConverter {
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
       throws Exception {
-    // TODO(ERICH): set the use column major flag in this ctor
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
 
     // The segment generation code in SegmentColumnarIndexCreator will throw
