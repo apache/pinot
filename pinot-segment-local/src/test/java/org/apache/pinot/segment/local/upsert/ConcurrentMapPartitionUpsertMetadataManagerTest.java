@@ -88,8 +88,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   public void testStartFinishOperation() {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class), false);
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, false, 0, INDEX_DIR,
+            mock(ServerMetrics.class));
 
     // Start 2 operations
     assertTrue(upsertMetadataManager.startOperation());
@@ -163,8 +163,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String comparisonColumn = "timeCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class), false);
+            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, false, 0, INDEX_DIR,
+            mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
 
@@ -326,8 +326,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String deleteRecordColumn = "deleteCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), deleteRecordColumn, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class), false);
+            Collections.singletonList(comparisonColumn), deleteRecordColumn, hashFunction, null, false, false, 0,
+            INDEX_DIR, mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
 
@@ -609,8 +609,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String comparisonColumn = "timeCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class), false);
+            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, false, 0, INDEX_DIR,
+            mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -703,8 +703,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     // here dropOutOfOrderRecord = true
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class), true);
+            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, true, 0, INDEX_DIR,
+            mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -773,8 +773,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String comparisonColumn = "timeCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class), false);
+            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, false, 0, INDEX_DIR,
+            mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -829,8 +829,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String deleteColumn = "deleteCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), deleteColumn, hashFunction, null, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class), false);
+            Collections.singletonList(comparisonColumn), deleteColumn, hashFunction, null, false, false, 0, INDEX_DIR,
+            mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // queryableDocIds is same as validDocIds in the absence of delete markers
@@ -930,8 +930,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 30, tableDir,
-            mock(ServerMetrics.class), false);
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, false, 30, tableDir,
+            mock(ServerMetrics.class));
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -991,8 +991,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 30, tableDir,
-            mock(ServerMetrics.class), false);
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, false, 30, tableDir,
+            mock(ServerMetrics.class));
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -1057,8 +1057,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 30, tableDir,
-            mock(ServerMetrics.class), false);
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, false, 30, tableDir,
+            mock(ServerMetrics.class));
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -1111,8 +1111,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private void verifyPersistAndLoadWatermark() {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 10, INDEX_DIR,
-            mock(ServerMetrics.class), false);
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, false, 10, INDEX_DIR,
+            mock(ServerMetrics.class));
 
     double currentTimeMs = System.currentTimeMillis();
     upsertMetadataManager.persistWatermark(currentTimeMs);
