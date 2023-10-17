@@ -241,23 +241,6 @@ public class StreamConfig {
     }
   }
 
-  private boolean extractFlushEnableColumnMajorMode(Map<String, String> streamConfigMap) {
-    String key = StreamConfigProperties.SEGMENT_FLUSH_ENABLE_COLUMN_MAJOR;
-    String enableColumnMajorStr = streamConfigMap.get(key);
-    boolean enableColumnMajor = false;
-
-    if (enableColumnMajorStr != null) {
-      try {
-        enableColumnMajor = Boolean.parseBoolean(enableColumnMajorStr);
-      } catch (Exception e) {
-        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", key, enableColumnMajorStr,
-                false);
-      }
-    }
-
-    return enableColumnMajor;
-  }
-
   protected int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS;
     String flushThresholdRowsStr = streamConfigMap.get(key);
