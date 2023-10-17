@@ -311,7 +311,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     long startNS = System.nanoTime();
 
-    // TODO(ERICH): Get a measure of the ratio of columns to indexes (how many indexes per column are there)
     for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
       String columnName = byColEntry.getKey();
 
@@ -353,7 +352,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           throws IOException {
     long startNS = System.nanoTime();
 
-    // TODO(ERICH): Get a measure of the ratio of columns to indexes (how many indexes per column are there)
     // Iterate over each value in the column
     try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
       int numDocs = segment.getSegmentMetadata().getTotalDocs();
@@ -393,11 +391,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     if (columnValueToIndex == null) {
       throw new RuntimeException("Null value for column:" + columnName);
     }
-
-    // TODO(ERICH): pull this out of the loop because it only needs to be looked up once per column
-    // TODO(ERICH): do a performance comparison for before and after pulling this out
-    //FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
-    //SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
 
     if (fieldSpec.isSingleValueField()) {
       indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
