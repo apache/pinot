@@ -212,24 +212,6 @@
         <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
-    <!-- jfim: this profile is overridden in pinot-integration-tests -->
-    <profile>
-      <id>integration-tests-only</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>true</skipTests>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <!-- Disable source release assembly for 'apache-release' profile. -->
     <profile>
       <id>apache-release</id>
@@ -1769,6 +1751,7 @@
           </execution>
         </executions>
         <configuration>
+          <append>true</append>
           <includes>
             <include>org/apache/pinot/**/*</include>
           </includes>
