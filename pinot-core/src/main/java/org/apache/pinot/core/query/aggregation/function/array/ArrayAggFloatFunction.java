@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.function;
+package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -24,30 +24,12 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class ArrayAggFloatFunction extends ArrayAggFunction<FloatArrayList> {
+public class ArrayAggFloatFunction extends ArrayAggBaseFloatFunction<FloatArrayList> {
   public ArrayAggFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, FieldSpec.DataType.FLOAT, nullHandlingEnabled);
-  }
-
-  @Override
-  public FloatArrayList merge(FloatArrayList intermediateResult1, FloatArrayList intermediateResult2) {
-    if (intermediateResult1 == null) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null) {
-      return intermediateResult1;
-    }
-    intermediateResult1.addAll(intermediateResult2);
-    return intermediateResult1;
-  }
-
-  @Override
-  public FloatArrayList extractFinalResult(FloatArrayList floatArrayList) {
-    return floatArrayList;
+    super(expression, nullHandlingEnabled);
   }
 
   @Override
@@ -74,15 +56,8 @@ public class ArrayAggFloatFunction extends ArrayAggFunction<FloatArrayList> {
   }
 
   @Override
-  protected void aggregateArrayGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet) {
-    float[] values = blockValSet.getFloatValuesSV();
-    for (int i = 0; i < length; i++) {
-      setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
-    }
-  }
 
-  private void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, float value) {
+  protected void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, float value) {
     ObjectGroupByResultHolder resultHolder = (ObjectGroupByResultHolder) groupByResultHolder;
     if (resultHolder.getResult(groupKey) == null) {
       FloatArrayList valueArray = new FloatArrayList();
@@ -91,41 +66,6 @@ public class ArrayAggFloatFunction extends ArrayAggFunction<FloatArrayList> {
     } else {
       FloatArrayList valueArray = resultHolder.getResult(groupKey);
       valueArray.add(value);
-    }
-  }
-
-  @Override
-  protected void aggregateArrayGroupBySVWithNull(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    float[] values = blockValSet.getFloatValuesSV();
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
-        setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
-      }
-    }
-  }
-
-  @Override
-  protected void aggregateArrayGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet) {
-    float[] values = blockValSet.getFloatValuesSV();
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
-        setGroupByResult(groupByResultHolder, groupKey, values[i]);
-      }
-    }
-  }
-
-  @Override
-  protected void aggregateArrayGroupByMVWithNull(int length, int[][] groupKeysArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    float[] values = blockValSet.getFloatValuesSV();
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
-        if (!nullBitmap.contains(i)) {
-          setGroupByResult(groupByResultHolder, groupKey, values[i]);
-        }
-      }
     }
   }
 }

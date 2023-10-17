@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.function;
+package org.apache.pinot.core.query.aggregation.function.array;
 
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -24,6 +24,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -31,7 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public abstract class ArrayAggFunction<V extends Comparable> extends BaseSingleInputAggregationFunction<V, V> {
+public abstract class ArrayAggFunction<I, F extends Comparable> extends BaseSingleInputAggregationFunction<I, F> {
 
   protected final boolean _nullHandlingEnabled;
   private final DataSchema.ColumnDataType _resultColumnType;
@@ -129,12 +130,12 @@ public abstract class ArrayAggFunction<V extends Comparable> extends BaseSingleI
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap);
 
   @Override
-  public V extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public I extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
   @Override
-  public V extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public I extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 }

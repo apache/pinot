@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.function;
+package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -28,7 +28,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class ArrayAggLongFunction extends ArrayAggFunction<LongArrayList> {
+public class ArrayAggLongFunction extends ArrayAggBaseLongFunction<LongArrayList> {
   public ArrayAggLongFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
   }
@@ -58,25 +58,6 @@ public class ArrayAggLongFunction extends ArrayAggFunction<LongArrayList> {
   }
 
   @Override
-  protected void aggregateArrayGroupBySV(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet) {
-    long[] values = blockValSet.getLongValuesSV();
-    for (int i = 0; i < length; i++) {
-      setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
-    }
-  }
-
-  @Override
-  protected void aggregateArrayGroupBySVWithNull(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    long[] values = blockValSet.getLongValuesSV();
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
-        setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
-      }
-    }
-  }
-
   protected void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, long value) {
     ObjectGroupByResultHolder resultHolder = (ObjectGroupByResultHolder) groupByResultHolder;
     if (resultHolder.getResult(groupKey) == null) {
@@ -84,48 +65,5 @@ public class ArrayAggLongFunction extends ArrayAggFunction<LongArrayList> {
     }
     LongArrayList groupValue = resultHolder.getResult(groupKey);
     groupValue.add(value);
-  }
-
-  @Override
-  protected void aggregateArrayGroupByMV(int length, int[][] groupKeysArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet) {
-    long[] values = blockValSet.getLongValuesSV();
-    for (int i = 0; i < length; i++) {
-      int[] groupKeys = groupKeysArray[i];
-      for (int groupKey : groupKeys) {
-        setGroupByResult(groupByResultHolder, groupKey, values[i]);
-      }
-    }
-  }
-
-  @Override
-  protected void aggregateArrayGroupByMVWithNull(int length, int[][] groupKeysArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    long[] values = blockValSet.getLongValuesSV();
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
-        int[] groupKeys = groupKeysArray[i];
-        for (int groupKey : groupKeys) {
-          setGroupByResult(groupByResultHolder, groupKey, values[i]);
-        }
-      }
-    }
-  }
-
-  @Override
-  public LongArrayList merge(LongArrayList intermediateResult1, LongArrayList intermediateResult2) {
-    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
-      return intermediateResult2;
-    }
-    if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
-      return intermediateResult1;
-    }
-    intermediateResult1.addAll(intermediateResult2);
-    return intermediateResult1;
-  }
-
-  @Override
-  public LongArrayList extractFinalResult(LongArrayList arrayList) {
-    return new LongArrayList(arrayList.elements());
   }
 }

@@ -76,6 +76,33 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(4).size(), getCountStarResult());
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testQueryWithDistinct(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "arrayAgg(boolCol, 'BOOLEAN', true), "
+            + "arrayAgg(intCol, 'INT', true), "
+            + "arrayAgg(longCol, 'LONG', true), "
+            // NOTE: FLOAT array is auto converted to DOUBLE array
+            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE', true), "
+            : "arrayAgg(floatCol, 'FLOAT', true), ")
+            + "arrayAgg(doubleCol, 'DOUBLE', true), "
+            + "arrayAgg(stringCol, 'STRING', true), "
+            + "arrayAgg(timestampCol, 'TIMESTAMP', true) "
+            + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    System.out.println(jsonNode);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 7);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).size(), 2);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(2).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(3).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(4).size(), getCountStarResult() / 10);
+  }
+
   @Override
   public String getTableName() {
     return DEFAULT_TABLE_NAME;

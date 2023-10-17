@@ -16,49 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.query.aggregation.function;
+package org.apache.pinot.core.query.aggregation.function.array;
 
+import it.unimi.dsi.fastutil.ints.AbstractIntCollection;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class ArrayAggIntFunction extends ArrayAggFunction<IntArrayList> {
-  public ArrayAggIntFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
+public abstract class ArrayAggBaseIntFunction<I extends AbstractIntCollection>
+    extends ArrayAggFunction<I, IntArrayList> {
+  public ArrayAggBaseIntFunction(ExpressionContext expression, FieldSpec.DataType dataType,
+      boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
   }
 
-  @Override
-  protected void aggregateArray(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet) {
-    ObjectAggregationResultHolder resultHolder = (ObjectAggregationResultHolder) aggregationResultHolder;
-    int[] value = blockValSet.getIntValuesSV();
-    IntArrayList valueArray = new IntArrayList(length);
-    for (int i = 0; i < length; i++) {
-      valueArray.add(value[i]);
-    }
-    resultHolder.setValue(valueArray);
-  }
-
-  @Override
-  protected void aggregateArrayWithNull(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    ObjectAggregationResultHolder resultHolder = (ObjectAggregationResultHolder) aggregationResultHolder;
-    int[] value = blockValSet.getIntValuesSV();
-    IntArrayList valueArray = new IntArrayList(length);
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
-        valueArray.add(value[i]);
-      }
-    }
-    resultHolder.setValue(valueArray);
-  }
+  abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, int value);
 
   @Override
   protected void aggregateArrayGroupBySV(int length, int[] groupKeyArray,
@@ -77,16 +53,6 @@ public class ArrayAggIntFunction extends ArrayAggFunction<IntArrayList> {
       if (!nullBitmap.contains(i)) {
         setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
       }
-    }
-  }
-
-  protected void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, int value) {
-    ObjectGroupByResultHolder resultHolder = (ObjectGroupByResultHolder) groupByResultHolder;
-    IntArrayList groupValue = resultHolder.getResult(groupKey);
-    if (groupValue == null) {
-      resultHolder.setValueForKey(groupKey, new IntArrayList(value));
-    } else {
-      groupValue.add(value);
     }
   }
 
@@ -119,7 +85,7 @@ public class ArrayAggIntFunction extends ArrayAggFunction<IntArrayList> {
   }
 
   @Override
-  public IntArrayList merge(IntArrayList intermediateResult1, IntArrayList intermediateResult2) {
+  public I merge(I intermediateResult1, I intermediateResult2) {
     if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
       return intermediateResult2;
     }
@@ -131,7 +97,7 @@ public class ArrayAggIntFunction extends ArrayAggFunction<IntArrayList> {
   }
 
   @Override
-  public IntArrayList extractFinalResult(IntArrayList intArrayList) {
-    return new IntArrayList(intArrayList.elements());
+  public IntArrayList extractFinalResult(I intArrayList) {
+    return new IntArrayList(intArrayList);
   }
 }

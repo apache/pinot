@@ -359,12 +359,12 @@ public class ObjectSerDeUtils {
     @Override
     public byte[] serialize(IntArrayList intArrayList) {
       int size = intArrayList.size();
-      byte[] bytes = new byte[Integer.BYTES + size * Double.BYTES];
+      byte[] bytes = new byte[Integer.BYTES + size * Integer.BYTES];
       ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
       byteBuffer.putInt(size);
       int[] values = intArrayList.elements();
       for (int i = 0; i < size; i++) {
-        byteBuffer.putDouble(values[i]);
+        byteBuffer.putInt(values[i]);
       }
       return bytes;
     }
@@ -486,12 +486,11 @@ public class ObjectSerDeUtils {
           // Besides the value bytes, we store: size, length for each value
           long bufferSize = (1 + (long) size) * Integer.BYTES;
           byte[][] valueBytesArray = new byte[size][];
-          int index = 0;
-          Object[] elements = stringArrayList.elements();
-          for (Object value : elements) {
+          for (int index = 0; index < size; index++) {
+            Object value = stringArrayList.get(index);
             byte[] valueBytes = value.toString().getBytes(UTF_8);
             bufferSize += valueBytes.length;
-            valueBytesArray[index++] = valueBytes;
+            valueBytesArray[index] = valueBytes;
           }
           Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
           byte[] bytes = new byte[(int) bufferSize];
@@ -515,9 +514,9 @@ public class ObjectSerDeUtils {
           ObjectArrayList stringArrayList = new ObjectArrayList(size);
           for (int i = 0; i < size; i++) {
             int length = byteBuffer.getInt();
-            byte[] bytes = new byte[length];
-            byteBuffer.get(bytes);
-            stringArrayList.add(new String(bytes, UTF_8));
+            byte[] valueBytes = new byte[length];
+            byteBuffer.get(valueBytes);
+            stringArrayList.add(new String(valueBytes, UTF_8));
           }
           return stringArrayList;
         }
