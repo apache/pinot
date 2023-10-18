@@ -74,7 +74,7 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /**
    * Updates the upsert metadata for a new consumed record in the given consuming segment.
    */
-  void addRecord(MutableSegment segment, RecordInfo recordInfo);
+  boolean addRecord(MutableSegment segment, RecordInfo recordInfo);
 
   /**
    * Replaces the upsert metadata for the old segment with the new immutable segment.
@@ -90,11 +90,6 @@ public interface PartitionUpsertMetadataManager extends Closeable {
    * Returns the merged record when partial-upsert is enabled.
    */
   GenericRow updateRecord(GenericRow record, RecordInfo recordInfo);
-
-  /**
-   * Returns whether the record should be dropped or not.
-   */
-  boolean shouldDropRecord(RecordInfo recordInfo);
 
   /**
    * Takes snapshot for all the tracked immutable segments when snapshot is enabled. This method should be invoked

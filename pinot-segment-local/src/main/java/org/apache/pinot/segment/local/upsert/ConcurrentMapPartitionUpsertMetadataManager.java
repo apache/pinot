@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -236,7 +237,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
-  protected void doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
+  protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
+    AtomicBoolean shouldDropRecord = new AtomicBoolean(false);
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     int newDocId = recordInfo.getDocId();
@@ -267,6 +269,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               return new RecordLocation(segment, newDocId, newComparisonValue);
             } else {
               handleOutOfOrderEvent(currentRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
+              // this is a out-of-order record, if upsert config _dropOutOfOrderRecord is true, then set
+              // shouldDropRecord to true. This method returns inverse of this value
+              shouldDropRecord.set(_dropOutOfOrderRecord);
               return currentRecordLocation;
             }
           } else {
@@ -279,6 +284,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
+    return !shouldDropRecord.get();
   }
 
   @Override
@@ -302,29 +308,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
           return recordLocation;
         });
     return record;
-  }
-
-  protected boolean doShouldDropRecord(RecordInfo recordInfo) {
-    // if _dropOutOfOrderRecord is false, then always add row
-    if (!_dropOutOfOrderRecord) {
-      return false;
-    }
-    RecordLocation previousRecordLocation =
-        _primaryKeyToRecordLocationMap.get(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction));
-    // if previous-record not found, then we should add row so return false
-    if (previousRecordLocation == null) {
-      return false;
-    }
-
-    // if out-of-order event, update UPSERT_OUT_OF_ORDER metric here and then return true to drop record.
-    // UPSERT_OUT_OF_ORDER metric is updated only in addNewRecord call which will be skipped when
-    // _dropOutOfOrderRecord = true
-    if (recordInfo.getComparisonValue().compareTo(previousRecordLocation.getComparisonValue()) < 0) {
-      handleOutOfOrderEvent(previousRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
-      return true;
-    } else {
-      return false;
-    }
   }
 
   @VisibleForTesting

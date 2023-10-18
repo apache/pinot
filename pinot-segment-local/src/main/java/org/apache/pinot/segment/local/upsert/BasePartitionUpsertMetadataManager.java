@@ -319,24 +319,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
-  public void addRecord(MutableSegment segment, RecordInfo recordInfo) {
+  public boolean addRecord(MutableSegment segment, RecordInfo recordInfo) {
     _gotFirstConsumingSegment = true;
     if (!startOperation()) {
       _logger.debug("Skip adding record to segment: {} because metadata manager is already stopped",
           segment.getSegmentName());
-      return;
+      return false;
     }
     // NOTE: We don't acquire snapshot read lock here because snapshot is always taken before a new consuming segment
     //       starts consuming, so it won't overlap with this method
     try {
-      doAddRecord(segment, recordInfo);
+      boolean addRecord = doAddRecord(segment, recordInfo);
       _trackedSegments.add(segment);
+      return addRecord;
     } finally {
       finishOperation();
     }
   }
 
-  protected abstract void doAddRecord(MutableSegment segment, RecordInfo recordInfo);
+  protected abstract boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo);
 
   @Override
   public void replaceSegment(ImmutableSegment segment, IndexSegment oldSegment) {
@@ -536,13 +537,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected abstract GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo);
-
-  @Override
-  public boolean shouldDropRecord(RecordInfo recordInfo) {
-    return doShouldDropRecord(recordInfo);
-  }
-
-  protected abstract boolean doShouldDropRecord(RecordInfo recordInfo);
 
   protected void handleOutOfOrderEvent(Object currentComparisonValue, Object recordComparisonValue) {
     boolean isPartialUpsertTable = (_partialUpsertHandler != null);

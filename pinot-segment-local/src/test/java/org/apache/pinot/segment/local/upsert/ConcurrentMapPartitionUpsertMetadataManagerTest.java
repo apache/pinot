@@ -722,11 +722,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
     MutableSegment segment2 = mockMutableSegment(1, validDocIds2, null);
 
-    // new record, should return false to not drop
-    boolean shouldDropRecord =
-        upsertMetadataManager.doShouldDropRecord(new RecordInfo(makePrimaryKey(3), 0, new IntWrapper(100), false));
-    assertFalse(shouldDropRecord);
-    upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(3), 0, new IntWrapper(100), false));
+    // new record, should return true to add it
+    boolean shouldAddRecord =
+        upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(3), 0, new IntWrapper(100), false));
+    assertTrue(shouldAddRecord);
 
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
     // segment2: 3 -> {0, 100}
@@ -737,16 +736,15 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
 
-    // send an out-of-order event, should return true to drop event
-    shouldDropRecord =
-        upsertMetadataManager.doShouldDropRecord(new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(80), false));
-    assertTrue(shouldDropRecord);
+    // send an out-of-order event, should return false to drop event
+    shouldAddRecord =
+        upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(80), false));
+    assertFalse(shouldAddRecord);
 
     // ordered event for an existing key
-    shouldDropRecord =
-        upsertMetadataManager.doShouldDropRecord(new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(150), false));
-    assertFalse(shouldDropRecord);
-    upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(150), false));
+    shouldAddRecord =
+        upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(150), false));
+    assertTrue(shouldAddRecord);
 
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}
     // segment2: 3 -> {0, 100}, 2 -> {1, 150}
