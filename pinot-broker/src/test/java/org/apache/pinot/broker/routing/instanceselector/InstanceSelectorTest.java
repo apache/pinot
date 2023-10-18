@@ -236,7 +236,8 @@ public class InstanceSelectorTest {
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
         new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, null,
+            Clock.systemUTC());
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -1091,7 +1092,8 @@ public class InstanceSelectorTest {
         new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
     // ReplicaGroupInstanceSelector has the same behavior as BalancedInstanceSelector for the unavailable segments
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, null,
+            Clock.systemUTC());
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);

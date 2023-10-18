@@ -69,10 +69,28 @@ import org.slf4j.LoggerFactory;
  */
 public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(StrictReplicaGroupInstanceSelector.class);
+  // With strictReplicaGroup routing policy, when none of the replica groups has all the segments available in it, we
+  // simply mark all segments as unavailable by default. But if allowFallback option is set to true, we choose one of
+  // the replica groups and process the available segments in that replica group. To choose a replica group, we can
+  // do it randomly to avoid hotspot or pick the one with most available segments to get a better query result.
+  private static final String PROPERTY_KEY_ALLOW_FALLBACK = "allowFallback";
+  private static final String PROPERTY_KEY_FALLBACK_POLICY = "fallbackPolicy";
+  private static final String FALLBACK_POLICY_RANDOM = "random";
+  private static final String FALLBACK_POLICY_BEST = "best";
+  private final boolean _allowFallback;
+  private final String _fallbackPolicy;
 
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector,
+      @Nullable Map<String, String> instanceSelectorProperties, Clock clock) {
     super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
+    if (instanceSelectorProperties != null) {
+      _allowFallback = Boolean.parseBoolean(instanceSelectorProperties.get(PROPERTY_KEY_ALLOW_FALLBACK));
+      _fallbackPolicy = instanceSelectorProperties.getOrDefault(PROPERTY_KEY_FALLBACK_POLICY, FALLBACK_POLICY_RANDOM);
+    } else {
+      _allowFallback = false;
+      _fallbackPolicy = FALLBACK_POLICY_RANDOM;
+    }
   }
 
   /**
@@ -93,6 +111,7 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
   void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, Long> newSegmentCreationTimeMap) {
     _oldSegmentCandidatesMap.clear();
+    _segmentOnlineInstanceMap.clear();
     int newSegmentMapCapacity = HashUtil.getHashMapCapacity(newSegmentCreationTimeMap.size());
     _newSegmentStateMap = new HashMap<>(newSegmentMapCapacity);
 
@@ -123,6 +142,11 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
     // Calculate the unavailable instances based on the old segments' online instances for each combination of instances
     // in the ideal state
     Map<Set<String>, Set<String>> unavailableInstancesMap = new HashMap<>();
+    // For fallbackPolicy=best, we track how many available segments on instances to find the best one to fall back to.
+    Map<String, Integer> instanceAvailableSegmentCountMap = null;
+    if (_allowFallback && FALLBACK_POLICY_BEST.equalsIgnoreCase(_fallbackPolicy)) {
+      instanceAvailableSegmentCountMap = new HashMap<>();
+    }
     for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
       String segment = entry.getKey();
       Set<String> onlineInstances = entry.getValue();
@@ -138,9 +162,17 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
                 instance, instancesInIdealState, segment, _tableNameWithType, idealStateInstanceStateMap,
                 externalViewAssignment.get(segment));
           }
+        } else if (instanceAvailableSegmentCountMap != null) {
+          instanceAvailableSegmentCountMap.compute(instance, (k, v) -> v == null ? 1 : v + 1);
         }
       }
     }
+
+    // Decided fallback instance for each combination of instances in the ideal state. For fallbackPolicy=random,
+    // the fallback instance is selected randomly when updateSegmentMaps() is called, instead of upon each query.
+    Map<Set<String>, String> fallbackInstanceMap =
+        _allowFallback ? getFallbackInstance(instanceAvailableSegmentCountMap, oldSegmentToOnlineInstancesMap,
+            idealStateAssignment) : null;
 
     // Iterate over the maps and exclude the unavailable instances
     for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
@@ -148,11 +180,21 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       // NOTE: onlineInstances is either a TreeSet or an EmptySet (sorted)
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
-      Set<String> unavailableInstances = unavailableInstancesMap.get(idealStateInstanceStateMap.keySet());
+      Set<String> instancesInIdealState = idealStateInstanceStateMap.keySet();
+      Set<String> unavailableInstances = unavailableInstancesMap.get(instancesInIdealState);
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
       for (String instance : onlineInstances) {
         if (!unavailableInstances.contains(instance)) {
           candidates.add(new SegmentInstanceCandidate(instance, true));
+        }
+      }
+      if (candidates.isEmpty()) {
+        _segmentOnlineInstanceMap.put(segment, onlineInstances);
+        if (_allowFallback) {
+          String fallbackInstance = fallbackInstanceMap.get(instancesInIdealState);
+          if (fallbackInstance != null && onlineInstances.contains(fallbackInstance)) {
+            candidates.add(new SegmentInstanceCandidate(fallbackInstance, true));
+          }
         }
       }
       _oldSegmentCandidatesMap.put(segment, candidates);
@@ -162,15 +204,66 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       String segment = entry.getKey();
       Set<String> onlineInstances = entry.getValue();
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Set<String> instancesInIdealState = idealStateInstanceStateMap.keySet();
       Set<String> unavailableInstances =
-          unavailableInstancesMap.getOrDefault(idealStateInstanceStateMap.keySet(), Collections.emptySet());
+          unavailableInstancesMap.getOrDefault(instancesInIdealState, Collections.emptySet());
       List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
       for (String instance : convertToSortedMap(idealStateInstanceStateMap).keySet()) {
         if (!unavailableInstances.contains(instance)) {
           candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance)));
         }
       }
+      if (candidates.isEmpty()) {
+        _segmentOnlineInstanceMap.put(segment, onlineInstances);
+        if (_allowFallback) {
+          String fallbackInstance = fallbackInstanceMap.get(instancesInIdealState);
+          if (fallbackInstance != null) {
+            candidates.add(new SegmentInstanceCandidate(fallbackInstance, onlineInstances.contains(fallbackInstance)));
+          }
+        }
+      }
       _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));
     }
+  }
+
+  private static Map<Set<String>, String> getFallbackInstance(Map<String, Integer> instanceAvailableSegmentCountMap,
+      Map<String, Set<String>> oldSegmentToOnlineInstancesMap, Map<String, Map<String, String>> idealStateAssignment) {
+    return instanceAvailableSegmentCountMap != null ? getMostAvailableInstance(instanceAvailableSegmentCountMap,
+        oldSegmentToOnlineInstancesMap, idealStateAssignment)
+        : getRandomInstance(oldSegmentToOnlineInstancesMap, idealStateAssignment);
+  }
+
+  private static Map<Set<String>, String> getRandomInstance(Map<String, Set<String>> oldSegmentToOnlineInstancesMap,
+      Map<String, Map<String, String>> idealStateAssignment) {
+    Map<Set<String>, String> randomInstanceMap = new HashMap<>();
+    for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
+      String segment = entry.getKey();
+      Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Set<String> instancesInIdealState = idealStateInstanceStateMap.keySet();
+      ArrayList<String> instanceList = new ArrayList<>(instancesInIdealState);
+      Collections.shuffle(instanceList);
+      randomInstanceMap.put(instancesInIdealState, instanceList.get(0));
+    }
+    return randomInstanceMap;
+  }
+
+  private static Map<Set<String>, String> getMostAvailableInstance(
+      Map<String, Integer> instanceAvailableSegmentCountMap, Map<String, Set<String>> oldSegmentToOnlineInstancesMap,
+      Map<String, Map<String, String>> idealStateAssignment) {
+    Map<Set<String>, String> mostAvailableInstanceMap = new HashMap<>();
+    for (Map.Entry<String, Set<String>> entry : oldSegmentToOnlineInstancesMap.entrySet()) {
+      String segment = entry.getKey();
+      Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      Set<String> instancesInIdealState = idealStateInstanceStateMap.keySet();
+      int maxCnt = 0;
+      for (String instance : instancesInIdealState) {
+        int cnt = instanceAvailableSegmentCountMap.getOrDefault(instance, 0);
+        if (cnt > maxCnt) {
+          mostAvailableInstanceMap.put(instancesInIdealState, instance);
+          maxCnt = cnt;
+        }
+      }
+    }
+    return mostAvailableInstanceMap;
   }
 }

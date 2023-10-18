@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -39,14 +40,24 @@ public class RoutingConfig extends BaseJsonConfig {
 
   private final List<String> _segmentPrunerTypes;
   private final String _instanceSelectorType;
+  private final Map<String, String> _instanceSelectorProperties;
 
   @JsonCreator
   public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
       @JsonProperty("segmentPrunerTypes") @Nullable List<String> segmentPrunerTypes,
       @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType) {
+    this(routingTableBuilderName, segmentPrunerTypes, instanceSelectorType, null);
+  }
+
+  @JsonCreator
+  public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
+      @JsonProperty("segmentPrunerTypes") @Nullable List<String> segmentPrunerTypes,
+      @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType,
+      @JsonProperty("instanceSelectorProperties") @Nullable Map<String, String> instanceSelectorProperties) {
     _routingTableBuilderName = routingTableBuilderName;
     _segmentPrunerTypes = segmentPrunerTypes;
     _instanceSelectorType = instanceSelectorType;
+    _instanceSelectorProperties = instanceSelectorProperties;
   }
 
   @Nullable
@@ -62,5 +73,9 @@ public class RoutingConfig extends BaseJsonConfig {
   @Nullable
   public String getInstanceSelectorType() {
     return _instanceSelectorType;
+  }
+
+  public Map<String, String> getInstanceSelectorProperties() {
+    return _instanceSelectorProperties;
   }
 }

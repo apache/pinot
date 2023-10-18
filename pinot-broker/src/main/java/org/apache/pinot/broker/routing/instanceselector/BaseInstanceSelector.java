@@ -93,6 +93,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   // Reduce this map to reduce garbage
   final Map<String, List<SegmentInstanceCandidate>> _oldSegmentCandidatesMap = new HashMap<>();
   Map<String, NewSegmentState> _newSegmentStateMap;
+  final Map<String, Set<String>> _segmentOnlineInstanceMap = new HashMap<>();
 
   // _segmentStates is needed for instance selection (multi-threaded), so it is made volatile.
   private volatile SegmentStates _segmentStates;
@@ -226,6 +227,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   void updateSegmentMaps(IdealState idealState, ExternalView externalView, Set<String> onlineSegments,
       Map<String, Long> newSegmentCreationTimeMap) {
     _oldSegmentCandidatesMap.clear();
+    _segmentOnlineInstanceMap.clear();
     _newSegmentStateMap = new HashMap<>(HashUtil.getHashMapCapacity(newSegmentCreationTimeMap.size()));
 
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
@@ -294,9 +296,10 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         for (SegmentInstanceCandidate candidate : candidates) {
           candidateInstances.add(candidate.getInstance());
         }
-        LOGGER.warn("Failed to find servers hosting old segment: {} for table: {} "
-                + "(all candidate instances: {} are disabled, counting segment as unavailable)", segment,
-            _tableNameWithType, candidateInstances);
+        LOGGER.warn("Failed to find servers to process old segment: {} for table: {} "
+                + "(counting segment as unavailable because all candidate instances: {} are disabled, with online "
+                + "instances: {})",
+            segment, _tableNameWithType, candidateInstances, _segmentOnlineInstanceMap.get(segment));
         unavailableSegments.add(segment);
         _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
       }
@@ -316,9 +319,10 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         for (SegmentInstanceCandidate candidate : candidates) {
           candidateInstances.add(candidate.getInstance());
         }
-        LOGGER.info("Failed to find servers hosting new segment: {} for table: {} "
-                + "(all candidate instances: {} are disabled, but not counting new segment as unavailable)", segment,
-            _tableNameWithType, candidateInstances);
+        LOGGER.info("Failed to find servers to process new segment: {} for table: {} "
+                + "(not counting new segment as unavailable although all candidate instances: {} are disabled, with "
+                + "online instances: {})",
+            segment, _tableNameWithType, candidateInstances, _segmentOnlineInstanceMap.get(segment));
       }
     }
 
