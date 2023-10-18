@@ -44,6 +44,6 @@ public class NoOpTableRebalanceObserver implements TableRebalanceObserver {
 
   @Override
   public RebalanceResult.Status getStopStatus() {
-    return RebalanceResult.Status.DONE;
+    throw new UnsupportedOperationException();
   }
 }
