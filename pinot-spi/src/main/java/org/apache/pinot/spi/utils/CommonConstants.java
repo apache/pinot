@@ -318,6 +318,16 @@ public class CommonConstants {
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = false;
 
+    // Broker config indicating the maximum serialized response size across all servers for a query. This value is
+    // equally divided across all servers processing the query.
+    public static final String CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES = "pinot.broker.max.query.response.size.bytes";
+    public static final long DEFAULT_MAX_QUERY_RESPONSE_SIZE_BYTES = Long.MAX_VALUE;
+
+    // Broker config indicating the maximum length of the serialized response per server for a query.
+    public static final String CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES = "pinot.broker.max.server.response.size.bytes";
+    public static final long DEFAULT_MAX_SERVER_RESPONSE_SIZE_BYTES = Long.MAX_VALUE;
+
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
@@ -361,6 +371,13 @@ public class CommonConstants {
         // Handle JOIN Overflow
         public static final String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
         public static final String JOIN_OVERFLOW_MODE = "joinOverflowMode";
+
+        // Indicates the maximum length of the serialized response per server for a query.
+        public static final String MAX_SERVER_RESPONSE_SIZE_BYTES = "maxServerResponseSizeBytes";
+
+        // Indicates the maximum length of serialized response across all servers for a query. This value is equally
+        // divided across all servers processing the query.
+        public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
 
         // TODO: Remove these keys (only apply to PQL) after releasing 0.11.0
         @Deprecated
