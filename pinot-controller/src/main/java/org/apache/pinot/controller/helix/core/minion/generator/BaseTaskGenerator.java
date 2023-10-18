@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.controller.helix.core.minion.generator;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.task.JobConfig;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
@@ -87,6 +91,28 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
       }
     }
     return MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK;
+  }
+
+  /**
+   * Returns the list of segment zk metadata for available segments in the table. The list does NOT filter out inactive
+   * segments based on the lineage. In order to compute the valid segments, we look at both idealstate and segment
+   * zk metadata in the property store and compute the intersection. In this way, we can avoid picking the dangling
+   * segments.
+   *
+   * @param tableNameWithType
+   * @return the list of segment zk metadata for available segments in the table.
+   */
+  public List<SegmentZKMetadata> getSegmentsZKMetadataForTable(String tableNameWithType) {
+    IdealState idealState = _clusterInfoAccessor.getIdealState(tableNameWithType);
+    Set<String> segmentsForTable = idealState.getPartitionSet();
+    List<SegmentZKMetadata> segmentZKMetadataList = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+    List<SegmentZKMetadata> selectedSegmentZKMetadataList = new ArrayList<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      if (segmentsForTable.contains(segmentZKMetadata.getSegmentName())) {
+        selectedSegmentZKMetadataList.add(segmentZKMetadata);
+      }
+    }
+    return selectedSegmentZKMetadataList;
   }
 
   @Override
