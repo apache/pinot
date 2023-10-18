@@ -226,4 +226,48 @@ public class ArrayFunctions {
   public static String arrayElementAtString(String[] arr, int idx) {
     return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.STRING;
   }
+
+  @ScalarFunction
+  public static int[] arrayGenerateAtInt(int start, int end, int inc) {
+    int size = (end - start) / inc +1;
+    int[] arr = new int[size];
+
+    for (int i = 0, value = start; i < size; i++, value += inc) {
+      arr[i] = value;
+    }
+    return arr;
+  }
+
+  @ScalarFunction
+  public static long[] arrayGenerateAtLong(long start, long end, long inc) {
+    int size = (int)((end - start) / inc +1);
+    long[] arr = new long[size];
+
+    for (int i = 0; i < size; i++, start += inc) {
+      arr[i] = start;
+    }
+    return arr;
+  }
+
+  @ScalarFunction
+  public static float[] arrayGenerateAtFloat(float start, float end, float inc) {
+    int size = (int)((end - start) / inc +1);
+    float[] arr = new float[size];
+
+    for (int i = 0; i < size; i++, start += inc) {
+      arr[i] = start;
+    }
+    return arr;
+  }
+
+  @ScalarFunction
+  public static double[] arrayGenerateAtDouble(double start, double end, double inc) {
+    int size = (int)((end - start) / inc +1);
+    double[] arr = new double[size];
+
+    for (int i = 0; i < size; i++, start += inc) {
+      arr[i] = start;
+    }
+    return arr;
+  }
 }
