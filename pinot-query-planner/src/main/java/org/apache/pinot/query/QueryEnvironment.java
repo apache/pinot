@@ -29,6 +29,7 @@ import org.apache.calcite.config.CalciteConnectionConfigImpl;
 import org.apache.calcite.config.CalciteConnectionProperty;
 import org.apache.calcite.jdbc.CalciteSchema;
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.hep.HepMatchOrder;
@@ -42,6 +43,7 @@ import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.rules.PinotQueryRuleSets;
+import org.apache.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
@@ -89,7 +91,8 @@ public class QueryEnvironment {
   private final Prepare.CatalogReader _catalogReader;
   private final RelDataTypeFactory _typeFactory;
 
-  private final HepProgram _hepProgram;
+  private final HepProgram _optProgram;
+  private final HepProgram _traitProgram;
 
   // Pinot extensions
   private final WorkerManager _workerManager;
@@ -121,38 +124,8 @@ public class QueryEnvironment {
             .addRelBuilderConfigTransform(c -> c.withPushJoinCondition(true))
             .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true)))
         .build();
-
-    HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
-    // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
-    // best to be explicit.
-    hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
-
-    // ----
-    // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
-    // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
-    for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
-      hepProgramBuilder.addRuleInstance(relOptRule);
-    }
-
-    // ----
-    // Run Pinot rule to attach aggregation auxiliary info
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PINOT_AGG_PROCESS_RULES);
-
-    // ----
-    // Pushdown filters using a single HepInstruction.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
-
-    // ----
-    // Prune duplicate/unnecessary nodes using a single HepInstruction.
-    // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
-    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PRUNE_RULES);
-
-    // ----
-    // Run pinot specific rules that should run after all other rules, using 1 HepInstruction per rule.
-    for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES) {
-      hepProgramBuilder.addRuleInstance(relOptRule);
-    }
-    _hepProgram = hepProgramBuilder.build();
+    _optProgram = getOptProgram();
+    _traitProgram = getTraitProgram();
   }
 
   /**
@@ -168,7 +141,8 @@ public class QueryEnvironment {
    * @return QueryPlannerResult containing the dispatchable query plan and the relRoot.
    */
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
-    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
+    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram,
+        _traitProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
@@ -196,7 +170,8 @@ public class QueryEnvironment {
    * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
   public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
-    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
+    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram,
+        _traitProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
@@ -229,7 +204,8 @@ public class QueryEnvironment {
   }
 
   public List<String> getTableNamesForQuery(String sqlQuery) {
-    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _hepProgram)) {
+    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram,
+        _traitProgram)) {
       SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
@@ -335,8 +311,12 @@ public class QueryEnvironment {
     // 4. optimize relNode
     // TODO: add support for traits, cost factory.
     try {
-      plannerContext.getRelOptPlanner().setRoot(relRoot.rel);
-      return plannerContext.getRelOptPlanner().findBestExp();
+      RelOptPlanner optPlanner = plannerContext.getRelOptPlanner();
+      optPlanner.setRoot(relRoot.rel);
+      RelNode optimized = optPlanner.findBestExp();
+      RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
+      traitPlanner.setRoot(optimized);
+      return traitPlanner.findBestExp();
     } catch (Exception e) {
       throw new UnsupportedOperationException(
           "Cannot generate a valid execution plan for the given query: " + RelOptUtil.toString(relRoot.rel), e);
@@ -363,5 +343,51 @@ public class QueryEnvironment {
 
   private HintStrategyTable getHintStrategyTable() {
     return PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE;
+  }
+
+  private static HepProgram getOptProgram() {
+    HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
+    // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
+    // best to be explicit.
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
+
+    // ----
+    // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
+    // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
+    for (RelOptRule relOptRule : PinotQueryRuleSets.BASIC_RULES) {
+      hepProgramBuilder.addRuleInstance(relOptRule);
+    }
+
+    // ----
+    // Run Pinot rule to attach aggregation auxiliary info
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PINOT_AGG_PROCESS_RULES);
+
+    // ----
+    // Pushdown filters using a single HepInstruction.
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES);
+
+    // ----
+    // Prune duplicate/unnecessary nodes using a single HepInstruction.
+    // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
+    hepProgramBuilder.addRuleCollection(PinotQueryRuleSets.PRUNE_RULES);
+    return hepProgramBuilder.build();
+  }
+
+  private static HepProgram getTraitProgram() {
+    HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
+
+    // Set the match order as BOTTOM_UP.
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
+
+    // ----
+    // Run pinot specific rules that should run after all other rules, using 1 HepInstruction per rule.
+    for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES) {
+      hepProgramBuilder.addRuleInstance(relOptRule);
+    }
+
+    // apply RelDistribution trait to all nodes
+    hepProgramBuilder.addRuleInstance(PinotRelDistributionTraitRule.INSTANCE);
+
+    return hepProgramBuilder.build();
   }
 }

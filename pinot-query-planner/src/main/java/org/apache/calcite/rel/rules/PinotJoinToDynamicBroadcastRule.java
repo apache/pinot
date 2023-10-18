@@ -162,9 +162,6 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
         new LogicalJoin(join.getCluster(), join.getTraitSet(), left.getInput(), dynamicBroadcastExchange,
             join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
             ImmutableList.copyOf(join.getSystemFieldList()));
-    // adding pass-through exchange after join b/c currently leaf-stage doesn't support chaining operator(s) after JOIN
-    PinotLogicalExchange passThroughAfterJoinExchange =
-        PinotLogicalExchange.create(dynamicFilterJoin, RelDistributions.hash(join.analyzeCondition().leftKeys));
-    call.transformTo(passThroughAfterJoinExchange);
+    call.transformTo(dynamicFilterJoin);
   }
 }
