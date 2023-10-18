@@ -55,6 +55,9 @@ public class ValueAggregatorFactory {
       case SUMVALUESINTEGERSUMTUPLESKETCH:
       case AVGVALUEINTEGERSUMTUPLESKETCH:
         return new IntegerTupleSketchAggregator(IntegerSummary.Mode.Sum);
+      case DISTINCTCOUNTCPCSKETCH:
+      case DISTINCTCOUNTRAWCPCSKETCH:
+        return new DistinctCountCPCSketchAggregator();
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

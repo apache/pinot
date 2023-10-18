@@ -18,26 +18,34 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.Union;
+import org.apache.datasketches.cpc.CpcSketch;
+import org.apache.datasketches.cpc.CpcUnion;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class DistinctCountThetaSketchAggregator implements ValueAggregator {
+public class DistinctCountCPCSketchAggregator implements ValueAggregator {
 
-  private final Union _union;
-
-  public DistinctCountThetaSketchAggregator() {
-    // TODO: Handle configurable nominal entries
-    _union = Union.builder().setNominalEntries(CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES).buildUnion();
+  public DistinctCountCPCSketchAggregator() {
   }
 
   @Override
   public Object aggregate(Object value1, Object value2) {
-    Sketch first = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize((byte[]) value1);
-    Sketch second = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize((byte[]) value2);
-    Sketch result = _union.union(first, second);
-    return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(result);
+    CpcSketch first = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize((byte[]) value1);
+    CpcSketch second = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize((byte[]) value2);
+    CpcSketch result;
+    if (first == null && second == null) {
+      result = new CpcSketch(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
+    } else if (second == null) {
+      result = first;
+    } else if (first == null) {
+      result = second;
+    } else {
+      CpcUnion union = new CpcUnion(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
+      union.update(first);
+      union.update(second);
+      result = union.getResult();
+    }
+    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(result);
   }
 }

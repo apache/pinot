@@ -168,11 +168,11 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   @Override
   public byte[] serializeAggregatedValue(Sketch value) {
-    return CustomSerDeUtils.DATA_SKETCH_SER_DE.serialize(value);
+    return CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(value);
   }
 
   @Override
   public Sketch deserializeAggregatedValue(byte[] bytes) {
-    return CustomSerDeUtils.DATA_SKETCH_SER_DE.deserialize(bytes);
+    return CustomSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(bytes);
   }
 }
