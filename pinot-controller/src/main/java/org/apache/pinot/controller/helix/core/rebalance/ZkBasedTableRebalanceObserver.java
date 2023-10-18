@@ -178,10 +178,10 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           if (prevStats == null || RebalanceResult.Status.IN_PROGRESS == prevStats.getStatus()) {
             return true;
           }
-          LOGGER.warn("Rebalance job: {} for table: {} has stopped with status: {}", _rebalanceJobId,
-              _tableNameWithType, prevStats.getStatus());
           _isStopped = true;
           _stopStatus = prevStats.getStatus();
+          LOGGER.warn("Rebalance job: {} for table: {} has already stopped with status: {}", _rebalanceJobId,
+              _tableNameWithType, _stopStatus);
           // No need to update job status if job has ended. This also keeps the last status from being overwritten.
           return false;
         });

@@ -1988,40 +1988,33 @@ public class PinotHelixResourceManager {
    */
   @Nullable
   public Map<String, String> getControllerJobZKMetadata(String jobId, ControllerJobType jobType) {
-    String controllerJobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
-    ZNRecord taskResourceZnRecord = _propertyStore.get(controllerJobResourcePath, null, AccessOption.PERSISTENT);
-    if (taskResourceZnRecord != null) {
-      return taskResourceZnRecord.getMapFields().get(jobId);
-    }
-    return null;
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
+    ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
+    return jobsZnRecord != null ? jobsZnRecord.getMapFields().get(jobId) : null;
   }
 
   /**
-   * Returns a Map of jobId to job's ZK metadata for the given table
-   * @param tableNameWithType the table for which jobs are to be fetched
+   * Returns a Map of jobId to job's ZK metadata that passes the checker, like for specific tables.
    * @return A Map of jobId to job properties
    */
-  public Map<String, Map<String, String>> getAllJobsForTable(String tableNameWithType,
-      Set<ControllerJobType> jobTypes) {
+  public Map<String, Map<String, String>> getAllJobs(Set<ControllerJobType> jobTypes,
+      Predicate<Map<String, String>> jobMetadataChecker) {
     Map<String, Map<String, String>> controllerJobs = new HashMap<>();
     for (ControllerJobType jobType : jobTypes) {
-      String jobsResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
-      try {
-        ZNRecord znRecord = _propertyStore.get(jobsResourcePath, null, AccessOption.PERSISTENT);
-        if (znRecord == null) {
-          continue;
+      String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
+      ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
+      if (jobsZnRecord == null) {
+        continue;
+      }
+      Map<String, Map<String, String>> jobMetadataMap = jobsZnRecord.getMapFields();
+      for (Map.Entry<String, Map<String, String>> jobMetadataEntry : jobMetadataMap.entrySet()) {
+        String jobId = jobMetadataEntry.getKey();
+        Map<String, String> jobMetadata = jobMetadataEntry.getValue();
+        Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType.name()),
+            "Got unexpected jobType: %s at jobResourcePath: %s with jobId: %s", jobType.name(), jobResourcePath, jobId);
+        if (jobMetadataChecker.test(jobMetadata)) {
+          controllerJobs.put(jobId, jobMetadata);
         }
-        Map<String, Map<String, String>> tableJobsRecord = znRecord.getMapFields();
-        for (Map.Entry<String, Map<String, String>> tableEntry : tableJobsRecord.entrySet()) {
-          if (tableEntry.getValue().get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType.name())
-              && tableEntry.getValue().get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)
-              .equals(tableNameWithType)) {
-            controllerJobs.put(tableEntry.getKey(), tableEntry.getValue());
-          }
-        }
-      } catch (Exception e) {
-        LOGGER.warn("Could not find controller job node for table: {} jobType: {} at path: {}", tableNameWithType,
-            jobType, jobsResourcePath, e);
       }
     }
     return controllerJobs;

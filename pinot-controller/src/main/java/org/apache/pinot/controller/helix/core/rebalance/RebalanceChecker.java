@@ -23,13 +23,16 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -63,20 +66,49 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
   }
 
   @Override
-  protected void processTable(String tableNameWithType) {
-    try {
-      LOGGER.info("Start to retry rebalance for table: {}", tableNameWithType);
-      // Get all rebalance jobs as tracked in ZK for this table to check if there is any failure to retry.
-      Map<String, Map<String, String>> allJobMetadata = _pinotHelixResourceManager.getAllJobsForTable(tableNameWithType,
-          Collections.singleton(ControllerJobType.TABLE_REBALANCE));
-      if (allJobMetadata.isEmpty()) {
-        LOGGER.info("No rebalance job has been triggered for table: {}. Skip retry", tableNameWithType);
-        return;
+  protected void processTables(List<String> tableNamesWithType, Properties periodicTaskProperties) {
+    int numTables = tableNamesWithType.size();
+    LOGGER.info("Processing {} tables in task: {}", numTables, _taskName);
+    int numTablesProcessed = retryRebalanceTables(new HashSet<>(tableNamesWithType));
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, _taskName,
+        numTablesProcessed);
+    LOGGER.info("Finish processing {}/{} tables in task: {}", numTablesProcessed, numTables, _taskName);
+  }
+
+  /**
+   * Rare but the task may be executed by more than one threads because user can trigger the periodic task to run
+   * immediately, in addition to the one scheduled to run periodically. So make this method synchronized to be simple.
+   */
+  private synchronized int retryRebalanceTables(Set<String> tableNamesWithType) {
+    // Get all jobMetadata for all the given tables with a single ZK read.
+    Map<String, Map<String, String>> allJobMetadataByJobId =
+        _pinotHelixResourceManager.getAllJobs(Collections.singleton(ControllerJobType.TABLE_REBALANCE),
+            jobMetadata -> tableNamesWithType.contains(
+                jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)));
+    Map<String, Map<String, Map<String, String>>> tableJobMetadataMap = new HashMap<>();
+    allJobMetadataByJobId.forEach((jobId, jobMetadata) -> {
+      String tableNameWithType = jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
+      tableJobMetadataMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>()).put(jobId, jobMetadata);
+    });
+    int numTablesProcessed = 0;
+    for (String tableNameWithType : tableNamesWithType) {
+      try {
+        LOGGER.info("Start to retry rebalance for table: {}", tableNameWithType);
+        // Get all rebalance jobs as tracked in ZK for this table to check if there is any failure to retry.
+        Map<String, Map<String, String>> allJobMetadata = tableJobMetadataMap.get(tableNameWithType);
+        if (allJobMetadata.isEmpty()) {
+          LOGGER.info("No rebalance job has been triggered for table: {}. Skip retry", tableNameWithType);
+          continue;
+        }
+        retryRebalanceTable(tableNameWithType, allJobMetadata);
+        numTablesProcessed++;
+      } catch (Exception e) {
+        LOGGER.error("Failed to retry rebalance for table: {}", tableNameWithType, e);
+        _controllerMetrics.addMeteredTableValue(tableNameWithType + "." + _taskName,
+            ControllerMeter.PERIODIC_TASK_ERROR, 1L);
       }
-      retryRebalanceTable(tableNameWithType, allJobMetadata);
-    } catch (Exception e) {
-      LOGGER.error("Failed to retry rebalance for table: {}", tableNameWithType, e);
     }
+    return numTablesProcessed;
   }
 
   @VisibleForTesting
@@ -125,7 +157,11 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
     _executorService.submit(() -> {
       // Retry rebalance in another thread as rebalance can take time.
-      retryRebalanceTableWithContext(tableNameWithType, tableConfig, jobCtx);
+      try {
+        retryRebalanceTableWithContext(tableNameWithType, tableConfig, jobCtx);
+      } catch (Throwable t) {
+        LOGGER.error("Failed to retry rebalance for table: {} asynchronously", tableNameWithType, t);
+      }
     });
   }
 

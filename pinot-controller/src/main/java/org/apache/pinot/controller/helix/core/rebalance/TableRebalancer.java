@@ -722,7 +722,9 @@ public class TableRebalancer {
             TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
             externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields());
         if (_tableRebalanceObserver.isStopped()) {
-          throw new RuntimeException(String.format("Rebalance for table: %s has stopped already", tableNameWithType));
+          throw new RuntimeException(
+              String.format("Rebalance for table: %s has already stopped with status: %s", tableNameWithType,
+                  _tableRebalanceObserver.getStopStatus()));
         }
         if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
             idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)) {

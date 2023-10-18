@@ -22,7 +22,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.MoreExecutors;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -248,8 +247,7 @@ public class RebalanceCheckerTest {
     TableConfig tableConfig = mock(TableConfig.class);
     PinotHelixResourceManager helixManager = mock(PinotHelixResourceManager.class);
     when(helixManager.getTableConfig(tableName)).thenReturn(tableConfig);
-    when(helixManager.getAllJobsForTable(tableName,
-        Collections.singleton(ControllerJobType.TABLE_REBALANCE))).thenReturn(allJobMetadata);
+    when(helixManager.getAllJobs(any(), any())).thenReturn(allJobMetadata);
     RebalanceChecker checker = new RebalanceChecker(helixManager, leadController, cfg, metrics, exec);
     // Although job1_3 was submitted most recently but job1 had exceeded maxAttempts. Chose job3 to retry, which got
     // stuck at in progress status.
