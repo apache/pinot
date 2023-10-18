@@ -42,9 +42,9 @@ It's perfect for user-facing real-time analytics and other analytical use cases,
     <category rdf:resource="https://projects.apache.org/category/big-data" />
     <release>
       <Version>
-        <name>0.12.1</name>
-        <created>2023-02-28</created>
-        <revision>0.12.1</revision>
+        <name>1.0.0</name>
+        <created>2023-09-23</created>
+        <revision>1.0.0</revision>
       </Version>
     </release>
     <repository>
