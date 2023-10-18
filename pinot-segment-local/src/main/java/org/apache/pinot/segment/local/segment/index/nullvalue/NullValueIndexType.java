@@ -77,14 +77,11 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withFallbackAlternative(
-            IndexConfigDeserializer.ifIndexingConfig(
-                IndexConfigDeserializer.alwaysCall((TableConfig tableConfig, Schema schema) ->
-                  tableConfig.getIndexingConfig().isNullHandlingEnabled()
-                      ? IndexConfig.ENABLED
-                      : IndexConfig.DISABLED))
-        );
+    return IndexConfigDeserializer.ifIndexingConfig(
+        IndexConfigDeserializer.alwaysCall((TableConfig tableConfig, Schema schema) ->
+            tableConfig.getIndexingConfig().isNullHandlingEnabled()
+                ? IndexConfig.ENABLED
+                : IndexConfig.DISABLED));
   }
 
   public NullValueVectorCreator createIndexCreator(File indexDir, String columnName) {
@@ -129,5 +126,9 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   public void convertToNewFormat(TableConfig tableConfig, Schema schema) {
+  }
+
+  public BuildLifecycle getIndexBuildLifecycle() {
+    return BuildLifecycle.CUSTOM;
   }
 }

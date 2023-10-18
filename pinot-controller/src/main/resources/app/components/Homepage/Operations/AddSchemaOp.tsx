@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { createStyles, DialogContent, Grid, makeStyles, Theme, Tooltip} from '@material-ui/core';
+import { Button, ButtonGroup, createStyles, DialogContent, Grid, makeStyles, Theme, Tooltip} from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import SimpleAccordion from '../../SimpleAccordion';
 import SchemaComponent from './SchemaComponent';
@@ -46,14 +46,72 @@ type Props = {
   fetchData: Function
 };
 
+const defaultSchemaConfig = {
+  schemaName:'', 
+  dimensionFieldSpecs: [], 
+  metricFieldSpecs: [], 
+  dateTimeFieldSpecs: []
+};
+
+enum EditView {
+  SIMPLE = "SIMPLE",
+  JSON = "JSON"
+}
+
+const DialogTitle = ({ editView, setEditView }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+      Add Schema{" "}
+      <Tooltip
+          arrow
+          interactive
+          placement="top"
+          title={
+              <a
+                  className="tooltip-link"
+                  href="https://docs.pinot.apache.org/configuration-reference/schema"
+                  rel="noreferrer"
+                  target="_blank"
+              >
+                  Click here for more details
+              </a>
+          }
+      >
+          <InfoOutlinedIcon />
+      </Tooltip>
+      <ButtonGroup style={{marginLeft: "16px"}} size="small" color="primary">
+        <Button
+            variant={editView === EditView.SIMPLE ? "contained" : "outlined"}
+            onClick={() => setEditView(EditView.SIMPLE)}
+        >
+            Simple
+        </Button>
+        <Button
+            variant={editView === EditView.JSON ? "contained" : "outlined"}
+            onClick={() => setEditView(EditView.JSON)}
+        >
+            Json
+        </Button>
+    </ButtonGroup>
+  </div>
+);
+
 export default function AddSchemaOp({
   hideModal,
   fetchData
 }: Props) {
+  const [editView, setEditView] = useState<EditView>(EditView.SIMPLE);
   const classes = useStyles();
-  const [schemaObj, setSchemaObj] = useState({schemaName:'', dateTimeFieldSpecs: []});
+  const [schemaObj, setSchemaObj] = useState({...defaultSchemaConfig});
+  const [jsonSchema, setJsonSchema] = useState({...defaultSchemaConfig});
   const {dispatch} = React.useContext(NotificationContext);
-  let isError = false
+  const schemaConfig = editView === EditView.SIMPLE ? schemaObj : jsonSchema;
+  let isError = false;
+
+  useEffect(() => {
+    // reset schema config when view changes
+    setSchemaObj({...defaultSchemaConfig});
+    setJsonSchema({...defaultSchemaConfig});
+  }, [editView]);
 
     const returnValue = (data,key) =>{
         Object.keys(data).map(async (o)=>{
@@ -98,7 +156,7 @@ export default function AddSchemaOp({
         const types = ["dimensionFieldSpecs","metricFieldSpecs","dateTimeFieldSpecs"];
         let notEmpty = true;
         types.map((t)=>{
-          if(schemaObj[t].length)
+          if(schemaConfig[t].length)
           {
             notEmpty = false
           }
@@ -107,7 +165,7 @@ export default function AddSchemaOp({
       }
 
   const validateSchema = async () => {
-    const validSchema = await PinotMethodUtils.validateSchemaAction(schemaObj);
+    const validSchema = await PinotMethodUtils.validateSchemaAction(schemaConfig);
     if(validSchema.error || typeof validSchema === 'string'){
       dispatch({
         type: 'error',
@@ -121,14 +179,14 @@ export default function AddSchemaOp({
 
   const handleSave = async () => {
     const fields = [{key:"schemaName",label:"schema Name"},{key:"name",label:"Column Name"},{key:"dataType",label:"Data Type"}];
-    await checkFields(schemaObj,fields);
+    await checkFields(schemaConfig,fields);
     if(isError){
       isError = false;
       return false;
     }
     if(!isObjEmpty()){
     if(await validateSchema()){
-      const schemaCreationResp = await PinotMethodUtils.saveSchemaAction(schemaObj);
+      const schemaCreationResp = await PinotMethodUtils.saveSchemaAction(schemaConfig);
       dispatch({
         type: (schemaCreationResp.error || typeof schemaCreationResp === 'string') ? 'error' : 'success',
         message: schemaCreationResp.error || schemaCreationResp.status || schemaCreationResp,
@@ -153,49 +211,66 @@ export default function AddSchemaOp({
       open={true}
       handleClose={hideModal}
       handleSave={handleSave}
-      title={(<>Add Schema <Tooltip interactive title={(<a className={"tooltip-link"} target="_blank" href="https://docs.pinot.apache.org/configuration-reference/schema">Click here for more details</a>)} arrow placement="top"><InfoOutlinedIcon/></Tooltip></>)}
+      title={<DialogTitle editView={editView} setEditView={setEditView} />}
       size="xl"
       disableBackdropClick={true}
       disableEscapeKeyDown={true}
     >
       <DialogContent>
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <SimpleAccordion
-              headerTitle="Add Schema"
-              showSearchBox={false}
-            >
-              <SchemaComponent
-                schemaObj={schemaObj}
-                schemaName={schemaObj.schemaName}
-                setSchemaObj={(o)=>{setSchemaObj(o);}}
-              />
-            </SimpleAccordion>
-          </Grid>
-          <Grid item xs={6}>
-            <div className={classes.sqlDiv}>
+        {editView === EditView.SIMPLE && (
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
               <SimpleAccordion
-                headerTitle="Schema Config (Read Only)"
+                headerTitle="Add Schema"
                 showSearchBox={false}
               >
-                <CustomCodemirror
-                  customClass={classes.queryOutput}
-                  data={schemaObj}
-                  isEditable={false}
-                  returnCodemirrorValue={(newValue)=>{
-                    try{
-                      const jsonObj = JSON.parse(newValue);
-                      if(jsonObj){
-                        jsonObj.segmentsConfig.replicasPerPartition = jsonObj.segmentsConfig.replication;
-                        setSchemaObj(jsonObj);
-                      }
-                    }catch(e){}
-                  }}
+                <SchemaComponent
+                  schemaObj={schemaObj}
+                  schemaName={schemaObj.schemaName}
+                  setSchemaObj={(o)=>{setSchemaObj(o);}}
                 />
               </SimpleAccordion>
-            </div>
+            </Grid>
+            <Grid item xs={6}>
+              <div className={classes.sqlDiv}>
+                <SimpleAccordion
+                  headerTitle="Schema Config (Read Only)"
+                  showSearchBox={false}
+                >
+                  <CustomCodemirror
+                    customClass={classes.queryOutput}
+                    data={schemaObj}
+                    isEditable={false}
+                    returnCodemirrorValue={(newValue)=>{
+                      try{
+                        const jsonObj = JSON.parse(newValue);
+                        if(jsonObj){
+                          jsonObj.segmentsConfig.replicasPerPartition = jsonObj.segmentsConfig.replication;
+                          setSchemaObj(jsonObj);
+                        }
+                      }catch(e){}
+                    }}
+                  />
+                </SimpleAccordion>
+              </div>
+            </Grid>
           </Grid>
-        </Grid>
+        )}
+
+        {editView === EditView.JSON && (
+          <CustomCodemirror 
+            data={jsonSchema} 
+            isEditable={true} 
+            returnCodemirrorValue={(newValue)=>{
+              try{
+                const jsonSchema = JSON.parse(newValue);
+                if(jsonSchema){
+                  setJsonSchema(jsonSchema);
+                }
+              }catch(e){}
+            }} 
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -37,6 +37,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.response.ProcessingException;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -168,6 +169,24 @@ public abstract class QueryScheduler {
 
       byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
 
+      Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
+      Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
+
+      // TODO: Perform this check sooner during the serialization of DataTable.
+      if (maxResponseSizeBytes != null && responseBytes.length > maxResponseSizeBytes) {
+        String errMsg =
+            String.format("Serialized query response size %d exceeds threshold %d for requestId %d from broker %s",
+                responseBytes.length, maxResponseSizeBytes, queryRequest.getRequestId(), queryRequest.getBrokerId());
+        LOGGER.error(errMsg);
+        _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(),
+            ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);
+
+        instanceResponse = new InstanceResponseBlock();
+        instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR, errMsg));
+        instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+        responseBytes = serializeResponse(queryRequest, instanceResponse);
+      }
+
       // Log the statistics
       String tableNameWithType = queryRequest.getTableNameWithType();
       long numDocsScanned =
@@ -227,6 +246,8 @@ public abstract class QueryScheduler {
       if (threadCpuTimeNs > 0) {
         _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.EXECUTION_THREAD_CPU_TIME_NS, threadCpuTimeNs,
             TimeUnit.NANOSECONDS);
+        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.TOTAL_THREAD_CPU_TIME_MILLIS,
+            TimeUnit.MILLISECONDS.convert(threadCpuTimeNs, TimeUnit.NANOSECONDS));
       }
       if (systemActivitiesCpuTimeNs > 0) {
         _serverMetrics.addTimedTableValue(tableNameWithType, ServerTimer.SYSTEM_ACTIVITIES_CPU_TIME_NS,

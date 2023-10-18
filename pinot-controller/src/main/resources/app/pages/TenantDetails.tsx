@@ -601,6 +601,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           <CustomizedTables
             title={"Instance Count - " + instanceCountData.records.length}
             data={instanceCountData}
+            addLinks
+            baseURL="/instance/"
             showSearchBox={true}
             inAccordionFormat={true}
           />

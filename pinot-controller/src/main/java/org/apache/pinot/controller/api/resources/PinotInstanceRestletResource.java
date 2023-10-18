@@ -53,6 +53,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -502,7 +503,8 @@ public class PinotInstanceRestletResource {
     Map<String, Integer> tagToInstanceCountMap = getUpdatedTagToInstanceCountMap(requests);
     Map<String, Integer> tagDeficiency = computeTagDeficiency(tagToInstanceCountMap, tagMinServerMap);
 
-    Map<String, List<OperationValidationResponse.ErrorWrapper>> responseMap = new HashMap<>(requests.size());
+    Map<String, List<OperationValidationResponse.ErrorWrapper>> responseMap
+        = new HashMap<>(HashUtil.getHashMapCapacity(requests.size()));
     List<OperationValidationResponse.ErrorWrapper> tenantIssues = new ArrayList<>();
     requests.forEach(request -> responseMap.put(request.getInstanceName(), new ArrayList<>()));
     for (InstanceTagUpdateRequest request : requests) {

@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
@@ -170,6 +171,19 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     T valueBuffer = constructor.apply(maxElements);
     for (int i = 0; i < numDocs; i++) {
       Assert.assertEquals(inputs.get(i), extractor.extract(reader, context, i, valueBuffer));
+    }
+
+    // Value byte range test
+    Assert.assertTrue(reader.isBufferByteRangeInfoSupported());
+    Assert.assertFalse(reader.isFixedOffsetMappingType());
+    final ForwardIndexReaderContext valueRangeContext = reader.createContext();
+    List<ForwardIndexReader.ByteRange> ranges = new ArrayList<>();
+    for (int i = 0; i < numDocs; i++) {
+      try {
+        reader.recordDocIdByteRanges(i, valueRangeContext, ranges);
+      } catch (Exception e) {
+        Assert.fail("Failed to record byte ranges for docId: " + i, e);
+      }
     }
   }
 

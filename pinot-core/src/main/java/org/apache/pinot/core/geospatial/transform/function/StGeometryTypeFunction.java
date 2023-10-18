@@ -47,6 +47,7 @@ public class StGeometryTypeFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     Preconditions
         .checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s", getName());
     TransformFunction transformFunction = arguments.get(0);

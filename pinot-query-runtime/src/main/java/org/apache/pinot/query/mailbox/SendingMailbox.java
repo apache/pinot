@@ -62,4 +62,10 @@ public interface SendingMailbox {
    * mailbox is terminated.
    */
   boolean isTerminated();
+
+  /**
+   * Returns whether the {@link ReceivingMailbox} is considered itself finished, and is expected a EOS block with
+   * statistics to be sent next.
+   */
+  boolean isEarlyTerminated();
 }

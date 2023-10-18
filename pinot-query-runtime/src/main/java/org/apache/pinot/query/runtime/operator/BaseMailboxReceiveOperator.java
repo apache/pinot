@@ -82,6 +82,12 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   @Override
+  protected void earlyTerminate() {
+    _isEarlyTerminated = true;
+    _multiConsumer.earlyTerminate();
+  }
+
+  @Override
   public List<MultiStageOperator> getChildOperators() {
     return Collections.emptyList();
   }
@@ -126,6 +132,11 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     @Override
     public void addOnNewDataListener(OnNewData onNewData) {
       _mailbox.registeredReader(onNewData::newDataAvailable);
+    }
+
+    @Override
+    public void earlyTerminate() {
+      _mailbox.earlyTerminate();
     }
 
     @Override

@@ -293,6 +293,31 @@ public class MailboxServiceTest {
   }
 
   @Test
+  public void testLocalEarlyTerminated()
+      throws Exception {
+    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+    SendingMailbox sendingMailbox =
+        _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
+    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> { });
+
+    // send a block
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    // receiving-side early terminates after pulling the first block
+    TransferableBlock block = receivingMailbox.poll();
+    receivingMailbox.earlyTerminate();
+    assertNotNull(block);
+    assertEquals(block.getNumRows(), 1);
+    // send another block b/c it doesn't guarantee the next block must be EOS
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    // send a metadata block
+    sendingMailbox.send(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    // sending side should early terminate
+    assertTrue(sendingMailbox.isEarlyTerminated());
+  }
+
+  @Test
   public void testRemoteHappyPathSendFirst()
       throws Exception {
     String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
@@ -555,5 +580,35 @@ public class MailboxServiceTest {
     receivingMailbox.cancel();
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
     assertEquals(receivingMailbox.getNumPendingBlocks(), 0);
+  }
+
+  @Test
+  public void testRemoteEarlyTerminated()
+      throws Exception {
+    String mailboxId = MailboxIdUtils.toMailboxId(_requestId++, SENDER_STAGE_ID, 0, RECEIVER_STAGE_ID, 0);
+
+    // Sends are non-blocking as long as channel capacity is not breached
+    SendingMailbox sendingMailbox =
+        _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
+    ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
+    receivingMailbox.registeredReader(() -> { });
+
+    // send a block
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    // receiving-side early terminates after pulling the first block
+    TestUtils.waitForCondition(aVoid -> {
+          TransferableBlock block = receivingMailbox.poll();
+          return block != null && block.getNumRows() == 1;
+        }, 1000L, "Failed to deliver mails");
+    receivingMailbox.earlyTerminate();
+
+    // send another block b/c it doesn't guarantee the next block must be EOS
+    sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
+    // send a metadata block
+    sendingMailbox.send(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    sendingMailbox.complete();
+
+    // sending side should early terminate
+    TestUtils.waitForCondition(aVoid -> sendingMailbox.isEarlyTerminated(), 1000L, "Failed to early-terminate sender");
   }
 }

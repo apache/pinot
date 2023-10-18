@@ -92,6 +92,7 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
+    super.init(arguments, columnContextMap);
     // Check that there are exactly 4 arguments
     if (arguments.size() != 4) {
       throw new IllegalArgumentException("Exactly 4 arguments are required for DATE_TIME_CONVERT transform function");

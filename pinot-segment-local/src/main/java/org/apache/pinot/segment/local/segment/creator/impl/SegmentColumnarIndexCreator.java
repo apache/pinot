@@ -94,7 +94,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   /**
    * Contains, indexed by column name, the creator associated with each index type.
    *
-   * Indexes that {@link #hasSpecialLifecycle(IndexType) have a special lyfecycle} are not included here.
+   * Indexes whose build lifecycle is not DURING_SEGMENT_CREATION are not included here.
    */
   private Map<String, Map<IndexType<?, ?, ?>, IndexCreator>> _creatorsByColAndIndex = new HashMap<>();
   private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
@@ -195,7 +195,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex =
           Maps.newHashMapWithExpectedSize(IndexService.getInstance().getAllIndexes().size());
       for (IndexType<?, ?, ?> index : IndexService.getInstance().getAllIndexes()) {
-        if (hasSpecialLifecycle(index)) {
+        if (index.getIndexBuildLifecycle() != IndexType.BuildLifecycle.DURING_SEGMENT_CREATION) {
           continue;
         }
         tryCreateIndexCreator(creatorsByIndex, index, context, config);
@@ -241,14 +241,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       builder.undeclare(StandardIndexes.inverted());
     }
     return builder.build();
-  }
-
-  /**
-   * Returns true if the given index type has their own construction lifecycle and therefore should not be instantiated
-   * in the general index loop and shouldn't be notified of each new column.
-   */
-  private boolean hasSpecialLifecycle(IndexType<?, ?, ?> indexType) {
-    return indexType == StandardIndexes.nullValueVector() || indexType == StandardIndexes.dictionary();
   }
 
   /**

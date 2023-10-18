@@ -72,7 +72,6 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class GroupByDataTableReducer implements DataTableReducer {
   private static final int MIN_DATA_TABLES_FOR_CONCURRENT_REDUCE = 2; // TBD, find a better value.
-  private static final int MAX_ROWS_UPSERT_PER_INTERRUPTION_CHECK = 10_000;
 
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
@@ -81,7 +80,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   private final int _numGroupByExpressions;
   private final int _numColumns;
 
-  GroupByDataTableReducer(QueryContext queryContext) {
+  public GroupByDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
@@ -99,7 +98,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
       Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponse,
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
-    assert dataSchema != null;
+    dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(_queryContext, dataSchema);
 
     if (dataTableMap.isEmpty()) {
       PostAggregationHandler postAggregationHandler =

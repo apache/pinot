@@ -123,7 +123,7 @@
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.10.2</avro.version>
     <parquet.version>1.12.3</parquet.version>
-    <helix.version>1.0.4</helix.version>
+    <helix.version>1.3.1</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.12.7.20221012</jackson.version>
     <zookeeper.version>3.6.3</zookeeper.version>
@@ -151,7 +151,7 @@
     <snappy-java.version>1.1.10.4</snappy-java.version>
     <zstd-jni.version>1.5.2-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
-    <log4j.version>2.17.1</log4j.version>
+    <log4j.version>2.20.0</log4j.version>
     <netty.version>4.1.94.Final</netty.version>
     <reactivestreams.version>1.0.3</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
@@ -162,9 +162,11 @@
     <stax2-api.version>4.1</stax2-api.version>
     <aws.sdk.version>2.20.94</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
+    <testng.version>7.8.0</testng.version>
+
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
-    <protobuf.version>3.22.0</protobuf.version>
+    <protobuf.version>3.24.3</protobuf.version>
     <grpc.version>1.53.0</grpc.version>
     <confluent.version>5.5.3</confluent.version>
 
@@ -174,9 +176,16 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
-    <surefire.version>3.0.0-M5</surefire.version>
     <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
     <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
+    <surefire.version>3.1.2</surefire.version>
+
+    <!-- Configuration for Scala -->
+    <scala.version>2.12.18</scala.version>
+    <scala.compat.version>2.12</scala.compat.version>
+
+    <flink.version>1.12.0</flink.version>
+    <commons-configuration2.version>2.9.0</commons-configuration2.version>
   </properties>
 
   <profiles>
@@ -203,24 +212,6 @@
         <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
-    <!-- jfim: this profile is overridden in pinot-integration-tests -->
-    <profile>
-      <id>integration-tests-only</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>true</skipTests>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <!-- Disable source release assembly for 'apache-release' profile. -->
     <profile>
       <id>apache-release</id>
@@ -237,6 +228,17 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+
+    <profile>
+      <id>scala-2.13</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <properties>
+        <scala.version>2.13.3</scala.version>
+        <scala.compat.version>2.13</scala.compat.version>
+      </properties>
     </profile>
   </profiles>
   <dependencyManagement>
@@ -399,7 +401,7 @@
       <dependency>
         <groupId>org.testng</groupId>
         <artifactId>testng</artifactId>
-        <version>6.11</version>
+        <version>${testng.version}</version>
       </dependency>
       <dependency>
         <groupId>org.roaringbitmap</groupId>
@@ -457,10 +459,17 @@
         <artifactId>commons-collections</artifactId>
         <version>3.2.2</version>
       </dependency>
+
+      <!-- commons-configuration1.10, will be deleted after the upgrade. -->
       <dependency>
         <groupId>commons-configuration</groupId>
         <artifactId>commons-configuration</artifactId>
         <version>1.10</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-configuration2</artifactId>
+        <version>${commons-configuration2.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-io</groupId>
@@ -586,7 +595,7 @@
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>1.7.25</version>
+        <version>2.0.9</version>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
@@ -600,8 +609,19 @@
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-slf4j2-impl</artifactId>
+        <version>${log4j.version}</version>
+      </dependency>
+      <dependency>
+        <!--
+         We don't use slf4j but slf4j2, so we can just ignore this dependency.
+         Instead of just remove this dependency, we set the scope as provided.
+         We cannot just remove the dependency because that would create conflicts in the enforcer
+        -->
+        <groupId>org.apache.logging.log4j</groupId>
         <artifactId>log4j-slf4j-impl</artifactId>
         <version>${log4j.version}</version>
+        <scope>provided</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
@@ -713,10 +733,6 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.yetus</groupId>
             <artifactId>audience-annotations</artifactId>
           </exclusion>
@@ -727,6 +743,14 @@
           <exclusion>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-configuration2</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-text</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -803,10 +827,6 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -888,12 +908,6 @@
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
         <version>1.5.9</version>
-        <exclusions>
-          <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
-        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -946,16 +960,8 @@
         <version>${calcite.version}</version>
         <exclusions>
           <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.calcite.avatica</groupId>
             <artifactId>avatica-metrics</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.apache.httpcomponents</groupId>
@@ -1259,10 +1265,10 @@
         </exclusions>
       </dependency>
       <dependency>
-        <!-- Older versions fail with Java >= 16 -->
+        <!-- starting from 1.18.30, JDK21 is supported -->
         <groupId>org.projectlombok</groupId>
         <artifactId>lombok</artifactId>
-        <version>1.18.28</version>
+        <version>1.18.30</version>
       </dependency>
 
       <dependency>
@@ -1306,6 +1312,24 @@
         <version>${aws.sdk.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-library</artifactId>
+        <version>${scala.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-clients_${scala.compat.version}</artifactId>
+        <version>${flink.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
+        <version>${flink.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -1555,6 +1579,63 @@
             <encoding>${project.build.sourceEncoding}</encoding>
           </configuration>
         </plugin>
+        <plugin>
+          <groupId>net.alchim31.maven</groupId>
+          <artifactId>scala-maven-plugin</artifactId>
+          <version>3.2.2</version>
+          <executions>
+            <execution>
+              <id>add-source</id>
+              <phase>generate-sources</phase>
+              <goals>
+                <goal>add-source</goal>
+              </goals>
+              <configuration>
+                <sourceDir>src/main/java</sourceDir>
+              </configuration>
+            </execution>
+            <execution>
+              <id>scala-compile-first</id>
+              <phase>process-resources</phase>
+              <goals>
+                <goal>compile</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>scala-test-compile-first</id>
+              <phase>process-test-resources</phase>
+              <goals>
+                <goal>testCompile</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>attach-scaladocs</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>doc-jar</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <scalaVersion>${scala.version}</scalaVersion>
+            <args>
+              <arg>-unchecked</arg>
+              <arg>-deprecation</arg>
+              <arg>-feature</arg>
+            </args>
+            <jvmArgs>
+              <jvmArg>-Xms1024m</jvmArg>
+              <jvmArg>-Xmx1024m</jvmArg>
+            </jvmArgs>
+            <javacArgs>
+              <javacArg>-source</javacArg>
+              <javacArg>${jdk.version}</javacArg>
+              <javacArg>-target</javacArg>
+              <javacArg>${jdk.version}</javacArg>
+              <javacArg>-Xlint:all,-serial,-path</javacArg>
+            </javacArgs>
+          </configuration>
+        </plugin>
       </plugins>
     </pluginManagement>
     <plugins>
@@ -1670,6 +1751,7 @@
           </execution>
         </executions>
         <configuration>
+          <append>true</append>
           <includes>
             <include>org/apache/pinot/**/*</include>
           </includes>

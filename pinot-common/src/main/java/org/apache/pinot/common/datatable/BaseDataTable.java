@@ -28,6 +28,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -118,12 +119,12 @@ public abstract class BaseDataTable implements DataTable {
   protected Map<String, Map<Integer, String>> deserializeDictionaryMap(ByteBuffer buffer)
       throws IOException {
     int numDictionaries = buffer.getInt();
-    Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(numDictionaries);
+    Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(HashUtil.getHashMapCapacity(numDictionaries));
 
     for (int i = 0; i < numDictionaries; i++) {
       String column = DataTableUtils.decodeString(buffer);
       int dictionarySize = buffer.getInt();
-      Map<Integer, String> dictionary = new HashMap<>(dictionarySize);
+      Map<Integer, String> dictionary = new HashMap<>(HashUtil.getHashMapCapacity(dictionarySize));
       for (int j = 0; j < dictionarySize; j++) {
         int key = buffer.getInt();
         String value = DataTableUtils.decodeString(buffer);

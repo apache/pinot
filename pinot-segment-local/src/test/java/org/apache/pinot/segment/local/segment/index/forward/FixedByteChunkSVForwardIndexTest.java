@@ -102,6 +102,24 @@ public class FixedByteChunkSVForwardIndexTest {
         Assert.assertEquals(fourByteOffsetReader.getInt(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getInt(i, eightByteOffsetReaderContext), expected[i]);
       }
+
+
+      Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
+      Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
+      // Validate byte range provider behaviour
+      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+        // For pass through compression, the buffer is fixed offset mapping type
+        Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertEquals(fourByteOffsetReader.getDocLength(), Integer.BYTES);
+        Assert.assertFalse(fourByteOffsetReader.isDocLengthInBits());
+
+        Assert.assertTrue(eightByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertEquals(eightByteOffsetReader.getDocLength(), Integer.BYTES);
+        Assert.assertFalse(eightByteOffsetReader.isDocLengthInBits());
+      } else {
+        Assert.assertFalse(eightByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertFalse(eightByteOffsetReader.isFixedOffsetMappingType());
+      }
     }
 
     FileUtils.deleteQuietly(outFileFourByte);
@@ -149,6 +167,23 @@ public class FixedByteChunkSVForwardIndexTest {
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getLong(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getLong(i, eightByteOffsetReaderContext), expected[i]);
+      }
+
+      // Validate byte range provider behaviour
+      Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
+      Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
+      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+        // For pass through compression, the buffer is fixed offset mapping type
+        Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertEquals(fourByteOffsetReader.getDocLength(), Long.BYTES);
+        Assert.assertFalse(fourByteOffsetReader.isDocLengthInBits());
+
+        Assert.assertTrue(eightByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertEquals(eightByteOffsetReader.getDocLength(), Long.BYTES);
+        Assert.assertFalse(eightByteOffsetReader.isDocLengthInBits());
+      } else {
+        Assert.assertFalse(fourByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertFalse(eightByteOffsetReader.isFixedOffsetMappingType());
       }
     }
 
@@ -198,6 +233,23 @@ public class FixedByteChunkSVForwardIndexTest {
         Assert.assertEquals(fourByteOffsetReader.getFloat(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getFloat(i, eightByteOffsetReaderContext), expected[i]);
       }
+
+      // Validate byte range provider behaviour
+      Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
+      Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
+      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+        // For pass through compression, the buffer is fixed offset mapping type
+        Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertEquals(fourByteOffsetReader.getDocLength(), Float.BYTES);
+        Assert.assertFalse(fourByteOffsetReader.isDocLengthInBits());
+
+        Assert.assertTrue(eightByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertEquals(eightByteOffsetReader.getDocLength(), Float.BYTES);
+        Assert.assertFalse(eightByteOffsetReader.isDocLengthInBits());
+      } else {
+        Assert.assertFalse(fourByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertFalse(eightByteOffsetReader.isFixedOffsetMappingType());
+      }
     }
 
     FileUtils.deleteQuietly(outFileFourByte);
@@ -245,6 +297,39 @@ public class FixedByteChunkSVForwardIndexTest {
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getDouble(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getDouble(i, eightByteOffsetReaderContext), expected[i]);
+      }
+
+      // Validate byte range provider behaviour
+      Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
+      Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
+      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+        // For pass through compression, the buffer is fixed offset mapping type
+        Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertEquals(fourByteOffsetReader.getDocLength(), Double.BYTES);
+        Assert.assertFalse(fourByteOffsetReader.isDocLengthInBits());
+
+        Assert.assertTrue(eightByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertEquals(eightByteOffsetReader.getDocLength(), Double.BYTES);
+        Assert.assertFalse(eightByteOffsetReader.isDocLengthInBits());
+      } else {
+        Assert.assertFalse(fourByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertFalse(eightByteOffsetReader.isFixedOffsetMappingType());
+      }
+
+      Assert.assertTrue(fourByteOffsetReader.isBufferByteRangeInfoSupported());
+      Assert.assertTrue(eightByteOffsetReader.isBufferByteRangeInfoSupported());
+      if (compressionType == ChunkCompressionType.PASS_THROUGH) {
+        // For pass through compression, the buffer is fixed offset mapping type
+        Assert.assertTrue(fourByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertEquals(fourByteOffsetReader.getDocLength(), Double.BYTES);
+        Assert.assertFalse(fourByteOffsetReader.isDocLengthInBits());
+
+        Assert.assertTrue(eightByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertEquals(eightByteOffsetReader.getDocLength(), Double.BYTES);
+        Assert.assertFalse(eightByteOffsetReader.isDocLengthInBits());
+      } else {
+        Assert.assertFalse(fourByteOffsetReader.isFixedOffsetMappingType());
+        Assert.assertFalse(eightByteOffsetReader.isFixedOffsetMappingType());
       }
     }
 

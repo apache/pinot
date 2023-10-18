@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.segment.local.customobject.AvgPair;
@@ -372,6 +373,23 @@ public class ObjectSerDeUtilsTest {
       Double2LongOpenHashMap actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.Double2LongMap);
 
       assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testCpcSketch() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      CpcSketch sketch = new CpcSketch();
+      int size = RANDOM.nextInt(100) + 1;
+      for (int j = 0; j < size; j++) {
+        sketch.update(RANDOM.nextLong());
+      }
+
+      byte[] bytes = ObjectSerDeUtils.serialize(sketch);
+      CpcSketch actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.CompressedProbabilisticCounting);
+
+      assertEquals(actual.getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
     }
   }
 }

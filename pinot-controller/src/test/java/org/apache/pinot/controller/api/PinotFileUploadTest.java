@@ -46,6 +46,8 @@ public class PinotFileUploadTest {
       throws Exception {
     TEST_INSTANCE.setupSharedStateAndValidate();
 
+    // Create schema
+    TEST_INSTANCE.addDummySchema(TABLE_NAME);
     // Adding table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setSegmentAssignmentStrategy("RandomAssignmentStrategy").setNumReplicas(2).build();

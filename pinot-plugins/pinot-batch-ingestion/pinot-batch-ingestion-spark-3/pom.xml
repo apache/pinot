@@ -30,14 +30,14 @@
     <relativePath>..</relativePath>
   </parent>
 
-  <artifactId>pinot-batch-ingestion-spark-3.2</artifactId>
-  <name>Pinot Batch Ingestion for Spark 3.2</name>
+  <artifactId>pinot-batch-ingestion-spark-3</artifactId>
+  <name>Pinot Batch Ingestion for Spark 3</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
     <scala.major.version>2.12</scala.major.version>
-    <spark.version>3.2.1</spark.version>
+    <spark.version>3.5.0</spark.version>
     <scala.minor.version>2.12.15</scala.minor.version>
     <commons-lang3.version>3.11</commons-lang3.version>
   </properties>
@@ -77,10 +77,6 @@
         <exclusion>
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-log4j12</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.protobuf</groupId>
-          <artifactId>protobuf-java</artifactId>
         </exclusion>
         <exclusion>
           <groupId>com.zaxxer</groupId>

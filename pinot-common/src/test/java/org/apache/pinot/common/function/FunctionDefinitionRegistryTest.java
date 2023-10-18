@@ -47,10 +47,8 @@ public class FunctionDefinitionRegistryTest {
       // Scalar function
       "scalar",
       // Functions without scalar function counterpart as of now
-      // TODO: Revisit this list when we add scalar function for these functions
-      "arraylength", "arrayaverage", "arraymin", "arraymax", "arraysum",
-      "valuein", "mapvalue", "inidset", "lookup", "groovy",
-      "timeconvert", "datetimeconvert", "jsonextractscalar", "jsonextractkey", "clpdecode",
+      "arraylength", "arrayaverage", "arraymin", "arraymax", "arraysum", "clpdecode", "groovy",
+      "inidset", "jsonextractscalar", "jsonextractkey", "lookup", "mapvalue", "timeconvert", "valuein",
       // functions not needed for register b/c they are in std sql table or they will not be composed directly.
       "in", "not_in", "and", "or", "range", "extract", "is_true", "is_not_true", "is_false", "is_not_false"
   );

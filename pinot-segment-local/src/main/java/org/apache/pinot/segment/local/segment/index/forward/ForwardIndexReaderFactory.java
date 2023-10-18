@@ -41,7 +41,15 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<ForwardIndexConfig, ForwardIndexReader> {
-  public static final ForwardIndexReaderFactory INSTANCE = new ForwardIndexReaderFactory();
+  private static volatile ForwardIndexReaderFactory _instance = new ForwardIndexReaderFactory();
+
+  public static void setInstance(ForwardIndexReaderFactory factory) {
+    _instance = factory;
+  }
+
+  public static ForwardIndexReaderFactory getInstance() {
+    return _instance;
+  }
 
   @Override
   protected IndexType<ForwardIndexConfig, ForwardIndexReader, ?> getIndexType() {

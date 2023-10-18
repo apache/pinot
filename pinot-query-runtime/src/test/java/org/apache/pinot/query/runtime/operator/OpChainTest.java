@@ -376,6 +376,11 @@ public class OpChainTest {
     }
 
     @Override
+    public List<MultiStageOperator> getChildOperators() {
+      return Collections.singletonList(_upstream);
+    }
+
+    @Override
     protected TransferableBlock getNextBlock() {
       try {
         Thread.sleep(_sleepTimeInMillis);

@@ -84,6 +84,10 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
               .putMetadata(ChannelUtils.MAILBOX_METADATA_BUFFER_SIZE_KEY,
                   Integer.toString(_mailbox.getNumPendingBlocks())).build());
           break;
+        case CANCELLED:
+          LOGGER.warn("Mailbox: {} already cancelled from upstream", mailboxId);
+          cancelStream();
+          break;
         case ERROR:
           LOGGER.warn("Mailbox: {} already errored out (received error block before)", mailboxId);
           cancelStream();
@@ -94,7 +98,8 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
           break;
         case EARLY_TERMINATED:
           LOGGER.debug("Mailbox: {} has been early terminated", mailboxId);
-          onCompleted();
+          _responseObserver.onNext(MailboxStatus.newBuilder().setMailboxId(mailboxId)
+              .putMetadata(ChannelUtils.MAILBOX_METADATA_REQUEST_EARLY_TERMINATE, "true").build());
           break;
         default:
           throw new IllegalStateException("Unsupported mailbox status: " + status);

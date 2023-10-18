@@ -555,6 +555,24 @@ public class TableConfigUtilsTest {
       Assert.fail("Should not fail due to valid aggregation function", e);
     }
 
+    // distinctcounthllplus, expect that the function name in various forms still validates
+    aggregationConfigs = Arrays.asList(new AggregationConfig("d1", "distinct_count_hll_plus(s1)"),
+        new AggregationConfig("d2", "DISTINCTCOUNTHLLPLUS(s1)"),
+        new AggregationConfig("d3", "distinctcounthllplus(s1)"),
+        new AggregationConfig("d4", "DISTINCTCOUNT_HLL_PLUS(s1)"),
+        new AggregationConfig("d5", "DISTINCT_COUNT_HLL_PLUS(s1)"));
+
+    ingestionConfig.setAggregationConfigs(aggregationConfigs);
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfig).build();
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.fail("Should not fail due to valid aggregation function", e);
+    }
+
     // distinctcounthll, expect not specified log2m argument to default to 8
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("d1", FieldSpec.DataType.BYTES).build();
 
@@ -1882,6 +1900,14 @@ public class TableConfigUtilsTest {
     validAggConfig.put("myCol.aggregationType", "distinctCountHLL");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
         ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAggConfig, "SegmentGenerationAndPushTask",
+            segmentGenerationAndPushTaskConfig))).build();
+    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
+
+    // valid agg
+    HashMap<String, String> validAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
+    validAgg2Config.put("myCol.aggregationType", "distinctCountHLLPlus");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
+        ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAgg2Config, "SegmentGenerationAndPushTask",
             segmentGenerationAndPushTaskConfig))).build();
     TableConfigUtils.validateTaskConfigs(tableConfig, schema);
   }

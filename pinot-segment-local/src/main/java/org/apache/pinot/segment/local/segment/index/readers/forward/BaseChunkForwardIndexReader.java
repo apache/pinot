@@ -25,6 +25,8 @@ import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
@@ -53,6 +55,8 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   protected final int _headerEntryChunkOffsetSize;
   protected final PinotDataBuffer _rawData;
   protected final boolean _isSingleValue;
+  protected final int _dataHeaderStart;
+  protected final int _rawDataStart;
 
   protected BaseChunkForwardIndexReader(PinotDataBuffer dataBuffer, DataType storedType, boolean isSingleValue) {
     _dataBuffer = dataBuffer;
@@ -96,9 +100,11 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     // Slice out the header from the data buffer.
     int dataHeaderLength = _numChunks * _headerEntryChunkOffsetSize;
     int rawDataStart = dataHeaderStart + dataHeaderLength;
+    _dataHeaderStart = dataHeaderStart;
     _dataHeader = _dataBuffer.view(dataHeaderStart, rawDataStart);
 
     // Useful for uncompressed data.
+    _rawDataStart = rawDataStart;
     _rawData = _dataBuffer.view(rawDataStart, _dataBuffer.size());
 
     _isSingleValue = isSingleValue;
@@ -115,11 +121,84 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
    * @return Chunk for the row
    */
   protected ByteBuffer getChunkBuffer(int docId, ChunkReaderContext context) {
-    int chunkId = docId / _numDocsPerChunk;
+    int chunkId = getChunkId(docId);
     if (context.getChunkId() == chunkId) {
       return context.getChunkBuffer();
     }
     return decompressChunk(chunkId, context);
+  }
+
+  protected int getChunkId(int docId) {
+    return docId / _numDocsPerChunk;
+  }
+
+  protected void recordDocIdRangesUncompressed(int docId, int rowOffsetSize, List<ByteRange> ranges) {
+    int chunkId = getChunkId(docId);
+    int chunkRowId = docId % _numDocsPerChunk;
+
+    // These offsets are offset in the data buffer
+    long chunkStartOffset = getChunkPositionAndRecordRanges(chunkId, ranges);
+    ranges.add(new ByteRange(chunkStartOffset + (long) chunkRowId * rowOffsetSize, Integer.BYTES));
+    long valueStartOffset = chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) chunkRowId * rowOffsetSize);
+    long valueEndOffset =
+        getValueEndOffsetAndRecordRanges(chunkId, chunkRowId, rowOffsetSize, chunkStartOffset, ranges);
+
+    ranges.add(new ByteRange(valueStartOffset, (int) (valueEndOffset - valueStartOffset)));
+  }
+
+  protected long getValueEndOffsetAndRecordRanges(int chunkId, int chunkRowId, int rowOffsetSize, long chunkStartOffset,
+      List<ByteRange> ranges) {
+    if (chunkId == _numChunks - 1) {
+      // Last chunk
+      if (chunkRowId == _numDocsPerChunk - 1) {
+        // Last row in the last chunk
+        return _dataBuffer.size();
+      } else {
+        ranges.add(new ByteRange(chunkStartOffset + (long) (chunkRowId + 1) * rowOffsetSize, Integer.BYTES));
+        int valueEndOffsetInChunk = _dataBuffer.getInt(chunkStartOffset + (long) (chunkRowId + 1) * rowOffsetSize);
+        if (valueEndOffsetInChunk == 0) {
+          // Last row in the last chunk (chunk is incomplete, which stores 0 as the offset for the absent rows)
+          return _dataBuffer.size();
+        } else {
+          return chunkStartOffset + valueEndOffsetInChunk;
+        }
+      }
+    } else {
+      if (chunkRowId == _numDocsPerChunk - 1) {
+        // Last row in the chunk
+        return getChunkPositionAndRecordRanges(chunkId + 1, ranges);
+      } else {
+        ranges.add(new ByteRange(chunkStartOffset + (long) (chunkRowId + 1) * rowOffsetSize, Integer.BYTES));
+        return chunkStartOffset + _dataBuffer.getInt(chunkStartOffset + (long) (chunkRowId + 1) * rowOffsetSize);
+      }
+    }
+  }
+
+  protected void recordDocIdRanges(int docId, ChunkReaderContext context, List<ByteRange> ranges) {
+    int chunkId = getChunkId(docId);
+    if (context.getChunkId() == chunkId) {
+      ranges.addAll(context.getRanges());
+      return;
+    }
+    recordChunkRanges(chunkId, context, ranges);
+  }
+
+  protected void recordChunkRanges(int chunkId, ChunkReaderContext context, List<ByteRange> ranges) {
+    List<ByteRange> chunkRanges = new ArrayList<>();
+    int chunkSize;
+    long chunkPosition = getChunkPositionAndRecordRanges(chunkId, chunkRanges);
+
+    // Size of chunk can be determined using next chunks offset, or end of data buffer for last chunk.
+    if (chunkId == (_numChunks - 1)) { // Last chunk.
+      chunkSize = (int) (_dataBuffer.size() - chunkPosition);
+    } else {
+      long nextChunkOffset = getChunkPositionAndRecordRanges(chunkId + 1, chunkRanges);
+      chunkSize = (int) (nextChunkOffset - chunkPosition);
+    }
+    chunkRanges.add(new ByteRange(chunkPosition, chunkSize));
+    context.setChunkId(chunkId);
+    context.setRanges(chunkRanges);
+    ranges.addAll(chunkRanges);
   }
 
   protected ByteBuffer decompressChunk(int chunkId, ChunkReaderContext context) {
@@ -156,6 +235,18 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
       return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
     } else {
+      return _dataHeader.getLong(chunkId * _headerEntryChunkOffsetSize);
+    }
+  }
+
+  protected long getChunkPositionAndRecordRanges(int chunkId, List<ByteRange> ranges) {
+    if (_headerEntryChunkOffsetSize == Integer.BYTES) {
+      ranges.add(
+          new ByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES));
+      return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
+    } else {
+      ranges.add(
+          new ByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES));
       return _dataHeader.getLong(chunkId * _headerEntryChunkOffsetSize);
     }
   }

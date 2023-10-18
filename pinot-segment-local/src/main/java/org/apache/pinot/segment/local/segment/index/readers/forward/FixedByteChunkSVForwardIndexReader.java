@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import java.nio.ByteBuffer;
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -90,5 +91,40 @@ public final class FixedByteChunkSVForwardIndexReader extends BaseChunkForwardIn
     } else {
       return _rawData.getDouble(docId * Double.BYTES);
     }
+  }
+
+  @Override
+  public boolean isBufferByteRangeInfoSupported() {
+    return true;
+  }
+
+  @Override
+  public void recordDocIdByteRanges(int docId, ChunkReaderContext context, @Nullable List<ByteRange> ranges) {
+    if (!_isCompressed) {
+      // If uncompressed, should use fixed offset
+      throw new UnsupportedOperationException("Forward index is fixed length type");
+    }
+    recordDocIdRanges(docId, context, ranges);
+  }
+
+  @Override
+  public boolean isFixedOffsetMappingType() {
+    return !_isCompressed;
+  }
+
+  @Override
+  public long getRawDataStartOffset() {
+    if (isFixedOffsetMappingType()) {
+      return _rawDataStart;
+    }
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
+  }
+
+  @Override
+  public int getDocLength() {
+    if (isFixedOffsetMappingType()) {
+      return _storedType.size();
+    }
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
   }
 }

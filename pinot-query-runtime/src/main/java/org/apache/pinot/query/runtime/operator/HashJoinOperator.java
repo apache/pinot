@@ -239,9 +239,8 @@ public class HashJoinOperator extends MultiStageOperator {
       }
       _currentRowsInHashTable += container.size();
       if (_currentRowsInHashTable == _maxRowsInHashTable) {
-        // Early terminate right table operator.
-        _rightTableOperator.close();
-        break;
+        // setting only the rightTableOperator to be early terminated and awaits EOS block next.
+        _rightTableOperator.earlyTerminate();
       }
       rightBlock = _rightTableOperator.nextBlock();
     }

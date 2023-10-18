@@ -20,8 +20,10 @@
 package org.apache.pinot.segment.local.segment.index.forward;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -41,6 +43,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
@@ -153,24 +156,35 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   @Override
   public ColumnConfigDeserializer<ForwardIndexConfig> createDeserializer() {
     // reads tableConfig.fieldConfigList and decides what to create using the FieldConfig properties and encoding
-    ColumnConfigDeserializer<ForwardIndexConfig> fromFieldConfig = IndexConfigDeserializer.fromCollection(
-        TableConfig::getFieldConfigList,
-        (accum, fieldConfig) -> {
+    ColumnConfigDeserializer<ForwardIndexConfig> fromOld = (tableConfig, schema) -> {
+      Map<String, DictionaryIndexConfig> dictConfigs = StandardIndexes.dictionary().getConfig(tableConfig, schema);
+
+      Map<String, ForwardIndexConfig> fwdConfig = Maps.newHashMapWithExpectedSize(
+          Math.max(dictConfigs.size(), schema.size()));
+
+      Collection<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
+      if (fieldConfigs != null) {
+        for (FieldConfig fieldConfig : fieldConfigs) {
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
-            accum.put(fieldConfig.getName(), ForwardIndexConfig.DISABLED);
-          } else if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW) {
-            accum.put(fieldConfig.getName(), createConfigFromFieldConfig(fieldConfig));
+            fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.DISABLED);
+          } else {
+            DictionaryIndexConfig dictConfig = dictConfigs.get(fieldConfig.getName());
+            if (dictConfig != null && dictConfig.isDisabled()) {
+              fwdConfig.put(fieldConfig.getName(), createConfigFromFieldConfig(fieldConfig));
+            }
+            // On other case encoding is DICTIONARY. We create the default forward index by default. That means that if
+            // field config indicates for example a compression while using encoding dictionary, the compression is
+            // ignored.
+            // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
+            // the default `fromIndexes` deserializer.
           }
-          // On other case encoding is DICTIONARY. We create the default forward index by default. That means that if
-          // field config indicates for example a compression while using encoding dictionary, the compression is
-          // ignored.
-          // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
-          // the default `fromIndexes` deserializer.
         }
-    );
+      }
+      return fwdConfig;
+    };
     return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative(fromFieldConfig);
+        .withExclusiveAlternative(fromOld);
   }
 
   private boolean isDisabled(Map<String, String> props) {
@@ -215,7 +229,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   protected IndexReaderFactory<ForwardIndexReader> createReaderFactory() {
-    return ForwardIndexReaderFactory.INSTANCE;
+    return ForwardIndexReaderFactory.getInstance();
   }
 
   public String getFileExtension(ColumnMetadata columnMetadata) {

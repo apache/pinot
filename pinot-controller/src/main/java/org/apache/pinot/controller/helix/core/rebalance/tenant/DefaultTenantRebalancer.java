@@ -29,13 +29,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,21 +48,23 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
   }
 
   @Override
-  public TenantRebalanceResult rebalance(TenantRebalanceContext context) {
+  public TenantRebalanceResult rebalance(TenantRebalanceConfig config) {
     Map<String, RebalanceResult> rebalanceResult = new HashMap<>();
-    Set<String> tables = getTenantTables(context.getTenantName());
+    Set<String> tables = getTenantTables(config.getTenantName());
     tables.forEach(table -> {
       try {
-        Configuration config = extractRebalanceConfig(context);
-        config.setProperty(RebalanceConfigConstants.DRY_RUN, true);
-        rebalanceResult.put(table, _pinotHelixResourceManager.rebalanceTable(table, config, false));
+        RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
+        rebalanceConfig.setDryRun(true);
+        rebalanceResult.put(table,
+            _pinotHelixResourceManager.rebalanceTable(table, rebalanceConfig, createUniqueRebalanceJobIdentifier(),
+                false));
       } catch (TableNotFoundException exception) {
         rebalanceResult.put(table, new RebalanceResult(null, RebalanceResult.Status.FAILED, exception.getMessage(),
             null, null, null));
       }
     });
-    if (context.isDryRun() || context.isDowntime()) {
-      return new TenantRebalanceResult(null, rebalanceResult, context.isVerboseResult());
+    if (config.isDryRun() || config.isDowntime()) {
+      return new TenantRebalanceResult(null, rebalanceResult, config.isVerboseResult());
     } else {
       for (String table : rebalanceResult.keySet()) {
         RebalanceResult result = rebalanceResult.get(table);
@@ -77,25 +77,25 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     }
 
     String tenantRebalanceJobId = createUniqueRebalanceJobIdentifier();
-    TenantRebalanceObserver observer = new ZkBasedTenantRebalanceObserver(tenantRebalanceJobId, context.getTenantName(),
+    TenantRebalanceObserver observer = new ZkBasedTenantRebalanceObserver(tenantRebalanceJobId, config.getTenantName(),
         tables, _pinotHelixResourceManager);
     observer.onTrigger(TenantRebalanceObserver.Trigger.START_TRIGGER, null, null);
     final Deque<String> sequentialQueue = new LinkedList<>();
     final Deque<String> parallelQueue = new ConcurrentLinkedDeque<>();
     // ensure atleast 1 thread is created to run the sequential table rebalance operations
-    int parallelism = Math.max(context.getDegreeOfParallelism(), 1);
-    Set<String> dimTables = getDimensionalTables(context.getTenantName());
+    int parallelism = Math.max(config.getDegreeOfParallelism(), 1);
+    Set<String> dimTables = getDimensionalTables(config.getTenantName());
     AtomicInteger activeThreads = new AtomicInteger(parallelism);
     try {
       if (parallelism > 1) {
         Set<String> parallelTables;
-        if (!context.getParallelWhitelist().isEmpty()) {
-          parallelTables = new HashSet<>(context.getParallelWhitelist());
+        if (!config.getParallelWhitelist().isEmpty()) {
+          parallelTables = new HashSet<>(config.getParallelWhitelist());
         } else {
           parallelTables = new HashSet<>(tables);
         }
-        if (!context.getParallelBlacklist().isEmpty()) {
-          parallelTables = Sets.difference(parallelTables, context.getParallelBlacklist());
+        if (!config.getParallelBlacklist().isEmpty()) {
+          parallelTables = Sets.difference(parallelTables, config.getParallelBlacklist());
         }
         parallelTables.forEach(table -> {
           if (dimTables.contains(table)) {
@@ -131,33 +131,31 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
             if (table == null) {
               break;
             }
-            Configuration config = extractRebalanceConfig(context);
-            config.setProperty(RebalanceConfigConstants.DRY_RUN, false);
-            config.setProperty(RebalanceConfigConstants.JOB_ID, rebalanceResult.get(table).getJobId());
-            rebalanceTable(table, config, observer);
+            RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
+            rebalanceConfig.setDryRun(false);
+            rebalanceTable(table, rebalanceConfig, rebalanceResult.get(table).getJobId(), observer);
           }
           // Last parallel thread to finish the table rebalance job will pick up the
           // sequential table rebalance execution
           if (activeThreads.decrementAndGet() == 0) {
-            Configuration config = extractRebalanceConfig(context);
-            config.setProperty(RebalanceConfigConstants.DRY_RUN, false);
+            RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
+            rebalanceConfig.setDryRun(false);
             while (true) {
               String table = sequentialQueue.pollFirst();
               if (table == null) {
                 break;
               }
-              config.setProperty(RebalanceConfigConstants.JOB_ID, rebalanceResult.get(table).getJobId());
-              rebalanceTable(table, config, observer);
+              rebalanceTable(table, rebalanceConfig, rebalanceResult.get(table).getJobId(), observer);
             }
-            observer.onSuccess(String.format("Successfully rebalanced tenant %s.", context.getTenantName()));
+            observer.onSuccess(String.format("Successfully rebalanced tenant %s.", config.getTenantName()));
           }
         });
       }
     } catch (Exception exception) {
-      observer.onError(String.format("Failed to rebalance the tenant %s. Cause: %s", context.getTenantName(),
+      observer.onError(String.format("Failed to rebalance the tenant %s. Cause: %s", config.getTenantName(),
           exception.getMessage()));
     }
-    return new TenantRebalanceResult(tenantRebalanceJobId, rebalanceResult, context.isVerboseResult());
+    return new TenantRebalanceResult(tenantRebalanceJobId, rebalanceResult, config.isVerboseResult());
   }
 
   private Set<String> getDimensionalTables(String tenantName) {
@@ -173,25 +171,6 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
       }
     }
     return dimTables;
-  }
-
-  private Configuration extractRebalanceConfig(TenantRebalanceContext context) {
-    Configuration rebalanceConfig = new BaseConfiguration();
-    rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, context.isDryRun());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, context.isReassignInstances());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.INCLUDE_CONSUMING, context.isIncludeConsuming());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.BOOTSTRAP, context.isBootstrap());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.DOWNTIME, context.isDowntime());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME,
-        context.getMinAvailableReplicas());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.BEST_EFFORTS, context.isBestEfforts());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-        context.getExternalViewCheckIntervalInMs());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-        context.getExternalViewStabilizationTimeoutInMs());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.UPDATE_TARGET_TIER, context.isUpdateTargetTier());
-    rebalanceConfig.addProperty(RebalanceConfigConstants.JOB_ID, createUniqueRebalanceJobIdentifier());
-    return rebalanceConfig;
   }
 
   private String createUniqueRebalanceJobIdentifier() {
@@ -214,12 +193,11 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     return tables;
   }
 
-  private void rebalanceTable(String tableName, Configuration config,
+  private void rebalanceTable(String tableName, RebalanceConfig config, String rebalanceJobId,
       TenantRebalanceObserver observer) {
     try {
-      observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName,
-          config.getString(RebalanceConfigConstants.JOB_ID));
-      RebalanceResult result = _pinotHelixResourceManager.rebalanceTable(tableName, config, true);
+      observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
+      RebalanceResult result = _pinotHelixResourceManager.rebalanceTable(tableName, config, rebalanceJobId, true);
       if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
         observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
       } else {

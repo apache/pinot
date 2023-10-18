@@ -33,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <spark.version>3.4.0</spark.version>
+    <spark.version>3.5.0</spark.version>
     <antlr-runtime.version>4.8</antlr-runtime.version>
     <scalatest.version>3.1.1</scalatest.version>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
@@ -45,10 +45,6 @@
       <activation>
         <activeByDefault>true</activeByDefault>
       </activation>
-      <properties>
-        <scala.version>2.12.11</scala.version>
-        <scala.compat.version>2.12</scala.compat.version>
-      </properties>
       <dependencies>
         <dependency>
           <groupId>org.apache.spark</groupId>
@@ -86,7 +82,6 @@
         <dependency>
           <groupId>org.scala-lang</groupId>
           <artifactId>scala-library</artifactId>
-          <version>${scala.version}</version>
           <scope>provided</scope>
         </dependency>
         <!-- tests -->
@@ -140,55 +135,6 @@
           <plugin>
             <groupId>net.alchim31.maven</groupId>
             <artifactId>scala-maven-plugin</artifactId>
-            <version>3.2.2</version>
-            <executions>
-              <execution>
-                <id>eclipse-add-source</id>
-                <goals>
-                  <goal>add-source</goal>
-                </goals>
-              </execution>
-              <execution>
-                <id>scala-compile-first</id>
-                <phase>process-resources</phase>
-                <goals>
-                  <goal>compile</goal>
-                </goals>
-              </execution>
-              <execution>
-                <id>scala-test-compile-first</id>
-                <phase>process-test-resources</phase>
-                <goals>
-                  <goal>testCompile</goal>
-                </goals>
-              </execution>
-              <execution>
-                <id>attach-scaladocs</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>doc-jar</goal>
-                </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <scalaVersion>${scala.version}</scalaVersion>
-              <args>
-                <arg>-unchecked</arg>
-                <arg>-deprecation</arg>
-                <arg>-feature</arg>
-              </args>
-              <jvmArgs>
-                <jvmArg>-Xms1024m</jvmArg>
-                <jvmArg>-Xmx1024m</jvmArg>
-              </jvmArgs>
-              <javacArgs>
-                <javacArg>-source</javacArg>
-                <javacArg>${jdk.version}</javacArg>
-                <javacArg>-target</javacArg>
-                <javacArg>${jdk.version}</javacArg>
-                <javacArg>-Xlint:all,-serial,-path</javacArg>
-              </javacArgs>
-            </configuration>
           </plugin>
         </plugins>
       </build>
@@ -228,7 +174,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>2.7</version>
         <configuration>
           <skipTests>true</skipTests>
         </configuration>

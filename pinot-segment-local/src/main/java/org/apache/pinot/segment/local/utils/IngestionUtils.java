@@ -167,7 +167,7 @@ public final class IngestionUtils {
 
       case BatchConfigProperties.SegmentNameGeneratorType.SIMPLE:
         return new SimpleSegmentNameGenerator(rawTableName, batchConfig.getSegmentNamePostfix(),
-            batchConfig.isAppendUUIDToSegmentName());
+            batchConfig.isAppendUUIDToSegmentName(), batchConfig.isExcludeTimeInSegmentName());
       default:
         throw new IllegalStateException(String
             .format("Unsupported segmentNameGeneratorType: %s for table: %s", segmentNameGeneratorType,

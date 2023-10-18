@@ -22,12 +22,12 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
-import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.proto.Plan;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -129,8 +129,8 @@ public class ProtoSerializationUtils {
     return Plan.LiteralField.newBuilder().setStringField(val).build();
   }
 
-  private static Plan.LiteralField bytesField(ByteString val) {
-    return Plan.LiteralField.newBuilder().setBytesField(val).build();
+  private static Plan.LiteralField bytesField(ByteArray val) {
+    return Plan.LiteralField.newBuilder().setBytesField(ByteString.copyFrom(val.getBytes())).build();
   }
 
   private static Plan.MemberVariableField serializeMemberVariable(Object fieldObject) {
@@ -147,10 +147,8 @@ public class ProtoSerializationUtils {
       builder.setLiteralField(doubleField((Double) fieldObject));
     } else if (fieldObject instanceof String) {
       builder.setLiteralField(stringField((String) fieldObject));
-    } else if (fieldObject instanceof byte[]) {
-      builder.setLiteralField(bytesField(ByteString.copyFrom((byte[]) fieldObject)));
-    } else if (fieldObject instanceof GregorianCalendar) {
-      builder.setLiteralField(longField(((GregorianCalendar) fieldObject).getTimeInMillis()));
+    } else if (fieldObject instanceof ByteArray) {
+      builder.setLiteralField(bytesField((ByteArray) fieldObject));
     } else if (fieldObject instanceof List) {
       builder.setListField(serializeListMemberVariable(fieldObject));
     } else if (fieldObject instanceof Map) {
@@ -215,7 +213,7 @@ public class ProtoSerializationUtils {
       case STRINGFIELD:
         return literalField.getStringField();
       case BYTESFIELD:
-        return literalField.getBytesField();
+        return new ByteArray(literalField.getBytesField().toByteArray());
       case LITERALFIELD_NOT_SET:
       default:
         return null;

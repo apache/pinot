@@ -29,11 +29,11 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.AccessOption;
@@ -48,6 +48,7 @@ import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
@@ -64,7 +65,6 @@ import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,40 +138,45 @@ public class TableRebalancer {
     return UUID.randomUUID().toString();
   }
 
-  public RebalanceResult rebalance(TableConfig tableConfig, Configuration rebalanceConfig) {
+  public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
+      @Nullable String rebalanceJobId) {
+    long startTime = System.currentTimeMillis();
+    String tableNameWithType = tableConfig.getTableName();
+    RebalanceResult.Status status = RebalanceResult.Status.UNKNOWN_ERROR;
+    try {
+      RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId);
+      status = result.getStatus();
+      return result;
+    } finally {
+      if (_controllerMetrics != null) {
+        _controllerMetrics.addTimedTableValue(String.format("%s.%s", tableNameWithType, status.toString()),
+            ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS, System.currentTimeMillis() - startTime,
+            TimeUnit.MILLISECONDS);
+      }
+    }
+  }
+
+  private RebalanceResult doRebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
+      @Nullable String rebalanceJobId) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
-    String rebalanceJobId = rebalanceConfig.getString(RebalanceConfigConstants.JOB_ID);
     if (rebalanceJobId == null) {
       // If not passed along, create one.
       // TODO - Add rebalanceJobId to all log messages for easy tracking.
       rebalanceJobId = createUniqueRebalanceJobIdentifier();
     }
-
-    boolean dryRun =
-        rebalanceConfig.getBoolean(RebalanceConfigConstants.DRY_RUN, RebalanceConfigConstants.DEFAULT_DRY_RUN);
-    boolean reassignInstances = rebalanceConfig.getBoolean(RebalanceConfigConstants.REASSIGN_INSTANCES,
-        RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES);
-    boolean includeConsuming = rebalanceConfig.getBoolean(RebalanceConfigConstants.INCLUDE_CONSUMING,
-        RebalanceConfigConstants.DEFAULT_INCLUDE_CONSUMING);
-    boolean bootstrap =
-        rebalanceConfig.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
-    boolean downtime =
-        rebalanceConfig.getBoolean(RebalanceConfigConstants.DOWNTIME, RebalanceConfigConstants.DEFAULT_DOWNTIME);
-    int minReplicasToKeepUpForNoDowntime =
-        rebalanceConfig.getInt(RebalanceConfigConstants.MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME,
-            RebalanceConfigConstants.DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME);
+    boolean dryRun = rebalanceConfig.isDryRun();
+    boolean reassignInstances = rebalanceConfig.isReassignInstances();
+    boolean includeConsuming = rebalanceConfig.isIncludeConsuming();
+    boolean bootstrap = rebalanceConfig.isBootstrap();
+    boolean downtime = rebalanceConfig.isDowntime();
+    int minReplicasToKeepUpForNoDowntime = rebalanceConfig.getMinAvailableReplicas();
+    boolean bestEfforts = rebalanceConfig.isBestEfforts();
+    long externalViewCheckIntervalInMs = rebalanceConfig.getExternalViewCheckIntervalInMs();
+    long externalViewStabilizationTimeoutInMs = rebalanceConfig.getExternalViewStabilizationTimeoutInMs();
     boolean enableStrictReplicaGroup = tableConfig.getRoutingConfig() != null
         && RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
         tableConfig.getRoutingConfig().getInstanceSelectorType());
-    boolean bestEfforts = rebalanceConfig.getBoolean(RebalanceConfigConstants.BEST_EFFORTS,
-        RebalanceConfigConstants.DEFAULT_BEST_EFFORTS);
-    long externalViewCheckIntervalInMs =
-        rebalanceConfig.getLong(RebalanceConfigConstants.EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-            RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS);
-    long externalViewStabilizationTimeoutInMs =
-        rebalanceConfig.getLong(RebalanceConfigConstants.EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-            RebalanceConfigConstants.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
     LOGGER.info(
         "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, bootstrap: {}, "
             + "downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, bestEfforts: {}, "
@@ -370,6 +375,11 @@ public class TableRebalancer {
             "For rebalanceId: %s, caught exception while waiting for ExternalView to converge for table: %s, "
                 + "aborting the rebalance", rebalanceJobId, tableNameWithType);
         LOGGER.warn(errorMsg, e);
+        if (_tableRebalanceObserver.isStopped()) {
+          return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
+              "Caught exception while waiting for ExternalView to converge: " + e, instancePartitionsMap,
+              tierToInstancePartitionsMap, targetAssignment);
+        }
         _tableRebalanceObserver.onError(errorMsg);
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
             "Caught exception while waiting for ExternalView to converge: " + e, instancePartitionsMap,
@@ -449,6 +459,11 @@ public class TableRebalancer {
       // Record change of current ideal state and the new target
       _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, currentAssignment,
           targetAssignment);
+      if (_tableRebalanceObserver.isStopped()) {
+        return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
+            "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
+            tierToInstancePartitionsMap, targetAssignment);
+      }
       Map<String, Map<String, String>> nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup);
       LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be moved to "
@@ -706,6 +721,11 @@ public class TableRebalancer {
         _tableRebalanceObserver.onTrigger(
             TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
             externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields());
+        if (_tableRebalanceObserver.isStopped()) {
+          throw new RuntimeException(
+              String.format("Rebalance for table: %s has already stopped with status: %s", tableNameWithType,
+                  _tableRebalanceObserver.getStopStatus()));
+        }
         if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
             idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)) {
           LOGGER.info("ExternalView converged for table: {}", tableNameWithType);

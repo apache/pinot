@@ -111,8 +111,8 @@ public class AggregationFunctionFactory {
         } else if (numArguments == 2) {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
           // second argument is a decimal number from 0.0 to 100.0.
-          // Have to use literal string because we need to cast int to double here.
-          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral().getStringValue());
+          double percentile = arguments.get(1).getLiteral().getDoubleValue();
+          Preconditions.checkArgument(percentile >= 0 && percentile <= 100, "Invalid percentile: %s", percentile);
           if (remainingFunctionName.isEmpty()) {
             // Percentile
             return new PercentileAggregationFunction(firstArgument, percentile);
@@ -159,9 +159,10 @@ public class AggregationFunctionFactory {
           // the compression_factor for the TDigest. This can only be used for TDigest type percentile functions to
           // pass in a custom compression_factor. If the two argument version is used the default compression_factor
           // of 100.0 is used.
-          // Have to use literal string because we need to cast int to double here.
-          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral().getStringValue());
-          int compressionFactor = parseCompressionFactorToInt(arguments.get(2).getLiteral().getStringValue());
+          double percentile = arguments.get(1).getLiteral().getDoubleValue();
+          Preconditions.checkArgument(percentile >= 0 && percentile <= 100, "Invalid percentile: %s", percentile);
+          int compressionFactor = arguments.get(2).getLiteral().getIntValue();
+          Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %d", compressionFactor);
           if (remainingFunctionName.equals("TDIGEST")) {
             // PercentileTDigest
             return new PercentileTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
@@ -363,6 +364,10 @@ public class AggregationFunctionFactory {
             return new FrequentStringsSketchAggregationFunction(arguments);
           case FREQUENTLONGSSKETCH:
             return new FrequentLongsSketchAggregationFunction(arguments);
+          case DISTINCTCOUNTCPCSKETCH:
+            return new DistinctCountCPCSketchAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWCPCSKETCH:
+            return new DistinctCountRawCPCSketchAggregationFunction(arguments);
 
           default:
             throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);
@@ -377,17 +382,5 @@ public class AggregationFunctionFactory {
     int percentile = Integer.parseInt(percentileString);
     Preconditions.checkArgument(percentile >= 0 && percentile <= 100, "Invalid percentile: %s", percentile);
     return percentile;
-  }
-
-  private static double parsePercentileToDouble(String percentileString) {
-    double percentile = Double.parseDouble(percentileString);
-    Preconditions.checkArgument(percentile >= 0d && percentile <= 100d, "Invalid percentile: %s", percentile);
-    return percentile;
-  }
-
-  private static int parseCompressionFactorToInt(String compressionFactorString) {
-    int compressionFactor = Integer.parseInt(compressionFactorString);
-    Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %d", compressionFactor);
-    return compressionFactor;
   }
 }
