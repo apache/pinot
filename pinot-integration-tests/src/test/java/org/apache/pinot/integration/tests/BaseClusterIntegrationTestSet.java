@@ -25,7 +25,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
@@ -645,7 +644,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws IOException {
     String response =
         sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload), null);
-    response = StringEscapeUtils.unescapeJava(response);
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
     JsonNode responseJson = JsonUtils.stringToJsonNode(response);
     JsonNode tableLevelDetails = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
