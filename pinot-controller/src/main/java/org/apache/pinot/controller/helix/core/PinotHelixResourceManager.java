@@ -48,7 +48,9 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.BadRequestException;
@@ -86,7 +88,6 @@ import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.zkclient.exception.ZkNoNodeException;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
@@ -146,6 +147,7 @@ import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.ZkBasedTableRebalanceObserver;
 import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
@@ -1981,43 +1983,38 @@ public class PinotHelixResourceManager {
   /**
    * Returns the ZK metdata for the given jobId and jobType
    * @param jobId the id of the job
-   * @param jobType Job Path
+   * @param jobType the type of the job to figure out where job metadata is kept in ZK
    * @return Map representing the job's ZK properties
    */
   @Nullable
   public Map<String, String> getControllerJobZKMetadata(String jobId, ControllerJobType jobType) {
-    String controllerJobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
-    ZNRecord taskResourceZnRecord = _propertyStore.get(controllerJobResourcePath, null, AccessOption.PERSISTENT);
-    if (taskResourceZnRecord != null) {
-      return taskResourceZnRecord.getMapFields().get(jobId);
-    }
-    return null;
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
+    ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
+    return jobsZnRecord != null ? jobsZnRecord.getMapFields().get(jobId) : null;
   }
 
   /**
-   * Returns a Map of jobId to job's ZK metadata for the given table
-   * @param tableNameWithType the table for which jobs are to be fetched
+   * Returns a Map of jobId to job's ZK metadata that passes the checker, like for specific tables.
    * @return A Map of jobId to job properties
    */
-  public Map<String, Map<String, String>> getAllJobsForTable(String tableNameWithType,
-      Set<ControllerJobType> jobTypes) {
+  public Map<String, Map<String, String>> getAllJobs(Set<ControllerJobType> jobTypes,
+      Predicate<Map<String, String>> jobMetadataChecker) {
     Map<String, Map<String, String>> controllerJobs = new HashMap<>();
     for (ControllerJobType jobType : jobTypes) {
-      String jobsResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
-      try {
-        ZNRecord znRecord = _propertyStore.get(jobsResourcePath, null, -1);
-        if (znRecord != null) {
-          Map<String, Map<String, String>> tableJobsRecord = znRecord.getMapFields();
-          for (Map.Entry<String, Map<String, String>> tableEntry : tableJobsRecord.entrySet()) {
-            if (tableEntry.getValue().get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType.name())
-                && tableEntry.getValue().get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)
-                .equals(tableNameWithType)) {
-              controllerJobs.put(tableEntry.getKey(), tableEntry.getValue());
-            }
-          }
+      String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
+      ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
+      if (jobsZnRecord == null) {
+        continue;
+      }
+      Map<String, Map<String, String>> jobMetadataMap = jobsZnRecord.getMapFields();
+      for (Map.Entry<String, Map<String, String>> jobMetadataEntry : jobMetadataMap.entrySet()) {
+        String jobId = jobMetadataEntry.getKey();
+        Map<String, String> jobMetadata = jobMetadataEntry.getValue();
+        Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType.name()),
+            "Got unexpected jobType: %s at jobResourcePath: %s with jobId: %s", jobType.name(), jobResourcePath, jobId);
+        if (jobMetadataChecker.test(jobMetadata)) {
+          controllerJobs.put(jobId, jobMetadata);
         }
-      } catch (ZkNoNodeException e) {
-        LOGGER.warn("Could not find controller job node for table : {} jobType: {}", tableNameWithType, jobType, e);
       }
     }
     return controllerJobs;
@@ -2041,8 +2038,7 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numMessagesSent));
     jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentName);
-    return addControllerJobToZK(jobId, jobMetadata,
-        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.RELOAD_SEGMENT));
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
   }
 
   public boolean addNewForceCommitJob(String tableNameWithType, String jobId, long jobSubmissionTimeMs,
@@ -2055,8 +2051,7 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST,
         JsonUtils.objectToString(consumingSegmentsCommitted));
-    return addControllerJobToZK(jobId, jobMetadata,
-        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.FORCE_COMMIT));
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.FORCE_COMMIT);
   }
 
   /**
@@ -2075,32 +2070,81 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT.toString());
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
-    return addControllerJobToZK(jobId, jobMetadata,
-        ZKMetadataProvider.constructPropertyStorePathForControllerJob(ControllerJobType.RELOAD_SEGMENT));
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
   }
 
-  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobResourcePath) {
+  /**
+   * Adds a new job metadata for controller job like table rebalance or reload into ZK
+   * @param jobId job's UUID
+   * @param jobMetadata the job metadata
+   * @param jobType the type of the job to figure out where job metadata is kept in ZK
+   * @return boolean representing success / failure of the ZK write step
+   */
+  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, ControllerJobType jobType) {
+    return addControllerJobToZK(jobId, jobMetadata, jobType, prev -> true);
+  }
+
+  /**
+   * Adds a new job metadata for controller job like table rebalance or reload into ZK
+   * @param jobId job's UUID
+   * @param jobMetadata the job metadata
+   * @param jobType the type of the job to figure out where job metadata is kept in ZK
+   * @param prevJobMetadataChecker to check the previous job metadata before adding new one
+   * @return boolean representing success / failure of the ZK write step
+   */
+  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, ControllerJobType jobType,
+      Predicate<Map<String, String>> prevJobMetadataChecker) {
     Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS) != null,
         "Submission Time in JobMetadata record not set. Cannot expire these records");
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
     Stat stat = new Stat();
-    ZNRecord tableJobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
-    if (tableJobsZnRecord != null) {
-      Map<String, Map<String, String>> tasks = tableJobsZnRecord.getMapFields();
-      tasks.put(jobId, jobMetadata);
-      if (tasks.size() > CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK) {
-        tasks = tasks.entrySet().stream().sorted((v1, v2) -> Long.compare(
+    ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
+    if (jobsZnRecord != null) {
+      Map<String, Map<String, String>> jobMetadataMap = jobsZnRecord.getMapFields();
+      Map<String, String> prevJobMetadata = jobMetadataMap.get(jobId);
+      if (!prevJobMetadataChecker.test(prevJobMetadata)) {
+        return false;
+      }
+      jobMetadataMap.put(jobId, jobMetadata);
+      if (jobMetadataMap.size() > CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK) {
+        jobMetadataMap = jobMetadataMap.entrySet().stream().sorted((v1, v2) -> Long.compare(
                 Long.parseLong(v2.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS)),
                 Long.parseLong(v1.getValue().get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS))))
             .collect(Collectors.toList()).subList(0, CommonConstants.ControllerJob.MAXIMUM_CONTROLLER_JOBS_IN_ZK)
             .stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
       }
-      tableJobsZnRecord.setMapFields(tasks);
-      return _propertyStore.set(jobResourcePath, tableJobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
+      jobsZnRecord.setMapFields(jobMetadataMap);
+      return _propertyStore.set(jobResourcePath, jobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
     } else {
-      tableJobsZnRecord = new ZNRecord(jobResourcePath);
-      tableJobsZnRecord.setMapField(jobId, jobMetadata);
-      return _propertyStore.set(jobResourcePath, tableJobsZnRecord, AccessOption.PERSISTENT);
+      jobsZnRecord = new ZNRecord(jobResourcePath);
+      jobsZnRecord.setMapField(jobId, jobMetadata);
+      return _propertyStore.set(jobResourcePath, jobsZnRecord, AccessOption.PERSISTENT);
     }
+  }
+
+  /**
+   * Update existing job metadata belong to the table
+   * @param tableNameWithType whose job metadata to be updated
+   * @param jobType the type of the job to figure out where job metadata is kept in ZK
+   * @param updater to modify the job metadata in place
+   * @return boolean representing success / failure of the ZK write step
+   */
+  public boolean updateJobsForTable(String tableNameWithType, ControllerJobType jobType,
+      Consumer<Map<String, String>> updater) {
+    String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
+    Stat stat = new Stat();
+    ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
+    if (jobsZnRecord == null) {
+      return true;
+    }
+    Map<String, Map<String, String>> jobMetadataMap = jobsZnRecord.getMapFields();
+    for (Map<String, String> jobMetadata : jobMetadataMap.values()) {
+      if (jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE).equals(tableNameWithType)) {
+        updater.accept(jobMetadata);
+      }
+    }
+    jobsZnRecord.setMapFields(jobMetadataMap);
+    return _propertyStore.set(jobResourcePath, jobsZnRecord, stat.getVersion(), AccessOption.PERSISTENT);
   }
 
   @VisibleForTesting
@@ -3112,12 +3156,19 @@ public class PinotHelixResourceManager {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
     Preconditions.checkState(rebalanceJobId != null, "RebalanceId not populated in the rebalanceConfig");
-    if (rebalanceConfig.isUpdateTargetTier()) {
-      updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
-    }
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
     if (trackRebalanceProgress) {
-      zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId, this);
+      zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId,
+          TableRebalanceContext.forInitialAttempt(rebalanceJobId, rebalanceConfig), this);
+    }
+    return rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig,
+        zkBasedTableRebalanceObserver);
+  }
+
+  public RebalanceResult rebalanceTable(String tableNameWithType, TableConfig tableConfig, String rebalanceJobId,
+      RebalanceConfig rebalanceConfig, @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver) {
+    if (rebalanceConfig.isUpdateTargetTier()) {
+      updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
     }
     TableRebalancer tableRebalancer =
         new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics);

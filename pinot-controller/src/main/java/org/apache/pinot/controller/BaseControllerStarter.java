@@ -93,6 +93,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceChecker;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
@@ -174,6 +175,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected SegmentRelocator _segmentRelocator;
   protected RetentionManager _retentionManager;
   protected SegmentStatusChecker _segmentStatusChecker;
+  protected RebalanceChecker _rebalanceChecker;
   protected RealtimeConsumerMonitor _realtimeConsumerMonitor;
   protected PinotTaskManager _taskManager;
   protected TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
@@ -818,6 +820,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
             _executorService);
     periodicTasks.add(_segmentStatusChecker);
+    _rebalanceChecker = new RebalanceChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+        _executorService);
+    periodicTasks.add(_rebalanceChecker);
     _realtimeConsumerMonitor =
         new RealtimeConsumerMonitor(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics,
             _executorService);
