@@ -43,6 +43,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
+
 public class RealtimeSegmentConverter {
   private final MutableSegmentImpl _realtimeSegmentImpl;
   private final SegmentZKPropsConfig _segmentZKPropsConfig;
@@ -113,10 +114,9 @@ public class RealtimeSegmentConverter {
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-      int[] sortedDocIds =
-          _columnIndicesForRealtimeTable.getSortedColumn() != null
-              ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(
-                  _columnIndicesForRealtimeTable.getSortedColumn()) : null;
+      int[] sortedDocIds = _columnIndicesForRealtimeTable.getSortedColumn() != null
+          ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(
+          _columnIndicesForRealtimeTable.getSortedColumn()) : null;
       recordReader.init(_realtimeSegmentImpl, sortedDocIds);
       RealtimeSegmentSegmentCreationDataSource dataSource =
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
@@ -140,8 +140,8 @@ public class RealtimeSegmentConverter {
     }
   }
 
-  private <C extends IndexConfig> void addIndexOrDefault(SegmentGeneratorConfig genConfig,
-      IndexType<C, ?, ?> indexType, @Nullable Collection<String> columns, C defaultConfig) {
+  private <C extends IndexConfig> void addIndexOrDefault(SegmentGeneratorConfig genConfig, IndexType<C, ?, ?> indexType,
+      @Nullable Collection<String> columns, C defaultConfig) {
     Map<String, C> config = indexType.getConfig(genConfig.getTableConfig(), genConfig.getSchema());
     if (columns != null) {
       for (String column : columns) {
