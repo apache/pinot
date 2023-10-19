@@ -19,8 +19,10 @@
 
 package org.apache.pinot.segment.local.segment.index.nullvalue;
 
+import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,15 +35,17 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.AbstractIndexType;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
-import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexHandler;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -77,11 +81,24 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.ifIndexingConfig(
-        IndexConfigDeserializer.alwaysCall((TableConfig tableConfig, Schema schema) ->
-            tableConfig.getIndexingConfig().isNullHandlingEnabled()
-                ? IndexConfig.ENABLED
-                : IndexConfig.DISABLED));
+    return (TableConfig tableConfig, Schema schema) -> {
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      boolean nullHandlingEnabled = indexingConfig != null && indexingConfig.isNullHandlingEnabled();
+
+      Collection<FieldSpec> allFieldSpecs = schema.getAllFieldSpecs();
+      Map<String, IndexConfig> configMap = Maps.newHashMapWithExpectedSize(allFieldSpecs.size());
+
+      for (FieldSpec fieldSpec : allFieldSpecs) {
+        IndexConfig indexConfig;
+        if (fieldSpec.getNullable() == Boolean.TRUE || fieldSpec.getNullable() == null && nullHandlingEnabled) {
+          indexConfig = IndexConfig.ENABLED;
+        } else {
+          indexConfig = IndexConfig.DISABLED;
+        }
+        configMap.put(fieldSpec.getName(), indexConfig);
+      }
+      return configMap;
+    };
   }
 
   public NullValueVectorCreator createIndexCreator(File indexDir, String columnName) {
@@ -116,10 +133,14 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
     public NullValueVectorReader createIndexReader(SegmentDirectory.Reader segmentReader,
         FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
           throws IOException {
-      if (!segmentReader.hasIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector())) {
+      IndexType<IndexConfig, NullValueVectorReader, ?> indexType = StandardIndexes.nullValueVector();
+      if (fieldIndexConfigs.getConfig(indexType).isDisabled()) {
         return null;
       }
-      PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.nullValueVector());
+      if (!segmentReader.hasIndexFor(metadata.getColumnName(), indexType)) {
+        return null;
+      }
+      PinotDataBuffer buffer = segmentReader.getIndexFor(metadata.getColumnName(), indexType);
       return new NullValueVectorReaderImpl(buffer);
     }
   }

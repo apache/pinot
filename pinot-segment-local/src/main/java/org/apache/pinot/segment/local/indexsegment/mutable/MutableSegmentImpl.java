@@ -252,8 +252,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     Set<IndexType> specialIndexes =
-        Sets.newHashSet(StandardIndexes.dictionary(), // dictionaries implement other contract
-            StandardIndexes.nullValueVector()); // null value vector implement other contract
+        Sets.newHashSet(StandardIndexes.dictionary(), // dictionaries implements other contract
+            StandardIndexes.nullValueVector()); // null value vector implements other contract
 
     // Initialize for each column
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
