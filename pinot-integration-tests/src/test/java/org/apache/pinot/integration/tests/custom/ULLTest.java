@@ -149,7 +149,7 @@ public class ULLTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   private byte[] getRandomRawValue() {
-    UltraLogLog ull = UltraLogLog.create(4); // test on a smaller P to save some ram and ensure we support custom P values
+    UltraLogLog ull = UltraLogLog.create(4); // test on a smaller P to save some ram & ensure we support custom P values
     UltraLogLogUtils.hashObject(RANDOM.nextInt(100))
         .ifPresent(ull::add);
     return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(ull);
