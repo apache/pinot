@@ -301,9 +301,10 @@ public class PinotTenantRestletResource {
       @ApiResponse(code = 500, message = "Instance partitions not found")})
   public InstancePartitions getInstancePartitions(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "Server type (OFFLINE|REALTIME)", required = true)
-      @QueryParam("serverType") String serverType) {
-    String tenantNameWithType = InstancePartitionsType.valueOf(serverType).getInstancePartitionsName(tenantName);
+      @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true)
+      @QueryParam("instancePartitionType") String instancePartitionType) {
+    String tenantNameWithType = InstancePartitionsType.valueOf(instancePartitionType)
+        .getInstancePartitionsName(tenantName);
     InstancePartitions instancePartitions =
         InstancePartitionsUtils.fetchInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
             tenantNameWithType);
@@ -327,7 +328,8 @@ public class PinotTenantRestletResource {
       @ApiResponse(code = 500, message = "Failed to update the tenant")})
   public InstancePartitions assignInstancesPartitionMap(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "Server type (OFFLINE|REALTIME)", required = true) @QueryParam("serverType") String serverType,
+      @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true)
+      @QueryParam("instancePartitionType") String instancePartitionType,
       String instancePartitionsStr) {
     InstancePartitions instancePartitions;
     try {
@@ -337,7 +339,8 @@ public class PinotTenantRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
-    String tenantNameWithType = InstancePartitionsType.valueOf(serverType).getInstancePartitionsName(tenantName);
+    String tenantNameWithType = InstancePartitionsType.valueOf(instancePartitionType)
+        .getInstancePartitionsName(tenantName);
     Preconditions.checkState(instancePartitions.getInstancePartitionsName().equals(tenantNameWithType),
         "Instance partitions name mismatch, expected: %s, got: %s", tenantNameWithType,
         instancePartitions.getInstancePartitionsName());
