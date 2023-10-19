@@ -176,8 +176,11 @@ public class RealtimeSegmentConverterTest {
             .addSingleValueDimension(LONG_COLUMN1, FieldSpec.DataType.LONG)
             .addSingleValueDimension(LONG_COLUMN2, FieldSpec.DataType.LONG)
             .addSingleValueDimension(LONG_COLUMN3, FieldSpec.DataType.LONG)
-            .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT).addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
-            .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+            .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
+            .addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
+            .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG,
+                    "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .build();
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
@@ -187,10 +190,15 @@ public class RealtimeSegmentConverterTest {
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
             new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
-                    .setStreamName(tableNameWithType).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
+                    .setStreamName(tableNameWithType).setSchema(schema)
+                    .setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
                     .setAvgNumMultiValues(3)
-                    .setIndex(Sets.newHashSet(LONG_COLUMN2), StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
-                    .setIndex(Sets.newHashSet(Sets.newHashSet(STRING_COLUMN3)), StandardIndexes.dictionary(), varLengthDictConf)
+                    .setIndex(Sets.newHashSet(LONG_COLUMN2),
+                            StandardIndexes.dictionary(),
+                            DictionaryIndexConfig.DISABLED)
+                    .setIndex(Sets.newHashSet(Sets.newHashSet(STRING_COLUMN3)),
+                            StandardIndexes.dictionary(),
+                            varLengthDictConf)
                     .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
                     .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
                     .setMemoryManager(new DirectMemoryManager(segmentName))
@@ -198,7 +206,8 @@ public class RealtimeSegmentConverterTest {
                     .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(),
+            null);
 
     File outputDir = new File(tmpDir, "outputDir");
     SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
