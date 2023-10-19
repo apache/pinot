@@ -37,6 +37,7 @@
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
     <plugin.type>pinot-file-system</plugin.type>
+    <woodstox.version>6.4.0</woodstox.version>
   </properties>
 
   <modules>
@@ -45,6 +46,15 @@
     <module>pinot-gcs</module>
     <module>pinot-s3</module>
   </modules>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.fasterxml.woodstox</groupId>
+        <artifactId>woodstox-core</artifactId>
+        <version>${woodstox.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <!-- test -->
