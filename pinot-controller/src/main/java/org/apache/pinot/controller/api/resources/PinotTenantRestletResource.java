@@ -301,8 +301,8 @@ public class PinotTenantRestletResource {
       @ApiResponse(code = 500, message = "Instance partitions not found")})
   public InstancePartitions getInstancePartitions(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "Server type (OFFLINE|REALTIME)", required = true) @QueryParam("serverType") String serverType)
-  {
+      @ApiParam(value = "Server type (OFFLINE|REALTIME)", required = true)
+      @QueryParam("serverType") String serverType) {
     String tenantNameWithType = InstancePartitionsType.valueOf(serverType).getInstancePartitionsName(tenantName);
     InstancePartitions instancePartitions =
         InstancePartitionsUtils.fetchInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
