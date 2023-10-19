@@ -59,7 +59,7 @@ public class ULLTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
-    UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(rawSketchBytes);
+    UltraLogLog ull = UltraLogLog.wrap(rawSketchBytes);
 
     assertTrue(distinctCount > 0);
     assertEquals(Math.round(ull.getDistinctCountEstimate()), distinctCount);
@@ -79,7 +79,7 @@ public class ULLTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
-    UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(rawSketchBytes);
+    UltraLogLog ull = UltraLogLog.wrap(rawSketchBytes);
 
     assertTrue(distinctCount > 0);
     assertEquals(Math.round(ull.getDistinctCountEstimate()), distinctCount);
@@ -98,14 +98,14 @@ public class ULLTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode jsonNode = postQuery(query);
     long distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
     byte[] rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(1).asText());
-    UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(rawSketchBytes);
+    UltraLogLog ull = UltraLogLog.wrap(rawSketchBytes);
 
     assertTrue(distinctCount > 0);
     assertEquals(Math.round(ull.getDistinctCountEstimate()), distinctCount);
 
     distinctCount = jsonNode.get("resultTable").get("rows").get(0).get(2).asLong();
     rawSketchBytes = Base64.getDecoder().decode(jsonNode.get("resultTable").get("rows").get(0).get(3).asText());
-    ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(rawSketchBytes);
+    ull = UltraLogLog.wrap(rawSketchBytes);
 
     assertTrue(distinctCount > 0);
     assertEquals(Math.round(ull.getDistinctCountEstimate()), distinctCount);
