@@ -53,8 +53,6 @@ public class PinotSegmentRecordReader implements RecordReader {
   private boolean _skipDefaultNullValues;
 
   private int _nextDocId = 0;
-  private long _timeSpentConvertingNS = 0;
-  private long _numberDefaults = 0;
 
   public PinotSegmentRecordReader() {
   }
@@ -226,20 +224,15 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   public void getRecord(int docId, GenericRow buffer) {
-    // TODO: start duration
-    long start = System.nanoTime();
     for (Map.Entry<String, PinotSegmentColumnReader> entry : _columnReaderMap.entrySet()) {
       String column = entry.getKey();
       PinotSegmentColumnReader columnReader = entry.getValue();
       if (!columnReader.isNull(docId)) {
         buffer.putValue(column, columnReader.getValue(docId));
       } else if (!_skipDefaultNullValues) {
-        _numberDefaults++;
         buffer.putDefaultNullValue(column, columnReader.getValue(docId));
       }
     }
-    // Add the time spent doing this conversion to the total time spent converting
-    _timeSpentConvertingNS += System.nanoTime() - start;
   }
 
   public Object getValue(int docId, String column) {
