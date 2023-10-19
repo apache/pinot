@@ -71,7 +71,7 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   public IndexConfig getDefaultConfig() {
-    return IndexConfig.DISABLED;
+    return IndexConfig.ENABLED;
   }
 
   @Override
