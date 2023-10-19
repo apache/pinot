@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.utils;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.primitives.Longs;
 import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
@@ -344,6 +345,30 @@ public class CustomSerDeUtils {
     @Override
     public QuantileDigest deserialize(ByteBuffer byteBuffer) {
       return QuantileDigest.fromByteBuffer(byteBuffer);
+    }
+  };
+
+  public static final ObjectSerDe<UltraLogLog> ULTRA_LOG_LOG_OBJECT_SER_DE = new ObjectSerDe<UltraLogLog>() {
+
+    @Override
+    public byte[] serialize(UltraLogLog value) {
+      ByteBuffer buff = ByteBuffer.wrap(new byte[(1 << value.getP()) + 1]);
+      buff.put((byte) value.getP());
+      buff.put(value.getState());
+      return buff.array();
+    }
+
+    @Override
+    public UltraLogLog deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public UltraLogLog deserialize(ByteBuffer byteBuffer) {
+      byte p = byteBuffer.get();
+      byte[] state = new byte[1 << p];
+      byteBuffer.get(state);
+      return UltraLogLog.wrap(state);
     }
   };
 }

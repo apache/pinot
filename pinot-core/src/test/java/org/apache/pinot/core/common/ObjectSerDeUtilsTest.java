@@ -19,6 +19,7 @@
 package org.apache.pinot.core.common;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
@@ -45,6 +46,7 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
+import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -390,6 +392,25 @@ public class ObjectSerDeUtilsTest {
           ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.CompressedProbabilisticCounting);
 
       assertEquals(actual.getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testULL() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      UltraLogLog ull = UltraLogLog.create(12);
+      int size = RANDOM.nextInt(100) + 1;
+      for (int j = 0; j < size; j++) {
+        UltraLogLogUtils.hashObject(RANDOM.nextLong())
+            .ifPresent(ull::add);
+      }
+
+      byte[] bytes = ObjectSerDeUtils.serialize(ull);
+      UltraLogLog actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.UltraLogLog);
+
+      assertEquals(actual.getDistinctCountEstimate(), ull.getDistinctCountEstimate(), ERROR_MESSAGE);
+      assertEquals(actual.getState(), ull.getState(), ERROR_MESSAGE);
     }
   }
 }

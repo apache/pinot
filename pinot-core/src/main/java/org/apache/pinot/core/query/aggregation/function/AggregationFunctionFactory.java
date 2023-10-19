@@ -368,7 +368,10 @@ public class AggregationFunctionFactory {
             return new DistinctCountCPCSketchAggregationFunction(arguments);
           case DISTINCTCOUNTRAWCPCSKETCH:
             return new DistinctCountRawCPCSketchAggregationFunction(arguments);
-
+          case DISTINCTCOUNTULL:
+            return new DistinctCountULLAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWULL:
+            return new DistinctCountRawULLAggregationFunction(arguments);
           default:
             throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);
         }
