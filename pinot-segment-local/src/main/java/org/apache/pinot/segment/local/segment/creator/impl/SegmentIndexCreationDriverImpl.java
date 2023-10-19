@@ -310,6 +310,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _indexCreator.close();
       throw e;
     } finally {
+      // The record reader is created by the `init` method and needs to be closed and
+      // cleaned up even by the Column Mode builder.
       _recordReader.close();
     }
 
