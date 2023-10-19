@@ -393,7 +393,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       throws Exception {
     URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
     try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
-      URI outputSegmentTarURI = URI.create(outputSegmentDirURI + localSegmentTarFile.getName());
+      URI outputSegmentTarURI =
+          URI.create(MinionTaskUtils.normalizeDirectoryURI(outputSegmentDirURI) + localSegmentTarFile.getName());
       if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
           outputSegmentTarURI)) {
         throw new RuntimeException(String.format("Output file: %s already exists. "
