@@ -1415,7 +1415,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
     if (_tableConfig.getIngestionConfig() != null
-            &&  _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null){
+            && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
       _enableColumnMajorSegmentBuilder = _tableConfig.getIngestionConfig()
               .getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
     } else {
