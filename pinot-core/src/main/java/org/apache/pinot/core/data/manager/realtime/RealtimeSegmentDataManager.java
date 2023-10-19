@@ -1414,7 +1414,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
-    _enableColumnMajorSegmentBuilder = indexingConfig.isColumnMajorSegmentBuilderEnabled();
+    if (_tableConfig.getIngestionConfig() != null
+            &&  _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null){
+      _enableColumnMajorSegmentBuilder = _tableConfig.getIngestionConfig()
+              .getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
+    } else {
+      _enableColumnMajorSegmentBuilder = indexingConfig.isColumnMajorSegmentBuilderEnabled();
+    }
 
 
     _columnIndicesForRealtimeTable = new ColumnIndicesForRealtimeTable(sortedColumn,
