@@ -382,7 +382,6 @@ public class SketchFunctions {
   }
 
   /**
-<<<<<<< Updated upstream
    * Create a CPC Sketch containing the input
    *
    * @param input an Object we want to insert into the sketch, may be null to return an empty sketch
