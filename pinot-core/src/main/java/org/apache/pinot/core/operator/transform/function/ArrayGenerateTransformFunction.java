@@ -1,3 +1,22 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
@@ -26,6 +45,10 @@ public class ArrayGenerateTransformFunction implements TransformFunction {
   private final long[] _longArrayLiteral;
   private final float[] _floatArrayLiteral;
   private final double[] _doubleArrayLiteral;
+  private int[][] _intArrayResult;
+  private long[][] _longArrayResult;
+  private float[][] _floatArrayResult;
+  private double[][] _doubleArrayResult;
   public ArrayGenerateTransformFunction (List<ExpressionContext> literalContexts) {
     Preconditions.checkNotNull(literalContexts);
     if (literalContexts.isEmpty()) {
@@ -142,82 +165,217 @@ public class ArrayGenerateTransformFunction implements TransformFunction {
 
   @Override
   public int[] transformToDictIdsSV(ValueBlock valueBlock) {
-    return new UnsupportedOperationException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public int[][] transformToDictIdsMV(ValueBlock valueBlock) {
-    return new UnsupportedOperationException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
-    return new UnsupportedOperationException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
-    return new UnsupportedOperationException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public float[] transformToFloatValuesSV(ValueBlock valueBlock) {
-    return new UnsupportedOperationException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
-    return new UnsupportedOperationException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BigDecimal[] transformToBigDecimalValuesSV(ValueBlock valueBlock) {
-    return new UnsupportedOperationException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
-    return new UnsupportedOperationException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
-    return new UnsupportedOperationException();
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
-    return new int[0][];
+    int numDocs = valueBlock.getNumDocs();
+    int[][] intArrayResult = _intArrayResult;
+    if (intArrayResult == null || intArrayResult.length < numDocs ) {
+      intArrayResult = new int[numDocs][];
+      int[] intArrayLiteral = _intArrayLiteral;
+      if (intArrayLiteral == null) {
+        switch (_dataType) {
+          case LONG:
+            intArrayLiteral = new int[_longArrayLiteral.length];
+            for (int i = 0; i < _longArrayLiteral.length; i++) {
+              intArrayLiteral[i] = (int) _longArrayLiteral[i];
+            }
+            break;
+          case FLOAT:
+            intArrayLiteral = new int[_floatArrayLiteral.length];
+            for (int i = 0; i < _floatArrayLiteral.length; i++) {
+              intArrayLiteral[i] = (int) _floatArrayLiteral[i];
+            }
+            break;
+          case DOUBLE:
+            intArrayLiteral = new int[_doubleArrayLiteral.length];
+            for (int i = 0; i < _doubleArrayLiteral.length; i++) {
+              intArrayLiteral[i] = (int) _doubleArrayLiteral[i];
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unable to convert data type: " + _dataType + " to in array");
+        }
+      }
+      Arrays.fill(intArrayResult, intArrayLiteral);
+      _intArrayResult = intArrayResult;
+    }
+    return intArrayResult;
   }
 
   @Override
   public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
-    return new long[0][];
+    int numDocs = valueBlock.getNumDocs();
+    long[][] longArrayResult = _longArrayResult;
+    if (longArrayResult == null || longArrayResult.length < numDocs) {
+      longArrayResult = new long[numDocs][];
+      long[] longArrayLiteral = _longArrayLiteral;
+      if (longArrayLiteral == null) {
+        switch (_dataType) {
+          case INT:
+            longArrayLiteral = new long[_intArrayLiteral.length];
+            for (int i = 0; i < _intArrayLiteral.length; i++) {
+              longArrayLiteral[i] = _intArrayLiteral[i];
+            }
+            break;
+          case FLOAT:
+            longArrayLiteral = new long[_floatArrayLiteral.length];
+            for (int i = 0; i < _floatArrayLiteral.length; i++) {
+              longArrayLiteral[i] = (long) _floatArrayLiteral[i];
+            }
+            break;
+          case DOUBLE:
+            longArrayLiteral = new long[_doubleArrayLiteral.length];
+            for (int i = 0; i < _doubleArrayLiteral.length; i++) {
+              longArrayLiteral[i] = (long) _doubleArrayLiteral[i];
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unable to convert data type: " + _dataType + " to long array");
+        }
+      }
+      Arrays.fill(longArrayResult, longArrayLiteral);
+      _longArrayResult = longArrayResult;
+    }
+    return longArrayResult;
   }
 
   @Override
   public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
-    return new float[0][];
+    int numDocs = valueBlock.getNumDocs();
+    float[][] floatArrayResult = _floatArrayResult;
+    if (floatArrayResult == null || floatArrayResult.length < numDocs) {
+      floatArrayResult = new float[numDocs][];
+      float[] floatArrayLiteral = _floatArrayLiteral;
+      if (floatArrayLiteral == null) {
+        switch (_dataType) {
+          case INT:
+            floatArrayLiteral = new float[_intArrayLiteral.length];
+            for (int i = 0; i < _intArrayLiteral.length; i++) {
+              floatArrayLiteral[i] = _intArrayLiteral[i];
+            }
+            break;
+          case LONG:
+            floatArrayLiteral = new float[_longArrayLiteral.length];
+            for (int i = 0; i < _longArrayLiteral.length; i++) {
+              floatArrayLiteral[i] = _longArrayLiteral[i];
+            }
+            break;
+          case DOUBLE:
+            floatArrayLiteral = new float[_doubleArrayLiteral.length];
+            for (int i = 0; i < _doubleArrayLiteral.length; i++) {
+              floatArrayLiteral[i] = (float) _doubleArrayLiteral[i];
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unable to convert data type: " + _dataType + " to float array");
+        }
+      }
+      Arrays.fill(floatArrayResult, floatArrayLiteral);
+      _floatArrayResult = floatArrayResult;
+    }
+    return floatArrayResult;
   }
 
   @Override
   public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
-    return new double[0][];
+    int numDocs = valueBlock.getNumDocs();
+    double[][] doubleArrayResult = _doubleArrayResult;
+    if (doubleArrayResult == null || doubleArrayResult.length < numDocs) {
+      doubleArrayResult = new double[numDocs][];
+      double[] doubleArrayLiteral = _doubleArrayLiteral;
+      if (doubleArrayLiteral == null) {
+        switch (_dataType) {
+          case INT:
+            doubleArrayLiteral = new double[_intArrayLiteral.length];
+            for (int i = 0; i < _intArrayLiteral.length; i++) {
+              doubleArrayLiteral[i] = _intArrayLiteral[i];
+            }
+            break;
+          case LONG:
+            doubleArrayLiteral = new double[_longArrayLiteral.length];
+            for (int i = 0; i < _longArrayLiteral.length; i++) {
+              doubleArrayLiteral[i] = _longArrayLiteral[i];
+            }
+            break;
+          case FLOAT:
+            doubleArrayLiteral = new double[_floatArrayLiteral.length];
+            for (int i = 0; i < _floatArrayLiteral.length; i++) {
+              doubleArrayLiteral[i] = _floatArrayLiteral[i];
+            }
+            break;
+          default:
+            throw new IllegalStateException("Unable to convert data type: " + _dataType + " to double array");
+        }
+      }
+      Arrays.fill(doubleArrayResult, doubleArrayLiteral);
+      _doubleArrayResult = doubleArrayResult;
+    }
+    return doubleArrayResult;
   }
 
   @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
-    return new String[0][];
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public byte[][][] transformToBytesValuesMV(ValueBlock valueBlock) {
-    return new byte[0][][];
+    throw new UnsupportedOperationException();
   }
 
   @Nullable
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock block) {
-    return null;
+    // Treat all unknown type values as null regardless of the value.
+    if (_dataType != DataType.UNKNOWN) {
+      return null;
+    }
+    int length = block.getNumDocs();
+    RoaringBitmap bitmap = new RoaringBitmap();
+    bitmap.add(0L, length);
+    return bitmap;
   }
 }
