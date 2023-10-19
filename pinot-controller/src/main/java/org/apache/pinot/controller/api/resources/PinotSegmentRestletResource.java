@@ -34,12 +34,12 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -661,13 +661,13 @@ public class PinotSegmentRestletResource {
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
     if (singleSegmentName != null) {
       // No need to query servers where this segment is not supposed to be hosted
-      serverToSegments = new HashMap<>();
-      List<String> segmentList = Arrays.asList(singleSegmentName);
+      serverToSegments = new TreeMap<>();
+      List<String> segmentList = Collections.singletonList(singleSegmentName);
       _pinotHelixResourceManager.getServers(tableNameWithType, singleSegmentName).forEach(server -> {
         serverToSegments.put(server, segmentList);
       });
     } else {
-      serverToSegments = _pinotHelixResourceManager.getServerToOnlineSegmentsMap(tableNameWithType);
+      serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
     }
 
     BiMap<String, String> serverEndPoints =
@@ -786,7 +786,7 @@ public class PinotSegmentRestletResource {
         LOGGER.error("Failed to add reload all segments job meta into zookeeper for table: {}", tableNameWithType, e);
       }
     }
-    return new SuccessResponse("Segment reload details: " + JsonUtils.objectToString(perTableMsgData));
+    return new SuccessResponse(JsonUtils.objectToString(perTableMsgData));
   }
 
   @Deprecated

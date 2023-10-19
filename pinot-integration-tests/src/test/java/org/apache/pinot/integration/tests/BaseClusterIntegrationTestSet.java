@@ -27,7 +27,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
@@ -655,8 +654,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String response =
         sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload), null);
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
-    JsonNode tableLevelDetails =
-        JsonUtils.stringToJsonNode(StringEscapeUtils.unescapeJava(response.split(": ")[1])).get(tableNameWithType);
+    JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+    JsonNode tableLevelDetails = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
     String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
     assertEquals(isZKWriteSuccess, "SUCCESS");
     String jobId = tableLevelDetails.get("reloadJobId").asText();

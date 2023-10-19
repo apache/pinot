@@ -299,7 +299,7 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
     String query = "SELECT DISTINCT_COUNT_RAW_THETA_SKETCH(intSVColumn) FROM testTable";
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     String serializedSketch = (String) brokerResponse.getResultTable().getRows().get(0)[0];
-    Sketch sketch = ObjectSerDeUtils.DATA_SKETCH_SER_DE.deserialize(Base64.getDecoder().decode(serializedSketch));
+    Sketch sketch = ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(Base64.getDecoder().decode(serializedSketch));
     assertEquals(Math.round(sketch.getEstimate()), NUM_RECORDS);
   }
 

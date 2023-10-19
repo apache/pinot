@@ -16,39 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.segment.local.customobject;
 
-import org.apache.pinot.common.Utils;
+import java.util.Base64;
+import org.apache.datasketches.cpc.CpcSketch;
 
 
 /**
- * Enumeration containing all the timers exposed by the Pinot controller.
- *
+ * Serialized and comparable version of CPC Sketch.
+ * Ordering is defined by the cardinality estimate and not the size
+ * of the underlying sketch.
  */
-public enum ControllerTimer implements AbstractMetrics.Timer {
-  TABLE_REBALANCE_EXECUTION_TIME_MS("tableRebalanceExecutionTimeMs", false),
-  CRON_SCHEDULER_JOB_EXECUTION_TIME_MS("cronSchedulerJobExecutionTimeMs", false);
+public class SerializedCPCSketch implements Comparable<SerializedCPCSketch> {
+  private final CpcSketch _sketch;
 
-  private final String _timerName;
-  private final boolean _global;
-
-  ControllerTimer(String unit, boolean global) {
-    _global = global;
-    _timerName = Utils.toCamelCase(name().toLowerCase());
+  public SerializedCPCSketch(CpcSketch sketch) {
+    _sketch = sketch;
   }
 
   @Override
-  public String getTimerName() {
-    return _timerName;
+  public int compareTo(SerializedCPCSketch other) {
+    return Double.compare(_sketch.getEstimate(), other._sketch.getEstimate());
   }
 
-  /**
-   * Returns true if the timer is global (not attached to a particular resource)
-   *
-   * @return true if the timer is global
-   */
   @Override
-  public boolean isGlobal() {
-    return _global;
+  public String toString() {
+    return Base64.getEncoder().encodeToString(_sketch.toByteArray());
   }
 }

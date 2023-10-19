@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -99,6 +100,10 @@ public class ClusterInfoAccessor {
    */
   public List<SegmentZKMetadata> getSegmentsZKMetadata(String tableNameWithType) {
     return ZKMetadataProvider.getSegmentsZKMetadata(_pinotHelixResourceManager.getPropertyStore(), tableNameWithType);
+  }
+
+  public IdealState getIdealState(String tableNameWithType) {
+    return _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
   }
 
   /**

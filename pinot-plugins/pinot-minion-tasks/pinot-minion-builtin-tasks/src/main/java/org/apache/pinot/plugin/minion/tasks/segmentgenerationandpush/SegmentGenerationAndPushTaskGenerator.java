@@ -149,7 +149,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
           List<SegmentZKMetadata> segmentsZKMetadata = Collections.emptyList();
           // For append mode, we don't create segments for input file URIs already created.
           if (BatchConfigProperties.SegmentIngestionType.APPEND.name().equalsIgnoreCase(batchSegmentIngestionType)) {
-            segmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(offlineTableName);
+            segmentsZKMetadata = getSegmentsZKMetadataForTable(offlineTableName);
           }
           Set<String> existingSegmentInputFiles = getExistingSegmentInputFiles(segmentsZKMetadata);
           Set<String> inputFilesFromRunningTasks = getInputFilesFromRunningTasks(offlineTableName);

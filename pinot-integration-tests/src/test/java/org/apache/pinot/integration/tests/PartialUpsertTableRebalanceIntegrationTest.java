@@ -370,9 +370,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
 
           ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse =
               JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
-          String status = serverRebalanceJobStatusResponse.getTableRebalanceProgressStats().getStatus();
-          return status.equals(RebalanceResult.Status.DONE.toString()) || status.equals(
-              RebalanceResult.Status.FAILED.toString());
+          RebalanceResult.Status status = serverRebalanceJobStatusResponse.getTableRebalanceProgressStats().getStatus();
+          return status != RebalanceResult.Status.IN_PROGRESS;
         } catch (HttpErrorStatusException | URISyntaxException e) {
           throw new IOException(e);
         }

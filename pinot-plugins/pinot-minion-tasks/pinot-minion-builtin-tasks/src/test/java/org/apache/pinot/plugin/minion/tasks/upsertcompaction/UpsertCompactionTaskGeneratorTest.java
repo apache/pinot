@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
@@ -130,6 +131,9 @@ public class UpsertCompactionTaskGeneratorTest {
   public void testGenerateTasksWithNoSegments() {
     when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
         Lists.newArrayList(Collections.emptyList()));
+    when(_mockClusterInfoAccessor.getIdealState(REALTIME_TABLE_NAME)).thenReturn(
+        getIdealState(REALTIME_TABLE_NAME, Lists.newArrayList(Collections.emptyList())));
+
     _taskGenerator.init(_mockClusterInfoAccessor);
 
     List<PinotTaskConfig> pinotTaskConfigs = _taskGenerator.generateTasks(Lists.newArrayList(_tableConfig));
@@ -143,6 +147,9 @@ public class UpsertCompactionTaskGeneratorTest {
     consumingSegment.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
     when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
         Lists.newArrayList(consumingSegment));
+    when(_mockClusterInfoAccessor.getIdealState(REALTIME_TABLE_NAME)).thenReturn(
+        getIdealState(REALTIME_TABLE_NAME, Lists.newArrayList("testTable__0")));
+
     _taskGenerator.init(_mockClusterInfoAccessor);
 
     List<PinotTaskConfig> pinotTaskConfigs = _taskGenerator.generateTasks(Lists.newArrayList(_tableConfig));
@@ -154,6 +161,9 @@ public class UpsertCompactionTaskGeneratorTest {
   public void testGenerateTasksWithNewlyCompletedSegment() {
     when(_mockClusterInfoAccessor.getSegmentsZKMetadata(REALTIME_TABLE_NAME)).thenReturn(
         Lists.newArrayList(_completedSegment));
+    when(_mockClusterInfoAccessor.getIdealState(REALTIME_TABLE_NAME)).thenReturn(
+        getIdealState(REALTIME_TABLE_NAME, Lists.newArrayList(_completedSegment.getSegmentName())));
+
     _taskGenerator.init(_mockClusterInfoAccessor);
 
     List<PinotTaskConfig> pinotTaskConfigs = _taskGenerator.generateTasks(Lists.newArrayList(_tableConfig));
@@ -269,5 +279,14 @@ public class UpsertCompactionTaskGeneratorTest {
       compactionConfigs.put(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT, invalidRecordsThresholdCount);
     }
     return compactionConfigs;
+  }
+
+  private IdealState getIdealState(String tableName, List<String> segmentNames) {
+    IdealState idealState = new IdealState(tableName);
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    for (String segmentName: segmentNames) {
+      idealState.setPartitionState(segmentName, "Server_0", "ONLINE");
+    }
+    return idealState;
   }
 }

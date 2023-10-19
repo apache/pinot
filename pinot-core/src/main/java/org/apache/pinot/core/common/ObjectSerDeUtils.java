@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.common.ArrayOfStringsSerDe;
+import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.frequencies.ItemsSketch;
 import org.apache.datasketches.frequencies.LongsSketch;
 import org.apache.datasketches.kll.KllDoublesSketch;
@@ -142,8 +143,8 @@ public class ObjectSerDeUtils {
     IntegerTupleSketch(37),
     FrequentStringsSketch(38),
     FrequentLongsSketch(39),
-    HyperLogLogPlus(40);
-
+    HyperLogLogPlus(40),
+    CompressedProbabilisticCounting(41);
 
     private final int _value;
 
@@ -241,6 +242,8 @@ public class ObjectSerDeUtils {
         return ObjectType.FrequentLongsSketch;
       } else if (value instanceof HyperLogLogPlus) {
         return ObjectType.HyperLogLogPlus;
+      } else if (value instanceof CpcSketch) {
+        return ObjectType.CompressedProbabilisticCounting;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -952,7 +955,7 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<Sketch> DATA_SKETCH_SER_DE = new ObjectSerDe<Sketch>() {
+  public static final ObjectSerDe<Sketch> DATA_SKETCH_THETA_SER_DE = new ObjectSerDe<Sketch>() {
 
     @Override
     public byte[] serialize(Sketch value) {
@@ -1013,6 +1016,25 @@ public class ObjectSerDeUtils {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
       return KllDoublesSketch.wrap(Memory.wrap(bytes));
+    }
+  };
+
+  public static final ObjectSerDe<CpcSketch> DATA_SKETCH_CPC_SER_DE = new ObjectSerDe<CpcSketch>() {
+    @Override
+    public byte[] serialize(CpcSketch value) {
+      return value.toByteArray();
+    }
+
+    @Override
+    public CpcSketch deserialize(byte[] bytes) {
+      return CpcSketch.heapify(Memory.wrap(bytes));
+    }
+
+    @Override
+    public CpcSketch deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return CpcSketch.heapify(Memory.wrap(bytes));
     }
   };
 
@@ -1383,7 +1405,7 @@ public class ObjectSerDeUtils {
       INT_SET_SER_DE,
       TDIGEST_SER_DE,
       DISTINCT_TABLE_SER_DE,
-      DATA_SKETCH_SER_DE,
+      DATA_SKETCH_THETA_SER_DE,
       GEOMETRY_SER_DE,
       ROARING_BITMAP_SER_DE,
       LONG_SET_SER_DE,
@@ -1412,6 +1434,7 @@ public class ObjectSerDeUtils {
       FREQUENT_STRINGS_SKETCH_SER_DE,
       FREQUENT_LONGS_SKETCH_SER_DE,
       HYPER_LOG_LOG_PLUS_SER_DE,
+      DATA_SKETCH_CPC_SER_DE,
   };
   //@formatter:on
 
