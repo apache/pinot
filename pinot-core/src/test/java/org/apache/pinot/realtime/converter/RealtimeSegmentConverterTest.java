@@ -88,17 +88,13 @@ public class RealtimeSegmentConverterTest {
       throws Exception {
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
     TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE)
-                .setTableName("testTable")
-                .setTimeColumnName(DATE_TIME_COLUMN)
-                .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1))
-                .setSortedColumn(LONG_COLUMN1)
-                .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
-                .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
-                .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
-                .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3))
-                .setColumnMajorSegmentBuilderEnabled(false)
-                .build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
+            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
+            .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
+            .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
+            .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
+            .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).setColumnMajorSegmentBuilderEnabled(false)
+            .build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN3, FieldSpec.DataType.STRING)
@@ -135,8 +131,8 @@ public class RealtimeSegmentConverterTest {
     segmentZKPropsConfig.setStartOffset("1");
     segmentZKPropsConfig.setEndOffset("100");
     ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
-        indexingConfig.getInvertedIndexColumns(), null, null,
-        indexingConfig.getNoDictionaryColumns(), indexingConfig.getVarLengthDictionaryColumns());
+        indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
+        indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
             tableNameWithType, tableConfig, segmentName, cdc, false, false);
@@ -155,32 +151,25 @@ public class RealtimeSegmentConverterTest {
 
   @Test
   public void testNoRecordsIndexedColumnMajorSegmentBuilder()
-          throws Exception {
+      throws Exception {
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
     TableConfig tableConfig =
-            new TableConfigBuilder(TableType.OFFLINE)
-                    .setTableName("testTable")
-                    .setTimeColumnName(DATE_TIME_COLUMN)
-                    .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1))
-                    .setSortedColumn(LONG_COLUMN1)
-                    .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
-                    .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
-                    .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
-                    .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3))
-                    .setColumnMajorSegmentBuilderEnabled(true)
-                    .build();
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(STRING_COLUMN3, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(STRING_COLUMN4, FieldSpec.DataType.STRING)
-            .addSingleValueDimension(LONG_COLUMN1, FieldSpec.DataType.LONG)
-            .addSingleValueDimension(LONG_COLUMN2, FieldSpec.DataType.LONG)
-            .addSingleValueDimension(LONG_COLUMN3, FieldSpec.DataType.LONG)
-            .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
-            .addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
-            .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG,
-                    "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
+            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
+            .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
+            .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
+            .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
+            .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).setColumnMajorSegmentBuilderEnabled(true)
             .build();
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN3, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN4, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(LONG_COLUMN1, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_COLUMN2, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(LONG_COLUMN3, FieldSpec.DataType.LONG)
+        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT).addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
+        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
@@ -189,36 +178,30 @@ public class RealtimeSegmentConverterTest {
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-            new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
-                    .setStreamName(tableNameWithType).setSchema(schema)
-                    .setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
-                    .setAvgNumMultiValues(3)
-                    .setIndex(Sets.newHashSet(LONG_COLUMN2),
-                            StandardIndexes.dictionary(),
-                            DictionaryIndexConfig.DISABLED)
-                    .setIndex(Sets.newHashSet(Sets.newHashSet(STRING_COLUMN3)),
-                            StandardIndexes.dictionary(),
-                            varLengthDictConf)
-                    .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
-                    .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
-                    .setMemoryManager(new DirectMemoryManager(segmentName))
-                    .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
-                    .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
+        new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
+            .setStreamName(tableNameWithType).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
+            .setAvgNumMultiValues(3)
+            .setIndex(Sets.newHashSet(LONG_COLUMN2), StandardIndexes.dictionary(), DictionaryIndexConfig.DISABLED)
+            .setIndex(Sets.newHashSet(Sets.newHashSet(STRING_COLUMN3)), StandardIndexes.dictionary(), varLengthDictConf)
+            .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
+            .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
+            .setMemoryManager(new DirectMemoryManager(segmentName))
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
+            .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
 
     // create mutable segment impl
-    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(),
-            null);
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
 
     File outputDir = new File(tmpDir, "outputDir");
     SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
     segmentZKPropsConfig.setStartOffset("1");
     segmentZKPropsConfig.setEndOffset("100");
     ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
-            indexingConfig.getInvertedIndexColumns(), null, null,
-            indexingConfig.getNoDictionaryColumns(), indexingConfig.getVarLengthDictionaryColumns());
+        indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
+        indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
-            new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-                    tableNameWithType, tableConfig, segmentName, cdc, false, false);
+        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+            tableNameWithType, tableConfig, segmentName, cdc, false, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);

@@ -108,12 +108,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private boolean _nullHandlingEnabled;
 
   @Override
-  public void init(
-          SegmentGeneratorConfig segmentCreationSpec,
-          SegmentIndexCreationInfo segmentIndexCreationInfo,
-          TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap,
-          Schema schema,
-          File outDir)
+  public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
+      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
       throws Exception {
     _docPosOnDisk = 0;
     _config = segmentCreationSpec;
@@ -345,11 +341,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   @Override
-  public void indexColumn(String columnName,
-                          @Nullable int[] sortedDocIds,
-                          IndexSegment segment,
-                          boolean skipDefaultNullValues)
-          throws IOException {
+  public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
+      boolean skipDefaultNullValues)
+      throws IOException {
     long startNS = System.nanoTime();
 
     // Iterate over each value in the column
@@ -362,14 +356,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (sortedDocIds != null) {
         int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec,
-                  dictionaryCreator, docId, onDiskDocId, nullVec, skipDefaultNullValues);
+          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
+              nullVec, skipDefaultNullValues);
           onDiskDocId += 1;
         }
       } else {
         for (int docId = 0; docId < numDocs; docId++) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec,
-                  dictionaryCreator, docId, docId, nullVec, skipDefaultNullValues);
+          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec,
+              skipDefaultNullValues);
         }
       }
     }
@@ -378,15 +372,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   private void indexColumnValue(PinotSegmentColumnReader colReader,
-                                Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex,
-                                String columnName,
-                                FieldSpec fieldSpec,
-                                SegmentDictionaryCreator dictionaryCreator,
-                                int sourceDocId,
-                                int onDiskDocPos,
-                                NullValueVectorCreator nullVec,
-                                boolean skipDefaultNullValues)
-  throws IOException {
+      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex, String columnName, FieldSpec fieldSpec,
+      SegmentDictionaryCreator dictionaryCreator, int sourceDocId, int onDiskDocPos, NullValueVectorCreator nullVec,
+      boolean skipDefaultNullValues)
+      throws IOException {
     Object columnValueToIndex = colReader.getValue(sourceDocId);
     if (columnValueToIndex == null) {
       throw new RuntimeException("Null value for column:" + columnName);

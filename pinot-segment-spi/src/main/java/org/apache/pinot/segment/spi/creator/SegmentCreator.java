@@ -64,11 +64,8 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @param sortedDocIds - If not null, then this provides the sorted order of documents.
    * @param segment - Used to get the values of the column.
    */
-  void indexColumn(String columnName,
-                   @Nullable int[] sortedDocIds,
-                   IndexSegment segment,
-                   boolean skipDefaultNullValues)
-          throws IOException;
+  void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment, boolean skipDefaultNullValues)
+      throws IOException;
 
   /**
    * Sets the name of the segment.
