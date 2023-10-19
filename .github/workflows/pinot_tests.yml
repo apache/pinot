@@ -77,12 +77,22 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17, 20 ]
+        java: [ 11, 21 ]
         distribution: [ "temurin" ]
-    name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
+        skip_bytebuffer: [false]
+        include:
+          - java: 21
+            testset: 1
+            distribution: "temurin"
+            skip_bytebuffer: true
+          - java: 21
+            testset: 2
+            distribution: "temurin"
+            skip_bytebuffer: true
+    name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with skip bytebuffers:${{matrix.skip_bytebuffer}}
     steps:
       - uses: actions/checkout@v3
-      - name: Set up JDK ${{ matrix.java }}
+      - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
         uses: actions/setup-java@v3
         with:
           java-version: ${{ matrix.java }}
@@ -116,6 +126,7 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: false
           RUN_TEST_SET: ${{ matrix.testset }}
+          PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
@@ -132,7 +143,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 5
         with:
-          flags: unittests,unittests${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          flags: unittests,unittests${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}},skip-bytebuffers-${{matrix.skip_bytebuffer}}
           name: codecov-unit-tests
           fail_ci_if_error: false
           verbose: true
@@ -145,12 +156,22 @@ jobs:
       fail-fast: false
       matrix:
         testset: [ 1, 2 ]
-        java: [ 11, 17, 20 ]
+        java: [ 11, 21 ]
         distribution: [ "temurin" ]
-    name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}})
+        skip_bytebuffer: [false]
+        include:
+          - java: 21
+            testset: 1
+            distribution: "temurin"
+            skip_bytebuffer: true
+          - java: 21
+            testset: 2
+            distribution: "temurin"
+            skip_bytebuffer: true
+    name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with skip bytebuffers:${{matrix.skip_bytebuffer}}
     steps:
       - uses: actions/checkout@v3
-      - name: Set up JDK ${{ matrix.java }}
+      - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
         uses: actions/setup-java@v3
         with:
           java-version: ${{ matrix.java }}
@@ -183,6 +204,7 @@ jobs:
         env:
           RUN_INTEGRATION_TESTS: true
           RUN_TEST_SET: ${{ matrix.testset }}
+          PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
           MAVEN_OPTS: >
             -Xmx2G -DskipShade -DfailIfNoTests=false -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
@@ -199,7 +221,7 @@ jobs:
         continue-on-error: true
         timeout-minutes: 5
         with:
-          flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}}
+          flags: integration,integration${{ matrix.testset }},${{matrix.distribution}},java-${{matrix.java}},skip-bytebuffers-${{matrix.skip_bytebuffer}}
           name: codecov-integration-tests
           fail_ci_if_error: false
           verbose: true
@@ -292,9 +314,14 @@ jobs:
       # Changed to false in order to improve coverage using unsafe buffers
       fail-fast: false
       matrix:
-        java: [ 11, 17, 20 ]
+        java: [ 11, 21 ]
         distribution: [ "temurin" ]
-    name: Pinot Quickstart on JDK ${{ matrix.java }}
+        skip_bytebuffer: [false]
+        include:
+          - java: 21
+            distribution: "temurin"
+            skip_bytebuffer: true
+    name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }} with skip bytebuffers:${{matrix.skip_bytebuffer}}
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}
@@ -314,4 +341,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
       - name: Quickstart on JDK ${{ matrix.java }}
+        env:
+          PINOT_OFFHEAP_SKIP_BYTEBUFFER: ${{ matrix.skip_bytebuffer }}
         run: .github/workflows/scripts/.pinot_quickstart.sh

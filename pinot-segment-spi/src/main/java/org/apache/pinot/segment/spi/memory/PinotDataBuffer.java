@@ -67,6 +67,13 @@ public abstract class PinotDataBuffer implements Closeable {
   // With number of bytes less than this threshold, we get/put bytes one by one
   // With number of bytes more than this threshold, we create a ByteBuffer from the buffer and use bulk get/put method
   public static final int BULK_BYTES_PROCESSING_THRESHOLD = 10;
+  private static final String SKIP_BYTEBUFFER_ENV = "PINOT_OFFHEAP_SKIP_BYTEBUFFER";
+  private static final boolean DEFAULT_PRIORITIZE_BYTE_BUFFER;
+
+  static {
+     String skipBbEnvValue = System.getenv(SKIP_BYTEBUFFER_ENV);
+     DEFAULT_PRIORITIZE_BYTE_BUFFER = !Boolean.parseBoolean(skipBbEnvValue);
+  }
 
   private static class BufferContext {
     enum Type {
@@ -152,17 +159,20 @@ public abstract class PinotDataBuffer implements Closeable {
   }
 
   public static PinotBufferFactory createDefaultFactory() {
-    return createDefaultFactory(true);
+    return createDefaultFactory(DEFAULT_PRIORITIZE_BYTE_BUFFER);
   }
 
   public static PinotBufferFactory createDefaultFactory(boolean prioritizeByteBuffer) {
     String factoryClassName;
-    if (JavaVersion.VERSION < 16) {
-      LOGGER.info("Using LArray as buffer on JVM version {}", JavaVersion.VERSION);
-      factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
-    } else {
-      LOGGER.info("Using Unsafe as buffer on JVM version {}", JavaVersion.VERSION);
-      factoryClassName = UnsafePinotBufferFactory.class.getCanonicalName();
+    factoryClassName = System.getenv("PINOT_BUFFER_LIBRARY");
+    if (factoryClassName == null) {
+      if (JavaVersion.VERSION < 16) {
+        LOGGER.info("Using LArray as buffer on JVM version {}", JavaVersion.VERSION);
+        factoryClassName = LArrayPinotBufferFactory.class.getCanonicalName();
+      } else {
+        LOGGER.info("Using Unsafe as buffer on JVM version {}", JavaVersion.VERSION);
+        factoryClassName = UnsafePinotBufferFactory.class.getCanonicalName();
+      }
     }
     return createFactory(factoryClassName, prioritizeByteBuffer);
   }
