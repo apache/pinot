@@ -190,6 +190,10 @@
 
     <flink.version>1.12.0</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
+
+    <proto.google.common.protos.version>2.9.6</proto.google.common.protos.version>
+
+    <kotlin.stdlib.version>1.7.22</kotlin.stdlib.version>
   </properties>
 
   <profiles>
@@ -1248,7 +1252,7 @@
       <dependency>
         <groupId>com.google.api.grpc</groupId>
         <artifactId>proto-google-common-protos</artifactId>
-        <version>2.9.6</version>
+        <version>${proto.google.common.protos.version}</version>
       </dependency>
       <!-- geo dependencies -->
       <dependency>
@@ -1350,12 +1354,12 @@
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-stdlib-jdk8</artifactId>
-        <version>1.7.22</version>
+        <version>${kotlin.stdlib.version}</version>
       </dependency>
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-stdlib</artifactId>
-        <version>1.7.22</version>
+        <version>${kotlin.stdlib.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
