@@ -56,52 +56,70 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * As of now, the reason why we use the plan visitor for server request is for additional support such as dynamic
  * filtering and other auxiliary functionalities.
  */
-public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
+public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpChainExecutionContext> {
   private static final ServerPlanRequestVisitor INSTANCE = new ServerPlanRequestVisitor();
 
-  static void walkStageNode(PlanNode node, ServerPlanRequestContext context) {
+  static void walkStageNode(PlanNode node, ServerOpChainExecutionContext context) {
     node.visit(INSTANCE, context);
   }
 
   @Override
-  public Void visitAggregate(AggregateNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    // set group-by list
-    context.getPinotQuery()
-        .setGroupByList(CalciteRexExpressionParser.convertGroupByList(node.getGroupSet(), context.getPinotQuery()));
-    // set agg list
-    context.getPinotQuery().setSelectList(
-        CalciteRexExpressionParser.convertAggregateList(context.getPinotQuery().getGroupByList(), node.getAggCalls(),
-            node.getFilterArgIndices(), context.getPinotQuery()));
+  public Void visitAggregate(AggregateNode node, ServerOpChainExecutionContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      PinotQuery pinotQuery = context.getPinotQuery();
+      if (pinotQuery.getGroupByList() == null) {
+        // set group-by list
+        pinotQuery.setGroupByList(CalciteRexExpressionParser.convertGroupByList(node.getGroupSet(), pinotQuery));
+        // set agg list
+        pinotQuery.setSelectList(
+            CalciteRexExpressionParser.convertAggregateList(pinotQuery.getGroupByList(), node.getAggCalls(),
+                node.getFilterArgIndices(), pinotQuery));
+        // there cannot be any more modification of PinotQuery post agg, thus this is the last one possible.
+        context.setLeafStageBoundaryNode(node);
+      }
+    }
     return null;
   }
 
   @Override
-  public Void visitWindow(WindowNode node, ServerPlanRequestContext context) {
-    throw new UnsupportedOperationException("Window not yet supported!");
-  }
-
-  @Override
-  public Void visitSetOp(SetOpNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
+  public Void visitWindow(WindowNode node, ServerOpChainExecutionContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      // window node is not runnable on leaf, setting it to boundary directly
+      context.setLeafStageBoundaryNode(node.getInputs().get(0));
+    }
     return null;
   }
 
   @Override
-  public Void visitExchange(ExchangeNode exchangeNode, ServerPlanRequestContext context) {
-    throw new UnsupportedOperationException("Exchange not yet supported!");
-  }
-
-  @Override
-  public Void visitFilter(FilterNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    context.getPinotQuery()
-        .setFilterExpression(CalciteRexExpressionParser.toExpression(node.getCondition(), context.getPinotQuery()));
+  public Void visitSetOp(SetOpNode node, ServerOpChainExecutionContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      // Set node is not runnable on leaf, setting it to boundary directly
+      context.setLeafStageBoundaryNode(node.getInputs().get(0));
+    }
     return null;
   }
 
   @Override
-  public Void visitJoin(JoinNode node, ServerPlanRequestContext context) {
+  public Void visitExchange(ExchangeNode exchangeNode, ServerOpChainExecutionContext context) {
+    throw new UnsupportedOperationException("Leaf stage should not visit ExchangeNode!");
+  }
+
+  @Override
+  public Void visitFilter(FilterNode node, ServerOpChainExecutionContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      PinotQuery pinotQuery = context.getPinotQuery();
+      if (pinotQuery.getFilterExpression() == null) {
+        pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(node.getCondition(), pinotQuery));
+      } else {
+        // if filter is already applied then it cannot have another one on leaf.
+        context.setLeafStageBoundaryNode(node.getInputs().get(0));
+      }
+    }
+    return null;
+  }
+
+  @Override
+  public Void visitJoin(JoinNode node, ServerOpChainExecutionContext context) {
     // visit only the static side, turn the dynamic side into a lookup from the pipeline breaker resultDataContainer
     PlanNode staticSide = node.getInputs().get(0);
     PlanNode dynamicSide = node.getInputs().get(1);
@@ -109,72 +127,74 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       dynamicSide = node.getInputs().get(0);
       staticSide = node.getInputs().get(1);
     }
-    staticSide.visit(this, context);
-    PipelineBreakerResult pipelineBreakerResult = context.getExecutionContext().getPipelineBreakerResult();
-    int resultMapId = pipelineBreakerResult.getNodeIdMap().get(dynamicSide);
-    List<TransferableBlock> transferableBlocks = pipelineBreakerResult.getResultMap().getOrDefault(
-        resultMapId, Collections.emptyList());
-    List<Object[]> resultDataContainer = new ArrayList<>();
-    DataSchema dataSchema = dynamicSide.getDataSchema();
-    for (TransferableBlock block : transferableBlocks) {
-      if (block.getType() == DataBlock.Type.ROW) {
-        resultDataContainer.addAll(block.getContainer());
+    if (visit(staticSide, context)) {
+      PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
+      int resultMapId = pipelineBreakerResult.getNodeIdMap().get(dynamicSide);
+      List<TransferableBlock> transferableBlocks =
+          pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
+      List<Object[]> resultDataContainer = new ArrayList<>();
+      DataSchema dataSchema = dynamicSide.getDataSchema();
+      for (TransferableBlock block : transferableBlocks) {
+        if (block.getType() == DataBlock.Type.ROW) {
+          resultDataContainer.addAll(block.getContainer());
+        }
       }
-    }
-
-    if (!resultDataContainer.isEmpty()) {
-      // rewrite SEMI-JOIN as filter clause.
       ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getJoinKeys(), resultDataContainer,
           dataSchema);
-    } else {
-      // do not pull any data out, this is constant false filter.
-      context.getPinotQuery().setLimit(0);
     }
     return null;
   }
 
   @Override
-  public Void visitMailboxReceive(MailboxReceiveNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    return null;
+  public Void visitMailboxReceive(MailboxReceiveNode node, ServerOpChainExecutionContext context) {
+    throw new UnsupportedOperationException("Leaf stage should not visit MailboxReceiveNode!");
   }
 
   @Override
-  public Void visitMailboxSend(MailboxSendNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    return null;
-  }
-
-  @Override
-  public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    context.getPinotQuery()
-        .setSelectList(CalciteRexExpressionParser.convertProjectList(node.getProjects(), context.getPinotQuery()));
-    return null;
-  }
-
-  @Override
-  public Void visitSort(SortNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    PinotQuery pinotQuery = context.getPinotQuery();
-    if (!node.getCollationKeys().isEmpty()) {
-      pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(node, pinotQuery));
-    }
-    if (node.getFetch() >= 0) {
-      pinotQuery.setLimit(node.getFetch());
-    }
-    if (node.getOffset() >= 0) {
-      pinotQuery.setOffset(node.getOffset());
+  public Void visitMailboxSend(MailboxSendNode node, ServerOpChainExecutionContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      context.setLeafStageBoundaryNode(node.getInputs().get(0));
     }
     return null;
   }
 
   @Override
-  public Void visitTableScan(TableScanNode node, ServerPlanRequestContext context) {
+  public Void visitProject(ProjectNode node, ServerOpChainExecutionContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      PinotQuery pinotQuery = context.getPinotQuery();
+      pinotQuery.setSelectList(CalciteRexExpressionParser.convertProjectList(node.getProjects(), pinotQuery));
+    }
+    return null;
+  }
+
+  @Override
+  public Void visitSort(SortNode node, ServerOpChainExecutionContext context) {
+    if (visit(node.getInputs().get(0), context)) {
+      PinotQuery pinotQuery = context.getPinotQuery();
+      if (pinotQuery.getOrderByList() == null) {
+        if (!node.getCollationKeys().isEmpty()) {
+          pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(node, pinotQuery));
+        }
+        if (node.getFetch() >= 0) {
+          pinotQuery.setLimit(node.getFetch());
+        }
+        if (node.getOffset() >= 0) {
+          pinotQuery.setOffset(node.getOffset());
+        }
+      } else {
+        context.setLeafStageBoundaryNode(node.getInputs().get(0));
+      }
+    }
+    return null;
+  }
+
+  @Override
+  public Void visitTableScan(TableScanNode node, ServerOpChainExecutionContext context) {
     DataSource dataSource = new DataSource();
-    String tableNameWithType = TableNameBuilder.forType(context.getTableType())
-        .tableNameWithType(TableNameBuilder.extractRawTableName(node.getTableName()));
-    dataSource.setTableName(tableNameWithType);
+    // construct the PinotQuery object with raw table name.
+    // later it will be converted into the actual table name with type.
+    String rawTableName = TableNameBuilder.extractRawTableName(node.getTableName());
+    dataSource.setTableName(rawTableName);
     context.getPinotQuery().setDataSource(dataSource);
     context.getPinotQuery().setSelectList(
         node.getTableScanColumns().stream().map(RequestUtils::getIdentifierExpression).collect(Collectors.toList()));
@@ -182,14 +202,12 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   }
 
   @Override
-  public Void visitValue(ValueNode node, ServerPlanRequestContext context) {
-    visitChildren(node, context);
-    return null;
+  public Void visitValue(ValueNode node, ServerOpChainExecutionContext context) {
+    throw new UnsupportedOperationException("Leaf stage should not visit ValueNode!");
   }
 
-  private void visitChildren(PlanNode node, ServerPlanRequestContext context) {
-    for (PlanNode child : node.getInputs()) {
-      child.visit(this, context);
-    }
+  private boolean visit(PlanNode node, ServerOpChainExecutionContext context) {
+    node.visit(this, context);
+    return context.getLeafStageBoundaryNode() == null;
   }
 }

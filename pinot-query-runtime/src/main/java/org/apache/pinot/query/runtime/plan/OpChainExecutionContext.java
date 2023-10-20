@@ -46,6 +46,20 @@ public class OpChainExecutionContext {
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
 
+  protected OpChainExecutionContext(OpChainExecutionContext that) {
+    _mailboxService = that._mailboxService;
+    _requestId = that._requestId;
+    _stageId = that._stageId;
+    _server = that._server;
+    _deadlineMs = that._deadlineMs;
+    _opChainMetadata = that._opChainMetadata;
+    _stageMetadata = that._stageMetadata;
+    _id = that._id;
+    _stats = that._stats;
+    _pipelineBreakerResult = that._pipelineBreakerResult;
+    _traceEnabled = that._traceEnabled;
+  }
+
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
       VirtualServerAddress server, long deadlineMs, Map<String, String> opChainMetadata, StageMetadata stageMetadata,
       PipelineBreakerResult pipelineBreakerResult) {
