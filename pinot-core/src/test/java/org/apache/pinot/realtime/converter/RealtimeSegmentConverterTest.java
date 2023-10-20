@@ -235,7 +235,7 @@ public class RealtimeSegmentConverterTest {
   }
 
   @Test
-  public void testNoRecordsIndexedColumnMajorSegmentBuilderX()
+  public void testNoRecordsIndexedColumnMajorSegmentBuilderWith10Documents()
       throws Exception {
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
     TableConfig tableConfig =
