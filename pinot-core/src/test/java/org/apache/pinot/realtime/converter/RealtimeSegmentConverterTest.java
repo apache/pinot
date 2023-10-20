@@ -305,7 +305,12 @@ public class RealtimeSegmentConverterTest {
     assertEquals(segmentMetadata.getTotalDocs(), rows.size());
     assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
     assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
-    assertEquals(segmentMetadata.getStartTime(), segmentMetadata.getEndTime() - (rows.size() - 1));
+
+    long expectedStartTime = (long)rows.get(0).getValue(DATE_TIME_COLUMN);
+    assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
+    long expectedEndTime = (long)rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
+    assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
+
     assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
     assertEquals(segmentMetadata.getStartOffset(), "1");
     assertEquals(segmentMetadata.getEndOffset(), "100");
