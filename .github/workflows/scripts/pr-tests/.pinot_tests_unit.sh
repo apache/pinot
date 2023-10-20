@@ -37,7 +37,7 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
-      -P github-actions || exit 1
+      -P github-actions,no-integration-tests || exit 1
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
   mvn test \
@@ -48,5 +48,5 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-core' \
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
-    -P github-actions || exit 1
+    -P github-actions,no-integration-tests || exit 1
 fi
