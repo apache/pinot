@@ -297,7 +297,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
   private final boolean _nullHandlingEnabled;
-  private final boolean _enableColumnMajorSegmentBuilder;
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _rateLimiter;
 
@@ -927,11 +926,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
       segmentZKPropsConfig.setStartOffset(_segmentZKMetadata.getStartOffset());
       segmentZKPropsConfig.setEndOffset(_currentOffset.toString());
-      // lets convert the segment now
+      // let's convert the segment now
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
               _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _columnIndicesForRealtimeTable, _nullHandlingEnabled, _enableColumnMajorSegmentBuilder);
+              _columnIndicesForRealtimeTable, _nullHandlingEnabled, useColumnMajorSegmentBuilder());
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1395,13 +1394,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
 
     _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
-    if (_tableConfig.getIngestionConfig() != null
-        && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
-      _enableColumnMajorSegmentBuilder =
-          _tableConfig.getIngestionConfig().getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
-    } else {
-      _enableColumnMajorSegmentBuilder = indexingConfig.isColumnMajorSegmentBuilderEnabled();
-    }
 
     _columnIndicesForRealtimeTable =
         new ColumnIndicesForRealtimeTable(sortedColumn, new ArrayList<>(indexLoadingConfig.getInvertedIndexColumns()),
@@ -1658,6 +1650,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           rowsConsumed, consumedRate, _currentOffset, _numRowsConsumed, _numRowsIndexed);
       _lastConsumedCount = _numRowsConsumed;
       _lastLogTime = now;
+    }
+  }
+
+  private boolean useColumnMajorSegmentBuilder() {
+    if (_tableConfig.getIngestionConfig() != null
+        && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
+     return _tableConfig.getIngestionConfig().getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
+    } else {
+      return _tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
     }
   }
 
