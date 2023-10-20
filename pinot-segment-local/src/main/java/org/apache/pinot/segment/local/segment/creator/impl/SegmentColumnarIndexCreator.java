@@ -382,16 +382,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     if (_nullHandlingEnabled && !skipDefaultNullValues) {
-      //handling null values
-//            In row oriented:
-//              - this.indexRow iterates over each column and checks if it isNullValue.  If it is then it sets the null
-//              value vector for that doc id
-//              - This null value comes from the GenericRow that is created by PinotSegmentRecordReader
-//              - PinotSegmentRecordReader:L224 is where we figure out the null value stuff
-//              - PSegRecReader calls PinotSegmentColumnReader.isNull on the doc id to determine if the value for that
-//              column of that docId is null
-//              - if it returns true and we are NOT skipping null values we put the default null value into that field
-//              of the GenericRow
       if (colReader.isNull(sourceDocId)) {
         nullVec.setNull(onDiskDocPos);
       }
