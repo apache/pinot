@@ -343,8 +343,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       boolean skipDefaultNullValues)
       throws IOException {
     // Iterate over each value in the column
+    int numDocs = segment.getSegmentMetadata().getTotalDocs();
+    if(numDocs == 0) {
+      return;
+    }
+
     try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
-      int numDocs = segment.getSegmentMetadata().getTotalDocs();
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
       NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
       FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
