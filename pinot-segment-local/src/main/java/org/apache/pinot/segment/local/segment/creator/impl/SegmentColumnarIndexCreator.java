@@ -342,8 +342,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
       boolean skipDefaultNullValues)
       throws IOException {
-    long startNS = System.nanoTime();
-
     // Iterate over each value in the column
     try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
       int numDocs = segment.getSegmentMetadata().getTotalDocs();
@@ -365,8 +363,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         }
       }
     }
-
-    _docPosOnDisk++;
   }
 
   private void indexColumnValue(PinotSegmentColumnReader colReader,
