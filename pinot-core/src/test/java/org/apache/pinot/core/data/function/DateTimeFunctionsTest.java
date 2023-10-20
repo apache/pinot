@@ -592,7 +592,7 @@ public class DateTimeFunctionsTest {
     row.putValue("timeCol", timeValue);
     List<String> arguments = Collections.singletonList("timeCol");
     testFunction(String.format("dateTimeConvert(timeCol, '%s', '%s', '%s')", inputFormatStr, outputFormatStr,
-        outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult.toString());
+        outputGranularityStr), arguments, row, expectedResult == null ? null : expectedResult);
   }
 
   private void testMultipleInvocations(String functionExpression, List<GenericRow> rows, List<Object> expectedResults) {
@@ -600,7 +600,7 @@ public class DateTimeFunctionsTest {
     int numInvocations = rows.size();
     assertEquals(expectedResults.size(), numInvocations);
     for (int i = 0; i < numInvocations; i++) {
-      assertEquals(evaluator.evaluate(rows.get(i)), expectedResults.get(i).toString());
+      assertEquals(evaluator.evaluate(rows.get(i)), expectedResults.get(i));
     }
   }
 
