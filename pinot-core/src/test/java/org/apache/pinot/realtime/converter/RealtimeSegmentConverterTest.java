@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -186,6 +187,7 @@ public class RealtimeSegmentConverterTest {
         .addSingleValueDimension(LONG_COLUMN1, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_COLUMN2, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_COLUMN3, FieldSpec.DataType.LONG)
+        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
         .addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
         .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
@@ -266,7 +268,8 @@ public class RealtimeSegmentConverterTest {
         .addSingleValueDimension(LONG_COLUMN1, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_COLUMN2, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_COLUMN3, FieldSpec.DataType.LONG)
-        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT).addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
+        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
+        .addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
         .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
 
     String tableNameWithType = tableConfig.getTableName();
@@ -336,6 +339,7 @@ public class RealtimeSegmentConverterTest {
         .addSingleValueDimension(LONG_COLUMN1, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_COLUMN2, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LONG_COLUMN3, FieldSpec.DataType.LONG)
+        .addMultiValueDimension(MV_INT_COLUMN, FieldSpec.DataType.INT)
         .addMetric(LONG_COLUMN4, FieldSpec.DataType.LONG)
         .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .build();
@@ -424,6 +428,7 @@ public class RealtimeSegmentConverterTest {
       assertEquals(readRow.getValue(LONG_COLUMN2), row.getValue(LONG_COLUMN2));
       assertEquals(readRow.getValue(LONG_COLUMN3), row.getValue(LONG_COLUMN3));
       assertEquals(readRow.getValue(LONG_COLUMN4), row.getValue(LONG_COLUMN4));
+      assertEquals(readRow.getValue(MV_INT_COLUMN), row.getValue(MV_INT_COLUMN));
       assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
 
       docId += 1;
@@ -443,6 +448,10 @@ public class RealtimeSegmentConverterTest {
       row.putValue(LONG_COLUMN2, 66L + i);
       row.putValue(LONG_COLUMN3, 65L + i);
       row.putValue(LONG_COLUMN4, 64L + i);
+      List<Integer> intList = new ArrayList<>();
+      intList.add(100 + i);
+      intList.add(200 + i);
+      row.putValue(MV_INT_COLUMN, intList.toArray());
       row.putValue(DATE_TIME_COLUMN, 1697814309L + i);
       rows.add(row);
     }
