@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +31,6 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -40,16 +38,12 @@ import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
-import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
-import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
-import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
-import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -193,7 +187,8 @@ public class QueryRunner {
             pipelineBreakerResult);
     OpChain opChain;
     if (DistributedStagePlan.isLeafStage(distributedStagePlan)) {
-      opChain = compileLeafStage(executionContext, distributedStagePlan);
+      opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, distributedStagePlan, _helixManager,
+          _serverMetrics, _leafQueryExecutor, _executorService);
     } else {
       opChain = PhysicalPlanVisitor.walkPlanNode(distributedStagePlan.getStageRoot(), executionContext);
     }
@@ -245,27 +240,5 @@ public class QueryRunner {
 
   public void cancel(long requestId) {
     _opChainScheduler.cancel(requestId);
-  }
-
-  private OpChain compileLeafStage(OpChainExecutionContext executionContext,
-      DistributedStagePlan distributedStagePlan) {
-    List<ServerPlanRequestContext> serverPlanRequestContexts =
-        ServerPlanRequestUtils.constructServerQueryRequests(executionContext, distributedStagePlan,
-            _helixManager.getHelixPropertyStore());
-    List<ServerQueryRequest> serverQueryRequests = new ArrayList<>(serverPlanRequestContexts.size());
-    long queryArrivalTimeMs = System.currentTimeMillis();
-    for (ServerPlanRequestContext requestContext : serverPlanRequestContexts) {
-      serverQueryRequests.add(
-          new ServerQueryRequest(requestContext.getInstanceRequest(), _serverMetrics, queryArrivalTimeMs, true));
-    }
-    MailboxSendNode sendNode = (MailboxSendNode) distributedStagePlan.getStageRoot();
-    MultiStageOperator leafStageOperator =
-        new LeafStageTransferableBlockOperator(executionContext, serverQueryRequests, sendNode.getDataSchema(),
-            _leafQueryExecutor, _executorService);
-    MailboxSendOperator mailboxSendOperator =
-        new MailboxSendOperator(executionContext, leafStageOperator, sendNode.getDistributionType(),
-            sendNode.getDistributionKeys(), sendNode.getCollationKeys(), sendNode.getCollationDirections(),
-            sendNode.isSortOnSender(), sendNode.getReceiverStageId());
-    return new OpChain(executionContext, mailboxSendOperator);
   }
 }
