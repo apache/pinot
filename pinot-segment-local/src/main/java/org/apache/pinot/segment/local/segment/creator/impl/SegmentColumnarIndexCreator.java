@@ -104,14 +104,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Schema _schema;
   private File _indexDir;
   private int _totalDocs;
-  private int _docPosOnDisk;
+  private int _docIdCounter;
   private boolean _nullHandlingEnabled;
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
       TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
       throws Exception {
-    _docPosOnDisk = 0;
+    _docIdCounter = 0;
     _config = segmentCreationSpec;
     _indexCreationInfoMap = indexCreationInfoMap;
 
@@ -330,12 +330,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         String columnName = entry.getKey();
         // If row has null value for given column name, add to null value vector
         if (row.isNullValue(columnName)) {
-          _nullValueVectorCreatorMap.get(columnName).setNull(_docPosOnDisk);
+          _nullValueVectorCreatorMap.get(columnName).setNull(_docIdCounter);
         }
       }
     }
 
-    _docPosOnDisk++;
+    _docIdCounter++;
   }
 
   @Override
