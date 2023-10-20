@@ -318,7 +318,7 @@ public class IndexingConfig extends BaseJsonConfig {
   }
 
   public boolean isColumnMajorSegmentBuilderEnabled() {
-    return _columnMajorSegmentBuilderEnabled;
+    return true;
   }
 
   public void setColumnMajorSegmentBuilderEnabled(boolean columnMajorSegmentBuilderEnabled) {

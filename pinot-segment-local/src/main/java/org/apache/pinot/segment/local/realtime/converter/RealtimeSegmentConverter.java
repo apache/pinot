@@ -169,6 +169,6 @@ public class RealtimeSegmentConverter {
   }
 
   public boolean isColumnMajorEnabled() {
-    return _enableColumnMajor;
+    return true;
   }
 }

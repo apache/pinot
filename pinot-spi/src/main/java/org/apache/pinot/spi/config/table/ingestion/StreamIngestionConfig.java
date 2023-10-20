@@ -51,6 +51,6 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   }
 
   public boolean getColumnMajorSegmentBuilderEnabled() {
-    return _columnMajorSegmentBuilderEnabled;
+    return true;
   }
 }
