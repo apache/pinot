@@ -58,7 +58,7 @@ public class RealtimeSegmentConverter {
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
-      ColumnIndicesForRealtimeTable cdc, boolean nullHandlingEnabled, boolean enableColumnMajorSegmentBuilder) {
+      ColumnIndicesForRealtimeTable cdc, boolean nullHandlingEnabled) {
     _realtimeSegmentImpl = realtimeSegment;
     _segmentZKPropsConfig = segmentZKPropsConfig;
     _outputPath = outputPath;
@@ -71,7 +71,13 @@ public class RealtimeSegmentConverter {
     _tableConfig = tableConfig;
     _segmentName = segmentName;
     _nullHandlingEnabled = nullHandlingEnabled;
-    _enableColumnMajor = enableColumnMajorSegmentBuilder;
+    if (_tableConfig.getIngestionConfig() != null
+        && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
+      _enableColumnMajor = _tableConfig.getIngestionConfig()
+          .getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
+    } else {
+      _enableColumnMajor = _tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
+    }
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)

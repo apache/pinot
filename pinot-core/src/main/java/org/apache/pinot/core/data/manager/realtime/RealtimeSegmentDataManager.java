@@ -930,7 +930,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
               _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _columnIndicesForRealtimeTable, _nullHandlingEnabled, useColumnMajorSegmentBuilder());
+              _columnIndicesForRealtimeTable, _nullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1650,21 +1650,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           rowsConsumed, consumedRate, _currentOffset, _numRowsConsumed, _numRowsIndexed);
       _lastConsumedCount = _numRowsConsumed;
       _lastLogTime = now;
-    }
-  }
-
-  /**
-   * Returns true if this table is configured to use the Column Major segment builder which skips the
-   * transposition transformation that happens in the original segment builder.
-   *
-   * @return true if column major segment builder should be used.
-   */
-  private boolean useColumnMajorSegmentBuilder() {
-    if (_tableConfig.getIngestionConfig() != null
-        && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
-     return _tableConfig.getIngestionConfig().getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
-    } else {
-      return _tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
     }
   }
 

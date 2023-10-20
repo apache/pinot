@@ -149,7 +149,7 @@ public class RealtimeSegmentConverterTest {
         indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false, false);
+            tableNameWithType, tableConfig, segmentName, cdc, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);
@@ -225,7 +225,7 @@ public class RealtimeSegmentConverterTest {
         indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false, false);
+            tableNameWithType, tableConfig, segmentName, cdc, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);
@@ -299,7 +299,7 @@ public class RealtimeSegmentConverterTest {
         indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false, true);
+            tableNameWithType, tableConfig, segmentName, cdc, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);
@@ -375,7 +375,7 @@ public class RealtimeSegmentConverterTest {
         indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false, true);
+            tableNameWithType, tableConfig, segmentName, cdc, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);
