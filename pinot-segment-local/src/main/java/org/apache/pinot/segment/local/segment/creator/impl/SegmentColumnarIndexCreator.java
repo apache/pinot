@@ -305,8 +305,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   @Override
   public void indexRow(GenericRow row)
       throws IOException {
-    long startNS = System.nanoTime();
-
     for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
       String columnName = byColEntry.getKey();
 
