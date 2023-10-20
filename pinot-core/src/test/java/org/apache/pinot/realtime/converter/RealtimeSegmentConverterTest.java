@@ -407,7 +407,6 @@ public class RealtimeSegmentConverterTest {
     Map<String, ColumnMetadata> columnMetadataMap = segmentMetadata.getColumnMetadataMap();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig);
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
-      // FIXME: text-index only works with local SegmentDirectory
       indexContainerMap.put(entry.getKey(),
           new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
     }
