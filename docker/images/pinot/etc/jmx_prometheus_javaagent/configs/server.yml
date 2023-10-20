@@ -144,6 +144,10 @@ rules:
     table: "$1"
     tableType: "$2"
     partition: "$3"
+#grpc related metrics
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.grpc(.+)\"><>(\\w+)"
+  name: "pinot_server_grpc$1_$2"
+  cache: true
 
   ## Metrics that fit the catch-all patterns above should not be added to this file.
   ## In case a metric does not fit the catch-all patterns, add them before this comment
