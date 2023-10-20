@@ -23,6 +23,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.AvgValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -49,5 +50,10 @@ public class PreAggregatedAvgStarTreeV2Test extends BaseStarTreeV2Test<Object, A
   protected void assertAggregatedValue(AvgPair starTreeResult, AvgPair nonStarTreeResult) {
     assertEquals(starTreeResult.getSum(), nonStarTreeResult.getSum(), 1e-5);
     assertEquals(starTreeResult.getCount(), nonStarTreeResult.getCount());
+  }
+
+  @Override
+  protected FieldConfig.CompressionCodec getCompressionCodec() {
+    return FieldConfig.CompressionCodec.PASS_THROUGH;
   }
 }

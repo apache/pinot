@@ -22,6 +22,7 @@ import com.tdunning.math.stats.TDigest;
 import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -51,5 +52,10 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, 
     for (int i = 0; i <= 100; i++) {
       assertEquals(starTreeResult.quantile(i / 100.0), nonStarTreeResult.quantile(i / 100.0), delta);
     }
+  }
+
+  @Override
+  protected FieldConfig.CompressionCodec getCompressionCodec() {
+    return FieldConfig.CompressionCodec.ZSTANDARD;
   }
 }

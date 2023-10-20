@@ -26,6 +26,7 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -69,8 +70,9 @@ public class StarTreeIndexCombiner implements Closeable {
     }
 
     // Write metric (function-column pair) indexes
-    for (AggregationFunctionColumnPair functionColumnPair : builderConfig.getFunctionColumnPairs()) {
-      String metric = functionColumnPair.toColumnName();
+    for (Map.Entry<String, AggregationFunctionColumnPair> functionColumnPair : builderConfig.getFunctionColumnPairs()
+        .entrySet()) {
+      String metric = functionColumnPair.getValue().toColumnName();
       File metricIndexFile =
           new File(starTreeIndexDir, metric + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
       indexMap.add(Pair.of(new IndexKey(IndexType.FORWARD_INDEX, metric), writeFile(metricIndexFile)));

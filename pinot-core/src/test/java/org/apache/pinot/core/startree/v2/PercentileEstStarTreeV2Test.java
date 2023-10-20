@@ -23,6 +23,7 @@ import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregation
 import org.apache.pinot.segment.local.aggregator.PercentileEstValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -52,5 +53,10 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<Object, Quan
     for (int i = 0; i <= 100; i++) {
       assertEquals(starTreeResult.getQuantile(i / 100.0), nonStarTreeResult.getQuantile(i / 100.0), delta);
     }
+  }
+
+  @Override
+  protected FieldConfig.CompressionCodec getCompressionCodec() {
+    return FieldConfig.CompressionCodec.SNAPPY;
   }
 }

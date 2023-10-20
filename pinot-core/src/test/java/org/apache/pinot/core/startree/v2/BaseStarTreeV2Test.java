@@ -54,6 +54,8 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -114,6 +116,8 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String FILTER_AGG_CLAUSE = " FILTER(WHERE d1 > 10)";
 
   private ValueAggregator _valueAggregator;
+
+  private FieldConfig.CompressionCodec _compressionCodec;
   private DataType _aggregatedValueType;
   private String _aggregation;
   private IndexSegment _indexSegment;
@@ -122,6 +126,7 @@ abstract class BaseStarTreeV2Test<R, A> {
   @BeforeClass
   public void setUp()
       throws Exception {
+    _compressionCodec = getCompressionCodec();
     _valueAggregator = getValueAggregator();
     _aggregatedValueType = _valueAggregator.getAggregatedValueType();
     AggregationFunctionType aggregationType = _valueAggregator.getAggregationType();
@@ -163,10 +168,10 @@ abstract class BaseStarTreeV2Test<R, A> {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords));
     driver.build();
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList(DIMENSION_D1, DIMENSION_D2), null,
-        Collections.singletonList(
-            new AggregationFunctionColumnPair(_valueAggregator.getAggregationType(), METRIC).toColumnName()),
-        null, MAX_LEAF_RECORDS);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(Arrays.asList(DIMENSION_D1, DIMENSION_D2), null, null, Collections.singletonList(
+            new StarTreeAggregationConfig(METRIC, _valueAggregator.getAggregationType().getName(), _compressionCodec)),
+            MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
     MultipleTreesBuilder.BuildMode buildMode =
@@ -457,4 +462,6 @@ abstract class BaseStarTreeV2Test<R, A> {
   abstract R getRandomRawValue(Random random);
 
   abstract void assertAggregatedValue(A starTreeResult, A nonStarTreeResult);
+
+  protected abstract FieldConfig.CompressionCodec getCompressionCodec();
 }

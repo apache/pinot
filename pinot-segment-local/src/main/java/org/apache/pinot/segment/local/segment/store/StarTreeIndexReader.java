@@ -120,8 +120,9 @@ public class StarTreeIndexReader implements Closeable {
           _dataBuffer, ByteOrder.BIG_ENDIAN));
     }
     // Load metric (function-column pair) forward indexes
-    for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
-      String metric = functionColumnPair.toColumnName();
+    for (Map.Entry<String, AggregationFunctionColumnPair> functionColumnPair : starTreeMetadata.getFunctionColumnPairs()
+        .entrySet()) {
+      String metric = functionColumnPair.getValue().toColumnName();
       IndexKey indexKey = new IndexKey(metric, StandardIndexes.forward());
       columnEntries.computeIfAbsent(indexKey, k -> new StarTreeIndexEntry(
           indexMap.get(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, metric)),

@@ -29,7 +29,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -135,7 +134,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
           "Dimension: " + dimension + " does not have dictionary");
     }
 
-    Set<AggregationFunctionColumnPair> functionColumnPairs = builderConfig.getFunctionColumnPairs();
+    Map<String, AggregationFunctionColumnPair> functionColumnPairs = builderConfig.getFunctionColumnPairs();
     _numMetrics = functionColumnPairs.size();
     _metrics = new String[_numMetrics];
     _functionColumnPairs = new AggregationFunctionColumnPair[_numMetrics];
@@ -143,27 +142,19 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _metricReaders = new PinotSegmentColumnReader[_numMetrics];
     _chunkCompressionType = new ChunkCompressionType[_numMetrics];
 
-    // From aggregationConfig extracting compression type. Consider switching to this instead of
-    // functionColumnPairs for star-tree config.
-    Map<String, AggregationFunctionColumnPair> functionColumnPairMap =
-        _builderConfig.getFunctionColumnPairs().stream()
-            .collect(Collectors.toMap(AggregationFunctionColumnPair::toColumnName, v -> v));
-
     int index = 0;
-    for (AggregationFunctionColumnPair functionColumnPair : functionColumnPairs) {
-      _metrics[index] = functionColumnPair.toColumnName();
-      _functionColumnPairs[index] = functionColumnPair;
+    for (Map.Entry<String, AggregationFunctionColumnPair> functionColumnPair : functionColumnPairs.entrySet()) {
+      _metrics[index] = functionColumnPair.getValue().toColumnName();
+      _functionColumnPairs[index] = functionColumnPair.getValue();
       // TODO: Allow extra arguments in star-tree (e.g. log2m, precision)
       _valueAggregators[index] =
-          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.emptyList());
+          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getValue().getFunctionType(),
+              Collections.emptyList());
 
-      // Merging compression type to get default value
-      AggregationFunctionColumnPair functionColumnPairConfig = functionColumnPairMap.get(_metrics[index]);
-      _chunkCompressionType[index] = functionColumnPairConfig == null ? functionColumnPair.getChunkCompressionType()
-          : functionColumnPairConfig.getChunkCompressionType();
+      _chunkCompressionType[index] = functionColumnPair.getValue().getChunkCompressionType();
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
-        String column = functionColumnPair.getColumn();
+        String column = functionColumnPair.getValue().getColumn();
         _metricReaders[index] = new PinotSegmentColumnReader(segment, column);
       }
 
@@ -543,9 +534,13 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
     _metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _metrics);
     _metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
-    for (AggregationFunctionColumnPair functionColumnPair : _builderConfig.getFunctionColumnPairs()) {
-      functionColumnPair.addToConfiguration(_metadataProperties);
+    int index = 0;
+    for (Map.Entry<String, AggregationFunctionColumnPair> functionColumnPair : _builderConfig.getFunctionColumnPairs()
+        .entrySet()) {
+      functionColumnPair.getValue().addToConfiguration(_metadataProperties, index);
+      index++;
     }
+    _metadataProperties.setProperty(MetadataKey.NUM_OF_AGGREGATION_CONFIG, index);
     _metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
         _builderConfig.getSkipStarNodeCreationForDimensions());
   }

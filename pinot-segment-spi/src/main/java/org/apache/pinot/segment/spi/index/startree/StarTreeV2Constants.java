@@ -50,9 +50,10 @@ public class StarTreeV2Constants {
     public static final String AGGREGATION_CONFIG = "aggregation.config";
     public static final String MAX_LEAF_RECORDS = "max.leaf.records";
     public static final String SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS = "skip.star.node.creation";
-    public static final String FUNCTION_TYPE = "function_type";
-    public static final String COLUMN_NAME = "column_name";
-    public static final String COMPRESSION_TYPE = "compression_type";
+    public static final String FUNCTION_TYPE = "function.type";
+    public static final String COLUMN_NAME = "column.name";
+    public static final String COMPRESSION_TYPE = "compression.type";
+    public static final String NUM_OF_AGGREGATION_CONFIG = "num.of.aggregation.config";
 
     public static String getStarTreePrefix(int index) {
       return STAR_TREE_PREFIX + index;

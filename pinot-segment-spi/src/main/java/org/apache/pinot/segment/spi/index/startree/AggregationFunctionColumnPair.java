@@ -66,8 +66,8 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
   }
 
   // Adds current object to Configuration by reference
-  public void addToConfiguration(Configuration configuration) {
-    String configPrefix = StarTreeV2Constants.MetadataKey.AGGREGATION_CONFIG + "." + this.toColumnName();
+  public void addToConfiguration(Configuration configuration, int index) {
+    String configPrefix = StarTreeV2Constants.MetadataKey.AGGREGATION_CONFIG + "." + index;
     configuration.setProperty(configPrefix + "." + StarTreeV2Constants.MetadataKey.FUNCTION_TYPE,
         _functionType.getName());
     configuration.setProperty(configPrefix + "." + StarTreeV2Constants.MetadataKey.COLUMN_NAME, _column);
@@ -107,7 +107,7 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
 
   public static AggregationFunctionColumnPair fromStarTreeAggregationConfigs(
       StarTreeAggregationConfig starTreeAggregationConfig) {
-    String chunkCompressionType = starTreeAggregationConfig.getChunkCompressionType();
+    String chunkCompressionType = starTreeAggregationConfig.getCompressionCodec().name();
     AggregationFunctionType aggregationFunctionType;
     try {
       ChunkCompressionType.valueOf(chunkCompressionType);

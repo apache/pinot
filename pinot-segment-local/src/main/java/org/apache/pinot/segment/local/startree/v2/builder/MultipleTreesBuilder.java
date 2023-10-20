@@ -25,6 +25,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
@@ -111,8 +112,8 @@ public class MultipleTreesBuilder implements Closeable {
     Preconditions.checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree already exists");
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {
-      _builderConfigs = StarTreeBuilderUtils
-          .generateBuilderConfigs(indexConfigs, enableDefaultStarTree, _segment.getSegmentMetadata());
+      _builderConfigs = StarTreeBuilderUtils.generateBuilderConfigs(indexConfigs, enableDefaultStarTree,
+          _segment.getSegmentMetadata());
     } catch (Exception e) {
       _segment.destroy();
       throw e;
@@ -128,12 +129,12 @@ public class MultipleTreesBuilder implements Closeable {
     try {
       _separatorTempDir = new File(_segmentDirectory, StarTreeV2Constants.EXISTING_STAR_TREE_TEMP_DIR);
       FileUtils.forceMkdir(_separatorTempDir);
-      FileUtils.moveFileToDirectory(
-          new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME), _separatorTempDir, false);
-      FileUtils.moveFileToDirectory(
-          new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME), _separatorTempDir, false);
-      StarTreeIndexSeparator separator = new StarTreeIndexSeparator(
-              new File(_separatorTempDir, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
+      FileUtils.moveFileToDirectory(new File(_segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME), _separatorTempDir,
+          false);
+      FileUtils.moveFileToDirectory(new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
+          _separatorTempDir, false);
+      StarTreeIndexSeparator separator =
+          new StarTreeIndexSeparator(new File(_separatorTempDir, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
               new File(_separatorTempDir, StarTreeV2Constants.INDEX_FILE_NAME), _metadataProperties);
       _metadataProperties.subset(StarTreeV2Constants.MetadataKey.STAR_TREE_SUBSET).clear();
       SegmentMetadataUtils.savePropertiesConfiguration(_metadataProperties);
@@ -143,7 +144,7 @@ public class MultipleTreesBuilder implements Closeable {
         FileUtils.forceDelete(_separatorTempDir);
       } catch (Exception e1) {
         LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
-                _separatorTempDir.getAbsolutePath());
+            _separatorTempDir.getAbsolutePath());
       }
       throw e;
     }
@@ -186,8 +187,8 @@ public class MultipleTreesBuilder implements Closeable {
 
       // Save the metadata and index maps to the disk
       SegmentMetadataUtils.savePropertiesConfiguration(_metadataProperties);
-      StarTreeIndexMapUtils
-          .storeToFile(indexMaps, new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
+      StarTreeIndexMapUtils.storeToFile(indexMaps,
+          new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
       FileUtils.forceDelete(starTreeIndexDir);
     }
 
@@ -212,9 +213,13 @@ public class MultipleTreesBuilder implements Closeable {
     metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, totalDocs);
     metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, builderConfig.getDimensionsSplitOrder());
     metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, builderConfig.getFunctionColumnPairs());
-    for (AggregationFunctionColumnPair functionColumnPair : builderConfig.getFunctionColumnPairs()) {
-      functionColumnPair.addToConfiguration(metadataProperties);
+    int index = 0;
+    for (Map.Entry<String, AggregationFunctionColumnPair> functionColumnPair : builderConfig.getFunctionColumnPairs()
+        .entrySet()) {
+      functionColumnPair.getValue().addToConfiguration(metadataProperties, index);
+      index++;
     }
+    metadataProperties.setProperty(MetadataKey.NUM_OF_AGGREGATION_CONFIG, index);
     metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, builderConfig.getMaxLeafRecords());
     metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
         builderConfig.getSkipStarNodeCreationForDimensions());
@@ -238,7 +243,7 @@ public class MultipleTreesBuilder implements Closeable {
         FileUtils.forceDelete(_separatorTempDir);
       } catch (Exception e) {
         LOGGER.warn("Caught exception while deleting the separator tmp directory: {}",
-                _separatorTempDir.getAbsolutePath());
+            _separatorTempDir.getAbsolutePath());
       }
     }
     _segment.destroy();

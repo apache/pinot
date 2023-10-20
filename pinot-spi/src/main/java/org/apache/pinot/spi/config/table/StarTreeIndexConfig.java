@@ -21,7 +21,6 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
@@ -51,12 +50,12 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
     Preconditions.checkArgument(CollectionUtils.isNotEmpty(dimensionsSplitOrder),
         "'dimensionsSplitOrder' must be configured");
     _dimensionsSplitOrder = dimensionsSplitOrder;
-    _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
-    _functionColumnPairs = functionColumnPairs != null ? functionColumnPairs : new ArrayList<>();
+    _skipStarNodeCreationForDimensions =
+        CollectionUtils.isNotEmpty(skipStarNodeCreationForDimensions) ? skipStarNodeCreationForDimensions : null;
+    _functionColumnPairs = CollectionUtils.isNotEmpty(functionColumnPairs) ? functionColumnPairs : null;
+    _aggregationConfigs = CollectionUtils.isNotEmpty(aggregationConfigs) ? aggregationConfigs : null;
     _maxLeafRecords = maxLeafRecords;
-    _aggregationConfigs = aggregationConfigs != null ? aggregationConfigs : new ArrayList<>();
-    Preconditions.checkArgument(
-        CollectionUtils.isNotEmpty(functionColumnPairs) || CollectionUtils.isNotEmpty(aggregationConfigs),
+    Preconditions.checkArgument(_functionColumnPairs != null || _aggregationConfigs != null,
         "Either 'functionColumnPairs' or 'aggregationConfigs' must be configured");
   }
 
@@ -69,10 +68,12 @@ public class StarTreeIndexConfig extends BaseJsonConfig {
     return _skipStarNodeCreationForDimensions;
   }
 
+  @Nullable
   public List<String> getFunctionColumnPairs() {
     return _functionColumnPairs;
   }
 
+  @Nullable
   public List<StarTreeAggregationConfig> getAggregationConfigs() {
     return _aggregationConfigs;
   }

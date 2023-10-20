@@ -83,10 +83,10 @@ public class SegmentMetadataFetcher {
       columnSet = new HashSet<>(columns);
     }
     ObjectNode segmentMetadataJson = (ObjectNode) segmentMetadata.toJson(columnSet);
-    segmentMetadataJson
-        .set(COLUMN_INDEX_KEY, JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager, columnSet)));
-    segmentMetadataJson
-        .set(STAR_TREE_INDEX_KEY, JsonUtils.objectToJsonNode((getStarTreeIndexesForSegment(segmentDataManager))));
+    segmentMetadataJson.set(COLUMN_INDEX_KEY,
+        JsonUtils.objectToJsonNode(getIndexesForSegmentColumns(segmentDataManager, columnSet)));
+    segmentMetadataJson.set(STAR_TREE_INDEX_KEY,
+        JsonUtils.objectToJsonNode((getStarTreeIndexesForSegment(segmentDataManager))));
     return JsonUtils.objectToString(segmentMetadataJson);
   }
 
@@ -199,15 +199,15 @@ public class SegmentMetadataFetcher {
       starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS, starTreeDimensions);
 
       List<String> starTreeMetricAggregations = new ArrayList<>();
-      Set<AggregationFunctionColumnPair> functionColumnPairs = starTreeMetadata.getFunctionColumnPairs();
-      for (AggregationFunctionColumnPair functionColumnPair : functionColumnPairs) {
-        starTreeMetricAggregations.add(functionColumnPair.toColumnName());
+      Map<String, AggregationFunctionColumnPair> functionColumnPairs = starTreeMetadata.getFunctionColumnPairs();
+      for (Map.Entry<String, AggregationFunctionColumnPair> functionColumnPair : functionColumnPairs.entrySet()) {
+        starTreeMetricAggregations.add(functionColumnPair.getValue().toColumnName());
       }
       starTreeIndexMap.put(STAR_TREE_METRIC_AGGREGATIONS, starTreeMetricAggregations);
 
       starTreeIndexMap.put(STAR_TREE_MAX_LEAF_RECORDS, starTreeMetadata.getMaxLeafRecords());
-      starTreeIndexMap
-          .put(STAR_TREE_DIMENSION_COLUMNS_SKIPPED, starTreeMetadata.getSkipStarNodeCreationForDimensions());
+      starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS_SKIPPED,
+          starTreeMetadata.getSkipStarNodeCreationForDimensions());
       startreeDetails.add(starTreeIndexMap);
     }
     return startreeDetails;

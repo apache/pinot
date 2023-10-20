@@ -22,6 +22,7 @@ import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.MinMaxRangeValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -48,5 +49,10 @@ public class MinMaxRangeStarTreeV2Test extends BaseStarTreeV2Test<Object, MinMax
   protected void assertAggregatedValue(MinMaxRangePair starTreeResult, MinMaxRangePair nonStarTreeResult) {
     assertEquals(starTreeResult.getMin(), nonStarTreeResult.getMin(), 1e-5);
     assertEquals(starTreeResult.getMax(), nonStarTreeResult.getMax(), 1e-5);
+  }
+
+  @Override
+  protected FieldConfig.CompressionCodec getCompressionCodec() {
+    return FieldConfig.CompressionCodec.LZ4;
   }
 }

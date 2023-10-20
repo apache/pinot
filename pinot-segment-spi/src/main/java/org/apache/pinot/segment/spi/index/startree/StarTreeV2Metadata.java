@@ -21,7 +21,9 @@ package org.apache.pinot.segment.spi.index.startree;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
 
@@ -32,7 +34,7 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataK
 public class StarTreeV2Metadata {
   private final int _numDocs;
   private final List<String> _dimensionsSplitOrder;
-  private final Set<AggregationFunctionColumnPair> _functionColumnPairs;
+  private final Map<String, AggregationFunctionColumnPair> _functionColumnPairs;
 
   // The following properties are useful for generating the builder config
   private final int _maxLeafRecords;
@@ -41,15 +43,22 @@ public class StarTreeV2Metadata {
   public StarTreeV2Metadata(Configuration metadataProperties) {
     _numDocs = metadataProperties.getInt(MetadataKey.TOTAL_DOCS);
     _dimensionsSplitOrder = Arrays.asList(metadataProperties.getStringArray(MetadataKey.DIMENSIONS_SPLIT_ORDER));
-    _functionColumnPairs = new HashSet<>();
-    for (String functionColumnPair : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
-      _functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName(functionColumnPair));
-      Configuration functionColPairsConfig =
-          metadataProperties.subset(MetadataKey.AGGREGATION_CONFIG + "." + functionColumnPair);
+    _functionColumnPairs = new TreeMap<>();
+    // Backward compatibility with columnName format
+    for (String functionColumnPairName : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
+      AggregationFunctionColumnPair functionColumnPair =
+          AggregationFunctionColumnPair.fromColumnName(functionColumnPairName);
+      _functionColumnPairs.put(functionColumnPair.toColumnName(), functionColumnPair);
+    }
+    for (int i = 0; i < metadataProperties.getInt(MetadataKey.NUM_OF_AGGREGATION_CONFIG); i++) {
+      Configuration functionColPairsConfig = metadataProperties.subset(MetadataKey.AGGREGATION_CONFIG + "." + i);
       if (!functionColPairsConfig.isEmpty()) {
-        _functionColumnPairs.add(AggregationFunctionColumnPair.fromConfiguration(functionColPairsConfig));
+        AggregationFunctionColumnPair functionColumnPair =
+            AggregationFunctionColumnPair.fromConfiguration(functionColPairsConfig);
+        _functionColumnPairs.put(functionColumnPair.toColumnName(), functionColumnPair);
       }
-    } _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
+    }
+    _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
     _skipStarNodeCreationForDimensions = new HashSet<>(
         Arrays.asList(metadataProperties.getStringArray(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS)));
   }
@@ -62,12 +71,12 @@ public class StarTreeV2Metadata {
     return _dimensionsSplitOrder;
   }
 
-  public Set<AggregationFunctionColumnPair> getFunctionColumnPairs() {
+  public Map<String, AggregationFunctionColumnPair> getFunctionColumnPairs() {
     return _functionColumnPairs;
   }
 
   public boolean containsFunctionColumnPair(AggregationFunctionColumnPair functionColumnPair) {
-    return _functionColumnPairs.contains(functionColumnPair);
+    return _functionColumnPairs.get(functionColumnPair.toColumnName()) != null;
   }
 
   public int getMaxLeafRecords() {
