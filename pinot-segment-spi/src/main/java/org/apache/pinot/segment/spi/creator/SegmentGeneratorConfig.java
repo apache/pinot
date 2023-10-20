@@ -93,7 +93,6 @@ public class SegmentGeneratorConfig implements Serializable {
   private String _segmentNamePrefix = null;
   private String _segmentNamePostfix = null;
   private String _segmentTimeColumnName = null;
-  private boolean _segmentEnableColumnMajor = false;
   private FieldSpec.DataType _segmentTimeColumnDataType = null;
   private TimeUnit _segmentTimeUnit = null;
   private String _segmentCreationTime = null;
@@ -460,10 +459,6 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public void setTimeColumnName(String timeColumnName) {
     _segmentTimeColumnName = timeColumnName;
-  }
-
-  public void setEnableColumnMajor(boolean enable) {
-    _segmentEnableColumnMajor = enable;
   }
 
   public int getSequenceId() {

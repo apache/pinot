@@ -232,12 +232,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       GenericRow reuse = new GenericRow();
       TransformPipeline.Result reusedResult = new TransformPipeline.Result();
       while (_recordReader.hasNext()) {
-        long recordReadStartTime = System.nanoTime();
         long recordReadStopTime = System.nanoTime();
         long indexStopTime;
         reuse.clear();
 
         try {
+          long recordReadStartTime = System.nanoTime();
           GenericRow decodedRow = _recordReader.next(reuse);
           recordReadStartTime = System.nanoTime();
 

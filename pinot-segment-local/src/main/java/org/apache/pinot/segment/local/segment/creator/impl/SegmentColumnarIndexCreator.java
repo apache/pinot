@@ -344,7 +344,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       throws IOException {
     // Iterate over each value in the column
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
-    if(numDocs == 0) {
+    if (numDocs == 0) {
       return;
     }
 

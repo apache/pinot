@@ -23,14 +23,12 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.index.SegmentReader;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
@@ -44,7 +42,6 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -60,8 +57,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.RowMetadata;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
@@ -217,7 +212,7 @@ public class RealtimeSegmentConverterTest {
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     List<GenericRow> rows = generateTestData();
 
-    for(GenericRow row : rows) {
+    for (GenericRow row : rows) {
       mutableSegmentImpl.index(row, null);
     }
 
@@ -240,9 +235,9 @@ public class RealtimeSegmentConverterTest {
     assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
     assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
 
-    long expectedStartTime = (long)rows.get(0).getValue(DATE_TIME_COLUMN);
+    long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
     assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
-    long expectedEndTime = (long)rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
+    long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
     assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
 
     assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
@@ -367,7 +362,7 @@ public class RealtimeSegmentConverterTest {
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     List<GenericRow> rows = generateTestData();
 
-    for(GenericRow row : rows) {
+    for (GenericRow row : rows) {
       mutableSegmentImpl.index(row, null);
     }
 
@@ -390,9 +385,9 @@ public class RealtimeSegmentConverterTest {
     assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
     assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
 
-    long expectedStartTime = (long)rows.get(0).getValue(DATE_TIME_COLUMN);
+    long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
     assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
-    long expectedEndTime = (long)rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
+    long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
     assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
 
     assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
@@ -402,7 +397,8 @@ public class RealtimeSegmentConverterTest {
     testSegment(rows, indexDir, tableConfig, segmentMetadata);
   }
 
-  private void testSegment(List<GenericRow> rows, File indexDir, TableConfig tableConfig, SegmentMetadataImpl segmentMetadata)
+  private void testSegment(List<GenericRow> rows, File indexDir,
+      TableConfig tableConfig, SegmentMetadataImpl segmentMetadata)
       throws IOException {
     SegmentLocalFSDirectory segmentDir = new SegmentLocalFSDirectory(indexDir, segmentMetadata, ReadMode.mmap);
     SegmentDirectory.Reader segmentReader = segmentDir.createReader();
@@ -415,12 +411,12 @@ public class RealtimeSegmentConverterTest {
       indexContainerMap.put(entry.getKey(),
           new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
     }
-    ImmutableSegmentImpl segment_file = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null);
+    ImmutableSegmentImpl segmentFile = new ImmutableSegmentImpl(segmentDir, segmentMetadata, indexContainerMap, null);
 
     GenericRow readRow = new GenericRow();
     int docId = 0;
-    for(GenericRow row : rows) {
-      segment_file.getRecord(docId, readRow);
+    for (GenericRow row : rows) {
+      segmentFile.getRecord(docId, readRow);
       assertEquals(readRow.getValue(STRING_COLUMN1), row.getValue(STRING_COLUMN1));
       assertEquals(readRow.getValue(STRING_COLUMN2), row.getValue(STRING_COLUMN2));
       assertEquals(readRow.getValue(STRING_COLUMN3), row.getValue(STRING_COLUMN3));
@@ -438,7 +434,7 @@ public class RealtimeSegmentConverterTest {
   private List<GenericRow> generateTestData() {
     LinkedList<GenericRow> rows = new LinkedList<>();
 
-    for(int i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
       GenericRow row = new GenericRow();
       row.putValue(STRING_COLUMN1, "Hello" + i);
       row.putValue(STRING_COLUMN2, "World" + i);
