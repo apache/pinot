@@ -131,7 +131,6 @@ public class PinotControllerTransport {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
       }
 
-
       final Future<Response> response =
           requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").execute();
 
