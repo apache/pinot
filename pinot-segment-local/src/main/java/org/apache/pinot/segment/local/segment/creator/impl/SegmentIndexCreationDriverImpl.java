@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
@@ -303,9 +304,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
       //    removed from this code.
       int[] sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
-      boolean skip = ((PinotSegmentRecordReader) _recordReader).getSkipDefaultNullValues();
       for (String col : columns) {
-        _indexCreator.indexColumn(col, sortedDocIds, indexSegment, skip);
+        _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
       }
     } catch (Exception e) {
       _indexCreator.close();
@@ -394,7 +394,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
 
-    LOGGER.info("Driver, record read time : {}", ((float) _totalRecordReadTimeNs) / 1000000.0);
+    LOGGER.info("Driver, record read time : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
     LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", _totalIndexTime);
   }

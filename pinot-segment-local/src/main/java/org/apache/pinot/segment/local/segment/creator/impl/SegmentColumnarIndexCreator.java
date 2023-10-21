@@ -339,8 +339,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   @Override
-  public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
-      boolean skipDefaultNullValues)
+  public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
       throws IOException {
     // Iterate over each value in the column
     int numDocs = segment.getSegmentMetadata().getTotalDocs();
@@ -357,13 +356,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
           indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
-              nullVec, skipDefaultNullValues);
-          onDiskDocId += 1;
+              nullVec);
+          onDiskDocId++;
         }
       } else {
         for (int docId = 0; docId < numDocs; docId++) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec,
-              skipDefaultNullValues);
+          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec);
         }
       }
     }
@@ -371,8 +369,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   private void indexColumnValue(PinotSegmentColumnReader colReader,
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex, String columnName, FieldSpec fieldSpec,
-      SegmentDictionaryCreator dictionaryCreator, int sourceDocId, int onDiskDocPos, NullValueVectorCreator nullVec,
-      boolean skipDefaultNullValues)
+      SegmentDictionaryCreator dictionaryCreator, int sourceDocId, int onDiskDocPos, NullValueVectorCreator nullVec)
       throws IOException {
     Object columnValueToIndex = colReader.getValue(sourceDocId);
     if (columnValueToIndex == null) {
@@ -385,7 +382,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
     }
 
-    if (_nullHandlingEnabled && !skipDefaultNullValues) {
+    if (_nullHandlingEnabled) {
       if (colReader.isNull(sourceDocId)) {
         nullVec.setNull(onDiskDocPos);
       }

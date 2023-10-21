@@ -194,10 +194,6 @@ public class PinotSegmentRecordReader implements RecordReader {
     return _sortedDocIds;
   }
 
-  public boolean getSkipDefaultNullValues() {
-    return _skipDefaultNullValues;
-  }
-
   @Override
   public boolean hasNext() {
     return _nextDocId < _numDocs;
