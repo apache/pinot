@@ -521,6 +521,18 @@ public class CommonConstants {
     public static final String CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT =
         "pinot.server.instance.reload.consumingSegment";
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
+
+    // Query logger related configs
+    public static final String CONFIG_OF_QUERY_LOG_MAX_RATE = "pinot.server.query.log.maxRatePerSecond";
+    @Deprecated
+    public static final String DEPRECATED_CONFIG_OF_QUERY_LOG_MAX_RATE =
+        "pinot.query.scheduler.query.log.maxRatePerSecond";
+    public static final double DEFAULT_QUERY_LOG_MAX_RATE = 10_000;
+    public static final String CONFIG_OF_QUERY_LOG_DROPPED_REPORT_MAX_RATE =
+        "pinot.server.query.log.droppedReportMaxRatePerSecond";
+    public static final double DEFAULT_QUERY_LOG_DROPPED_REPORT_MAX_RATE = 1;
+
+    // Query executor related configs
     public static final String CONFIG_OF_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_PRUNER_CLASS = "pinot.server.query.executor.pruner.class";
     public static final String CONFIG_OF_QUERY_EXECUTOR_PLAN_MAKER_CLASS =
@@ -530,6 +542,7 @@ public class CommonConstants {
         "pinot.server.query.executor.num.groups.limit";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
+
     public static final String CONFIG_OF_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
     public static final String CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES = "pinot.server.query.rewriter.class.names";
     public static final String CONFIG_OF_ENABLE_QUERY_CANCELLATION = "pinot.server.enable.query.cancellation";
