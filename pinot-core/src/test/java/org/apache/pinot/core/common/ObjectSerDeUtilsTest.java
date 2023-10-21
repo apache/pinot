@@ -23,10 +23,14 @@ import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.floats.Float2LongOpenHashMap;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -390,6 +394,62 @@ public class ObjectSerDeUtilsTest {
           ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.CompressedProbabilisticCounting);
 
       assertEquals(actual.getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testIntArrayList() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      IntArrayList expected = new IntArrayList(size);
+      for (int j = 0; j < size; j++) {
+        expected.add(RANDOM.nextInt());
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      IntArrayList actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.IntArrayList);
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testLongArrayList() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      LongArrayList expected = new LongArrayList(size);
+      for (int j = 0; j < size; j++) {
+        expected.add(RANDOM.nextLong());
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      LongArrayList actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.LongArrayList);
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testFloatArrayList() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      FloatArrayList expected = new FloatArrayList(size);
+      for (int j = 0; j < size; j++) {
+        expected.add(RANDOM.nextFloat());
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      FloatArrayList actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.FloatArrayList);
+      assertEquals(actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testStringArrayList() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100);
+      ObjectArrayList<String> expected = new ObjectArrayList<>(size);
+      for (int j = 0; j < size; j++) {
+        expected.add(RandomStringUtils.random(RANDOM.nextInt(20)));
+      }
+      byte[] bytes = ObjectSerDeUtils.serialize(expected);
+      ObjectArrayList<String> actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.StringArrayList);
+      assertEquals(actual, expected, ERROR_MESSAGE);
     }
   }
 }

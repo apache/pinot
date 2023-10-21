@@ -19,7 +19,10 @@
 package org.apache.pinot.core.operator.blocks.results;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.Collections;
@@ -191,11 +194,20 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       case BYTES:
         dataTableBuilder.setColumn(index, (ByteArray) result);
         break;
-      case DOUBLE_ARRAY:
-        dataTableBuilder.setColumn(index, ((DoubleArrayList) result).elements());
+      case INT_ARRAY:
+        dataTableBuilder.setColumn(index, ((IntArrayList) result).elements());
         break;
       case LONG_ARRAY:
         dataTableBuilder.setColumn(index, ((LongArrayList) result).elements());
+        break;
+      case FLOAT_ARRAY:
+        dataTableBuilder.setColumn(index, ((FloatArrayList) result).elements());
+        break;
+      case DOUBLE_ARRAY:
+        dataTableBuilder.setColumn(index, ((DoubleArrayList) result).elements());
+        break;
+      case STRING_ARRAY:
+        dataTableBuilder.setColumn(index, ((ObjectArrayList<String>) result).toArray(new String[0]));
         break;
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
