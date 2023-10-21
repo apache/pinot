@@ -161,13 +161,6 @@ public class AggregationResultsBlock extends BaseResultsBlock {
         dataTableBuilder.setColumn(index, (double) result);
         break;
       case OBJECT:
-      case BOOLEAN_ARRAY:
-      case INT_ARRAY:
-      case LONG_ARRAY:
-      case FLOAT_ARRAY:
-      case DOUBLE_ARRAY:
-      case STRING_ARRAY:
-      case TIMESTAMP_ARRAY:
         dataTableBuilder.setColumn(index, result);
         break;
       default:

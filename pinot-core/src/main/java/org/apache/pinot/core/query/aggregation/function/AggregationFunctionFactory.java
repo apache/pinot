@@ -37,7 +37,6 @@ import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggreg
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
-import org.apache.pinot.spi.utils.BooleanUtils;
 
 
 /**
@@ -252,7 +251,7 @@ public class AggregationFunctionFactory {
               Preconditions.checkArgument(isDistinctExp.getType() == ExpressionContext.Type.LITERAL,
                   "ARRAY_AGG expects the 3rd argument to be literal, got: %s. The function can be used as "
                       + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", isDistinctExp.getType());
-              isDistinct = BooleanUtils.toBoolean(isDistinctExp.getLiteral().getStringValue());
+              isDistinct = isDistinctExp.getLiteral().getBooleanValue();
             }
             if (isDistinct) {
               switch (dataType) {

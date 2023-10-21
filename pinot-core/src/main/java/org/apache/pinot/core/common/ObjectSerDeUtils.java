@@ -184,7 +184,7 @@ public class ObjectSerDeUtils {
       } else if (value instanceof ObjectArrayList) {
         ObjectArrayList objectArrayList = (ObjectArrayList) value;
         if (!objectArrayList.isEmpty()) {
-          Object next = objectArrayList.iterator().next();
+          Object next = objectArrayList.get(0);
           if (next instanceof String) {
             return ObjectType.StringArrayList;
           }

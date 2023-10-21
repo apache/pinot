@@ -27,7 +27,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class ArrayAggDistinctFloatFunction extends ArrayAggBaseFloatFunction<FloatOpenHashSet> {
+public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<FloatOpenHashSet> {
   public ArrayAggDistinctFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }

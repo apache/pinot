@@ -28,7 +28,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class ArrayAggStringFunction extends ArrayAggBaseStringFunction<ObjectArrayList<String>> {
+public class ArrayAggStringFunction extends BaseArrayAggStringFunction<ObjectArrayList<String>> {
   public ArrayAggStringFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }

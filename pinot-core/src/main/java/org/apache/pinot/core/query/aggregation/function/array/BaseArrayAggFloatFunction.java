@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.ints.AbstractIntCollection;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.floats.AbstractFloatCollection;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -27,19 +27,18 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public abstract class ArrayAggBaseIntFunction<I extends AbstractIntCollection>
-    extends ArrayAggFunction<I, IntArrayList> {
-  public ArrayAggBaseIntFunction(ExpressionContext expression, FieldSpec.DataType dataType,
-      boolean nullHandlingEnabled) {
-    super(expression, dataType, nullHandlingEnabled);
+public abstract class BaseArrayAggFloatFunction<I extends AbstractFloatCollection>
+    extends BaseArrayAggFunction<I, FloatArrayList> {
+  public BaseArrayAggFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+    super(expression, FieldSpec.DataType.FLOAT, nullHandlingEnabled);
   }
 
-  abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, int value);
+  abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, float value);
 
   @Override
-  protected void aggregateArrayGroupBySV(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet) {
-    int[] values = blockValSet.getIntValuesSV();
+  protected void aggregateArrayGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    float[] values = blockValSet.getFloatValuesSV();
     for (int i = 0; i < length; i++) {
       setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
     }
@@ -48,7 +47,7 @@ public abstract class ArrayAggBaseIntFunction<I extends AbstractIntCollection>
   @Override
   protected void aggregateArrayGroupBySVWithNull(int length, int[] groupKeyArray,
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    int[] values = blockValSet.getIntValuesSV();
+    float[] values = blockValSet.getFloatValuesSV();
     for (int i = 0; i < length; i++) {
       if (!nullBitmap.contains(i)) {
         setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
@@ -57,14 +56,12 @@ public abstract class ArrayAggBaseIntFunction<I extends AbstractIntCollection>
   }
 
   @Override
-  protected void aggregateArrayGroupByMV(int length, int[][] groupKeysArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet) {
-    int[] values = blockValSet.getIntValuesSV();
+  protected void aggregateArrayGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      BlockValSet blockValSet) {
+    float[] values = blockValSet.getFloatValuesSV();
     for (int i = 0; i < length; i++) {
-      int[] groupKeys = groupKeysArray[i];
-      int value = values[i];
-      for (int groupKey : groupKeys) {
-        setGroupByResult(groupByResultHolder, groupKey, value);
+      for (int groupKey : groupKeysArray[i]) {
+        setGroupByResult(groupByResultHolder, groupKey, values[i]);
       }
     }
   }
@@ -72,13 +69,11 @@ public abstract class ArrayAggBaseIntFunction<I extends AbstractIntCollection>
   @Override
   protected void aggregateArrayGroupByMVWithNull(int length, int[][] groupKeysArray,
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    int[] values = blockValSet.getIntValuesSV();
+    float[] values = blockValSet.getFloatValuesSV();
     for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
-        int[] groupKeys = groupKeysArray[i];
-        int value = values[i];
-        for (int groupKey : groupKeys) {
-          setGroupByResult(groupByResultHolder, groupKey, value);
+      for (int groupKey : groupKeysArray[i]) {
+        if (!nullBitmap.contains(i)) {
+          setGroupByResult(groupByResultHolder, groupKey, values[i]);
         }
       }
     }
@@ -86,10 +81,10 @@ public abstract class ArrayAggBaseIntFunction<I extends AbstractIntCollection>
 
   @Override
   public I merge(I intermediateResult1, I intermediateResult2) {
-    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
+    if (intermediateResult1 == null) {
       return intermediateResult2;
     }
-    if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
+    if (intermediateResult2 == null) {
       return intermediateResult1;
     }
     intermediateResult1.addAll(intermediateResult2);
@@ -97,7 +92,7 @@ public abstract class ArrayAggBaseIntFunction<I extends AbstractIntCollection>
   }
 
   @Override
-  public IntArrayList extractFinalResult(I intArrayList) {
-    return new IntArrayList(intArrayList);
+  public FloatArrayList extractFinalResult(I floatArrayList) {
+    return new FloatArrayList(floatArrayList);
   }
 }

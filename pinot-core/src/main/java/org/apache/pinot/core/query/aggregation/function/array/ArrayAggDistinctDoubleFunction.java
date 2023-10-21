@@ -27,7 +27,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class ArrayAggDistinctDoubleFunction extends ArrayAggBaseDoubleFunction<DoubleOpenHashSet> {
+public class ArrayAggDistinctDoubleFunction extends BaseArrayAggDoubleFunction<DoubleOpenHashSet> {
   public ArrayAggDistinctDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, nullHandlingEnabled);
   }

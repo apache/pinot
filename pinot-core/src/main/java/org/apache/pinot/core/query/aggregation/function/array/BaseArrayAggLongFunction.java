@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.doubles.AbstractDoubleCollection;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.longs.AbstractLongCollection;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -27,18 +27,19 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public abstract class ArrayAggBaseDoubleFunction<I extends AbstractDoubleCollection>
-    extends ArrayAggFunction<I, DoubleArrayList> {
-  public ArrayAggBaseDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, FieldSpec.DataType.DOUBLE, nullHandlingEnabled);
+public abstract class BaseArrayAggLongFunction<I extends AbstractLongCollection>
+    extends BaseArrayAggFunction<I, LongArrayList> {
+  public BaseArrayAggLongFunction(ExpressionContext expression, FieldSpec.DataType dataType,
+      boolean nullHandlingEnabled) {
+    super(expression, dataType, nullHandlingEnabled);
   }
 
-  abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, double value);
+  abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, long value);
 
   @Override
-  protected void aggregateArrayGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet) {
-    double[] values = blockValSet.getDoubleValuesSV();
+  protected void aggregateArrayGroupBySV(int length, int[] groupKeyArray,
+      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet) {
+    long[] values = blockValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
       setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
     }
@@ -47,7 +48,7 @@ public abstract class ArrayAggBaseDoubleFunction<I extends AbstractDoubleCollect
   @Override
   protected void aggregateArrayGroupBySVWithNull(int length, int[] groupKeyArray,
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    double[] values = blockValSet.getDoubleValuesSV();
+    long[] values = blockValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
       if (!nullBitmap.contains(i)) {
         setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
@@ -56,11 +57,12 @@ public abstract class ArrayAggBaseDoubleFunction<I extends AbstractDoubleCollect
   }
 
   @Override
-  protected void aggregateArrayGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet) {
-    double[] values = blockValSet.getDoubleValuesSV();
+  protected void aggregateArrayGroupByMV(int length, int[][] groupKeysArray,
+      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet) {
+    long[] values = blockValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
+      int[] groupKeys = groupKeysArray[i];
+      for (int groupKey : groupKeys) {
         setGroupByResult(groupByResultHolder, groupKey, values[i]);
       }
     }
@@ -69,10 +71,11 @@ public abstract class ArrayAggBaseDoubleFunction<I extends AbstractDoubleCollect
   @Override
   protected void aggregateArrayGroupByMVWithNull(int length, int[][] groupKeysArray,
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    double[] values = blockValSet.getDoubleValuesSV();
+    long[] values = blockValSet.getLongValuesSV();
     for (int i = 0; i < length; i++) {
       if (!nullBitmap.contains(i)) {
-        for (int groupKey : groupKeysArray[i]) {
+        int[] groupKeys = groupKeysArray[i];
+        for (int groupKey : groupKeys) {
           setGroupByResult(groupByResultHolder, groupKey, values[i]);
         }
       }
@@ -81,10 +84,10 @@ public abstract class ArrayAggBaseDoubleFunction<I extends AbstractDoubleCollect
 
   @Override
   public I merge(I intermediateResult1, I intermediateResult2) {
-    if (intermediateResult1 == null) {
+    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
       return intermediateResult2;
     }
-    if (intermediateResult2 == null) {
+    if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
     intermediateResult1.addAll(intermediateResult2);
@@ -92,7 +95,7 @@ public abstract class ArrayAggBaseDoubleFunction<I extends AbstractDoubleCollect
   }
 
   @Override
-  public DoubleArrayList extractFinalResult(I doubleArrayList) {
-    return new DoubleArrayList(doubleArrayList);
+  public LongArrayList extractFinalResult(I arrayList) {
+    return new LongArrayList(arrayList);
   }
 }

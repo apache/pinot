@@ -32,12 +32,12 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public abstract class ArrayAggFunction<I, F extends Comparable> extends BaseSingleInputAggregationFunction<I, F> {
+public abstract class BaseArrayAggFunction<I, F extends Comparable> extends BaseSingleInputAggregationFunction<I, F> {
 
   protected final boolean _nullHandlingEnabled;
   private final DataSchema.ColumnDataType _resultColumnType;
 
-  public ArrayAggFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
+  public BaseArrayAggFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
     super(expression);
     _nullHandlingEnabled = nullHandlingEnabled;
     _resultColumnType = DataSchema.ColumnDataType.fromDataTypeMV(dataType);
@@ -60,7 +60,7 @@ public abstract class ArrayAggFunction<I, F extends Comparable> extends BaseSing
 
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return _resultColumnType;
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Override

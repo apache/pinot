@@ -28,7 +28,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class ArrayAggDistinctLongFunction extends ArrayAggBaseLongFunction<LongOpenHashSet> {
+public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongOpenHashSet> {
   public ArrayAggDistinctLongFunction(ExpressionContext expression, FieldSpec.DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);

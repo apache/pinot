@@ -29,7 +29,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class ArrayAggDistinctIntFunction extends ArrayAggBaseIntFunction<IntOpenHashSet> {
+public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntOpenHashSet> {
   public ArrayAggDistinctIntFunction(ExpressionContext expression, FieldSpec.DataType dataType,
       boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);

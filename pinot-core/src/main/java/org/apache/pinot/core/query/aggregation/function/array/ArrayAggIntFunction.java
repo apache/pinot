@@ -27,7 +27,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class ArrayAggIntFunction extends ArrayAggBaseIntFunction<IntArrayList> {
+public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
   public ArrayAggIntFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
     super(expression, dataType, nullHandlingEnabled);
   }

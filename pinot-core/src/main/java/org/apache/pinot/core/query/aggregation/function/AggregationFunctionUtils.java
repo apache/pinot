@@ -144,13 +144,6 @@ public class AggregationFunctionUtils {
         return dataTable.getLong(rowId, colId);
       case DOUBLE:
         return dataTable.getDouble(rowId, colId);
-      case BOOLEAN_ARRAY:
-      case INT_ARRAY:
-      case LONG_ARRAY:
-      case FLOAT_ARRAY:
-      case DOUBLE_ARRAY:
-      case STRING_ARRAY:
-      case TIMESTAMP_ARRAY:
       case OBJECT:
         CustomObject customObject = dataTable.getCustomObject(rowId, colId);
         return customObject != null ? ObjectSerDeUtils.deserialize(customObject) : null;
