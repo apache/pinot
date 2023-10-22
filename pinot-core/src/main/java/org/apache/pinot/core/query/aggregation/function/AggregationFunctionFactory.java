@@ -23,6 +23,16 @@ import java.util.List;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctDoubleFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctFloatFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctIntFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctLongFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctStringFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDoubleFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggFloatFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggIntFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -224,6 +234,58 @@ public class AggregationFunctionFactory {
                 return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol);
               default:
                 throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
+            }
+          }
+          case ARRAYAGG: {
+            Preconditions.checkArgument(numArguments >= 2,
+                "ARRAY_AGG expects 2 or 3 arguments, got: %s. The function can be used as "
+                    + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", numArguments);
+            ExpressionContext dataTypeExp = arguments.get(1);
+            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
+                "ARRAY_AGG expects the 2nd argument to be literal, got: %s. The function can be used as "
+                    + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", dataTypeExp.getType());
+            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
+            boolean isDistinct = false;
+            if (numArguments == 3) {
+              ExpressionContext isDistinctExp = arguments.get(2);
+              Preconditions.checkArgument(isDistinctExp.getType() == ExpressionContext.Type.LITERAL,
+                  "ARRAY_AGG expects the 3rd argument to be literal, got: %s. The function can be used as "
+                      + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", isDistinctExp.getType());
+              isDistinct = isDistinctExp.getLiteral().getBooleanValue();
+            }
+            if (isDistinct) {
+              switch (dataType) {
+                case BOOLEAN:
+                case INT:
+                  return new ArrayAggDistinctIntFunction(firstArgument, dataType, nullHandlingEnabled);
+                case LONG:
+                case TIMESTAMP:
+                  return new ArrayAggDistinctLongFunction(firstArgument, dataType, nullHandlingEnabled);
+                case FLOAT:
+                  return new ArrayAggDistinctFloatFunction(firstArgument, nullHandlingEnabled);
+                case DOUBLE:
+                  return new ArrayAggDistinctDoubleFunction(firstArgument, nullHandlingEnabled);
+                case STRING:
+                  return new ArrayAggDistinctStringFunction(firstArgument, nullHandlingEnabled);
+                default:
+                  throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
+              }
+            }
+            switch (dataType) {
+              case BOOLEAN:
+              case INT:
+                return new ArrayAggIntFunction(firstArgument, dataType, nullHandlingEnabled);
+              case LONG:
+              case TIMESTAMP:
+                return new ArrayAggLongFunction(firstArgument, dataType, nullHandlingEnabled);
+              case FLOAT:
+                return new ArrayAggFloatFunction(firstArgument, nullHandlingEnabled);
+              case DOUBLE:
+                return new ArrayAggDoubleFunction(firstArgument, nullHandlingEnabled);
+              case STRING:
+                return new ArrayAggStringFunction(firstArgument, nullHandlingEnabled);
+              default:
+                throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
             }
           }
           case LASTWITHTIME: {

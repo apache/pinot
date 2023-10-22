@@ -282,6 +282,21 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       for (int i = 0; i < numDocsFetched; i++) {
         blockValueFetcher.getRow(i, rowList.get(rowBaseId + i), numOrderByExpressions);
       }
+      if (_nullHandlingEnabled) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[numNonOrderByExpressions];
+        for (int i = 0; i < numNonOrderByExpressions; i++) {
+          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+        }
+        for (int i = 0; i < numDocsFetched; i++) {
+          Object[] values = rowList.get(rowBaseId + i);
+          for (int colId = 0; colId < numNonOrderByExpressions; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(i)) {
+              int valueColId = numOrderByExpressions + colId;
+              values[valueColId] = null;
+            }
+          }
+        }
+      }
       _numEntriesScannedPostFilter += (long) numDocsFetched * numColumns;
       rowBaseId += numDocsFetched;
     }

@@ -29,12 +29,15 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class MinionTaskUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionTaskUtils.class);
+
+  private static final String DEFAULT_DIR_PATH_TERMINATOR = "/";
 
   private MinionTaskUtils() {
   }
@@ -84,7 +87,8 @@ public class MinionTaskUtils {
         singleFileGenerationTaskConfig.put(BatchConfigProperties.PUSH_MODE,
             BatchConfigProperties.SegmentPushType.TAR.toString());
       } else {
-        URI outputDirURI = URI.create(clusterInfoAccessor.getDataDir() + "/" + tableName);
+        URI outputDirURI = URI.create(
+            normalizeDirectoryURI(clusterInfoAccessor.getDataDir()) + TableNameBuilder.extractRawTableName(tableName));
         String outputDirURIScheme = outputDirURI.getScheme();
 
         if (!isLocalOutputDir(outputDirURIScheme)) {
@@ -114,5 +118,16 @@ public class MinionTaskUtils {
 
   public static PinotFS getLocalPinotFs() {
     return new LocalPinotFS();
+  }
+
+  public static String normalizeDirectoryURI(URI dirURI) {
+    return normalizeDirectoryURI(dirURI.toString());
+  }
+
+  public static String normalizeDirectoryURI(String dirInStr) {
+    if (!dirInStr.endsWith(DEFAULT_DIR_PATH_TERMINATOR)) {
+      return dirInStr + DEFAULT_DIR_PATH_TERMINATOR;
+    }
+    return dirInStr;
   }
 }

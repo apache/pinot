@@ -235,8 +235,8 @@ public class PinotHelixResourceManager {
   private final LineageManager _lineageManager;
 
   public PinotHelixResourceManager(String zkURL, String helixClusterName, @Nullable String dataDir,
-      boolean isSingleTenantCluster, boolean enableBatchMessageMode,
-      int deletedSegmentsRetentionInDays, boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
+      boolean isSingleTenantCluster, boolean enableBatchMessageMode, int deletedSegmentsRetentionInDays,
+      boolean enableTieredSegmentAssignment, LineageManager lineageManager) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _dataDir = dataDir;
@@ -315,8 +315,8 @@ public class PinotHelixResourceManager {
     // Initialize TableCache
     HelixConfigScope helixConfigScope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(_helixClusterName).build();
-    Map<String, String> configs = _helixAdmin.getConfig(helixConfigScope,
-        Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY));
+    Map<String, String> configs =
+        _helixAdmin.getConfig(helixConfigScope, Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY));
     boolean caseInsensitive = Boolean.parseBoolean(configs.getOrDefault(Helix.ENABLE_CASE_INSENSITIVE_KEY,
         Boolean.toString(Helix.DEFAULT_ENABLE_CASE_INSENSITIVE)));
     _tableCache = new TableCache(_propertyStore, caseInsensitive);
@@ -470,8 +470,8 @@ public class PinotHelixResourceManager {
   }
 
   public List<String> getAllBrokerInstances() {
-    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream()
-        .filter(InstanceTypeUtils::isBroker).collect(Collectors.toList());
+    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream().filter(InstanceTypeUtils::isBroker)
+        .collect(Collectors.toList());
   }
 
   public List<InstanceConfig> getAllBrokerInstanceConfigs() {
@@ -808,21 +808,33 @@ public class PinotHelixResourceManager {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
     List<String> segments = new ArrayList<>(idealState.getPartitionSet());
-    if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
-      return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, segments) : segments;
-    } else {
-      List<String> selectedSegments = new ArrayList<>();
-      List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
-      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-        String segmentName = segmentZKMetadata.getSegmentName();
-        if (segments.contains(segmentName) && isSegmentWithinTimeStamps(segmentZKMetadata, startTimestamp, endTimestamp,
-            excludeOverlapping)) {
+    List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
+    List<String> selectedSegments = new ArrayList<>();
+    ArrayList<String> filteredSegments = new ArrayList<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      String segmentName = segmentZKMetadata.getSegmentName();
+      // Compute the interesction of segmentZK metadata and idealstate for valid segmnets
+      if (!segments.contains(segmentName)) {
+        filteredSegments.add(segmentName);
+        continue;
+      }
+      // No need to filter by time if the time range is not specified
+      if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
+        selectedSegments.add(segmentName);
+      } else {
+        // Filter by time if the time range is specified
+        if (isSegmentWithinTimeStamps(segmentZKMetadata, startTimestamp, endTimestamp, excludeOverlapping)) {
           selectedSegments.add(segmentName);
         }
       }
-      return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, selectedSegments)
-          : selectedSegments;
     }
+    LOGGER.info(
+        "Successfully computed the segments for table : {}. # of filtered segments: {}, the filtered segment list: "
+            + "{}. Only showing up to 100 filtered segments.", tableNameWithType, filteredSegments.size(),
+        (filteredSegments.size() > 0) ? filteredSegments.subList(0, Math.min(filteredSegments.size(), 100))
+            : filteredSegments);
+    return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, selectedSegments)
+        : selectedSegments;
   }
 
   /**
@@ -3182,8 +3194,8 @@ public class PinotHelixResourceManager {
   @VisibleForTesting
   void updateTargetTier(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig) {
     List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
-    List<Tier> sortedTiers = tierCfgs == null ? Collections.emptyList()
-        : TierConfigUtils.getSortedTiers(tierCfgs, _helixZkManager);
+    List<Tier> sortedTiers =
+        tierCfgs == null ? Collections.emptyList() : TierConfigUtils.getSortedTiers(tierCfgs, _helixZkManager);
     LOGGER.info("For rebalanceId: {}, updating target tiers for segments of table: {} with tierConfigs: {}",
         rebalanceJobId, tableNameWithType, sortedTiers);
     for (String segmentName : getSegmentsFor(tableNameWithType, true)) {
@@ -3463,9 +3475,9 @@ public class PinotHelixResourceManager {
 
               // Add segments for proactive clean-up.
               segmentsToCleanUp.addAll(segmentsToForEntryToRevert);
-            } else if (lineageEntry.getState() == LineageEntryState.COMPLETED
-                && "REFRESH".equalsIgnoreCase(IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig))
-                && CollectionUtils.isEqualCollection(segmentsFrom, lineageEntry.getSegmentsTo())) {
+            } else if (lineageEntry.getState() == LineageEntryState.COMPLETED && "REFRESH".equalsIgnoreCase(
+                IngestionConfigUtils.getBatchSegmentIngestionType(tableConfig)) && CollectionUtils.isEqualCollection(
+                segmentsFrom, lineageEntry.getSegmentsTo())) {
               // This part of code assumes that we only allow at most 2 data snapshots at a time by proactively
               // deleting the older snapshots (for REFRESH tables).
               //
@@ -3514,8 +3526,8 @@ public class PinotHelixResourceManager {
         segmentLineage.addLineageEntry(segmentLineageEntryId,
             new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, System.currentTimeMillis()));
 
-        _lineageManager
-            .updateLineageForStartReplaceSegments(tableConfig, segmentLineageEntryId, customMap, segmentLineage);
+        _lineageManager.updateLineageForStartReplaceSegments(tableConfig, segmentLineageEntryId, customMap,
+            segmentLineage);
         // Write back to the lineage entry to the property store
         if (SegmentLineageAccessHelper.writeSegmentLineage(_propertyStore, segmentLineage, expectedVersion)) {
           // Trigger the proactive segment clean up if needed. Once the lineage is updated in the property store, it
@@ -3768,8 +3780,7 @@ public class PinotHelixResourceManager {
    * @param customMap
    */
   private boolean writeLineageEntryWithTightLoop(TableConfig tableConfig, String lineageEntryId,
-      LineageEntry lineageEntryToUpdate, LineageEntry lineageEntryToMatch,
-      ZkHelixPropertyStore<ZNRecord> propertyStore,
+      LineageEntry lineageEntryToUpdate, LineageEntry lineageEntryToMatch, ZkHelixPropertyStore<ZNRecord> propertyStore,
       LineageUpdateType lineageUpdateType, Map<String, String> customMap) {
     for (int i = 0; i < DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY; i++) {
       // Fetch the segment lineage
@@ -3792,16 +3803,16 @@ public class PinotHelixResourceManager {
       segmentLineageToUpdate.updateLineageEntry(lineageEntryId, lineageEntryToUpdate);
       switch (lineageUpdateType) {
         case START:
-          _lineageManager
-              .updateLineageForStartReplaceSegments(tableConfig, lineageEntryId, customMap, segmentLineageToUpdate);
+          _lineageManager.updateLineageForStartReplaceSegments(tableConfig, lineageEntryId, customMap,
+              segmentLineageToUpdate);
           break;
         case END:
-          _lineageManager
-              .updateLineageForEndReplaceSegments(tableConfig, lineageEntryId, customMap, segmentLineageToUpdate);
+          _lineageManager.updateLineageForEndReplaceSegments(tableConfig, lineageEntryId, customMap,
+              segmentLineageToUpdate);
           break;
         case REVERT:
-          _lineageManager
-              .updateLineageForRevertReplaceSegments(tableConfig, lineageEntryId, customMap, segmentLineageToUpdate);
+          _lineageManager.updateLineageForRevertReplaceSegments(tableConfig, lineageEntryId, customMap,
+              segmentLineageToUpdate);
           break;
         default:
       }
@@ -4034,8 +4045,8 @@ public class PinotHelixResourceManager {
       }
     }
     for (TableConfig tableConfig : getAllTableConfigs()) {
-      String tag = TagNameUtils.getServerTagForTenant(tableConfig.getTenantConfig().getServer(),
-          tableConfig.getTableType());
+      String tag =
+          TagNameUtils.getServerTagForTenant(tableConfig.getTenantConfig().getServer(), tableConfig.getTableType());
       tagMinInstanceMap.put(tag, Math.max(tagMinInstanceMap.getOrDefault(tag, 0), tableConfig.getReplication()));
       String brokerTag = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
       tagMinInstanceMap.put(brokerTag, 1);

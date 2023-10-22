@@ -81,6 +81,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   // Emitted only by Server to Deep-store segment uploader.
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
+  RESIZE_TIME_MS("resizeTimeMs", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
 
