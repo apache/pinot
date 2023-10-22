@@ -79,7 +79,8 @@
     <dependency>
       <groupId>com.dynatrace.hash4j</groupId>
       <artifactId>hash4j</artifactId>
-    </dependency>    <dependency>
+    </dependency>
+    <dependency>
       <groupId>com.tdunning</groupId>
       <artifactId>t-digest</artifactId>
     </dependency>
@@ -145,10 +146,6 @@
       <version>${project.version}</version>
       <type>test-jar</type>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.dynatrace.hash4j</groupId>
-      <artifactId>hash4j</artifactId>
     </dependency>
   </dependencies>
 </project>
