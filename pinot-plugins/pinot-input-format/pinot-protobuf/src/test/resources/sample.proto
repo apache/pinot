@@ -25,4 +25,5 @@ message SampleRecord {
   int32 id = 2;
   string email = 3;
   repeated string friends = 4;
+  optional string optionalField = 5;
 }
