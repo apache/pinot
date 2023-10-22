@@ -168,7 +168,7 @@
     <argLine>-Xms4g -Xmx4g</argLine>
     <protobuf.version>3.24.3</protobuf.version>
     <grpc.version>1.53.0</grpc.version>
-    <confluent.version>5.5.3</confluent.version>
+    <confluent.version>7.2.6</confluent.version>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -190,6 +190,10 @@
 
     <flink.version>1.12.0</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
+
+    <proto.google.common.protos.version>2.9.6</proto.google.common.protos.version>
+
+    <kotlin.stdlib.version>1.7.22</kotlin.stdlib.version>
   </properties>
 
   <profiles>
@@ -1226,6 +1230,11 @@
         <version>${protobuf.version}</version>
       </dependency>
       <dependency>
+        <groupId>com.google.protobuf</groupId>
+        <artifactId>protobuf-java-util</artifactId>
+        <version>${protobuf.version}</version>
+      </dependency>
+      <dependency>
         <groupId>io.grpc</groupId>
         <artifactId>grpc-netty-shaded</artifactId>
         <version>${grpc.version}</version>
@@ -1239,6 +1248,11 @@
         <groupId>io.grpc</groupId>
         <artifactId>grpc-stub</artifactId>
         <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.api.grpc</groupId>
+        <artifactId>proto-google-common-protos</artifactId>
+        <version>${proto.google.common.protos.version}</version>
       </dependency>
       <!-- geo dependencies -->
       <dependency>
@@ -1334,6 +1348,18 @@
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
         <version>${flink.version}</version>
+      </dependency>
+
+      <!-- used by some projects like kafka-protobuf-serializer-->
+      <dependency>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-stdlib-jdk8</artifactId>
+        <version>${kotlin.stdlib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-stdlib</artifactId>
+        <version>${kotlin.stdlib.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

@@ -19,7 +19,10 @@
 package org.apache.pinot.query.runtime.operator.utils;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
@@ -45,17 +48,38 @@ public class TypeUtils {
       // For AggregationFunctions that return serialized custom object, e.g. DistinctCountRawHLLAggregationFunction
       case STRING:
         return value.toString();
+      case INT_ARRAY:
+        if (value instanceof IntArrayList) {
+          // For ArrayAggregationFunction
+          return ((IntArrayList) value).elements();
+        } else {
+          return value;
+        }
       case LONG_ARRAY:
         if (value instanceof LongArrayList) {
-          // For FunnelCountAggregationFunction
+          // For FunnelCountAggregationFunction and ArrayAggregationFunction
           return ((LongArrayList) value).elements();
+        } else {
+          return value;
+        }
+      case FLOAT_ARRAY:
+        if (value instanceof FloatArrayList) {
+          // For ArrayAggregationFunction
+          return ((FloatArrayList) value).elements();
         } else {
           return value;
         }
       case DOUBLE_ARRAY:
         if (value instanceof DoubleArrayList) {
-          // For HistogramAggregationFunction
+          // For HistogramAggregationFunction and ArrayAggregationFunction
           return ((DoubleArrayList) value).elements();
+        } else {
+          return value;
+        }
+      case STRING_ARRAY:
+        if (value instanceof ObjectArrayList) {
+          // For ArrayAggregationFunction
+          return ((ObjectArrayList<String>) value).toArray(new String[0]);
         } else {
           return value;
         }

@@ -312,6 +312,17 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals(rows.get(0).get(0).asText(), "null");
   }
 
+  @Test
+  public void testOrderByByNullableKeepsOtherColNulls()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String h2Query = "select salary from mytable"
+        + " where salary is null"
+        + " order by description";
+    String pinotQuery = h2Query + " option(enableNullHandling=true)";
+    testQuery(pinotQuery, h2Query);
+  }
+
   @Test(dataProvider = "useBothQueryEngines")
   public void testOrderByNullsFirst(boolean useMultiStageQueryEngine)
       throws Exception {

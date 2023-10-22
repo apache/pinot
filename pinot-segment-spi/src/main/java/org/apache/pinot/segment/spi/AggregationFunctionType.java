@@ -308,6 +308,11 @@ public enum AggregationFunctionType {
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.INTEGER, SqlTypeFamily.ANY), ordinal -> ordinal > 3),
       ReturnTypes.ARG1, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
+  // Array aggregate functions
+  ARRAYAGG("arrayAgg", null, SqlKind.ARRAY_AGG, SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN),
+          ordinal -> ordinal > 1), ReturnTypes.TO_ARRAY, ReturnTypes.explicit(SqlTypeName.OTHER)),
+
   // funnel aggregate functions
   // TODO: revisit support for funnel count in V2
   FUNNELCOUNT("funnelCount");
@@ -357,12 +362,12 @@ public enum AggregationFunctionType {
    * Constructor to use for aggregation functions which are supported in both v1 and multistage engines with
    * different behavior comparing to Calcite and requires literal operand inputs.
    *
-   * @param name name of the agg function
-   * @param alternativeNames alternative name of the agg function.
-   * @param sqlKind sql kind indicator, used by Calcite
-   * @param sqlFunctionCategory function catalog, used by Calcite
-   * @param operandTypeChecker input operand type signature, used by Calcite
-   * @param finalReturnType final output type signature, used by Calcite
+   * @param name                   name of the agg function
+   * @param alternativeNames       alternative name of the agg function.
+   * @param sqlKind                sql kind indicator, used by Calcite
+   * @param sqlFunctionCategory    function catalog, used by Calcite
+   * @param operandTypeChecker     input operand type signature, used by Calcite
+   * @param finalReturnType        final output type signature, used by Calcite
    * @param intermediateReturnType intermediate output type signature, used by Pinot and Calcite
    */
   AggregationFunctionType(String name, @Nullable List<String> alternativeNames, @Nullable SqlKind sqlKind,

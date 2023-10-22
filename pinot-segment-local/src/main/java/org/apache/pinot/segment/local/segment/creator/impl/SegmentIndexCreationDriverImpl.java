@@ -29,7 +29,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
@@ -45,6 +47,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.converter.SegmentFormatConverter;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
@@ -102,7 +105,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private int _totalDocs = 0;
   private File _tempIndexDir;
   private String _segmentName;
-  private long _totalRecordReadTime = 0;
+  private long _totalRecordReadTimeNs = 0;
   private long _totalIndexTime = 0;
   private long _totalStatsCollectorTime = 0;
   private boolean _continueOnError;
@@ -122,8 +125,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     TableConfig tableConfig = segmentGeneratorConfig.getTableConfig();
     FileFormat fileFormat = segmentGeneratorConfig.getFormat();
     String recordReaderClassName = segmentGeneratorConfig.getRecordReaderPath();
-    Set<String> sourceFields = IngestionUtils
-        .getFieldsForRecordExtractor(tableConfig.getIngestionConfig(), segmentGeneratorConfig.getSchema());
+    Set<String> sourceFields = IngestionUtils.getFieldsForRecordExtractor(tableConfig.getIngestionConfig(),
+        segmentGeneratorConfig.getSchema());
 
     // Allow for instantiation general record readers from a record reader path passed into segment generator config
     // If this is set, this will override the file format
@@ -142,8 +145,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (fileFormat == FileFormat.PINOT) {
       return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
     } else {
-      return RecordReaderFactory
-          .getRecordReader(fileFormat, dataFile, sourceFields, segmentGeneratorConfig.getReaderConfig());
+      return RecordReaderFactory.getRecordReader(fileFormat, dataFile, sourceFields,
+          segmentGeneratorConfig.getReaderConfig());
     }
   }
 
@@ -199,8 +202,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       indexDir.mkdirs();
     }
 
-    _ingestionSchemaValidator = SchemaValidatorFactory
-        .getSchemaValidator(_dataSchema, _recordReader.getClass().getName(), config.getInputFilePath());
+    _ingestionSchemaValidator =
+        SchemaValidatorFactory.getSchemaValidator(_dataSchema, _recordReader.getClass().getName(),
+            config.getInputFilePath());
 
     // Create a temporary directory used in segment creation
     _tempIndexDir = new File(indexDir, "tmp-" + UUID.randomUUID());
@@ -229,16 +233,21 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       GenericRow reuse = new GenericRow();
       TransformPipeline.Result reusedResult = new TransformPipeline.Result();
       while (_recordReader.hasNext()) {
-        long recordReadStartTime = System.currentTimeMillis();
-        long recordReadStopTime = System.currentTimeMillis();
+        long recordReadStopTime = System.nanoTime();
         long indexStopTime;
         reuse.clear();
+
         try {
+          long recordReadStartTime = System.nanoTime();
           GenericRow decodedRow = _recordReader.next(reuse);
-          recordReadStartTime = System.currentTimeMillis();
+          recordReadStartTime = System.nanoTime();
+
+          // Should not be needed anymore.
+          // Add row to indexes
           _transformPipeline.processRow(decodedRow, reusedResult);
-          recordReadStopTime = System.currentTimeMillis();
-          _totalRecordReadTime += (recordReadStopTime - recordReadStartTime);
+
+          recordReadStopTime = System.nanoTime();
+          _totalRecordReadTimeNs += (recordReadStopTime - recordReadStartTime);
         } catch (Exception e) {
           if (!_continueOnError) {
             throw new RuntimeException("Error occurred while reading row during indexing", e);
@@ -273,6 +282,47 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     handlePostCreation();
   }
 
+  public void buildByColumn(IndexSegment indexSegment)
+      throws Exception {
+    // Count the number of documents and gather per-column statistics
+    LOGGER.debug("Start building StatsCollector!");
+    buildIndexCreationInfo();
+    LOGGER.info("Finished building StatsCollector!");
+    LOGGER.info("Collected stats for {} documents", _totalDocs);
+
+    try {
+      // Initialize the index creation using the per-column statistics information
+      // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
+      //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
+      _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir);
+
+      // Build the indexes
+      LOGGER.info("Start building Index by column");
+
+      TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
+
+      // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
+      //    removed from this code.
+      int[] sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
+      for (String col : columns) {
+        _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
+      }
+    } catch (Exception e) {
+      _indexCreator.close();
+      throw e;
+    } finally {
+      // The record reader is created by the `init` method and needs to be closed and
+      // cleaned up even by the Column Mode builder.
+      _recordReader.close();
+    }
+
+    // TODO: Using column oriented, we can't catch incomplete records.  Does that matter?
+
+    LOGGER.info("Finished records indexing by column in IndexCreator!");
+
+    handlePostCreation();
+  }
+
   private void handlePostCreation()
       throws Exception {
     ColumnStatistics timeColumnStatistics = _segmentStats.getColumnProfileFor(_config.getTimeColumnName());
@@ -285,8 +335,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         // When totalDoc is 0, check whether 'failOnEmptySegment' option is true. If so, directly fail the segment
         // creation.
         Preconditions.checkArgument(!_config.isFailOnEmptySegment(),
-            "Failing the empty segment creation as the option 'failOnEmptySegment' is set to: " + _config
-                .isFailOnEmptySegment());
+            "Failing the empty segment creation as the option 'failOnEmptySegment' is set to: "
+                + _config.isFailOnEmptySegment());
         // Generate a unique name for a segment with no rows
         long now = System.currentTimeMillis();
         _segmentName = _config.getSegmentNameGenerator().generateSegmentName(sequenceId, now, now);
@@ -344,12 +394,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc, creationTime);
 
-    LOGGER.info("Driver, record read time : {}", _totalRecordReadTime);
+    LOGGER.info("Driver, record read time : {}", TimeUnit.NANOSECONDS.toMillis(_totalRecordReadTimeNs));
     LOGGER.info("Driver, stats collector time : {}", _totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", _totalIndexTime);
   }
 
-  private void updatePostSegmentCreationIndexes(File indexDir) throws Exception {
+  private void updatePostSegmentCreationIndexes(File indexDir)
+      throws Exception {
     Set<IndexType> postSegCreationIndexes = IndexService.getInstance().getAllIndexes().stream()
         .filter(indexType -> indexType.getIndexBuildLifecycle() == IndexType.BuildLifecycle.POST_SEGMENT_CREATION)
         .collect(Collectors.toSet());
@@ -459,11 +510,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       if (storedType == DataType.BYTES) {
         defaultNullValue = new ByteArray((byte[]) defaultNullValue);
       }
-      boolean createDictionary = !rawIndexCreationColumns.contains(columnName)
-          && !rawIndexCompressionTypeKeys.contains(columnName);
+      boolean createDictionary =
+          !rawIndexCreationColumns.contains(columnName) && !rawIndexCompressionTypeKeys.contains(columnName);
       _indexCreationInfoMap.put(columnName,
-          new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary,
-              false/*isAutoGenerated*/, defaultNullValue));
+          new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary, false/*isAutoGenerated*/,
+              defaultNullValue));
     }
     _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
   }
@@ -477,8 +528,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Deprecated
   public static boolean shouldUseVarLengthDictionary(String columnName, Set<String> varLengthDictColumns,
       DataType columnStoredType, ColumnStatistics columnProfile) {
-    return DictionaryIndexType.shouldUseVarLengthDictionary(
-        columnName, varLengthDictColumns, columnStoredType, columnProfile);
+    return DictionaryIndexType.shouldUseVarLengthDictionary(columnName, varLengthDictColumns, columnStoredType,
+        columnProfile);
   }
 
   /**

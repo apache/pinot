@@ -125,6 +125,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws Exception {
     String query;
     String h2Query;
+    // Literal early evaluation
+    query = "SELECT DATETIMECONVERT(1697762729000, '1:MILLISECONDS:EPOCH', '1:DAYS:EPOCH', '1:DAYS') from mytable";
+    h2Query = "SELECT 19650";
+    testQuery(query, h2Query);
 
     // SUM INTEGER result will be BIGINT
     query = "SELECT SUM(ActualElapsedTime) FROM mytable";
