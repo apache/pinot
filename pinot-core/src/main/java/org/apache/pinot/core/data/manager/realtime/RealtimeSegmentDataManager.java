@@ -934,7 +934,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
       segmentZKPropsConfig.setStartOffset(_segmentZKMetadata.getStartOffset());
       segmentZKPropsConfig.setEndOffset(_currentOffset.toString());
-      // lets convert the segment now
+      // let's convert the segment now
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
               _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
@@ -951,8 +951,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
       final long buildTimeMillis = now() - lockAcquireTimeMillis;
       final long waitTimeMillis = lockAcquireTimeMillis - startTimeMillis;
-      _segmentLogger
-          .info("Successfully built segment in {} ms, after lockWaitTime {} ms", buildTimeMillis, waitTimeMillis);
+      _segmentLogger.info("Successfully built segment (Column Mode: {}) in {} ms, after lockWaitTime {} ms",
+          converter.isColumnMajorEnabled(), buildTimeMillis, waitTimeMillis);
 
       File dataDir = new File(_resourceDataDir);
       File indexDir = new File(dataDir, _segmentNameStr);

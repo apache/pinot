@@ -34,6 +34,9 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("All configs for the streams from which to ingest")
   private final List<Map<String, String>> _streamConfigMaps;
 
+  @JsonPropertyDescription("Whether to use column major mode when creating the segment.")
+  private boolean _columnMajorSegmentBuilderEnabled;
+
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
     _streamConfigMaps = streamConfigMaps;
@@ -41,5 +44,13 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public List<Map<String, String>> getStreamConfigMaps() {
     return _streamConfigMaps;
+  }
+
+  public void setColumnMajorSegmentBuilderEnabled(boolean enableColumnMajorSegmentCreation) {
+    _columnMajorSegmentBuilderEnabled = enableColumnMajorSegmentCreation;
+  }
+
+  public boolean getColumnMajorSegmentBuilderEnabled() {
+    return _columnMajorSegmentBuilderEnabled;
   }
 }
