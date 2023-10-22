@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.ColumnContext;
@@ -34,7 +33,7 @@ import org.roaringbitmap.RoaringBitmap;
  * The <code>JsonExtractIndexTransformFunction</code> provides the same behavior as JsonExtractScalar, with the
  * implementation changed to read values from the JSON index. For large JSON blobs this can be faster than parsing
  * GBs of JSON at query time. For small JSON blobs/highly filtered input this is generally slower than the *scalar
- * implementation.
+ * implementation. The inflection point is highly dependent on the number of docs remaining post filter.
  */
 public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractIndex";
@@ -44,7 +43,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   private TransformResultMetadata _resultMetadata;
   private JsonIndexReader _jsonIndexReader;
   private Object _defaultValue;
-  private Map<Object, RoaringBitmap> _postingListCache;
+  private Map<String, RoaringBitmap> _jsonIndexReaderContext;
 
   @Override
   public String getName() {
@@ -61,36 +60,41 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     }
 
     TransformFunction firstArgument = arguments.get(0);
-    if (firstArgument instanceof LiteralTransformFunction || !firstArgument.getResultMetadata().isSingleValue()) {
-      throw new IllegalArgumentException(
-          "The first argument of jsonExtractIndex transform function must be a single-valued column or a transform "
-              + "function");
-    }
     if (firstArgument instanceof IdentifierTransformFunction) {
       String columnName = ((IdentifierTransformFunction) firstArgument).getColumnName();
-      if (columnContextMap.containsKey(columnName)) {
-        _jsonIndexReader = columnContextMap.get(columnName).getDataSource().getJsonIndex();
-        if (_jsonIndexReader == null) {
-          throw new UnsupportedOperationException("jsonExtractIndex can only be applied on a column with JSON index");
-        }
+      _jsonIndexReader = columnContextMap.get(columnName).getDataSource().getJsonIndex();
+      if (_jsonIndexReader == null) {
+        throw new IllegalStateException("jsonExtractIndex can only be applied on a column with JSON index");
       }
     } else {
       throw new IllegalArgumentException("jsonExtractIndex can only be applied to a raw column");
     }
     _jsonFieldTransformFunction = firstArgument;
-    _jsonPathString = ((LiteralTransformFunction) arguments.get(1)).getStringLiteral().substring(1); // remove $ prefix
-    String resultsType = ((LiteralTransformFunction) arguments.get(2)).getStringLiteral().toUpperCase();
+    TransformFunction secondArgument = arguments.get(1);
+    if (!(secondArgument instanceof LiteralTransformFunction)) {
+      throw new IllegalArgumentException("JSON path argument must be a literal");
+    }
+    _jsonPathString = ((LiteralTransformFunction) secondArgument).getStringLiteral().substring(1); // remove $ prefix
+    TransformFunction thirdArgument = arguments.get(2);
+    if (!(thirdArgument instanceof LiteralTransformFunction)) {
+      throw new IllegalArgumentException("Result type argument must be a literal");
+    }
+    String resultsType = ((LiteralTransformFunction) thirdArgument).getStringLiteral().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
     if (!isSingleValue) {
       throw new IllegalArgumentException("jsonExtractIndex only supports single value type");
     }
     DataType dataType = DataType.valueOf(resultsType);
     if (arguments.size() == 4) {
-      _defaultValue = dataType.convert(((LiteralTransformFunction) arguments.get(3)).getStringLiteral());
+      TransformFunction fourthArgument = arguments.get(3);
+      if (!(fourthArgument instanceof LiteralTransformFunction)) {
+        throw new IllegalArgumentException("Default value must be a literal");
+      }
+      _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
     }
 
     _resultMetadata = new TransformResultMetadata(dataType, true, false);
-    _postingListCache = new HashMap<>();
+    _jsonIndexReaderContext = _jsonIndexReader.getMatchingDocsMap(_jsonPathString);
   }
 
   @Override
@@ -104,7 +108,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initIntValuesSV(numDocs);
     String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(_jsonPathString, valueBlock.getDocIds(), _postingListCache);
+        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _jsonIndexReaderContext);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[inputDocIds[i]];
       if (value == null) {
@@ -126,7 +130,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initLongValuesSV(numDocs);
     String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(_jsonPathString, valueBlock.getDocIds(), _postingListCache);
+        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _jsonIndexReaderContext);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -148,7 +152,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initFloatValuesSV(numDocs);
     String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(_jsonPathString, valueBlock.getDocIds(), _postingListCache);
+        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _jsonIndexReaderContext);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -170,7 +174,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initDoubleValuesSV(numDocs);
     String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(_jsonPathString, valueBlock.getDocIds(), _postingListCache);
+        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _jsonIndexReaderContext);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -192,7 +196,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initBigDecimalValuesSV(numDocs);
     String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(_jsonPathString, valueBlock.getDocIds(), _postingListCache);
+        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _jsonIndexReaderContext);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -214,7 +218,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int[] inputDocIds = valueBlock.getDocIds();
     initStringValuesSV(numDocs);
     String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(_jsonPathString, valueBlock.getDocIds(), _postingListCache);
+        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _jsonIndexReaderContext);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {

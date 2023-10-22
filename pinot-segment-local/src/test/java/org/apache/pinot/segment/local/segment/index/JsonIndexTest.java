@@ -303,6 +303,7 @@ public class JsonIndexTest {
     };
     // CHECKSTYLE:ON
     // @formatter: on
+    String[] testKeys = new String[]{".field1", ".field2", ".field3", ".field4"};
 
     String colName = "col";
     try (
@@ -320,85 +321,52 @@ public class JsonIndexTest {
       try (PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
           ImmutableJsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer,
               records.length)) {
+
         // No filtering
         int[] docMask = new int[]{0, 1, 2};
+        String[][] expectedValues =
+            new String[][]{{"value1", "value2", "value1"}, {"value2", null, "value4"}, {"value3", null, null},
+                {null, null, null}};
+        for (int i = 0; i < testKeys.length; i++) {
+          Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingDocsMap(testKeys[i]);
+          String[] values = offHeapIndexReader.getValuesForKeyAndDocs(docMask, context);
+          Assert.assertEquals(values, expectedValues[i]);
 
-        // Immutable index
-        Map<Object, RoaringBitmap> cache = new HashMap<>();
-        String[] values = offHeapIndexReader.getValuesForKeyAndDocs(".field1", docMask, cache);
-        Assert.assertEquals(values, new String[]{"value1", "value2", "value1"});
-        cache.clear();
-        values = offHeapIndexReader.getValuesForKeyAndDocs(".field2", docMask, cache);
-        Assert.assertEquals(values, new String[]{"value2", null, "value4"});
-        cache.clear();
-        values = offHeapIndexReader.getValuesForKeyAndDocs(".field3", docMask, cache);
-        Assert.assertEquals(values, new String[]{"value3", null, null});
-        cache.clear();
-        values = offHeapIndexReader.getValuesForKeyAndDocs(".field4", docMask, cache);
-        Assert.assertEquals(values, new String[]{null, null, null});
-
-        // Mutable index
-        cache.clear();
-        values = mutableJsonIndex.getValuesForKeyAndDocs(".field1", docMask, cache);
-        Assert.assertEquals(values, new String[]{"value1", "value2", "value1"});
-        cache.clear();
-        values = mutableJsonIndex.getValuesForKeyAndDocs(".field2", docMask, cache);
-        Assert.assertEquals(values, new String[]{"value2", null, "value4"});
-        cache.clear();
-        values = mutableJsonIndex.getValuesForKeyAndDocs(".field3", docMask, cache);
-        Assert.assertEquals(values, new String[]{"value3", null, null});
-        cache.clear();
-        values = mutableJsonIndex.getValuesForKeyAndDocs(".field4", docMask, cache);
-        Assert.assertEquals(values, new String[]{null, null, null});
+          context = mutableJsonIndex.getMatchingDocsMap(testKeys[i]);
+          values = mutableJsonIndex.getValuesForKeyAndDocs(docMask, context);
+          Assert.assertEquals(values, expectedValues[i]);
+        }
 
         // Some filtering
         docMask = new int[]{1, 2};
+        expectedValues = new String[][]{{"value2", "value1"}, {null, "value4"}, {null, null}, {null, null}};
+        for (int i = 0; i < testKeys.length; i++) {
+          Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingDocsMap(testKeys[i]);
+          String[] values = offHeapIndexReader.getValuesForKeyAndDocs(docMask, context);
+          Assert.assertEquals(values, expectedValues[i]);
 
-        // Immutable index
-        cache.clear();
-        values = offHeapIndexReader.getValuesForKeyAndDocs(".field1", docMask, cache);
-        Assert.assertEquals(values, new String[]{"value2", "value1"});
-        cache.clear();
-        values = offHeapIndexReader.getValuesForKeyAndDocs(".field2", docMask, cache);
-        Assert.assertEquals(values, new String[]{null, "value4"});
-        cache.clear();
-        values = offHeapIndexReader.getValuesForKeyAndDocs(".field3", docMask, cache);
-        Assert.assertEquals(values, new String[]{null, null});
-        cache.clear();
-        values = offHeapIndexReader.getValuesForKeyAndDocs(".field4", docMask, cache);
-        Assert.assertEquals(values, new String[]{null, null});
+          context = mutableJsonIndex.getMatchingDocsMap(testKeys[i]);
+          values = mutableJsonIndex.getValuesForKeyAndDocs(docMask, context);
+          Assert.assertEquals(values, expectedValues[i]);
+        }
 
-        // Mutable index
-        cache.clear();
-        values = mutableJsonIndex.getValuesForKeyAndDocs(".field1", docMask, cache);
-        Assert.assertEquals(values, new String[]{"value2", "value1"});
-        cache.clear();
-        values = mutableJsonIndex.getValuesForKeyAndDocs(".field2", docMask, cache);
-        Assert.assertEquals(values, new String[]{null, "value4"});
-        cache.clear();
-        values = mutableJsonIndex.getValuesForKeyAndDocs(".field3", docMask, cache);
-        Assert.assertEquals(values, new String[]{null, null});
-        cache.clear();
-        values = mutableJsonIndex.getValuesForKeyAndDocs(".field4", docMask, cache);
-        Assert.assertEquals(values, new String[]{null, null});
-
-        // Immutable index, cache is not cleared and is therefore used for the second lookup
-        cache.clear();
-        docMask = new int[]{1, 2};
-        values = offHeapIndexReader.getValuesForKeyAndDocs(".field1", docMask, cache);
-        Assert.assertEquals(values, new String[]{"value2", "value1"});
+        // Immutable index, context is reused for the second method call
+        Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingDocsMap(".field1");
         docMask = new int[]{0};
-        values = offHeapIndexReader.getValuesForKeyAndDocs(".field1", docMask, cache);
+        String[] values = offHeapIndexReader.getValuesForKeyAndDocs(docMask, context);
         Assert.assertEquals(values, new String[]{"value1"});
-
-        // Mutable index, cache is not cleared and is therefore used for the second lookup
-        cache.clear();
         docMask = new int[]{1, 2};
-        values = mutableJsonIndex.getValuesForKeyAndDocs(".field1", docMask, cache);
+        values = offHeapIndexReader.getValuesForKeyAndDocs(docMask, context);
         Assert.assertEquals(values, new String[]{"value2", "value1"});
+
+        // Mutable index, context is reused for the second method call
+        context = mutableJsonIndex.getMatchingDocsMap(".field1");;
         docMask = new int[]{0};
-        values = mutableJsonIndex.getValuesForKeyAndDocs(".field1", docMask, cache);
+        values = mutableJsonIndex.getValuesForKeyAndDocs(docMask, context);
         Assert.assertEquals(values, new String[]{"value1"});
+        docMask = new int[]{1, 2};
+        values = mutableJsonIndex.getValuesForKeyAndDocs(docMask, context);
+        Assert.assertEquals(values, new String[]{"value2", "value1"});
       }
     }
   }

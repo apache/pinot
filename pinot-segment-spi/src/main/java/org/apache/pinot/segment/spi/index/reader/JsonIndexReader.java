@@ -35,11 +35,16 @@ public interface JsonIndexReader extends IndexReader {
   MutableRoaringBitmap getMatchingDocIds(String filterString);
 
   /**
-   * For a JSON key and array of docIds, returns the corresponding values for each docId.
-   * This method takes a map as input which is used to cache the posting list for each dictId/value. It will be
-   * populated if empty, otherwise it will be used to avoid reading and converting the posting list of flattened docs
+   * For an array of docIds and context specific to a JSON key, returns the corresponding values for each docId. The
+   * context should be created from the getMatchingDocsMap method.
    *
    * @return String[] where String[i] is the value for docIds[i]
    */
-  String[] getValuesForKeyAndDocs(String key, int[] docIds, Map<Object, RoaringBitmap> cache);
+  String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> context);
+
+  /**
+   * For a JSON key, returns a Map from each value to the docId posting list. This map should be  used to avoid reading
+   * and converting the posting list of flattened docIds to real docIds
+   */
+  Map<String, RoaringBitmap> getMatchingDocsMap(String key);
 }
