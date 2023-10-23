@@ -92,15 +92,14 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable> extends Base
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    RoaringBitmap nullBitmap = null;
     if (_nullHandlingEnabled) {
-      nullBitmap = blockValSet.getNullBitmap();
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateArrayGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
+        aggregateArrayGroupBySVWithNull(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
         return;
       }
     }
-    aggregateArrayGroupBySVWithNull(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
+    aggregateArrayGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
   }
 
   protected abstract void aggregateArrayGroupBySV(int length, int[] groupKeyArray,

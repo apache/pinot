@@ -23,7 +23,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -59,12 +58,12 @@ public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongO
   }
 
   @Override
-  protected void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, long value) {
-    ObjectGroupByResultHolder resultHolder = (ObjectGroupByResultHolder) groupByResultHolder;
-    if (resultHolder.getResult(groupKey) == null) {
-      resultHolder.setValueForKey(groupKey, new LongOpenHashSet());
+  protected void setGroupByResult(GroupByResultHolder resultHolder, int groupKey, long value) {
+    LongOpenHashSet valueSet = resultHolder.getResult(groupKey);
+    if (valueSet == null) {
+      valueSet = new LongOpenHashSet();
+      resultHolder.setValueForKey(groupKey, valueSet);
     }
-    LongOpenHashSet groupValue = resultHolder.getResult(groupKey);
-    groupValue.add(value);
+    valueSet.add(value);
   }
 }

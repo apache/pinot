@@ -24,7 +24,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -37,7 +36,7 @@ public class ArrayAggStringFunction extends BaseArrayAggStringFunction<ObjectArr
   protected void aggregateArray(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
     ObjectArrayList<String> valueArray = new ObjectArrayList<>(length);
     String[] value = blockValSet.getStringValuesSV();
-    valueArray.addAll(Arrays.asList(value).subList(0, length));
+    valueArray.addAll(Arrays.asList(value));
     aggregationResultHolder.setValue(valueArray);
   }
 
@@ -55,15 +54,12 @@ public class ArrayAggStringFunction extends BaseArrayAggStringFunction<ObjectArr
   }
 
   @Override
-  protected void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, String value) {
-    ObjectGroupByResultHolder resultHolder = (ObjectGroupByResultHolder) groupByResultHolder;
-    if (resultHolder.getResult(groupKey) == null) {
-      ObjectArrayList<String> valueArray = new ObjectArrayList<>();
-      valueArray.add(value);
+  protected void setGroupByResult(GroupByResultHolder resultHolder, int groupKey, String value) {
+    ObjectArrayList<String> valueArray = resultHolder.getResult(groupKey);
+    if (valueArray == null) {
+      valueArray = new ObjectArrayList<>();
       resultHolder.setValueForKey(groupKey, valueArray);
-    } else {
-      ObjectArrayList<String> valueArray = resultHolder.getResult(groupKey);
-      valueArray.add(value);
     }
+    valueArray.add(value);
   }
 }
