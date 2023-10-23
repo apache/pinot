@@ -268,20 +268,27 @@ public class PinotTableRestletResource {
   @Path("/tables")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE)
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
-  public String listTables(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
+  public String listTables(@ApiParam(value = "realtime|offline|dimension") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
       @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") String sortTypeStr,
       @ApiParam(value = "true|false") @QueryParam("sortAsc") @DefaultValue("true") boolean sortAsc) {
     try {
+      final boolean isDimensionTable = StringUtils.equalsIgnoreCase(tableTypeStr, "dimension");
       TableType tableType = null;
-      if (tableTypeStr != null) {
+      if (isDimensionTable) {
+        // Set the table type to OFFLINE for all sorting related operations
+        tableType = TableType.OFFLINE;
+      } else if (tableTypeStr != null) {
         tableType = TableType.valueOf(tableTypeStr.toUpperCase());
       }
       SortType sortType = sortTypeStr != null ? SortType.valueOf(sortTypeStr.toUpperCase()) : SortType.NAME;
 
-      List<String> tableNamesWithType = tableType == null ? _pinotHelixResourceManager.getAllTables()
-          : (tableType == TableType.REALTIME ? _pinotHelixResourceManager.getAllRealtimeTables()
-              : _pinotHelixResourceManager.getAllOfflineTables());
+      // If tableTypeStr is dimension, then tableType is set to TableType.OFFLINE.
+      // So, checking the isDimensionTable to get the list of dimension tables only.
+      List<String> tableNamesWithType = isDimensionTable ? _pinotHelixResourceManager.getAllDimensionTables()
+          : tableType == null ? _pinotHelixResourceManager.getAllTables()
+              : (tableType == TableType.REALTIME ? _pinotHelixResourceManager.getAllRealtimeTables()
+                  : _pinotHelixResourceManager.getAllOfflineTables());
 
       if (StringUtils.isNotBlank(taskType)) {
         Set<String> tableNamesForTaskType = new HashSet<>();

@@ -730,6 +730,24 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all dimension table names.
+   *
+   * @return List of dimension table names
+   */
+  public List<String> getAllDimensionTables() {
+    List<String> dimensionTableNames = new ArrayList<>();
+    for (String resourceName : getAllResources()) {
+      if (TableNameBuilder.isOfflineTableResource(resourceName)) {
+        final TableConfig tableConfig = getTableConfig(resourceName);
+        if (tableConfig != null && tableConfig.isDimTable()) {
+          dimensionTableNames.add(resourceName);
+        }
+      }
+    }
+    return dimensionTableNames;
+  }
+
+  /**
    * Get all realtime table names.
    *
    * @return List of realtime table names
