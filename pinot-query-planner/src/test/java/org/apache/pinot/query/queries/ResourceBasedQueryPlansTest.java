@@ -45,12 +45,14 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
 
   @Test(dataProvider = "testResourceQueryPlannerTestCaseProviderHappyPath")
-  public void testQueryExplainPlansAndQueryPlanConversion(String testCaseName, String query, String output) {
+  public void testQueryExplainPlansAndQueryPlanConversion(String testCaseName, String description, String query,
+      String output) {
     try {
       long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
       String explainedPlan = _queryEnvironment.explainQuery(query, requestId);
       Assert.assertEquals(explainedPlan, output,
-          String.format("Test case %s for query %s doesn't match expected output: %s", testCaseName, query, output));
+          String.format("Test case %s for query %s (%s) doesn't match expected output: %s", testCaseName, description,
+              query, output));
       String queryWithoutExplainPlan = query.replace("EXPLAIN PLAN FOR ", "");
       DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(queryWithoutExplainPlan);
       Assert.assertNotNull(dispatchableSubPlan,
@@ -102,7 +104,7 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
           String sql = queryCase._sql;
           List<String> orgOutput = queryCase._output;
           String concatenatedOutput = StringUtils.join(orgOutput, "");
-          Object[] testEntry = new Object[]{testCaseName, sql, concatenatedOutput};
+          Object[] testEntry = new Object[]{testCaseName, queryCase._description, sql, concatenatedOutput};
           providerContent.add(testEntry);
         }
       }
