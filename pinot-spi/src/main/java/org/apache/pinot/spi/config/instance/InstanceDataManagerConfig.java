@@ -68,4 +68,10 @@ public interface InstanceDataManagerConfig {
   long getExternalViewDroppedMaxWaitMs();
 
   long getExternalViewDroppedCheckIntervalMs();
+
+  String getUpsertDefaultMetadataManagerClass();
+
+  String getUpsertDefaultEnableSnapshot();
+
+  String getUpsertDefaultEnablePreload();
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -32,13 +33,18 @@ public class TableUpsertMetadataManagerFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableUpsertMetadataManagerFactory.class);
 
-  public static TableUpsertMetadataManager create(TableConfig tableConfig) {
+  public static TableUpsertMetadataManager create(TableConfig tableConfig,
+      @Nullable String defaultMetadataManagerClass) {
     String tableNameWithType = tableConfig.getTableName();
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     Preconditions.checkArgument(upsertConfig != null, "Must provide upsert config for table: %s", tableNameWithType);
 
     TableUpsertMetadataManager metadataManager;
-    String metadataManagerClass = upsertConfig.getMetadataManagerClass();
+    String tableMetadataManagerClass = upsertConfig.getMetadataManagerClass();
+
+    // Use the default metadata manager class mentioned in the server config if the table config does not specify one.
+    String metadataManagerClass = tableMetadataManagerClass != null ? tableMetadataManagerClass
+        : defaultMetadataManagerClass;
     if (StringUtils.isNotEmpty(metadataManagerClass)) {
       LOGGER.info("Creating TableUpsertMetadataManager with class: {} for table: {}", metadataManagerClass,
           tableNameWithType);

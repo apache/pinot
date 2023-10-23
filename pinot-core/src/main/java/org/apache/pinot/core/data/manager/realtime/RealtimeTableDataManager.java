@@ -207,7 +207,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
       // NOTE: Set _tableUpsertMetadataManager before initializing it because when preloading is enabled, we need to
       //       load segments into it
-      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig);
+      String defaultMetadataManagerClass =
+          _tableDataManagerConfig.getInstanceDataManagerConfig().getUpsertDefaultMetadataManagerClass();
+      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig, defaultMetadataManagerClass);
       _tableUpsertMetadataManager.init(tableConfig, schema, this, _helixManager, _segmentPreloadExecutor);
     }
 

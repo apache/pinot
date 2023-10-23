@@ -96,7 +96,7 @@ public class MutableSegmentImplUpsertTest {
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
-    TableUpsertMetadataManager tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(_tableConfig);
+    TableUpsertMetadataManager tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(_tableConfig, null);
     tableUpsertMetadataManager.init(_tableConfig, _schema, _tableDataManager, mock(HelixManager.class),
         mock(ExecutorService.class));
     _partitionUpsertMetadataManager = tableUpsertMetadataManager.getOrCreatePartitionManager(0);

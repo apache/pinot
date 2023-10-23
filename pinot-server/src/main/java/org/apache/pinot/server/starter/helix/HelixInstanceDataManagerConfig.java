@@ -131,6 +131,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = "external.view.dropped.max.wait.ms";
   private static final String EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = "external.view.dropped.check.interval.ms";
 
+  public static final String UPSERT_DEFAULT_METADATA_MANAGER_CLASS = "upsert.default.metadata.manager.class";
+  public static final String UPSERT_DEFAULT_ENABLE_SNAPSHOT = "upsert.default.enable.snapshot";
+  public static final String UPSERT_DEFAULT_ENABLE_PRELOAD = "upsert.default.enable.preload";
+
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
@@ -292,6 +296,21 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public long getExternalViewDroppedCheckIntervalMs() {
     return _instanceDataManagerConfiguration.getProperty(EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS,
         DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS);
+  }
+
+  @Override
+  public String getUpsertDefaultMetadataManagerClass() {
+    return _instanceDataManagerConfiguration.getProperty(UPSERT_DEFAULT_METADATA_MANAGER_CLASS);
+  }
+
+  @Override
+  public String getUpsertDefaultEnableSnapshot() {
+    return _instanceDataManagerConfiguration.getProperty(UPSERT_DEFAULT_ENABLE_SNAPSHOT);
+  }
+
+  @Override
+  public String getUpsertDefaultEnablePreload() {
+    return _instanceDataManagerConfiguration.getProperty(UPSERT_DEFAULT_ENABLE_PRELOAD);
   }
 
   @Override
