@@ -157,13 +157,13 @@ public class ConsumingSegmentInfoReader {
         }
 
         // Check if any responses are missing
-        Set<String> serversForSegment = _pinotHelixResourceManager.getServersForSegment(tableNameWithType, segmentName);
-        if (serversForSegment.size() != consumingSegmentInfoList.size()) {
+        Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
+        if (servers.size() != consumingSegmentInfoList.size()) {
           Set<String> serversResponded =
               consumingSegmentInfoList.stream().map(c -> c._serverName).collect(Collectors.toSet());
-          serversForSegment.removeAll(serversResponded);
+          servers.removeAll(serversResponded);
           String errorMessage =
-              "Not all servers responded for segment: " + segmentName + " Missing servers : " + serversForSegment;
+              "Not all servers responded for segment: " + segmentName + " Missing servers : " + servers;
           return TableStatus.IngestionStatus.newIngestionStatus(TableStatus.IngestionState.UNHEALTHY, errorMessage);
         }
 

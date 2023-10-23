@@ -101,6 +101,30 @@ public class QueryOptionsUtils {
     }
   }
 
+  @Nullable
+  public static Long getMaxServerResponseSizeBytes(Map<String, String> queryOptions) {
+    String responseSize = queryOptions.get(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES);
+    if (responseSize != null) {
+      long maxSize = Long.parseLong(responseSize);
+      Preconditions.checkState(maxSize > 0, "maxServerResponseSize must be positive. got %s", maxSize);
+      return maxSize;
+    }
+
+    return null;
+  }
+
+  @Nullable
+  public static Long getMaxQueryResponseSizeBytes(Map<String, String> queryOptions) {
+    String responseSize = queryOptions.get(QueryOptionKey.MAX_QUERY_RESPONSE_SIZE_BYTES);
+    if (responseSize != null) {
+      long maxSize = Long.parseLong(responseSize);
+      Preconditions.checkState(maxSize > 0, "maxQueryResponseSize must be positive. got %s", maxSize);
+      return maxSize;
+    }
+
+    return null;
+  }
+
   public static boolean isAndScanReorderingEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.AND_SCAN_REORDERING));
   }

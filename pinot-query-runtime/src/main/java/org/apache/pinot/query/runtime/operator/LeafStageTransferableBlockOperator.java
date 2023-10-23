@@ -46,6 +46,7 @@ import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
+import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -149,12 +150,16 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
 
   private Future<Void> startExecution() {
     ResultsBlockConsumer resultsBlockConsumer = new ResultsBlockConsumer();
+    ServerQueryLogger queryLogger = ServerQueryLogger.getInstance();
     return _executorService.submit(() -> {
       try {
         if (_requests.size() == 1) {
           ServerQueryRequest request = _requests.get(0);
           InstanceResponseBlock instanceResponseBlock =
               _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
+          if (queryLogger != null) {
+            queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
+          }
           // TODO: Revisit if we should treat all exceptions as query failure. Currently MERGE_RESPONSE_ERROR and
           //       SERVER_SEGMENT_MISSING_ERROR are counted as query failure.
           Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
@@ -180,6 +185,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
               try {
                 InstanceResponseBlock instanceResponseBlock =
                     _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
+                if (queryLogger != null) {
+                  queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
+                }
                 Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
                 if (!exceptions.isEmpty()) {
                   // Drain the latch when receiving exception block and not wait for the other thread to finish

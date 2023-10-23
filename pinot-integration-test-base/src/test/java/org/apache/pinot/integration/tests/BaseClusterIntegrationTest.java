@@ -246,7 +246,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected QueryConfig getQueryConfig() {
     // Enable groovy for tables used in the tests
-    return new QueryConfig(null, false, null, null);
+    return new QueryConfig(null, false, null, null, null, null);
   }
 
   protected boolean getNullHandlingEnabled() {

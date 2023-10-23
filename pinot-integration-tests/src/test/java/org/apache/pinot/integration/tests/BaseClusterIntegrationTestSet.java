@@ -27,7 +27,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
@@ -126,6 +125,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws Exception {
     String query;
     String h2Query;
+    // Literal early evaluation
+    query = "SELECT DATETIMECONVERT(1697762729000, '1:MILLISECONDS:EPOCH', '1:DAYS:EPOCH', '1:DAYS') from mytable";
+    h2Query = "SELECT 19650";
+    testQuery(query, h2Query);
 
     // SUM INTEGER result will be BIGINT
     query = "SELECT SUM(ActualElapsedTime) FROM mytable";
@@ -655,8 +658,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String response =
         sendPostRequest(_controllerRequestURLBuilder.forTableReload(tableName, tableType, forceDownload), null);
     String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
-    JsonNode tableLevelDetails =
-        JsonUtils.stringToJsonNode(StringEscapeUtils.unescapeJava(response.split(": ")[1])).get(tableNameWithType);
+    JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+    JsonNode tableLevelDetails = JsonUtils.stringToJsonNode(responseJson.get("status").asText()).get(tableNameWithType);
     String isZKWriteSuccess = tableLevelDetails.get("reloadJobMetaZKStorageStatus").asText();
     assertEquals(isZKWriteSuccess, "SUCCESS");
     String jobId = tableLevelDetails.get("reloadJobId").asText();

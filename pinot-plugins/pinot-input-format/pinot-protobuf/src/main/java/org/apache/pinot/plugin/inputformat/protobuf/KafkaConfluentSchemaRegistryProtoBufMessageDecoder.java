@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.protobuf;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Message;
 import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
@@ -30,6 +31,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.config.types.Password;
@@ -56,6 +59,24 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
   private KafkaProtobufDeserializer<Message> _deserializer;
   private RecordExtractor<Message> _protoBufRecordExtractor;
   private String _topicName;
+  @Nullable
+  private final Consumer<Message> _onMessage;
+
+  /**
+   * Creates a new instance of this decoder. This constructor with no argument is usually called by reflection
+   */
+  public KafkaConfluentSchemaRegistryProtoBufMessageDecoder() {
+    _onMessage = null;
+  }
+
+  /**
+   * Creates a new instance of this decoder. This constructor with a Consumer argument is used by test to be able to
+   * analyze the received message.
+   */
+  @VisibleForTesting
+  KafkaConfluentSchemaRegistryProtoBufMessageDecoder(@Nullable Consumer<Message> onMessage) {
+    _onMessage = onMessage;
+  }
 
   private RestService createRestService(String schemaRegistryUrl, Map<String, String> configs) {
     RestService restService = new RestService(schemaRegistryUrl);
@@ -109,6 +130,9 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
   public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
       Message protoMessage = _deserializer.deserialize(_topicName, payload);
+      if (_onMessage != null) {
+        _onMessage.accept(protoMessage);
+      }
       return _protoBufRecordExtractor.extract(protoMessage, destination);
     } catch (RuntimeException e) {
       ignoreOrRethrowException(e);

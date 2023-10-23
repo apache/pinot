@@ -103,6 +103,17 @@ public class ServerConf {
     return _serverConf.getProperty(CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS, DEFAULT_DATA_MANAGER_CLASS);
   }
 
+  public double getQueryLogMaxRate() {
+    Double queryLogMaxRate = _serverConf.getProperty(CONFIG_OF_QUERY_LOG_MAX_RATE, Double.class);
+    return queryLogMaxRate != null ? queryLogMaxRate
+        : _serverConf.getProperty(DEPRECATED_CONFIG_OF_QUERY_LOG_MAX_RATE, DEFAULT_QUERY_LOG_MAX_RATE);
+  }
+
+  public double getQueryLogDroppedReportMaxRate() {
+    return _serverConf.getProperty(CONFIG_OF_QUERY_LOG_DROPPED_REPORT_MAX_RATE,
+        DEFAULT_QUERY_LOG_DROPPED_REPORT_MAX_RATE);
+  }
+
   public String getQueryExecutorClassName() {
     return _serverConf.getProperty(CONFIG_OF_QUERY_EXECUTOR_CLASS, DEFAULT_QUERY_EXECUTOR_CLASS);
   }

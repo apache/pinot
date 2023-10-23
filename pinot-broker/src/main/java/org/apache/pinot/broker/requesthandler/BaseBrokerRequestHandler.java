@@ -688,6 +688,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return responseNative;
       }
 
+      // Set the maximum serialized response size per server
+      int numServers = 0;
+      if (offlineRoutingTable != null) {
+        numServers += offlineRoutingTable.size();
+      }
+      if (realtimeRoutingTable != null) {
+        numServers += realtimeRoutingTable.size();
+      }
+
+      if (offlineBrokerRequest != null) {
+        setMaxServerResponseSizeBytes(numServers, offlineBrokerRequest.getPinotQuery().getQueryOptions(),
+            offlineTableConfig);
+      }
+      if (realtimeBrokerRequest != null) {
+        setMaxServerResponseSizeBytes(numServers, realtimeBrokerRequest.getPinotQuery().getQueryOptions(),
+            realtimeTableConfig);
+      }
+
       // Execute the query
       // TODO: Replace ServerStats with ServerRoutingStatsEntry.
       ServerStats serverStats = new ServerStats();
@@ -1660,6 +1678,71 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
     queryOptions.put(Broker.Request.QueryOptionKey.TIMEOUT_MS, Long.toString(remainingTimeMs));
     return remainingTimeMs;
+  }
+
+  /**
+   * Sets a query option indicating the maximum response size that can be sent from a server to the broker. This size
+   * is measured for the serialized response.
+   */
+  private void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
+      TableConfig tableConfig) {
+    if (numServers == 0) {
+      return;
+    }
+
+    // The overriding order of priority is:
+    // 1. QueryOption  -> maxServerResponseSizeBytes
+    // 2. QueryOption  -> maxQueryResponseSizeBytes
+    // 3. TableConfig  -> maxServerResponseSizeBytes
+    // 4. TableConfig  -> maxQueryResponseSizeBytes
+    // 5. BrokerConfig -> maxServerResponseSizeBytes
+    // 6. BrokerConfig -> maxServerResponseSizeBytes
+
+    // QueryOption
+    if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
+      return;
+    }
+    Long maxQueryResponseSizeQOption = QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions);
+    if (maxQueryResponseSizeQOption != null) {
+      Long maxServerResponseSize = maxQueryResponseSizeQOption / numServers;
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxServerResponseSize));
+      return;
+    }
+
+    // TableConfig
+    Preconditions.checkState(tableConfig != null);
+    QueryConfig queryConfig = tableConfig.getQueryConfig();
+    if (queryConfig != null && queryConfig.getMaxServerResponseSizeBytes() != null) {
+      Long maxServerResponseSize = queryConfig.getMaxServerResponseSizeBytes();
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxServerResponseSize));
+      return;
+    }
+    if (queryConfig != null && queryConfig.getMaxQueryResponseSizeBytes() != null) {
+      Long maxQueryResponseSize = queryConfig.getMaxQueryResponseSizeBytes();
+      Long maxServerResponseSize = maxQueryResponseSize / numServers;
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxServerResponseSize));
+      return;
+    }
+
+    // BrokerConfig
+    Long maxServerResponseSizeCfg = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES,
+        Broker.DEFAULT_MAX_SERVER_RESPONSE_SIZE_BYTES);
+    Long maxQueryResponseSizeCfg = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES,
+        Broker.DEFAULT_MAX_QUERY_RESPONSE_SIZE_BYTES);
+
+    if (maxServerResponseSizeCfg > 0) {
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxServerResponseSizeCfg));
+      return;
+    }
+    if (maxQueryResponseSizeCfg > 0) {
+      Long maxServerResponseSize = maxQueryResponseSizeCfg / numServers;
+      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxServerResponseSize));
+    }
   }
 
   /**

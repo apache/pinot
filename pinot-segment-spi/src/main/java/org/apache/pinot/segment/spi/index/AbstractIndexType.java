@@ -62,7 +62,11 @@ public abstract class AbstractIndexType<C extends IndexConfig, IR extends IndexR
     if (_deserializer == null) {
       _deserializer = createDeserializer();
     }
-    return _deserializer.deserialize(tableConfig, schema);
+    try {
+      return _deserializer.deserialize(tableConfig, schema);
+    } catch (MergedColumnConfigDeserializer.ConfigDeclaredTwiceException ex) {
+      throw new MergedColumnConfigDeserializer.ConfigDeclaredTwiceException(ex.getColumn(), this, ex);
+    }
   }
 
   @Override

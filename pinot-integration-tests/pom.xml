@@ -63,7 +63,7 @@
 
   <profiles>
     <profile>
-      <id>integration-tests-only</id>
+      <id>no-integration-tests</id>
       <activation>
         <activeByDefault>false</activeByDefault>
       </activation>
@@ -73,15 +73,7 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
-              <skipTests>false</skipTests>
-              <excludes>
-                <!-- Covered by FlakyConsumerRealtimeClusterIntegrationTest -->
-                <exclude>**/RealtimeClusterIntegrationTest.java</exclude>
-                <!-- Covered by ConvertToRawIndexMinionClusterIntegrationTest -->
-                <exclude>**/HybridClusterIntegrationTest.java</exclude>
-                <!-- Covered by TlsIntegrationTest -->
-                <exclude>**/BasicAuthRealtimeIntegrationTest.java</exclude>
-              </excludes>
+              <skipTests>true</skipTests>
             </configuration>
           </plugin>
         </plugins>
@@ -139,12 +131,14 @@
                 <include>**/org/apache/pinot/integration/tests/R*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/S*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/T*Test.java</include>
+                <include>**/org/apache/pinot/integration/tests/tpch/*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/U*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/V*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/W*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/X*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/Y*Test.java</include>
                 <include>**/org/apache/pinot/integration/tests/Z*Test.java</include>
+                <include>**/org/apache/pinot/server/realtime/**</include>
               </includes>
             </configuration>
           </plugin>
@@ -166,23 +160,6 @@
               <suiteXmlFiles>
                 <suiteXmlFile>src/test/resources/custom-cluster-integration-test-suite.xml</suiteXmlFile>
               </suiteXmlFiles>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>no-integration-tests</id>
-      <activation>
-        <activeByDefault>false</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>true</skipTests>
             </configuration>
           </plugin>
         </plugins>
