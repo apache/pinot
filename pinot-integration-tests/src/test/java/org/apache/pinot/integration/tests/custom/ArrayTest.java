@@ -67,15 +67,17 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(timestampCol, 'TIMESTAMP') "
             + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 7);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).size(), getCountStarResult());
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).size(), getCountStarResult());
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(2).size(), getCountStarResult());
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(3).size(), getCountStarResult());
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(4).size(), getCountStarResult());
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(5).size(), getCountStarResult());
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(6).size(), getCountStarResult());
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 7);
+    Assert.assertEquals(row.get(0).size(), getCountStarResult());
+    Assert.assertEquals(row.get(1).size(), getCountStarResult());
+    Assert.assertEquals(row.get(2).size(), getCountStarResult());
+    Assert.assertEquals(row.get(3).size(), getCountStarResult());
+    Assert.assertEquals(row.get(4).size(), getCountStarResult());
+    Assert.assertEquals(row.get(5).size(), getCountStarResult());
+    Assert.assertEquals(row.get(6).size(), getCountStarResult());
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -97,16 +99,19 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "GROUP BY groupKey "
             + "LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
-    System.out.println("jsonNode = " + jsonNode);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 8);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(2).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(3).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(4).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(5).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(6).size(), getCountStarResult() / 10);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      Assert.assertEquals(row.size(), 8);
+      Assert.assertEquals(row.get(0).size(), getCountStarResult() / 10);
+      Assert.assertEquals(row.get(1).size(), getCountStarResult() / 10);
+      Assert.assertEquals(row.get(2).size(), getCountStarResult() / 10);
+      Assert.assertEquals(row.get(3).size(), getCountStarResult() / 10);
+      Assert.assertEquals(row.get(4).size(), getCountStarResult() / 10);
+      Assert.assertEquals(row.get(5).size(), getCountStarResult() / 10);
+      Assert.assertEquals(row.get(6).size(), getCountStarResult() / 10);
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -126,15 +131,17 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(timestampCol, 'TIMESTAMP', true) "
             + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 7);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).size(), 2);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(2).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(3).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(4).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(5).size(), getCountStarResult() / 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(6).size(), getCountStarResult() / 10);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 7);
+    Assert.assertEquals(row.get(0).size(), 2);
+    Assert.assertEquals(row.get(1).size(), getCountStarResult() / 10);
+    Assert.assertEquals(row.get(2).size(), getCountStarResult() / 10);
+    Assert.assertEquals(row.get(3).size(), getCountStarResult() / 10);
+    Assert.assertEquals(row.get(4).size(), getCountStarResult() / 10);
+    Assert.assertEquals(row.get(5).size(), getCountStarResult() / 10);
+    Assert.assertEquals(row.get(6).size(), getCountStarResult() / 10);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -157,15 +164,19 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "GROUP BY groupKey "
             + "LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 8);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).size(), 2);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).size(), getCountStarResult() / 100);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(2).size(), getCountStarResult() / 100);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(3).size(), getCountStarResult() / 100);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(4).size(), getCountStarResult() / 100);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(5).size(), getCountStarResult() / 100);
-    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(6).size(), getCountStarResult() / 100);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 10);
+    for (int i = 0; i < 10; i++) {
+      JsonNode row = rows.get(i);
+      Assert.assertEquals(row.size(), 8);
+      Assert.assertEquals(row.get(0).size(), 2);
+      Assert.assertEquals(row.get(1).size(), getCountStarResult() / 100);
+      Assert.assertEquals(row.get(2).size(), getCountStarResult() / 100);
+      Assert.assertEquals(row.get(3).size(), getCountStarResult() / 100);
+      Assert.assertEquals(row.get(4).size(), getCountStarResult() / 100);
+      Assert.assertEquals(row.get(5).size(), getCountStarResult() / 100);
+      Assert.assertEquals(row.get(6).size(), getCountStarResult() / 100);
+    }
   }
 
   @Override
@@ -232,7 +243,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
               record.put(LONG_COLUMN, finalI);
               record.put(FLOAT_COLUMN, finalI + RANDOM.nextFloat());
               record.put(DOUBLE_COLUMN, finalI + RANDOM.nextDouble());
-              record.put(STRING_COLUMN, RandomStringUtils.random(RANDOM.nextInt(100)));
+              record.put(STRING_COLUMN, RandomStringUtils.random(finalI));
               record.put(TIMESTAMP_COLUMN, finalI);
               record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
               return record;
