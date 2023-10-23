@@ -391,12 +391,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
         1L);
     if (_consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
-      _segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after {} attempts",
-          _consecutiveErrorCount, e);
+      _segmentLogger.warn("Stream transient exception when fetching messages, stopping consumption after "
+          + _consecutiveErrorCount + " attempts", e);
       throw e;
     } else {
-      _segmentLogger
-          .warn("Stream transient exception when fetching messages, retrying (count={})", _consecutiveErrorCount, e);
+      _segmentLogger.warn("Stream transient exception when fetching messages, retrying (count="
+          + _consecutiveErrorCount + ")", e);
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       recreateStreamConsumer("Too many transient errors");
     }
@@ -444,6 +444,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         // One such exception seen so far is java.net.SocketTimeoutException
         handleTransientStreamErrors(e);
         continue;
+      } catch (Throwable t) {
+        _segmentLogger.warn("Stream error when fetching messages, stopping consumption", t);
+        throw t;
       }
 
       boolean endCriteriaReached = processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
