@@ -56,12 +56,12 @@ public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
     aggregationResultHolder.setValue(valueArray);
   }
 
-  protected void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, int value) {
-    IntArrayList groupValue = groupByResultHolder.getResult(groupKey);
-    if (groupValue == null) {
-      groupByResultHolder.setValueForKey(groupKey, new IntArrayList(value));
-    } else {
-      groupValue.add(value);
+  protected void setGroupByResult(GroupByResultHolder resultHolder, int groupKey, int value) {
+    IntArrayList valueArray = resultHolder.getResult(groupKey);
+    if (valueArray == null) {
+      valueArray = new IntArrayList();
+      resultHolder.setValueForKey(groupKey, valueArray);
     }
+    valueArray.add(value);
   }
 }

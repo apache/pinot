@@ -44,6 +44,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   private static final String DOUBLE_COLUMN = "doubleCol";
   private static final String STRING_COLUMN = "stringCol";
   private static final String TIMESTAMP_COLUMN = "timestampCol";
+  private static final String GROUP_BY_COLUMN = "groupKey";
 
   @Override
   protected long getCountStarResult() {
@@ -51,7 +52,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
-  public void testQueries(boolean useMultiStageQueryEngine)
+  public void testArrayAggQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query =
@@ -66,7 +67,6 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(timestampCol, 'TIMESTAMP') "
             + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
-    System.out.println(jsonNode);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 7);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).size(), getCountStarResult());
@@ -74,10 +74,43 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(2).size(), getCountStarResult());
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(3).size(), getCountStarResult());
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(4).size(), getCountStarResult());
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(5).size(), getCountStarResult());
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(6).size(), getCountStarResult());
   }
 
   @Test(dataProvider = "useBothQueryEngines")
-  public void testQueryWithDistinct(boolean useMultiStageQueryEngine)
+  public void testArrayAggGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "arrayAgg(boolCol, 'BOOLEAN'), "
+            + "arrayAgg(intCol, 'INT'), "
+            + "arrayAgg(longCol, 'LONG'), "
+            // NOTE: FLOAT array is auto converted to DOUBLE array
+            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE'), " : "arrayAgg(floatCol, 'FLOAT'), ")
+            + "arrayAgg(doubleCol, 'DOUBLE'), "
+            + "arrayAgg(stringCol, 'STRING'), "
+            + "arrayAgg(timestampCol, 'TIMESTAMP'), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    System.out.println("jsonNode = " + jsonNode);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 8);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(2).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(3).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(4).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(5).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(6).size(), getCountStarResult() / 10);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggDistinctQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query =
@@ -93,7 +126,6 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(timestampCol, 'TIMESTAMP', true) "
             + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
-    System.out.println(jsonNode);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 7);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).size(), 2);
@@ -101,6 +133,39 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(2).size(), getCountStarResult() / 10);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(3).size(), getCountStarResult() / 10);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(4).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(5).size(), getCountStarResult() / 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(6).size(), getCountStarResult() / 10);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testArrayAggDistinctGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "arrayAgg(boolCol, 'BOOLEAN', true), "
+            + "arrayAgg(intCol, 'INT', true), "
+            + "arrayAgg(longCol, 'LONG', true), "
+            // NOTE: FLOAT array is auto converted to DOUBLE array
+            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE', true), "
+            : "arrayAgg(floatCol, 'FLOAT', true), ")
+            + "arrayAgg(doubleCol, 'DOUBLE', true), "
+            + "arrayAgg(stringCol, 'STRING', true), "
+            + "arrayAgg(timestampCol, 'TIMESTAMP', true), "
+            + "groupKey "
+            + "FROM %s "
+            + "GROUP BY groupKey "
+            + "LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 10);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).size(), 8);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).size(), 2);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(1).size(), getCountStarResult() / 100);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(2).size(), getCountStarResult() / 100);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(3).size(), getCountStarResult() / 100);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(4).size(), getCountStarResult() / 100);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(5).size(), getCountStarResult() / 100);
+    Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(6).size(), getCountStarResult() / 100);
   }
 
   @Override
@@ -118,6 +183,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         .addSingleValueDimension(DOUBLE_COLUMN, FieldSpec.DataType.DOUBLE)
         .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(TIMESTAMP_COLUMN, FieldSpec.DataType.TIMESTAMP)
+        .addSingleValueDimension(GROUP_BY_COLUMN, FieldSpec.DataType.STRING)
         .build();
   }
 
@@ -144,6 +210,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             null, null),
         new org.apache.avro.Schema.Field(TIMESTAMP_COLUMN,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
+            null, null),
+        new org.apache.avro.Schema.Field(GROUP_BY_COLUMN,
+            org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
             null, null)
     ));
 
@@ -154,16 +223,18 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
       fileWriter.create(avroSchema, avroFile);
       for (int i = 0; i < getCountStarResult(); i++) {
         // add avro record to file
+        int finalI = i;
         fileWriter.append(recordCache.get((int) (i % (getCountStarResult() / 10)), () -> {
               // create avro record
               GenericData.Record record = new GenericData.Record(avroSchema);
               record.put(BOOLEAN_COLUMN, RANDOM.nextBoolean());
-              record.put(INT_COLUMN, RANDOM.nextInt());
-              record.put(LONG_COLUMN, RANDOM.nextLong());
-              record.put(FLOAT_COLUMN, RANDOM.nextFloat());
-              record.put(DOUBLE_COLUMN, RANDOM.nextDouble());
+              record.put(INT_COLUMN, finalI);
+              record.put(LONG_COLUMN, finalI);
+              record.put(FLOAT_COLUMN, finalI + RANDOM.nextFloat());
+              record.put(DOUBLE_COLUMN, finalI + RANDOM.nextDouble());
               record.put(STRING_COLUMN, RandomStringUtils.random(RANDOM.nextInt(100)));
-              record.put(TIMESTAMP_COLUMN, RANDOM.nextLong());
+              record.put(TIMESTAMP_COLUMN, finalI);
+              record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
               return record;
             }
         ));
