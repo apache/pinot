@@ -47,8 +47,8 @@ public class InstancePartitionSelectorFactory {
       case INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR:
         return new InstanceReplicaGroupPartitionSelector(instanceReplicaGroupPartitionConfig, tableNameWithType,
             existingInstancePartitions);
-      case PRE_CONFIGURATION_BASED_PARTITION_SELECTOR:
-        return new PreConfiguredInstancePartitionSelector(instanceReplicaGroupPartitionConfig, tableNameWithType,
+      case MIRROR_SERVER_SET_PARTITION_SELECTOR:
+        return new MirrorServerSetInstancePartitionSelector(instanceReplicaGroupPartitionConfig, tableNameWithType,
             existingInstancePartitions, preConfiguredInstancePartitions);
       default:
         throw new IllegalStateException("Unexpected PartitionSelector: " + partitionSelector + ", should be from"

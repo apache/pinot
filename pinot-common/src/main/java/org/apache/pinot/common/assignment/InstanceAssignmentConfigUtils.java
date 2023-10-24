@@ -132,6 +132,6 @@ public class InstanceAssignmentConfigUtils {
     return tableConfig.getInstanceAssignmentConfigMap().get(instancePartitionsType.toString()) != null
         && InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, instancePartitionsType)
         .getPartitionSelector()
-        == InstanceAssignmentConfig.PartitionSelector.PRE_CONFIGURATION_BASED_PARTITION_SELECTOR;
+        == InstanceAssignmentConfig.PartitionSelector.MIRROR_SERVER_SET_PARTITION_SELECTOR;
   }
 }

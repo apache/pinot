@@ -38,8 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class PreConfiguredInstancePartitionSelector extends InstancePartitionSelector {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PreConfiguredInstancePartitionSelector.class);
+public class MirrorServerSetInstancePartitionSelector extends InstancePartitionSelector {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MirrorServerSetInstancePartitionSelector.class);
   private final InstancePartitions _preConfiguredInstancePartitions;
 
   // dimensions of target instance partition
@@ -61,7 +61,7 @@ public class PreConfiguredInstancePartitionSelector extends InstancePartitionSel
 
   private final List<List<String>> _existingMirroredServerLists = new ArrayList<>();
 
-  public PreConfiguredInstancePartitionSelector(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
+  public MirrorServerSetInstancePartitionSelector(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
       String tableNameWithType, InstancePartitions existingInstancePartitions,
       InstancePartitions preConfiguredInstancePartitions) {
     super(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions);
