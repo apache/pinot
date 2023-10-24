@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.spi.trace;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 
@@ -32,7 +36,7 @@ public class DefaultRequestContext implements RequestScope {
 
   private int _errorCode = 0;
   private String _query;
-  private String _tableName = DEFAULT_TABLE_NAME;
+  private List<String> _tableNames = new ArrayList<>();
   private long _processingTimeMillis = -1;
   private long _totalDocs;
   private long _numDocsScanned;
@@ -63,6 +67,19 @@ public class DefaultRequestContext implements RequestScope {
 
   private FanoutType _fanoutType;
   private int _numUnavailableSegments;
+  private long _numConsumingSegmentsQueried;
+  private long _numConsumingSegmentsProcessed;
+  private long _numConsumingSegmentsMatched;
+  private long _minConsumingFreshnessTimeMs;
+  private long _numSegmentsPrunedByBroker;
+  private long _numSegmentsPrunedByServer;
+  private long _numSegmentsPrunedInvalid;
+  private long _numSegmentsPrunedByLimit;
+  private long _numSegmentsPrunedByValue;
+  private long _explainPlanNumEmptyFilterSegments;
+  private long _explainPlanNumMatchAllFilterSegments;
+  private Map<String, String> _traceInfo = new HashMap<>();
+  private List<String> _processingExceptions = new ArrayList<>();
 
   public DefaultRequestContext() {
   }
@@ -169,7 +186,12 @@ public class DefaultRequestContext implements RequestScope {
 
   @Override
   public void setTableName(String tableName) {
-    _tableName = tableName;
+    _tableNames.add(tableName);
+  }
+
+  @Override
+  public void setTableNames(List<String> tableNames) {
+    _tableNames.addAll(tableNames);
   }
 
   @Override
@@ -239,7 +261,15 @@ public class DefaultRequestContext implements RequestScope {
 
   @Override
   public String getTableName() {
-    return _tableName;
+    if (_tableNames.size() == 0) {
+      return DEFAULT_TABLE_NAME;
+    }
+    return _tableNames.get(0);
+  }
+
+  @Override
+  public List<String> getTableNames() {
+    return _tableNames;
   }
 
   @Override
@@ -314,7 +344,7 @@ public class DefaultRequestContext implements RequestScope {
 
   @Override
   public boolean hasValidTableName() {
-    return !DEFAULT_TABLE_NAME.equals(_tableName);
+    return !_tableNames.isEmpty();
   }
 
   @Override
@@ -400,6 +430,136 @@ public class DefaultRequestContext implements RequestScope {
   @Override
   public void setReduceTimeMillis(long reduceTimeMillis) {
     _reduceTimeMillis = reduceTimeMillis;
+  }
+
+  @Override
+  public long getNumConsumingSegmentsQueried() {
+    return _numConsumingSegmentsQueried;
+  }
+
+  @Override
+  public void setNumConsumingSegmentsQueried(long numConsumingSegmentsQueried) {
+    _numConsumingSegmentsQueried = numConsumingSegmentsQueried;
+  }
+
+  @Override
+  public long getNumConsumingSegmentsProcessed() {
+    return _numConsumingSegmentsProcessed;
+  }
+
+  @Override
+  public void setNumConsumingSegmentsProcessed(long numConsumingSegmentsProcessed) {
+    _numConsumingSegmentsProcessed = numConsumingSegmentsProcessed;
+  }
+
+  @Override
+  public long getNumConsumingSegmentsMatched() {
+    return _numConsumingSegmentsMatched;
+  }
+
+  @Override
+  public void setNumConsumingSegmentsMatched(long numConsumingSegmentsMatched) {
+    _numConsumingSegmentsMatched = numConsumingSegmentsMatched;
+  }
+
+  @Override
+  public long getMinConsumingFreshnessTimeMs() {
+    return _minConsumingFreshnessTimeMs;
+  }
+
+  @Override
+  public void setMinConsumingFreshnessTimeMs(long minConsumingFreshnessTimeMs) {
+    _minConsumingFreshnessTimeMs = minConsumingFreshnessTimeMs;
+  }
+
+  @Override
+  public long getNumSegmentsPrunedByBroker() {
+    return _numSegmentsPrunedByBroker;
+  }
+
+  @Override
+  public void setNumSegmentsPrunedByBroker(long numSegmentsPrunedByBroker) {
+    _numSegmentsPrunedByBroker = numSegmentsPrunedByBroker;
+  }
+
+  @Override
+  public long getNumSegmentsPrunedByServer() {
+    return _numSegmentsPrunedByServer;
+  }
+
+  @Override
+  public void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer) {
+    _numSegmentsPrunedByServer = numSegmentsPrunedByServer;
+  }
+
+  @Override
+  public long getNumSegmentsPrunedInvalid() {
+    return _numSegmentsPrunedInvalid;
+  }
+
+  @Override
+  public void setNumSegmentsPrunedInvalid(long numSegmentsPrunedInvalid) {
+    _numSegmentsPrunedInvalid = numSegmentsPrunedInvalid;
+  }
+
+  @Override
+  public long getNumSegmentsPrunedByLimit() {
+    return _numSegmentsPrunedByLimit;
+  }
+
+  @Override
+  public void setNumSegmentsPrunedByLimit(long numSegmentsPrunedByLimit) {
+    _numSegmentsPrunedByLimit = numSegmentsPrunedByLimit;
+  }
+
+  @Override
+  public long getNumSegmentsPrunedByValue() {
+    return _numSegmentsPrunedByValue;
+  }
+
+  @Override
+  public void setNumSegmentsPrunedByValue(long numSegmentsPrunedByValue) {
+    _numSegmentsPrunedByValue = numSegmentsPrunedByValue;
+  }
+
+  @Override
+  public long getExplainPlanNumEmptyFilterSegments() {
+    return _explainPlanNumEmptyFilterSegments;
+  }
+
+  @Override
+  public void setExplainPlanNumEmptyFilterSegments(long explainPlanNumEmptyFilterSegments) {
+    _explainPlanNumEmptyFilterSegments = explainPlanNumEmptyFilterSegments;
+  }
+
+  @Override
+  public long getExplainPlanNumMatchAllFilterSegments() {
+    return _explainPlanNumMatchAllFilterSegments;
+  }
+
+  @Override
+  public void setExplainPlanNumMatchAllFilterSegments(long explainPlanNumMatchAllFilterSegments) {
+    _explainPlanNumMatchAllFilterSegments = explainPlanNumMatchAllFilterSegments;
+  }
+
+  @Override
+  public Map<String, String> getTraceInfo() {
+    return _traceInfo;
+  }
+
+  @Override
+  public void setTraceInfo(Map<String, String> traceInfo) {
+    _traceInfo.putAll(traceInfo);
+  }
+
+  @Override
+  public List<String> getProcessingExceptions() {
+    return _processingExceptions;
+  }
+
+  @Override
+  public void setProcessingExceptions(List<String> processingExceptions) {
+    _processingExceptions.addAll(processingExceptions);
   }
 
   @Override

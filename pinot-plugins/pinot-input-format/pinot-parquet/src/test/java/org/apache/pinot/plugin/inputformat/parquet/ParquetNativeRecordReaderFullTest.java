@@ -30,6 +30,8 @@ public class ParquetNativeRecordReaderFullTest {
   @Test
   protected void testReadDataSet1()
       throws Exception {
+    testParquetFile("airlineStats.zstd.parquet");
+    testParquetFile("baseballStats.zstd.parquet");
     testParquetFile("test-data/gzip-nation.impala.parquet");
     //testParquetFile("test-data/nation.dict.parquet");
     testParquetFile("test-data/nation.impala.parquet");

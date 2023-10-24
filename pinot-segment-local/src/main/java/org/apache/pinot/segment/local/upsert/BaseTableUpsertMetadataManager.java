@@ -118,6 +118,13 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     initCustomVariables();
 
+    LOGGER.info(
+        "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
+            + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {}, table "
+            + "index dir: {}", getClass().getSimpleName(), _tableNameWithType, _primaryKeyColumns, _comparisonColumns,
+        _deleteRecordColumn, _hashFunction, upsertConfig.getMode(), _enableSnapshot, upsertConfig.isEnablePreload(),
+        _metadataTTL, _tableIndexDir);
+
     if (_enableSnapshot && segmentPreloadExecutor != null && upsertConfig.isEnablePreload()) {
       // Preloading the segments with snapshots for fast upsert metadata recovery.
       // Note that there is an implicit waiting logic between the thread doing the segment preloading here and the

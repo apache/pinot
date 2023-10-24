@@ -34,9 +34,9 @@ public class AggregationFunctionTypeTest {
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("AvG"), AggregationFunctionType.AVG);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MoDe"), AggregationFunctionType.MODE);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("FiRsTwItHtImE"),
-            AggregationFunctionType.FIRSTWITHTIME);
+        AggregationFunctionType.FIRSTWITHTIME);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("LaStWiThTiMe"),
-            AggregationFunctionType.LASTWITHTIME);
+        AggregationFunctionType.LASTWITHTIME);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("MiNmAxRaNgE"),
         AggregationFunctionType.MINMAXRANGE);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnT"),
@@ -79,6 +79,10 @@ public class AggregationFunctionTypeTest {
         AggregationFunctionType.PERCENTILERAWEST);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("PeRcEnTiLeRaWtDiGeSt99"),
         AggregationFunctionType.PERCENTILERAWTDIGEST);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTcPcSkEtCh"),
+        AggregationFunctionType.DISTINCTCOUNTCPCSKETCH);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTrAwCpCsKeTcH"),
+        AggregationFunctionType.DISTINCTCOUNTRAWCPCSKETCH);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)

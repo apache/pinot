@@ -38,7 +38,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,14 +123,16 @@ public class MailboxSendOperator extends MultiStageOperator {
         // and the receiving opChain will not be able to access the stats from the previous opChain
         TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
             OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+        // no need to check early terminate signal b/c the current block is already EOS
         sendTransferableBlock(eosBlockWithStats);
       } else {
-        sendTransferableBlock(block);
+        if (sendTransferableBlock(block)) {
+          earlyTerminate();
+        }
       }
       return block;
-    } catch (EarlyTerminationException e) {
-      // TODO: Query stats are not sent when opChain is early terminated
-      LOGGER.debug("Early terminating opChain: {}", _context.getId());
+    } catch (QueryCancelledException e) {
+      LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
       return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     } catch (TimeoutException e) {
       LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
@@ -147,12 +149,13 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
-  private void sendTransferableBlock(TransferableBlock block)
+  private boolean sendTransferableBlock(TransferableBlock block)
       throws Exception {
-    _exchange.send(block);
+    boolean isEarlyTerminated = _exchange.send(block);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("==[SEND]== Block " + block + " sent from: " + _context.getId());
     }
+    return isEarlyTerminated;
   }
 
   /**

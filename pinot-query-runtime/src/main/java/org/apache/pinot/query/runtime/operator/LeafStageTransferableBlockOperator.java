@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,6 +36,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -44,8 +46,9 @@ import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
+import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
@@ -124,29 +127,39 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       if (exceptions != null) {
         return TransferableBlockUtils.getErrorTransferableBlock(exceptions);
       }
-      if (resultsBlock != LAST_RESULTS_BLOCK) {
+      if (_isEarlyTerminated || resultsBlock == LAST_RESULTS_BLOCK) {
+        return constructMetadataBlock();
+      } else {
         // Regular data block
         return composeTransferableBlock(resultsBlock, _dataSchema);
-      } else {
-        // All data blocks have been returned. Record the stats and return EOS.
-        Map<String, String> executionStats = _executionStats;
-        OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, getOperatorId());
-        operatorStats.recordExecutionStats(executionStats);
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
   }
 
+  private TransferableBlock constructMetadataBlock() {
+    // All data blocks have been returned. Record the stats and return EOS.
+    Map<String, String> executionStats = _executionStats;
+    if (executionStats != null) {
+      OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, getOperatorId());
+      operatorStats.recordExecutionStats(executionStats);
+    }
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+  }
+
   private Future<Void> startExecution() {
     ResultsBlockConsumer resultsBlockConsumer = new ResultsBlockConsumer();
+    ServerQueryLogger queryLogger = ServerQueryLogger.getInstance();
     return _executorService.submit(() -> {
       try {
         if (_requests.size() == 1) {
           ServerQueryRequest request = _requests.get(0);
           InstanceResponseBlock instanceResponseBlock =
               _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
+          if (queryLogger != null) {
+            queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
+          }
           // TODO: Revisit if we should treat all exceptions as query failure. Currently MERGE_RESPONSE_ERROR and
           //       SERVER_SEGMENT_MISSING_ERROR are counted as query failure.
           Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
@@ -172,6 +185,9 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
               try {
                 InstanceResponseBlock instanceResponseBlock =
                     _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
+                if (queryLogger != null) {
+                  queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
+                }
                 Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
                 if (!exceptions.isEmpty()) {
                   // Drain the latch when receiving exception block and not wait for the other thread to finish
@@ -281,18 +297,33 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   /**
    * For selection, we need to check if the columns are in order. If not, we need to re-arrange the columns.
    */
-  @SuppressWarnings("ConstantConditions")
   private static TransferableBlock composeSelectTransferableBlock(SelectionResultsBlock resultsBlock,
       DataSchema desiredDataSchema) {
-    DataSchema resultSchema = resultsBlock.getDataSchema();
-    List<String> selectionColumns =
-        SelectionOperatorUtils.getSelectionColumns(resultsBlock.getQueryContext(), resultSchema);
-    int[] columnIndices = SelectionOperatorUtils.getColumnIndices(selectionColumns, resultSchema);
+    int[] columnIndices = getColumnIndices(resultsBlock);
     if (!inOrder(columnIndices)) {
       return composeColumnIndexedTransferableBlock(resultsBlock, desiredDataSchema, columnIndices);
     } else {
       return composeDirectTransferableBlock(resultsBlock, desiredDataSchema);
     }
+  }
+
+  private static int[] getColumnIndices(SelectionResultsBlock resultsBlock) {
+    DataSchema dataSchema = resultsBlock.getDataSchema();
+    assert dataSchema != null;
+    String[] columnNames = dataSchema.getColumnNames();
+    Object2IntOpenHashMap<String> columnIndexMap = new Object2IntOpenHashMap<>(columnNames.length);
+    for (int i = 0; i < columnNames.length; i++) {
+      columnIndexMap.put(columnNames[i], i);
+    }
+    QueryContext queryContext = resultsBlock.getQueryContext();
+    assert queryContext != null;
+    List<ExpressionContext> selectExpressions = queryContext.getSelectExpressions();
+    int numSelectExpressions = selectExpressions.size();
+    int[] columnIndices = new int[numSelectExpressions];
+    for (int i = 0; i < numSelectExpressions; i++) {
+      columnIndices[i] = columnIndexMap.getInt(selectExpressions.get(i).toString());
+    }
+    return columnIndices;
   }
 
   private static boolean inOrder(int[] columnIndices) {

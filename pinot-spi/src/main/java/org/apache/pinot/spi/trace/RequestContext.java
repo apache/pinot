@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.spi.trace;
 
+import java.util.List;
+import java.util.Map;
+
+
 public interface RequestContext {
   long getOfflineSystemActivitiesCpuTimeNs();
 
@@ -65,6 +69,8 @@ public interface RequestContext {
 
   void setTableName(String tableName);
 
+  void setTableNames(List<String> tableNames);
+
   void setQueryProcessingTime(long processingTimeMillis);
 
   void setBrokerId(String brokerId);
@@ -92,6 +98,8 @@ public interface RequestContext {
   String getQuery();
 
   String getTableName();
+
+  List<String> getTableNames();
 
   long getProcessingTimeMillis();
 
@@ -156,6 +164,58 @@ public interface RequestContext {
   void setNumRowsResultSet(int numRowsResultSet);
 
   void setReduceTimeMillis(long reduceTimeMillis);
+
+  long getNumConsumingSegmentsQueried();
+
+  void setNumConsumingSegmentsQueried(long numConsumingSegmentsQueried);
+
+  long getNumConsumingSegmentsProcessed();
+
+  void setNumConsumingSegmentsProcessed(long numConsumingSegmentsProcessed);
+
+  long getNumConsumingSegmentsMatched();
+
+  void setNumConsumingSegmentsMatched(long numConsumingSegmentsMatched);
+
+  long getMinConsumingFreshnessTimeMs();
+
+  void setMinConsumingFreshnessTimeMs(long minConsumingFreshnessTimeMs);
+
+  long getNumSegmentsPrunedByBroker();
+
+  void setNumSegmentsPrunedByBroker(long numSegmentsPrunedByBroker);
+
+  long getNumSegmentsPrunedByServer();
+
+  void setNumSegmentsPrunedByServer(long numSegmentsPrunedByServer);
+
+  long getNumSegmentsPrunedInvalid();
+
+  void setNumSegmentsPrunedInvalid(long numSegmentsPrunedInvalid);
+
+  long getNumSegmentsPrunedByLimit();
+
+  void setNumSegmentsPrunedByLimit(long numSegmentsPrunedByLimit);
+
+  long getNumSegmentsPrunedByValue();
+
+  void setNumSegmentsPrunedByValue(long numSegmentsPrunedByValue);
+
+  long getExplainPlanNumEmptyFilterSegments();
+
+  void setExplainPlanNumEmptyFilterSegments(long explainPlanNumEmptyFilterSegments);
+
+  long getExplainPlanNumMatchAllFilterSegments();
+
+  void setExplainPlanNumMatchAllFilterSegments(long explainPlanNumMatchAllFilterSegments);
+
+  Map<String, String> getTraceInfo();
+
+  void setTraceInfo(Map<String, String> traceInfo);
+
+  List<String> getProcessingExceptions();
+
+  void setProcessingExceptions(List<String> processingExceptions);
 
   enum FanoutType {
     OFFLINE, REALTIME, HYBRID

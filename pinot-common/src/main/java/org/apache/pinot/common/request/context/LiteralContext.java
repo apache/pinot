@@ -18,163 +18,127 @@
  */
 package org.apache.pinot.common.request.context;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.math.NumberUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.PinotDataType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 
 
 /**
  * The {@code LiteralContext} class represents a literal in the query.
  * <p>This includes both value and type information. We translate thrift literal to this representation in server.
- * Currently, only Boolean literal is correctly encoded in thrift and passed in.
- * All integers are encoded as LONG in thrift, and the other numerical types are encoded as DOUBLE.
- * The remaining types are encoded as STRING.
  */
 public class LiteralContext {
   // TODO: Support all of the types for sql.
-  private final FieldSpec.DataType _type;
+  private final DataType _type;
   private final Object _value;
-  private final BigDecimal _bigDecimalValue;
 
-  private static BigDecimal getBigDecimalValue(FieldSpec.DataType type, Object value) {
-    switch (type) {
-      case BIG_DECIMAL:
-        return (BigDecimal) value;
-      case BOOLEAN:
-        return PinotDataType.BOOLEAN.toBigDecimal(value);
-      case TIMESTAMP:
-        return PinotDataType.TIMESTAMP.toBigDecimal(Timestamp.valueOf(value.toString()));
-      default:
-        if (type.isNumeric()) {
-          return new BigDecimal(value.toString());
-        }
-        return BigDecimal.ZERO;
-    }
-  }
+  /**
+   * This is used for type conversion, and is not included in {@link #equals} and {@link #hashCode}.
+   */
+  private final PinotDataType _pinotDataType;
 
-  @VisibleForTesting
-  static Pair<FieldSpec.DataType, Object> inferLiteralDataTypeAndValue(String literal) {
-    // Try to interpret the literal as number
-    try {
-      Number number = NumberUtils.createNumber(literal);
-      if (number instanceof BigDecimal || number instanceof BigInteger) {
-        return ImmutablePair.of(FieldSpec.DataType.BIG_DECIMAL, new BigDecimal(literal));
-      } else {
-        return ImmutablePair.of(FieldSpec.DataType.STRING, literal);
-      }
-    } catch (Exception e) {
-      // Ignored
-    }
+  private Boolean _booleanValue;
+  private Integer _intValue;
+  private Long _longValue;
+  private Float _floatValue;
+  private Double _doubleValue;
+  private BigDecimal _bigDecimalValue;
+  private String _stringValue;
+  private byte[] _bytesValue;
 
-    // Try to interpret the literal as TIMESTAMP
-    try {
-      Timestamp timestamp = Timestamp.valueOf(literal);
-      return ImmutablePair.of(FieldSpec.DataType.TIMESTAMP, timestamp);
-    } catch (Exception e) {
-      // Ignored
-    }
-    return ImmutablePair.of(FieldSpec.DataType.STRING, literal);
+  public LiteralContext(DataType type, Object value) {
+    _type = type;
+    _value = value;
+    _pinotDataType = getPinotDataType(type);
   }
 
   public LiteralContext(Literal literal) {
-    Preconditions.checkState(literal.getFieldValue() != null,
-        "Field value cannot be null for field:" + literal.getSetField());
     switch (literal.getSetField()) {
       case BOOL_VALUE:
-        _type = FieldSpec.DataType.BOOLEAN;
-        _value = literal.getFieldValue();
-        _bigDecimalValue = PinotDataType.BOOLEAN.toBigDecimal(_value);
+        _type = DataType.BOOLEAN;
+        _value = literal.getBoolValue();
         break;
       case INT_VALUE:
-        _type = FieldSpec.DataType.INT;
+        _type = DataType.INT;
         _value = literal.getIntValue();
-        _bigDecimalValue = new BigDecimal((int) _value);
         break;
       case LONG_VALUE:
+        // TODO: Remove this special handling after broker uses INT type for integer literals.
+        //       https://github.com/apache/pinot/pull/11751
+//        _type = DataType.LONG;
+//        _value = literal.getLongValue();
         long longValue = literal.getLongValue();
-        if (longValue == (int) longValue) {
-          _type = FieldSpec.DataType.INT;
+        if (longValue >= Integer.MIN_VALUE && longValue <= Integer.MAX_VALUE) {
+          _type = DataType.INT;
           _value = (int) longValue;
         } else {
-          _type = FieldSpec.DataType.LONG;
+          _type = DataType.LONG;
           _value = longValue;
         }
-        _bigDecimalValue = new BigDecimal(longValue);
+        break;
+      case FLOAT_VALUE:
+        _type = DataType.FLOAT;
+        _value = Float.intBitsToFloat(literal.getFloatValue());
         break;
       case DOUBLE_VALUE:
-        String stringValue = literal.getFieldValue().toString();
-        Number floatingNumber = NumberUtils.createNumber(stringValue);
-        if (floatingNumber instanceof Float) {
-          _type = FieldSpec.DataType.FLOAT;
-          _value = floatingNumber;
-        } else {
-          _type = FieldSpec.DataType.DOUBLE;
-          _value = literal.getDoubleValue();
-        }
-        _bigDecimalValue = new BigDecimal(stringValue);
-        break;
-      case STRING_VALUE:
-        Pair<FieldSpec.DataType, Object> typeAndValue =
-            inferLiteralDataTypeAndValue(literal.getFieldValue().toString());
-        _type = typeAndValue.getLeft();
-        if (_type == FieldSpec.DataType.BIG_DECIMAL) {
-          _bigDecimalValue = (BigDecimal) typeAndValue.getRight();
-        } else if (_type == FieldSpec.DataType.TIMESTAMP) {
-          _bigDecimalValue = PinotDataType.TIMESTAMP.toBigDecimal(typeAndValue.getRight());
-        } else {
-          _bigDecimalValue = BigDecimal.ZERO;
-        }
-        _value = literal.getFieldValue().toString();
+        _type = DataType.DOUBLE;
+        _value = literal.getDoubleValue();
         break;
       case BIG_DECIMAL_VALUE:
-        _type = FieldSpec.DataType.BIG_DECIMAL;
-        _bigDecimalValue = BigDecimalUtils.deserialize(literal.getBigDecimalValue());
-        _value = _bigDecimalValue;
+        _type = DataType.BIG_DECIMAL;
+        _value = BigDecimalUtils.deserialize(literal.getBigDecimalValue());
+        break;
+      case STRING_VALUE:
+        _type = DataType.STRING;
+        _value = literal.getStringValue();
         break;
       case BINARY_VALUE:
-        _type = FieldSpec.DataType.BYTES;
+        _type = DataType.BYTES;
         _value = literal.getBinaryValue();
-        _bigDecimalValue = BigDecimal.ZERO;
         break;
       case NULL_VALUE:
-        _type = FieldSpec.DataType.UNKNOWN;
+        _type = DataType.UNKNOWN;
         _value = null;
-        _bigDecimalValue = BigDecimal.ZERO;
         break;
       default:
-        throw new UnsupportedOperationException("Unsupported data type:" + literal.getSetField());
+        throw new IllegalStateException("Unsupported field type: " + literal.getSetField());
+    }
+    _pinotDataType = getPinotDataType(_type);
+  }
+
+  private static PinotDataType getPinotDataType(DataType type) {
+    switch (type) {
+      case BOOLEAN:
+        return PinotDataType.BOOLEAN;
+      case INT:
+        return PinotDataType.INTEGER;
+      case LONG:
+        return PinotDataType.LONG;
+      case FLOAT:
+        return PinotDataType.FLOAT;
+      case DOUBLE:
+        return PinotDataType.DOUBLE;
+      case BIG_DECIMAL:
+        return PinotDataType.BIG_DECIMAL;
+      case STRING:
+        return PinotDataType.STRING;
+      case BYTES:
+        return PinotDataType.BYTES;
+      case UNKNOWN:
+        return null;
+      default:
+        throw new IllegalStateException("Unsupported data type: " + type);
     }
   }
 
-  public FieldSpec.DataType getType() {
+  public DataType getType() {
     return _type;
-  }
-
-  public int getIntValue() {
-    return _bigDecimalValue.intValue();
-  }
-
-  public double getDoubleValue() {
-    return _bigDecimalValue.doubleValue();
-  }
-
-  public BigDecimal getBigDecimalValue() {
-    return _bigDecimalValue;
-  }
-
-  public String getStringValue() {
-    return String.valueOf(_value);
   }
 
   @Nullable
@@ -182,15 +146,103 @@ public class LiteralContext {
     return _value;
   }
 
-  // This ctor is only used for special handling in subquery.
-  public LiteralContext(FieldSpec.DataType type, Object value) {
-    _type = type;
-    if (type == FieldSpec.DataType.UNKNOWN) {
-      _value = null;
-    } else {
-      _value = value;
+  public boolean getBooleanValue() {
+    Boolean booleanValue = _booleanValue;
+    if (booleanValue == null) {
+      booleanValue = _pinotDataType != null && _pinotDataType.toBoolean(_value);
+      _booleanValue = booleanValue;
     }
-    _bigDecimalValue = getBigDecimalValue(type, value);
+    return booleanValue;
+  }
+
+  public int getIntValue() {
+    Integer intValue = _intValue;
+    if (intValue == null) {
+      try {
+        intValue = _pinotDataType != null ? _pinotDataType.toInt(_value) : NullValuePlaceHolder.INT;
+      } catch (NumberFormatException e) {
+        // Pinot uses int to represent BOOLEAN value, so we need to handle the case when the value is the string
+        // representation of a BOOLEAN value.
+        String stringValue = (String) _value;
+        if (stringValue.equalsIgnoreCase("true")) {
+          intValue = 1;
+        } else if (stringValue.equalsIgnoreCase("false")) {
+          intValue = 0;
+        } else {
+          throw new IllegalArgumentException("Invalid int value: " + _value);
+        }
+      }
+      _intValue = intValue;
+    }
+    return intValue;
+  }
+
+  public long getLongValue() {
+    Long longValue = _longValue;
+    if (longValue == null) {
+      try {
+        longValue = _pinotDataType != null ? _pinotDataType.toLong(_value) : NullValuePlaceHolder.LONG;
+      } catch (NumberFormatException e) {
+        // Pinot uses long to represent TIMESTAMP value, so we need to handle the case when the value is the string
+        // representation of a TIMESTAMP value.
+        try {
+          longValue = Timestamp.valueOf((String) _value).getTime();
+        } catch (IllegalArgumentException e1) {
+          throw new IllegalArgumentException("Invalid long value: " + _value);
+        }
+      }
+      _longValue = longValue;
+    }
+    return longValue;
+  }
+
+  public float getFloatValue() {
+    Float floatValue = _floatValue;
+    if (floatValue == null) {
+      floatValue = _pinotDataType != null ? _pinotDataType.toFloat(_value) : NullValuePlaceHolder.FLOAT;
+      _floatValue = floatValue;
+    }
+    return floatValue;
+  }
+
+  public double getDoubleValue() {
+    Double doubleValue = _doubleValue;
+    if (doubleValue == null) {
+      doubleValue = _pinotDataType != null ? _pinotDataType.toDouble(_value) : NullValuePlaceHolder.DOUBLE;
+      _doubleValue = doubleValue;
+    }
+    return doubleValue;
+  }
+
+  public BigDecimal getBigDecimalValue() {
+    BigDecimal bigDecimalValue = _bigDecimalValue;
+    if (bigDecimalValue == null) {
+      bigDecimalValue = _pinotDataType != null ? _pinotDataType.toBigDecimal(_value) : NullValuePlaceHolder.BIG_DECIMAL;
+      _bigDecimalValue = bigDecimalValue;
+    }
+    return bigDecimalValue;
+  }
+
+  public String getStringValue() {
+    String stringValue = _stringValue;
+    if (stringValue == null) {
+      stringValue = _pinotDataType != null ? _pinotDataType.toString(_value) : NullValuePlaceHolder.STRING;
+      _stringValue = stringValue;
+    }
+    return stringValue;
+  }
+
+  public byte[] getBytesValue() {
+    byte[] bytesValue = _bytesValue;
+    if (bytesValue == null) {
+      bytesValue = _pinotDataType != null ? _pinotDataType.toBytes(_value) : NullValuePlaceHolder.BYTES;
+      _bytesValue = bytesValue;
+    }
+    return bytesValue;
+  }
+
+  public boolean isNull() {
+    return _value == null;
   }
 
   @Override
@@ -212,7 +264,12 @@ public class LiteralContext {
 
   @Override
   public String toString() {
-    // TODO: print out the type.
-    return '\'' + String.valueOf(_value) + '\'';
+    // TODO: Remove single quotes except for string and bytes after broker reducer supports expression format change.
+    //       https://github.com/apache/pinot/pull/11762)
+    if (isNull()) {
+      return "'null'";
+    } else {
+      return "'" + getStringValue() + "'";
+    }
   }
 }

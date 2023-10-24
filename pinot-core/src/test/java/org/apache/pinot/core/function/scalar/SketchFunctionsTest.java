@@ -27,7 +27,7 @@ import org.testng.annotations.Test;
 public class SketchFunctionsTest {
 
   private double thetaEstimate(byte[] bytes) {
-    return ObjectSerDeUtils.DATA_SKETCH_SER_DE.deserialize(bytes).getEstimate();
+    return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.deserialize(bytes).getEstimate();
   }
 
   byte[] _bytes = {1, 2, 3};
@@ -77,5 +77,21 @@ public class SketchFunctionsTest {
     Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toIntegerSumTupleSketch(new Object(), 1));
     Assert.assertThrows(IllegalArgumentException.class,
         () -> SketchFunctions.toIntegerSumTupleSketch(new Object(), 1, 1024));
+  }
+
+  private double cpcEstimate(byte[] bytes) {
+    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes).getEstimate();
+  }
+
+  @Test
+  public void testCpcCreation() {
+    for (Object i : _inputs) {
+      Assert.assertEquals(cpcEstimate(SketchFunctions.toCpcSketch(i)), 1.0);
+      Assert.assertEquals(cpcEstimate(SketchFunctions.toCpcSketch(i, 11)), 1.0);
+    }
+    Assert.assertEquals(cpcEstimate(SketchFunctions.toCpcSketch(null)), 0.0);
+    Assert.assertEquals(cpcEstimate(SketchFunctions.toCpcSketch(null, 11)), 0.0);
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toCpcSketch(new Object()));
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toCpcSketch(new Object(), 11));
   }
 }

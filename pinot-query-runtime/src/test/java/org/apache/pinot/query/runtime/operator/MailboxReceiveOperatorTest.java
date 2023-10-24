@@ -44,6 +44,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
 import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -234,6 +235,34 @@ public class MailboxReceiveOperatorTest {
       TransferableBlock block = receiveOp.nextBlock();
       assertTrue(block.isErrorBlock());
       assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(errorMessage));
+    }
+  }
+
+  @Test
+  public void shouldEarlyTerminateMailboxesWhenIndicated() {
+    Object[] row1 = new Object[]{1, 1};
+    Object[] row2 = new Object[]{2, 2};
+    Object[] row3 = new Object[]{3, 3};
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
+    when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
+        OperatorTestUtil.block(DATA_SCHEMA, row3), TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
+    when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
+        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    OpChainExecutionContext context =
+        OperatorTestUtil.getOpChainContext(_mailboxService, RECEIVER_ADDRESS, Long.MAX_VALUE, _stageMetadataBoth);
+    try (MailboxReceiveOperator receiveOp = new MailboxReceiveOperator(context, RelDistribution.Type.HASH_DISTRIBUTED,
+        1)) {
+      // Receive first block from server1
+      assertEquals(receiveOp.nextBlock().getContainer().get(0), row1);
+      // at this point operator received a signal to early terminate
+      receiveOp.earlyTerminate();
+      // Receive next block should be EOS even if upstream keep sending normal block.
+      assertTrue(receiveOp.nextBlock().isEndOfStreamBlock());
+      // Assure that early terminate signal goes into each mailbox
+      verify(_mailbox1).earlyTerminate();
+      verify(_mailbox2).earlyTerminate();
     }
   }
 }

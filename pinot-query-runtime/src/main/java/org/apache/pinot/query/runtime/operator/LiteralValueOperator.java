@@ -61,7 +61,7 @@ public class LiteralValueOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (!_isLiteralBlockReturned) {
+    if (!_isLiteralBlockReturned && !_isEarlyTerminated) {
       _isLiteralBlockReturned = true;
       return _rexLiteralBlock;
     } else {

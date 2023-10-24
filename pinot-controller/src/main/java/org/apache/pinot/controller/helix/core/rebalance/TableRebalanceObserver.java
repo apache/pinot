@@ -43,4 +43,8 @@ public interface TableRebalanceObserver {
   void onSuccess(String msg);
 
   void onError(String errorMsg);
+
+  boolean isStopped();
+
+  RebalanceResult.Status getStopStatus();
 }

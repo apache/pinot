@@ -40,6 +40,8 @@ import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVe
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
@@ -334,6 +336,57 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     _docIdCounter++;
+  }
+
+  @Override
+  public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
+      throws IOException {
+    // Iterate over each value in the column
+    int numDocs = segment.getSegmentMetadata().getTotalDocs();
+    if (numDocs == 0) {
+      return;
+    }
+
+    try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
+      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
+      NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+      SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+      if (sortedDocIds != null) {
+        int onDiskDocId = 0;
+        for (int docId : sortedDocIds) {
+          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
+              nullVec);
+          onDiskDocId++;
+        }
+      } else {
+        for (int docId = 0; docId < numDocs; docId++) {
+          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec);
+        }
+      }
+    }
+  }
+
+  private void indexColumnValue(PinotSegmentColumnReader colReader,
+      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex, String columnName, FieldSpec fieldSpec,
+      SegmentDictionaryCreator dictionaryCreator, int sourceDocId, int onDiskDocPos, NullValueVectorCreator nullVec)
+      throws IOException {
+    Object columnValueToIndex = colReader.getValue(sourceDocId);
+    if (columnValueToIndex == null) {
+      throw new RuntimeException("Null value for column:" + columnName);
+    }
+
+    if (fieldSpec.isSingleValueField()) {
+      indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+    } else {
+      indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+    }
+
+    if (_nullHandlingEnabled) {
+      if (colReader.isNull(sourceDocId)) {
+        nullVec.setNull(onDiskDocPos);
+      }
+    }
   }
 
   private void indexSingleValueRow(SegmentDictionaryCreator dictionaryCreator, Object value,

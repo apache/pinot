@@ -22,6 +22,8 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import java.math.BigDecimal;
 import java.util.Base64;
 import javax.annotation.Nullable;
+import org.apache.datasketches.cpc.CpcSketch;
+import org.apache.datasketches.cpc.CpcUnion;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.AnotB;
 import org.apache.datasketches.theta.Intersection;
@@ -68,6 +70,14 @@ import org.apache.pinot.spi.utils.CommonConstants;
  *     {
  *       "columnName": "names",
  *       "transformFunction": "toHLL(playerName, 8)"
+ *     },
+ *     {
+ *       "columnName": "players",
+ *       "transformFunction": "toCpcSketch(playerID)"
+ *     },
+ *     {
+ *       "columnName": "players",
+ *       "transformFunction": "toCpcSketch(playerID, 11)"
  *     }
  *   ]
  * }
@@ -119,7 +129,7 @@ public class SketchFunctions {
             "Unrecognised input type for Theta sketch: " + input.getClass().getSimpleName());
       }
     }
-    return ObjectSerDeUtils.DATA_SKETCH_SER_DE.serialize(sketch.compact());
+    return ObjectSerDeUtils.DATA_SKETCH_THETA_SER_DE.serialize(sketch.compact());
   }
 
   /**
@@ -274,8 +284,8 @@ public class SketchFunctions {
     } else if (sketchObj instanceof byte[]) {
       return Sketches.wrapSketch(Memory.wrap((byte[]) sketchObj));
     } else {
-      throw new RuntimeException("Exception occurred getting estimate from Theta Sketch, unsupported Object type: "
-          + sketchObj.getClass());
+      throw new RuntimeException(
+          "Exception occurred getting estimate from Theta Sketch, unsupported Object type: " + sketchObj.getClass());
     }
   }
 
@@ -310,9 +320,8 @@ public class SketchFunctions {
   }
 
   private static byte[] intTupleSketchUnionVar(IntegerSummary.Mode mode, int nomEntries, Object... sketchObjects) {
-    org.apache.datasketches.tuple.Union<IntegerSummary>
-        union = new org.apache.datasketches.tuple.Union<>(nomEntries,
-        new IntegerSummarySetOperations(mode, mode));
+    org.apache.datasketches.tuple.Union<IntegerSummary> union =
+        new org.apache.datasketches.tuple.Union<>(nomEntries, new IntegerSummarySetOperations(mode, mode));
     for (Object sketchObj : sketchObjects) {
       union.union(asIntegerSketch(sketchObj));
     }
@@ -360,13 +369,104 @@ public class SketchFunctions {
     } else if (sketchObj instanceof byte[]) {
       return ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize((byte[]) sketchObj);
     } else {
-      throw new RuntimeException("Exception occurred getting reading Tuple Sketch, unsupported Object type: "
-          + sketchObj.getClass());
+      throw new RuntimeException(
+          "Exception occurred getting reading Tuple Sketch, unsupported Object type: " + sketchObj.getClass());
     }
   }
 
   @ScalarFunction(names = {"getIntTupleSketchEstimate", "get_int_tuple_sketch_estimate"})
   public static long getIntTupleSketchEstimate(Object o1) {
     return Math.round(asIntegerSketch(o1).getEstimate());
+  }
+
+  /**
+   * Create a CPC Sketch containing the input
+   *
+   * @param input an Object we want to insert into the sketch, may be null to return an empty sketch
+   * @return serialized CPC sketch as bytes
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static byte[] toCpcSketch(@Nullable Object input) {
+    return toCpcSketch(input, CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
+  }
+
+  @ScalarFunction(names = {"getCpcSketchEstimate", "get_cpc_sketch_estimate"})
+  public static long getCpcSketchEstimate(Object o1) {
+    return Math.round(asCpcSketch(o1).getEstimate());
+  }
+
+  @ScalarFunction(names = {"cpcSketchUnion", "cpc_sketch_union"})
+  public static byte[] cpcSketchUnion(Object o1, Object o2) {
+    return cpcSketchUnionVar(o1, o2);
+  }
+
+  @ScalarFunction(names = {"cpcSketchUnion", "cpc_sketch_union"})
+  public static byte[] cpcSketchUnion(Object o1, Object o2, Object o3) {
+    return cpcSketchUnionVar(o1, o2, o3);
+  }
+
+  @ScalarFunction(names = {"cpcSketchUnion", "cpc_sketch_union"})
+  public static byte[] cpcSketchUnion(Object o1, Object o2, Object o3, Object o4) {
+    return cpcSketchUnionVar(o1, o2, o3, o4);
+  }
+
+  @ScalarFunction(names = {"cpcSketchUnion", "cpc_sketch_union"})
+  public static byte[] cpcSketchUnion(Object o1, Object o2, Object o3, Object o4, Object o5) {
+    return cpcSketchUnionVar(o1, o2, o3, o4, o5);
+  }
+
+  /**
+   * Create a CPC Sketch containing the input, with a configured nominal entries
+   *
+   * @param input an Object we want to insert into the sketch, may be null to return an empty sketch
+   * @param lgK the given log_base2 of k, which is the nominal entries that the sketch is configured to keep
+   * @return serialized CPC sketch as bytes
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static byte[] toCpcSketch(@Nullable Object input, int lgK) {
+    CpcSketch sketch = new CpcSketch(lgK);
+    if (input != null) {
+      if (input instanceof Integer) {
+        sketch.update((Integer) input);
+      } else if (input instanceof Long) {
+        sketch.update((Long) input);
+      } else if (input instanceof Float) {
+        sketch.update((Float) input);
+      } else if (input instanceof Double) {
+        sketch.update((Double) input);
+      } else if (input instanceof BigDecimal) {
+        sketch.update(((BigDecimal) input).toString());
+      } else if (input instanceof String) {
+        sketch.update((String) input);
+      } else if (input instanceof byte[]) {
+        sketch.update((byte[]) input);
+      } else {
+        throw new IllegalArgumentException(
+            "Unrecognised input type for CPC sketch: " + input.getClass().getSimpleName());
+      }
+    }
+    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(sketch);
+  }
+
+  private static CpcSketch asCpcSketch(Object sketchObj) {
+    if (sketchObj instanceof CpcSketch) {
+      return (CpcSketch) sketchObj;
+    } else if (sketchObj instanceof byte[]) {
+      return CpcSketch.heapify(Memory.wrap((byte[]) sketchObj));
+    } else if (sketchObj instanceof String) {
+      byte[] decoded = Base64.getDecoder().decode((String) sketchObj);
+      return CpcSketch.heapify(Memory.wrap((decoded)));
+    } else {
+      throw new RuntimeException(
+          "Exception occurred getting estimate from CPC Sketch, unsupported Object type: " + sketchObj.getClass());
+    }
+  }
+
+  private static byte[] cpcSketchUnionVar(Object... sketchObjects) {
+    CpcUnion union = new CpcUnion(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
+    for (Object sketchObj : sketchObjects) {
+      union.update(asCpcSketch(sketchObj));
+    }
+    return union.getResult().toByteArray();
   }
 }

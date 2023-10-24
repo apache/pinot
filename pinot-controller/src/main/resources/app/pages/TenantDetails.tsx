@@ -337,7 +337,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
 
     try {
       // extract reloadJobId from response
-      const statusResponseObj = JSON.parse(result.status.replace("Segment reload details: ", ""))
+      const statusResponseObj = JSON.parse(result.status)
       reloadJobId = get(statusResponseObj, `${tableName}.reloadJobId`, null)
     } catch {
       reloadJobId = null;
@@ -601,6 +601,8 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
           <CustomizedTables
             title={"Instance Count - " + instanceCountData.records.length}
             data={instanceCountData}
+            addLinks
+            baseURL="/instance/"
             showSearchBox={true}
             inAccordionFormat={true}
           />

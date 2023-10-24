@@ -24,6 +24,8 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -56,6 +58,7 @@ public class VarByteChunkForwardIndexReaderV4
   private final PinotDataBuffer _metadata;
   private final PinotDataBuffer _chunks;
   private final boolean _isSingleValue;
+  private final long _chunksStartOffset;
 
   public VarByteChunkForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
       boolean isSingleValue) {
@@ -68,6 +71,7 @@ public class VarByteChunkForwardIndexReaderV4
     int chunksOffset = dataBuffer.getInt(12);
     // the file has a BE header for compatability reasons (version selection) but the content is LE
     _metadata = dataBuffer.view(16, chunksOffset, ByteOrder.LITTLE_ENDIAN);
+    _chunksStartOffset = chunksOffset;
     _chunks = dataBuffer.view(chunksOffset, dataBuffer.size(), ByteOrder.LITTLE_ENDIAN);
     _isSingleValue = isSingleValue;
   }
@@ -97,8 +101,9 @@ public class VarByteChunkForwardIndexReaderV4
   @Override
   public ReaderContext createContext() {
     return _chunkCompressionType == ChunkCompressionType.PASS_THROUGH ? new UncompressedReaderContext(_chunks,
-        _metadata) : new CompressedReaderContext(_metadata, _chunks, _chunkDecompressor, _chunkCompressionType,
-        _targetDecompressedChunkSize);
+        _metadata, _chunksStartOffset)
+        : new CompressedReaderContext(_metadata, _chunks, _chunksStartOffset, _chunkDecompressor, _chunkCompressionType,
+            _targetDecompressedChunkSize);
   }
 
   @Override
@@ -263,6 +268,31 @@ public class VarByteChunkForwardIndexReaderV4
       throws IOException {
   }
 
+  @Override
+  public boolean isBufferByteRangeInfoSupported() {
+    return true;
+  }
+
+  @Override
+  public void recordDocIdByteRanges(int docId, ReaderContext context, List<ByteRange> ranges) {
+    context.recordRangesForDocId(docId, ranges);
+  }
+
+  @Override
+  public boolean isFixedOffsetMappingType() {
+    return false;
+  }
+
+  @Override
+  public long getRawDataStartOffset() {
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
+  }
+
+  @Override
+  public int getDocLength() {
+    throw new UnsupportedOperationException("Forward index is not fixed length type");
+  }
+
   public static abstract class ReaderContext implements ForwardIndexReaderContext {
 
     protected final PinotDataBuffer _chunks;
@@ -271,10 +301,21 @@ public class VarByteChunkForwardIndexReaderV4
     protected int _nextDocIdOffset;
     protected boolean _regularChunk;
     protected int _numDocsInCurrentChunk;
+    protected long _chunkStartOffset;
+    private List<ByteRange> _ranges;
 
-    protected ReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks) {
+    protected ReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset) {
       _chunks = chunks;
       _metadata = metadata;
+      _chunkStartOffset = chunkStartOffset;
+    }
+
+    private void recordRangesForDocId(int docId, List<ByteRange> ranges) {
+      if (docId >= _docIdOffset && docId < _nextDocIdOffset) {
+        ranges.addAll(_ranges);
+      } else {
+        initAndRecordRangesForDocId(docId, ranges);
+      }
     }
 
     public byte[] getValue(int docId) {
@@ -330,14 +371,36 @@ public class VarByteChunkForwardIndexReaderV4
       }
       return processChunkAndReadFirstValue(docId, offset, limit);
     }
+
+    private void initAndRecordRangesForDocId(int docId, List<ByteRange> ranges) {
+      // Due to binary search on metadata buffer, it's simple to record the entire metadata buffer byte ranges
+      _ranges = new ArrayList<>();
+      _ranges.add(new ByteRange(0, (int) _metadata.size()));
+      long metadataEntry = chunkIndexFor(docId);
+      int info = _metadata.getInt(metadataEntry);
+      _docIdOffset = info & 0x7FFFFFFF;
+      _regularChunk = _docIdOffset == info;
+      long offset = _metadata.getInt(metadataEntry + Integer.BYTES) & 0xFFFFFFFFL;
+      long limit;
+      if (_metadata.size() - METADATA_ENTRY_SIZE > metadataEntry) {
+        _nextDocIdOffset = _metadata.getInt(metadataEntry + METADATA_ENTRY_SIZE) & 0x7FFFFFFF;
+        limit = _metadata.getInt(metadataEntry + METADATA_ENTRY_SIZE + Integer.BYTES) & 0xFFFFFFFFL;
+      } else {
+        _nextDocIdOffset = Integer.MAX_VALUE;
+        limit = _chunks.size();
+      }
+      _ranges.add(new ByteRange(_chunkStartOffset + offset, (int) (limit - offset)));
+      ranges.addAll(_ranges);
+    }
   }
 
   private static final class UncompressedReaderContext extends ReaderContext {
 
     private ByteBuffer _chunk;
+    private List<ByteRange> _ranges;
 
-    UncompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks) {
-      super(chunks, metadata);
+    UncompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset) {
+      super(chunks, metadata, chunkStartOffset);
     }
 
     @Override
@@ -380,9 +443,9 @@ public class VarByteChunkForwardIndexReaderV4
     private final ChunkDecompressor _chunkDecompressor;
     private final ChunkCompressionType _chunkCompressionType;
 
-    CompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, ChunkDecompressor chunkDecompressor,
-        ChunkCompressionType chunkCompressionType, int targetChunkSize) {
-      super(metadata, chunks);
+    CompressedReaderContext(PinotDataBuffer metadata, PinotDataBuffer chunks, long chunkStartOffset,
+        ChunkDecompressor chunkDecompressor, ChunkCompressionType chunkCompressionType, int targetChunkSize) {
+      super(metadata, chunks, chunkStartOffset);
       _chunkDecompressor = chunkDecompressor;
       _chunkCompressionType = chunkCompressionType;
       _decompressedBuffer = ByteBuffer.allocateDirect(targetChunkSize).order(ByteOrder.LITTLE_ENDIAN);

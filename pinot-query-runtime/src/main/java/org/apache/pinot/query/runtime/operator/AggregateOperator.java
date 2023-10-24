@@ -142,7 +142,6 @@ public class AggregateOperator extends MultiStageOperator {
       if (!_hasReturnedAggregateBlock) {
         return produceAggregatedBlock();
       } else {
-        // TODO: Move to close call.
         return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } catch (Exception e) {

@@ -39,6 +39,10 @@
   </properties>
   <dependencies>
     <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-configuration2</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.orc</groupId>
       <artifactId>orc-core</artifactId>
     </dependency>

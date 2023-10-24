@@ -81,6 +81,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   // Emitted only by Server to Deep-store segment uploader.
   SEGMENT_UPLOAD_TIMEOUT("segments", false),
   NUM_RESIZES("numResizes", false),
+  RESIZE_TIME_MS("resizeTimeMs", false),
   NO_TABLE_ACCESS("tables", true),
   INDEXING_FAILURES("attributeValues", true),
 
@@ -104,7 +105,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", false),
   NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),
   LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
-  TOTAL_THREAD_CPU_TIME_MILLIS("millis", false);
+  TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
+  LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false);
 
   private final String _meterName;
   private final String _unit;

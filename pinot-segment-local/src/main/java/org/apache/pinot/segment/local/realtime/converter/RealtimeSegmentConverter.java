@@ -54,6 +54,7 @@ public class RealtimeSegmentConverter {
   private final String _segmentName;
   private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
   private final boolean _nullHandlingEnabled;
+  private final boolean _enableColumnMajor;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, SegmentZKPropsConfig segmentZKPropsConfig,
       String outputPath, Schema schema, String tableName, TableConfig tableConfig, String segmentName,
@@ -70,11 +71,19 @@ public class RealtimeSegmentConverter {
     _tableConfig = tableConfig;
     _segmentName = segmentName;
     _nullHandlingEnabled = nullHandlingEnabled;
+    if (_tableConfig.getIngestionConfig() != null
+        && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
+      _enableColumnMajor = _tableConfig.getIngestionConfig()
+          .getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
+    } else {
+      _enableColumnMajor = _tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
+    }
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics)
       throws Exception {
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema);
+
     // The segment generation code in SegmentColumnarIndexCreator will throw
     // exception if start and end time in time column are not in acceptable
     // range. We don't want the realtime consumption to stop (if an exception
@@ -110,15 +119,19 @@ public class RealtimeSegmentConverter {
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-      int[] sortedDocIds =
-          _columnIndicesForRealtimeTable.getSortedColumn() != null
-              ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(
-                  _columnIndicesForRealtimeTable.getSortedColumn()) : null;
+      int[] sortedDocIds = _columnIndicesForRealtimeTable.getSortedColumn() != null
+          ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(
+          _columnIndicesForRealtimeTable.getSortedColumn()) : null;
       recordReader.init(_realtimeSegmentImpl, sortedDocIds);
       RealtimeSegmentSegmentCreationDataSource dataSource =
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
       driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline());
-      driver.build();
+
+      if (!_enableColumnMajor) {
+        driver.build();
+      } else {
+        driver.buildByColumn(_realtimeSegmentImpl);
+      }
     }
 
     if (segmentPartitionConfig != null) {
@@ -130,8 +143,8 @@ public class RealtimeSegmentConverter {
     }
   }
 
-  private <C extends IndexConfig> void addIndexOrDefault(SegmentGeneratorConfig genConfig,
-      IndexType<C, ?, ?> indexType, @Nullable Collection<String> columns, C defaultConfig) {
+  private <C extends IndexConfig> void addIndexOrDefault(SegmentGeneratorConfig genConfig, IndexType<C, ?, ?> indexType,
+      @Nullable Collection<String> columns, C defaultConfig) {
     Map<String, C> config = indexType.getConfig(genConfig.getTableConfig(), genConfig.getSchema());
     if (columns != null) {
       for (String column : columns) {
@@ -153,5 +166,9 @@ public class RealtimeSegmentConverter {
       }
     }
     return newSchema;
+  }
+
+  public boolean isColumnMajorEnabled() {
+    return _enableColumnMajor;
   }
 }

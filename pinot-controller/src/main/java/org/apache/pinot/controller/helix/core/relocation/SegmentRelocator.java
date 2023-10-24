@@ -169,7 +169,6 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     rebalanceConfig.setExternalViewCheckIntervalInMs(_externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(_externalViewStabilizationTimeoutInMs);
     rebalanceConfig.setUpdateTargetTier(TierConfigUtils.shouldRelocateToTiers(tableConfig));
-    rebalanceConfig.setJobId(TableRebalancer.createUniqueRebalanceJobIdentifier());
 
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
@@ -178,7 +177,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       // all segments are put on the right servers. If any segments are not on their target tier, the server local
       // tier migration is triggered for them, basically asking the hosting servers to reload them. The segment
       // target tier may get changed between the two sequential actions, but cluster states converge eventually.
-      RebalanceResult rebalance = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, false);
+      RebalanceResult rebalance = _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig,
+          TableRebalancer.createUniqueRebalanceJobIdentifier(), false);
       switch (rebalance.getStatus()) {
         case NO_OP:
           LOGGER.info("All segments are already relocated for table: {}", tableNameWithType);

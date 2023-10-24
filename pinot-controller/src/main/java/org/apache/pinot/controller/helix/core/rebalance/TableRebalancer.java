@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
@@ -47,6 +48,7 @@ import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
@@ -136,10 +138,28 @@ public class TableRebalancer {
     return UUID.randomUUID().toString();
   }
 
-  public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig) {
+  public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
+      @Nullable String rebalanceJobId) {
+    long startTime = System.currentTimeMillis();
+    String tableNameWithType = tableConfig.getTableName();
+    RebalanceResult.Status status = RebalanceResult.Status.UNKNOWN_ERROR;
+    try {
+      RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId);
+      status = result.getStatus();
+      return result;
+    } finally {
+      if (_controllerMetrics != null) {
+        _controllerMetrics.addTimedTableValue(String.format("%s.%s", tableNameWithType, status.toString()),
+            ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS, System.currentTimeMillis() - startTime,
+            TimeUnit.MILLISECONDS);
+      }
+    }
+  }
+
+  private RebalanceResult doRebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
+      @Nullable String rebalanceJobId) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
-    String rebalanceJobId = rebalanceConfig.getJobId();
     if (rebalanceJobId == null) {
       // If not passed along, create one.
       // TODO - Add rebalanceJobId to all log messages for easy tracking.
@@ -355,6 +375,11 @@ public class TableRebalancer {
             "For rebalanceId: %s, caught exception while waiting for ExternalView to converge for table: %s, "
                 + "aborting the rebalance", rebalanceJobId, tableNameWithType);
         LOGGER.warn(errorMsg, e);
+        if (_tableRebalanceObserver.isStopped()) {
+          return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
+              "Caught exception while waiting for ExternalView to converge: " + e, instancePartitionsMap,
+              tierToInstancePartitionsMap, targetAssignment);
+        }
         _tableRebalanceObserver.onError(errorMsg);
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED,
             "Caught exception while waiting for ExternalView to converge: " + e, instancePartitionsMap,
@@ -434,6 +459,11 @@ public class TableRebalancer {
       // Record change of current ideal state and the new target
       _tableRebalanceObserver.onTrigger(TableRebalanceObserver.Trigger.IDEAL_STATE_CHANGE_TRIGGER, currentAssignment,
           targetAssignment);
+      if (_tableRebalanceObserver.isStopped()) {
+        return new RebalanceResult(rebalanceJobId, _tableRebalanceObserver.getStopStatus(),
+            "Rebalance has stopped already before updating the IdealState", instancePartitionsMap,
+            tierToInstancePartitionsMap, targetAssignment);
+      }
       Map<String, Map<String, String>> nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup);
       LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be moved to "
@@ -691,6 +721,11 @@ public class TableRebalancer {
         _tableRebalanceObserver.onTrigger(
             TableRebalanceObserver.Trigger.EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
             externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields());
+        if (_tableRebalanceObserver.isStopped()) {
+          throw new RuntimeException(
+              String.format("Rebalance for table: %s has already stopped with status: %s", tableNameWithType,
+                  _tableRebalanceObserver.getStopStatus()));
+        }
         if (isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
             idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)) {
           LOGGER.info("ExternalView converged for table: {}", tableNameWithType);

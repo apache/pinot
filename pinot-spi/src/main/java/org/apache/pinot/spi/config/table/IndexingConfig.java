@@ -61,6 +61,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
   private boolean _nullHandlingEnabled;
+  private boolean _columnMajorSegmentBuilderEnabled = false;
 
   /**
    * If `optimizeDictionary` enabled, dictionary is not created for the high-cardinality
@@ -314,6 +315,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
     _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
+  public boolean isColumnMajorSegmentBuilderEnabled() {
+    return _columnMajorSegmentBuilderEnabled;
+  }
+
+  public void setColumnMajorSegmentBuilderEnabled(boolean columnMajorSegmentBuilderEnabled) {
+    _columnMajorSegmentBuilderEnabled = columnMajorSegmentBuilderEnabled;
   }
 
   public boolean isOptimizeDictionary() {

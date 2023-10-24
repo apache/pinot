@@ -36,11 +36,13 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   protected final OpChainExecutionContext _context;
   protected final String _operatorId;
   protected final OpChainStats _opChainStats;
+  protected boolean _isEarlyTerminated;
 
   public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
     _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
     _opChainStats = _context.getStats();
+    _isEarlyTerminated = false;
   }
 
   @Override
@@ -69,6 +71,13 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
 
   // Make it protected because we should always call nextBlock()
   protected abstract TransferableBlock getNextBlock();
+
+  protected void earlyTerminate() {
+    _isEarlyTerminated = true;
+    for (MultiStageOperator child : getChildOperators()) {
+      child.earlyTerminate();
+    }
+  }
 
   protected boolean shouldCollectStats() {
     return _context.isTraceEnabled();

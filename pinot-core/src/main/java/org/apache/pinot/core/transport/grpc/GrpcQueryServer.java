@@ -43,6 +43,7 @@ import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.streaming.StreamingResponseUtils;
 import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.server.access.AccessControl;
@@ -61,6 +62,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   private final ExecutorService _executorService =
       Executors.newFixedThreadPool(ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
   private final AccessControl _accessControl;
+  private final ServerQueryLogger _queryLogger = ServerQueryLogger.getInstance();
 
   public GrpcQueryServer(int port, GrpcConfig config, TlsConfig tlsConfig, QueryExecutor queryExecutor,
       ServerMetrics serverMetrics, AccessControl accessControl) {
@@ -174,5 +176,10 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     responseObserver.onNext(serverResponse);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_SENT, serverResponse.getSerializedSize());
     responseObserver.onCompleted();
+
+    // Log the query
+    if (_queryLogger != null) {
+      _queryLogger.logQuery(queryRequest, instanceResponse, "GrpcQueryServer");
+    }
   }
 }

@@ -33,9 +33,8 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.io.api.Binary;
-import org.apache.parquet.schema.DecimalMetadata;
 import org.apache.parquet.schema.GroupType;
-import org.apache.parquet.schema.OriginalType;
+import org.apache.parquet.schema.LogicalTypeAnnotation;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
@@ -143,14 +142,26 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
   }
 
   private Object extractValue(Group from, int fieldIndex, Type fieldType, int index) {
-    OriginalType originalType = fieldType.getOriginalType();
+    LogicalTypeAnnotation logicalTypeAnnotation = fieldType.getLogicalTypeAnnotation();
     if (fieldType.isPrimitive()) {
       PrimitiveType.PrimitiveTypeName primitiveTypeName = fieldType.asPrimitiveType().getPrimitiveTypeName();
       switch (primitiveTypeName) {
         case INT32:
-          return from.getInteger(fieldIndex, index);
+          int intValue = from.getInteger(fieldIndex, index);
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+            LogicalTypeAnnotation.DecimalLogicalTypeAnnotation decimalLogicalTypeAnnotation =
+                (LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalTypeAnnotation;
+            return BigDecimal.valueOf(intValue, decimalLogicalTypeAnnotation.getScale());
+          }
+          return intValue;
         case INT64:
-          return from.getLong(fieldIndex, index);
+          long longValue = from.getLong(fieldIndex, index);
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+            LogicalTypeAnnotation.DecimalLogicalTypeAnnotation decimalLogicalTypeAnnotation =
+                (LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalTypeAnnotation;
+            return BigDecimal.valueOf(longValue, decimalLogicalTypeAnnotation.getScale());
+          }
+          return longValue;
         case FLOAT:
           return from.getFloat(fieldIndex, index);
         case DOUBLE:
@@ -160,34 +171,32 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
         case INT96:
           Binary int96 = from.getInt96(fieldIndex, index);
           ByteBuffer buf = ByteBuffer.wrap(int96.getBytes()).order(ByteOrder.LITTLE_ENDIAN);
-          long dateTime = (buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH) * DateTimeConstants.MILLIS_PER_DAY
+          return (buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH) * DateTimeConstants.MILLIS_PER_DAY
               + buf.getLong(0) / NANOS_PER_MILLISECOND;
-          return dateTime;
         case BINARY:
         case FIXED_LEN_BYTE_ARRAY:
-          if (originalType != null) {
-            switch (originalType) {
-              case UTF8:
-              case ENUM:
-                return from.getValueToString(fieldIndex, index);
-              case DECIMAL:
-                DecimalMetadata decimalMetadata = fieldType.asPrimitiveType().getDecimalMetadata();
-                return binaryToDecimal(from.getBinary(fieldIndex, index), decimalMetadata.getPrecision(),
-                    decimalMetadata.getScale());
-              default:
-                break;
-            }
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
+            LogicalTypeAnnotation.DecimalLogicalTypeAnnotation decimalLogicalTypeAnnotation =
+                (LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) logicalTypeAnnotation;
+            return binaryToDecimal(from.getBinary(fieldIndex, index), decimalLogicalTypeAnnotation.getPrecision(),
+                decimalLogicalTypeAnnotation.getScale());
+          }
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.StringLogicalTypeAnnotation) {
+            return from.getValueToString(fieldIndex, index);
+          }
+          if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.EnumLogicalTypeAnnotation) {
+            return from.getValueToString(fieldIndex, index);
           }
           return from.getBinary(fieldIndex, index).getBytes();
         default:
           throw new IllegalArgumentException(
-              String.format("Unsupported field type: %s, primitive type: %s, original type: %s", fieldType,
-                  primitiveTypeName, originalType));
+              String.format("Unsupported field type: %s, primitive type: %s, logical type: %s", fieldType,
+                  primitiveTypeName, logicalTypeAnnotation));
       }
     } else if ((fieldType.isRepetition(Type.Repetition.OPTIONAL)) || (fieldType.isRepetition(Type.Repetition.REQUIRED))
         || (fieldType.isRepetition(Type.Repetition.REPEATED))) {
       Group group = from.getGroup(fieldIndex, index);
-      if (originalType == OriginalType.LIST) {
+      if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.ListLogicalTypeAnnotation) {
         return extractList(group);
       }
       return extractMap(group);

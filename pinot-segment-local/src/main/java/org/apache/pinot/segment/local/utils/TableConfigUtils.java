@@ -213,8 +213,7 @@ public final class TableConfigUtils {
     String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
     String schemaName = tableConfig.getValidationConfig().getSchemaName();
     if (schemaName != null && !schemaName.equals(rawTableName)) {
-      throw new IllegalStateException(
-          "Schema name: " + schemaName + " does not match table name: " + rawTableName);
+      throw new IllegalStateException("Schema name: " + schemaName + " does not match table name: " + rawTableName);
     }
   }
 
@@ -576,7 +575,8 @@ public final class TableConfigUtils {
   public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
       EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
           DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
-          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTRAWHLLPLUS);
+          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTRAWHLLPLUS,
+          DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH);
 
   @VisibleForTesting
   static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
@@ -626,8 +626,8 @@ public final class TableConfigUtils {
                   throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft.toString());
                 }
               } catch (IllegalArgumentException e) {
-                String err = String.format(
-                    "Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
+                String err =
+                    String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
                 throw new IllegalStateException(err);
               }
             }
