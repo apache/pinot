@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.core.function.scalar;
 
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.math.BigDecimal;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -93,5 +95,33 @@ public class SketchFunctionsTest {
     Assert.assertEquals(cpcEstimate(SketchFunctions.toCpcSketch(null, 11)), 0.0);
     Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toCpcSketch(new Object()));
     Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toCpcSketch(new Object(), 11));
+  }
+
+  private long ullEstimate(byte[] bytes) {
+    // round it to a long to make it easier to assert on
+    return Math.round(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(bytes).getDistinctCountEstimate());
+  }
+
+  @Test
+  public void testULLCreation() {
+    for (Object i : _inputs) {
+      Assert.assertEquals(ullEstimate(SketchFunctions.toULL(i)), 1);
+      Assert.assertEquals(ullEstimate(SketchFunctions.toULL(i, 11)), 1);
+    }
+    Assert.assertEquals(ullEstimate(SketchFunctions.toULL(null)), 0);
+    Assert.assertEquals(ullEstimate(SketchFunctions.toULL(null, 11)), 0);
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toULL(new Object()));
+    Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toULL(new Object(), 11));
+  }
+
+  @Test
+  public void testULLLoading() {
+    for (Object i : _inputs) {
+      UltraLogLog ull = UltraLogLog.create(12);
+      UltraLogLogUtils.hashObject(i).ifPresent(ull::add);
+      byte[] loaded = SketchFunctions.fromULL(ull.getState());
+      UltraLogLog deserialized = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(loaded);
+      Assert.assertEquals(deserialized.getState(), ull.getState());
+    }
   }
 }

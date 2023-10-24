@@ -81,6 +81,9 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTCPCSKETCH:
       case DISTINCTCOUNTRAWCPCSKETCH:
         return new DistinctCountCPCSketchValueAggregator(arguments);
+      case DISTINCTCOUNTULL:
+      case DISTINCTCOUNTRAWULL:
+        return new DistinctCountULLValueAggregator(arguments);
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }
@@ -133,6 +136,9 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTCPCSKETCH:
       case DISTINCTCOUNTRAWCPCSKETCH:
         return DistinctCountCPCSketchValueAggregator.AGGREGATED_VALUE_TYPE;
+      case DISTINCTCOUNTULL:
+      case DISTINCTCOUNTRAWULL:
+        return DistinctCountULLValueAggregator.AGGREGATED_VALUE_TYPE;
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }
