@@ -76,7 +76,7 @@ public class PinotControllerTransport {
       userAgentProperties.load(
           PinotControllerTransport.class.getClassLoader().getResourceAsStream("version.properties"));
     } catch (IOException e) {
-      LOGGER.warn("Unable to set user agent version");
+      LOGGER.warn("Unable to set user agent version", e);
     }
     String userAgentFromProperties = userAgentProperties.getProperty("ua", "unknown");
     if (StringUtils.isNotEmpty(appId)) {

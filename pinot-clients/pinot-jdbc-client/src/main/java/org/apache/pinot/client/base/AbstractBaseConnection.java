@@ -51,7 +51,7 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public void clearWarnings()
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op
   }
 
   @Override
@@ -111,42 +111,43 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public boolean getAutoCommit()
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return false;
   }
 
   @Override
   public void setAutoCommit(boolean autoCommit)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op
   }
 
   @Override
   public String getCatalog()
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return null;
   }
 
   @Override
   public void setCatalog(String catalog)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op
   }
 
   @Override
   public String getClientInfo(String name)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return null;
   }
 
   @Override
   public Properties getClientInfo()
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return null;
   }
 
   @Override
   public void setClientInfo(Properties properties)
       throws SQLClientInfoException {
+    // no-op
   }
 
   @Override
@@ -170,13 +171,13 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public String getSchema()
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return null;
   }
 
   @Override
   public void setSchema(String schema)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op
   }
 
   @Override
@@ -206,7 +207,7 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public SQLWarning getWarnings()
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    return null;
   }
 
   @Override
@@ -218,7 +219,7 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public void setReadOnly(boolean readOnly)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op
   }
 
   @Override
@@ -310,6 +311,7 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public void setClientInfo(String name, String value)
       throws SQLClientInfoException {
+    // no-op
   }
 
   @Override
