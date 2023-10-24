@@ -33,7 +33,6 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
-      -pl 'pinot-segment-local' \
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
@@ -44,7 +43,6 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \
-    -pl '!pinot-segment-local' \
     -pl '!pinot-core' \
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
