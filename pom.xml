@@ -163,6 +163,7 @@
     <aws.sdk.version>2.20.137</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
     <testng.version>7.8.0</testng.version>
+    <woodstox.version>6.4.0</woodstox.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
@@ -1354,8 +1355,6 @@
         <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
         <version>${flink.version}</version>
       </dependency>
-
-      <!-- used by some projects like kafka-protobuf-serializer-->
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-stdlib-jdk8</artifactId>
@@ -1365,6 +1364,11 @@
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-stdlib</artifactId>
         <version>${kotlin.stdlib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.woodstox</groupId>
+        <artifactId>woodstox-core</artifactId>
+        <version>${woodstox.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

@@ -107,8 +107,8 @@ public class PinotFSSegmentUploader implements SegmentUploader {
       _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_TIMEOUT, 1);
       LOGGER.warn("Timed out waiting to upload segment: {} for table: {}", segmentName.getSegmentName(), rawTableName);
     } catch (Exception e) {
-      LOGGER
-          .warn("Failed to upload file {} of segment {} for table {} ", segmentFile.getAbsolutePath(), segmentName, e);
+      LOGGER.warn("Failed to upload file {} of segment {} for table {}",
+              segmentFile.getAbsolutePath(), segmentName, rawTableName, e);
     }
     _serverMetrics.addMeteredTableValue(rawTableName, ServerMeter.SEGMENT_UPLOAD_FAILURE, 1);
 
