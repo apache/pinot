@@ -144,6 +144,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
         _brokerReduceService.reduceOnDataTable(originalBrokerRequest, serverBrokerRequest, dataTableMap,
             reduceTimeOutMs, _brokerMetrics);
     final long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
+    requestContext.setTraceInfo(brokerResponse.getTraceInfo());
     requestContext.setReduceTimeNanos(reduceTimeNanos);
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);
 

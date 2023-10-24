@@ -40,7 +40,6 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   REALTIME_OFFHEAP_MEMORY_USED("bytes", false),
   REALTIME_SEGMENT_NUM_PARTITIONS("realtimeSegmentNumPartitions", false),
   LLC_SIMULTANEOUS_SEGMENT_BUILDS("llcSimultaneousSegmentBuilds", true),
-  RESIZE_TIME_MS("milliseconds", false),
   // Upsert metrics
   UPSERT_PRIMARY_KEYS_COUNT("upsertPrimaryKeysCount", false),
   // Dedup metrics

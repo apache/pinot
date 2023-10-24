@@ -313,9 +313,8 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   }
 
   @Test
-  public void testReset()
-      throws Exception {
-    super.testReset(TableType.REALTIME);
+  public void testReset() {
+    testReset(TableType.REALTIME);
   }
 
   @Test

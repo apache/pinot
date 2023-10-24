@@ -58,7 +58,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   private final int _brokerReadTimeout;
   private final AsyncHttpClient _httpClient;
   private final String _extraOptionStr;
-  private final boolean _useMultiStageEngine;
+  private final boolean _useMultistageEngine;
 
   public JsonAsyncHttpPinotClientTransport() {
     _brokerReadTimeout = 60000;
@@ -66,17 +66,17 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     _scheme = CommonConstants.HTTP_PROTOCOL;
     _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;
     _httpClient = Dsl.asyncHttpClient(Dsl.config().setRequestTimeout(_brokerReadTimeout));
-    _useMultiStageEngine = false;
+    _useMultistageEngine = false;
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
-      boolean useMultiStageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
+      boolean useMultistageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
       TlsProtocols tlsProtocols, @Nullable String appId) {
     _brokerReadTimeout = connectionTimeouts.getReadTimeoutMs();
     _headers = headers;
     _scheme = scheme;
     _extraOptionStr = StringUtils.isEmpty(extraOptionString) ? DEFAULT_EXTRA_QUERY_OPTION_STRING : extraOptionString;
-    _useMultiStageEngine = useMultiStageEngine;
+    _useMultistageEngine = useMultistageEngine;
 
     Builder builder = Dsl.config();
     if (sslContext != null) {
@@ -109,7 +109,9 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       json.put("sql", query);
       json.put("queryOptions", _extraOptionStr);
 
-      String url = String.format("%s://%s%s", _scheme, brokerAddress, _useMultiStageEngine ? "/query" : "/query/sql");
+      LOGGER.debug("Query will use Multistage Engine = {}", _useMultistageEngine);
+
+      String url = String.format("%s://%s%s", _scheme, brokerAddress, _useMultistageEngine ? "/query" : "/query/sql");
       BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
 
       if (_headers != null) {

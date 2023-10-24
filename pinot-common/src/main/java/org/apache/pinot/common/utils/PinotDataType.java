@@ -394,7 +394,9 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      return BigDecimal.valueOf((Float) value);
+      // Use string representation of the value to create BigDecimal to avoid getting the exact floating-point value.
+      // new BigDecimal(123.45f) -> 123.4499969482421875
+      return new BigDecimal(value.toString());
     }
 
     @Override
@@ -446,11 +448,9 @@ public enum PinotDataType {
 
     @Override
     public BigDecimal toBigDecimal(Object value) {
-      // Note:
-      // - BigDecimal.valueOf(double): uses the canonical String representation of the double value passed
-      //     in to instantiate the BigDecimal object.
-      // - new BigDecimal(double): attempts to represent the double value as accurately as possible.
-      return BigDecimal.valueOf((Double) value);
+      // Use string representation of the value to create BigDecimal to avoid getting the exact floating-point value.
+      // new BigDecimal(123.45) -> 123.4500000000000028421709430404007434844970703125
+      return new BigDecimal(value.toString());
     }
 
     @Override

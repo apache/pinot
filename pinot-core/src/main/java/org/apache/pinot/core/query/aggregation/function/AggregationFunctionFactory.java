@@ -23,6 +23,16 @@ import java.util.List;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctDoubleFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctFloatFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctIntFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctLongFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDistinctStringFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggDoubleFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggFloatFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggIntFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFunction;
+import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -111,8 +121,8 @@ public class AggregationFunctionFactory {
         } else if (numArguments == 2) {
           // Double arguments percentile (e.g. percentile(foo, 99), percentileTDigest(bar, 95), etc.) where the
           // second argument is a decimal number from 0.0 to 100.0.
-          // Have to use literal string because we need to cast int to double here.
-          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral().getStringValue());
+          double percentile = arguments.get(1).getLiteral().getDoubleValue();
+          Preconditions.checkArgument(percentile >= 0 && percentile <= 100, "Invalid percentile: %s", percentile);
           if (remainingFunctionName.isEmpty()) {
             // Percentile
             return new PercentileAggregationFunction(firstArgument, percentile);
@@ -159,9 +169,10 @@ public class AggregationFunctionFactory {
           // the compression_factor for the TDigest. This can only be used for TDigest type percentile functions to
           // pass in a custom compression_factor. If the two argument version is used the default compression_factor
           // of 100.0 is used.
-          // Have to use literal string because we need to cast int to double here.
-          double percentile = parsePercentileToDouble(arguments.get(1).getLiteral().getStringValue());
-          int compressionFactor = parseCompressionFactorToInt(arguments.get(2).getLiteral().getStringValue());
+          double percentile = arguments.get(1).getLiteral().getDoubleValue();
+          Preconditions.checkArgument(percentile >= 0 && percentile <= 100, "Invalid percentile: %s", percentile);
+          int compressionFactor = arguments.get(2).getLiteral().getIntValue();
+          Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %d", compressionFactor);
           if (remainingFunctionName.equals("TDIGEST")) {
             // PercentileTDigest
             return new PercentileTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
@@ -223,6 +234,58 @@ public class AggregationFunctionFactory {
                 return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol);
               default:
                 throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
+            }
+          }
+          case ARRAYAGG: {
+            Preconditions.checkArgument(numArguments >= 2,
+                "ARRAY_AGG expects 2 or 3 arguments, got: %s. The function can be used as "
+                    + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", numArguments);
+            ExpressionContext dataTypeExp = arguments.get(1);
+            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
+                "ARRAY_AGG expects the 2nd argument to be literal, got: %s. The function can be used as "
+                    + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", dataTypeExp.getType());
+            DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
+            boolean isDistinct = false;
+            if (numArguments == 3) {
+              ExpressionContext isDistinctExp = arguments.get(2);
+              Preconditions.checkArgument(isDistinctExp.getType() == ExpressionContext.Type.LITERAL,
+                  "ARRAY_AGG expects the 3rd argument to be literal, got: %s. The function can be used as "
+                      + "arrayAgg(dataColumn, 'dataType', ['isDistinct'])", isDistinctExp.getType());
+              isDistinct = isDistinctExp.getLiteral().getBooleanValue();
+            }
+            if (isDistinct) {
+              switch (dataType) {
+                case BOOLEAN:
+                case INT:
+                  return new ArrayAggDistinctIntFunction(firstArgument, dataType, nullHandlingEnabled);
+                case LONG:
+                case TIMESTAMP:
+                  return new ArrayAggDistinctLongFunction(firstArgument, dataType, nullHandlingEnabled);
+                case FLOAT:
+                  return new ArrayAggDistinctFloatFunction(firstArgument, nullHandlingEnabled);
+                case DOUBLE:
+                  return new ArrayAggDistinctDoubleFunction(firstArgument, nullHandlingEnabled);
+                case STRING:
+                  return new ArrayAggDistinctStringFunction(firstArgument, nullHandlingEnabled);
+                default:
+                  throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
+              }
+            }
+            switch (dataType) {
+              case BOOLEAN:
+              case INT:
+                return new ArrayAggIntFunction(firstArgument, dataType, nullHandlingEnabled);
+              case LONG:
+              case TIMESTAMP:
+                return new ArrayAggLongFunction(firstArgument, dataType, nullHandlingEnabled);
+              case FLOAT:
+                return new ArrayAggFloatFunction(firstArgument, nullHandlingEnabled);
+              case DOUBLE:
+                return new ArrayAggDoubleFunction(firstArgument, nullHandlingEnabled);
+              case STRING:
+                return new ArrayAggStringFunction(firstArgument, nullHandlingEnabled);
+              default:
+                throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
             }
           }
           case LASTWITHTIME: {
@@ -363,7 +426,14 @@ public class AggregationFunctionFactory {
             return new FrequentStringsSketchAggregationFunction(arguments);
           case FREQUENTLONGSSKETCH:
             return new FrequentLongsSketchAggregationFunction(arguments);
-
+          case DISTINCTCOUNTCPCSKETCH:
+            return new DistinctCountCPCSketchAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWCPCSKETCH:
+            return new DistinctCountRawCPCSketchAggregationFunction(arguments);
+          case DISTINCTCOUNTULL:
+            return new DistinctCountULLAggregationFunction(arguments);
+          case DISTINCTCOUNTRAWULL:
+            return new DistinctCountRawULLAggregationFunction(arguments);
           default:
             throw new IllegalArgumentException("Unsupported aggregation function type: " + functionType);
         }
@@ -377,17 +447,5 @@ public class AggregationFunctionFactory {
     int percentile = Integer.parseInt(percentileString);
     Preconditions.checkArgument(percentile >= 0 && percentile <= 100, "Invalid percentile: %s", percentile);
     return percentile;
-  }
-
-  private static double parsePercentileToDouble(String percentileString) {
-    double percentile = Double.parseDouble(percentileString);
-    Preconditions.checkArgument(percentile >= 0d && percentile <= 100d, "Invalid percentile: %s", percentile);
-    return percentile;
-  }
-
-  private static int parseCompressionFactorToInt(String compressionFactorString) {
-    int compressionFactor = Integer.parseInt(compressionFactorString);
-    Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %d", compressionFactor);
-    return compressionFactor;
   }
 }

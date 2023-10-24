@@ -92,7 +92,7 @@ public class ControllerLeaderLocatorTest {
 
     // invalidate within {@link ControllerLeaderLocator::getMinInvalidateIntervalMs()} millis
     // values should remain unchanged
-    currentTimeMs = 32_000L;
+    currentTimeMs = currentTimeMs + controllerLeaderLocator.getMinInvalidateIntervalMs() / 3;
     controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderValid());
@@ -105,7 +105,7 @@ public class ControllerLeaderLocatorTest {
 
     // invalidate within {@link ControllerLeaderLocator::getMinInvalidateIntervalMs()} millis
     // values should remain unchanged
-    currentTimeMs = 33_000L;
+    currentTimeMs = currentTimeMs + controllerLeaderLocator.getMinInvalidateIntervalMs() / 3;
     controllerLeaderLocator.setCurrentTimeMs(currentTimeMs);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderValid());

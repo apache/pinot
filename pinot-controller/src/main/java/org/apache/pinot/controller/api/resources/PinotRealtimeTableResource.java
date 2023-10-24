@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -139,8 +138,8 @@ public class PinotRealtimeTableResource {
           + "Please note that this is an asynchronous operation, "
           + "and 200 response does not mean it has actually been done already")
   public Map<String, String> forceCommit(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName)
-      throws JsonProcessingException {
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+    long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validate(tableNameWithType);
     Map<String, String> response = new HashMap<>();
@@ -149,7 +148,8 @@ public class PinotRealtimeTableResource {
       response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();
-        _pinotHelixResourceManager.addNewForceCommitJob(tableNameWithType, jobId, consumingSegmentsForceCommitted);
+        _pinotHelixResourceManager.addNewForceCommitJob(tableNameWithType, jobId, startTimeMs,
+            consumingSegmentsForceCommitted);
         response.put("jobMetaZKWriteStatus", "SUCCESS");
         response.put("forceCommitJobId", jobId);
       } catch (Exception e) {

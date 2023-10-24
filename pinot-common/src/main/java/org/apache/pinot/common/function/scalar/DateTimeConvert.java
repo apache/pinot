@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -35,7 +36,7 @@ public class DateTimeConvert {
   private DateTimeGranularitySpec _granularitySpec;
 
   @ScalarFunction(names = {"dateTimeConvert", "date_time_convert"})
-  public String dateTimeConvert(String timeValueStr, String inputFormatStr, String outputFormatStr,
+  public Object dateTimeConvert(String timeValueStr, String inputFormatStr, String outputFormatStr,
       String outputGranularityStr) {
     if (_inputFormatSpec == null) {
       _inputFormatSpec = new DateTimeFormatSpec(inputFormatStr);
@@ -74,6 +75,11 @@ public class DateTimeConvert {
     } else {
       long granularityMs = _granularitySpec.granularityToMillis();
       long roundedTimeValueMs = timeValueMs / granularityMs * granularityMs;
+      if (_outputFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.EPOCH) {
+        return _outputFormatSpec.getColumnUnit().convert(roundedTimeValueMs, TimeUnit.MILLISECONDS)
+            / _outputFormatSpec.getColumnSize();
+      }
+      // _outputFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.TIMESTAMP
       return _outputFormatSpec.fromMillisToFormat(roundedTimeValueMs);
     }
   }

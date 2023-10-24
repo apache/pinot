@@ -125,16 +125,16 @@
     },
     "queries": [
       {
-        "sql": "SELECT PERCENTILE(float_col, 50), PERCENTILE(double_col, 5), PERCENTILE(int_col, 75), PERCENTILE(long_col, 75) FROM {tbl}",
-        "outputs": [[1.75, 1, 150, 150]]
+        "sql": "SELECT AVG(int_col), PERCENTILE(float_col, 50), PERCENTILE(double_col, 5), PERCENTILE(int_col, 75), PERCENTILE(long_col, 75) FROM {tbl}",
+        "outputs": [[76.14285714285714, 1.75, 1, 150, 150]]
       },
       {
-        "sql": "SELECT bool_col, PERCENTILE(float_col, 50), PERCENTILE(double_col, 5), PERCENTILE(int_col, 75), PERCENTILE(long_col, 75) FROM {tbl} GROUP BY bool_col",
-        "outputs": [[false, 1.5, 1, 150, 150], [true, 300, 1.75, 175, 175]]
+        "sql": "SELECT bool_col, AVG(int_col), PERCENTILE(float_col, 50), PERCENTILE(double_col, 5), PERCENTILE(int_col, 75), PERCENTILE(long_col, 75) FROM {tbl} GROUP BY bool_col",
+        "outputs": [[false, 88.5, 1.5, 1, 150, 150], [true, 59.666666666666664, 300, 1.75, 175, 175]]
       },
       {
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, PERCENTILE(float_col, 50), PERCENTILE(double_col, 5), PERCENTILE(int_col, 75), PERCENTILE(long_col, 75) FROM {tbl} GROUP BY string_col",
-        "outputs": [["a", 400, 300, 2, 2], ["b", 100, 1, 100, 100], ["c", 1.5, 1.01, 175, 175]]
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, AVG(int_col), PERCENTILE(float_col, 50), PERCENTILE(double_col, 5), PERCENTILE(int_col, 75), PERCENTILE(long_col, 75) FROM {tbl} GROUP BY string_col",
+        "outputs": [["a", 2.0, 400, 300, 2, 2], ["b", 51.5, 100, 1, 100, 100], ["c", 142.0, 1.5, 1.01, 175, 175]]
       },
       {
         "sql": "SELECT PERCENTILE_EST(float_col, 50), PERCENTILE_EST(double_col, 5), PERCENTILE_EST(int_col, 75), PERCENTILE_EST(long_col, 75) FROM {tbl}",
@@ -201,16 +201,16 @@
     },
     "queries": [
       {
-        "sql": "select GET_THETA_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_THETA_SKETCH(string_col, 'nominalEntries=16')), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(long_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT(DISTINCT_COUNT_RAW_THETA_SKETCH(double_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(float_col, 'nominalEntries=1000'))) FROM {tbl}",
-        "outputs": [[3, 0, 6, 6]]
+        "sql": "select AVG(int_col), GET_THETA_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_THETA_SKETCH(string_col, 'nominalEntries=16')), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(long_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT(DISTINCT_COUNT_RAW_THETA_SKETCH(double_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(float_col, 'nominalEntries=1000'))) FROM {tbl}",
+        "outputs": [[76.14285714285714, 3, 0, 6, 6]]
       },
       {
-        "sql": "select bool_col, GET_THETA_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_THETA_SKETCH(string_col, 'nominalEntries=16')), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(long_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT(DISTINCT_COUNT_RAW_THETA_SKETCH(double_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(float_col, 'nominalEntries=1000'))) FROM {tbl} GROUP BY bool_col",
-        "outputs": [[true, 2, 0, 2, 3], [false, 2, 0, 4, 3]]
+        "sql": "select bool_col, AVG(int_col), GET_THETA_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_THETA_SKETCH(string_col, 'nominalEntries=16')), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(long_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT(DISTINCT_COUNT_RAW_THETA_SKETCH(double_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(float_col, 'nominalEntries=1000'))) FROM {tbl} GROUP BY bool_col",
+        "outputs": [[true, 59.666666666666664, 2, 0, 2, 3], [false, 88.5, 2, 0, 4, 3]]
       },
       {
-        "sql": "select /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ bool_col, GET_THETA_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_THETA_SKETCH(string_col, 'nominalEntries=16')), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(long_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT(DISTINCT_COUNT_RAW_THETA_SKETCH(double_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(float_col, 'nominalEntries=1000'))) FROM {tbl} GROUP BY bool_col",
-        "outputs": [[true, 2, 0, 2, 3], [false, 2, 0, 4, 3]]
+        "sql": "select /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ bool_col, AVG(int_col), GET_THETA_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_THETA_SKETCH(string_col, 'nominalEntries=16')), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_DIFF(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_UNION(DISTINCT_COUNT_RAW_THETA_SKETCH(int_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(long_col, ''))), GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT(DISTINCT_COUNT_RAW_THETA_SKETCH(double_col, ''), DISTINCT_COUNT_RAW_THETA_SKETCH(float_col, 'nominalEntries=1000'))) FROM {tbl} GROUP BY bool_col",
+        "outputs": [[true, 59.666666666666664, 2, 0, 2, 3], [false, 88.5, 2, 0, 4, 3]]
       },
       {
         "sql": "select distinct_count_theta_sketch(int_col), distinctCountThetaSketch(long_col), DISTINCT_COUNT_THETA_SKETCH(float_col), DISTINCTCOUNTTHETASKETCH(double_col) FROM {tbl}",

@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
@@ -71,7 +72,6 @@ import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TlsUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
@@ -93,6 +93,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceChecker;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
@@ -127,7 +128,6 @@ import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
-import org.apache.zookeeper.data.Stat;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,6 +175,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected SegmentRelocator _segmentRelocator;
   protected RetentionManager _retentionManager;
   protected SegmentStatusChecker _segmentStatusChecker;
+  protected RebalanceChecker _rebalanceChecker;
   protected RealtimeConsumerMonitor _realtimeConsumerMonitor;
   protected PinotTaskManager _taskManager;
   protected TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
@@ -580,22 +581,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     List<String> allTables = _helixResourceManager.getAllTables();
     allTables.forEach(tableNameWithType -> {
-      String tableConfigPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType);
-      Stat tableConfigStat = new Stat();
-      ZNRecord tableConfigZNRecord = propertyStore.get(tableConfigPath, tableConfigStat, AccessOption.PERSISTENT);
-      if (tableConfigZNRecord == null) {
+      Pair<TableConfig, Integer> tableConfigWithVersion =
+          ZKMetadataProvider.getTableConfigWithVersion(propertyStore, tableNameWithType);
+      if (tableConfigWithVersion == null) {
         // This might due to table deletion, just log it here.
         LOGGER.warn("Failed to find table config for table: {}, the table likely already got deleted",
             tableNameWithType);
         return;
       }
-      TableConfig tableConfig;
-      try {
-        tableConfig = TableConfigUtils.fromZNRecord(tableConfigZNRecord);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception constructing table config from ZNRecord for table: {}", tableNameWithType, e);
-        return;
-      }
+      TableConfig tableConfig = tableConfigWithVersion.getLeft();
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       String schemaPath = ZKMetadataProvider.constructPropertyStorePathForSchema(rawTableName);
       boolean schemaExists = propertyStore.exists(schemaPath, AccessOption.PERSISTENT);
@@ -635,14 +629,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       }
       // Update table config to remove schema name
       tableConfig.getValidationConfig().setSchemaName(null);
-      try {
-        tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception constructing ZNRecord from table config for table: {}", tableNameWithType, e);
-        return;
-      }
-      if (propertyStore.set(tableConfigPath, tableConfigZNRecord, tableConfigStat.getVersion(),
-          AccessOption.PERSISTENT)) {
+      if (ZKMetadataProvider.setTableConfig(propertyStore, tableConfig, tableConfigWithVersion.getRight())) {
         LOGGER.info("Removed schema name from table config for table: {}", tableNameWithType);
         fixedSchemaTableCount.getAndIncrement();
       } else {
@@ -833,6 +820,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
             _executorService);
     periodicTasks.add(_segmentStatusChecker);
+    _rebalanceChecker = new RebalanceChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
+        _executorService);
+    periodicTasks.add(_rebalanceChecker);
     _realtimeConsumerMonitor =
         new RealtimeConsumerMonitor(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics,
             _executorService);

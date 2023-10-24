@@ -40,8 +40,8 @@ import picocli.CommandLine;
 
 @CommandLine.Command
 public class SegmentDumpTool extends AbstractBaseCommand implements Command {
-  @CommandLine.Option(names = {"-path"}, required = true,
-      description = "Path of the folder containing the segment" + " file")
+  @CommandLine.Option(names = {"-path"}, required = true, description = "Path of the folder containing the segment"
+      + " file")
   private String _segmentDir = null;
 
   @CommandLine.Option(names = {"-columns"}, arity = "1..*", description = "Columns to dump")
@@ -50,8 +50,8 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-dumpStarTree"})
   private boolean _dumpStarTree = false;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
-      description = "Print this message.")
+  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true, description =
+      "Print this message.")
   private boolean _help = false;
 
   private void dump()
@@ -94,6 +94,15 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
     }
   }
 
+  // Adds custom output formatting depending on the type of value
+  private void printRowValue(Object value) {
+    if (value instanceof byte[]) {
+      System.out.printf("%s bytes", ((byte[]) value).length);
+    } else {
+      System.out.print(value);
+    }
+  }
+
   private void dumpRows(PinotSegmentRecordReader reader, GenericRow reuse, Set<String> mvColumns) {
     int docId = 0;
 
@@ -103,7 +112,7 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
 
       for (String columnName : _columnNames) {
         if (!mvColumns.contains(columnName)) {
-          System.out.print(row.getValue(columnName));
+          printRowValue(row.getValue(columnName));
           System.out.print("\t");
         } else {
           Object[] values = (Object[]) row.getValue(columnName);

@@ -23,7 +23,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -52,7 +55,9 @@ public class DataSchema {
   private final ColumnDataType[] _columnDataTypes;
   private ColumnDataType[] _storedColumnDataTypes;
 
-  /** Used by both Broker and Server to generate results for EXPLAIN PLAN queries. */
+  /**
+   * Used by both Broker and Server to generate results for EXPLAIN PLAN queries.
+   */
   public static final DataSchema EXPLAIN_RESULT_SCHEMA =
       new DataSchema(new String[]{"Operator", "Operator_Id", "Parent_Id"}, new ColumnDataType[]{
           ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.INT
@@ -425,19 +430,19 @@ public class DataSchema {
         case BYTES:
           return ((ByteArray) value).getBytes();
         case INT_ARRAY:
-          return (int[]) value;
+          return toIntArray(value);
         case LONG_ARRAY:
           return toLongArray(value);
         case FLOAT_ARRAY:
-          return (float[]) value;
+          return toFloatArray(value);
         case DOUBLE_ARRAY:
           return toDoubleArray(value);
         case STRING_ARRAY:
-          return (String[]) value;
+          return toStringArray(value);
         case BOOLEAN_ARRAY:
-          return toBooleanArray((int[]) value);
+          return toBooleanArray(toIntArray(value));
         case TIMESTAMP_ARRAY:
-          return toTimestampArray((long[]) value);
+          return toTimestampArray(toLongArray(value));
         case BYTES_ARRAY:
           return (byte[][]) value;
         case UNKNOWN: // fall through
@@ -513,11 +518,31 @@ public class DataSchema {
       }
     }
 
+    private static int[] toIntArray(Object value) {
+      if (value instanceof int[]) {
+        return (int[]) value;
+      } else if (value instanceof IntArrayList) {
+        // For ArrayAggregationFunction
+        return ((IntArrayList) value).elements();
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to int[]", value));
+    }
+
+    private static float[] toFloatArray(Object value) {
+      if (value instanceof float[]) {
+        return (float[]) value;
+      } else if (value instanceof FloatArrayList) {
+        // For ArrayAggregationFunction
+        return ((FloatArrayList) value).elements();
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to float[]", value));
+    }
+
     private static double[] toDoubleArray(Object value) {
       if (value instanceof double[]) {
         return (double[]) value;
       } else if (value instanceof DoubleArrayList) {
-        // For HistogramAggregationFunction
+        // For HistogramAggregationFunction and ArrayAggregationFunction
         return ((DoubleArrayList) value).elements();
       } else if (value instanceof int[]) {
         int[] intValues = (int[]) value;
@@ -550,7 +575,7 @@ public class DataSchema {
       if (value instanceof long[]) {
         return (long[]) value;
       } else if (value instanceof LongArrayList) {
-        // For FunnelCountAggregationFunction
+        // For FunnelCountAggregationFunction and ArrayAggregationFunction
         return ((LongArrayList) value).elements();
       } else {
         int[] intValues = (int[]) value;
@@ -561,6 +586,16 @@ public class DataSchema {
         }
         return longValues;
       }
+    }
+
+    private static String[] toStringArray(Object value) {
+      if (value instanceof String[]) {
+        return (String[]) value;
+      } else if (value instanceof ObjectArrayList) {
+        // For ArrayAggregationFunction
+        return ((ObjectArrayList<String>) value).toArray(new String[0]);
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to String[]", value));
     }
 
     private static boolean[] toBooleanArray(int[] intArray) {

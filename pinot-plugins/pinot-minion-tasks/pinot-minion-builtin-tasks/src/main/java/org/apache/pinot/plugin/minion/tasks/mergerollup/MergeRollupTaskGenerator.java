@@ -157,7 +157,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       LOGGER.info("Start generating task configs for table: {} for task: {}", tableNameWithType, taskType);
 
       // Get all segment metadata
-      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+      List<SegmentZKMetadata> allSegments = getSegmentsZKMetadataForTable(tableNameWithType);
       // Filter segments based on status
       List<SegmentZKMetadata> preSelectedSegmentsBasedOnStatus
           = filterSegmentsBasedOnStatus(tableConfig.getTableType(), allSegments);

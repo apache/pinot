@@ -21,6 +21,7 @@ package org.apache.pinot.core.common;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.clearspring.analytics.stream.cardinality.RegisterSet;
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
@@ -34,19 +35,23 @@ import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import it.unimi.dsi.fastutil.floats.Float2LongMap;
 import it.unimi.dsi.fastutil.floats.Float2LongOpenHashMap;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import it.unimi.dsi.fastutil.floats.FloatIterator;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatSet;
 import it.unimi.dsi.fastutil.ints.Int2LongMap;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2LongMap;
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.IOException;
@@ -59,6 +64,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.datasketches.common.ArrayOfStringsSerDe;
+import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.frequencies.ItemsSketch;
 import org.apache.datasketches.frequencies.LongsSketch;
 import org.apache.datasketches.kll.KllDoublesSketch;
@@ -142,8 +148,13 @@ public class ObjectSerDeUtils {
     IntegerTupleSketch(37),
     FrequentStringsSketch(38),
     FrequentLongsSketch(39),
-    HyperLogLogPlus(40);
-
+    HyperLogLogPlus(40),
+    CompressedProbabilisticCounting(41),
+    IntArrayList(42),
+    LongArrayList(43),
+    FloatArrayList(44),
+    StringArrayList(45),
+    UltraLogLog(46);
 
     private final int _value;
 
@@ -164,8 +175,25 @@ public class ObjectSerDeUtils {
         return ObjectType.Double;
       } else if (value instanceof BigDecimal) {
         return ObjectType.BigDecimal;
+      } else if (value instanceof IntArrayList) {
+        return ObjectType.IntArrayList;
+      } else if (value instanceof LongArrayList) {
+        return ObjectType.LongArrayList;
+      } else if (value instanceof FloatArrayList) {
+        return ObjectType.FloatArrayList;
       } else if (value instanceof DoubleArrayList) {
         return ObjectType.DoubleArrayList;
+      } else if (value instanceof ObjectArrayList) {
+        ObjectArrayList objectArrayList = (ObjectArrayList) value;
+        if (!objectArrayList.isEmpty()) {
+          Object next = objectArrayList.get(0);
+          if (next instanceof String) {
+            return ObjectType.StringArrayList;
+          }
+          throw new IllegalArgumentException(
+              "Unsupported type of value: " + next.getClass().getSimpleName());
+        }
+        return ObjectType.StringArrayList;
       } else if (value instanceof AvgPair) {
         return ObjectType.AvgPair;
       } else if (value instanceof MinMaxRangePair) {
@@ -241,6 +269,10 @@ public class ObjectSerDeUtils {
         return ObjectType.FrequentLongsSketch;
       } else if (value instanceof HyperLogLogPlus) {
         return ObjectType.HyperLogLogPlus;
+      } else if (value instanceof CpcSketch) {
+        return ObjectType.CompressedProbabilisticCounting;
+      } else if (value instanceof UltraLogLog) {
+        return ObjectType.UltraLogLog;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -326,6 +358,99 @@ public class ObjectSerDeUtils {
     }
   };
 
+  public static final ObjectSerDe<IntArrayList> INT_ARRAY_LIST_SER_DE = new ObjectSerDe<IntArrayList>() {
+
+    @Override
+    public byte[] serialize(IntArrayList intArrayList) {
+      int size = intArrayList.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Integer.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      int[] values = intArrayList.elements();
+      for (int i = 0; i < size; i++) {
+        byteBuffer.putInt(values[i]);
+      }
+      return bytes;
+    }
+
+    @Override
+    public IntArrayList deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public IntArrayList deserialize(ByteBuffer byteBuffer) {
+      int numValues = byteBuffer.getInt();
+      IntArrayList intArrayList = new IntArrayList(numValues);
+      for (int i = 0; i < numValues; i++) {
+        intArrayList.add(byteBuffer.getInt());
+      }
+      return intArrayList;
+    }
+  };
+
+  public static final ObjectSerDe<LongArrayList> LONG_ARRAY_LIST_SER_DE = new ObjectSerDe<LongArrayList>() {
+
+    @Override
+    public byte[] serialize(LongArrayList longArrayList) {
+      int size = longArrayList.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Long.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      long[] values = longArrayList.elements();
+      for (int i = 0; i < size; i++) {
+        byteBuffer.putLong(values[i]);
+      }
+      return bytes;
+    }
+
+    @Override
+    public LongArrayList deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public LongArrayList deserialize(ByteBuffer byteBuffer) {
+      int numValues = byteBuffer.getInt();
+      LongArrayList longArrayList = new LongArrayList(numValues);
+      for (int i = 0; i < numValues; i++) {
+        longArrayList.add(byteBuffer.getLong());
+      }
+      return longArrayList;
+    }
+  };
+
+  public static final ObjectSerDe<FloatArrayList> FLOAT_ARRAY_LIST_SER_DE = new ObjectSerDe<FloatArrayList>() {
+
+    @Override
+    public byte[] serialize(FloatArrayList floatArrayList) {
+      int size = floatArrayList.size();
+      byte[] bytes = new byte[Integer.BYTES + size * Float.BYTES];
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+      byteBuffer.putInt(size);
+      float[] values = floatArrayList.elements();
+      for (int i = 0; i < size; i++) {
+        byteBuffer.putFloat(values[i]);
+      }
+      return bytes;
+    }
+
+    @Override
+    public FloatArrayList deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public FloatArrayList deserialize(ByteBuffer byteBuffer) {
+      int numValues = byteBuffer.getInt();
+      FloatArrayList floatArrayList = new FloatArrayList(numValues);
+      for (int i = 0; i < numValues; i++) {
+        floatArrayList.add(byteBuffer.getFloat());
+      }
+      return floatArrayList;
+    }
+  };
+
   public static final ObjectSerDe<DoubleArrayList> DOUBLE_ARRAY_LIST_SER_DE = new ObjectSerDe<DoubleArrayList>() {
 
     @Override
@@ -356,6 +481,50 @@ public class ObjectSerDeUtils {
       return doubleArrayList;
     }
   };
+
+  public static final ObjectSerDe<ObjectArrayList> STRING_ARRAY_LIST_SER_DE =
+      new ObjectSerDe<ObjectArrayList>() {
+        @Override
+        public byte[] serialize(ObjectArrayList stringArrayList) {
+          int size = stringArrayList.size();
+          // Besides the value bytes, we store: size, length for each value
+          long bufferSize = (1 + (long) size) * Integer.BYTES;
+          byte[][] valueBytesArray = new byte[size][];
+          for (int index = 0; index < size; index++) {
+            Object value = stringArrayList.get(index);
+            byte[] valueBytes = value.toString().getBytes(UTF_8);
+            bufferSize += valueBytes.length;
+            valueBytesArray[index] = valueBytes;
+          }
+          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+          byte[] bytes = new byte[(int) bufferSize];
+          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+          byteBuffer.putInt(size);
+          for (byte[] valueBytes : valueBytesArray) {
+            byteBuffer.putInt(valueBytes.length);
+            byteBuffer.put(valueBytes);
+          }
+          return bytes;
+        }
+
+        @Override
+        public ObjectArrayList deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        @Override
+        public ObjectArrayList deserialize(ByteBuffer byteBuffer) {
+          int size = byteBuffer.getInt();
+          ObjectArrayList stringArrayList = new ObjectArrayList(size);
+          for (int i = 0; i < size; i++) {
+            int length = byteBuffer.getInt();
+            byte[] valueBytes = new byte[length];
+            byteBuffer.get(valueBytes);
+            stringArrayList.add(new String(valueBytes, UTF_8));
+          }
+          return stringArrayList;
+        }
+      };
 
   public static final ObjectSerDe<AvgPair> AVG_PAIR_SER_DE = new ObjectSerDe<AvgPair>() {
 
@@ -952,7 +1121,7 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<Sketch> DATA_SKETCH_SER_DE = new ObjectSerDe<Sketch>() {
+  public static final ObjectSerDe<Sketch> DATA_SKETCH_THETA_SER_DE = new ObjectSerDe<Sketch>() {
 
     @Override
     public byte[] serialize(Sketch value) {
@@ -1013,6 +1182,25 @@ public class ObjectSerDeUtils {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
       return KllDoublesSketch.wrap(Memory.wrap(bytes));
+    }
+  };
+
+  public static final ObjectSerDe<CpcSketch> DATA_SKETCH_CPC_SER_DE = new ObjectSerDe<CpcSketch>() {
+    @Override
+    public byte[] serialize(CpcSketch value) {
+      return value.toByteArray();
+    }
+
+    @Override
+    public CpcSketch deserialize(byte[] bytes) {
+      return CpcSketch.heapify(Memory.wrap(bytes));
+    }
+
+    @Override
+    public CpcSketch deserialize(ByteBuffer byteBuffer) {
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return CpcSketch.heapify(Memory.wrap(bytes));
     }
   };
 
@@ -1368,6 +1556,30 @@ public class ObjectSerDeUtils {
         }
       };
 
+  public static final ObjectSerDe<UltraLogLog> ULTRA_LOG_LOG_OBJECT_SER_DE = new ObjectSerDe<UltraLogLog>() {
+
+    @Override
+    public byte[] serialize(UltraLogLog value) {
+      ByteBuffer buff = ByteBuffer.wrap(new byte[(1 << value.getP()) + 1]);
+      buff.put((byte) value.getP());
+      buff.put(value.getState());
+      return buff.array();
+    }
+
+    @Override
+    public UltraLogLog deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public UltraLogLog deserialize(ByteBuffer byteBuffer) {
+      byte p = byteBuffer.get();
+      byte[] state = new byte[1 << p];
+      byteBuffer.get(state);
+      return UltraLogLog.wrap(state);
+    }
+  };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -1383,7 +1595,7 @@ public class ObjectSerDeUtils {
       INT_SET_SER_DE,
       TDIGEST_SER_DE,
       DISTINCT_TABLE_SER_DE,
-      DATA_SKETCH_SER_DE,
+      DATA_SKETCH_THETA_SER_DE,
       GEOMETRY_SER_DE,
       ROARING_BITMAP_SER_DE,
       LONG_SET_SER_DE,
@@ -1412,6 +1624,12 @@ public class ObjectSerDeUtils {
       FREQUENT_STRINGS_SKETCH_SER_DE,
       FREQUENT_LONGS_SKETCH_SER_DE,
       HYPER_LOG_LOG_PLUS_SER_DE,
+      DATA_SKETCH_CPC_SER_DE,
+      INT_ARRAY_LIST_SER_DE,
+      LONG_ARRAY_LIST_SER_DE,
+      FLOAT_ARRAY_LIST_SER_DE,
+      STRING_ARRAY_LIST_SER_DE,
+      ULTRA_LOG_LOG_OBJECT_SER_DE,
   };
   //@formatter:on
 

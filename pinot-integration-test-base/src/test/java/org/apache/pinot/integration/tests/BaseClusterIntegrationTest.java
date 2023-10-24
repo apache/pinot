@@ -246,7 +246,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected QueryConfig getQueryConfig() {
     // Enable groovy for tables used in the tests
-    return new QueryConfig(null, false, null, null);
+    return new QueryConfig(null, false, null, null, null, null);
   }
 
   protected boolean getNullHandlingEnabled() {
@@ -464,7 +464,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     if (useMultiStageQueryEngine()) {
       if (_pinotConnectionV2 == null) {
         Properties properties = getPinotConnectionProperties();
-        properties.put("useMultiStageEngine", "true");
+        properties.put("useMultistageEngine", "true");
         _pinotConnectionV2 = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
             new JsonAsyncHttpPinotClientTransportFactory()
                 .withConnectionProperties(properties)

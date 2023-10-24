@@ -57,7 +57,7 @@ public class ControllerPeriodicTaskStarterStatelessTest extends ControllerTest {
   }
 
   private class MockControllerStarter extends ControllerStarter {
-    private static final int NUM_PERIODIC_TASKS = 10;
+    private static final int NUM_PERIODIC_TASKS = 11;
 
     public MockControllerStarter() {
       super();

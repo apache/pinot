@@ -90,7 +90,7 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       }
       List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
       if (tableConfig.getTableType() == TableType.REALTIME) {
-        List<SegmentZKMetadata> segmentsZKMetadataAll = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
+        List<SegmentZKMetadata> segmentsZKMetadataAll = getSegmentsZKMetadataForTable(tableName);
         for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadataAll) {
           CommonConstants.Segment.Realtime.Status status = segmentZKMetadata.getStatus();
           if (status.isCompleted()) {
@@ -98,7 +98,7 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
           }
         }
       } else {
-        segmentsZKMetadata = _clusterInfoAccessor.getSegmentsZKMetadata(tableName);
+        segmentsZKMetadata = getSegmentsZKMetadataForTable(tableName);
       }
 
       List<SegmentZKMetadata> purgedSegmentsZKMetadata = new ArrayList<>();

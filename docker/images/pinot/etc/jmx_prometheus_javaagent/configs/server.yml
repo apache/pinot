@@ -112,6 +112,12 @@ rules:
   cache: true
   labels:
     table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.numResizes.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+  name: "pinot_server_numResizes_$3"
+  cache: true
+  labels:
+    table: "$1"
+    tableType: "$2"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.resizeTimeMs.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_server_resizeTimeMs_$3"
   cache: true
@@ -144,6 +150,10 @@ rules:
     table: "$1"
     tableType: "$2"
     partition: "$3"
+#grpc related metrics
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.grpc(.+)\"><>(\\w+)"
+  name: "pinot_server_grpc$1_$2"
+  cache: true
 
   ## Metrics that fit the catch-all patterns above should not be added to this file.
   ## In case a metric does not fit the catch-all patterns, add them before this comment

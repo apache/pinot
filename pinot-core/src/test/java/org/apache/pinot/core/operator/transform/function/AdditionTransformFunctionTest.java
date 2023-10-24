@@ -69,8 +69,8 @@ public class AdditionTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunction(transformFunction, expectedBigDecimalValues);
 
     expression = RequestContextUtils.getExpression(
-        String.format("add(add(12,%s),%s,add(add(%s,%s),'12110.34556677889901122335678',%s),%s)", STRING_SV_COLUMN,
-            DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
+        String.format("add(add(12,%s),%s,add(add(%s,%s),cast('12110.34556677889901122335678' as decimal),%s),%s)",
+            STRING_SV_COLUMN, DOUBLE_SV_COLUMN, FLOAT_SV_COLUMN, LONG_SV_COLUMN, INT_SV_COLUMN, BIG_DECIMAL_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof AdditionTransformFunction);
     BigDecimal val4 = new BigDecimal("12110.34556677889901122335678");

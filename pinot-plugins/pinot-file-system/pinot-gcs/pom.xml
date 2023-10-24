@@ -82,7 +82,6 @@
     <dependency>
       <groupId>com.google.api.grpc</groupId>
       <artifactId>proto-google-common-protos</artifactId>
-      <version>1.18.1</version>
     </dependency>
     <dependency>
       <groupId>com.google.api.grpc</groupId>

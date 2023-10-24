@@ -90,6 +90,7 @@ public class Actions {
   // Action names for table
   public static class Table {
     public static final String BUILD_ROUTING = "BuildRouting";
+    public static final String CANCEL_REBALANCE = "CancelRebalance";
     public static final String CREATE_INSTANCE_PARTITIONS = "CreateInstancePartitions";
     public static final String CREATE_SCHEMA = "CreateSchema";
     public static final String CREATE_TABLE = "CreateTable";

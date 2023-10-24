@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Project;
@@ -31,7 +32,6 @@ import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalAggregate;
-import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.tools.RelBuilderFactory;
@@ -50,7 +50,7 @@ public class PinotAggregateLiteralAttachmentRule extends RelOptRule {
       new PinotAggregateLiteralAttachmentRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotAggregateLiteralAttachmentRule(RelBuilderFactory factory) {
-    super(operand(LogicalAggregate.class, some(operand(LogicalProject.class, any()))), factory, null);
+    super(operand(LogicalAggregate.class, any()), factory, null);
   }
 
   @Override
@@ -81,8 +81,8 @@ public class PinotAggregateLiteralAttachmentRule extends RelOptRule {
 
   private static Map<Pair<Integer, Integer>, RexExpression.Literal> extractLiterals(RelOptRuleCall call) {
     Aggregate aggregate = call.rel(0);
-    Project project = call.rel(1);
-    List<RexNode> rexNodes = project.getProjects();
+    RelNode input = PinotRuleUtils.unboxRel(aggregate.getInput());
+    List<RexNode> rexNodes = (input instanceof Project) ? ((Project) input).getProjects() : null;
     List<AggregateCall> aggCallList = aggregate.getAggCallList();
     final Map<Pair<Integer, Integer>, RexExpression.Literal> rexLiteralMap = new HashMap<>();
     for (int aggIdx = 0; aggIdx < aggCallList.size(); aggIdx++) {
@@ -93,9 +93,11 @@ public class PinotAggregateLiteralAttachmentRule extends RelOptRule {
         rexLiteralMap.put(new Pair<>(aggIdx, -1), new RexExpression.Literal(ColumnDataType.INT, argSize));
         // put the literals in to the map.
         for (int argIdx = 0; argIdx < argSize; argIdx++) {
-          RexNode field = rexNodes.get(aggCall.getArgList().get(argIdx));
-          if (field instanceof RexLiteral) {
-            rexLiteralMap.put(new Pair<>(aggIdx, argIdx), RexExpressionUtils.fromRexLiteral((RexLiteral) field));
+          if (rexNodes != null) {
+            RexNode field = rexNodes.get(aggCall.getArgList().get(argIdx));
+            if (field instanceof RexLiteral) {
+              rexLiteralMap.put(new Pair<>(aggIdx, argIdx), RexExpressionUtils.fromRexLiteral((RexLiteral) field));
+            }
           }
         }
       }

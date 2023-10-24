@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.index;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -60,14 +61,28 @@ public class MergedColumnConfigDeserializer<C> implements ColumnConfigDeserializ
 
   public static class ConfigDeclaredTwiceException extends RuntimeException {
     private final String _column;
+    @Nullable
+    private final IndexType<?, ?, ?> _indexType;
+
+    public ConfigDeclaredTwiceException(String column, IndexType<?, ?, ?> index, Throwable t) {
+      super("Configuration is declared in two different ways for index " + index.getId() + " on column " + column, t);
+      _column = column;
+      _indexType = index;
+    }
 
     public ConfigDeclaredTwiceException(String column) {
       super("Configuration is declared in two different ways for column " + column);
       _column = column;
+      _indexType = null;
     }
 
     public String getColumn() {
       return _column;
+    }
+
+    @Nullable
+    public IndexType<?, ?, ?> getIndexType() {
+      return _indexType;
     }
   }
 
