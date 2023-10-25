@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.plan;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,15 +28,21 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
+import org.apache.pinot.core.operator.query.DictionaryBasedGroupByOperator;
 import org.apache.pinot.core.operator.query.FilteredGroupByOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
@@ -66,7 +73,7 @@ public class GroupByPlanNode implements PlanNode {
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
-  private GroupByOperator buildNonFilteredGroupByPlan() {
+  private Operator<GroupByResultsBlock> buildNonFilteredGroupByPlan() {
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     List<ExpressionContext> groupByExpressionsList = _queryContext.getGroupByExpressions();
@@ -75,6 +82,38 @@ public class GroupByPlanNode implements PlanNode {
 
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
+
+    if (canOptimize(filterOperator, groupByExpressions, aggregationFunctions)) {
+      if (groupByExpressions[0].getType() == ExpressionContext.Type.IDENTIFIER) {
+        // TODO: Should we do a check here for dictionary length?
+        String columName = groupByExpressions[0].getIdentifier();
+        Map<String, DataSource> dataSourceMap = new HashMap<>(1);
+        dataSourceMap.put(columName, _indexSegment.getDataSource(columName));
+        return new DictionaryBasedGroupByOperator(
+            _queryContext, groupByExpressions, filterOperator, null, dataSourceMap, columName);
+      } else if (groupByExpressions[0].getType() == ExpressionContext.Type.FUNCTION) {
+        List<ExpressionContext> arguments = groupByExpressions[0].getFunction().getArguments();
+        String columName = null;
+        boolean canOptimizeTransform = false;
+        for (ExpressionContext arg : arguments) {
+          if (arg.getType() == ExpressionContext.Type.IDENTIFIER) {
+            if (columName == null) {
+              columName = arg.getIdentifier();
+              canOptimizeTransform = true;
+            } else {
+              canOptimizeTransform = false;
+            }
+          }
+        }
+        if (canOptimizeTransform) {
+          Map<String, DataSource> dataSourceMap = new HashMap<>(1);
+          dataSourceMap.put(columName, _indexSegment.getDataSource(columName));
+          TransformFunction transformFunction = TransformFunctionFactory.get(groupByExpressions[0], dataSourceMap);
+          return new DictionaryBasedGroupByOperator(
+              _queryContext, groupByExpressions, filterOperator, transformFunction, dataSourceMap, columName);
+        }
+      }
+    }
 
     // Use star-tree to solve the query if possible
     List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
@@ -105,5 +144,17 @@ public class GroupByPlanNode implements PlanNode {
         new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
             filterOperator).run();
     return new GroupByOperator(_queryContext, groupByExpressions, projectOperator, numTotalDocs, false);
+  }
+
+  private boolean canOptimize(BaseFilterOperator filterOperator, ExpressionContext[] groupByExpressions,
+      AggregationFunction[] aggregationFunctions) {
+    if (filterOperator instanceof MatchAllFilterOperator || filterOperator.canProduceBitmaps()) {
+      if (groupByExpressions != null && groupByExpressions.length == 1) {
+        if (aggregationFunctions != null && aggregationFunctions.length == 1) {
+          return aggregationFunctions[0] instanceof CountAggregationFunction;
+        }
+      }
+    }
+    return false;
   }
 }

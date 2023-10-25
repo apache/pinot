@@ -31,7 +31,8 @@ import org.slf4j.LoggerFactory;
  * Reader for bitmap based inverted index. Please reference
  * {@link BitmapInvertedIndexWriter} for the index file layout.
  */
-public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
+public class BitmapInvertedIndexReader
+    implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
   private final PinotDataBuffer _offsetBuffer;

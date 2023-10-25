@@ -16,40 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.creator;
+package org.apache.pinot.core.common.inverted;
 
-import java.io.IOException;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-/**
- * Index creator for json index.
- */
-public interface JsonIndexCreator extends IndexCreator {
-  char KEY_VALUE_SEPARATOR = '\0';
-  char TERM_CHAR = (char) 255;
+public interface InvertedDataFetcher {
+  Object[] getValues();
 
-  @Override
-  default void add(@Nonnull Object value, int dictId)
-      throws IOException {
-    add((String) value);
-  }
+  ImmutableRoaringBitmap getDocIds(int dictId);
 
-  @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
-  }
+  ImmutableRoaringBitmap getDocIds(Object value);
 
-  /**
-   * Adds the next json value.
-   */
-  void add(String jsonString)
-      throws IOException;
-
-  /**
-   * Seals the index and flushes it to disk.
-   */
-  void seal()
-      throws IOException;
+  boolean supportsDictId();
 }
