@@ -514,38 +514,38 @@ public class InstanceAssignmentTest {
      *
      * Final assignment for this table:
      *         RG1    RG2    RG3
+     *   Host  0      1      2
+     *   Host  3      4      5
      *   Host  6      7      8
+     *   Host  9      10     11
      *   Host  12     13     14
      *   Host  15     16     17
-     *   Host  9      10     11
      *   Host  18     19     20
-     *   Host  3      4      5
-     *   Host  0      1      2
      */
     assertEquals(instancePartitions.getInstances(0, 0),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 6,
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 0,
+            SERVER_INSTANCE_ID_PREFIX + 3,
+            SERVER_INSTANCE_ID_PREFIX + 6,
+            SERVER_INSTANCE_ID_PREFIX + 9,
             SERVER_INSTANCE_ID_PREFIX + 12,
             SERVER_INSTANCE_ID_PREFIX + 15,
-            SERVER_INSTANCE_ID_PREFIX + 9,
-            SERVER_INSTANCE_ID_PREFIX + 18,
-            SERVER_INSTANCE_ID_PREFIX + 3,
-            SERVER_INSTANCE_ID_PREFIX + 0));
+            SERVER_INSTANCE_ID_PREFIX + 18));
     assertEquals(instancePartitions.getInstances(0, 1),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 7,
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 1,
+            SERVER_INSTANCE_ID_PREFIX + 4,
+            SERVER_INSTANCE_ID_PREFIX + 7,
+            SERVER_INSTANCE_ID_PREFIX + 10,
             SERVER_INSTANCE_ID_PREFIX + 13,
             SERVER_INSTANCE_ID_PREFIX + 16,
-            SERVER_INSTANCE_ID_PREFIX + 10,
-            SERVER_INSTANCE_ID_PREFIX + 19,
-            SERVER_INSTANCE_ID_PREFIX + 4,
-            SERVER_INSTANCE_ID_PREFIX + 1));
+            SERVER_INSTANCE_ID_PREFIX + 19));
     assertEquals(instancePartitions.getInstances(0, 2),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8,
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 2,
+            SERVER_INSTANCE_ID_PREFIX + 5,
+            SERVER_INSTANCE_ID_PREFIX + 8,
+            SERVER_INSTANCE_ID_PREFIX + 11,
             SERVER_INSTANCE_ID_PREFIX + 14,
             SERVER_INSTANCE_ID_PREFIX + 17,
-            SERVER_INSTANCE_ID_PREFIX + 11,
-            SERVER_INSTANCE_ID_PREFIX + 20,
-            SERVER_INSTANCE_ID_PREFIX + 5,
-            SERVER_INSTANCE_ID_PREFIX + 2));
+            SERVER_INSTANCE_ID_PREFIX + 20));
 
     // Test instance shuffling/uplifting from 3*5 to 3*7
     numPartitions = 0;
@@ -716,31 +716,31 @@ public class InstanceAssignmentTest {
      * Final assignment for this table:
      *         RG1    RG2    RG3
      *   Host  18     19     20
-     *   Host  6      7      8
-     *   Host  3      4      5
-     *   Host  15     16     17
-     *   Host  9      10     11
+     *   Host  21     22     23
+     *   Host  24     25     26
+     *   Host  27     28     29
+     *   Host  30     31     32
      *
      */
 
     assertEquals(instancePartitions.getInstances(0, 0),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 18,
-            SERVER_INSTANCE_ID_PREFIX + 30,
             SERVER_INSTANCE_ID_PREFIX + 21,
             SERVER_INSTANCE_ID_PREFIX + 24,
-            SERVER_INSTANCE_ID_PREFIX + 27));
+            SERVER_INSTANCE_ID_PREFIX + 27,
+            SERVER_INSTANCE_ID_PREFIX + 30));
     assertEquals(instancePartitions.getInstances(0, 1),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 19,
-            SERVER_INSTANCE_ID_PREFIX + 31,
             SERVER_INSTANCE_ID_PREFIX + 22,
             SERVER_INSTANCE_ID_PREFIX + 25,
-            SERVER_INSTANCE_ID_PREFIX + 28));
+            SERVER_INSTANCE_ID_PREFIX + 28,
+            SERVER_INSTANCE_ID_PREFIX + 31));
     assertEquals(instancePartitions.getInstances(0, 2),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 20,
-            SERVER_INSTANCE_ID_PREFIX + 32,
             SERVER_INSTANCE_ID_PREFIX + 23,
             SERVER_INSTANCE_ID_PREFIX + 26,
-            SERVER_INSTANCE_ID_PREFIX + 29));
+            SERVER_INSTANCE_ID_PREFIX + 29,
+            SERVER_INSTANCE_ID_PREFIX + 32));
 
     // Test instance shuffling/uplifting from 3*5 to 3*7, with some instance replacement
     numPartitions = 0;

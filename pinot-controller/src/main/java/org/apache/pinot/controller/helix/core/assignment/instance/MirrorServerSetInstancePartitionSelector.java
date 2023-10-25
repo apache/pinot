@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -217,16 +218,28 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
         createListFromPreConfiguredInstanceAssignmentMap();
         // shuffle the list of lists of mirrored servers based on the table name hash
         int tableNameHash = Math.abs(_tableNameWithType.hashCode());
-        Collections.shuffle(_preConfiguredMirroredServerLists, new Random(tableNameHash));
+        // initialize a list of indices from 0 to _numPreConfiguredInstancesPerReplicaGroup
+        List<Integer> shuffledIndex = new ArrayList<>(_numPreConfiguredInstancesPerReplicaGroup);
+        for (int i = 0; i < _numPreConfiguredInstancesPerReplicaGroup; i++) {
+          shuffledIndex.add(i);
+        }
+        // shuffle the list of indices based on the table name hash
+        Collections.shuffle(shuffledIndex, new Random(tableNameHash));
+        // select the first _numTargetInstancesPerReplicaGroup indices
+        shuffledIndex = shuffledIndex.subList(0, _numTargetInstancesPerReplicaGroup);
+        // sort the list of indices so that they follow the original order of the pre-configured instance partitions
+        shuffledIndex.sort(Comparator.naturalOrder());
 
-        // create the instance partitions based on the rotated list of mirrored servers
+        // create the instance partitions based on the shuffled list of mirrored servers
         List<List<String>> resultReplicaGroups = new ArrayList<>(_numTargetReplicaGroups);
         for (int i = 0; i < _numTargetReplicaGroups; i++) {
           resultReplicaGroups.add(new ArrayList<>(_numTargetInstancesPerReplicaGroup));
         }
+
+        // populate the instance partitions with the selected mirrored servers
         for (int j = 0; j < _numTargetInstancesPerReplicaGroup; j++) {
           for (int i = 0; i < _numTargetReplicaGroups; i++) {
-            resultReplicaGroups.get(i).add(_preConfiguredMirroredServerLists.get(j).get(i));
+            resultReplicaGroups.get(i).add(_preConfiguredMirroredServerLists.get(shuffledIndex.get(j)).get(i));
           }
         }
         for (int i = 0; i < _numTargetReplicaGroups; i++) {
@@ -246,7 +259,7 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
         Map<Integer, Map.Entry<Integer, Long>> existingOffsetToResultTuple = new HashMap<>();
 
         // For each instance offset, find the mirrored server that is most similar to the existing mirrored server
-        // set. If the mirrored server is not used, add it to the result list.
+        // set. If this mirrored server is not used, add it to the result list.
         for (int j = 0; j < _numExistingInstancesPerReplicaGroup; j++) {
           List<String> existingMirroredServers = _existingMirroredServerLists.get(j);
           int finalJ = j;
@@ -284,7 +297,12 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
           for (int j = 0; j < _numPreConfiguredInstancesPerReplicaGroup; j++) {
             shuffledOffsets.add(j);
           }
-          Collections.shuffle(shuffledOffsets, new Random(Math.abs(_tableNameWithType.hashCode())));
+          // Commenting this out as
+          // (1) Shuffling is already done in the initial step.
+          // (2) We want to keep the order of the pre-configured instance partitions, so that the segment assignment
+          //     strategy for single tenant cluster can be minimized-impact.
+          // But keeping the code here in case we want to have a specific reordering strategy in the future.
+          // Collections.shuffle(shuffledOffsets, new Random(Math.abs(_tableNameWithType.hashCode())));
           for (int k = 0, j = 0; j < _numTargetInstancesPerReplicaGroup; j++) {
             if (existingOffsetToResultTuple.containsKey(j)) {
               continue;
