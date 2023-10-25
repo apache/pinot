@@ -97,16 +97,21 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
     // numTargetInstancesPerReplica should be positive
     Preconditions.checkState(_numTargetInstancesPerReplicaGroup > 0,
         "Number of instances per replica must be positive");
+    LOGGER.info("Number of instances per replica: {}", _numTargetInstancesPerReplicaGroup);
     // _numTargetReplicaGroups should be positive
     Preconditions.checkState(_numTargetReplicaGroups > 0, "Number of replica-groups must be positive");
+    LOGGER.info("Number of replica-groups: {}", _numTargetReplicaGroups);
     // validate target partition count is 1
     Preconditions.checkState(_replicaGroupPartitionConfig.getNumPartitions() <= 1,
         "This algorithm does not support table level partitioning for target assignment");
+    LOGGER.info("Number of partitions: {}", _replicaGroupPartitionConfig.getNumPartitions());
 
     // Validate the existing instance partitions is null or has only one partition
     Preconditions.checkState(
         (_existingInstancePartitions == null || _existingInstancePartitions.getNumPartitions() == 1),
         "This algorithm does not support table level partitioning for existing assignment");
+    LOGGER.info("Number of partitions in existing instance partitions: {}", _existingInstancePartitions == null ? 0
+        : _existingInstancePartitions.getNumPartitions());
 
     _numExistingReplicaGroups =
         _existingInstancePartitions == null ? 0 : _existingInstancePartitions.getNumReplicaGroups();
@@ -118,6 +123,8 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
         "Pre-configured instance partitions must be provided for pre-configuration based selection");
     Preconditions.checkState(_preConfiguredInstancePartitions.getNumPartitions() == 1,
         "This algorithm does not support table level partitioning for pre-configured assignment");
+    LOGGER.info("Number of partitions in pre-configured instance partitions: {}", _preConfiguredInstancePartitions
+        .getNumPartitions());
 
     // Validate the number of replica-groups in the pre-configured instance partitions is equal to the target
     // number of replica-groups
@@ -126,12 +133,16 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
         "The number of replica-groups %s in the pre-configured instance partitions "
             + "is not equal to the target number of replica-groups %s", _numPreConfiguredReplicaGroups,
         _numTargetReplicaGroups);
+    LOGGER.info("Number of replica-groups in pre-configured instance partitions: {}", _numPreConfiguredReplicaGroups);
+
     // Validate the number of instances per replica-group in the pre-configured instance partitions is greater than or
     // equal to the target number of instances per replica-group
     _numPreConfiguredInstancesPerReplicaGroup = _preConfiguredInstancePartitions.getInstances(0, 0).size();
     Preconditions.checkState(_numPreConfiguredInstancesPerReplicaGroup >= _numTargetInstancesPerReplicaGroup,
         "The number of instances per replica-group in the pre-configured "
             + "instance partitions is less than the target number of instances per replica-group");
+    LOGGER.info("Number of instances per replica-group in pre-configured instance partitions: {}",
+        _numPreConfiguredInstancesPerReplicaGroup);
 
     // Validate the pool to instance configs map is not null or empty
     Preconditions.checkNotNull(poolToInstanceConfigsMap, "poolToInstanceConfigsMap is null");
@@ -143,12 +154,16 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
 
     HashSet<String> availableInstanceSet = new HashSet<>();
     poolToInstanceConfigsMap.values().forEach(list -> list.forEach(i -> availableInstanceSet.add(i.getInstanceName())));
+    LOGGER.info("Number of pools: {}", numPools);
+    LOGGER.info("Number of instances in all pools: {}", availableInstanceSet.size());
+    LOGGER.info("availableInstanceSet: {}", availableInstanceSet);
 
     for (int i = 0; i < _numPreConfiguredReplicaGroups; i++) {
       List<String> instances = _preConfiguredInstancePartitions.getInstances(0, i);
       for (String instance : instances) {
         Preconditions.checkState(availableInstanceSet.contains(instance),
-            "Instance %s in pre-configured instance " + "partitions is not in the pool to instance configs map",
+            "Instance %s in pre-configured instance partitions is not in "
+                + "the pool to instance configs map",
             instance);
       }
     }
