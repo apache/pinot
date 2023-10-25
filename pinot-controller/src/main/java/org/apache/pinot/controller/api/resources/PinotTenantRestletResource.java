@@ -21,7 +21,6 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -297,11 +296,12 @@ public class PinotTenantRestletResource {
   @Authenticate(AccessType.READ)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the instance partitions of a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Instance partitions not found")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+      @ApiResponse(code = 404, message = "Instance partitions not found")})
   public InstancePartitions getInstancePartitions(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true)
+      @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
+          allowableValues = "OFFLINE, CONSUMING, COMPLETED")
       @QueryParam("instancePartitionType") String instancePartitionType) {
     String tenantNameWithType = InstancePartitionsType.valueOf(instancePartitionType)
         .getInstancePartitionsName(tenantName);
@@ -324,11 +324,12 @@ public class PinotTenantRestletResource {
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update an instance partition for a server type in a tenant")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Failed to update the tenant")})
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+      @ApiResponse(code = 400, message = "Failed to update the tenant")})
   public InstancePartitions assignInstancesPartitionMap(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true)
+      @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
+          allowableValues = "OFFLINE, CONSUMING, COMPLETED")
       @QueryParam("instancePartitionType") String instancePartitionType,
       String instancePartitionsStr) {
     InstancePartitions instancePartitions;
@@ -339,11 +340,14 @@ public class PinotTenantRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
-    String tenantNameWithType = InstancePartitionsType.valueOf(instancePartitionType)
+    String tenantLevelInstancePartitionMap = InstancePartitionsType.valueOf(instancePartitionType)
         .getInstancePartitionsName(tenantName);
-    Preconditions.checkState(instancePartitions.getInstancePartitionsName().equals(tenantNameWithType),
-        "Instance partitions name mismatch, expected: %s, got: %s", tenantNameWithType,
-        instancePartitions.getInstancePartitionsName());
+
+    if (!instancePartitions.getInstancePartitionsName().equals(tenantLevelInstancePartitionMap)) {
+      throw new ControllerApplicationException(LOGGER, "Instance partitions name mismatch, expected: "
+          + tenantLevelInstancePartitionMap
+          + ", got: " + instancePartitions.getInstancePartitionsName(), Response.Status.BAD_REQUEST);
+    }
 
     persistInstancePartitionsHelper(instancePartitions);
     return instancePartitions;
