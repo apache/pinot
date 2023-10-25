@@ -389,6 +389,20 @@ public class TableCache implements PinotConfigProvider {
     return tableConfigs;
   }
 
+  /**
+   * Get all dimension table names.
+   * @return List of dimension table names
+   */
+  public List<String> getAllDimensionTables() {
+    List<String> dimensionTables = new ArrayList<>();
+    for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
+      if (tableConfigInfo._tableConfig.isDimTable()) {
+        dimensionTables.add(tableConfigInfo._tableConfig.getTableName());
+      }
+    }
+    return dimensionTables;
+  }
+
   private void notifySchemaChangeListeners() {
     if (!_schemaChangeListeners.isEmpty()) {
       List<Schema> schemas = getSchemas();
