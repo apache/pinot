@@ -310,7 +310,8 @@ public class PinotTenantRestletResource {
             tenantNameWithType);
 
     if (instancePartitions == null) {
-      throw new ControllerApplicationException(LOGGER, "Failed to find the instance partitions",
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to find the instance partitions for %s", tenantNameWithType),
           Response.Status.NOT_FOUND);
     } else {
       return instancePartitions;
@@ -340,12 +341,12 @@ public class PinotTenantRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
-    String tenantLevelInstancePartitionMap = InstancePartitionsType.valueOf(instancePartitionType)
+    String inputTenantName = InstancePartitionsType.valueOf(instancePartitionType)
         .getInstancePartitionsName(tenantName);
 
-    if (!instancePartitions.getInstancePartitionsName().equals(tenantLevelInstancePartitionMap)) {
+    if (!instancePartitions.getInstancePartitionsName().equals(inputTenantName)) {
       throw new ControllerApplicationException(LOGGER, "Instance partitions name mismatch, expected: "
-          + tenantLevelInstancePartitionMap
+          + inputTenantName
           + ", got: " + instancePartitions.getInstancePartitionsName(), Response.Status.BAD_REQUEST);
     }
 
