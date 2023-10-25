@@ -723,6 +723,11 @@ public final class TableConfigUtils {
             "The delete record column must be a single-valued BOOLEAN column");
       }
     }
+
+    Preconditions.checkState(
+        tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
+            .containsKey(InstancePartitionsType.COMPLETED),
+        "InstanceAssignmentConfig for COMPLETED is not allowed for upsert tables");
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
   }
