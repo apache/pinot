@@ -21,7 +21,6 @@ package org.apache.pinot.core.startree.v2;
 import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.MinValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -47,10 +46,5 @@ public class MinStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
   @Override
   protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
     assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
-  }
-
-  @Override
-  protected FieldConfig.CompressionCodec getCompressionCodec() {
-    return FieldConfig.CompressionCodec.PASS_THROUGH;
   }
 }

@@ -199,12 +199,10 @@ public class SegmentMetadataFetcher {
       starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS, starTreeDimensions);
 
       List<String> starTreeMetricAggregations = new ArrayList<>();
-      Map<String, AggregationFunctionColumnPair> functionColumnPairs = starTreeMetadata.getFunctionColumnPairs();
-      for (Map.Entry<String, AggregationFunctionColumnPair> functionColumnPair : functionColumnPairs.entrySet()) {
-        starTreeMetricAggregations.add(functionColumnPair.getValue().toColumnName());
+      for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
+        starTreeMetricAggregations.add(functionColumnPair.toColumnName());
       }
       starTreeIndexMap.put(STAR_TREE_METRIC_AGGREGATIONS, starTreeMetricAggregations);
-
       starTreeIndexMap.put(STAR_TREE_MAX_LEAF_RECORDS, starTreeMetadata.getMaxLeafRecords());
       starTreeIndexMap.put(STAR_TREE_DIMENSION_COLUMNS_SKIPPED,
           starTreeMetadata.getSkipStarNodeCreationForDimensions());

@@ -22,7 +22,6 @@ import java.util.Random;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.segment.local.aggregator.DistinctCountThetaSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -48,10 +47,5 @@ public class DistinctCountThetaSketchStarTreeV2Test extends BaseStarTreeV2Test<O
   @Override
   void assertAggregatedValue(Sketch starTreeResult, Sketch nonStarTreeResult) {
     assertEquals(starTreeResult.getEstimate(), nonStarTreeResult.getEstimate());
-  }
-
-  @Override
-  protected FieldConfig.CompressionCodec getCompressionCodec() {
-    return FieldConfig.CompressionCodec.PASS_THROUGH;
   }
 }

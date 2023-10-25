@@ -16,35 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.startree.v2;
+package org.apache.pinot.segment.spi.index.startree;
 
-import java.util.Random;
-import org.apache.pinot.segment.local.aggregator.MaxValueAggregator;
-import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-
-import static org.testng.Assert.assertEquals;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
 
-public class MaxStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
+public class AggregationSpec {
+  public static final AggregationSpec DEFAULT = new AggregationSpec(ChunkCompressionType.PASS_THROUGH);
 
-  @Override
-  ValueAggregator<Number, Double> getValueAggregator() {
-    return new MaxValueAggregator();
+  private final ChunkCompressionType _compressionType;
+
+  public AggregationSpec(ChunkCompressionType compressionType) {
+    _compressionType = compressionType;
+  }
+
+  public ChunkCompressionType getCompressionType() {
+    return _compressionType;
   }
 
   @Override
-  DataType getRawValueType() {
-    return DataType.DOUBLE;
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof AggregationSpec)) {
+      return false;
+    }
+    AggregationSpec that = (AggregationSpec) o;
+    return _compressionType == that._compressionType;
   }
 
   @Override
-  Number getRandomRawValue(Random random) {
-    return random.nextDouble();
-  }
-
-  @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  public int hashCode() {
+    return _compressionType.hashCode();
   }
 }

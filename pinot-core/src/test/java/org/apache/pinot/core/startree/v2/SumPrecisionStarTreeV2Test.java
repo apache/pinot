@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.SumPrecisionValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -49,10 +48,5 @@ public class SumPrecisionStarTreeV2Test extends BaseStarTreeV2Test<Object, BigDe
   @Override
   void assertAggregatedValue(BigDecimal starTreeResult, BigDecimal nonStarTreeResult) {
     assertEquals(starTreeResult, nonStarTreeResult);
-  }
-
-  @Override
-  protected FieldConfig.CompressionCodec getCompressionCodec() {
-    return FieldConfig.CompressionCodec.SNAPPY;
   }
 }

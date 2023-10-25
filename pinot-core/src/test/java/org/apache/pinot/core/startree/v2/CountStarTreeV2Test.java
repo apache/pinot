@@ -21,7 +21,6 @@ package org.apache.pinot.core.startree.v2;
 import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.CountValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -47,10 +46,5 @@ public class CountStarTreeV2Test extends BaseStarTreeV2Test<Object, Long> {
   @Override
   protected void assertAggregatedValue(Long starTreeResult, Long nonStarTreeResult) {
     assertEquals(starTreeResult, nonStarTreeResult);
-  }
-
-  @Override
-  protected FieldConfig.CompressionCodec getCompressionCodec() {
-    return FieldConfig.CompressionCodec.SNAPPY;
   }
 }

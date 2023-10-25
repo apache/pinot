@@ -21,10 +21,11 @@ package org.apache.pinot.segment.spi.index.startree;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.configuration.Configuration;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
 
 
@@ -34,7 +35,7 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataK
 public class StarTreeV2Metadata {
   private final int _numDocs;
   private final List<String> _dimensionsSplitOrder;
-  private final Map<String, AggregationFunctionColumnPair> _functionColumnPairs;
+  private final TreeMap<AggregationFunctionColumnPair, AggregationSpec> _aggregationSpecs;
 
   // The following properties are useful for generating the builder config
   private final int _maxLeafRecords;
@@ -43,19 +44,25 @@ public class StarTreeV2Metadata {
   public StarTreeV2Metadata(Configuration metadataProperties) {
     _numDocs = metadataProperties.getInt(MetadataKey.TOTAL_DOCS);
     _dimensionsSplitOrder = Arrays.asList(metadataProperties.getStringArray(MetadataKey.DIMENSIONS_SPLIT_ORDER));
-    _functionColumnPairs = new TreeMap<>();
-    // Backward compatibility with columnName format
-    for (String functionColumnPairName : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
-      AggregationFunctionColumnPair functionColumnPair =
-          AggregationFunctionColumnPair.fromColumnName(functionColumnPairName);
-      _functionColumnPairs.put(functionColumnPair.toColumnName(), functionColumnPair);
-    }
-    for (int i = 0; i < metadataProperties.getInt(MetadataKey.NUM_OF_AGGREGATION_CONFIG); i++) {
-      Configuration functionColPairsConfig = metadataProperties.subset(MetadataKey.AGGREGATION_CONFIG + "." + i);
-      if (!functionColPairsConfig.isEmpty()) {
+    _aggregationSpecs = new TreeMap<>();
+    int numAggregations = metadataProperties.getInt(MetadataKey.AGGREGATION_COUNT, 0);
+    if (numAggregations > 0) {
+      for (int i = 0; i < numAggregations; i++) {
+        Configuration aggregationConfig = metadataProperties.subset(MetadataKey.AGGREGATION_PREFIX + i);
+        AggregationFunctionType functionType =
+            AggregationFunctionType.getAggregationFunctionType(aggregationConfig.getString(MetadataKey.FUNCTION_TYPE));
+        String columnName = aggregationConfig.getString(MetadataKey.COLUMN_NAME);
+        ChunkCompressionType compressionType =
+            ChunkCompressionType.valueOf(aggregationConfig.getString(MetadataKey.COMPRESSION_CODEC));
+        _aggregationSpecs.put(new AggregationFunctionColumnPair(functionType, columnName),
+            new AggregationSpec(compressionType));
+      }
+    } else {
+      // Backward compatibility with columnName format
+      for (String functionColumnPairName : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
         AggregationFunctionColumnPair functionColumnPair =
-            AggregationFunctionColumnPair.fromConfiguration(functionColPairsConfig);
-        _functionColumnPairs.put(functionColumnPair.toColumnName(), functionColumnPair);
+            AggregationFunctionColumnPair.fromColumnName(functionColumnPairName);
+        _aggregationSpecs.put(functionColumnPair, AggregationSpec.DEFAULT);
       }
     }
     _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
@@ -71,12 +78,16 @@ public class StarTreeV2Metadata {
     return _dimensionsSplitOrder;
   }
 
-  public Map<String, AggregationFunctionColumnPair> getFunctionColumnPairs() {
-    return _functionColumnPairs;
+  public TreeMap<AggregationFunctionColumnPair, AggregationSpec> getAggregationSpecs() {
+    return _aggregationSpecs;
+  }
+
+  public Set<AggregationFunctionColumnPair> getFunctionColumnPairs() {
+    return _aggregationSpecs.keySet();
   }
 
   public boolean containsFunctionColumnPair(AggregationFunctionColumnPair functionColumnPair) {
-    return _functionColumnPairs.get(functionColumnPair.toColumnName()) != null;
+    return _aggregationSpecs.containsKey(functionColumnPair);
   }
 
   public int getMaxLeafRecords() {

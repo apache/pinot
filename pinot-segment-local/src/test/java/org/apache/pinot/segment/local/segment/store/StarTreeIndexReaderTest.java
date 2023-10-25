@@ -79,12 +79,11 @@ public class StarTreeIndexReaderTest {
     // Test with 2 index trees.
     StarTreeV2Metadata stMeta1 = mock(StarTreeV2Metadata.class);
     when(stMeta1.getDimensionsSplitOrder()).thenReturn(Arrays.asList("dim0", "dim1"));
-    when(stMeta1.getFunctionColumnPairs()).thenReturn(
-        Collections.singletonMap("COUNT_*", new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "*")));
+    when(stMeta1.getFunctionColumnPairs()).thenReturn(Collections.singleton(AggregationFunctionColumnPair.COUNT_STAR));
     StarTreeV2Metadata stMeta2 = mock(StarTreeV2Metadata.class);
     when(stMeta2.getDimensionsSplitOrder()).thenReturn(Arrays.asList("dimX", "dimY"));
     when(stMeta2.getFunctionColumnPairs()).thenReturn(
-        Collections.singletonMap("SUM_dimX", new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "dimX")));
+        Collections.singleton(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "dimX")));
     when(_segmentMetadata.getStarTreeV2MetadataList()).thenReturn(Arrays.asList(stMeta1, stMeta2));
     // Mock the offset/sizes for the index buffers.
     List<List<Pair<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>>> indexMaps = new ArrayList<>();

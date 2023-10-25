@@ -244,7 +244,7 @@ public class StarTreeBuilderUtils {
           .equals(metadata.getSkipStarNodeCreationForDimensions())) {
         return true;
       }
-      if (!builderConfig.getFunctionColumnPairs().equals(metadata.getFunctionColumnPairs())) {
+      if (!builderConfig.getAggregationSpecs().equals(metadata.getAggregationSpecs())) {
         return true;
       }
       if (builderConfig.getMaxLeafRecords() != metadata.getMaxLeafRecords()) {

@@ -23,7 +23,6 @@ import java.util.Random;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -58,10 +57,5 @@ public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2
     for (int i = 0; i <= 100; i++) {
       assertEquals(starTreeResult.quantile(i / 100.0), nonStarTreeResult.quantile(i / 100.0), delta);
     }
-  }
-
-  @Override
-  protected FieldConfig.CompressionCodec getCompressionCodec() {
-    return FieldConfig.CompressionCodec.PASS_THROUGH;
   }
 }

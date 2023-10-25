@@ -22,21 +22,21 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 
 
 public class StarTreeAggregationConfig extends BaseJsonConfig {
-
   private final String _columnName;
   private final String _aggregationFunction;
-  private final FieldConfig.CompressionCodec _compressionCodec;
+  private final CompressionCodec _compressionCodec;
 
   @JsonCreator
   public StarTreeAggregationConfig(@JsonProperty(value = "columnName", required = true) String columnName,
       @JsonProperty(value = "aggregationFunction", required = true) String aggregationFunction,
-      @JsonProperty(value = "compressionCodec") @Nullable FieldConfig.CompressionCodec compressionCodec) {
+      @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec) {
     _columnName = columnName;
     _aggregationFunction = aggregationFunction;
-    _compressionCodec = compressionCodec == null ? FieldConfig.CompressionCodec.PASS_THROUGH : compressionCodec;
+    _compressionCodec = compressionCodec != null ? compressionCodec : CompressionCodec.PASS_THROUGH;
   }
 
   public String getColumnName() {
@@ -47,7 +47,7 @@ public class StarTreeAggregationConfig extends BaseJsonConfig {
     return _aggregationFunction;
   }
 
-  public FieldConfig.CompressionCodec getCompressionCodec() {
+  public CompressionCodec getCompressionCodec() {
     return _compressionCodec;
   }
 }

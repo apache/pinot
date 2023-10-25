@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.DistinctCountHLLValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static org.testng.Assert.assertEquals;
@@ -49,10 +48,5 @@ public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<Object, H
   @Override
   void assertAggregatedValue(HyperLogLog starTreeResult, HyperLogLog nonStarTreeResult) {
     assertEquals(starTreeResult.cardinality(), nonStarTreeResult.cardinality());
-  }
-
-  @Override
-  protected FieldConfig.CompressionCodec getCompressionCodec() {
-    return FieldConfig.CompressionCodec.LZ4;
   }
 }

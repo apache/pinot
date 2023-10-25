@@ -27,12 +27,16 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -52,14 +56,8 @@ public class StarTreeV2BuilderConfig {
 
   private final List<String> _dimensionsSplitOrder;
   private final Set<String> _skipStarNodeCreationForDimensions;
-  private final Map<String, AggregationFunctionColumnPair> _functionColumnPairs;
+  private final TreeMap<AggregationFunctionColumnPair, AggregationSpec> _aggregationSpecs;
   private final int _maxLeafRecords;
-
-  public static StarTreeV2BuilderConfig fromMetadata(StarTreeV2Metadata starTreeV2Metadata) {
-    return new StarTreeV2BuilderConfig(starTreeV2Metadata.getDimensionsSplitOrder(),
-        starTreeV2Metadata.getSkipStarNodeCreationForDimensions(), starTreeV2Metadata.getFunctionColumnPairs(),
-        starTreeV2Metadata.getMaxLeafRecords());
-  }
 
   public static StarTreeV2BuilderConfig fromIndexConfig(StarTreeIndexConfig indexConfig) {
     List<String> dimensionsSplitOrder = indexConfig.getDimensionsSplitOrder();
@@ -73,20 +71,21 @@ public class StarTreeV2BuilderConfig {
     } else {
       skipStarNodeCreationForDimensions = Collections.emptySet();
     }
-    Map<String, AggregationFunctionColumnPair> aggregationConfigs = new TreeMap<>();
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
     if (indexConfig.getFunctionColumnPairs() != null) {
       for (String functionColumnPair : indexConfig.getFunctionColumnPairs()) {
         AggregationFunctionColumnPair aggregationFunctionColumnPair =
             AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
-        aggregationConfigs.put(aggregationFunctionColumnPair.toColumnName(), aggregationFunctionColumnPair);
+        aggregationSpecs.put(aggregationFunctionColumnPair, AggregationSpec.DEFAULT);
       }
     }
-
     if (indexConfig.getAggregationConfigs() != null) {
       for (StarTreeAggregationConfig aggregationConfig : indexConfig.getAggregationConfigs()) {
         AggregationFunctionColumnPair aggregationFunctionColumnPair =
-            AggregationFunctionColumnPair.fromStarTreeAggregationConfigs(aggregationConfig);
-        aggregationConfigs.put(aggregationFunctionColumnPair.toColumnName(), aggregationFunctionColumnPair);
+            AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
+        ChunkCompressionType compressionType =
+            ChunkCompressionType.valueOf(aggregationConfig.getCompressionCodec().name());
+        aggregationSpecs.put(aggregationFunctionColumnPair, new AggregationSpec(compressionType));
       }
     }
 
@@ -95,8 +94,14 @@ public class StarTreeV2BuilderConfig {
       maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
     }
 
-    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, skipStarNodeCreationForDimensions, aggregationConfigs,
+    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, skipStarNodeCreationForDimensions, aggregationSpecs,
         maxLeafRecords);
+  }
+
+  public static StarTreeV2BuilderConfig fromMetadata(StarTreeV2Metadata starTreeV2Metadata) {
+    return new StarTreeV2BuilderConfig(starTreeV2Metadata.getDimensionsSplitOrder(),
+        starTreeV2Metadata.getSkipStarNodeCreationForDimensions(), starTreeV2Metadata.getAggregationSpecs(),
+        starTreeV2Metadata.getMaxLeafRecords());
   }
 
   /**
@@ -165,24 +170,22 @@ public class StarTreeV2BuilderConfig {
     }
     Preconditions.checkState(!dimensionsSplitOrder.isEmpty(), "No qualified dimension found for star-tree split order");
 
-    Map<String, AggregationFunctionColumnPair> functionColumnPairs = new TreeMap<>();
-    functionColumnPairs.put(AggregationFunctionColumnPair.COUNT_STAR.toColumnName(),
-        AggregationFunctionColumnPair.COUNT_STAR);
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
+    aggregationSpecs.put(AggregationFunctionColumnPair.COUNT_STAR, AggregationSpec.DEFAULT);
     for (String numericMetric : numericMetrics) {
-      AggregationFunctionColumnPair sumAggregationFunctionColumnPair =
-          new AggregationFunctionColumnPair(AggregationFunctionType.SUM, numericMetric);
-      functionColumnPairs.put(sumAggregationFunctionColumnPair.toColumnName(), sumAggregationFunctionColumnPair);
+      aggregationSpecs.put(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, numericMetric),
+          AggregationSpec.DEFAULT);
     }
 
-    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), functionColumnPairs,
+    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), aggregationSpecs,
         DEFAULT_MAX_LEAF_RECORDS);
   }
 
   private StarTreeV2BuilderConfig(List<String> dimensionsSplitOrder, Set<String> skipStarNodeCreationForDimensions,
-      Map<String, AggregationFunctionColumnPair> functionColumnPairs, int maxLeafRecords) {
+      TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs, int maxLeafRecords) {
     _dimensionsSplitOrder = dimensionsSplitOrder;
     _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
-    _functionColumnPairs = functionColumnPairs;
+    _aggregationSpecs = aggregationSpecs;
     _maxLeafRecords = maxLeafRecords;
   }
 
@@ -194,12 +197,40 @@ public class StarTreeV2BuilderConfig {
     return _skipStarNodeCreationForDimensions;
   }
 
-  public Map<String, AggregationFunctionColumnPair> getFunctionColumnPairs() {
-    return _functionColumnPairs;
+  public Map<AggregationFunctionColumnPair, AggregationSpec> getAggregationSpecs() {
+    return _aggregationSpecs;
+  }
+
+  public Set<AggregationFunctionColumnPair> getFunctionColumnPairs() {
+    return _aggregationSpecs.keySet();
   }
 
   public int getMaxLeafRecords() {
     return _maxLeafRecords;
+  }
+
+  /**
+   * Writes the metadata which is used to initialize the {@link StarTreeV2Metadata} when loading the segment.
+   */
+  public void writeMetadata(Configuration metadataProperties, int totalDocs) {
+    metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, totalDocs);
+    metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
+    metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _aggregationSpecs.keySet());
+    metadataProperties.setProperty(MetadataKey.AGGREGATION_COUNT, _aggregationSpecs.size());
+    int index = 0;
+    for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : _aggregationSpecs.entrySet()) {
+      AggregationFunctionColumnPair functionColumnPair = entry.getKey();
+      AggregationSpec aggregationSpec = entry.getValue();
+      String prefix = MetadataKey.AGGREGATION_PREFIX + index + '.';
+      metadataProperties.setProperty(prefix + MetadataKey.FUNCTION_TYPE,
+          functionColumnPair.getFunctionType().getName());
+      metadataProperties.setProperty(prefix + MetadataKey.COLUMN_NAME, functionColumnPair.getColumn());
+      metadataProperties.setProperty(prefix + MetadataKey.COMPRESSION_CODEC, aggregationSpec.getCompressionType());
+      index++;
+    }
+    metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
+    metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
+        _skipStarNodeCreationForDimensions);
   }
 
   @Override
@@ -213,19 +244,18 @@ public class StarTreeV2BuilderConfig {
     StarTreeV2BuilderConfig that = (StarTreeV2BuilderConfig) o;
     return _maxLeafRecords == that._maxLeafRecords && Objects.equals(_dimensionsSplitOrder, that._dimensionsSplitOrder)
         && Objects.equals(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions)
-        && Objects.equals(_functionColumnPairs, that._functionColumnPairs);
+        && Objects.equals(_aggregationSpecs, that._aggregationSpecs);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_dimensionsSplitOrder, _skipStarNodeCreationForDimensions, _functionColumnPairs,
-        _maxLeafRecords);
+    return Objects.hash(_dimensionsSplitOrder, _skipStarNodeCreationForDimensions, _aggregationSpecs, _maxLeafRecords);
   }
 
   @Override
   public String toString() {
     return new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE).append("splitOrder", _dimensionsSplitOrder)
         .append("skipStarNodeCreation", _skipStarNodeCreationForDimensions)
-        .append("functionColumnPairs", _functionColumnPairs).append("maxLeafRecords", _maxLeafRecords).toString();
+        .append("aggregationSpecs", _aggregationSpecs).append("maxLeafRecords", _maxLeafRecords).toString();
   }
 }

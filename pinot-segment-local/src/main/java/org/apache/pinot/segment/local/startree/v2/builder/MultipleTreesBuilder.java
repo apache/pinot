@@ -25,7 +25,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.configuration.Configuration;
@@ -39,7 +38,6 @@ import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.In
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.IndexValue;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -210,19 +208,7 @@ public class MultipleTreesBuilder implements Closeable {
     if (totalDocs == -1) {
       return false;
     }
-    metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, totalDocs);
-    metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, builderConfig.getDimensionsSplitOrder());
-    metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, builderConfig.getFunctionColumnPairs());
-    int index = 0;
-    for (Map.Entry<String, AggregationFunctionColumnPair> functionColumnPair : builderConfig.getFunctionColumnPairs()
-        .entrySet()) {
-      functionColumnPair.getValue().addToConfiguration(metadataProperties, index);
-      index++;
-    }
-    metadataProperties.setProperty(MetadataKey.NUM_OF_AGGREGATION_CONFIG, index);
-    metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, builderConfig.getMaxLeafRecords());
-    metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
-        builderConfig.getSkipStarNodeCreationForDimensions());
+    builderConfig.writeMetadata(metadataProperties, totalDocs);
     return true;
   }
 

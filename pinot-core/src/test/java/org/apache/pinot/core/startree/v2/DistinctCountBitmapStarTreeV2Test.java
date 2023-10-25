@@ -21,7 +21,6 @@ package org.apache.pinot.core.startree.v2;
 import java.util.Random;
 import org.apache.pinot.segment.local.aggregator.DistinctCountBitmapValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -48,10 +47,5 @@ public class DistinctCountBitmapStarTreeV2Test extends BaseStarTreeV2Test<Object
   @Override
   void assertAggregatedValue(RoaringBitmap starTreeResult, RoaringBitmap nonStarTreeResult) {
     assertEquals(starTreeResult, nonStarTreeResult);
-  }
-
-  @Override
-  protected FieldConfig.CompressionCodec getCompressionCodec() {
-    return FieldConfig.CompressionCodec.ZSTANDARD;
   }
 }

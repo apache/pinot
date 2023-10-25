@@ -30,7 +30,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
@@ -949,40 +948,37 @@ public final class TableConfigUtils {
         for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
           columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
         }
-        // Function column pairs cannot be null
-        Map<String, AggregationFunctionColumnPair> aggregationConfigs = new TreeMap<>();
-        if (starTreeIndexConfig.getFunctionColumnPairs() != null) {
-          for (String functionColumnPair : starTreeIndexConfig.getFunctionColumnPairs()) {
+        List<String> functionColumnPairs = starTreeIndexConfig.getFunctionColumnPairs();
+        if (functionColumnPairs != null) {
+          for (String functionColumnPair : functionColumnPairs) {
             AggregationFunctionColumnPair columnPair;
             try {
               columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
-              Preconditions.checkState(aggregationConfigs.put(columnPair.toColumnName(), columnPair) == null,
-                  String.format("Found duplicate aggregation pair for for column:%s , function: %s",
-                      columnPair.getColumn(), columnPair.getFunctionType().name()));
             } catch (Exception e) {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                   + "in the form <Aggregation function>__<Column name>");
             }
-
             String columnName = columnPair.getColumn();
             if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
               columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
             }
           }
         }
-
-        List<StarTreeAggregationConfig> starTreeAggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
-        if (starTreeAggregationConfigs != null) {
-          for (StarTreeAggregationConfig starTreeAggregationConfig : starTreeAggregationConfigs) {
-            AggregationFunctionColumnPair columnPair =
-                AggregationFunctionColumnPair.fromStarTreeAggregationConfigs(starTreeAggregationConfig);
-            Preconditions.checkState(aggregationConfigs.put(columnPair.toColumnName(), columnPair) == null,
-                String.format("Found duplicate aggregation pair for for column:%s , function: %s",
-                    columnPair.getColumn(), columnPair.getFunctionType().name()));
-            columnNameToConfigMap.put(columnPair.getColumn(), STAR_TREE_CONFIG_NAME);
+        List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
+        if (aggregationConfigs != null) {
+          for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
+            AggregationFunctionColumnPair columnPair;
+            try {
+              columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
+            } catch (Exception e) {
+              throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
+            }
+            String columnName = columnPair.getColumn();
+            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+            }
           }
         }
-
         List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
         if (skipDimensionList != null) {
           for (String columnName : skipDimensionList) {
