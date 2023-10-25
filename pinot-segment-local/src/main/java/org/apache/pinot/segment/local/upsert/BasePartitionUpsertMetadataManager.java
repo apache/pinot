@@ -68,6 +68,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
   protected final double _metadataTTL;
+  protected final boolean _dropOutOfOrderRecord;
   protected final File _tableIndexDir;
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
@@ -95,7 +96,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      boolean dropOutOfOrderRecord, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
@@ -105,6 +106,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _partialUpsertHandler = partialUpsertHandler;
     _enableSnapshot = enableSnapshot;
     _metadataTTL = metadataTTL;
+    _dropOutOfOrderRecord = dropOutOfOrderRecord;
     _tableIndexDir = tableIndexDir;
     _snapshotLock = enableSnapshot ? new ReentrantReadWriteLock() : null;
     _serverMetrics = serverMetrics;
@@ -317,24 +319,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
-  public void addRecord(MutableSegment segment, RecordInfo recordInfo) {
+  public boolean addRecord(MutableSegment segment, RecordInfo recordInfo) {
     _gotFirstConsumingSegment = true;
     if (!startOperation()) {
       _logger.debug("Skip adding record to segment: {} because metadata manager is already stopped",
           segment.getSegmentName());
-      return;
+      return false;
     }
     // NOTE: We don't acquire snapshot read lock here because snapshot is always taken before a new consuming segment
     //       starts consuming, so it won't overlap with this method
     try {
-      doAddRecord(segment, recordInfo);
+      boolean addRecord = doAddRecord(segment, recordInfo);
       _trackedSegments.add(segment);
+      return addRecord;
     } finally {
       finishOperation();
     }
   }
 
-  protected abstract void doAddRecord(MutableSegment segment, RecordInfo recordInfo);
+  protected abstract boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo);
 
   @Override
   public void replaceSegment(ImmutableSegment segment, IndexSegment oldSegment) {
