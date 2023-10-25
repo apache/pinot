@@ -276,7 +276,7 @@ public class PinotTableRestletResource {
       final boolean isDimensionTable = StringUtils.equalsIgnoreCase(tableTypeStr, "dimension");
       TableType tableType = null;
       if (isDimensionTable) {
-        // Set the table type to OFFLINE for all sorting related operations
+        // Dimension is a property (isDimTable) of an OFFLINE table.
         tableType = TableType.OFFLINE;
       } else if (tableTypeStr != null) {
         tableType = TableType.valueOf(tableTypeStr.toUpperCase());
