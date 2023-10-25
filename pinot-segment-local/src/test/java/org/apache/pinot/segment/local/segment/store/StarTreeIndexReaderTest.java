@@ -79,7 +79,8 @@ public class StarTreeIndexReaderTest {
     // Test with 2 index trees.
     StarTreeV2Metadata stMeta1 = mock(StarTreeV2Metadata.class);
     when(stMeta1.getDimensionsSplitOrder()).thenReturn(Arrays.asList("dim0", "dim1"));
-    when(stMeta1.getFunctionColumnPairs()).thenReturn(Collections.singleton(AggregationFunctionColumnPair.COUNT_STAR));
+    when(stMeta1.getFunctionColumnPairs()).thenReturn(
+        Collections.singleton(new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "*")));
     StarTreeV2Metadata stMeta2 = mock(StarTreeV2Metadata.class);
     when(stMeta2.getDimensionsSplitOrder()).thenReturn(Arrays.asList("dimX", "dimY"));
     when(stMeta2.getFunctionColumnPairs()).thenReturn(

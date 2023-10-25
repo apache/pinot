@@ -1350,6 +1350,17 @@ public class TableConfigUtilsTest {
       // expected
     }
 
+    starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol"), null, null,
+        Arrays.asList(new StarTreeAggregationConfig("myCol2", "SUM", FieldConfig.CompressionCodec.LZ4)), 1);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
+    try {
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should fail for invalid StarTreeIndex config column name in function column pair");
+    } catch (Exception e) {
+      // expected
+    }
+
     starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("multiValCol"), Arrays.asList("multiValCol"),
         Arrays.asList("SUM__multiValCol"), null, 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1357,29 +1368,6 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail for multi-value column name in StarTreeIndex config");
-    } catch (Exception e) {
-      // expected
-    }
-
-    starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol"), null, Arrays.asList("SUM__myCol2"),
-        Arrays.asList(new StarTreeAggregationConfig("myCol2", "MAX", FieldConfig.CompressionCodec.LZ4)), 1);
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for duplicate column function pair");
-    } catch (Exception e) {
-      // expected
-    }
-
-    starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol"), null, null,
-        Arrays.asList(new StarTreeAggregationConfig("myCol", "SUM", FieldConfig.CompressionCodec.LZ4),
-            new StarTreeAggregationConfig("myCol", "SUM", FieldConfig.CompressionCodec.SNAPPY)), 1);
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for duplicate column function pair");
     } catch (Exception e) {
       // expected
     }

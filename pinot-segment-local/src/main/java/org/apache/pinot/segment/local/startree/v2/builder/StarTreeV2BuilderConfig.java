@@ -197,7 +197,7 @@ public class StarTreeV2BuilderConfig {
     return _skipStarNodeCreationForDimensions;
   }
 
-  public Map<AggregationFunctionColumnPair, AggregationSpec> getAggregationSpecs() {
+  public TreeMap<AggregationFunctionColumnPair, AggregationSpec> getAggregationSpecs() {
     return _aggregationSpecs;
   }
 

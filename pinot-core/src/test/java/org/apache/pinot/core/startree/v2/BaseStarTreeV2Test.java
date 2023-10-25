@@ -116,7 +116,6 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String FILTER_AGG_CLAUSE = " FILTER(WHERE d1 > 10)";
 
   private ValueAggregator _valueAggregator;
-
   private DataType _aggregatedValueType;
   private String _aggregation;
   private IndexSegment _indexSegment;

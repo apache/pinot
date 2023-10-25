@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -132,7 +133,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
           "Dimension: " + dimension + " does not have dictionary");
     }
 
-    Map<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = builderConfig.getAggregationSpecs();
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = builderConfig.getAggregationSpecs();
     _numMetrics = aggregationSpecs.size();
     _metrics = new String[_numMetrics];
     _valueAggregators = new ValueAggregator[_numMetrics];
