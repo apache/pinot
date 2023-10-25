@@ -27,8 +27,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.builder.fluent.Configurations;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf;
@@ -98,7 +98,8 @@ public class PinotConfigUtils {
       return null;
     }
 
-    Map<String, Object> properties = CommonsConfigurationUtils.toMap(new PropertiesConfiguration(configFile));
+    Configurations configs = new Configurations();
+    Map<String, Object> properties = CommonsConfigurationUtils.toMap(configs.properties(configFile));
     ControllerConf conf = new ControllerConf(properties);
 
     conf.setPinotFSFactoryClasses(null);
@@ -142,7 +143,8 @@ public class PinotConfigUtils {
     }
     File configFile = new File(configFileName);
     if (configFile.exists()) {
-      return CommonsConfigurationUtils.toMap(new PropertiesConfiguration(configFile));
+      Configurations configs = new Configurations();
+      return CommonsConfigurationUtils.toMap(configs.properties(configFile));
     }
 
     return null;

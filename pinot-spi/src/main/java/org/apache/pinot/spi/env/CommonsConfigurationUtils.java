@@ -105,6 +105,11 @@ public class CommonsConfigurationUtils {
     return StreamSupport.stream(getIterable(configuration.getKeys()).spliterator(), false);
   }
 
+  public static Stream<String> getKeysStream(org.apache.commons.configuration2.Configuration configuration) {
+    return StreamSupport.stream(getIterable(configuration.getKeys()).spliterator(), false);
+  }
+
+
   /**
    * Provides a list of all the keys found in a {@link Configuration}.
    * @param configuration to iterate on keys
@@ -121,7 +126,25 @@ public class CommonsConfigurationUtils {
     return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
   }
 
+  public static Map<String, Object> toMap(org.apache.commons.configuration2.Configuration configuration) {
+    return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
+  }
+
   private static Object mapValue(String key, Configuration configuration) {
+    // For multi-value config, convert it to a single comma connected string value.
+    // For single-value config, return its raw property, unless it needs interpolation.
+    return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1)
+        .<Object>map(values -> Arrays.stream(values).collect(Collectors.joining(","))).orElseGet(() -> {
+          Object rawProperty = configuration.getProperty(key);
+          if (!needInterpolate(rawProperty)) {
+            return rawProperty;
+          }
+          // The string value is converted to the requested type when accessing it via PinotConfiguration.
+          return configuration.getString(key);
+        });
+  }
+
+  private static Object mapValue(String key, org.apache.commons.configuration2.Configuration configuration) {
     // For multi-value config, convert it to a single comma connected string value.
     // For single-value config, return its raw property, unless it needs interpolation.
     return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1)
