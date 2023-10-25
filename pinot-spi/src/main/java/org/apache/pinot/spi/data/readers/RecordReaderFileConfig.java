@@ -34,7 +34,10 @@ public class RecordReaderFileConfig {
   public final File _dataFile;
   public final Set<String> _fieldsToRead;
   public final RecordReaderConfig _recordReaderConfig;
+  // Record Readers created/passed from clients.
   public final RecordReader _recordReader;
+  // Clients can indicate if the above reader can be closed, to optimize for memory usage.
+  public boolean _closeRecordReaderAfterUse = false;
 
   // Pass in the info needed to initialize the reader
   public RecordReaderFileConfig(FileFormat fileFormat, File dataFile, Set<String> fieldsToRead,
@@ -47,11 +50,12 @@ public class RecordReaderFileConfig {
   }
 
   // Pass in the reader instance directly
-  public RecordReaderFileConfig(RecordReader recordReader) {
+  public RecordReaderFileConfig(RecordReader recordReader, boolean closeRecordReaderAfterUse) {
     _recordReader = recordReader;
     _fileFormat = null;
     _dataFile = null;
     _fieldsToRead = null;
     _recordReaderConfig = null;
+    _closeRecordReaderAfterUse = closeRecordReaderAfterUse;
   }
 }

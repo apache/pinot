@@ -142,7 +142,7 @@ public class SegmentMapperTest {
     PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader();
     segmentRecordReader.init(_indexDir, null, null, true);
     SegmentMapper segmentMapper =
-        new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(segmentRecordReader)),
+        new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(segmentRecordReader, false)),
             processorConfig, mapperOutputDir);
     Map<String, GenericRowFileManager> partitionToFileManagerMap = segmentMapper.map();
     segmentRecordReader.close();

@@ -132,6 +132,7 @@ public class SegmentMapper {
     for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
       RecordReader recordReader = recordReaderFileConfig._recordReader;
       if (recordReader == null) {
+        // We create and use the recordReader here.
         try {
           recordReader =
               RecordReaderFactory.getRecordReader(recordReaderFileConfig._fileFormat, recordReaderFileConfig._dataFile,
@@ -143,7 +144,13 @@ public class SegmentMapper {
           }
         }
       } else {
+        // RecordReader was passed from the client. Check if we can close it
+        // here. This is to optimize memory usage because we no longer need these
+        // readers for segment generation.
         mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
+        if (recordReaderFileConfig._closeRecordReaderAfterUse) {
+          recordReader.close();
+        }
       }
       count++;
     }

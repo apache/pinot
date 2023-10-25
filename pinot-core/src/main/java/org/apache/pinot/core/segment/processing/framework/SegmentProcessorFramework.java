@@ -106,7 +106,8 @@ public class SegmentProcessorFramework {
     Preconditions.checkState(!recordReaders.isEmpty(), "No record reader is provided");
     List<RecordReaderFileConfig> recordReaderFileConfigs = new ArrayList<>();
     for (RecordReader recordReader : recordReaders) {
-      recordReaderFileConfigs.add(new RecordReaderFileConfig(recordReader));
+      // For backwards compatibility, we don't want to close readers passed from clients.
+      recordReaderFileConfigs.add(new RecordReaderFileConfig(recordReader, false));
     }
     return recordReaderFileConfigs;
   }
