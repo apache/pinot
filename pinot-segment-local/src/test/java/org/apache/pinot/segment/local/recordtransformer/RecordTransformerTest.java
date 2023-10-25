@@ -507,7 +507,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testDefaultTransformer() {
-    RecordTransformer transformer = CompositeTransformer.getDefaultTransformer(TABLE_CONFIG, SCHEMA);
+    RecordTransformer transformer = CompositeTransformer.composeDefaultTransformers(TABLE_CONFIG, SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);

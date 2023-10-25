@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -69,12 +70,22 @@ public class CompositeTransformer implements RecordTransformer {
    *   </li>
    * </ul>
    */
-  public static CompositeTransformer getDefaultTransformer(TableConfig tableConfig, Schema schema) {
-    return new CompositeTransformer(
-        Stream.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
-                new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
-                new TimeValidationTransformer(tableConfig, schema), new NullValueTransformer(tableConfig, schema),
-                new SanitizationTransformer(schema)).filter(t -> !t.isNoOp()).collect(Collectors.toList()));
+  public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema) {
+    return Stream.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
+        new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
+        new TimeValidationTransformer(tableConfig, schema), new NullValueTransformer(tableConfig, schema),
+        new SanitizationTransformer(schema)).filter(t -> !t.isNoOp()).collect(Collectors.toList());
+  }
+
+  public static CompositeTransformer composeDefaultTransformers(TableConfig tableConfig, Schema schema) {
+    return new CompositeTransformer(getDefaultTransformers(tableConfig, schema));
+  }
+
+  public static CompositeTransformer composeAllTransformers(List<RecordTransformer> customTransformers,
+      TableConfig tableConfig, Schema schema) {
+    List<RecordTransformer> allTransformers = new ArrayList<>(getDefaultTransformers(tableConfig, schema));
+    allTransformers.addAll(customTransformers);
+    return new CompositeTransformer(allTransformers);
   }
 
   /**

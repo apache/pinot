@@ -38,6 +38,7 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -63,6 +64,7 @@ public class SegmentMapper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMapper.class);
 
   private List<RecordReaderFileConfig> _recordReaderFileConfigs;
+  private List<RecordTransformer> _customRecordTransformers;
   private final SegmentProcessorConfig _processorConfig;
   private final File _mapperOutputDir;
 
@@ -78,8 +80,9 @@ public class SegmentMapper {
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
 
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
-      SegmentProcessorConfig processorConfig, File mapperOutputDir) {
+      List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
     _recordReaderFileConfigs = recordReaderFileConfigs;
+    _customRecordTransformers = customRecordTransformers;
     _processorConfig = processorConfig;
     _mapperOutputDir = mapperOutputDir;
 
@@ -90,7 +93,7 @@ public class SegmentMapper {
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();
     _includeNullFields = tableConfig.getIndexingConfig().isNullHandlingEnabled();
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
+    _recordTransformer = CompositeTransformer.composeAllTransformers(_customRecordTransformers, tableConfig, schema);
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
     List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
     int numPartitioners = partitionerConfigs.size();
@@ -132,6 +135,7 @@ public class SegmentMapper {
     for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
       RecordReader recordReader = recordReaderFileConfig._recordReader;
       if (recordReader == null) {
+        // We create and use the recordReader here.
         try {
           recordReader =
               RecordReaderFactory.getRecordReader(recordReaderFileConfig._fileFormat, recordReaderFileConfig._dataFile,
