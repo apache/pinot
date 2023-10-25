@@ -31,6 +31,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
@@ -38,6 +39,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Detailed design see https://docs.google.com/document/d/1xxPkGPxyY21gAkFi9gtFDeSzEXjPjp-IQW70kHynsL8
+ * During each creation/update/scale, the algorithm will refer to the corresponding tenant level instance partitions and
+ * generate an instance partition by taking numInstancePerReplicaGroup mirror server sets from the tenant level
+ * instance partitions.
+ *
+ * If an existingInstancePartition is provided, the algorithm will generate a best effort assignment that resembles
+ * the existingInstancePartition.
+ *
+ * Assumptions for this algorithm:
+ *  1. The number of replica groups in the tenant level instance partitions is the same as the number of replica groups
+ *     in the table config.
+ *  2. The number of partitions at replica group level is 1
+ *  3. This algorithm only works for replica group based table assignment
+ */
 public class MirrorServerSetInstancePartitionSelector extends InstancePartitionSelector {
   private static final Logger LOGGER = LoggerFactory.getLogger(MirrorServerSetInstancePartitionSelector.class);
   private final InstancePartitions _preConfiguredInstancePartitions;
@@ -62,7 +78,7 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
   private final List<List<String>> _existingMirroredServerLists = new ArrayList<>();
 
   public MirrorServerSetInstancePartitionSelector(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
-      String tableNameWithType, InstancePartitions existingInstancePartitions,
+      String tableNameWithType, @Nullable InstancePartitions existingInstancePartitions,
       InstancePartitions preConfiguredInstancePartitions) {
     super(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions);
     _preConfiguredInstancePartitions = preConfiguredInstancePartitions;
@@ -172,7 +188,7 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
   }
 
   @Override
-  void selectInstances(Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap,
+  public void selectInstances(Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap,
       InstancePartitions instancePartitions) {
     if (_replicaGroupPartitionConfig.isReplicaGroupBased()) {
       validatePoolDiversePreconditions(poolToInstanceConfigsMap);
