@@ -18,14 +18,18 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.upsert.merger.OverwriteMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
+import org.apache.pinot.segment.local.upsert.merger.PartialUpsertRowMergeEvaluator;
+import org.apache.pinot.segment.local.upsert.merger.PartialUpsertRowMergeEvaluatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -41,16 +45,21 @@ public class PartialUpsertHandler {
   private final PartialUpsertMerger _defaultPartialUpsertMerger;
   private final List<String> _comparisonColumns;
   private final List<String> _primaryKeyColumns;
+  private PartialUpsertRowMergeEvaluator _rowMerger;
+  private LazyRow _reusePreviousLazyRow;
+  private LazyRow _reuseNewLazyRow;
+  private Map<String, Object> _reuseRowMergerResult;
 
-  public PartialUpsertHandler(Schema schema, Map<String, UpsertConfig.Strategy> partialUpsertStrategies,
-      UpsertConfig.Strategy defaultPartialUpsertStrategy, List<String> comparisonColumns) {
-    _defaultPartialUpsertMerger = PartialUpsertMergerFactory.getMerger(defaultPartialUpsertStrategy);
+  public PartialUpsertHandler(Schema schema, UpsertConfig upsertConfig, List<String> comparisonColumns) {
+    _defaultPartialUpsertMerger = PartialUpsertMergerFactory.getMerger(upsertConfig.getDefaultPartialUpsertStrategy());
     _comparisonColumns = comparisonColumns;
     _primaryKeyColumns = schema.getPrimaryKeyColumns();
 
-    for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
+    for (Map.Entry<String, UpsertConfig.Strategy> entry : upsertConfig.getPartialUpsertStrategies().entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertMergerFactory.getMerger(entry.getValue()));
     }
+
+    initRowMerger(upsertConfig);
   }
 
   /**
@@ -69,7 +78,31 @@ public class PartialUpsertHandler {
    * @param newRecord the new consumed record.
    */
   public void merge(IndexSegment indexSegment, int docId, GenericRow newRecord) {
+
+    // If a row merger is initialised then evaluate it and get the results of merger
+    if (_rowMerger != null) {
+      _reuseRowMergerResult.clear();
+      _reusePreviousLazyRow.init(indexSegment, docId);
+      _reuseNewLazyRow.init(newRecord);
+      _rowMerger.evaluate(_reusePreviousLazyRow, _reuseNewLazyRow, _reuseRowMergerResult);
+    }
+
     for (String column : indexSegment.getColumnNames()) {
+
+      // use result from custom merger result if present
+      if (_reuseRowMergerResult != null && _reuseRowMergerResult.containsKey(column)) {
+        if (!_primaryKeyColumns.contains(column) && !_comparisonColumns.contains(column)) {
+          Object mergedValue = _reuseRowMergerResult.get(column);
+          if (mergedValue == null) {
+            newRecord.addNullValueField(column);
+          } else {
+            newRecord.removeNullValueField(column);
+            newRecord.putValue(column, mergedValue);
+          }
+        }
+        // skip any other partial upsert for this column
+        continue;
+      }
       if (!_primaryKeyColumns.contains(column)) {
         PartialUpsertMerger merger = _column2Mergers.getOrDefault(column, _defaultPartialUpsertMerger);
         // Non-overwrite mergers
@@ -116,5 +149,27 @@ public class PartialUpsertHandler {
         }
       }
     }
+  }
+
+  private void initRowMerger(UpsertConfig upsertConfig) {
+    // If custom row merger is specified initialize row merger.
+    String rowMergerCustomImplementation = upsertConfig.getRowMergerCustomImplementation();
+    if (rowMergerCustomImplementation != null && !rowMergerCustomImplementation.equals("")) {
+      try {
+        setRowMerger(PartialUpsertRowMergeEvaluatorFactory.getInstance(rowMergerCustomImplementation));
+      } catch (Exception e) {
+        throw new RuntimeException("Cannot create partial upsert row merger", e);
+      }
+    } else {
+      _rowMerger = null;
+    }
+  }
+
+  @VisibleForTesting
+  public void setRowMerger(PartialUpsertRowMergeEvaluator rowMerger) {
+    _rowMerger = rowMerger;
+    _reusePreviousLazyRow = new LazyRow();
+    _reuseNewLazyRow = new LazyRow();
+    _reuseRowMergerResult = new HashMap<>();
   }
 }

@@ -51,6 +51,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("default upsert strategy for partial mode")
   private Strategy _defaultPartialUpsertStrategy = Strategy.OVERWRITE;
 
+  @JsonPropertyDescription("Class name for custom row merger implementation")
+  private String _rowMergerCustomImplementation;
+
   @JsonPropertyDescription("Columns for upsert comparison, default to time column")
   private List<String> _comparisonColumns;
 
@@ -99,6 +102,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public Strategy getDefaultPartialUpsertStrategy() {
     return _defaultPartialUpsertStrategy;
+  }
+
+  public String getRowMergerCustomImplementation() {
+    return _rowMergerCustomImplementation;
   }
 
   public List<String> getComparisonColumns() {
@@ -151,6 +158,10 @@ public class UpsertConfig extends BaseJsonConfig {
    */
   public void setDefaultPartialUpsertStrategy(Strategy defaultPartialUpsertStrategy) {
     _defaultPartialUpsertStrategy = defaultPartialUpsertStrategy;
+  }
+
+  public void setRowMergerCustomImplementation(String rowMergerCustomImplementation) {
+    _rowMergerCustomImplementation = rowMergerCustomImplementation;
   }
 
   /**

@@ -23,7 +23,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.upsert.merger.PartialUpsertRowMergeEvaluator;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -66,6 +68,41 @@ public class PartialUpsertHandlerTest {
     testMerge(false, 2, false, 8, "hoursSinceEpoch", 8, false);
   }
 
+  @Test
+  public void testRowMerger() {
+
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("field1", FieldSpec.DataType.LONG).addMetric("field2", FieldSpec.DataType.LONG)
+        .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+        .setPrimaryKeyColumns(Arrays.asList("pk")).build();
+    Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
+    partialUpsertStrategies.put("field1", UpsertConfig.Strategy.OVERWRITE);
+
+    UpsertConfig upsertConfig = new UpsertConfig();
+    upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.IGNORE);
+    upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
+
+    try (MockedConstruction<PinotSegmentColumnReader> reader = mockConstruction(PinotSegmentColumnReader.class,
+        (mockReader, context) -> {
+          when(mockReader.isNull(1)).thenReturn(false);
+          when(mockReader.getValue(1)).thenReturn(1L);
+        })) {
+
+
+      ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
+      when(segment.getColumnNames()).thenReturn(Sets.newSet("field1", "field2", "hoursSinceEpoch"));
+      GenericRow row = new GenericRow();
+      row.putValue("field1", 0L);
+      row.putValue("field2", 2L);
+
+      PartialUpsertHandler handler =
+          spy(new PartialUpsertHandler(schema, upsertConfig, Collections.singletonList("hoursSinceEpoch")));
+      handler.setRowMerger(new TestRowMerger());
+      handler.merge(segment, 1, row);
+      assertEquals(3L, row.getValue("field2"));
+    }
+  }
+
   public void testMerge(boolean isPreviousNull, Object previousValue, boolean isNewNull, Object newValue,
       String columnName, Object expectedValue, boolean isExpectedNull) {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
@@ -74,6 +111,9 @@ public class PartialUpsertHandlerTest {
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.OVERWRITE);
+    UpsertConfig upsertConfig = new UpsertConfig();
+    upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.IGNORE);
+    upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
 
     try (MockedConstruction<PinotSegmentColumnReader> reader = mockConstruction(PinotSegmentColumnReader.class,
         (mockReader, context) -> {
@@ -81,8 +121,7 @@ public class PartialUpsertHandlerTest {
           when(mockReader.getValue(1)).thenReturn(previousValue);
         })) {
       PartialUpsertHandler handler =
-          spy(new PartialUpsertHandler(schema, partialUpsertStrategies, UpsertConfig.Strategy.IGNORE,
-              Collections.singletonList("hoursSinceEpoch")));
+          spy(new PartialUpsertHandler(schema, upsertConfig, Collections.singletonList("hoursSinceEpoch")));
 
       ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
       when(segment.getColumnNames()).thenReturn(Sets.newSet("field1", "field2", "hoursSinceEpoch"));
@@ -96,6 +135,18 @@ public class PartialUpsertHandlerTest {
       handler.merge(segment, 1, row);
       assertEquals(row.getValue(columnName), expectedValue);
       assertEquals(row.isNullValue(columnName), isExpectedNull);
+    }
+  }
+
+  class TestRowMerger implements PartialUpsertRowMergeEvaluator {
+
+    @Override
+    public void evaluate(LazyRow previousRow, LazyRow newRow, Map<String, Object> result) {
+      if ((Long) previousRow.getValue("field1") == 0) {
+        result.put("field2", (Long) newRow.getValue("field2"));
+      } else {
+        result.put("field2", (Long) previousRow.getValue("field2") + (Long) newRow.getValue("field2"));
+      }
     }
   }
 }
