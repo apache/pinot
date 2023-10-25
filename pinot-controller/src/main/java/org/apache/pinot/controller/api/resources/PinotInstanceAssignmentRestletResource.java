@@ -251,28 +251,30 @@ public class PinotInstanceAssignmentRestletResource {
       instancePartitionsMap.put(instancePartitionsType.toString(),
           new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
               existingInstancePartitions));
-    } else if (InstanceAssignmentConfigUtils.isPreConfigurationBasedAssignment(tableConfig, instancePartitionsType)) {
-      // fetch the existing instance partitions, if the table, this is referenced in the new instance partitions
-      // generation for minimum difference
-      InstancePartitions existingInstancePartitions =
-          InstancePartitionsUtils.fetchInstancePartitions(_resourceManager.getHelixZkManager().getHelixPropertyStore(),
-              InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      // fetch the pre-configured instance partitions, the renaming part is irrelevant as we are not really
-      // preserving this preConfigured, but only using it as a reference to generate the new instance partitions
-      InstancePartitions preConfigured =
-          InstancePartitionsUtils.fetchInstancePartitionsWithRename(_resourceManager.getPropertyStore(),
-              tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
-              instancePartitionsType.getInstancePartitionsName(rawTableName));
-      instancePartitionsMap.put(instancePartitionsType.toString(),
-          new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
-              existingInstancePartitions, preConfigured));
     } else {
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      instancePartitionsMap.put(instancePartitionsType.toString(),
-          InstancePartitionsUtils.fetchInstancePartitionsWithRename(_resourceManager.getPropertyStore(),
-              tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
-              instancePartitionsType.getInstancePartitionsName(rawTableName)));
+      if (InstanceAssignmentConfigUtils.isPreConfigurationBasedAssignment(tableConfig, instancePartitionsType)) {
+        // fetch the existing instance partitions, if the table, this is referenced in the new instance partitions
+        // generation for minimum difference
+        InstancePartitions existingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
+            _resourceManager.getHelixZkManager().getHelixPropertyStore(),
+            InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString()));
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+        // fetch the pre-configured instance partitions, the renaming part is irrelevant as we are not really
+        // preserving this preConfigured, but only using it as a reference to generate the new instance partitions
+        InstancePartitions preConfigured =
+            InstancePartitionsUtils.fetchInstancePartitionsWithRename(_resourceManager.getPropertyStore(),
+                tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
+                instancePartitionsType.getInstancePartitionsName(rawTableName));
+        instancePartitionsMap.put(instancePartitionsType.toString(),
+            new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
+                existingInstancePartitions, preConfigured));
+      } else {
+        String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+        instancePartitionsMap.put(instancePartitionsType.toString(),
+            InstancePartitionsUtils.fetchInstancePartitionsWithRename(_resourceManager.getPropertyStore(),
+                tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
+                instancePartitionsType.getInstancePartitionsName(rawTableName)));
+      }
     }
   }
 
