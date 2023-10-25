@@ -105,6 +105,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       if (testCase._ignored) {
         continue;
       }
+      boolean enableNullHandling = BooleanUtils.toBoolean(
+          testCase._extraProps.getOrDefault("EnableNullHandling", "false"));
 
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
@@ -119,7 +121,10 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         factory2.registerTable(pinotSchema, offlineTableName);
         List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
         List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
-
+        if (enableNullHandling) {
+          factory1.setNullHandlingForTable(offlineTableName);
+          factory2.setNullHandlingForTable(offlineTableName);
+        }
         // generate segments and dump into server1 and server2
         List<String> partitionColumns = tableEntry.getValue()._partitionColumns;
         String partitionColumn = null;
@@ -218,7 +223,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(_reducerPort, server1.getPort(), server2.getPort(),
         factory1.getRegisteredSchemaMap(), factory1.buildTableSegmentNameMap(), factory2.buildTableSegmentNameMap(),
-        partitionedSegmentsMap);
+        partitionedSegmentsMap, factory1.buildNullHandlingTableMap());
   }
 
   private void addSegments(MockInstanceDataManagerFactory factory1, MockInstanceDataManagerFactory factory2,
@@ -250,13 +255,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   // TODO: name the test using testCaseName for testng reports
   @Test(dataProvider = "testResourceQueryTestCaseProviderInputOnly")
-  public void testQueryTestCasesWithH2(String testCaseName, boolean isIgnored, String sql, String h2Sql, String expect,
-      boolean keepOutputRowOrder)
+  public void testQueryTestCasesWithH2(String testCaseName, String description, String sql, String h2Sql, String expect,
+      boolean keepOutputRowOrder, boolean isIgnored)
       throws Exception {
     // query pinot
     runQuery(sql, expect, null).ifPresent(resultTable -> {
       try {
-        compareRowEquals(resultTable, queryH2(h2Sql), keepOutputRowOrder);
+        compareRowEquals(resultTable, queryH2(h2Sql), sql, keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
       }
@@ -264,16 +269,16 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
-  public void testQueryTestCasesWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
-      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+  public void testQueryTestCasesWithOutput(String testCaseName, String description, String sql,
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean isIgnored)
       throws Exception {
     runQuery(sql, expect, null).ifPresent(
-        resultTable -> compareRowEquals(resultTable, expectedRows, keepOutputRowOrder));
+        resultTable -> compareRowEquals(resultTable, expectedRows, sql, keepOutputRowOrder));
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
-  public void testQueryTestCasesWithMetadata(String testCaseName, boolean isIgnored, String sql, String h2Sql,
-      String expect, int numSegments)
+  public void testQueryTestCasesWithMetadata(String testCaseName, String description, String sql,
+      String h2Sql, String expect, int numSegments, boolean isIgnored)
       throws Exception {
     Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap = new HashMap<>();
     runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(resultTable -> {
@@ -376,8 +381,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
             expectedRows.add(objs.toArray());
           }
           Object[] testEntry = new Object[]{
-              testCaseName, queryCase._ignored, sql, h2Sql, expectedRows, queryCase._expectedException,
-              queryCase._keepOutputRowOrder
+              testCaseName, queryCase._description, sql, h2Sql, expectedRows, queryCase._expectedException,
+              queryCase._keepOutputRowOrder, queryCase._ignored,
           };
           providerContent.add(testEntry);
         }
@@ -424,7 +429,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           }
 
           Object[] testEntry = new Object[]{
-              testCaseName, queryCase._ignored, sql, h2Sql, queryCase._expectedException, segmentCount
+              testCaseName, queryCase._description, sql, h2Sql, queryCase._expectedException, segmentCount,
+              queryCase._ignored
           };
           providerContent.add(testEntry);
         }
@@ -454,7 +460,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
               : replaceTableName(testCaseName, queryCase._sql);
           Object[] testEntry = new Object[]{
-              testCaseName, queryCase._ignored, sql, h2Sql, queryCase._expectedException, queryCase._keepOutputRowOrder
+              testCaseName, queryCase._description, sql, h2Sql, queryCase._expectedException,
+              queryCase._keepOutputRowOrder, queryCase._ignored
           };
           providerContent.add(testEntry);
         }

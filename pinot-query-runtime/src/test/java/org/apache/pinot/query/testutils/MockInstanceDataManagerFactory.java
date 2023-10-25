@@ -60,6 +60,7 @@ public class MockInstanceDataManagerFactory {
 
   // Key is raw table name
   private final Map<String, List<GenericRow>> _tableRowsMap;
+  private final Map<String, Boolean> _nullHandlingMap;
   private final Map<String, Schema> _schemaMap;
 
   // Key is registered table (with or without type)
@@ -75,6 +76,7 @@ public class MockInstanceDataManagerFactory {
     _tableRowsMap = new HashMap<>();
     _schemaMap = new HashMap<>();
     _registeredSchemaMap = new HashMap<>();
+    _nullHandlingMap = new HashMap<>();
   }
 
   public void registerTable(Schema schema, String tableName) {
@@ -87,6 +89,11 @@ public class MockInstanceDataManagerFactory {
       registerTableNameWithType(schema, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
       registerTableNameWithType(schema, TableNameBuilder.REALTIME.tableNameWithType(tableName));
     }
+  }
+
+  public MockInstanceDataManagerFactory setNullHandlingForTable(String tableName) {
+    _nullHandlingMap.put(tableName, true);
+    return this;
   }
 
   private void registerTableNameWithType(Schema schema, String tableNameWithType) {
@@ -138,6 +145,10 @@ public class MockInstanceDataManagerFactory {
     return _schemaMap;
   }
 
+  public Map<String, Boolean> buildNullHandlingTableMap() {
+    return _nullHandlingMap;
+  }
+
   public Map<String, List<GenericRow>> buildTableRowsMap() {
     return _tableRowsMap;
   }
@@ -163,7 +174,9 @@ public class MockInstanceDataManagerFactory {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     // TODO: plugin table config constructor
     TableConfig tableConfig =
-        new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts").build();
+        new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts")
+            .setNullHandlingEnabled(true)
+            .build();
     Schema schema = _schemaMap.get(rawTableName);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(indexDir.getPath());

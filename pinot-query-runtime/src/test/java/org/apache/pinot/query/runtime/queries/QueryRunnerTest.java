@@ -168,7 +168,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     ResultTable resultTable = queryRunner(sql, null);
     // query H2 for data
     List<Object[]> expectedRows = queryH2(sql);
-    compareRowEquals(resultTable, expectedRows);
+    compareRowEquals(resultTable, expectedRows, sql);
   }
 
   /**

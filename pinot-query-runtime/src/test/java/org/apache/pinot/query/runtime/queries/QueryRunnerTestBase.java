@@ -197,14 +197,17 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     return result;
   }
 
-  protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows) {
-    compareRowEquals(resultTable, expectedRows, false);
+  protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows, String sql) {
+    compareRowEquals(resultTable, expectedRows, sql, false);
   }
 
-  protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows, boolean keepOutputRowsInOrder) {
+  protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows, String sql,
+      boolean keepOutputRowsInOrder) {
     List<Object[]> resultRows = resultTable.getRows();
     int numRows = resultRows.size();
-    assertEquals(numRows, expectedRows.size(), String.format("Mismatched number of results. expected: %s, actual: %s",
+    assertEquals(numRows, expectedRows.size(), String.format("Mismatched number of results for %s. expected: %s, "
+            + "actual: %s",
+        sql,
         expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
         resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n"))));
 
@@ -219,12 +222,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       Object[] resultRow = resultRows.get(i);
       Object[] expectedRow = expectedRows.get(i);
       assertEquals(resultRow.length, expectedRow.length,
-          String.format("Unexpected row size mismatch. Expected: %s, Actual: %s", Arrays.toString(expectedRow),
-              Arrays.toString(resultRow)));
+          String.format("Unexpected row size mismatch for %s. Expected: %s, Actual: %s", sql,
+              Arrays.toString(expectedRow), Arrays.toString(resultRow)));
       for (int j = 0; j < resultRow.length; j++) {
         assertTrue(typeCompatibleFuzzyEquals(dataSchema.getColumnDataType(j), resultRow[j], expectedRow[j]),
-            "Not match at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow) + " Actual: "
-                + Arrays.toString(resultRow));
+            "Not match for " + sql + " at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow)
+                + " Actual: " + Arrays.toString(resultRow));
       }
     }
   }
@@ -407,7 +410,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     // TODO: ts is built-in, but we should allow user overwrite
     builder.addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:SECONDS");
     builder.setSchemaName(schemaName);
-    return builder.build();
+    Schema schema = builder.build();
+    for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
+      schema.getFieldSpecMap().get(columnAndType._name).setNullable(columnAndType._nullable);
+    }
+    return schema;
   }
 
   protected List<GenericRow> toRow(List<QueryTestCase.ColumnAndType> columnAndTypes, List<List<Object>> value) {
@@ -579,6 +586,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       String _type;
       @JsonProperty("isSingleValue")
       boolean _isSingleValue = true;
+      @JsonProperty("nullable")
+      Boolean _nullable = null;
     }
   }
 }
