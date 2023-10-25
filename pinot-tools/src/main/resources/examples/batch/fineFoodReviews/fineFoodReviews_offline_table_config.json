@@ -29,5 +29,17 @@
   "metadata": {
     "customConfigs": {
     }
-  }
+  },
+  "fieldConfigList": [
+    {
+      "encodingType": "RAW",
+      "indexType": "VECTOR",
+      "name": "embedding",
+      "properties": {
+        "vectorIndexType": "HNSW",
+        "vectorDimension": 1536,
+        "version": 1
+      }
+    }
+  ]
 }

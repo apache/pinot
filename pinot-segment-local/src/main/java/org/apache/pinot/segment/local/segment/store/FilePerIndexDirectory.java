@@ -102,6 +102,8 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     _indexBuffers.remove(new IndexKey(columnName, indexType));
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
+    } else if (indexType == StandardIndexes.vector()) {
+      VectorIndexUtils.cleanupVectorIndex(_segmentDirectory, columnName);
     } else {
       getFilesFor(columnName, indexType).forEach(FileUtils::deleteQuietly);
     }
