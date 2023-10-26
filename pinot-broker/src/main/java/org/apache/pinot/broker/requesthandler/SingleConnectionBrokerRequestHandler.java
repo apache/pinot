@@ -126,18 +126,13 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     long totalResponseSize = 0;
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>(HashUtil.getHashMapCapacity(numServersQueried));
     List<ServerRoutingInstance> serversNotResponded = new ArrayList<>();
-    int totalServersFailedOrNotResponded = 0;
     for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : finalResponses.entrySet()) {
       ServerResponse serverResponse = entry.getValue();
       DataTable dataTable = serverResponse.getDataTable();
       if (dataTable != null) {
         dataTableMap.put(entry.getKey(), dataTable);
-        if (!dataTable.getExceptions().isEmpty()) {
-          totalServersFailedOrNotResponded++;
-        }
         totalResponseSize += serverResponse.getResponseSize();
       } else {
-        totalServersFailedOrNotResponded++;
         serversNotResponded.add(entry.getKey());
       }
     }
@@ -168,10 +163,6 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
           String.format("%d servers %s not responded", numServersNotResponded, serversNotResponded)));
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
     }
-    if (totalServersFailedOrNotResponded > 0) {
-      brokerResponse.setPartialResult(true);
-    }
-
     if (brokerResponse.getExceptionsSize() > 0) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1);
     }
