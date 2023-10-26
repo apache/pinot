@@ -135,20 +135,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (validDocIds != null) {
       PeekableIntIterator iterator = validDocIds.getIntIterator();
       while (iterator.hasNext()) {
-        int doc_id = iterator.next();
-        if (deleteRecordColumnReader.isNull(doc_id)) {
+        int docId = iterator.next();
+        if (deleteRecordColumnReader.isNull(docId)) {
           // defaultNullValue for deleteColumn is "false"
-          queryableDocIds.add(doc_id);
-        } else if (!(Boolean) deleteRecordColumnReader.getValue(doc_id)) {
-          queryableDocIds.add(doc_id);
+          queryableDocIds.add(docId);
+        } else if (!(Boolean) deleteRecordColumnReader.getValue(docId)) {
+          queryableDocIds.add(docId);
         }
       }
     } else {
-      for (int doc_id = 0; doc_id < segment.getSegmentMetadata().getTotalDocs(); doc_id++) {
-        if (deleteRecordColumnReader.isNull(doc_id)) {
-          queryableDocIds.add(doc_id);
-        } else if (!(Boolean) deleteRecordColumnReader.getValue(doc_id)) {
-          queryableDocIds.add(doc_id);
+      for (int docId = 0; docId < segment.getSegmentMetadata().getTotalDocs(); docId++) {
+        if (deleteRecordColumnReader.isNull(docId)) {
+          queryableDocIds.add(docId);
+        } else if (!(Boolean) deleteRecordColumnReader.getValue(docId)) {
+          queryableDocIds.add(docId);
         }
       }
     }
