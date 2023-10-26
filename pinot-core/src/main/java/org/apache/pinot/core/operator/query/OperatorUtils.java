@@ -42,6 +42,10 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class OperatorUtils {
+  private OperatorUtils() {
+    // Prevent instantiation, make checkstyle happy
+  }
+
   public static BaseProjectOperator<?> getProjectionOperator(
       QueryContext queryContext,
       IndexSegment indexSegment,

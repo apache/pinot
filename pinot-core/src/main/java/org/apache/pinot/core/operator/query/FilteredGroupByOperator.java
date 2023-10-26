@@ -135,10 +135,11 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         // GroupByExecutor with a pre-existing GroupKeyGenerator so that the GroupKeyGenerator can be shared across
         // loop iterations i.e. across all aggs.
         if (canUseStarTree) {
-          groupByExecutor = new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
+          groupByExecutor = new StarTreeGroupByExecutor(
+              _queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
         } else {
-          groupByExecutor =
-              new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
+          groupByExecutor = new DefaultGroupByExecutor(
+              _queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
         }
         groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
       } else {
