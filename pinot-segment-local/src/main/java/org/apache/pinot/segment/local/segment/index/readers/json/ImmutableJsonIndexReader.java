@@ -325,11 +325,11 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   }
 
   @Override
-  public String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> context) {
+  public String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> matchingDocsMap) {
     Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
     RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
 
-    for (Map.Entry<String, RoaringBitmap> entry : context.entrySet()) {
+    for (Map.Entry<String, RoaringBitmap> entry : matchingDocsMap.entrySet()) {
       RoaringBitmap intersection = RoaringBitmap.and(entry.getValue(), docIdMask);
       if (intersection.isEmpty()) {
         continue;
