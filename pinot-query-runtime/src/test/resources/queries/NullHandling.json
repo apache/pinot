@@ -157,7 +157,7 @@
 
       {
         "description": "When projected with enableNullHandling=true, intCol1 is considered -2147483648",
-        "comment": "this tests is not correctly working. Returned `intCol1` is actually null",
+        "comment": "This test fails when it shouldn't. We need to fix this before merging",
         "sql": "SET enableNullHandling=true; SELECT intCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
         "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
       },
@@ -179,6 +179,7 @@
       },
       {
         "description": "When projected with enableNullHandling=true, nnIntCol1 is considered -2147483648",
+        "comment": "This test fails when it shouldn't. We need to fix this before merging",
         "sql": "SET enableNullHandling=true; SELECT nnIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
         "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
       },
