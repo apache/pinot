@@ -307,7 +307,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
   @Override
   public Map<String, RoaringBitmap> getMatchingDocsMap(String key) {
-    Map<String, RoaringBitmap> cache = new HashMap<>();
+    Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
     int[] dictIds = getDictIdRangeForKey(key);
 
     for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
@@ -318,10 +318,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       while (it.hasNext()) {
         realDocIds.add(getDocId(it.next()));
       }
-      cache.put(_dictionary.getStringValue(dictId).substring(key.length() + 1), realDocIds);
+      matchingDocsMap.put(_dictionary.getStringValue(dictId).substring(key.length() + 1), realDocIds);
     }
 
-    return cache;
+    return matchingDocsMap;
   }
 
   @Override

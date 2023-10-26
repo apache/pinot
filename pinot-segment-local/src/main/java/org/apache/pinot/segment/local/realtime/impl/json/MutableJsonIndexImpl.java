@@ -298,7 +298,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
 
   @Override
   public Map<String, RoaringBitmap> getMatchingDocsMap(String key) {
-    Map<String, RoaringBitmap> cache = new HashMap<>();
+    Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
     _readLock.lock();
     try {
       for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
@@ -312,12 +312,12 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
           postingList.add(_docIdMapping.getInt(it.next()));
         }
         String val = entry.getKey().substring(key.length() + 1);
-        cache.put(val, postingList.toRoaringBitmap());
+        matchingDocsMap.put(val, postingList.toRoaringBitmap());
       }
     } finally {
       _readLock.unlock();
     }
-    return cache;
+    return matchingDocsMap;
   }
 
   @Override
