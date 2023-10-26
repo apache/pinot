@@ -57,6 +57,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Boolean column to indicate whether a records should be deleted")
   private String _deleteRecordColumn;
 
+  @JsonPropertyDescription("Boolean column to indicate whether a records is out-of-order")
+  private String _outOfOrderRecordColumn;
+
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
 
@@ -111,6 +114,11 @@ public class UpsertConfig extends BaseJsonConfig {
   @Nullable
   public String getDeleteRecordColumn() {
     return _deleteRecordColumn;
+  }
+
+  @Nullable
+  public String getOutOfOrderRecordColumn() {
+    return _outOfOrderRecordColumn;
   }
 
   public boolean isEnableSnapshot() {
@@ -186,6 +194,12 @@ public class UpsertConfig extends BaseJsonConfig {
   public void setDeleteRecordColumn(String deleteRecordColumn) {
     if (deleteRecordColumn != null) {
       _deleteRecordColumn = deleteRecordColumn;
+    }
+  }
+
+  public void setOutOfOrderRecordColumn(String outOfOrderRecordColumn) {
+    if (outOfOrderRecordColumn != null) {
+      _outOfOrderRecordColumn = outOfOrderRecordColumn;
     }
   }
 

@@ -65,6 +65,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected List<String> _primaryKeyColumns;
   protected List<String> _comparisonColumns;
   protected String _deleteRecordColumn;
+  protected String _outOfOrderRecordColumn;
   protected HashFunction _hashFunction;
   protected PartialUpsertHandler _partialUpsertHandler;
   protected boolean _enableSnapshot;
@@ -99,6 +100,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     }
 
     _deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
+    _outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
     _hashFunction = upsertConfig.getHashFunction();
 
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {

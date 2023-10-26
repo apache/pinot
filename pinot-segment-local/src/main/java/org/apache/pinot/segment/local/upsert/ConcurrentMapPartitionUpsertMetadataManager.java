@@ -60,10 +60,12 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
-      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
+      @Nullable String outOfOrderRecordColumn, HashFunction hashFunction,
+      @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
       boolean dropOutOfOrderRecord, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
-    super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction,
-        partialUpsertHandler, enableSnapshot, dropOutOfOrderRecord, metadataTTL, tableIndexDir, serverMetrics);
+    super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn,
+        outOfOrderRecordColumn, hashFunction, partialUpsertHandler, enableSnapshot, dropOutOfOrderRecord, metadataTTL,
+        tableIndexDir, serverMetrics);
   }
 
   @Override
@@ -293,7 +295,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   @Override
   protected GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo) {
-    assert _partialUpsertHandler != null;
+    assert _partialUpsertHandler != null || _outOfOrderRecordColumn != null;
     _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (pk, recordLocation) -> {
           // Read the previous record if the following conditions are met:
@@ -306,9 +308,16 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
             int currentDocId = recordLocation.getDocId();
             if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-              _reusePreviousRow.init(currentSegment, currentDocId);
-              _partialUpsertHandler.merge(_reusePreviousRow, record);
+              // if partial-upsert, then only merge
+              if (_partialUpsertHandler != null) {
+                _reusePreviousRow.init(currentSegment, currentDocId);
+                _partialUpsertHandler.merge(_reusePreviousRow, record);
+              }
             }
+          }
+          if (_outOfOrderRecordColumn != null) {
+              record.putValue(_outOfOrderRecordColumn,
+                  recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) < 0);
           }
           return recordLocation;
         });

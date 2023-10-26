@@ -67,6 +67,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final List<String> _primaryKeyColumns;
   protected final List<String> _comparisonColumns;
   protected final String _deleteRecordColumn;
+  protected final String _outOfOrderRecordColumn;
   protected final HashFunction _hashFunction;
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
@@ -98,13 +99,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
-      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
+      @Nullable String outOfOrderRecordColumn, HashFunction hashFunction,
+      @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
       boolean dropOutOfOrderRecord, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
     _comparisonColumns = comparisonColumns;
     _deleteRecordColumn = deleteRecordColumn;
+    _outOfOrderRecordColumn = outOfOrderRecordColumn;
     _hashFunction = hashFunction;
     _partialUpsertHandler = partialUpsertHandler;
     _enableSnapshot = enableSnapshot;
@@ -547,7 +550,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   @Override
   public GenericRow updateRecord(GenericRow record, RecordInfo recordInfo) {
     // Directly return the record when partial-upsert is not enabled
-    if (_partialUpsertHandler == null) {
+    // in case of full-upsert check if _outOfOrderRecordColumn needs to be init
+    if (_partialUpsertHandler == null && _outOfOrderRecordColumn == null) {
       return record;
     }
     if (!startOperation()) {
