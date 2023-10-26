@@ -4,9 +4,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
@@ -26,7 +29,7 @@ public class OperatorUtils {
       QueryContext queryContext,
       IndexSegment indexSegment,
       AggregationFunction[] aggregationFunctions,
-      FilterPlanNode filterPlanNode,
+      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators,
       BaseFilterOperator filterOperator,
       @Nullable List<ExpressionContext> groupByExpressionsList) {
 
@@ -41,8 +44,7 @@ public class OperatorUtils {
           StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
         Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, queryContext.getFilter(),
-                filterPlanNode.getPredicateEvaluators());
+            StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, queryContext.getFilter(), predicateEvaluators);
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,

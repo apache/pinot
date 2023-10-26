@@ -115,8 +115,8 @@ public class AggregationPlanNode implements PlanNode {
     }
 
     BaseProjectOperator<?> projectOperator =
-        OperatorUtils.getProjectionOperator(_queryContext, _indexSegment, aggregationFunctions, filterPlanNode,
-            filterOperator, null);
+        OperatorUtils.getProjectionOperator(_queryContext, _indexSegment, aggregationFunctions,
+            filterPlanNode.getPredicateEvaluators(), filterOperator, null);
     return new AggregationOperator(_queryContext, projectOperator, numTotalDocs,
         projectOperator.getClass().isInstance(StarTreeProjectPlanNode.class));
   }

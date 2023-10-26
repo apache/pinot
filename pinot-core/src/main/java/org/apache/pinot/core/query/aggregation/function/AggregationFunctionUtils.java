@@ -26,12 +26,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -39,6 +43,7 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.OperatorUtils;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.FilterPlanNode;
@@ -216,17 +221,22 @@ public class AggregationFunctionUtils {
       FilterContext filter = functionFilterPair.getRight();
       if (filter != null) {
         filterOperators.computeIfAbsent(filter, k -> {
+          List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators;
           BaseFilterOperator combinedFilterOperator;
           FilterPlanNode subFilterPlan = new FilterPlanNode(indexSegment, queryContext, filter);
           BaseFilterOperator subFilterOperator = subFilterPlan.run();
           if (mainFilterOperator.isResultMatchingAll() || subFilterOperator.isResultEmpty()) {
             combinedFilterOperator = subFilterOperator;
+            predicateEvaluators = subFilterPlan.getPredicateEvaluators();
           } else if (subFilterOperator.isResultMatchingAll()) {
               combinedFilterOperator = mainFilterOperator;
-              subFilterPlan = mainFilterPlan;
+            predicateEvaluators = mainFilterPlan.getPredicateEvaluators();
           } else {
             combinedFilterOperator =
                 new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
+            predicateEvaluators = new ArrayList<>();
+            predicateEvaluators.addAll(mainFilterPlan.getPredicateEvaluators());
+            predicateEvaluators.addAll(subFilterPlan.getPredicateEvaluators());
           }
           return Pair.of(combinedFilterOperator, new ArrayList<>());
         }).getRight().add(aggregationFunction);
@@ -262,8 +272,8 @@ public class AggregationFunctionUtils {
       Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
       // TODO(egalpin): add logic here to determine use of startreeProjectOperator or not
       BaseProjectOperator<?> projectOperator =
-          OperatorUtils.getProjectionOperator(queryContext, indexSegment, aggregationFunctions, mainFilterPlan,
-              mainFilterOperator, new ArrayList<>(expressions));
+          OperatorUtils.getProjectionOperator(queryContext, indexSegment, aggregationFunctions,
+              mainFilterPlan.getPredicateEvaluators(), mainFilterOperator, new ArrayList<>(expressions));
       projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
     }
 
