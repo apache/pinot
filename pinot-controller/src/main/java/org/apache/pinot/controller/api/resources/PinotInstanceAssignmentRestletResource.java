@@ -252,7 +252,7 @@ public class PinotInstanceAssignmentRestletResource {
           new InstanceAssignmentDriver(tableConfig).assignInstances(instancePartitionsType, instanceConfigs,
               existingInstancePartitions));
     } else {
-      if (InstanceAssignmentConfigUtils.isPreConfigurationBasedAssignment(tableConfig, instancePartitionsType)) {
+      if (InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType)) {
         // fetch the existing instance partitions, if the table, this is referenced in the new instance partitions
         // generation for minimum difference
         InstancePartitions existingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(

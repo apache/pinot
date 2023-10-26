@@ -528,7 +528,7 @@ public class TableRebalancer {
         boolean hasPreConfiguredInstancePartitions =
             TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
         boolean isPreConfigurationBasedAssignment =
-            InstanceAssignmentConfigUtils.isPreConfigurationBasedAssignment(tableConfig, instancePartitionsType);
+            InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
         InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
         InstancePartitions instancePartitions;
         boolean instancePartitionsUnchanged;

@@ -1736,7 +1736,7 @@ public class PinotHelixResourceManager {
         boolean hasPreConfiguredInstancePartitions =
             TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
         boolean isPreConfigurationBasedAssignment =
-            InstanceAssignmentConfigUtils.isPreConfigurationBasedAssignment(tableConfig, instancePartitionsType);
+            InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
         InstancePartitions instancePartitions;
         if (!hasPreConfiguredInstancePartitions) {
           instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null);
