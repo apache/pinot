@@ -66,5 +66,229 @@
         "keepOutputRowOrder": true
       }
     ]
+  },
+  "nullable_columns": {
+    "tables": {
+      "tbl1" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "nIntCol1", "type": "INT", "nullable": true},
+          {"name": "nnIntCol1", "type": "INT", "nullable": false},
+          {"name": "strCol2", "type": "STRING"},
+          {"name": "nStrCol2", "type": "STRING", "nullable": true},
+          {"name": "nnStrCol2", "type": "STRING", "nullable": false}
+        ],
+        "inputs": [
+          ["foo", 1, 1, 1, "foo", "foo", "foo"],
+          ["bar", 2, 2, 2, "alice", "alice", "alice"],
+          ["alice", 2, 2, 2, null, null, null],
+          [null, 4, 4, 4, null, null, null],
+          ["bob", null, null, null, null, null, null]
+        ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "strCol2", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "doubleCol1", "type": "DOUBLE"}
+        ],
+        "inputs": [
+          ["foo", "bob", 3, 3.1416],
+          ["alice", "alice", 4, 2.7183],
+          [null, null, null, null]
+        ]
+      },
+      "tbl3": {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "strCol2", "type": "STRING"}
+        ],
+        "inputs": [
+          ["foo", 1, "foo"],
+          ["bar", 2, "foo"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "join 3 tables, mixed join conditions with null non-matching",
+        "sql": "SET enableNullHandling=true; SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.intCol1 > {tbl2}.doubleCol1 JOIN {tbl3} ON {tbl1}.strCol1 = {tbl3}.strCol2"
+      },
+      {
+        "description": "join 3 tables, mixed join condition with null matching",
+        "sql": "SET enableNullHandling=true; SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.intCol1 != {tbl2}.doubleCol1 JOIN {tbl3} ON {tbl1}.strCol1 = {tbl3}.strCol2"
+      },
+      {
+        "description": "join 2 tables, mixed join conditions of null matching or non-matching",
+        "sql": "SET enableNullHandling=true; SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.intCol1 > {tbl2}.doubleCol1 AND {tbl1}.strCol1 = {tbl2}.strCol1"
+      },
+
+      {
+        "description": "intCol1 IS NULL is always false",
+        "sql": "SET enableNullHandling=true; SELECT 1 FROM {tbl1} WHERE intCol1 IS NULL",
+        "h2Sql": "SELECT 'empty' FROM {tbl1} WHERE 1 = 0"
+      },
+      {
+        "description": "intCol1 IS NOT NULL is always true",
+        "sql": "SET enableNullHandling=true; SELECT intCol1 FROM {tbl1} WHERE intCol1 IS NOT NULL",
+        "h2Sql": "SELECT intCol1 FROM {tbl1} WHERE 1 = 1"
+      },
+      {
+        "description": "nIntCol1 IS NULL is honored",
+        "sql": "SET enableNullHandling=true; SELECT nIntCol1 FROM {tbl1} WHERE nIntCol1 IS NULL"
+      },
+      {
+        "description": "nIntCol1 IS NOT NULL is honored",
+        "sql": "SET enableNullHandling=true; SELECT nIntCol1 FROM {tbl1} WHERE nIntCol1 IS NOT NULL"
+      },
+      {
+        "description": "nnIntCol1 IS NULL is always false",
+        "sql": "SET enableNullHandling=true; SELECT 1 FROM {tbl1} WHERE nnIntCol1 IS NULL",
+        "h2Sql": "SELECT 'empty' FROM {tbl1} WHERE 1 = 0"
+      },
+      {
+        "description": "nnIntCol1 IS NOT NULL is always true",
+        "sql": "SET enableNullHandling=true; SELECT nnIntCol1 FROM {tbl1} WHERE nnIntCol1 IS NOT NULL",
+        "h2Sql": "SELECT nnIntCol1 FROM {tbl1} WHERE 1 = 1"
+      },
+
+      {
+        "description": "When projected with enableNullHandling=true, intCol1 is considered -2147483648",
+        "comment": "this tests is not correctly working. Returned `intCol1` is actually null",
+        "sql": "SET enableNullHandling=true; SELECT intCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=false, intCol1 is considered -2147483648",
+        "comment": "this tests is not correctly working. Returned `intCol1` is actually null",
+        "sql": "SET enableNullHandling=false; SELECT intCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=true, nIntCol1 is considered null",
+        "sql": "SET enableNullHandling=true; SELECT nIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT null FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=false, nIntCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=false; SELECT nIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=true, nnIntCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=true; SELECT nnIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=false, nnIntCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=false; SELECT nnIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+
+      {
+        "description": "aggregate with null checkers",
+        "sql": "SET enableNullHandling=true; SELECT SUM(intCol1) FROM {tbl1} WHERE intCol1 IS NOT NULL GROUP BY strCol2"
+      },
+
+      {
+        "description": "null checks in aggregate are skipped on not nullable columns",
+        "comment": "Given intCol1 is not explicitly nullable, V2 removes the IS NOT NULL predicate",
+        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE intCol1 IS NOT NULL GROUP BY strCol2",
+        "h2Sql": "SELECT strCol2, COUNT(*) FROM {tbl1} GROUP BY strCol2"
+      },
+      {
+        "description": "null checks in aggregate are honored on nullable columns",
+        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE nIntCol1 IS NOT NULL GROUP BY strCol2"
+      },
+
+      {
+        "description": "aggregate with null checkers on key from group set are skipped on not nullable columns",
+        "comment": "Given strCol2 is not explicitly nullable, V2 returns empty set",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE strCol2 IS NULL GROUP BY strCol2",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl1} WHERE 1 = 0 GROUP BY strCol2"
+      },
+      {
+        "description": "aggregate with null checkers on key from group set are honored on not nullable columns",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE nStrCol2 IS NULL GROUP BY nStrCol2"
+      }
+    ],
+    "extraProps": {
+      "EnableNullHandling": "true"
+    }
+  },
+  "column_level_null_handling": {
+    "tables": {
+      "tbl1" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT", "nullable": true},
+          {"name": "strCol2", "type": "STRING", "nullable": true}
+        ],
+        "inputs": [
+          ["foo", 1, "foo"],
+          ["bar", 2, "alice"],
+          ["alice", 3, null],
+          ["bob", 4, null],
+          ["bob", null, null]
+        ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "strCol2", "type": "STRING", "nullable": true},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "doubleCol1", "type": "DOUBLE", "nullable": true}
+        ],
+        "inputs": [
+          ["foo", "bob", 3, 3.1416],
+          ["alice", "alice", 4, 2.7183],
+          ["bob", null, 5, null]
+        ]
+      },
+      "tbl3" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "strCol2", "type": "STRING"}
+        ],
+        "inputs": [
+          ["foo", 1, "foo"],
+          ["bar", 2, "foo"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "join 3 tables, mixed join conditions with null non-matching",
+        "sql": "SET enableNullHandling=true; SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.intCol1 > {tbl2}.doubleCol1 JOIN {tbl3} ON {tbl1}.strCol1 = {tbl3}.strCol2"
+      },
+      {
+        "description": "join 3 tables, mixed join condition with null matching",
+        "sql": "SET enableNullHandling=true; SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.intCol1 != {tbl2}.doubleCol1 JOIN {tbl3} ON {tbl1}.strCol1 = {tbl3}.strCol2"
+      },
+      {
+        "description": "join 2 tables, mixed join conditions of null matching or non-matching",
+        "sql": "SET enableNullHandling=true; SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.intCol1 > {tbl2}.doubleCol1 AND {tbl1}.strCol1 = {tbl2}.strCol1"
+      },
+      {
+        "description": "aggregate with null checkers",
+        "sql": "SET enableNullHandling=true; SELECT SUM(intCol1) FROM {tbl1} WHERE intCol1 IS NOT NULL GROUP BY strCol2"
+      },
+      {
+        "description": "aggregate with null checkers",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE intCol1 IS NOT NULL GROUP BY strCol2"
+      },
+      {
+        "description": "aggregate with null checkers on key from group set",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE strCol2 IS NULL GROUP BY strCol2"
+      },
+      {
+        "description": "select only with NULL handling",
+        "sql": "SET enableNullHandling=true; SELECT * FROM {tbl1} WHERE strCol2 IS NULL AND intCol1 IS NOT NULL"
+      }
+    ]
   }
 }
