@@ -20,24 +20,21 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
-import javax.annotation.Nullable;
-import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-
 public class ArrayGenerateTransformFunction implements TransformFunction {
-  public static final String FUNCTION_NAME = "GENERATE_ARRAY";
+  public static final String FUNCTION_NAME = "arrayGenerate";
 
   private final DataType _dataType;
 
@@ -61,7 +58,7 @@ public class ArrayGenerateTransformFunction implements TransformFunction {
     }
     for (ExpressionContext literalContext : literalContexts) {
       Preconditions.checkState(literalContext.getType() == ExpressionContext.Type.LITERAL,
-              "ArrayLiteralTransformFunction only takes literals as arguments, found: %s", literalContext);
+              "ArrayGenerateTransformFunction only takes literals as arguments, found: %s", literalContext);
     }
     // Get the type of the first member in the literalContext and generate an array
     _dataType = literalContexts.get(0).getLiteral().getType();
