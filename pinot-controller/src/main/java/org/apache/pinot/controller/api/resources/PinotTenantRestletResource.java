@@ -326,7 +326,8 @@ public class PinotTenantRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Update an instance partition for a server type in a tenant")
   @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
-      @ApiResponse(code = 400, message = "Failed to update the tenant")})
+      @ApiResponse(code = 400, message = "Failed to deserialize/validate the instance partitions"),
+      @ApiResponse(code = 500, message = "Error updating the tenant")})
   public InstancePartitions assignInstancesPartitionMap(
       @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
