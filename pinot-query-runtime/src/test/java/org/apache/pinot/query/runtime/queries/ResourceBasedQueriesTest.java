@@ -59,6 +59,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -258,6 +259,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void testQueryTestCasesWithH2(String testCaseName, String description, String sql, String h2Sql, String expect,
       boolean keepOutputRowOrder, boolean isIgnored)
       throws Exception {
+    if (isIgnored) {
+      throw new SkipException("Test " + testCaseName + " with description " + description + " ignored");
+    }
     // query pinot
     runQuery(sql, expect, null).ifPresent(resultTable -> {
       try {
@@ -272,6 +276,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void testQueryTestCasesWithOutput(String testCaseName, String description, String sql,
       String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean isIgnored)
       throws Exception {
+    if (isIgnored) {
+      throw new SkipException("Test " + testCaseName + " with description " + description + " ignored");
+    }
     runQuery(sql, expect, null).ifPresent(
         resultTable -> compareRowEquals(resultTable, expectedRows, sql, keepOutputRowOrder));
   }
@@ -280,6 +287,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void testQueryTestCasesWithMetadata(String testCaseName, String description, String sql,
       String h2Sql, String expect, int numSegments, boolean isIgnored)
       throws Exception {
+    if (isIgnored) {
+      throw new SkipException("Test " + testCaseName + " with description " + description + " ignored");
+    }
     Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap = new HashMap<>();
     runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(resultTable -> {
       BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
@@ -367,10 +377,6 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
-        if (queryCase._ignored && !_isRunIgnored) {
-          continue;
-        }
-
         if (queryCase._outputs != null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
@@ -382,7 +388,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           }
           Object[] testEntry = new Object[]{
               testCaseName, queryCase._description, sql, h2Sql, expectedRows, queryCase._expectedException,
-              queryCase._keepOutputRowOrder, queryCase._ignored,
+              queryCase._keepOutputRowOrder, queryCase._ignored && !_isRunIgnored
           };
           providerContent.add(testEntry);
         }
@@ -411,11 +417,6 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
-
-        if (queryCase._ignored && !_isRunIgnored) {
-          continue;
-        }
-
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
@@ -430,7 +431,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
           Object[] testEntry = new Object[]{
               testCaseName, queryCase._description, sql, h2Sql, queryCase._expectedException, segmentCount,
-              queryCase._ignored
+              queryCase._ignored && !_isRunIgnored
           };
           providerContent.add(testEntry);
         }
@@ -452,16 +453,13 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       String testCaseName = testCaseEntry.getKey();
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
-        if (queryCase._ignored && !_isRunIgnored) {
-          continue;
-        }
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
               : replaceTableName(testCaseName, queryCase._sql);
           Object[] testEntry = new Object[]{
               testCaseName, queryCase._description, sql, h2Sql, queryCase._expectedException,
-              queryCase._keepOutputRowOrder, queryCase._ignored
+              queryCase._keepOutputRowOrder, queryCase._ignored && !_isRunIgnored
           };
           providerContent.add(testEntry);
         }
