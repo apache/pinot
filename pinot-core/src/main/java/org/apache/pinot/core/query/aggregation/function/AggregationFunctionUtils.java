@@ -240,9 +240,6 @@ public class AggregationFunctionUtils {
       }
     }
 
-    // Create the project operators
-    // TODO(egalpin): Use either StarTreeProjectPlanNode or ProjectPlanNode based on criteria such as that in GroupByPlanNode for
-    // leveraging startree index. This must be decided per filtered agg.
     List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators = new ArrayList<>();
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
     for (Pair<BaseFilterOperator, List<AggregationFunction>> filterOperatorFunctionsPair : filterOperators.values()) {
@@ -253,7 +250,6 @@ public class AggregationFunctionUtils {
       } else {
         AggregationFunction[] aggregationFunctions =
             filterOperatorFunctionsPair.getRight().toArray(new AggregationFunction[0]);
-        // TODO(egalpin): add logic here to determine use of startreeProjectOperator or not
         Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
         BaseProjectOperator<?> projectOperator =
             OperatorUtils.getProjectionOperator(queryContext, indexSegment, aggregationFunctions, List.copyOf(predicateEvaluators),
@@ -265,7 +261,6 @@ public class AggregationFunctionUtils {
     if (!nonFilteredFunctions.isEmpty()) {
       AggregationFunction[] aggregationFunctions = nonFilteredFunctions.toArray(new AggregationFunction[0]);
       Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
-      // TODO(egalpin): add logic here to determine use of startreeProjectOperator or not
       BaseProjectOperator<?> projectOperator =
           OperatorUtils.getProjectionOperator(queryContext, indexSegment, aggregationFunctions,
               mainFilterPlan.getPredicateEvaluators(), mainFilterOperator, new ArrayList<>(expressions));

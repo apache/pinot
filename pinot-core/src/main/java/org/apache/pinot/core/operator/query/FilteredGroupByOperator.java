@@ -105,10 +105,6 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
   }
 
-  private boolean canUseStarTree() {
-    return false;
-  }
-
   @Override
   protected GroupByResultsBlock getNextBlock() {
     // TODO(egalpin): Support Startree query resolution when possible, even with FILTER expressions
