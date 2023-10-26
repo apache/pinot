@@ -219,7 +219,6 @@ public class QueryEnvironmentTestBase {
         Collections.emptyMap());
   }
 
-
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
       Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
       @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap,
