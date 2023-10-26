@@ -22,8 +22,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.DataSource;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -95,8 +99,15 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitFilter(FilterNode node, ServerPlanRequestContext context) {
     visitChildren(node, context);
-    context.getPinotQuery()
-        .setFilterExpression(CalciteRexExpressionParser.toExpression(node.getCondition(), context.getPinotQuery()));
+    Expression filterExpr = CalciteRexExpressionParser.toExpression(node.getCondition(), context.getPinotQuery());
+    if (context.getPinotQuery().isSetFilterExpression()) {
+      Expression andExpression = new Expression(ExpressionType.FUNCTION);
+      andExpression.setFunctionCall(new Function(RequestUtils.canonicalizeFunctionName(SqlKind.AND.name())));
+      andExpression.getFunctionCall().addToOperands(filterExpr);
+      andExpression.getFunctionCall().addToOperands(context.getPinotQuery().getFilterExpression());
+      filterExpr = andExpression;
+    }
+    context.getPinotQuery().setFilterExpression(filterExpr);
     return null;
   }
 
