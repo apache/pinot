@@ -39,6 +39,7 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
+import org.apache.pinot.core.operator.query.OperatorUtils;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
@@ -192,7 +193,8 @@ public class AggregationFunctionUtils {
       IndexSegment indexSegment, QueryContext queryContext) {
     assert queryContext.getAggregationFunctions() != null && queryContext.getFilteredAggregationFunctions() != null;
 
-    BaseFilterOperator mainFilterOperator = new FilterPlanNode(indexSegment, queryContext).run();
+    FilterPlanNode mainFilterPlan = new FilterPlanNode(indexSegment, queryContext);
+    BaseFilterOperator mainFilterOperator = mainFilterPlan.run();
 
     // No need to process sub-filters when main filter has empty result
     if (mainFilterOperator.isResultEmpty()) {
@@ -215,11 +217,13 @@ public class AggregationFunctionUtils {
       if (filter != null) {
         filterOperators.computeIfAbsent(filter, k -> {
           BaseFilterOperator combinedFilterOperator;
-          BaseFilterOperator subFilterOperator = new FilterPlanNode(indexSegment, queryContext, filter).run();
+          FilterPlanNode subFilterPlan = new FilterPlanNode(indexSegment, queryContext, filter);
+          BaseFilterOperator subFilterOperator = subFilterPlan.run();
           if (mainFilterOperator.isResultMatchingAll() || subFilterOperator.isResultEmpty()) {
             combinedFilterOperator = subFilterOperator;
           } else if (subFilterOperator.isResultMatchingAll()) {
               combinedFilterOperator = mainFilterOperator;
+              subFilterPlan = mainFilterPlan;
           } else {
             combinedFilterOperator =
                 new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
@@ -247,8 +251,8 @@ public class AggregationFunctionUtils {
         // TODO(egalpin): add logic here to determine use of startreeProjectOperator or not
         Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
         BaseProjectOperator<?> projectOperator =
-            new ProjectPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-                filterOperator).run();
+            OperatorUtils.getProjectionOperator(queryContext, indexSegment, aggregationFunctions, filterPlanNode,
+                filterOperator, expressions);
         projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
       }
     }
@@ -258,8 +262,8 @@ public class AggregationFunctionUtils {
       Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
       // TODO(egalpin): add logic here to determine use of startreeProjectOperator or not
       BaseProjectOperator<?> projectOperator =
-          new ProjectPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-              mainFilterOperator).run();
+          OperatorUtils.getProjectionOperator(queryContext, indexSegment, aggregationFunctions, mainFilterPlan,
+              mainFilterOperator, new ArrayList<>(expressions));
       projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
     }
 

@@ -19,8 +19,6 @@
 package org.apache.pinot.core.plan;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
@@ -33,12 +31,8 @@ import org.apache.pinot.core.operator.query.OperatorUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.startree.CompositePredicateEvaluator;
-import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 /**
@@ -75,9 +69,10 @@ public class GroupByPlanNode implements PlanNode {
     ExpressionContext[] groupByExpressions = groupByExpressionsList.toArray(new ExpressionContext[0]);
 
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
+    BaseFilterOperator filterOperator = filterPlanNode.run();
     BaseProjectOperator<?> projectOperator =
-        OperatorUtils.getProjectOperator(_queryContext, _indexSegment, aggregationFunctions, filterPlanNode,
-            filterPlanNode.run(), groupByExpressionsList);
+        OperatorUtils.getProjectionOperator(_queryContext, _indexSegment, aggregationFunctions, filterPlanNode,
+            filterOperator, groupByExpressionsList);
     return new GroupByOperator(_queryContext, groupByExpressions, projectOperator, numTotalDocs,
         projectOperator.getClass().isInstance(StarTreeProjectPlanNode.class));
   }

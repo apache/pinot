@@ -22,7 +22,7 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class OperatorUtils {
-  public static BaseProjectOperator<?> getProjectOperator(
+  public static BaseProjectOperator<?> getProjectionOperator(
       QueryContext queryContext,
       IndexSegment indexSegment,
       AggregationFunction[] aggregationFunctions,
