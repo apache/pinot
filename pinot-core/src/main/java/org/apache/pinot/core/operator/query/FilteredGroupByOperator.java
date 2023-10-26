@@ -41,6 +41,8 @@ import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
+import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.trace.Tracing;
 
@@ -126,10 +128,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
       // Perform aggregation group-by on all the blocks
       DefaultGroupByExecutor groupByExecutor;
-
-      if (_useStarTree) {
-
-      }
+      boolean canUseStarTree = projectOperator.getClass().isInstance(StarTreeProjectPlanNode.class);
 
       if (groupKeyGenerator == null) {
         // The group key generator should be shared across all AggregationFunctions so that agg results can be
@@ -139,13 +138,23 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         // the GroupByExecutor to have sole ownership of the GroupKeyGenerator. Therefore, we allow constructing a
         // GroupByExecutor with a pre-existing GroupKeyGenerator so that the GroupKeyGenerator can be shared across
         // loop iterations i.e. across all aggs.
-        groupByExecutor =
-            new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
+        if (canUseStarTree) {
+          groupByExecutor = new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
+        } else {
+          groupByExecutor =
+              new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
+        }
         groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
       } else {
-        groupByExecutor =
-            new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                groupKeyGenerator);
+        if (canUseStarTree) {
+          groupByExecutor =
+              new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+                  groupKeyGenerator);
+        } else {
+          groupByExecutor =
+              new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+                  groupKeyGenerator);
+        }
       }
 
       int numDocsScanned = 0;
