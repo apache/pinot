@@ -128,31 +128,31 @@
 
       {
         "description": "intCol1 IS NULL is always false",
-        "sql": "SET enableNullHandling=true; SELECT 1 FROM {tbl1} WHERE intCol1 IS NULL",
-        "h2Sql": "SELECT 'empty' FROM {tbl1} WHERE 1 = 0"
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NULL",
+        "h2Sql": "SELECT 0"
       },
       {
         "description": "intCol1 IS NOT NULL is always true",
-        "sql": "SET enableNullHandling=true; SELECT intCol1 FROM {tbl1} WHERE intCol1 IS NOT NULL",
-        "h2Sql": "SELECT intCol1 FROM {tbl1} WHERE 1 = 1"
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NOT NULL",
+        "h2Sql": "SELECT count(*) FROM {tbl1}"
       },
       {
         "description": "nIntCol1 IS NULL is honored",
-        "sql": "SET enableNullHandling=true; SELECT nIntCol1 FROM {tbl1} WHERE nIntCol1 IS NULL"
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nIntCol1 IS NULL"
       },
       {
         "description": "nIntCol1 IS NOT NULL is honored",
-        "sql": "SET enableNullHandling=true; SELECT nIntCol1 FROM {tbl1} WHERE nIntCol1 IS NOT NULL"
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nIntCol1 IS NOT NULL"
       },
       {
         "description": "nnIntCol1 IS NULL is always false",
-        "sql": "SET enableNullHandling=true; SELECT 1 FROM {tbl1} WHERE nnIntCol1 IS NULL",
-        "h2Sql": "SELECT 'empty' FROM {tbl1} WHERE 1 = 0"
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nnIntCol1 IS NULL",
+        "h2Sql": "SELECT 0"
       },
       {
         "description": "nnIntCol1 IS NOT NULL is always true",
-        "sql": "SET enableNullHandling=true; SELECT nnIntCol1 FROM {tbl1} WHERE nnIntCol1 IS NOT NULL",
-        "h2Sql": "SELECT nnIntCol1 FROM {tbl1} WHERE 1 = 1"
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nnIntCol1 IS NOT NULL",
+        "h2Sql": "SELECT count(*) FROM {tbl1}"
       },
 
       {
@@ -179,7 +179,6 @@
       },
       {
         "description": "When projected with enableNullHandling=true, nnIntCol1 is considered -2147483648",
-        "comment": "This test fails when it shouldn't. We need to fix this before merging",
         "sql": "SET enableNullHandling=true; SELECT nnIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
         "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
       },

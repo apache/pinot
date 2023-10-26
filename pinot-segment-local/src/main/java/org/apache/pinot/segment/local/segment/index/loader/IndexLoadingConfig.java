@@ -133,6 +133,10 @@ public class IndexLoadingConfig {
     this(instanceDataManagerConfig, tableConfig, null);
   }
 
+  public IndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema) {
+    extractFromTableConfigAndSchema(tableConfig, schema);
+  }
+
   public IndexLoadingConfig() {
   }
 

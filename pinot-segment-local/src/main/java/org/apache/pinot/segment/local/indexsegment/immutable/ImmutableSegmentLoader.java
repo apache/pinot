@@ -45,6 +45,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -69,6 +70,17 @@ public class ImmutableSegmentLoader {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
     return load(indexDir, defaultIndexLoadingConfig, null, false);
+  }
+
+  /**
+   * Loads the segment with empty schema and IndexLoadingConfig. This method is used to
+   * access the segment without modifying it, i.e. in read-only mode.
+   */
+  public static ImmutableSegment load(File indexDir, ReadMode readMode, Schema schema, TableConfig tableConfig)
+      throws Exception {
+    IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    defaultIndexLoadingConfig.setReadMode(readMode);
+    return load(indexDir, defaultIndexLoadingConfig, schema, false);
   }
 
   /**

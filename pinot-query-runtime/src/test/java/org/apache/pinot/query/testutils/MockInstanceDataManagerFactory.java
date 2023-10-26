@@ -187,7 +187,7 @@ public class MockInstanceDataManagerFactory {
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
-      return ImmutableSegmentLoader.load(new File(indexDir, segmentName), ReadMode.mmap);
+      return ImmutableSegmentLoader.load(new File(indexDir, segmentName), ReadMode.mmap, schema, tableConfig);
     } catch (Exception e) {
       throw new RuntimeException("Unable to construct immutable segment from records", e);
     }
