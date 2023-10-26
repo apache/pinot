@@ -110,6 +110,9 @@ public class UpsertUtils {
         throws IOException {
       _primaryKeyReader.close();
       _comparisonColumnReader.close();
+      if (_deleteRecordColumnReader != null) {
+        _deleteRecordColumnReader.close();
+      }
     }
   }
 

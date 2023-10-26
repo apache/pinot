@@ -754,10 +754,6 @@ public final class TableConfigUtils {
     }
 
     Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
-
-    // TODO: Support deletion for TTL. Need to construct queryableDocIds when adding segments out of TTL.
-    Preconditions.checkState(upsertConfig.getDeleteRecordColumn() == null,
-        "Upsert TTL doesn't work with record deletion");
   }
 
   /**
