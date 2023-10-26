@@ -138,7 +138,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final RealtimeSegmentStatsHistory _statsHistory;
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
-  private final int _mainPartitionId;
+  private final int _mainPartitionId; // partition id designated for this consuming segment
   private final boolean _nullHandlingEnabled;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
