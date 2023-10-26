@@ -33,6 +33,8 @@ import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
+import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 
 
 /**
@@ -73,8 +75,15 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
 
     for (Pair<AggregationFunction[], BaseProjectOperator<?>> pair : _projectOperators) {
       AggregationFunction[] aggregationFunctions = pair.getLeft();
-      AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
       BaseProjectOperator<?> projectOperator = pair.getRight();
+      boolean canUseStarTree = projectOperator.getClass().isInstance(StarTreeProjectPlanNode.class);
+      AggregationExecutor aggregationExecutor;
+      if (canUseStarTree) {
+        aggregationExecutor = new StarTreeAggregationExecutor(aggregationFunctions);
+      } else {
+        aggregationExecutor = new DefaultAggregationExecutor(aggregationFunctions);
+      }
+
       ValueBlock valueBlock;
       int numDocsScanned = 0;
       while ((valueBlock = projectOperator.nextBlock()) != null) {
