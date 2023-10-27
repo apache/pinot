@@ -313,24 +313,22 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
     if (existingOffsetToResultTuple.size() < _numTargetInstancesPerReplicaGroup) {
       // If the number of instances selected from the result list is less than the target number
       // of instances per replica group, add the remaining instances from the pre-configured instance partitions.
-      ArrayList<Integer> shuffledOffsets = new ArrayList<>(_numPreConfiguredInstancesPerReplicaGroup);
+      List<Integer> shuffledOffsets = new ArrayList<>(_numPreConfiguredInstancesPerReplicaGroup);
       for (int j = 0; j < _numPreConfiguredInstancesPerReplicaGroup; j++) {
         shuffledOffsets.add(j);
       }
-      // Commenting this out as
-      // (1) Shuffling is already done in the initial step.
-      // (2) We want to keep the order of the pre-configured instance partitions, so that the segment assignment
-      //     strategy for single tenant cluster can be minimized-impact.
-      // But keeping the code here in case we want to have a specific reordering strategy in the future.
-      // Collections.shuffle(shuffledOffsets, new Random(Math.abs(_tableNameWithType.hashCode())));
+      for (Map.Entry<Integer, Map.Entry<Integer, Long>> entry : existingOffsetToResultTuple.entrySet()) {
+        shuffledOffsets.remove(entry.getValue().getKey());
+      }
+      Collections.shuffle(shuffledOffsets, new Random(Math.abs(_tableNameWithType.hashCode())));
+      shuffledOffsets =
+          shuffledOffsets.subList(0, _numTargetInstancesPerReplicaGroup - existingOffsetToResultTuple.size());
+      shuffledOffsets.sort(Comparator.naturalOrder());
       for (int k = 0, j = 0; j < _numTargetInstancesPerReplicaGroup; j++) {
         if (existingOffsetToResultTuple.containsKey(j)) {
           continue;
         }
-        while (usedPreconfiguredInstanceOffsets.contains(shuffledOffsets.get(k))) {
-          k++;
-        }
-        Integer offset = shuffledOffsets.get(k);
+        Integer offset = shuffledOffsets.get(k++);
         existingOffsetToResultTuple.put(j, new AbstractMap.SimpleEntry<>(offset, 0L));
         usedPreconfiguredInstanceOffsets.add(offset);
       }

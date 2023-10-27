@@ -336,11 +336,11 @@ public class InstanceAssignmentTest {
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 0));
   }
 
-  public void testPreConfigurationBasedRandom() throws FileNotFoundException {
-    testPreConfigurationBasedRandomInner(10000000);
+  public void testMirrorServerSetBasedRandom() throws FileNotFoundException {
+    testMirrorServerSetBasedRandomInner(10000000);
   }
 
-  public void testPreConfigurationBasedRandomInner(int loopCount) throws FileNotFoundException {
+  public void testMirrorServerSetBasedRandomInner(int loopCount) throws FileNotFoundException {
     PrintStream o = new PrintStream("output.txt");
     System.setOut(o);
     for (int iter = 0; iter < loopCount; iter++) {
@@ -451,7 +451,7 @@ public class InstanceAssignmentTest {
   }
 
   @Test
-  public void testPreConfigurationBased() {
+  public void testMirrorServerSetBased() {
     LogManager.getLogger(MirrorServerSetInstancePartitionSelector.class)
         .setLevel(Level.INFO);
 
