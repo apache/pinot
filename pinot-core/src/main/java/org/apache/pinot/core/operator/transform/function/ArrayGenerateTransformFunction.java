@@ -146,7 +146,9 @@ public class ArrayGenerateTransformFunction implements TransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-
+    if (arguments.size() < 3) {
+      throw new IllegalArgumentException("At least 3 arguments are required for arrayGenerate function");
+    }
   }
 
   @Override
