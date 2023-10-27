@@ -110,6 +110,14 @@
         ]
       },
       {
+        "description": "multi 'with' table with multiple semi-joins",
+        "sql": "WITH t1 AS ( SELECT * FROM {tbl1} WHERE intCol > 1 ), t2 AS ( SELECT * FROM {tbl2} WHERE strCol1 IN (SELECT strCol FROM t1) AND intCol > 2 ) SELECT strCol1, strCol2, intCol FROM t2 WHERE strCol1 IN (SELECT strCol FROM t1)",
+        "outputs": [
+          ["b", "alice", 42],
+          ["b", "bob", 196883]
+        ]
+      },
+      {
         "description": "nested 'with' on agg table: (with a as ( ... ), select ... ",
         "sql": "WITH agg1 AS (SELECT strCol1, strCol2, sum(intCol) AS sumVal FROM {tbl2} GROUP BY strCol1, strCol2) SELECT strCol1, avg(sumVal) AS avgVal FROM agg1 GROUP BY strCol1",
         "outputs": [
