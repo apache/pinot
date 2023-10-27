@@ -97,7 +97,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
       fileOutputStream = new FileOutputStream(_fstIndexFile);
       FST<Long> fst = _fstBuilder.done();
       OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
-      fst.save(d);
+      fst.save(d, d);
     } finally {
       if (fileOutputStream != null) {
         fileOutputStream.close();

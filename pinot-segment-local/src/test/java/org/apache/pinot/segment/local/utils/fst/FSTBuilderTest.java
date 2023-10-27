@@ -69,7 +69,7 @@ public class FSTBuilderTest {
     File outputFile = new File(TEMP_DIR, "test.lucene");
     FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
     OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
-    fst.save(d);
+    fst.save(d, d);
     fileOutputStream.close();
 
     Outputs<Long> outputs = PositiveIntOutputs.getSingleton();
@@ -78,7 +78,7 @@ public class FSTBuilderTest {
     PinotDataBuffer pinotDataBuffer =
         PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "");
     PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, fstFile.length());
-    FST<Long> readFST = new FST(indexInput, outputs, new OffHeapFSTStore());
+    FST<Long> readFST = new FST(indexInput, indexInput, outputs, new OffHeapFSTStore());
 
     List<Long> results = RegexpMatcher.regexMatch("hello.*123", fst);
     Assert.assertEquals(results.size(), 1);
