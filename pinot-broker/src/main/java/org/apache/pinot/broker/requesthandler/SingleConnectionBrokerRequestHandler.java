@@ -117,10 +117,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
             realtimeBrokerRequest, realtimeRoutingTable, timeoutMs);
     _failureDetector.notifyQuerySubmitted(asyncQueryResponse);
     Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
-    //a query will timeout when one or more server(s) couldn't respond in time. Technically,
-    // BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED can be used as a surrogate metric as well
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_QUERIES_TIMED_OUT, 1);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
     }
     _failureDetector.notifyQueryFinished(asyncQueryResponse);
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,

@@ -68,7 +68,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // (numServersQueried > numServersResponded)
   BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED("badResponses", false),
 
-  BROKER_QUERIES_TIMED_OUT("queryTimeout", false),
+  BROKER_RESPONSES_WITH_TIMEOUTS("badResponses", false),
 
   // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
   BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED("badResponses", false),

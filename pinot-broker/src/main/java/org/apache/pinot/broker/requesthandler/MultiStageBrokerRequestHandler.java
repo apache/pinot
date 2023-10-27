@@ -25,10 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import jnr.ffi.Runtime;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
@@ -191,6 +193,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimeoutMs, queryOptions,
           stageIdStatsMap);
+    } catch (TimeoutException e) {
+      for(String table : tableNames) {
+        _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
+      }
+      throw new RuntimeException(e);
     } catch (Throwable t) {
       String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
       LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);

@@ -103,8 +103,8 @@ rules:
   cache: true
   labels:
     table: "$1"
-- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.queryTimeout\"><>(\\w+)"
-  name: "pinot_broker_queryTimeout_$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.brokerResponsesWithTimeouts\"><>(\\w+)"
+  name: "pinot_broker_brokerResponsesWithTimeouts_$2"
   cache: true
   labels:
     table: "$1"
