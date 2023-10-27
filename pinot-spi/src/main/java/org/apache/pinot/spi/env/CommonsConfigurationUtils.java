@@ -101,6 +101,7 @@ public class CommonsConfigurationUtils {
    * @param configuration to iterate on keys
    * @return a stream of keys
    */
+  @Deprecated
   public static Stream<String> getKeysStream(Configuration configuration) {
     return StreamSupport.stream(getIterable(configuration.getKeys()).spliterator(), false);
   }
@@ -122,6 +123,7 @@ public class CommonsConfigurationUtils {
   /**
    * @return a key-value {@link Map} found in the provided {@link Configuration}
    */
+  @Deprecated
   public static Map<String, Object> toMap(Configuration configuration) {
     return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
   }
@@ -130,6 +132,7 @@ public class CommonsConfigurationUtils {
     return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
   }
 
+  @Deprecated
   private static Object mapValue(String key, Configuration configuration) {
     // For multi-value config, convert it to a single comma connected string value.
     // For single-value config, return its raw property, unless it needs interpolation.

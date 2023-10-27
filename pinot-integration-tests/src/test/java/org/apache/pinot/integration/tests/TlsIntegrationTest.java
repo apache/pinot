@@ -211,7 +211,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
         CertBasedTlsChannelAccessControlFactory.class.getName());
     prop.put("pinot.server.adminapi.access.protocols", "internal");
     prop.put("pinot.server.adminapi.access.protocols.internal.protocol", "https");
-    prop.put("pinot.server.adminapi.access.protocols.internal.port", "9443");
+    prop.put("pinot.server.adminapi.access.protocols.internal.port", "7443");
     prop.put("pinot.server.netty.enabled", "false");
     prop.put("pinot.server.nettytls.enabled", "true");
     prop.put("pinot.server.nettytls.port", "8089");
