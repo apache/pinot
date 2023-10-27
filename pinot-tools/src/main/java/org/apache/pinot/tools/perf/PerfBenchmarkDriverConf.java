@@ -71,6 +71,10 @@ public class PerfBenchmarkDriverConf {
   String _resultsOutputDirectory;
 
   boolean _verbose = false;
+  private String _user;
+  private String _password;
+  private String _authToken;
+  private String _authTokenUrl;
 
   public String getClusterName() {
     return _clusterName;
@@ -278,5 +282,37 @@ public class PerfBenchmarkDriverConf {
 
   public void setVerbose(boolean verbose) {
     _verbose = verbose;
+  }
+
+  public void setUser(String user) {
+    _user = user;
+  }
+
+  public String getUser() {
+    return _user;
+  }
+
+  public void setPassword(String password) {
+    _password = password;
+  }
+
+  public String getPassword() {
+    return _password;
+  }
+
+  public void setAuthToken(String authToken) {
+    _authToken = authToken;
+  }
+
+  public String getAuthToken() {
+    return _authToken;
+  }
+
+  public void setAuthTokenUrl(String authTokenUrl) {
+    _authTokenUrl = authTokenUrl;
+  }
+
+  public String getAuthTokenUrl() {
+    return _authTokenUrl;
   }
 }

@@ -25,6 +25,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -93,7 +94,8 @@ public class ChangeTableState extends AbstractBaseAdminCommand implements Comman
           URI_TABLES_PATH + _tableName, "state=" + stateValue, null);
 
       HttpGet httpGet = new HttpGet(uri);
-      makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
+      AuthProviderUtils.makeAuthHeaders(
+              AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password))
           .forEach(header -> httpGet.addHeader(header.getName(), header.getValue()));
 
       HttpResponse response = httpClient.execute(httpGet);

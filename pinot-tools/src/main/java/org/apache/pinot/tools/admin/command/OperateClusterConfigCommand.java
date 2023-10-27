@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.Header;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -154,7 +155,8 @@ public class OperateClusterConfigCommand extends AbstractBaseAdminCommand implem
     }
     String clusterConfigUrl =
         _controllerProtocol + "://" + _controllerHost + ":" + _controllerPort + "/cluster/configs";
-    List<Header> headers = makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user,
+    List<Header> headers = AuthProviderUtils.makeAuthHeaders(
+        AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user,
         _password));
     switch (_operation.toUpperCase()) {
       case "ADD":
