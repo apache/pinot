@@ -41,6 +41,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
+  // number of times partition of a record did not match the partition of the stream
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
   UPSERT_KEYS_IN_WRONG_SEGMENT("rows", false),

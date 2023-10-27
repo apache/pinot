@@ -138,6 +138,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final RealtimeSegmentStatsHistory _statsHistory;
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
+  private final int _mainPartitionId; // partition id designated for this consuming segment
   private final boolean _nullHandlingEnabled;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
@@ -211,6 +212,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _statsHistory = config.getStatsHistory();
     _partitionColumn = config.getPartitionColumn();
     _partitionFunction = config.getPartitionFunction();
+    _mainPartitionId = config.getPartitionId();
     _nullHandlingEnabled = config.isNullHandlingEnabled();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
@@ -290,10 +292,10 @@ public class MutableSegmentImpl implements MutableSegment {
 
         // NOTE: Use a concurrent set because the partitions can be updated when the partition of the ingested record
         //       does not match the stream partition. This could happen when stream partition changes, or the records
-        //       are not properly partitioned from the stream. Log an warning and emit a metric if it happens, then add
+        //       are not properly partitioned from the stream. Log a warning and emit a metric if it happens, then add
         //       the new partition into this set.
         partitions = ConcurrentHashMap.newKeySet();
-        partitions.add(config.getPartitionId());
+        partitions.add(_mainPartitionId);
       }
 
       // TODO (mutable-index-spi): The comment above was here, but no check was done.
@@ -666,9 +668,13 @@ public class MutableSegmentImpl implements MutableSegment {
         if (column.equals(_partitionColumn)) {
           Object valueToPartition = (dataType == BYTES) ? new ByteArray((byte[]) value) : value;
           int partition = _partitionFunction.getPartition(valueToPartition);
-          if (indexContainer._partitions.add(partition)) {
-            _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column,
-                valueToPartition);
+          if (partition != _mainPartitionId) {
+            if (indexContainer._partitions.add(partition)) {
+              // for every partition other than mainPartitionId, log a warning once
+              _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column,
+                  valueToPartition);
+            }
+            // always emit a metric when a partition other than mainPartitionId is detected
             if (_serverMetrics != null) {
               _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
             }
