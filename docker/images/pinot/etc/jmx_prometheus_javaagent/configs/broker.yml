@@ -103,6 +103,11 @@ rules:
   cache: true
   labels:
     table: "$1"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.queryTimeout\"><>(\\w+)"
+  name: "pinot_broker_queryTimeout_$2"
+  cache: true
+  labels:
+    table: "$1"
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"BrokerMetrics\", name=\"pinot.broker.([^\\.]*?)\\.noServerFoundExceptions\"><>(\\w+)"
   name: "pinot_broker_noServerFoundExceptions_$2"
   cache: true
