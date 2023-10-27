@@ -63,6 +63,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.apache.pinot.util.TestUtils;
@@ -73,6 +74,8 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_HEADER;
 import static org.apache.pinot.integration.tests.BasicAuthTestUtils.AUTH_TOKEN;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+import static org.apache.pinot.spi.utils.CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 
 
 public class TlsIntegrationTest extends BaseClusterIntegrationTest {
@@ -80,8 +83,6 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   private static final char[] PASSWORD_CHAR = PASSWORD.toCharArray();
   private static final Header CLIENT_HEADER = new BasicHeader("Authorization", AUTH_TOKEN);
 
-  private static final int EXTERNAL_CONTROLLER_PORT = DEFAULT_CONTROLLER_PORT + 1;
-  private static final int EXTERNAL_BROKER_PORT = DEFAULT_BROKER_PORT + 1;
   private static final String PKCS_12 = "PKCS12";
   private static final String JKS = "JKS";
 
@@ -90,11 +91,21 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   private final URL _tlsStorePKCS12 = TlsIntegrationTest.class.getResource("/tlstest.p12");
   private final URL _tlsStoreJKS = TlsIntegrationTest.class.getResource("/tlstest.jks");
 
+  private int _internalControllerPort;
+  private int _internalBrokerPort;
+  private int _externalControllerPort;
+  private int _externalBrokerPort;
+
   @BeforeClass
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
+    _internalControllerPort = NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT + RANDOM.nextInt(10000));
+    _externalControllerPort = NetUtils.findOpenPort(_internalControllerPort + RANDOM.nextInt(10000));
+
+    _internalBrokerPort = NetUtils.findOpenPort(DEFAULT_BROKER_PORT + RANDOM.nextInt(10000));
+    _externalBrokerPort = NetUtils.findOpenPort(_internalBrokerPort + RANDOM.nextInt(10000));
     // Start Zookeeper
     startZk();
     // Start Pinot cluster
@@ -145,10 +156,10 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     // CAUTION: order matters. first listener becomes registered as internal address in zookeeper
     prop.put("controller.access.protocols", "internal,external");
     prop.put("controller.access.protocols.internal.protocol", "https");
-    prop.put("controller.access.protocols.internal.port", DEFAULT_CONTROLLER_PORT);
+    prop.put("controller.access.protocols.internal.port", _internalControllerPort);
     prop.put("controller.access.protocols.internal.tls.client.auth.enabled", "true");
     prop.put("controller.access.protocols.external.protocol", "https");
-    prop.put("controller.access.protocols.external.port", EXTERNAL_CONTROLLER_PORT);
+    prop.put("controller.access.protocols.external.port", _externalControllerPort);
     prop.put("controller.access.protocols.external.tls.keystore.path", _tlsStoreJKS);
     prop.put("controller.access.protocols.external.tls.keystore.type", JKS);
     prop.put("controller.access.protocols.external.tls.truststore.path", _tlsStoreJKS);
@@ -158,7 +169,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
     // announce internal only
     prop.put("controller.vip.protocol", "https");
-    prop.put("controller.vip.port", DEFAULT_CONTROLLER_PORT);
+    prop.put("controller.vip.port", _internalControllerPort);
 
     prop.remove("controller.port");
 
@@ -180,10 +191,10 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     // CAUTION: order matters. first listener becomes registered as internal address in zookeeper
     prop.put("pinot.broker.client.access.protocols", "internal,external");
     prop.put("pinot.broker.client.access.protocols.internal.protocol", "https");
-    prop.put("pinot.broker.client.access.protocols.internal.port", DEFAULT_BROKER_PORT);
+    prop.put("pinot.broker.client.access.protocols.internal.port", _internalBrokerPort);
     prop.put("pinot.broker.client.access.protocols.internal.tls.client.auth.enabled", "true");
     prop.put("pinot.broker.client.access.protocols.external.protocol", "https");
-    prop.put("pinot.broker.client.access.protocols.external.port", EXTERNAL_BROKER_PORT);
+    prop.put("pinot.broker.client.access.protocols.external.port", _externalBrokerPort);
     prop.put("pinot.broker.client.access.protocols.external.tls.keystore.path", _tlsStoreJKS);
     prop.put("pinot.broker.client.access.protocols.external.tls.keystore.type", JKS);
     prop.put("pinot.broker.client.access.protocols.external.tls.truststore.path", _tlsStoreJKS);
@@ -211,10 +222,11 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
         CertBasedTlsChannelAccessControlFactory.class.getName());
     prop.put("pinot.server.adminapi.access.protocols", "internal");
     prop.put("pinot.server.adminapi.access.protocols.internal.protocol", "https");
-    prop.put("pinot.server.adminapi.access.protocols.internal.port", "7443");
+    prop.put("pinot.server.adminapi.access.protocols.internal.port",
+        NetUtils.findOpenPort(DEFAULT_ADMIN_API_PORT + RANDOM.nextInt(10000)));
     prop.put("pinot.server.netty.enabled", "false");
     prop.put("pinot.server.nettytls.enabled", "true");
-    prop.put("pinot.server.nettytls.port", "8089");
+    prop.put("pinot.server.nettytls.port", NetUtils.findOpenPort(DEFAULT_SERVER_NETTY_PORT + RANDOM.nextInt(10000)));
     prop.put("pinot.server.segment.uploader.protocol", "https");
 
     return BasicAuthTestUtils.addServerConfiguration(prop);
@@ -299,8 +311,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     Map<String, Object> prop = new HashMap<>(getDefaultControllerConfiguration());
     prop.put("controller.access.protocols", "https,http");
-    prop.put("controller.access.protocols.https.port", DEFAULT_CONTROLLER_PORT);
-    prop.put("controller.access.protocols.http.port", EXTERNAL_CONTROLLER_PORT);
+    prop.put("controller.access.protocols.https.port", _internalControllerPort);
+    prop.put("controller.access.protocols.http.port", _externalControllerPort);
 
     PinotConfigUtils.validateControllerConfig(new ControllerConf(prop));
   }
@@ -310,8 +322,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     Map<String, Object> prop = new HashMap<>(getDefaultControllerConfiguration());
     prop.put("controller.access.protocols", "invalid,http");
-    prop.put("controller.access.protocols.invalid.port", DEFAULT_CONTROLLER_PORT);
-    prop.put("controller.access.protocols.http.port", EXTERNAL_CONTROLLER_PORT);
+    prop.put("controller.access.protocols.invalid.port", _internalControllerPort);
+    prop.put("controller.access.protocols.http.port", _externalControllerPort);
 
     PinotConfigUtils.validateControllerConfig(new ControllerConf(prop));
   }
@@ -321,7 +333,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreJKS)) {
 
-      try (CloseableHttpResponse response = client.execute(makeGetTables(EXTERNAL_CONTROLLER_PORT))) {
+      try (CloseableHttpResponse response = client.execute(makeGetTables(_externalControllerPort))) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
         JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
         Assert.assertEquals(tables.size(), 1);
@@ -335,7 +347,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreEmptyJKS)) {
       try {
-        client.execute(makeGetTables(EXTERNAL_CONTROLLER_PORT));
+        client.execute(makeGetTables(_externalControllerPort));
         Assert.fail("Must not allow connection to untrusted server");
       } catch (IOException ignore) {
         // this should fail
@@ -347,7 +359,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testControllerInternalTrustedClient()
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStorePKCS12)) {
-      try (CloseableHttpResponse response = client.execute(makeGetTables(DEFAULT_CONTROLLER_PORT))) {
+      try (CloseableHttpResponse response = client.execute(makeGetTables(_internalControllerPort))) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
         JsonNode tables = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("tables");
         Assert.assertEquals(tables.size(), 1);
@@ -361,7 +373,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStoreEmptyPKCS12)) {
       try {
-        client.execute(makeGetTables(DEFAULT_CONTROLLER_PORT));
+        client.execute(makeGetTables(_internalControllerPort));
         Assert.fail("Must not allow connection to untrusted server");
       } catch (IOException ignore) {
         // this should fail
@@ -374,7 +386,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStoreEmptyPKCS12, _tlsStorePKCS12)) {
       try {
-        client.execute(makeGetTables(DEFAULT_CONTROLLER_PORT));
+        client.execute(makeGetTables(_internalControllerPort));
         Assert.fail("Must not allow connection from untrusted client");
       } catch (IOException ignore) {
         // this should fail
@@ -386,7 +398,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testBrokerExternalTrustedServer()
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, _tlsStoreEmptyJKS, _tlsStoreJKS)) {
-      try (CloseableHttpResponse response = client.execute(makeQueryBroker(EXTERNAL_BROKER_PORT))) {
+      try (CloseableHttpResponse response = client.execute(makeQueryBroker(_externalBrokerPort))) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
         JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
         Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
@@ -399,7 +411,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreEmptyJKS)) {
       try {
-        client.execute(makeQueryBroker(EXTERNAL_BROKER_PORT));
+        client.execute(makeQueryBroker(_externalBrokerPort));
         Assert.fail("Must not allow connection to untrusted server");
       } catch (Exception ignore) {
         // this should fail
@@ -411,7 +423,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testBrokerInternalTrustedServer()
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStorePKCS12)) {
-      try (CloseableHttpResponse response = client.execute(makeQueryBroker(DEFAULT_BROKER_PORT))) {
+      try (CloseableHttpResponse response = client.execute(makeQueryBroker(_internalBrokerPort))) {
         Assert.assertEquals(response.getStatusLine().getStatusCode(), 200);
         JsonNode resultTable = JsonUtils.inputStreamToJsonNode(response.getEntity().getContent()).get("resultTable");
         Assert.assertTrue(resultTable.get("rows").get(0).get(0).longValue() > 100000);
@@ -424,7 +436,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStorePKCS12, _tlsStoreEmptyJKS)) {
       try {
-        client.execute(makeQueryBroker(DEFAULT_BROKER_PORT));
+        client.execute(makeQueryBroker(_internalBrokerPort));
         Assert.fail("Must not allow connection to untrusted server");
       } catch (Exception ignore) {
         // this should fail
@@ -437,7 +449,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     try (CloseableHttpClient client = makeClient(PKCS_12, _tlsStoreEmptyPKCS12, _tlsStorePKCS12)) {
       try {
-        client.execute(makeQueryBroker(DEFAULT_BROKER_PORT));
+        client.execute(makeQueryBroker(_internalBrokerPort));
         Assert.fail("Must not allow connection from untrusted client");
       } catch (Exception ignore) {
         // this should fail
@@ -449,7 +461,7 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testControllerBrokerQueryForward()
       throws Exception {
     try (CloseableHttpClient client = makeClient(JKS, _tlsStoreJKS, _tlsStoreJKS)) {
-      HttpPost request = new HttpPost("https://localhost:" + EXTERNAL_CONTROLLER_PORT + "/sql");
+      HttpPost request = new HttpPost("https://localhost:" + _externalControllerPort + "/sql");
       request.addHeader(CLIENT_HEADER);
       request.setEntity(new StringEntity("{\"sql\":\"SELECT count(*) FROM mytable\"}"));
 
@@ -507,14 +519,14 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   public void testJDBCClient()
       throws Exception {
     String query = "SELECT count(*) FROM " + getTableName();
-    java.sql.Connection connection = getValidJDBCConnection(DEFAULT_CONTROLLER_PORT);
+    java.sql.Connection connection = getValidJDBCConnection(_internalControllerPort);
     Statement statement = connection.createStatement();
     ResultSet resultSet = statement.executeQuery(query);
     resultSet.first();
     Assert.assertTrue(resultSet.getLong(1) > 0);
 
     try {
-      java.sql.Connection invalidConnection = getInValidJDBCConnection(DEFAULT_CONTROLLER_PORT);
+      java.sql.Connection invalidConnection = getInValidJDBCConnection(_internalControllerPort);
       statement = invalidConnection.createStatement();
       resultSet = statement.executeQuery(query);
       Assert.fail("Should not allow queries with invalid TLS configuration");
@@ -533,7 +545,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     Assert.assertFalse(httpsComponentUrls.isEmpty());
   }
 
-  private java.sql.Connection getValidJDBCConnection(int controllerPort) throws Exception {
+  private java.sql.Connection getValidJDBCConnection(int controllerPort)
+      throws Exception {
     SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
     sslContextBuilder.setKeyStoreType(PKCS_12);
     sslContextBuilder.loadKeyMaterial(_tlsStorePKCS12, PASSWORD_CHAR, PASSWORD_CHAR);
@@ -546,7 +559,8 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
     return pinotDriver.connect("jdbc:pinot://localhost:" + controllerPort, jdbcProps);
   }
 
-  private java.sql.Connection getInValidJDBCConnection(int controllerPort) throws Exception {
+  private java.sql.Connection getInValidJDBCConnection(int controllerPort)
+      throws Exception {
     SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
     sslContextBuilder.setKeyStoreType(PKCS_12);
     sslContextBuilder.loadKeyMaterial(_tlsStoreEmptyPKCS12, PASSWORD_CHAR, PASSWORD_CHAR);

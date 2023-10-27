@@ -139,6 +139,7 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
     stopServer();
     stopBroker();
     stopController();
+    stopKafka();
     stopZk();
 
     FileUtils.deleteDirectory(_tempDir);

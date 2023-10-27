@@ -163,9 +163,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
         throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to drop the segments");
-
-    stopServer();
-    startServers(1);
+    restartServers();
   }
 
   @AfterClass
