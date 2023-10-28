@@ -32,7 +32,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang3.StringUtils;
@@ -102,11 +102,11 @@ public class CommonsConfigurationUtils {
    * @return a stream of keys
    */
   @Deprecated
-  public static Stream<String> getKeysStream(Configuration configuration) {
+  public static Stream<String> getKeysStream(org.apache.commons.configuration.Configuration configuration) {
     return StreamSupport.stream(getIterable(configuration.getKeys()).spliterator(), false);
   }
 
-  public static Stream<String> getKeysStream(org.apache.commons.configuration2.Configuration configuration) {
+  public static Stream<String> getKeysStream(Configuration configuration) {
     return StreamSupport.stream(getIterable(configuration.getKeys()).spliterator(), false);
   }
 
@@ -124,16 +124,16 @@ public class CommonsConfigurationUtils {
    * @return a key-value {@link Map} found in the provided {@link Configuration}
    */
   @Deprecated
+  public static Map<String, Object> toMap(org.apache.commons.configuration.Configuration configuration) {
+    return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
+  }
+
   public static Map<String, Object> toMap(Configuration configuration) {
     return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
   }
 
-  public static Map<String, Object> toMap(org.apache.commons.configuration2.Configuration configuration) {
-    return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
-  }
-
   @Deprecated
-  private static Object mapValue(String key, Configuration configuration) {
+  private static Object mapValue(String key, org.apache.commons.configuration.Configuration configuration) {
     // For multi-value config, convert it to a single comma connected string value.
     // For single-value config, return its raw property, unless it needs interpolation.
     return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1)
@@ -147,7 +147,7 @@ public class CommonsConfigurationUtils {
         });
   }
 
-  private static Object mapValue(String key, org.apache.commons.configuration2.Configuration configuration) {
+  private static Object mapValue(String key, Configuration configuration) {
     // For multi-value config, convert it to a single comma connected string value.
     // For single-value config, return its raw property, unless it needs interpolation.
     return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1)
