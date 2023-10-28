@@ -118,7 +118,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     _failureDetector.notifyQuerySubmitted(asyncQueryResponse);
     Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
-      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
+      _brokerMetrics.addMeteredTableValue(getActualTableName(rawTableName, _tableCache),
+          BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
     }
     _failureDetector.notifyQueryFinished(asyncQueryResponse);
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
