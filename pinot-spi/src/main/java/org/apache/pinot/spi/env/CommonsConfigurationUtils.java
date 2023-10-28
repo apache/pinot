@@ -116,7 +116,7 @@ public class CommonsConfigurationUtils {
    * @param configuration to iterate on keys
    * @return a list of keys
    */
-  public static List<String> getKeys(Configuration configuration) {
+  public static List<String> getKeys(org.apache.commons.configuration.Configuration configuration) {
     return getKeysStream(configuration).collect(Collectors.toList());
   }
 
@@ -172,7 +172,9 @@ public class CommonsConfigurationUtils {
   }
 
   @SuppressWarnings("unchecked")
-  public static <T> T interpolate(Configuration configuration, String key, T defaultValue, Class<T> returnType) {
+  @Deprecated
+  public static <T> T interpolate(org.apache.commons.configuration.Configuration configuration,
+      String key, T defaultValue, Class<T> returnType) {
     // Different from the generic getProperty() method, those type specific getters do config interpolation.
     if (Integer.class.equals(returnType)) {
       return (T) configuration.getInteger(key, (Integer) defaultValue);
