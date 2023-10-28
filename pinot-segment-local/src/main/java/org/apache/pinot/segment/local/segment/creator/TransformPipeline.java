@@ -57,7 +57,7 @@ public class TransformPipeline {
    */
   public TransformPipeline(TableConfig tableConfig, Schema schema) {
     // Create record transformer
-    _recordTransformer = CompositeTransformer.composeDefaultTransformers(tableConfig, schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
 
     // Create complex type transformer
     _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);

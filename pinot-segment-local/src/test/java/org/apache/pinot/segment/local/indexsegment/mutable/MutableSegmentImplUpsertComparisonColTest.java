@@ -66,7 +66,7 @@ public class MutableSegmentImplUpsertComparisonColTest {
     _tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setUpsertConfig(offsetUpsertConfig)
             .build();
-    _recordTransformer = CompositeTransformer.composeDefaultTransformers(_tableConfig, _schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     TableUpsertMetadataManager tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(_tableConfig);
     tableUpsertMetadataManager.init(_tableConfig, _schema, mock(TableDataManager.class), mock(ServerMetrics.class),

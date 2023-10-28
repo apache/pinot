@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.readers;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.io.File;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
@@ -69,8 +68,7 @@ public class RecordReaderSampleDataTest {
   @Test
   public void testRecordReaders()
       throws Exception {
-    CompositeTransformer defaultTransformer = CompositeTransformer.composeAllTransformers(Collections.emptyList(),
-        TABLE_CONFIG, SCHEMA);
+    CompositeTransformer defaultTransformer = CompositeTransformer.getDefaultTransformer(TABLE_CONFIG, SCHEMA);
     try (RecordReader avroRecordReader = RecordReaderFactory
         .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null);
         RecordReader csvRecordReader = RecordReaderFactory

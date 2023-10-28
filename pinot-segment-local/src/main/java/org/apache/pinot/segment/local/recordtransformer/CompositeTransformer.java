@@ -77,14 +77,21 @@ public class CompositeTransformer implements RecordTransformer {
         new SanitizationTransformer(schema)).filter(t -> !t.isNoOp()).collect(Collectors.toList());
   }
 
-  public static CompositeTransformer composeDefaultTransformers(TableConfig tableConfig, Schema schema) {
+  public static CompositeTransformer getDefaultTransformer(TableConfig tableConfig, Schema schema) {
     return new CompositeTransformer(getDefaultTransformers(tableConfig, schema));
   }
 
+  /**
+   * Includes custom and default transformers.
+   * @param customTransformers
+   * @param tableConfig
+   * @param schema
+   * @return
+   */
   public static CompositeTransformer composeAllTransformers(List<RecordTransformer> customTransformers,
       TableConfig tableConfig, Schema schema) {
-    List<RecordTransformer> allTransformers = new ArrayList<>(getDefaultTransformers(tableConfig, schema));
-    allTransformers.addAll(customTransformers);
+    List<RecordTransformer> allTransformers = new ArrayList<>(customTransformers);
+    allTransformers.addAll(getDefaultTransformers(tableConfig, schema));
     return new CompositeTransformer(allTransformers);
   }
 

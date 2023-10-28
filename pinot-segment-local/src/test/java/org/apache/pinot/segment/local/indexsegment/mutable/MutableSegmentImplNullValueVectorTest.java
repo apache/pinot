@@ -55,7 +55,7 @@ public class MutableSegmentImplNullValueVectorTest {
     URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE);
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
-    _recordTransformer = CompositeTransformer.composeDefaultTransformers(_tableConfig, _schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     _mutableSegmentImpl = MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),

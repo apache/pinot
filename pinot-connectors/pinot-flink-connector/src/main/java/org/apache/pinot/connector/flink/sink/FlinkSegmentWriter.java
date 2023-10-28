@@ -137,7 +137,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
 
     _schema = schema;
     _fieldsToRead = _schema.getColumnNames();
-    _recordTransformer = CompositeTransformer.composeDefaultTransformers(_tableConfig, _schema);
+    _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_schema);
     _reusableRecord = new GenericData.Record(_avroSchema);
 

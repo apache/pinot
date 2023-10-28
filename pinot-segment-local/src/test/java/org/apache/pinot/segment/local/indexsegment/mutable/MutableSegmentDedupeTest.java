@@ -55,7 +55,7 @@ public class MutableSegmentDedupeTest {
     Schema schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setDedupConfig(new DedupConfig(dedupEnabled, HashFunction.NONE)).build();
-    CompositeTransformer recordTransformer = CompositeTransformer.composeDefaultTransformers(tableConfig, schema);
+    CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         (dedupEnabled) ? getTableDedupMetadataManager(schema).getOrCreatePartitionManager(0) : null;
