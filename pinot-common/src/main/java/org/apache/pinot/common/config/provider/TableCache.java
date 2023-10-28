@@ -156,6 +156,20 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
+   * Get all dimension table names.
+   * @return List of dimension table names
+   */
+  public List<String> getAllDimensionTables() {
+    List<String> dimensionTables = new ArrayList<>();
+    for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
+      if (tableConfigInfo._tableConfig.isDimTable()) {
+        dimensionTables.add(tableConfigInfo._tableConfig.getTableName());
+      }
+    }
+    return dimensionTables;
+  }
+
+  /**
    * Returns a map from column name to actual column name for the given table, or {@code null} if the table schema does
    * not exist. For case-insensitive case, the keys of the map are in lower case.
    */
@@ -387,20 +401,6 @@ public class TableCache implements PinotConfigProvider {
       tableConfigs.add(tableConfigInfo._tableConfig);
     }
     return tableConfigs;
-  }
-
-  /**
-   * Get all dimension table names.
-   * @return List of dimension table names
-   */
-  public List<String> getAllDimensionTables() {
-    List<String> dimensionTables = new ArrayList<>();
-    for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
-      if (tableConfigInfo._tableConfig.isDimTable()) {
-        dimensionTables.add(tableConfigInfo._tableConfig.getTableName());
-      }
-    }
-    return dimensionTables;
   }
 
   private void notifySchemaChangeListeners() {

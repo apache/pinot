@@ -273,7 +273,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") String sortTypeStr,
       @ApiParam(value = "true|false") @QueryParam("sortAsc") @DefaultValue("true") boolean sortAsc) {
     try {
-      final boolean isDimensionTable = "dimension".equalsIgnoreCase(tableTypeStr);
+      boolean isDimensionTable = "dimension".equalsIgnoreCase(tableTypeStr);
       TableType tableType = null;
       if (isDimensionTable) {
         // Dimension is a property (isDimTable) of an OFFLINE table.
@@ -286,7 +286,7 @@ public class PinotTableRestletResource {
       // If tableTypeStr is dimension, then tableType is set to TableType.OFFLINE.
       // So, checking the isDimensionTable to get the list of dimension tables only.
       List<String> tableNamesWithType =
-          isDimensionTable ? _pinotHelixResourceManager.getTableCache().getAllDimensionTables()
+          isDimensionTable ? _pinotHelixResourceManager.getAllDimensionTables()
               : tableType == null ? _pinotHelixResourceManager.getAllTables()
                   : (tableType == TableType.REALTIME ? _pinotHelixResourceManager.getAllRealtimeTables()
                       : _pinotHelixResourceManager.getAllOfflineTables());
