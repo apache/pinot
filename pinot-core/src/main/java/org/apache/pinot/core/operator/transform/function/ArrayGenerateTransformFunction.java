@@ -46,7 +46,7 @@ public class ArrayGenerateTransformFunction implements TransformFunction {
   private long[][] _longArrayResult;
   private float[][] _floatArrayResult;
   private double[][] _doubleArrayResult;
-  public ArrayGenerateTransformFunction (List<ExpressionContext> literalContexts) {
+  public ArrayGenerateTransformFunction(List<ExpressionContext> literalContexts) {
     Preconditions.checkNotNull(literalContexts);
     if (literalContexts.isEmpty()) {
       _dataType = DataType.UNKNOWN;
@@ -68,10 +68,10 @@ public class ArrayGenerateTransformFunction implements TransformFunction {
         int startInt = literalContexts.get(0).getLiteral().getIntValue();
         int endInt = literalContexts.get(1).getLiteral().getIntValue();
         int incInt = literalContexts.get(2).getLiteral().getIntValue();
-        int size = (endInt - startInt) / incInt +1;
+        int size = (endInt - startInt) / incInt + 1;
         _intArrayLiteral = new int[size];
-        for (int i = 0, value = startInt; i < size ; i++, value += incInt) {
-          _intArrayLiteral[i]  = value;
+        for (int i = 0, value = startInt; i < size; i++, value += incInt) {
+          _intArrayLiteral[i] = value;
         }
         _longArrayLiteral = null;
         _floatArrayLiteral = null;
@@ -81,7 +81,7 @@ public class ArrayGenerateTransformFunction implements TransformFunction {
         long startLong = Long.parseLong(literalContexts.get(0).getLiteral().getStringValue());
         long endLong = Long.parseLong(literalContexts.get(1).getLiteral().getStringValue());
         long incLong = Long.parseLong(literalContexts.get(2).getLiteral().getStringValue());
-        size = (int)((endLong - startLong) / incLong +1);
+        size = (int) ((endLong - startLong) / incLong + 1);
         _longArrayLiteral = new long[size];
         for (int i = 0; i < size; i++, startLong += incLong) {
         _longArrayLiteral[i] = startLong;
@@ -96,7 +96,7 @@ public class ArrayGenerateTransformFunction implements TransformFunction {
         float incFloat = Float.parseFloat(literalContexts.get(2).getLiteral().getStringValue());
         size = (int) ((endFloat - startFloat) / incFloat + 1);
         _floatArrayLiteral = new float[size];
-        for (int i = 0 ; i < size; i ++, startFloat += incFloat) {
+        for (int i = 0; i < size; i++, startFloat += incFloat) {
           _floatArrayLiteral[i] = startFloat;
         }
         _intArrayLiteral = null;
@@ -107,9 +107,9 @@ public class ArrayGenerateTransformFunction implements TransformFunction {
         double startDouble = Double.parseDouble(literalContexts.get(0).getLiteral().getStringValue());
         double endDouble = Double.parseDouble(literalContexts.get(1).getLiteral().getStringValue());
         double incDouble = Double.parseDouble(literalContexts.get(2).getLiteral().getStringValue());
-        size = (int) ((endDouble - startDouble) / incDouble +1);
+        size = (int) ((endDouble - startDouble) / incDouble + 1);
         _doubleArrayLiteral = new double[size];
-        for (int i = 0 ; i < size; i ++, startDouble += incDouble) {
+        for (int i = 0; i < size; i++, startDouble += incDouble) {
           _doubleArrayLiteral[i] = startDouble;
       }
         _intArrayLiteral = null;
@@ -211,7 +211,7 @@ public class ArrayGenerateTransformFunction implements TransformFunction {
   public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     int[][] intArrayResult = _intArrayResult;
-    if (intArrayResult == null || intArrayResult.length < numDocs ) {
+    if (intArrayResult == null || intArrayResult.length < numDocs) {
       intArrayResult = new int[numDocs][];
       int[] intArrayLiteral = _intArrayLiteral;
       if (intArrayLiteral == null) {
