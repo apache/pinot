@@ -134,6 +134,9 @@ public class PinotQueryRuleSets {
       PinotSetOpExchangeNodeInsertRule.INSTANCE,
 
       // apply dynamic broadcast rule after exchange is inserted/
-      PinotJoinToDynamicBroadcastRule.INSTANCE
+      PinotJoinToDynamicBroadcastRule.INSTANCE,
+
+      // remove exchanges when there's duplicates
+      PinotExchangeEliminationRule.INSTANCE
   );
 }
