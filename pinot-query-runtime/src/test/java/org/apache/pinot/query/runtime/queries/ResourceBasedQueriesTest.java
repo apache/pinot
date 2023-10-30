@@ -72,7 +72,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final Random RANDOM = new Random(42);
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
   private static final String IGNORE_FILTER_PROPERTY = "pinot.runIgnored";
-  private static final int NUM_PARTITIONS = 4;
+  private static final int DEFAULT_NUM_PARTITIONS = 4;
 
   private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
   private boolean _isRunIgnored;
@@ -122,41 +122,43 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
         // generate segments and dump into server1 and server2
         List<String> partitionColumns = tableEntry.getValue()._partitionColumns;
+        int numPartitions = tableEntry.getValue()._partitionCount == null ? DEFAULT_NUM_PARTITIONS
+            : tableEntry.getValue()._partitionCount;
         String partitionColumn = null;
         List<List<String>> partitionIdToSegmentsMap = null;
         if (partitionColumns != null && partitionColumns.size() == 1) {
           partitionColumn = partitionColumns.get(0);
           partitionIdToSegmentsMap = new ArrayList<>();
-          for (int i = 0; i < NUM_PARTITIONS; i++) {
+          for (int i = 0; i < numPartitions; i++) {
             partitionIdToSegmentsMap.add(new ArrayList<>());
           }
         }
 
         List<List<GenericRow>> partitionIdToRowsMap = new ArrayList<>();
-        for (int i = 0; i < NUM_PARTITIONS; i++) {
+        for (int i = 0; i < numPartitions; i++) {
           partitionIdToRowsMap.add(new ArrayList<>());
         }
 
         for (GenericRow row : genericRows) {
           if (row == SEGMENT_BREAKER_ROW) {
             addSegments(factory1, factory2, offlineTableName, allowEmptySegment, partitionIdToRowsMap,
-                partitionIdToSegmentsMap);
+                partitionIdToSegmentsMap, numPartitions);
           } else {
             int partitionId;
             if (partitionColumns == null) {
-              partitionId = RANDOM.nextInt(NUM_PARTITIONS);
+              partitionId = RANDOM.nextInt(numPartitions);
             } else {
               int hashCode = 0;
               for (String field : partitionColumns) {
                 hashCode += row.getValue(field).hashCode();
               }
-              partitionId = (hashCode & Integer.MAX_VALUE) % NUM_PARTITIONS;
+              partitionId = (hashCode & Integer.MAX_VALUE) % numPartitions;
             }
             partitionIdToRowsMap.get(partitionId).add(row);
           }
         }
         addSegments(factory1, factory2, offlineTableName, allowEmptySegment, partitionIdToRowsMap,
-            partitionIdToSegmentsMap);
+            partitionIdToSegmentsMap, numPartitions);
 
         if (partitionColumn != null) {
           partitionedSegmentsMap.put(offlineTableName, Pair.of(partitionColumn, partitionIdToSegmentsMap));
@@ -223,9 +225,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   private void addSegments(MockInstanceDataManagerFactory factory1, MockInstanceDataManagerFactory factory2,
       String offlineTableName, boolean allowEmptySegment, List<List<GenericRow>> partitionIdToRowsMap,
-      @Nullable List<List<String>> partitionIdToSegmentsMap) {
-    for (int i = 0; i < NUM_PARTITIONS; i++) {
-      MockInstanceDataManagerFactory factory = i < (NUM_PARTITIONS / 2) ? factory1 : factory2;
+      @Nullable List<List<String>> partitionIdToSegmentsMap, int numPartitions) {
+    for (int i = 0; i < numPartitions; i++) {
+      MockInstanceDataManagerFactory factory = i < (numPartitions / 2) ? factory1 : factory2;
       List<GenericRow> rows = partitionIdToRowsMap.get(i);
       if (allowEmptySegment || !rows.isEmpty()) {
         String segmentName = factory.addSegment(offlineTableName, rows);
