@@ -41,6 +41,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _schemaName;
   private String _timeColumnName;
   private TimeUnit _timeType;
+  @Deprecated  // Use SegmentAssignmentConfig instead
   private String _segmentAssignmentStrategy;
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
@@ -51,6 +52,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
 
+  @Deprecated
   public String getSegmentAssignmentStrategy() {
     return _segmentAssignmentStrategy;
   }
