@@ -170,7 +170,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     if (!hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders)) {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
-    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
 
     // Validate QPS quota
     if (hasExceededQPSQuota(tableNames, requestContext)) {
@@ -255,6 +254,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
    */
   private boolean hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
       RequestContext requestContext, HttpHeaders httpHeaders) {
+    final long startTimeNs = System.nanoTime();
     AccessControl accessControl = _accessControlFactory.create();
     boolean hasAccess = accessControl.hasAccess(requesterIdentity, tableNames) && tableNames.stream()
         .allMatch(table -> accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY));
@@ -262,9 +262,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-      return false;
     }
-    return true;
+
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
+
+    return hasAccess;
   }
 
   /**
