@@ -54,6 +54,7 @@ public class StarTreeIndexSeparatorTest {
           Lists.newArrayList("AirlineID", "Origin", "Dest"),
           Lists.newArrayList(),
           Lists.newArrayList("count__*", "max__ArrDelay"),
+          null,
           10));
 
   @BeforeClass

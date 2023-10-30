@@ -55,6 +55,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -1006,18 +1007,35 @@ public final class TableConfigUtils {
         for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
           columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
         }
-        // Function column pairs cannot be null
-        for (String functionColumnPair : starTreeIndexConfig.getFunctionColumnPairs()) {
-          AggregationFunctionColumnPair columnPair;
-          try {
-            columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
-          } catch (Exception e) {
-            throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
-                + "in the form <Aggregation function>__<Column name>");
+        List<String> functionColumnPairs = starTreeIndexConfig.getFunctionColumnPairs();
+        if (functionColumnPairs != null) {
+          for (String functionColumnPair : functionColumnPairs) {
+            AggregationFunctionColumnPair columnPair;
+            try {
+              columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+            } catch (Exception e) {
+              throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
+                  + "in the form <Aggregation function>__<Column name>");
+            }
+            String columnName = columnPair.getColumn();
+            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+            }
           }
-          String columnName = columnPair.getColumn();
-          if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
-            columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+        }
+        List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
+        if (aggregationConfigs != null) {
+          for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
+            AggregationFunctionColumnPair columnPair;
+            try {
+              columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
+            } catch (Exception e) {
+              throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
+            }
+            String columnName = columnPair.getColumn();
+            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+            }
           }
         }
         List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();

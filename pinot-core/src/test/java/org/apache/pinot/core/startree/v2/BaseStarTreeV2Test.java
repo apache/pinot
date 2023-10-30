@@ -54,6 +54,8 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -163,10 +165,10 @@ abstract class BaseStarTreeV2Test<R, A> {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords));
     driver.build();
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList(DIMENSION_D1, DIMENSION_D2), null,
-        Collections.singletonList(
-            new AggregationFunctionColumnPair(_valueAggregator.getAggregationType(), METRIC).toColumnName()),
-        MAX_LEAF_RECORDS);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(Arrays.asList(DIMENSION_D1, DIMENSION_D2), null, null, Collections.singletonList(
+            new StarTreeAggregationConfig(METRIC, _valueAggregator.getAggregationType().getName(),
+                getCompressionCodec())), MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
     MultipleTreesBuilder.BuildMode buildMode =
@@ -448,6 +450,14 @@ abstract class BaseStarTreeV2Test<R, A> {
   private Object getNextRawValue(int docId, ForwardIndexReader reader, ForwardIndexReaderContext readerContext,
       Dictionary dictionary) {
     return dictionary.get(reader.getDictId(docId, readerContext));
+  }
+
+  /**
+   * Can be overridden to force the compression codec.
+   */
+  CompressionCodec getCompressionCodec() {
+    CompressionCodec[] compressionCodecs = CompressionCodec.values();
+    return compressionCodecs[RANDOM.nextInt(compressionCodecs.length)];
   }
 
   abstract ValueAggregator<R, A> getValueAggregator();
