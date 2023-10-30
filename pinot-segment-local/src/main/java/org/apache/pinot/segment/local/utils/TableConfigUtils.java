@@ -771,11 +771,25 @@ public final class TableConfigUtils {
         tableConfig.getInstanceAssignmentConfigMap())) {
       return;
     }
-    for (InstancePartitionsType instancePartitionsType : tableConfig.getInstancePartitionsMap().keySet()) {
-      Preconditions.checkState(
-          !tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType.toString()),
-          String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
-              instancePartitionsType));
+
+    for (InstancePartitionsType instancePartitionsType : InstancePartitionsType.values()) {
+      if (tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType.toString())) {
+        InstanceAssignmentConfig instanceAssignmentConfig =
+            tableConfig.getInstanceAssignmentConfigMap().get(instancePartitionsType.toString());
+        if (instanceAssignmentConfig.getPartitionSelector()
+            == InstanceAssignmentConfig.PartitionSelector.MIRROR_SERVER_SET_PARTITION_SELECTOR) {
+          Preconditions.checkState(
+              tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
+              String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap needed for %s, as "
+                      + "MIRROR_SERVER_SET_PARTITION_SELECTOR is used",
+                  instancePartitionsType));
+        } else {
+          Preconditions.checkState(
+              !tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
+              String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
+                  instancePartitionsType));
+        }
+      }
     }
   }
 

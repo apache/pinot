@@ -1753,20 +1753,30 @@ public class PinotHelixResourceManager {
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypesToAssign) {
         boolean hasPreConfiguredInstancePartitions =
             TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
+        boolean isPreConfigurationBasedAssignment =
+            InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
         InstancePartitions instancePartitions;
         if (!hasPreConfiguredInstancePartitions) {
           instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null);
           LOGGER.info("Persisting instance partitions: {}", instancePartitions);
-          InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
         } else {
           String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
-          instancePartitions =
-              InstancePartitionsUtils.fetchInstancePartitionsWithRename(_propertyStore, referenceInstancePartitionsName,
-                  instancePartitionsType.getInstancePartitionsName(rawTableName));
-          LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
-              referenceInstancePartitionsName);
-          InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
+          if (isPreConfigurationBasedAssignment) {
+            InstancePartitions preConfiguredInstancePartitions =
+                InstancePartitionsUtils.fetchInstancePartitionsWithRename(_propertyStore,
+                    referenceInstancePartitionsName, instancePartitionsType.getInstancePartitionsName(rawTableName));
+            instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType, instanceConfigs, null,
+                preConfiguredInstancePartitions);
+            LOGGER.info("Persisting instance partitions: {} (based on {})", instancePartitions,
+                preConfiguredInstancePartitions);
+          } else {
+            instancePartitions = InstancePartitionsUtils.fetchInstancePartitionsWithRename(_propertyStore,
+                referenceInstancePartitionsName, instancePartitionsType.getInstancePartitionsName(rawTableName));
+            LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
+                referenceInstancePartitionsName);
+          }
         }
+        InstancePartitionsUtils.persistInstancePartitions(_propertyStore, instancePartitions);
       }
     }
 
