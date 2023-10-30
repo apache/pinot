@@ -181,9 +181,15 @@ public class ControllerTest {
     return _controllerRequestClient;
   }
 
+  public void startDefaultTestZk() {
+    if (_zookeeperInstance == null) {
+      _zookeeperInstance = ZkStarter.startLocalZkServer(ZkStarter.DEFAULT_ZK_TEST_PORT);
+    }
+  }
+
   public void startZk() {
     if (_zookeeperInstance == null) {
-      _zookeeperInstance = ZkStarter.startLocalZkServer();
+      _zookeeperInstance = ZkStarter.startLocalZkServer(NetUtils.findOpenPort(20000 + RandomUtils.nextInt(10000)));
     }
   }
 
@@ -435,14 +441,18 @@ public class ControllerTest {
     _fakeInstanceHelixManagers.add(helixManager);
   }
 
-  /** Add fake server instances until total number of server instances reaches maxCount */
+  /**
+   * Add fake server instances until total number of server instances reaches maxCount
+   */
   public void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {
     addMoreFakeServerInstancesToAutoJoinHelixCluster(maxCount, isSingleTenant,
         NetUtils.findOpenPort(DEFAULT_ADMIN_API_PORT + RandomUtils.nextInt(10000)));
   }
 
-  /** Add fake server instances until total number of server instances reaches maxCount */
+  /**
+   * Add fake server instances until total number of server instances reaches maxCount
+   */
   public void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant, int baseAdminPort)
       throws Exception {
 
