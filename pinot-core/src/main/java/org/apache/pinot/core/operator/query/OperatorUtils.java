@@ -24,6 +24,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
@@ -42,12 +43,14 @@ import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class OperatorUtils {
+  //TODO(egalpin): This should be merged with org.apache.pinot.core.operator.ProjectionOperatorUtils
   private OperatorUtils() {
     // Prevent instantiation, make checkstyle happy
   }
 
   public static BaseProjectOperator<?> getProjectionOperator(
       QueryContext queryContext,
+      FilterContext filterContext,
       IndexSegment indexSegment,
       AggregationFunction[] aggregationFunctions,
       List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators,
@@ -65,7 +68,7 @@ public class OperatorUtils {
           StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
         Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, queryContext.getFilter(), predicateEvaluators);
+            StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, filterContext, predicateEvaluators);
         if (predicateEvaluatorsMap != null) {
           for (StarTreeV2 starTreeV2 : starTrees) {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,

@@ -39,6 +39,7 @@ import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
+import org.apache.pinot.core.operator.filter.CombinedFilteredAggregationContext;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.OperatorUtils;
@@ -211,17 +212,20 @@ public class AggregationFunctionUtils {
 
     // For each aggregation function, check if the aggregation function is a filtered aggregate. If so, populate the
     // corresponding filter operator.
-    Map<FilterContext, Pair<BaseFilterOperator, List<AggregationFunction>>> filterOperators = new HashMap<>();
+    Map<FilterContext, CombinedFilteredAggregationContext> filterOperators = new HashMap<>();
     List<AggregationFunction> nonFilteredFunctions = new ArrayList<>();
-    Set<Pair<Predicate, PredicateEvaluator>> predicateEvaluators =
-        new HashSet<>(mainFilterPlan.getPredicateEvaluators());
+    List<Pair<Predicate, PredicateEvaluator>> mainFilterPredicateEvaluators = mainFilterPlan.getPredicateEvaluators();
     for (Pair<AggregationFunction, FilterContext> functionFilterPair : queryContext.getFilteredAggregationFunctions()) {
       AggregationFunction aggregationFunction = functionFilterPair.getLeft();
       FilterContext filter = functionFilterPair.getRight();
       if (filter != null) {
-        FilterPlanNode subFilterPlan = new FilterPlanNode(indexSegment, queryContext, filter);
-        predicateEvaluators.addAll(subFilterPlan.getPredicateEvaluators());
         filterOperators.computeIfAbsent(filter, k -> {
+          FilterPlanNode subFilterPlan = new FilterPlanNode(indexSegment, queryContext, filter);
+          // TODO(egalpin): Possibly just use a single Set of all predicate evaluators across all filterContexts as
+          //  it will have a smaller overall memory footprint
+          List<Pair<Predicate, PredicateEvaluator>> combinedPredicateEvaluators = new ArrayList<>(mainFilterPredicateEvaluators);
+          combinedPredicateEvaluators.addAll(subFilterPlan.getPredicateEvaluators());
+
           BaseFilterOperator combinedFilterOperator;
           BaseFilterOperator subFilterOperator = subFilterPlan.run();
           if (mainFilterOperator.isResultMatchingAll() || subFilterOperator.isResultEmpty()) {
@@ -230,10 +234,10 @@ public class AggregationFunctionUtils {
               combinedFilterOperator = mainFilterOperator;
           } else {
             combinedFilterOperator =
-                new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
+                new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext);
           }
-          return Pair.of(combinedFilterOperator, new ArrayList<>());
-        }).getRight().add(aggregationFunction);
+          return new CombinedFilteredAggregationContext(combinedFilterOperator, combinedPredicateEvaluators, filter);
+        }).add(aggregationFunction);
       } else {
         nonFilteredFunctions.add(aggregationFunction);
       }
@@ -241,18 +245,19 @@ public class AggregationFunctionUtils {
 
     List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators = new ArrayList<>();
     List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
-    for (Pair<BaseFilterOperator, List<AggregationFunction>> filterOperatorFunctionsPair : filterOperators.values()) {
-      BaseFilterOperator filterOperator = filterOperatorFunctionsPair.getLeft();
+    for (CombinedFilteredAggregationContext combinedFilteredAggregationContext : filterOperators.values()) {
+      BaseFilterOperator filterOperator = combinedFilteredAggregationContext.getBaseFilterOperator();
       if (filterOperator == mainFilterOperator) {
         // This can happen when the sub filter matches all documents, and we can treat the function as non-filtered
-        nonFilteredFunctions.addAll(filterOperatorFunctionsPair.getRight());
+        nonFilteredFunctions.addAll(combinedFilteredAggregationContext.getAggregationFunctions());
       } else {
         AggregationFunction[] aggregationFunctions =
-            filterOperatorFunctionsPair.getRight().toArray(new AggregationFunction[0]);
+            combinedFilteredAggregationContext.getAggregationFunctions().toArray(new AggregationFunction[0]);
         Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
         BaseProjectOperator<?> projectOperator =
-            OperatorUtils.getProjectionOperator(queryContext, indexSegment, aggregationFunctions,
-                List.copyOf(predicateEvaluators), filterOperator, List.copyOf(expressions));
+            OperatorUtils.getProjectionOperator(queryContext, combinedFilteredAggregationContext.getFilterContext(),
+                indexSegment, aggregationFunctions, combinedFilteredAggregationContext.getPredicateEvaluatorMap(),
+                filterOperator, List.copyOf(expressions));
         projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
       }
     }
@@ -261,7 +266,7 @@ public class AggregationFunctionUtils {
       AggregationFunction[] aggregationFunctions = nonFilteredFunctions.toArray(new AggregationFunction[0]);
       Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
       BaseProjectOperator<?> projectOperator =
-          OperatorUtils.getProjectionOperator(queryContext, indexSegment, aggregationFunctions,
+          OperatorUtils.getProjectionOperator(queryContext, queryContext.getFilter(), indexSegment, aggregationFunctions,
               mainFilterPlan.getPredicateEvaluators(), mainFilterOperator, new ArrayList<>(expressions));
       projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
     }
