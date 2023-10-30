@@ -46,44 +46,6 @@ public class OperatorUtils {
     // Prevent instantiation, make checkstyle happy
   }
 
-  public static BaseProjectOperator<?> getProjectionOperatorBad(
-      QueryContext queryContext,
-      IndexSegment indexSegment,
-      AggregationFunction[] aggregationFunctions,
-      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators,
-      BaseFilterOperator filterOperator,
-      @Nullable List<ExpressionContext> groupByExpressionsList) {
-
-    ExpressionContext[] groupByExpressions = null;
-    if (groupByExpressionsList != null) {
-      groupByExpressions = groupByExpressionsList.toArray(new ExpressionContext[0]);
-    }
-
-    List<StarTreeV2> starTrees = indexSegment.getStarTrees();
-    if (starTrees != null && !queryContext.isSkipStarTree()) {
-      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
-      if (aggregationFunctionColumnPairs != null) {
-        Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, queryContext.getFilter(), predicateEvaluators);
-        if (predicateEvaluatorsMap != null) {
-          for (StarTreeV2 starTreeV2 : starTrees) {
-            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,
-                groupByExpressions, predicateEvaluatorsMap.keySet())) {
-              return new StarTreeProjectPlanNode(queryContext, starTreeV2, aggregationFunctionColumnPairs,
-                  groupByExpressions, predicateEvaluatorsMap).run();
-            }
-          }
-        }
-      }
-    }
-
-    Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressionsList);
-    return new ProjectPlanNode(indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-        filterOperator).run();
-  }
-
   public static BaseProjectOperator<?> getProjectionOperator(
       QueryContext queryContext,
       IndexSegment indexSegment,
