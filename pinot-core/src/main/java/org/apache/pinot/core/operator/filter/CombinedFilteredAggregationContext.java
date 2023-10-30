@@ -34,7 +34,8 @@ public class CombinedFilteredAggregationContext {
   private final List<AggregationFunction> _aggregationFunctions;
 
   public CombinedFilteredAggregationContext(BaseFilterOperator baseFilterOperator,
-      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, FilterContext filterContext, List<AggregationFunction> aggregationFunctions) {
+      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, FilterContext filterContext,
+      List<AggregationFunction> aggregationFunctions) {
     _baseFilterOperator = baseFilterOperator;
     _predicateEvaluators = predicateEvaluators;
     _filterContext = filterContext;

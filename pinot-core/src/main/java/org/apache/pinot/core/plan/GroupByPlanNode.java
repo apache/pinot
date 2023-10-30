@@ -71,8 +71,8 @@ public class GroupByPlanNode implements PlanNode {
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
     BaseProjectOperator<?> projectOperator =
-        OperatorUtils.getProjectionOperator(_queryContext, _queryContext.getFilter(), _indexSegment, aggregationFunctions,
-            filterPlanNode.getPredicateEvaluators(), filterOperator, groupByExpressionsList);
+        OperatorUtils.maybeGetStartreeProjectionOperator(_queryContext, _queryContext.getFilter(), _indexSegment,
+            aggregationFunctions, filterPlanNode.getPredicateEvaluators(), filterOperator, groupByExpressionsList);
     return new GroupByOperator(_queryContext, groupByExpressions, projectOperator, numTotalDocs,
         projectOperator.getClass().isInstance(StarTreeProjectPlanNode.class));
   }

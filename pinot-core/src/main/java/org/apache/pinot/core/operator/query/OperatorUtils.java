@@ -48,7 +48,7 @@ public class OperatorUtils {
     // Prevent instantiation, make checkstyle happy
   }
 
-  public static BaseProjectOperator<?> getProjectionOperator(
+  public static BaseProjectOperator<?> maybeGetStartreeProjectionOperator(
       QueryContext queryContext,
       FilterContext filterContext,
       IndexSegment indexSegment,

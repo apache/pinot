@@ -223,7 +223,8 @@ public class AggregationFunctionUtils {
           FilterPlanNode subFilterPlan = new FilterPlanNode(indexSegment, queryContext, filter);
           // TODO(egalpin): Possibly just use a single Set of all predicate evaluators across all filterContexts as
           //  it will have a smaller overall memory footprint
-          List<Pair<Predicate, PredicateEvaluator>> combinedPredicateEvaluators = new ArrayList<>(mainFilterPredicateEvaluators);
+          List<Pair<Predicate, PredicateEvaluator>> combinedPredicateEvaluators =
+              new ArrayList<>(mainFilterPredicateEvaluators);
           combinedPredicateEvaluators.addAll(subFilterPlan.getPredicateEvaluators());
 
           BaseFilterOperator combinedFilterOperator;
@@ -255,7 +256,7 @@ public class AggregationFunctionUtils {
             combinedFilteredAggregationContext.getAggregationFunctions().toArray(new AggregationFunction[0]);
         Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
         BaseProjectOperator<?> projectOperator =
-            OperatorUtils.getProjectionOperator(queryContext, combinedFilteredAggregationContext.getFilterContext(),
+            OperatorUtils.maybeGetStartreeProjectionOperator(queryContext, combinedFilteredAggregationContext.getFilterContext(),
                 indexSegment, aggregationFunctions, combinedFilteredAggregationContext.getPredicateEvaluatorMap(),
                 filterOperator, List.copyOf(expressions));
         projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
@@ -266,8 +267,9 @@ public class AggregationFunctionUtils {
       AggregationFunction[] aggregationFunctions = nonFilteredFunctions.toArray(new AggregationFunction[0]);
       Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
       BaseProjectOperator<?> projectOperator =
-          OperatorUtils.getProjectionOperator(queryContext, queryContext.getFilter(), indexSegment, aggregationFunctions,
-              mainFilterPlan.getPredicateEvaluators(), mainFilterOperator, new ArrayList<>(expressions));
+          OperatorUtils.maybeGetStartreeProjectionOperator(queryContext, queryContext.getFilter(), indexSegment,
+              aggregationFunctions, mainFilterPlan.getPredicateEvaluators(), mainFilterOperator,
+              new ArrayList<>(expressions));
       projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
     }
 

@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.query.request.context.QueryContext;
