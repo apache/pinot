@@ -730,6 +730,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all dimension table names.
+   *
+   * @return List of dimension table names
+   */
+  public List<String> getAllDimensionTables() {
+    return _tableCache.getAllDimensionTables();
+  }
+
+  /**
    * Get all realtime table names.
    *
    * @return List of realtime table names
