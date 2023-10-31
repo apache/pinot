@@ -67,6 +67,98 @@
       }
     ]
   },
+  "nullable_columns_when_nullHandling_disabled": {
+    "tables": {
+      "tbl1" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "nIntCol1", "type": "INT", "nullable": true},
+          {"name": "nnIntCol1", "type": "INT", "nullable": false},
+          {"name": "strCol2", "type": "STRING"},
+          {"name": "nStrCol2", "type": "STRING", "nullable": true},
+          {"name": "nnStrCol2", "type": "STRING", "nullable": false}
+        ],
+        "inputs": [
+          ["foo", 1, 1, 1, "foo", "foo", "foo"],
+          ["bar", 2, 2, 2, "alice", "alice", "alice"],
+          ["alice", 2, 2, 2, null, null, null],
+          [null, 4, 4, 4, null, null, null],
+          ["bob", null, null, null, null, null, null]
+        ]
+      }
+    },
+    "extraProps": {
+      "EnableNullHandling": "false"
+    },
+    "queries": [
+      {
+        "description": "intCol1 IS NULL is always false",
+        "comment": "Even when tableConfig nullHandlingEnabled is false, V2 respects column nullability",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NULL",
+        "h2Sql": "SELECT 0"
+      },
+      {
+        "description": "intCol1 IS NOT NULL is always true",
+        "comment": "Even when tableConfig nullHandlingEnabled is false, V2 respects column nullability",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NOT NULL",
+        "h2Sql": "SELECT count(*) FROM {tbl1}"
+      },
+      {
+        "description": "nIntCol1 IS NULL is always false",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nIntCol1 IS NULL",
+        "h2Sql": "SELECT 0"
+      },
+      {
+        "description": "nIntCol1 IS NOT NULL is always true",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nIntCol1 IS NOT NULL",
+        "h2Sql": "SELECT count(*) FROM {tbl1}"
+      },
+      {
+        "description": "nnIntCol1 IS NULL is always false",
+        "comment": "Even when tableConfig nullHandlingEnabled is false, V2 respects column nullability",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nnIntCol1 IS NULL",
+        "h2Sql": "SELECT 0"
+      },
+      {
+        "description": "nnIntCol1 IS NOT NULL is always true",
+        "comment": "Even when tableConfig nullHandlingEnabled is false, V2 respects column nullability",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nnIntCol1 IS NOT NULL",
+        "h2Sql": "SELECT count(*) FROM {tbl1}"
+      },
+
+      {
+        "description": "When projected with enableNullHandling=true, intCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=true; SELECT intCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=false, intCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=false; SELECT intCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=true, nIntCol1 is considered null",
+        "sql": "SET enableNullHandling=true; SELECT nIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=false, nIntCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=false; SELECT nIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=true, nnIntCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=true; SELECT nnIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=false, nnIntCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=false; SELECT nnIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      }
+    ]
+  },
   "nullable_columns": {
     "tables": {
       "tbl1" : {
@@ -111,6 +203,9 @@
           ["bar", 2, "foo"]
         ]
       }
+    },
+    "extraProps": {
+      "EnableNullHandling": "true"
     },
     "queries": [
       {
@@ -157,13 +252,11 @@
 
       {
         "description": "When projected with enableNullHandling=true, intCol1 is considered -2147483648",
-        "comment": "This test fails when it shouldn't. We need to fix this before merging",
         "sql": "SET enableNullHandling=true; SELECT intCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
-        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+        "h2Sql": "SELECT null FROM {tbl1} WHERE strCol1 = 'bob'"
       },
       {
         "description": "When projected with enableNullHandling=false, intCol1 is considered -2147483648",
-        "comment": "this tests is not correctly working. Returned `intCol1` is actually null",
         "sql": "SET enableNullHandling=false; SELECT intCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
         "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
       },
@@ -214,10 +307,7 @@
         "description": "aggregate with null checkers on key from group set are honored on not nullable columns",
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE nStrCol2 IS NULL GROUP BY nStrCol2"
       }
-    ],
-    "extraProps": {
-      "EnableNullHandling": "true"
-    }
+    ]
   },
   "column_level_null_handling": {
     "tables": {
@@ -259,6 +349,9 @@
           ["bar", 2, "foo"]
         ]
       }
+    },
+    "extraProps": {
+      "EnableNullHandling": "true"
     },
     "queries": [
       {
