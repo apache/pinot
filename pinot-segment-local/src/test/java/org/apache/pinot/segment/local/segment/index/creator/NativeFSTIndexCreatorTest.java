@@ -29,7 +29,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION;
 
 
 public class NativeFSTIndexCreatorTest {
@@ -59,7 +59,7 @@ public class NativeFSTIndexCreatorTest {
       creator.seal();
     }
 
-    File fstFile = new File(INDEX_DIR, "testFSTColumn" + FST_INDEX_FILE_EXTENSION);
+    File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V9_FST_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(fstFile);
         NativeFSTIndexReader reader = new NativeFSTIndexReader(dataBuffer)) {
 

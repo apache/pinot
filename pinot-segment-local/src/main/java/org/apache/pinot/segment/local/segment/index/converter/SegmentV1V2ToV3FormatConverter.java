@@ -110,7 +110,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       if (file.isFile() && file.exists()) {
         FileUtils.deleteQuietly(file);
       }
-      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION)) {
+      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION)) {
         FileUtils.deleteDirectory(file);
       }
     }
@@ -222,7 +222,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private void copyLuceneTextIndexIfExists(File segmentDirectory, File v3Dir)
       throws IOException {
     // TODO: see if this can be done by reusing some existing methods
-    String suffix = V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    String suffix = V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
     File[] textIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {
@@ -243,7 +243,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     // to moving the lucene text index files, we need to move the
     // docID mapping/cache file created by us in v1/v2 during an earlier
     // load of the segment.
-    String docIDFileSuffix = V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
+    String docIDFileSuffix = V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
     File[] textIndexDocIdMappingFiles = segmentDirectory.listFiles(new FilenameFilter() {
       @Override
       public boolean accept(File dir, String name) {

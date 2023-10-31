@@ -32,7 +32,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION;
 
 
 public class LuceneFSTIndexCreatorTest {
@@ -62,7 +62,7 @@ public class LuceneFSTIndexCreatorTest {
     LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(
         INDEX_DIR, "testFSTColumn", uniqueValues);
     creator.seal();
-    File fstFile = new File(INDEX_DIR, "testFSTColumn" + FST_INDEX_FILE_EXTENSION);
+    File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V9_FST_INDEX_FILE_EXTENSION);
     PinotDataBuffer pinotDataBuffer =
         PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "fstIndexFile");
     LuceneFSTIndexReader reader = new LuceneFSTIndexReader(pinotDataBuffer);
