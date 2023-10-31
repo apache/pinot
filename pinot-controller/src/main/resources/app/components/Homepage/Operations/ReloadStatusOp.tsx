@@ -18,7 +18,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { CircularProgress, createStyles, DialogContent, DialogContentText, Link, makeStyles, Paper, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Theme, withStyles} from '@material-ui/core';
+import { CircularProgress, createStyles, DialogContent, DialogContentText, Link, makeStyles, Paper, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Theme, Tooltip, withStyles} from '@material-ui/core';
 import Dialog from '../../CustomDialog';
 import CloseIcon from '@material-ui/icons/Close';
 import CheckIcon from '@material-ui/icons/Check';
@@ -29,6 +29,7 @@ import CustomDialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
 import CustomCodemirror from '../../CustomCodemirror';
 import SearchBar from '../../SearchBar';
+import RemoveCircleIcon from '@material-ui/icons/RemoveCircle';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -49,6 +50,9 @@ const useStyles = makeStyles((theme: Theme) =>
     },
     jobDetailsLoading: {
       alignSelf: "center"
+    },
+    yellowColor: {
+      color: theme.palette.warning.main
     }
   })
 );
@@ -77,6 +81,7 @@ export default function ReloadStatusOp({
   const classes = useStyles();
   const reloadStatusKey = "columnToIndexesCount"
   const indexes = reloadStatusData && reloadStatusData[reloadStatusKey];
+  if(indexes) indexes["Quarter"]["h3_index"] = 10;
   const indexesKeys = indexes && Object.keys(indexes);
   const indexObjKeys = indexes && indexes[indexesKeys[0]] && Object.keys(indexes[indexesKeys[0]]) || [];
   const [activeTab, setActiveTab] = useState(0);
@@ -232,8 +237,11 @@ export default function ReloadStatusOp({
                             let iconElement = null;
                             if(indexObj[o] === 0){
                               iconElement = <CloseIcon className={classes.redColor}/>;
-                            } else {
+                            } else if(indexObj[o] === reloadStatusData?.["totalOnlineSegments"]) {
                               iconElement = <CheckIcon className={classes.greenColor}/>;
+                            } else {
+                              const tooltipText = `Partial Index, present on ${indexObj[o]} / ${reloadStatusData?.["totalOnlineSegments"]} segments`;
+                              iconElement = <Tooltip placement='top' title={tooltipText}><RemoveCircleIcon className={classes.yellowColor} /></Tooltip>
                             }
                             return (
                               <StyledTableCell align="center" key={i}>
