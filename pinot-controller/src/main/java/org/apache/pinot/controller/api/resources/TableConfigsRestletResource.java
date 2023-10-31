@@ -48,6 +48,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -471,14 +473,14 @@ public class TableConfigsRestletResource {
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig, allowTableNameWithDatabase);
-        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+        TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip, isGroovyDisabled());
       }
       if (realtimeTableConfig != null) {
         String realtimeRawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
         Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig, allowTableNameWithDatabase);
-        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+        TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip, isGroovyDisabled());
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);
@@ -488,6 +490,20 @@ public class TableConfigsRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
+    }
+  }
+
+  private boolean isGroovyDisabled() {
+    HelixConfigScope helixConfigScope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
+            _pinotHelixResourceManager.getHelixClusterName()).build();
+    Map<String, String> configMap = _pinotHelixResourceManager.getHelixAdmin()
+        .getConfig(helixConfigScope, Collections.singletonList(ControllerConf.DISABLE_GROOVY));
+
+    if (configMap != null && configMap.containsKey(ControllerConf.DISABLE_GROOVY)) {
+      return Boolean.parseBoolean(configMap.get(ControllerConf.DISABLE_GROOVY));
+    } else {
+      return _controllerConf.isDisableIngestionGroovy();
     }
   }
 }

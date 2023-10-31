@@ -67,7 +67,9 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.http.conn.HttpClientConnectionManager;
@@ -213,7 +215,7 @@ public class PinotTableRestletResource {
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
       // TableConfigUtils.validate(...) is used across table create/update.
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip, isGroovyDisabled());
       // TableConfigUtils.validateTableName(...) checks table name rules.
       // So it won't affect already created tables.
       boolean allowTableNameWithDatabase =
@@ -464,7 +466,7 @@ public class PinotTableRestletResource {
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigString, TableConfig.class);
       tableConfig = tableConfigJsonPojoWithUnparsableProps.getLeft();
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip, isGroovyDisabled());
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
@@ -580,7 +582,7 @@ public class PinotTableRestletResource {
       if (schema == null) {
         throw new SchemaNotFoundException("Got empty schema");
       }
-      TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
+      TableConfigUtils.validate(tableConfig, schema, typesToSkip, isGroovyDisabled());
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
@@ -1162,5 +1164,19 @@ public class PinotTableRestletResource {
     }
 
     return timeBoundaryMs;
+  }
+
+  private boolean isGroovyDisabled() {
+    HelixConfigScope helixConfigScope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
+            _pinotHelixResourceManager.getHelixClusterName()).build();
+    Map<String, String> configMap = _pinotHelixResourceManager.getHelixAdmin()
+        .getConfig(helixConfigScope, Collections.singletonList(ControllerConf.DISABLE_GROOVY));
+
+    if (configMap != null && configMap.containsKey(ControllerConf.DISABLE_GROOVY)) {
+      return Boolean.parseBoolean(configMap.get(ControllerConf.DISABLE_GROOVY));
+    } else {
+      return _controllerConf.isDisableIngestionGroovy();
+    }
   }
 }
