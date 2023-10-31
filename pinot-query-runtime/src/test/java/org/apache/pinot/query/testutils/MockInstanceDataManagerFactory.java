@@ -175,7 +175,7 @@ public class MockInstanceDataManagerFactory {
     // TODO: plugin table config constructor
     TableConfig tableConfig =
         new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts")
-            .setNullHandlingEnabled(true)
+            .setNullHandlingEnabled(_nullHandlingMap.getOrDefault(tableNameWithType, false))
             .build();
     Schema schema = _schemaMap.get(rawTableName);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
