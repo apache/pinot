@@ -26,11 +26,11 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
+import org.apache.pinot.core.plan.ProjectionPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -48,7 +48,7 @@ public class OperatorUtils {
     // Prevent instantiation, make checkstyle happy
   }
 
-  public static BaseProjectOperator<?> maybeGetStartreeProjectionOperator(
+  public static ProjectionPlanNode maybeGetStartreeProjectionOperator(
       QueryContext queryContext,
       FilterContext filterContext,
       IndexSegment indexSegment,
@@ -74,7 +74,7 @@ public class OperatorUtils {
             if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,
                 groupByExpressions, predicateEvaluatorsMap.keySet())) {
               return new StarTreeProjectPlanNode(queryContext, starTreeV2, aggregationFunctionColumnPairs,
-                  groupByExpressions, predicateEvaluatorsMap).run();
+                  groupByExpressions, predicateEvaluatorsMap);
             }
           }
         }
@@ -84,6 +84,6 @@ public class OperatorUtils {
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressionsList);
     return new ProjectPlanNode(indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-        filterOperator).run();
+        filterOperator);
   }
 }

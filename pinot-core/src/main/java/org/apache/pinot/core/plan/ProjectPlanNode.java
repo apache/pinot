@@ -40,7 +40,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 /**
  * The <code>ProjectPlanNode</code> provides the execution plan for fetching column values on a single segment.
  */
-public class ProjectPlanNode implements PlanNode {
+public class ProjectPlanNode implements ProjectionPlanNode {
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
   private final Collection<ExpressionContext> _expressions;

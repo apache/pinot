@@ -55,6 +55,7 @@ public class GroupByPlanNode implements PlanNode {
   }
 
   private FilteredGroupByOperator buildFilteredGroupByPlan() {
+    // TODO(egalpin): maybe change this to use ProjectionPlanNode instead of BaseProjectOperator
     List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators =
         AggregationFunctionUtils.buildFilteredAggregateProjectOperators(_indexSegment, _queryContext);
     return new FilteredGroupByOperator(_queryContext, projectOperators,
@@ -70,10 +71,10 @@ public class GroupByPlanNode implements PlanNode {
 
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
-    BaseProjectOperator<?> projectOperator =
+    ProjectionPlanNode projectPlanNode =
         OperatorUtils.maybeGetStartreeProjectionOperator(_queryContext, _queryContext.getFilter(), _indexSegment,
             aggregationFunctions, filterPlanNode.getPredicateEvaluators(), filterOperator, groupByExpressionsList);
-    return new GroupByOperator(_queryContext, groupByExpressions, projectOperator, numTotalDocs,
-        projectOperator.getClass().isInstance(StarTreeProjectPlanNode.class));
+    return new GroupByOperator(_queryContext, groupByExpressions, projectPlanNode.run(), numTotalDocs,
+        projectPlanNode instanceof StarTreeProjectPlanNode);
   }
 }

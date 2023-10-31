@@ -77,6 +77,7 @@ public class AggregationPlanNode implements PlanNode {
    */
   private FilteredAggregationOperator buildFilteredAggOperator() {
     List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators =
+        // TODO(egalpin): maybe change this to use ProjectionPlanNode instead of BaseProjectOperator
         AggregationFunctionUtils.buildFilteredAggregateProjectOperators(_indexSegment, _queryContext);
     return new FilteredAggregationOperator(_queryContext, projectOperators,
         _indexSegment.getSegmentMetadata().getTotalDocs());
@@ -114,11 +115,11 @@ public class AggregationPlanNode implements PlanNode {
       }
     }
 
-    BaseProjectOperator<?> projectOperator =
+    ProjectionPlanNode projectPlanNode =
         OperatorUtils.maybeGetStartreeProjectionOperator(_queryContext, _queryContext.getFilter(), _indexSegment,
             aggregationFunctions, filterPlanNode.getPredicateEvaluators(), filterOperator, null);
-    return new AggregationOperator(_queryContext, projectOperator, numTotalDocs,
-        projectOperator.getClass().isInstance(StarTreeProjectPlanNode.class));
+    return new AggregationOperator(_queryContext, projectPlanNode.run(), numTotalDocs,
+        projectPlanNode instanceof StarTreeProjectPlanNode);
   }
 
   /**

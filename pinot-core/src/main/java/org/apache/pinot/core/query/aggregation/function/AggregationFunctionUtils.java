@@ -255,10 +255,10 @@ public class AggregationFunctionUtils {
         AggregationFunction[] aggregationFunctions =
             combinedFilteredAggregationContext.getAggregationFunctions().toArray(new AggregationFunction[0]);
         Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
-        BaseProjectOperator<?> projectOperator =
-            OperatorUtils.maybeGetStartreeProjectionOperator(queryContext, combinedFilteredAggregationContext.getFilterContext(),
-                indexSegment, aggregationFunctions, combinedFilteredAggregationContext.getPredicateEvaluatorMap(),
-                filterOperator, List.copyOf(expressions));
+        // TODO(egalpin): Likely need a way to pass the plan node, or that the plan node was of type StarTreeProjectPlanNode vs ProjectPlanNode
+        BaseProjectOperator<?> projectOperator = OperatorUtils.maybeGetStartreeProjectionOperator(queryContext,
+            combinedFilteredAggregationContext.getFilterContext(), indexSegment, aggregationFunctions,
+            combinedFilteredAggregationContext.getPredicateEvaluatorMap(), filterOperator, List.copyOf(expressions)).run();
         projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
       }
     }
@@ -269,7 +269,7 @@ public class AggregationFunctionUtils {
       BaseProjectOperator<?> projectOperator =
           OperatorUtils.maybeGetStartreeProjectionOperator(queryContext, queryContext.getFilter(), indexSegment,
               aggregationFunctions, mainFilterPlan.getPredicateEvaluators(), mainFilterOperator,
-              new ArrayList<>(expressions));
+              new ArrayList<>(expressions)).run();
       projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
     }
 
