@@ -778,14 +778,40 @@ public class StringFunctions {
   }
 
   @ScalarFunction(names = {"regexpLike", "regexp_like"})
+  public static boolean regexpLike(String inputStr, String regexPatternStr, String flag) {
+    Integer patternFlag;
+    switch (flag) {
+      case "i":
+        patternFlag = Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE;
+        break;
+      default:
+        patternFlag = null;
+        break;
+    }
+
+    Pattern p;
+    if (patternFlag != null) {
+      p = Pattern.compile(regexPatternStr, patternFlag);
+    } else {
+      p = Pattern.compile(regexPatternStr);
+    }
+    return p.matcher(inputStr).find();
+  }
+
+  @ScalarFunction(names = {"regexpLike", "regexp_like"})
   public static boolean regexpLike(String inputStr, String regexPatternStr) {
-    Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
-    return pattern.matcher(inputStr).find();
+    return regexpLike(inputStr, regexPatternStr, "i");
   }
 
   @ScalarFunction
   public static boolean like(String inputStr, String likePatternStr) {
     String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
-    return regexpLike(inputStr, regexPatternStr);
+    return regexpLike(inputStr, regexPatternStr, "");
+  }
+
+  @ScalarFunction
+  public static boolean ilike(String inputStr, String likePatternStr) {
+    String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
+    return regexpLike(inputStr, regexPatternStr, "i");
   }
 }
