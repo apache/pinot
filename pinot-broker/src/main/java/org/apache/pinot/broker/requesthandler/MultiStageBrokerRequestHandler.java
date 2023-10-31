@@ -76,6 +76,7 @@ import org.slf4j.LoggerFactory;
 
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
+  private static final String DEFAULT_MULTISTAGE_V2_TABLE = "default_multistage_v2_table";
 
   private final QueryEnvironment _queryEnvironment;
   private final MailboxService _mailboxService;
@@ -213,6 +214,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           String.format("Find unavailable segments: %s for table: %s", unavailableSegments, tableName)));
     }
 
+    boolean numGroupsLimitReached = false;
+
     for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
       if (entry.getKey() == 0) {
         // Root stats are aggregated and added separately to broker response for backward compatibility
@@ -226,12 +229,21 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         // find a way to split metrics in case of multiple table
         String rawTableName = TableNameBuilder.extractRawTableName(tableNames.iterator().next());
         entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics);
+
+        // Check if any of the stages had isNumGroupsLimitReached as true
+        numGroupsLimitReached = numGroupsLimitReached || brokerResponse.isNumGroupsLimitReached();
       } else {
         entry.getValue().setStageLevelStats(null, brokerResponseStats, null);
       }
       brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
     }
 
+    // Track number of v2 queries where number of groups limit reached
+    if (numGroupsLimitReached) {
+      _brokerMetrics.addMeteredTableValue(DEFAULT_MULTISTAGE_V2_TABLE,
+              BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
+    }
+    
     // Set total query processing time
     // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
