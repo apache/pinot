@@ -33,6 +33,7 @@ import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordR
 import org.apache.pinot.core.segment.processing.mapper.SegmentMapper;
 import org.apache.pinot.core.segment.processing.reducer.Reducer;
 import org.apache.pinot.core.segment.processing.reducer.ReducerFactory;
+import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -60,6 +61,7 @@ public class SegmentProcessorFramework {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFramework.class);
 
   private final List<RecordReaderFileConfig> _recordReaderFileConfigs;
+  private final List<RecordTransformer> _customRecordTransformers;
   private final SegmentProcessorConfig _segmentProcessorConfig;
   private final File _mapperOutputDir;
   private final File _reducerOutputDir;
@@ -76,17 +78,20 @@ public class SegmentProcessorFramework {
   public SegmentProcessorFramework(List<RecordReader> recordReaders, SegmentProcessorConfig segmentProcessorConfig,
       File workingDir)
       throws IOException {
-    this(segmentProcessorConfig, workingDir, convertRecordReadersToRecordReaderFileConfig(recordReaders), null);
+    this(segmentProcessorConfig, workingDir, convertRecordReadersToRecordReaderFileConfig(recordReaders),
+        Collections.emptyList(), null);
   }
 
   public SegmentProcessorFramework(SegmentProcessorConfig segmentProcessorConfig, File workingDir,
-      List<RecordReaderFileConfig> recordReaderFileConfigs, SegmentNumRowProvider segmentNumRowProvider)
+      List<RecordReaderFileConfig> recordReaderFileConfigs, List<RecordTransformer> customRecordTransformers,
+      SegmentNumRowProvider segmentNumRowProvider)
       throws IOException {
 
     Preconditions.checkState(!recordReaderFileConfigs.isEmpty(), "No recordReaderFileConfigs provided");
     LOGGER.info("Initializing SegmentProcessorFramework with {} record readers, config: {}, working dir: {}",
         recordReaderFileConfigs.size(), segmentProcessorConfig, workingDir.getAbsolutePath());
     _recordReaderFileConfigs = recordReaderFileConfigs;
+    _customRecordTransformers = customRecordTransformers;
 
     _segmentProcessorConfig = segmentProcessorConfig;
 
@@ -139,7 +144,8 @@ public class SegmentProcessorFramework {
       throws Exception {
     // Map phase
     LOGGER.info("Beginning map phase on {} record readers", _recordReaderFileConfigs.size());
-    SegmentMapper mapper = new SegmentMapper(_recordReaderFileConfigs, _segmentProcessorConfig, _mapperOutputDir);
+    SegmentMapper mapper = new SegmentMapper(_recordReaderFileConfigs, _customRecordTransformers,
+        _segmentProcessorConfig, _mapperOutputDir);
     _partitionToFileManagerMap = mapper.map();
 
     // Check for mapper output files
