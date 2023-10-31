@@ -22,9 +22,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.PlanFragmentMetadata;
 import org.apache.pinot.query.planner.SubPlan;
@@ -164,19 +164,20 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
 
   public static class Context {
     final int _currentPlanFragmentId;
-    final AtomicInteger _nextPlanFragmentId;
+    // _nextPlanFragmentId is shared across all PlanFragments to ensure uniqueness of PlanFragment ID.
+    final MutableInt _nextPlanFragmentId;
     final Map<Integer, PlanFragment> _planFragmentIdToRootNodeMap;
     final Map<Integer, List<Integer>> _planFragmentIdToChildrenMap;
 
     public Context() {
       // PlanFragment ID starts with 1, 0 is reserved for ROOT PlanFragment.
       _currentPlanFragmentId = 1;
-      _nextPlanFragmentId = new AtomicInteger(2);
+      _nextPlanFragmentId = new MutableInt(2);
       _planFragmentIdToRootNodeMap = new HashMap<>();
       _planFragmentIdToChildrenMap = new HashMap<>();
     }
 
-    private Context(int currentPlanFragmentId, AtomicInteger nextPlanFragmentId,
+    private Context(int currentPlanFragmentId, MutableInt nextPlanFragmentId,
         Map<Integer, PlanFragment> planFragmentIdToRootNodeMap,
         Map<Integer, List<Integer>> planFragmentIdToChildrenMap) {
       _currentPlanFragmentId = currentPlanFragmentId;
