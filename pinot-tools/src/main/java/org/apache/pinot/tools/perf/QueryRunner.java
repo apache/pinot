@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,6 +35,9 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.concurrent.ThreadSafe;
+import javax.net.ssl.KeyManager;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.apache.pinot.tools.AbstractBaseCommand;
@@ -99,6 +103,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-verbose"}, required = false, description = "Enable verbose query logging (default: "
       + "false).")
   private boolean _verbose = false;
+  @CommandLine.Option(names = {"-useTLS"}, required = false, description = "Use default trust manager (default: "
+      + "false).")
+  private boolean _useTLS = false;
+
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
       + "this message.")
   private boolean _help;
@@ -155,6 +163,12 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       LOGGER.error("Argument queueDepth should be a positive number.");
       printUsage();
       return false;
+    }
+
+    if (_useTLS) {
+      SSLContext ctx = SSLContext.getInstance("TLS");
+      ctx.init(new KeyManager[0], new TrustManager[]{new DefaultTrustManager()}, new SecureRandom());
+      SSLContext.setDefault(ctx);
     }
 
     LOGGER.info("Start query runner targeting broker: {}:{}", _brokerHost, _brokerPort);
