@@ -81,7 +81,6 @@ export default function ReloadStatusOp({
   const classes = useStyles();
   const reloadStatusKey = "columnToIndexesCount"
   const indexes = reloadStatusData && reloadStatusData[reloadStatusKey];
-  if(indexes) indexes["Quarter"]["h3_index"] = 10;
   const indexesKeys = indexes && Object.keys(indexes);
   const indexObjKeys = indexes && indexes[indexesKeys[0]] && Object.keys(indexes[indexesKeys[0]]) || [];
   const [activeTab, setActiveTab] = useState(0);
@@ -240,7 +239,7 @@ export default function ReloadStatusOp({
                             } else if(indexObj[o] === reloadStatusData?.["totalOnlineSegments"]) {
                               iconElement = <CheckIcon className={classes.greenColor}/>;
                             } else {
-                              const tooltipText = `Partial Index, present on ${indexObj[o]} / ${reloadStatusData?.["totalOnlineSegments"]} segments`;
+                              const tooltipText = `Index present in ${indexObj[o]} / ${reloadStatusData?.["totalOnlineSegments"]} segments`;
                               iconElement = <Tooltip placement='top' title={tooltipText}><RemoveCircleIcon className={classes.yellowColor} /></Tooltip>
                             }
                             return (
