@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -39,15 +40,18 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   public static final String RETRY_COUNT_CONFIG_KEY = "retry.count";
   public static final String RETRY_WAIT_MS_CONFIG_KEY = "retry.wait.ms";
   public static final String RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY = "retry.delay.scale.factor";
+  public static final String CONNECTION_SOCKET_TIMEOUT_MS = "socket.timeout.ms";
   public static final int DEFAULT_RETRY_COUNT = 3;
   public static final int DEFAULT_RETRY_WAIT_MS = 100;
   public static final int DEFAULT_RETRY_DELAY_SCALE_FACTOR = 5;
+  public static final int DEFAULT_SOCKET_TIMEOUT_MS = HttpClient.DEFAULT_SOCKET_TIMEOUT_MS;
 
   protected final Logger _logger = LoggerFactory.getLogger(getClass().getSimpleName());
 
   protected int _retryCount;
   protected int _retryWaitMs;
   protected int _retryDelayScaleFactor;
+  protected int _socketTimeoutMs;
   protected AuthProvider _authProvider;
 
   @Override
@@ -55,11 +59,11 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     _retryCount = config.getProperty(RETRY_COUNT_CONFIG_KEY, DEFAULT_RETRY_COUNT);
     _retryWaitMs = config.getProperty(RETRY_WAIT_MS_CONFIG_KEY, DEFAULT_RETRY_WAIT_MS);
     _retryDelayScaleFactor = config.getProperty(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, DEFAULT_RETRY_DELAY_SCALE_FACTOR);
+    _socketTimeoutMs = config.getProperty(CONNECTION_SOCKET_TIMEOUT_MS, DEFAULT_SOCKET_TIMEOUT_MS);
     _authProvider = AuthProviderUtils.extractAuthProvider(config, CommonConstants.KEY_OF_AUTH);
     doInit(config);
-    _logger
-        .info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}", _retryCount, _retryWaitMs,
-            _retryDelayScaleFactor);
+    _logger.info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}, sockeTimeoutMs: {}",
+        _retryCount, _retryWaitMs, _retryDelayScaleFactor, _socketTimeoutMs);
   }
 
   /**

@@ -1170,6 +1170,22 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   /**
+   * Download a file with a configurable timeout
+   *
+   * @param uri URI
+   * @param dest File destination
+   * @param authProvider auth provider
+   * @param socketTimeoutMs connection socket timeout ms
+   * @return Response status code
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public int downloadFile(URI uri, File dest, AuthProvider authProvider, int socketTimeoutMs)
+      throws IOException, HttpErrorStatusException {
+    return _httpClient.downloadFile(uri, socketTimeoutMs, dest, authProvider, null);
+  }
+
+  /**
    * Download a file.
    *
    * @param uri URI
@@ -1188,6 +1204,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * Download a file.
    *
    * @param uri URI
+   * @param socketTimeoutMs socketTimeoutMs
    * @param dest File destination
    * @param authProvider auth provider
    * @param httpHeaders http headers
@@ -1195,9 +1212,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public int downloadFile(URI uri, File dest, AuthProvider authProvider, List<Header> httpHeaders)
+  public int downloadFile(URI uri, int socketTimeoutMs, File dest, AuthProvider authProvider, List<Header> httpHeaders)
       throws IOException, HttpErrorStatusException {
-    return _httpClient.downloadFile(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider, httpHeaders);
+    return _httpClient.downloadFile(uri, socketTimeoutMs, dest, authProvider, httpHeaders);
   }
 
   /**
