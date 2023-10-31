@@ -47,6 +47,10 @@ public class TextIndexUtils {
     FileUtils.deleteQuietly(luceneIndexFile);
     File luceneMappingFile = new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneMappingFile);
+    File luceneV9IndexFile = new File(segDir, column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(luceneV9IndexFile);
+    File luceneV9MappingFile = new File(segDir, column + Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+    FileUtils.deleteQuietly(luceneV9MappingFile);
 
     // Remove the native index file
     File nativeIndexFile = new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION);
@@ -54,8 +58,9 @@ public class TextIndexUtils {
   }
 
   static boolean hasTextIndex(File segDir, String column) {
-    return new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists() || new File(segDir,
-        column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists();
+    return new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists();
   }
 
   public static boolean isFstTypeNative(@Nullable Map<String, String> textIndexProperties) {
@@ -108,7 +113,7 @@ public class TextIndexUtils {
   }
 
   public static StandardAnalyzer getStandardAnalyzerWithCustomizedStopWords(@Nullable List<String> stopWordsInclude,
-     @Nullable List<String> stopWordsExclude) {
+      @Nullable List<String> stopWordsExclude) {
     HashSet<String> stopWordSet = LuceneTextIndexCreator.getDefaultEnglishStopWordsSet();
     if (stopWordsInclude != null) {
       stopWordSet.addAll(stopWordsInclude);

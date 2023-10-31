@@ -79,8 +79,13 @@ public class SegmentDirectoryPaths {
    */
   @Nullable
   public static File findTextIndexIndexFile(File indexDir, String column) {
-    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
-    return findFormatFile(indexDir, luceneIndexDirectory);
+    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
+    File indexFormatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    if (indexFormatFile == null) {
+      luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+      indexFormatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    }
+    return indexFormatFile;
   }
 
   /**
@@ -96,15 +101,25 @@ public class SegmentDirectoryPaths {
   }
 
   public static File findFSTIndexIndexFile(File indexDir, String column) {
-    String luceneIndexDirectory = column + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
-    return findFormatFile(indexDir, luceneIndexDirectory);
+    String luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION;
+    File formatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    if (formatFile == null) {
+      luceneIndexDirectory = column + V1Constants.Indexes.LUCENE_FST_INDEX_FILE_EXTENSION;
+      formatFile = findFormatFile(indexDir, luceneIndexDirectory);
+    }
+    return formatFile;
   }
 
   @Nullable
   @VisibleForTesting
   public static File findTextIndexDocIdMappingFile(File indexDir, String column) {
-    String file = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
-    return findFormatFile(indexDir, file);
+    String file = column + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
+    File formatFile = findFormatFile(indexDir, file);
+    if (formatFile == null) {
+      file = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
+      formatFile = findFormatFile(indexDir, file);
+    }
+    return formatFile;
   }
 
   /**

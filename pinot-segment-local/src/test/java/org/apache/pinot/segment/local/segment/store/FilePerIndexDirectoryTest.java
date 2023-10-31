@@ -230,12 +230,13 @@ public class FilePerIndexDirectoryTest {
 
       // Both files for TextIndex should be removed.
       fpi.removeIndex("foo", StandardIndexes.text());
-      assertFalse(new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists());
+      assertFalse(new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION).exists());
       assertFalse(
-          new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
+          new File(TEMP_DIR, "foo" + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
     }
-    assertTrue(new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists());
-    assertTrue(new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
+    assertTrue(new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION).exists());
+    assertTrue(
+        new File(TEMP_DIR, "bar" + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION).exists());
 
     // Read indices back and check the content.
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {

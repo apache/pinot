@@ -84,9 +84,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
-      _standardAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
-          config.getStopWordsInclude(), config.getStopWordsExclude()
-      );
+      _standardAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(config.getStopWordsInclude(),
+          config.getStopWordsExclude());
+      LOGGER.info("Successfully read lucene index for {} from {}", _column, indexDir);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
           e.getMessage());
@@ -99,15 +99,15 @@ public class LuceneTextIndexReader implements TextIndexReader {
    * we load the text index (per column if it exists) and store
    * the reference in {@link PhysicalColumnIndexContainer}
    * similar to how it is done for other types of indexes.
-   * @param column column name
+   *
+   * @param column   column name
    * @param indexDir segment index directory
-   * @param numDocs number of documents in the segment
+   * @param numDocs  number of documents in the segment
    */
   public LuceneTextIndexReader(String column, File indexDir, int numDocs,
       @Nullable Map<String, String> textIndexProperties) {
-    this(column, indexDir, numDocs, new TextIndexConfigBuilder(FSTType.LUCENE)
-        .withProperties(textIndexProperties)
-        .build());
+    this(column, indexDir, numDocs,
+        new TextIndexConfigBuilder(FSTType.LUCENE).withProperties(textIndexProperties).build());
   }
 
   /**
@@ -120,6 +120,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
    * CASE 2: However, if IndexLoadingConfig doesn't specify the segment version to load or if the specified
    * version is same as the on-disk version of the segment, then ImmutableSegmentLoader will load
    * whatever the version of segment is on disk.
+   *
    * @param segmentIndexDir top-level segment index directory
    * @return text index file
    */
@@ -163,6 +164,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
    * When we destroy the loaded ImmutableSegment, all the indexes
    * (for each column) are destroyed and as part of that
    * we release the text index
+   *
    * @throws IOException
    */
   @Override
@@ -188,7 +190,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
         throws Exception {
       int length = Integer.BYTES * numDocs;
       File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
-          column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+          column + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
       // The mapping is local to a segment. It is created on the server during segment load.
       // Unless we are running Pinot on Solaris/SPARC, the underlying architecture is
       // LITTLE_ENDIAN (Linux/x86). So use that as byte order.
