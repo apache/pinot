@@ -151,6 +151,16 @@ public enum AggregationFunctionType {
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), ordinal -> ordinal > 0),
       ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
 
+  DISTINCTCOUNTULL("distinctCountULL", ImmutableList.of("DISTINCT_COUNT_ULL"), SqlKind.OTHER_FUNCTION,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC), ordinal -> ordinal > 0),
+      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
+
+  DISTINCTCOUNTRAWULL("distinctCountRawULL", ImmutableList.of("DISTINCT_COUNT_RAW_ULL"), SqlKind.OTHER_FUNCTION,
+      SqlFunctionCategory.USER_DEFINED_FUNCTION,
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC), ordinal -> ordinal > 0),
+      ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
+
   // DEPRECATED in v2
   @Deprecated IDSET("idSet"),
 

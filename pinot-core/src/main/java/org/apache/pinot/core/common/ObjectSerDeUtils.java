@@ -21,6 +21,7 @@ package org.apache.pinot.core.common;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.clearspring.analytics.stream.cardinality.RegisterSet;
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
@@ -152,7 +153,8 @@ public class ObjectSerDeUtils {
     IntArrayList(42),
     LongArrayList(43),
     FloatArrayList(44),
-    StringArrayList(45);
+    StringArrayList(45),
+    UltraLogLog(46);
 
     private final int _value;
 
@@ -269,6 +271,8 @@ public class ObjectSerDeUtils {
         return ObjectType.HyperLogLogPlus;
       } else if (value instanceof CpcSketch) {
         return ObjectType.CompressedProbabilisticCounting;
+      } else if (value instanceof UltraLogLog) {
+        return ObjectType.UltraLogLog;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -1552,6 +1556,30 @@ public class ObjectSerDeUtils {
         }
       };
 
+  public static final ObjectSerDe<UltraLogLog> ULTRA_LOG_LOG_OBJECT_SER_DE = new ObjectSerDe<UltraLogLog>() {
+
+    @Override
+    public byte[] serialize(UltraLogLog value) {
+      ByteBuffer buff = ByteBuffer.wrap(new byte[(1 << value.getP()) + 1]);
+      buff.put((byte) value.getP());
+      buff.put(value.getState());
+      return buff.array();
+    }
+
+    @Override
+    public UltraLogLog deserialize(byte[] bytes) {
+      return deserialize(ByteBuffer.wrap(bytes));
+    }
+
+    @Override
+    public UltraLogLog deserialize(ByteBuffer byteBuffer) {
+      byte p = byteBuffer.get();
+      byte[] state = new byte[1 << p];
+      byteBuffer.get(state);
+      return UltraLogLog.wrap(state);
+    }
+  };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -1601,6 +1629,7 @@ public class ObjectSerDeUtils {
       LONG_ARRAY_LIST_SER_DE,
       FLOAT_ARRAY_LIST_SER_DE,
       STRING_ARRAY_LIST_SER_DE,
+      ULTRA_LOG_LOG_OBJECT_SER_DE,
   };
   //@formatter:on
 

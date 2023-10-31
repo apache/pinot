@@ -85,6 +85,8 @@ public class Actions {
     public static final String UPDATE_USER = "UpdateUser";
     public static final String UPDATE_ZNODE = "UpdateZnode";
     public static final String UPLOAD_SEGMENT = "UploadSegment";
+    public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";
+    public static final String UPDATE_INSTANCE_PARTITIONS = "UpdateInstancePartitions";
   }
 
   // Action names for table

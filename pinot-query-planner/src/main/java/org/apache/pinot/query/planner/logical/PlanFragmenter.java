@@ -128,6 +128,8 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     }
     int currentPlanFragmentId = context._previousPlanFragmentId;
     int nextPlanFragmentId = ++context._currentPlanFragmentId;
+    // Set previous PlanFragment ID in the context to be the next PlanFragment ID to be used by the child node.
+    context._previousPlanFragmentId = nextPlanFragmentId;
     PlanNode nextPlanFragmentRoot = node.getInputs().get(0).visit(this, context);
 
     PinotRelExchangeType exchangeType = node.getExchangeType();

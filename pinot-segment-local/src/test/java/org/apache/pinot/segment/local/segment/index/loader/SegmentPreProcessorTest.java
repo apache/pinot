@@ -1846,7 +1846,7 @@ public class SegmentPreProcessorTest {
 
     // Update table config to convert dict to noDict for longCol and add the Startree index config
     StarTreeIndexConfig starTreeIndexConfig =
-        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), 1000);
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000);
     tableConfig.getIndexingConfig().setStarTreeIndexConfigs(List.of(starTreeIndexConfig));
     tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
     tableConfig.getIndexingConfig().setNoDictionaryColumns(List.of("longCol"));

@@ -73,8 +73,8 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   public void testDefaultServerConf()
       throws Exception {
     String expectedHost = NetUtils.getHostAddress();
+    int customPort = NetUtils.findOpenPort(CUSTOM_PORT);
     String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + DEFAULT_SERVER_NETTY_PORT;
-
     verifyInstanceConfig(new PinotConfiguration(), expectedInstanceId, expectedHost, DEFAULT_SERVER_NETTY_PORT);
   }
 
@@ -95,9 +95,10 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   public void testCustomInstanceId()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
-    properties.put(CONFIG_OF_INSTANCE_ID, CUSTOM_INSTANCE_ID);
+    String customInstanceId = CUSTOM_INSTANCE_ID + "_" + System.currentTimeMillis();
+    properties.put(CONFIG_OF_INSTANCE_ID, customInstanceId);
 
-    verifyInstanceConfig(new PinotConfiguration(properties), CUSTOM_INSTANCE_ID, NetUtils.getHostAddress(),
+    verifyInstanceConfig(new PinotConfiguration(properties), customInstanceId, NetUtils.getHostAddress(),
         DEFAULT_SERVER_NETTY_PORT);
   }
 
@@ -117,21 +118,25 @@ public class ServerStarterIntegrationTest extends ControllerTest {
   public void testCustomPort()
       throws Exception {
     String expectedHost = NetUtils.getHostAddress();
-    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + CUSTOM_PORT;
+    int customPort = NetUtils.findOpenPort(CUSTOM_PORT);
+    String expectedInstanceId = PREFIX_OF_SERVER_INSTANCE + expectedHost + "_" + customPort;
 
     Map<String, Object> properties = new HashMap<>();
-    properties.put(KEY_OF_SERVER_NETTY_PORT, CUSTOM_PORT);
+    properties.put(KEY_OF_SERVER_NETTY_PORT, customPort);
 
-    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost, CUSTOM_PORT);
+    verifyInstanceConfig(new PinotConfiguration(properties), expectedInstanceId, expectedHost, customPort);
   }
 
   @Test
   public void testAllCustomServerConf()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
-    properties.put(CONFIG_OF_INSTANCE_ID, CUSTOM_INSTANCE_ID);
-    properties.put(KEY_OF_SERVER_NETTY_HOST, CUSTOM_HOST);
-    properties.put(KEY_OF_SERVER_NETTY_PORT, CUSTOM_PORT);
-    verifyInstanceConfig(new PinotConfiguration(properties), CUSTOM_INSTANCE_ID, CUSTOM_HOST, CUSTOM_PORT);
+    String customInstanceId = CUSTOM_INSTANCE_ID + "_" + System.currentTimeMillis();
+    String customHost = CUSTOM_HOST + "_" + System.currentTimeMillis();
+    int customPort = NetUtils.findOpenPort(CUSTOM_PORT);
+    properties.put(CONFIG_OF_INSTANCE_ID, customInstanceId);
+    properties.put(KEY_OF_SERVER_NETTY_HOST, customHost);
+    properties.put(KEY_OF_SERVER_NETTY_PORT, customPort);
+    verifyInstanceConfig(new PinotConfiguration(properties), customInstanceId, customHost, customPort);
   }
 }

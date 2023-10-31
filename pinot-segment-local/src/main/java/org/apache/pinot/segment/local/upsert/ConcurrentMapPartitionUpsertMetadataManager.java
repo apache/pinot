@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -32,6 +33,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -50,15 +52,18 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 @ThreadSafe
 public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {
 
+  // Used to initialize a reference to previous row for merging in partial upsert
+  private final LazyRow _reusePreviousRow = new LazyRow();
+
   @VisibleForTesting
   final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      boolean dropOutOfOrderRecord, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction,
-        partialUpsertHandler, enableSnapshot, metadataTTL, tableIndexDir, serverMetrics);
+        partialUpsertHandler, enableSnapshot, dropOutOfOrderRecord, metadataTTL, tableIndexDir, serverMetrics);
   }
 
   @Override
@@ -236,7 +241,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
-  protected void doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
+  protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
+    AtomicBoolean shouldDropRecord = new AtomicBoolean(false);
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     int newDocId = recordInfo.getDocId();
@@ -267,6 +273,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               return new RecordLocation(segment, newDocId, newComparisonValue);
             } else {
               handleOutOfOrderEvent(currentRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
+              // this is a out-of-order record, if upsert config _dropOutOfOrderRecord is true, then set
+              // shouldDropRecord to true. This method returns inverse of this value
+              shouldDropRecord.set(_dropOutOfOrderRecord);
               return currentRecordLocation;
             }
           } else {
@@ -279,6 +288,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
+    return !shouldDropRecord.get();
   }
 
   @Override
@@ -296,7 +306,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
             int currentDocId = recordLocation.getDocId();
             if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-              _partialUpsertHandler.merge(currentSegment, currentDocId, record);
+              _reusePreviousRow.init(currentSegment, currentDocId);
+              _partialUpsertHandler.merge(_reusePreviousRow, record);
             }
           }
           return recordLocation;

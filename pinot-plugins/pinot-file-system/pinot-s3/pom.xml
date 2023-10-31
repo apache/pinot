@@ -144,6 +144,10 @@
       <artifactId>javax.servlet-api</artifactId>
       <version>${javax.version}</version>
     </dependency>
+    <dependency>
+      <groupId>com.fasterxml.woodstox</groupId>
+      <artifactId>woodstox-core</artifactId>
+    </dependency>
   </dependencies>
   <profiles>
     <profile>

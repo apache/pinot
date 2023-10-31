@@ -126,11 +126,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   // For star-tree triggering test
   private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_1 =
       new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
+          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_1 = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'UA'";
   private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_2 =
       new StarTreeIndexConfig(Collections.singletonList("DestState"), null,
-          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
+          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
 
   // For default columns test
@@ -3114,13 +3114,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testJDBCClient()
       throws Exception {
     String query = "SELECT count(*) FROM " + getTableName();
-    java.sql.Connection connection = getJDBCConnectionFromController(DEFAULT_CONTROLLER_PORT);
+    java.sql.Connection connection = getJDBCConnectionFromController(getControllerPort());
     Statement statement = connection.createStatement();
     ResultSet resultSet = statement.executeQuery(query);
     resultSet.first();
     Assert.assertTrue(resultSet.getLong(1) > 0);
 
-    connection = getJDBCConnectionFromBrokers(RANDOM.nextInt(), DEFAULT_BROKER_PORT);
+    connection = getJDBCConnectionFromBrokers(RANDOM.nextInt(), getRandomBrokerPort());
     statement = connection.createStatement();
     resultSet = statement.executeQuery(query);
     resultSet.first();

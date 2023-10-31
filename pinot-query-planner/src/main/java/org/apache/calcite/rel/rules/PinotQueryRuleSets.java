@@ -110,11 +110,10 @@ public class PinotQueryRuleSets {
       PruneEmptyRules.UNION_INSTANCE
   );
 
-  // Pinot specific rules that should be run BEFORE all other rules
-  public static final Collection<RelOptRule> PINOT_PRE_RULES = ImmutableList.of(
+  // Pinot specific rules to run using a single RuleCollection since we attach aggregate info after optimizer.
+  public static final Collection<RelOptRule> PINOT_AGG_PROCESS_RULES = ImmutableList.of(
       PinotAggregateLiteralAttachmentRule.INSTANCE
   );
-
 
   // Pinot specific rules that should be run AFTER all other rules
   public static final Collection<RelOptRule> PINOT_POST_RULES = ImmutableList.of(
@@ -135,6 +134,9 @@ public class PinotQueryRuleSets {
       PinotSetOpExchangeNodeInsertRule.INSTANCE,
 
       // apply dynamic broadcast rule after exchange is inserted/
-      PinotJoinToDynamicBroadcastRule.INSTANCE
+      PinotJoinToDynamicBroadcastRule.INSTANCE,
+
+      // remove exchanges when there's duplicates
+      PinotExchangeEliminationRule.INSTANCE
   );
 }

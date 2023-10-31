@@ -33,18 +33,16 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
-      -pl 'pinot-segment-local' \
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
       -P github-actions,no-integration-tests || exit 1
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
-  mvn test \
+  mvn test -T 16 \
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \
-    -pl '!pinot-segment-local' \
     -pl '!pinot-core' \
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \

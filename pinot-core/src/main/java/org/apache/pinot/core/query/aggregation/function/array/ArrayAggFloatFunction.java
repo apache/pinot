@@ -23,7 +23,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -57,15 +56,12 @@ public class ArrayAggFloatFunction extends BaseArrayAggFloatFunction<FloatArrayL
 
   @Override
 
-  protected void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, float value) {
-    ObjectGroupByResultHolder resultHolder = (ObjectGroupByResultHolder) groupByResultHolder;
-    if (resultHolder.getResult(groupKey) == null) {
-      FloatArrayList valueArray = new FloatArrayList();
-      valueArray.add(value);
+  protected void setGroupByResult(GroupByResultHolder resultHolder, int groupKey, float value) {
+    FloatArrayList valueArray = resultHolder.getResult(groupKey);
+    if (valueArray == null) {
+      valueArray = new FloatArrayList();
       resultHolder.setValueForKey(groupKey, valueArray);
-    } else {
-      FloatArrayList valueArray = resultHolder.getResult(groupKey);
-      valueArray.add(value);
     }
+    valueArray.add(value);
   }
 }

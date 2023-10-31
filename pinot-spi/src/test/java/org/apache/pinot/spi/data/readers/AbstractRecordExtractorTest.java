@@ -47,7 +47,7 @@ public abstract class AbstractRecordExtractorTest {
   protected List<Map<String, Object>> _inputRecords;
   private RecordReader _recordReader;
   private RecordReader _recordReaderNoIncludeList;
-  protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordTransformationTest");
+  protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getName());
 
   @BeforeClass
   public void setup()

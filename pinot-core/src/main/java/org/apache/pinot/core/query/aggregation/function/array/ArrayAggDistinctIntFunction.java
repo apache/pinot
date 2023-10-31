@@ -22,9 +22,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -38,19 +36,17 @@ public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntOpen
   @Override
   protected void aggregateArray(int length, AggregationResultHolder aggregationResultHolder,
       BlockValSet blockValSet) {
-    ObjectAggregationResultHolder resultHolder = (ObjectAggregationResultHolder) aggregationResultHolder;
     int[] value = blockValSet.getIntValuesSV();
-    IntOpenHashSet valueArray = new IntOpenHashSet();
+    IntOpenHashSet valueArray = new IntOpenHashSet(length);
     for (int i = 0; i < length; i++) {
       valueArray.add(value[i]);
     }
-    resultHolder.setValue(valueArray);
+    aggregationResultHolder.setValue(valueArray);
   }
 
   @Override
   protected void aggregateArrayWithNull(int length, AggregationResultHolder aggregationResultHolder,
       BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    ObjectAggregationResultHolder resultHolder = (ObjectAggregationResultHolder) aggregationResultHolder;
     int[] value = blockValSet.getIntValuesSV();
     IntOpenHashSet valueArray = new IntOpenHashSet(length);
     for (int i = 0; i < length; i++) {
@@ -58,17 +54,16 @@ public class ArrayAggDistinctIntFunction extends BaseArrayAggIntFunction<IntOpen
         valueArray.add(value[i]);
       }
     }
-    resultHolder.setValue(valueArray);
+    aggregationResultHolder.setValue(valueArray);
   }
 
   @Override
-  protected void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, int value) {
-    ObjectGroupByResultHolder resultHolder = (ObjectGroupByResultHolder) groupByResultHolder;
-    IntOpenHashSet groupValue = resultHolder.getResult(groupKey);
-    if (groupValue == null) {
-      resultHolder.setValueForKey(groupKey, new IntOpenHashSet(value));
-    } else {
-      groupValue.add(value);
+  protected void setGroupByResult(GroupByResultHolder resultHolder, int groupKey, int value) {
+    IntOpenHashSet valueSet = resultHolder.getResult(groupKey);
+    if (valueSet == null) {
+      valueSet = new IntOpenHashSet();
+      resultHolder.setValueForKey(groupKey, valueSet);
     }
+    valueSet.add(value);
   }
 }

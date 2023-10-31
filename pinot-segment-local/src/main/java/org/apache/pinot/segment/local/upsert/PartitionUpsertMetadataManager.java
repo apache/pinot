@@ -74,7 +74,7 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /**
    * Updates the upsert metadata for a new consumed record in the given consuming segment.
    */
-  void addRecord(MutableSegment segment, RecordInfo recordInfo);
+  boolean addRecord(MutableSegment segment, RecordInfo recordInfo);
 
   /**
    * Replaces the upsert metadata for the old segment with the new immutable segment.

@@ -73,6 +73,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected ServerMetrics _serverMetrics;
   protected HelixManager _helixManager;
   protected ExecutorService _segmentPreloadExecutor;
+  protected boolean _dropOutOfOrderRecord;
 
   private volatile boolean _isPreloading = false;
 
@@ -111,12 +112,20 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();
     _metadataTTL = upsertConfig.getMetadataTTL();
+    _dropOutOfOrderRecord = upsertConfig.isDropOutOfOrderRecord();
     _tableIndexDir = tableDataManager.getTableDataDir();
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
     _segmentPreloadExecutor = segmentPreloadExecutor;
 
     initCustomVariables();
+
+    LOGGER.info(
+        "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
+            + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {}, table "
+            + "index dir: {}", getClass().getSimpleName(), _tableNameWithType, _primaryKeyColumns, _comparisonColumns,
+        _deleteRecordColumn, _hashFunction, upsertConfig.getMode(), _enableSnapshot, upsertConfig.isEnablePreload(),
+        _metadataTTL, _tableIndexDir);
 
     if (_enableSnapshot && segmentPreloadExecutor != null && upsertConfig.isEnablePreload()) {
       // Preloading the segments with snapshots for fast upsert metadata recovery.

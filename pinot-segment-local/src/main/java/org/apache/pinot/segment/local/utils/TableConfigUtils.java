@@ -55,6 +55,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -576,7 +577,7 @@ public final class TableConfigUtils {
       EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
           DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
           SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTRAWHLLPLUS,
-          DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH);
+          DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL, DISTINCTCOUNTRAWULL);
 
   @VisibleForTesting
   static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
@@ -723,6 +724,11 @@ public final class TableConfigUtils {
             "The delete record column must be a single-valued BOOLEAN column");
       }
     }
+
+    Preconditions.checkState(
+        tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
+            .containsKey(InstancePartitionsType.COMPLETED),
+        "InstanceAssignmentConfig for COMPLETED is not allowed for upsert tables");
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
   }
@@ -766,11 +772,25 @@ public final class TableConfigUtils {
         tableConfig.getInstanceAssignmentConfigMap())) {
       return;
     }
-    for (InstancePartitionsType instancePartitionsType : tableConfig.getInstancePartitionsMap().keySet()) {
-      Preconditions.checkState(
-          !tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType.toString()),
-          String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
-              instancePartitionsType));
+
+    for (InstancePartitionsType instancePartitionsType : InstancePartitionsType.values()) {
+      if (tableConfig.getInstanceAssignmentConfigMap().containsKey(instancePartitionsType.toString())) {
+        InstanceAssignmentConfig instanceAssignmentConfig =
+            tableConfig.getInstanceAssignmentConfigMap().get(instancePartitionsType.toString());
+        if (instanceAssignmentConfig.getPartitionSelector()
+            == InstanceAssignmentConfig.PartitionSelector.MIRROR_SERVER_SET_PARTITION_SELECTOR) {
+          Preconditions.checkState(
+              tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
+              String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap needed for %s, as "
+                      + "MIRROR_SERVER_SET_PARTITION_SELECTOR is used",
+                  instancePartitionsType));
+        } else {
+          Preconditions.checkState(
+              !tableConfig.getInstancePartitionsMap().containsKey(instancePartitionsType),
+              String.format("Both InstanceAssignmentConfigMap and InstancePartitionsMap set for %s",
+                  instancePartitionsType));
+        }
+      }
     }
   }
 
@@ -987,18 +1007,35 @@ public final class TableConfigUtils {
         for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
           columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
         }
-        // Function column pairs cannot be null
-        for (String functionColumnPair : starTreeIndexConfig.getFunctionColumnPairs()) {
-          AggregationFunctionColumnPair columnPair;
-          try {
-            columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
-          } catch (Exception e) {
-            throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
-                + "in the form <Aggregation function>__<Column name>");
+        List<String> functionColumnPairs = starTreeIndexConfig.getFunctionColumnPairs();
+        if (functionColumnPairs != null) {
+          for (String functionColumnPair : functionColumnPairs) {
+            AggregationFunctionColumnPair columnPair;
+            try {
+              columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+            } catch (Exception e) {
+              throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
+                  + "in the form <Aggregation function>__<Column name>");
+            }
+            String columnName = columnPair.getColumn();
+            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+            }
           }
-          String columnName = columnPair.getColumn();
-          if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
-            columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+        }
+        List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
+        if (aggregationConfigs != null) {
+          for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
+            AggregationFunctionColumnPair columnPair;
+            try {
+              columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
+            } catch (Exception e) {
+              throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
+            }
+            String columnName = columnPair.getColumn();
+            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+            }
           }
         }
         List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();

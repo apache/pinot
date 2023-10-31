@@ -19,6 +19,7 @@
 package org.apache.pinot.core.function.scalar;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.math.BigDecimal;
 import java.util.Base64;
 import javax.annotation.Nullable;
@@ -36,6 +37,7 @@ import org.apache.datasketches.tuple.aninteger.IntegerSketch;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -468,5 +470,40 @@ public class SketchFunctions {
       union.update(asCpcSketch(sketchObj));
     }
     return union.getResult().toByteArray();
+  }
+
+  /**
+   * Create an UltraLogLog containing the input
+   *
+   * @param input an Object we want to insert into the ULL, may be null to return an empty ULL
+   * @return serialized ULL as bytes
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static byte[] toULL(@Nullable Object input) {
+    return toULL(input, CommonConstants.Helix.DEFAULT_ULTRALOGLOG_P);
+  }
+
+  /**
+   * Create an UltraLogLog containing the input, with a configurable p
+   *
+   * @param input an Object we want to insert into the ULL, may be null to return an empty HLL
+   * @param p the p value for the created UltraLogLog
+   * @return serialized HLL as bytes
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static byte[] toULL(@Nullable Object input, int p) {
+    UltraLogLog sketch = UltraLogLog.create(p);
+    UltraLogLogUtils.hashObject(input).ifPresent(sketch::add);
+    return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(sketch);
+  }
+
+  /**
+   * Takes a default UltraLogLog byte array and loads it into the format used in Pinot
+   *
+   * This adds the P value into the serialized byte stream, so it can be used easily
+   */
+  public static byte[] fromULL(byte[] input) {
+    UltraLogLog ull = UltraLogLog.wrap(input);
+    return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(ull);
   }
 }
