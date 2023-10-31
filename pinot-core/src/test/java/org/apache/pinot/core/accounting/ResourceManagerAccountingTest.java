@@ -18,22 +18,35 @@
  */
 package org.apache.pinot.core.accounting;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant;
+import org.apache.pinot.core.common.datablock.DataBlockTestUtils;
+import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -50,6 +63,7 @@ import org.testng.annotations.Test;
 public class ResourceManagerAccountingTest {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(ResourceManagerAccountingTest.class);
+  private static final int NUM_ROWS = 1_000_000;
 
   /**
    * Test thread cpu usage tracking in multithread environment, add @Test to run.
@@ -221,6 +235,137 @@ public class ResourceManagerAccountingTest {
       }
     }
     Assert.fail("Expected EarlyTerminationException to be thrown");
+  }
+
+  /**
+   * Test instrumentation during {@link DataTable} creation
+   */
+  @Test
+  public void testGetDataTableOOMSelect()
+      throws Exception {
+
+    // generate random rows
+    String[] columnNames = {
+        "int", "long", "float", "double", "big_decimal", "string", "bytes", "int_array", "long_array", "float_array",
+        "double_array", "string_array"
+    };
+    DataSchema.ColumnDataType[] columnDataTypes = {
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG, DataSchema.ColumnDataType.FLOAT,
+        DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.BIG_DECIMAL, DataSchema.ColumnDataType.STRING,
+        DataSchema.ColumnDataType.BYTES, DataSchema.ColumnDataType.INT_ARRAY, DataSchema.ColumnDataType.LONG_ARRAY,
+        DataSchema.ColumnDataType.FLOAT_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY,
+        DataSchema.ColumnDataType.STRING_ARRAY
+    };
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, NUM_ROWS, 0);
+
+    // set up logging and configs
+    LogManager.getLogger(PerQueryCPUMemResourceUsageAccountant.class).setLevel(Level.OFF);
+    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.OFF);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    HashMap<String, Object> configs = new HashMap<>();
+    ServerMetrics.register(Mockito.mock(ServerMetrics.class));
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.00f);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    PinotConfiguration config = getConfig(20, 2, configs);
+    ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
+    // init accountant and start watcher task
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testSelect");
+
+    CountDownLatch latch = new CountDownLatch(100);
+    AtomicBoolean earlyTerminationOccurred = new AtomicBoolean(false);
+
+    for (int i = 0; i < 100; i++) {
+      int finalI = i;
+      rm.getQueryRunners().submit(() -> {
+        Tracing.ThreadAccountantOps.setupRunner("testSelectQueryId" + finalI);
+        try {
+          SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, false).toBytes();
+        } catch (EarlyTerminationException e) {
+          earlyTerminationOccurred.set(true);
+          Tracing.ThreadAccountantOps.clear();
+        } catch (IOException e) {
+          Assert.fail(e.getMessage());
+        } finally {
+          latch.countDown();
+        }
+      });
+    }
+    latch.await();
+    // assert that EarlyTerminationException was thrown in at least one runner thread
+    Assert.assertTrue(earlyTerminationOccurred.get());
+  }
+
+  /**
+   * Test instrumentation during {@link DataTable} creation
+   */
+  @Test
+  public void testGetDataTableOOMGroupBy()
+      throws Exception {
+
+    // generate random indexedTable
+    QueryContext queryContext =
+        QueryContextConverterUtils.getQueryContext("SELECT SUM(m1), MAX(m2) FROM testTable GROUP BY d1, d2, d3, d4");
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"d1", "d2", "d3", "d4", "sum(m1)", "max(m2)"}, new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE,
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE
+        });
+    List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, NUM_ROWS, 0);
+    IndexedTable indexedTable =
+        new SimpleIndexedTable(dataSchema, queryContext, NUM_ROWS, Integer.MAX_VALUE, Integer.MAX_VALUE);
+    for (Object[] row : rows) {
+      indexedTable.upsert(new Record(row));
+    }
+    indexedTable.finish(false);
+    // set up GroupByResultsBlock
+    GroupByResultsBlock groupByResultsBlock = new GroupByResultsBlock(indexedTable, queryContext);
+
+    // set up logging and configs
+    LogManager.getLogger(PerQueryCPUMemResourceUsageAccountant.class).setLevel(Level.OFF);
+    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.OFF);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    HashMap<String, Object> configs = new HashMap<>();
+    ServerMetrics.register(Mockito.mock(ServerMetrics.class));
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO, 0.00f);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, 0.00f);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+        "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+    PinotConfiguration config = getConfig(20, 2, configs);
+    ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
+    // init accountant and start watcher task
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testGroupBy");
+
+    CountDownLatch latch = new CountDownLatch(100);
+    AtomicBoolean earlyTerminationOccurred = new AtomicBoolean(false);
+
+    for (int i = 0; i < 100; i++) {
+      int finalI = i;
+      rm.getQueryRunners().submit(() -> {
+        Tracing.ThreadAccountantOps.setupRunner("testGroupByQueryId" + finalI);
+        try {
+          groupByResultsBlock.getDataTable().toBytes();
+        } catch (EarlyTerminationException e) {
+          earlyTerminationOccurred.set(true);
+          Tracing.ThreadAccountantOps.clear();
+        } catch (IOException e) {
+          Assert.fail(e.getMessage());
+        } finally {
+          latch.countDown();
+        }
+      });
+    }
+    latch.await();
+    // assert that EarlyTerminationException was thrown in at least one runner thread
+    Assert.assertTrue(earlyTerminationOccurred.get());
   }
 
   /**
