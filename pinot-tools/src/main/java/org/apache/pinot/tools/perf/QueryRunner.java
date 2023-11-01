@@ -36,6 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
@@ -99,6 +100,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-verbose"}, required = false, description = "Enable verbose query logging (default: "
       + "false).")
   private boolean _verbose = false;
+  @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
+  private String _user;
+  @CommandLine.Option(names = {"-password"}, required = false, description = "Password for basic auth.")
+  private String _password;
+  @CommandLine.Option(names = {"-authToken"}, required = false, description = "Http auth token.")
+  private String _authToken;
+  @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
+  private String _authTokenUrl;
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
       + "this message.")
   private boolean _help;
@@ -168,6 +177,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     conf.setStartBroker(false);
     conf.setStartServer(false);
     conf.setVerbose(_verbose);
+    conf.setUser(_user);
+    conf.setPassword(_password);
+    conf.setAuthToken(_authToken);
+    conf.setAuthTokenUrl(_authTokenUrl);
 
     List<String> queries =
         makeQueries(IOUtils.readLines(new FileInputStream(_queryFile)), QueryMode.valueOf(_queryMode.toUpperCase()),
@@ -179,7 +192,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
                 + "numIntervalsToReportAndClearStatistics: {}, timeout: {}", _queryFile, _numTimesToRunQueries,
             _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _timeout);
         singleThreadedQueryRunner(conf, queries, _numTimesToRunQueries, _reportIntervalMs,
-            _numIntervalsToReportAndClearStatistics, _timeout);
+            _numIntervalsToReportAndClearStatistics, _timeout,
+            AuthProviderUtils.makeAuthHeadersMap(AuthProviderUtils.makeAuthProvider(null,
+                _authTokenUrl, _authToken, _user, _password)));
         break;
       case "multiThreads":
         if (_numThreads <= 0) {
@@ -192,7 +207,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             _queryFile, _numTimesToRunQueries, _numThreads, _reportIntervalMs, _numIntervalsToReportAndClearStatistics,
             _queueDepth, _timeout);
         multiThreadedQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _reportIntervalMs,
-            _numIntervalsToReportAndClearStatistics, _timeout);
+            _numIntervalsToReportAndClearStatistics, _timeout,
+            AuthProviderUtils.makeAuthHeadersMap(AuthProviderUtils.makeAuthProvider(null,
+                _authTokenUrl, _authToken, _user, _password)));
         break;
       case "targetQPS":
         if (_numThreads <= 0) {
@@ -211,7 +228,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             _queryFile, _numTimesToRunQueries, _numThreads, _startQPS, _reportIntervalMs,
             _numIntervalsToReportAndClearStatistics, _queueDepth, _timeout);
         targetQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _startQPS,
-            _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _timeout);
+            _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _timeout,
+            AuthProviderUtils.makeAuthHeadersMap(
+                AuthProviderUtils.makeAuthProvider(null, _authTokenUrl, _authToken, _user, _password)));
         break;
       case "increasingQPS":
         if (_numThreads <= 0) {
@@ -241,7 +260,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             _numThreads, _startQPS, _deltaQPS, _reportIntervalMs, _numIntervalsToReportAndClearStatistics,
             _numIntervalsToIncreaseQPS, _queueDepth, _timeout);
         increasingQPSQueryRunner(conf, queries, _numTimesToRunQueries, _numThreads, _queueDepth, _startQPS, _deltaQPS,
-            _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _numIntervalsToIncreaseQPS, _timeout);
+            _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _numIntervalsToIncreaseQPS, _timeout,
+            AuthProviderUtils.makeAuthHeadersMap(
+                AuthProviderUtils.makeAuthProvider(null, _authTokenUrl, _authToken, _user, _password)));
         break;
       default:
         LOGGER.error("Invalid mode: {}", _mode);
@@ -249,13 +270,6 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         break;
     }
     return true;
-  }
-
-  public static QuerySummary singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
-      int numTimesToRunQueries, int reportIntervalMs, int numIntervalsToReportAndClearStatistics, long timeout)
-      throws Exception {
-    return singleThreadedQueryRunner(conf, queries, numTimesToRunQueries, reportIntervalMs,
-        numIntervalsToReportAndClearStatistics, timeout, Collections.emptyMap());
   }
 
   /**
@@ -353,14 +367,6 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     return querySummary;
-  }
-
-  public static QuerySummary multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
-      int numTimesToRunQueries, int numThreads, int queueDepth, int reportIntervalMs,
-      int numIntervalsToReportAndClearStatistics, long timeout)
-      throws Exception {
-    return multiThreadedQueryRunner(conf, queries, numTimesToRunQueries, numThreads, queueDepth, reportIntervalMs,
-        numIntervalsToReportAndClearStatistics, timeout, Collections.emptyMap());
   }
 
   /**
@@ -473,14 +479,6 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     return querySummary;
-  }
-
-  public static QuerySummary targetQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
-      int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, int reportIntervalMs,
-      int numIntervalsToReportAndClearStatistics, long timeout)
-      throws Exception {
-    return targetQPSQueryRunner(conf, queries, numTimesToRunQueries, numThreads, queueDepth, startQPS, reportIntervalMs,
-        numIntervalsToReportAndClearStatistics, timeout, Collections.emptyMap());
   }
 
   /**
@@ -605,15 +603,6 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     return querySummary;
-  }
-
-  public static QuerySummary increasingQPSQueryRunner(PerfBenchmarkDriverConf conf, List<String> queries,
-      int numTimesToRunQueries, int numThreads, int queueDepth, double startQPS, double deltaQPS, int reportIntervalMs,
-      int numIntervalsToReportAndClearStatistics, int numIntervalsToIncreaseQPS, long timeout)
-      throws Exception {
-    return increasingQPSQueryRunner(conf, queries, numTimesToRunQueries, numThreads, queueDepth, startQPS, deltaQPS,
-        reportIntervalMs, numIntervalsToReportAndClearStatistics, numIntervalsToIncreaseQPS, timeout,
-        Collections.emptyMap());
   }
 
   /**
@@ -956,7 +945,6 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       // the last run's statistics is used;
       return _statisticsList.get(_statisticsList.size() - 1).getPercentile(p);
     }
-
 
     public List<Statistics> getStatisticsList() {
       return _statisticsList;

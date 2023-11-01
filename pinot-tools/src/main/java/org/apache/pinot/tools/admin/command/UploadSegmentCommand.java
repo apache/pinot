@@ -25,6 +25,7 @@ import java.net.URI;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.http.Header;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -187,7 +188,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
 
         LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
         List<Header> headerList =
-            makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
+            AuthProviderUtils.makeAuthHeaders(
+                AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
 
         FileInputStream fileInputStream = new FileInputStream(segmentTarFile);
         fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
