@@ -1767,21 +1767,41 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testInBuiltVirtualColumns(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT $docId, $hostName, $segmentName FROM mytable";
+
+    String query = "SELECT $docId, $hostName, $segmentName FROM mytable LIMIT 10";
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnNames").toString(), "[\"$docId\",\"$hostName\",\"$segmentName\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"STRING\",\"STRING\"]");
     JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
     String expectedHostName = NetUtils.getHostnameOrAddress();
     String expectedSegmentNamePrefix = "mytable_";
     for (int i = 0; i < 10; i++) {
       JsonNode row = rows.get(i);
       assertEquals(row.get(0).asInt(), i);
       assertEquals(row.get(1).asText(), expectedHostName);
-      assertTrue(row.get(2).asText().startsWith(expectedSegmentNamePrefix));
+      String segmentName = row.get(2).asText();
+      assertTrue(segmentName.startsWith(expectedSegmentNamePrefix));
     }
+
+    // Collect all segment names
+    query = "SELECT DISTINCT $segmentName FROM mytable LIMIT 10000";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    int numSegments = rows.size();
+    List<String> segmentNames = new ArrayList<>(numSegments);
+    for (int i = 0; i < numSegments; i++) {
+      segmentNames.add(rows.get(i).get(0).asText());
+    }
+    // Test IN clause on $segmentName
+    Collections.shuffle(segmentNames);
+    int numSegmentsToQuery = RANDOM.nextInt(numSegments) + 1;
+    query = "SELECT COUNT(*) FROM mytable WHERE $segmentName IN ('" + String.join("','",
+        segmentNames.subList(0, numSegmentsToQuery)) + "')";
+    response = postQuery(query);
+    assertEquals(response.get("numSegmentsMatched").asInt(), numSegmentsToQuery);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
