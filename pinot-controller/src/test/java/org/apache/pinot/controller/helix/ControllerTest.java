@@ -189,7 +189,7 @@ public class ControllerTest {
 
   public void startZk() {
     if (_zookeeperInstance == null) {
-      _zookeeperInstance = ZkStarter.startLocalZkServer(NetUtils.findOpenPort(20000 + RandomUtils.nextInt(10000)));
+      _zookeeperInstance = ZkStarter.startLocalZkServer(NetUtils.findOpenPort(ZkStarter.DEFAULT_ZK_TEST_PORT + RandomUtils.nextInt(10000)));
     }
   }
 
