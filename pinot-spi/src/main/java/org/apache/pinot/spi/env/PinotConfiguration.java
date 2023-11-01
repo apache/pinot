@@ -26,11 +26,11 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.configuration.CompositeConfiguration;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.MapConfiguration;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.CompositeConfiguration;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.MapConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
 
@@ -183,11 +183,12 @@ public class PinotConfiguration {
       PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
 
       propertiesConfiguration.setIOFactory(new ConfigFilePropertyReaderFactory());
+      CommonsConfigurationUtils.setDefaultListDelimiterHandler(propertiesConfiguration);
       if (configPath.startsWith("classpath:")) {
-        propertiesConfiguration
-            .load(PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())));
+        CommonsConfigurationUtils.loadPropertiesConfiguration(propertiesConfiguration,
+            PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())));
       } else {
-        propertiesConfiguration.load(configPath);
+        CommonsConfigurationUtils.loadPropertiesConfiguration(propertiesConfiguration, configPath);
       }
 
       return propertiesConfiguration;

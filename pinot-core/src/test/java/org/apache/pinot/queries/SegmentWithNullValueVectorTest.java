@@ -30,8 +30,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -170,8 +171,8 @@ public class SegmentWithNullValueVectorTest {
     URL resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
     Assert.assertNotNull(resourceUrl);
     PropertiesConfiguration queryExecutorConfig = new PropertiesConfiguration();
-    queryExecutorConfig.setDelimiterParsingDisabled(false);
-    queryExecutorConfig.load(new File(resourceUrl.getFile()));
+    FileHandler fileHandler = new FileHandler(queryExecutorConfig);
+    fileHandler.load(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), _instanceDataManager, _serverMetrics);
   }
