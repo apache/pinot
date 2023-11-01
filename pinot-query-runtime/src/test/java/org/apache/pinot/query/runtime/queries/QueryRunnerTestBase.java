@@ -549,6 +549,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public List<List<Object>> _inputs;
       @JsonProperty("partitionColumns")
       public List<String> _partitionColumns;
+      @JsonProperty("partitionCount")
+      public Integer _partitionCount;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
