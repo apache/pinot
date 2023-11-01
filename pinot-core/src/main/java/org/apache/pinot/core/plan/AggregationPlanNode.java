@@ -76,7 +76,7 @@ public class AggregationPlanNode implements PlanNode {
    * Build the operator to be used for filtered aggregations
    */
   private FilteredAggregationOperator buildFilteredAggOperator() {
-    List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators =
+    List<Pair<AggregationFunction[], Pair<BaseProjectOperator<?>, Boolean>>> projectOperators =
         // TODO(egalpin): maybe change this to use ProjectionPlanNode instead of BaseProjectOperator
         AggregationFunctionUtils.buildFilteredAggregateProjectOperators(_indexSegment, _queryContext);
     return new FilteredAggregationOperator(_queryContext, projectOperators,

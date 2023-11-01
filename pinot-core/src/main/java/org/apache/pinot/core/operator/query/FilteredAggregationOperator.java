@@ -34,7 +34,6 @@ import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
-import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 
 
 /**
@@ -49,7 +48,7 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
 
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
-  private final List<Pair<AggregationFunction[], BaseProjectOperator<?>>> _projectOperators;
+  private final List<Pair<AggregationFunction[], Pair<BaseProjectOperator<?>, Boolean>>> _projectOperators;
   private final long _numTotalDocs;
 
   private long _numDocsScanned;
@@ -57,7 +56,7 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
   private long _numEntriesScannedPostFilter;
 
   public FilteredAggregationOperator(QueryContext queryContext,
-      List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators, long numTotalDocs) {
+      List<Pair<AggregationFunction[], Pair<BaseProjectOperator<?>, Boolean>>> projectOperators, long numTotalDocs) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _projectOperators = projectOperators;
@@ -73,10 +72,10 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
       resultIndexMap.put(_aggregationFunctions[i], i);
     }
 
-    for (Pair<AggregationFunction[], BaseProjectOperator<?>> pair : _projectOperators) {
-      AggregationFunction[] aggregationFunctions = pair.getLeft();
-      BaseProjectOperator<?> projectOperator = pair.getRight();
-      boolean canUseStarTree = projectOperator.getClass().isInstance(StarTreeProjectPlanNode.class);
+    for (Pair<AggregationFunction[], Pair<BaseProjectOperator<?>, Boolean>> operatorInfo : _projectOperators) {
+      AggregationFunction[] aggregationFunctions = operatorInfo.getLeft();
+      BaseProjectOperator<?> projectOperator = operatorInfo.getRight().getLeft();
+      boolean canUseStarTree = operatorInfo.getRight().getRight();
       AggregationExecutor aggregationExecutor;
       if (canUseStarTree) {
         aggregationExecutor = new StarTreeAggregationExecutor(aggregationFunctions);
@@ -104,7 +103,7 @@ public class FilteredAggregationOperator extends BaseOperator<AggregationResults
 
   @Override
   public List<Operator> getChildOperators() {
-    return _projectOperators.stream().map(Pair::getRight).collect(Collectors.toList());
+    return _projectOperators.stream().map(Pair::getRight).map(Pair::getLeft).collect(Collectors.toList());
   }
 
   @Override

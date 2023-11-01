@@ -42,7 +42,6 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
-import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.trace.Tracing;
 
@@ -58,7 +57,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
-  private final List<Pair<AggregationFunction[], BaseProjectOperator<?>>> _projectOperators;
+  private final List<Pair<AggregationFunction[], Pair<BaseProjectOperator<?>, Boolean>>> _projectOperators;
   private final long _numTotalDocs;
   private final DataSchema _dataSchema;
 
@@ -67,7 +66,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private long _numEntriesScannedPostFilter;
 
   public FilteredGroupByOperator(QueryContext queryContext,
-      List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators, long numTotalDocs) {
+      List<Pair<AggregationFunction[], Pair<BaseProjectOperator<?>, Boolean>>> projectOperators, long numTotalDocs) {
     assert queryContext.getAggregationFunctions() != null && queryContext.getFilteredAggregationFunctions() != null
         && queryContext.getGroupByExpressions() != null;
     _queryContext = queryContext;
@@ -84,7 +83,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
 
     // Extract column names and data types for group-by columns
-    BaseProjectOperator<?> projectOperator = projectOperators.get(0).getRight();
+    BaseProjectOperator<?> projectOperator = projectOperators.get(0).getRight().getLeft();
     for (int i = 0; i < numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = _groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
@@ -118,13 +117,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     GroupKeyGenerator groupKeyGenerator = null;
-    for (Pair<AggregationFunction[], BaseProjectOperator<?>> pair : _projectOperators) {
-      AggregationFunction[] aggregationFunctions = pair.getLeft();
-      BaseProjectOperator<?> projectOperator = pair.getRight();
+    for (Pair<AggregationFunction[], Pair<BaseProjectOperator<?>, Boolean>> operatorInfo : _projectOperators) {
+      AggregationFunction[] aggregationFunctions = operatorInfo.getLeft();
+      BaseProjectOperator<?> projectOperator = operatorInfo.getRight().getLeft();
 
       // Perform aggregation group-by on all the blocks
       DefaultGroupByExecutor groupByExecutor;
-      boolean canUseStarTree = projectOperator.getClass().isInstance(StarTreeProjectPlanNode.class);
+      boolean canUseStarTree = operatorInfo.getRight().getRight();
 
       if (groupKeyGenerator == null) {
         // The group key generator should be shared across all AggregationFunctions so that agg results can be
@@ -206,7 +205,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    return _projectOperators.stream().map(Pair::getRight).collect(Collectors.toList());
+    return _projectOperators.stream().map(Pair::getRight).map(Pair::getLeft).collect(Collectors.toList());
   }
 
   @Override

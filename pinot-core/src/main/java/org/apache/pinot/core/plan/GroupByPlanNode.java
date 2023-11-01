@@ -56,7 +56,7 @@ public class GroupByPlanNode implements PlanNode {
 
   private FilteredGroupByOperator buildFilteredGroupByPlan() {
     // TODO(egalpin): maybe change this to use ProjectionPlanNode instead of BaseProjectOperator
-    List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators =
+    List<Pair<AggregationFunction[], Pair<BaseProjectOperator<?>, Boolean>>> projectOperators =
         AggregationFunctionUtils.buildFilteredAggregateProjectOperators(_indexSegment, _queryContext);
     return new FilteredGroupByOperator(_queryContext, projectOperators,
         _indexSegment.getSegmentMetadata().getTotalDocs());
