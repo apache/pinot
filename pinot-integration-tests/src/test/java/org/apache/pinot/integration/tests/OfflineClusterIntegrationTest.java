@@ -626,9 +626,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     String queryWithOption = "SET maxServerResponseSizeBytes=1000; " + SELECT_STAR_QUERY;
     JsonNode response = postQuery(queryWithOption);
-    assert response.get("exceptions").size() > 0;
-    int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
-    assertEquals(errorCode, 503);
+    JsonNode exceptions = response.get("exceptions");
+    assertFalse(exceptions.isEmpty());
+    int errorCode = exceptions.get(0).get("errorCode").asInt();
+    assertEquals(errorCode, QueryException.QUERY_CANCELLATION_ERROR_CODE);
   }
 
   @Test
@@ -636,9 +637,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     String queryWithOption = "SET maxQueryResponseSizeBytes=1000; " + SELECT_STAR_QUERY;
     JsonNode response = postQuery(queryWithOption);
-    assert response.get("exceptions").size() > 0;
-    int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
-    assertEquals(errorCode, 503);
+    JsonNode exceptions = response.get("exceptions");
+    assertFalse(exceptions.isEmpty());
+    int errorCode = exceptions.get(0).get("errorCode").asInt();
+    assertEquals(errorCode, QueryException.QUERY_CANCELLATION_ERROR_CODE);
   }
 
   @Test
@@ -649,16 +651,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should return an exception
+        // Server should return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        assert response.get("exceptions").size() > 0;
-        int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
-        if (errorCode == 503) {
-          return true;
-        }
-        return false;
+        JsonNode exceptions = response.get("exceptions");
+        return !exceptions.isEmpty()
+            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
 
@@ -667,14 +666,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should not return an exception
+        // Server should not return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        if (response.get("exceptions").size() == 0) {
-          return true;
-        }
-        return false;
+        return response.get("exceptions").isEmpty();
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
   }
@@ -687,16 +683,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should return an exception
+        // Server should return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        assert response.get("exceptions").size() > 0;
-        int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
-        if (errorCode == 503) {
-          return true;
-        }
-        return false;
+        JsonNode exceptions = response.get("exceptions");
+        return !exceptions.isEmpty()
+            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
 
@@ -705,14 +698,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should not return an exception
+        // Server should not return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        if (response.get("exceptions").size() == 0) {
-          return true;
-        }
-        return false;
+        return response.get("exceptions").isEmpty();
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
   }
@@ -725,16 +715,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should return an exception
+        // Server should return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        assert response.get("exceptions").size() > 0;
-        int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
-        if (errorCode == 503) {
-          return true;
-        }
-        return false;
+        JsonNode exceptions = response.get("exceptions");
+        return !exceptions.isEmpty()
+            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
 
@@ -743,14 +730,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should not return an exception
+        // Server should not return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        if (response.get("exceptions").size() == 0) {
-          return true;
-        }
-        return false;
+        return response.get("exceptions").isEmpty();
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
   }
