@@ -78,7 +78,7 @@ public final class ImmutableFSTTest {
   public void testVersion5()
       throws IOException {
     try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/abc.native.fst")) {
-      FST fst = FST.read(inputStream);
+      FST fst = FST.read(inputStream, 0);
       assertFalse(fst.getFlags().contains(FSTFlags.NUMBERS));
       verifyContent(fst, _expected);
     }
@@ -88,7 +88,7 @@ public final class ImmutableFSTTest {
   public void testVersion5WithNumbers()
       throws IOException {
     try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/abc-numbers.native.fst")) {
-      FST fst = FST.read(inputStream);
+      FST fst = FST.read(inputStream, 0);
       assertTrue(fst.getFlags().contains(FSTFlags.NUMBERS));
       verifyContent(fst, _expected);
     }
@@ -99,7 +99,8 @@ public final class ImmutableFSTTest {
       throws IOException {
     for (String resourceName : new String[]{"data/abc.native.fst", "data/abc-numbers.native.fst"}) {
       try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourceName)) {
-        FST fst = FST.read(inputStream);
+        //TODO: atri
+        FST fst = FST.read(inputStream, 0);
         FSTInfo fstInfo = new FSTInfo(fst);
         assertEquals(fstInfo._nodeCount, 4);
         assertEquals(fstInfo._arcsCount, 7);
@@ -111,7 +112,8 @@ public final class ImmutableFSTTest {
   public void testNumbers()
       throws IOException {
     try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/abc-numbers.native.fst")) {
-      FST fst = FST.read(inputStream);
+      //TODO: atri
+      FST fst = FST.read(inputStream, 0);
       assertTrue(fst.getFlags().contains(FSTFlags.NEXTBIT));
 
       // Get all numbers for nodes.
@@ -139,7 +141,8 @@ public final class ImmutableFSTTest {
     fst.save(new FileOutputStream(fstFile));
 
     try (FileInputStream inputStream = new FileInputStream(fstFile)) {
-      verifyContent(FST.read(inputStream, ImmutableFST.class, true), inputList);
+      //TODO: Atri
+      verifyContent(FST.read(inputStream, ImmutableFST.class, true, 0), inputList);
     }
 
     FileUtils.deleteQuietly(fstFile);

@@ -21,6 +21,10 @@ package org.apache.pinot.segment.local.utils.nativefst;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -30,12 +34,23 @@ import org.slf4j.LoggerFactory;
 
 
 public class NativeFSTIndexCreator implements FSTIndexCreator {
+  /*
+   * MAGIC HEADER (4 bytes)
+   * FST size (4 bytes)
+   */
+  public static final int HEADER_LENGTH = 8;
   private static final Logger LOGGER = LoggerFactory.getLogger(NativeFSTIndexCreator.class);
+
+  private static final String FST_FILE_NAME = "nativefst.fst";
 
   private final File _fstIndexFile;
   private final FSTBuilder _fstBuilder;
 
   private int _dictId;
+
+  private int _fstDataSize;
+
+  private final File _indexFile;
 
   /**
    * This index requires values of the column be added in sorted order. Sorted entries could be passed in through
@@ -47,7 +62,8 @@ public class NativeFSTIndexCreator implements FSTIndexCreator {
    * @param sortedEntries Sorted entries of the unique values of the column.
    */
   public NativeFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries) {
-    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
+    _fstIndexFile = new File(indexDir, columnName + FST_FILE_NAME);
+    _indexFile = new File(indexDir, columnName + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
 
     _fstBuilder = new FSTBuilder();
     _dictId = 0;
@@ -80,12 +96,26 @@ public class NativeFSTIndexCreator implements FSTIndexCreator {
     LOGGER.info("Sealing FST index: " + _fstIndexFile.getAbsolutePath());
     try (FileOutputStream fileOutputStream = new FileOutputStream(_fstIndexFile)) {
       FST fst = _fstBuilder.complete();
-      fst.save(fileOutputStream);
+      _fstDataSize = fst.save(fileOutputStream);
     }
   }
 
   @Override
   public void close()
       throws IOException {
+  }
+
+  private void generateIndexFile()
+          throws IOException {
+    ByteBuffer headerBuffer = ByteBuffer.allocate(HEADER_LENGTH);
+    headerBuffer.putInt(FSTHeader.FST_MAGIC);
+    headerBuffer.putInt(_fstDataSize);
+    headerBuffer.position(0);
+
+    try (FileChannel indexFileChannel = new RandomAccessFile(_indexFile, "rw").getChannel();
+         FileChannel fstFileChannel = new RandomAccessFile(_fstIndexFile, "rw").getChannel()) {
+      indexFileChannel.write(headerBuffer);
+      fstFileChannel.transferTo(0, _fstDataSize, indexFileChannel);
+    }
   }
 }

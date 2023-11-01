@@ -66,7 +66,8 @@ public class FSTRegexpWithWeirdTest {
     FST fst = fstBuilder.complete();
     byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
 
-    _fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
+    //TODO: atri
+    _fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true, 0);
   }
 
   @Test

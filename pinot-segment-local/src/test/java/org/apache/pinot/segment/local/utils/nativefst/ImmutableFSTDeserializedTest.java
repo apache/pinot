@@ -37,7 +37,7 @@ public class ImmutableFSTDeserializedTest {
   public void setUp()
       throws Exception {
     try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/serfst.txt")) {
-      _fst = FST.read(inputStream, true, new DirectMemoryManager(ImmutableFSTDeserializedTest.class.getName()));
+      _fst = FST.read(inputStream, true, new DirectMemoryManager(ImmutableFSTDeserializedTest.class.getName()), 0);
     }
   }
 

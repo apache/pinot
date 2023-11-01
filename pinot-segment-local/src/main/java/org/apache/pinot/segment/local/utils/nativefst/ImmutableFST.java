@@ -26,6 +26,7 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.OffHeapMutableBytesStore;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 
 
@@ -139,7 +140,11 @@ public final class ImmutableFST extends FST {
    * see the documentation of this class for more information on how this
    * structure is organized.
    */
-  public final OffHeapMutableBytesStore _mutableBytesStore;
+  //public final OffHeapMutableBytesStore _mutableBytesStore;
+
+  public final PinotDataBuffer _pinotDataBuffer;
+
+  public int _offset;
   /**
    * The length of the node header structure (if the automaton was compiled with
    * <code>NUMBERS</code> option). Otherwise zero.
@@ -162,15 +167,18 @@ public final class ImmutableFST extends FST {
   /**
    * Read and wrap a binary automaton in FST version 5.
    */
-  ImmutableFST(InputStream stream, boolean hasOutputSymbols, PinotDataBufferMemoryManager memoryManager)
+  ImmutableFST(InputStream stream, boolean hasOutputSymbols, PinotDataBufferMemoryManager memoryManager, final int fstDataSize)
       throws IOException {
     DataInputStream in = new DataInputStream(stream);
+
+    _offset = 0;
 
     _filler = in.readByte();
     _annotation = in.readByte();
     final byte hgtl = in.readByte();
 
-    _mutableBytesStore = new OffHeapMutableBytesStore(memoryManager, "ImmutableFST");
+    //_mutableBytesStore = new OffHeapMutableBytesStore(memoryManager, "ImmutableFST");
+    _pinotDataBuffer = memoryManager.allocate(fstDataSize, "ImmutableFST");
 
     /*
      * Determine if the automaton was compiled with NUMBERS. If so, modify
@@ -204,7 +212,9 @@ public final class ImmutableFST extends FST {
       throws IOException {
     byte[] buffer = new byte[PER_BUFFER_SIZE];
     while ((in.read(buffer)) >= 0) {
-      _mutableBytesStore.add(buffer);
+      _pinotDataBuffer.readFrom(_offset, buffer);
+      _offset = _offset + PER_BUFFER_SIZE;
+      //_mutableBytesStore.add(buffer);
     }
   }
 
@@ -348,7 +358,9 @@ public final class ImmutableFST extends FST {
       int actualArcOffset = seek >= PER_BUFFER_SIZE ? seek / PER_BUFFER_SIZE : 0;
       int bufferOffset = seek >= PER_BUFFER_SIZE ? seek - ((actualArcOffset) * PER_BUFFER_SIZE) : seek;
 
-      byte[] inputData = _mutableBytesStore.get(actualArcOffset);
+      //byte[] inputData = _mutableBytesStore.get(actualArcOffset);
+      byte[] inputData = new byte[PER_BUFFER_SIZE];
+      _pinotDataBuffer.copyTo(actualArcOffset, inputData);
 
       r = r << 8 | (inputData[bufferOffset] & 0xff);
     }
@@ -382,12 +394,15 @@ public final class ImmutableFST extends FST {
     int actualArcOffset = seek >= PER_BUFFER_SIZE ? seek / PER_BUFFER_SIZE : 0;
     int bufferOffset = seek >= PER_BUFFER_SIZE ? seek - ((actualArcOffset) * PER_BUFFER_SIZE) : seek;
 
-    byte[] retVal = _mutableBytesStore.get((actualArcOffset));
+    byte[] retVal = new byte[PER_BUFFER_SIZE];
+    //retVal = _mutableBytesStore.get(actualArcOffset);
+    _pinotDataBuffer.copyTo(actualArcOffset, retVal);
 
     int target = bufferOffset + offset;
 
     if (target >= PER_BUFFER_SIZE) {
-      retVal = _mutableBytesStore.get(actualArcOffset + 1);
+      //retVal = _mutableBytesStore.get(actualArcOffset + 1);
+      _pinotDataBuffer.copyTo(actualArcOffset + 1, retVal);
       target = target - PER_BUFFER_SIZE;
     }
 
