@@ -26,6 +26,7 @@ import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.RelFactories;
+import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.tools.RelBuilder;
@@ -68,19 +69,28 @@ public class PinotRuleUtils {
   }
 
   // TODO: optimize this part out as it is not efficient to scan the entire subtree for exchanges.
-  public static boolean noExchangeInSubtree(RelNode relNode) {
-    if (relNode instanceof HepRelVertex) {
-      relNode = ((HepRelVertex) relNode).getCurrentRel();
-    }
-    if (relNode instanceof Exchange) {
+  public static boolean canPushDynamicBroadcastToLeaf(RelNode relNode) {
+    relNode = PinotRuleUtils.unboxRel(relNode);
+    if (relNode instanceof TableScan) {
+      // reaching table means it is plannable.
+      return true;
+    } else if (relNode instanceof Exchange) {
+      // we do not allow any exchanges in between join and table scan.
       return false;
-    }
-    for (RelNode child : relNode.getInputs()) {
-      if (!noExchangeInSubtree(child)) {
+    } else if (relNode instanceof Join) {
+      // always check only the left child for dynamic broadcast
+      return canPushDynamicBroadcastToLeaf(((Join) relNode).getLeft());
+    } else if (relNode instanceof Aggregate) {
+      // if there's aggregation before join, join cannot be planned as dynamic broadcast.
+      return false;
+    } else {
+      if (relNode.getInputs().size() != 1) {
+        // other non-SingleRel node is now allowed.
         return false;
+      } else {
+        return canPushDynamicBroadcastToLeaf(relNode.getInput(0));
       }
     }
-    return true;
   }
 
   public static String extractFunctionName(RexCall function) {
