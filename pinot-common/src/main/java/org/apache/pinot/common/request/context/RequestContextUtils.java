@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.predicate.ConstantPredicate;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.IsNotNullPredicate;
@@ -216,6 +217,9 @@ public class RequestContextUtils {
       case IS_NOT_NULL:
         return new FilterContext(FilterContext.Type.PREDICATE, null,
             new IsNotNullPredicate(getExpression(operands.get(0))));
+      case CONSTANT:
+        return new FilterContext(FilterContext.Type.PREDICATE, null,
+            new ConstantPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       default:
         throw new IllegalStateException();
     }

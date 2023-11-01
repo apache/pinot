@@ -76,7 +76,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     switch (kind) {
       case IS_NULL:
       case IS_NOT_NULL:
-        // No need to try to optimize IS_NULL and IS_NOT_NULL operations on numerical columns.
+      case CONSTANT:
+        // No need to try to optimize CONSTANT, IS_NULL, IS_NOT_NULL operations on numerical columns.
         break;
       default:
         List<Expression> operands = function.getOperands();

@@ -27,6 +27,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.predicate.ConstantPredicate;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
@@ -243,6 +244,12 @@ public class FilterPlanNode implements PlanNode {
           } else {
             // TODO: ExpressionFilterOperator does not support predicate types without PredicateEvaluator (TEXT_MATCH)
             return new ExpressionFilterOperator(_indexSegment, _queryContext, predicate, numDocs);
+          }
+        } else if (predicate.getType() == Predicate.Type.CONSTANT) {
+          if (((ConstantPredicate) predicate).getConstValue()) {
+            return new MatchAllFilterOperator(numDocs);
+          } else {
+            return EmptyFilterOperator.getInstance();
           }
         } else {
           String column = lhs.getIdentifier();

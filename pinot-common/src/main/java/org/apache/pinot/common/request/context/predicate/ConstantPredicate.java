@@ -16,38 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.sql;
+package org.apache.pinot.common.request.context.predicate;
 
-public enum FilterKind {
-  AND,
-  OR,
-  NOT,
-  EQUALS,
-  NOT_EQUALS,
-  GREATER_THAN,
-  GREATER_THAN_OR_EQUAL,
-  LESS_THAN,
-  LESS_THAN_OR_EQUAL,
-  BETWEEN,
-  RANGE,
-  IN,
-  NOT_IN,
-  LIKE,
-  REGEXP_LIKE,
-  TEXT_CONTAINS,
-  TEXT_MATCH,
-  JSON_MATCH,
-  IS_NULL,
-  IS_NOT_NULL,
-  CONSTANT;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.spi.utils.BooleanUtils;
 
-  /**
-   * Helper method that returns true if the enum maps to a Range.
-   *
-   * @return True if the enum is of Range type, false otherwise.
-   */
-  public boolean isRange() {
-    return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
-        || this == BETWEEN || this == RANGE;
+
+public class ConstantPredicate extends BasePredicate {
+  private final boolean _constValue;
+
+  public ConstantPredicate(ExpressionContext identifier, String constant) {
+    super(identifier);
+    _constValue = BooleanUtils.toBoolean(constant);
+  }
+
+  @Override
+  public Type getType() {
+    return Type.CONSTANT;
+  }
+
+  public boolean getConstValue() {
+    return _constValue;
   }
 }

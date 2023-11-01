@@ -38,7 +38,8 @@ public interface Predicate {
     TEXT_MATCH,
     JSON_MATCH,
     IS_NULL,
-    IS_NOT_NULL(true);
+    IS_NOT_NULL(true),
+    CONSTANT;
 
     private final boolean _exclusive;
 
