@@ -69,18 +69,19 @@ public class PinotRuleUtils {
 
   // TODO: optimize this part out as it is not efficient to scan the entire subtree for exchanges.
   public static boolean noExchangeInSubtree(RelNode relNode) {
-    if (relNode instanceof HepRelVertex) {
-      relNode = ((HepRelVertex) relNode).getCurrentRel();
-    }
+    relNode = PinotRuleUtils.unboxRel(relNode);
     if (relNode instanceof Exchange) {
       return false;
-    }
-    for (RelNode child : relNode.getInputs()) {
-      if (!noExchangeInSubtree(child)) {
-        return false;
+    } else if (relNode instanceof Join) {
+      return noExchangeInSubtree(((Join) relNode).getLeft());
+    } else {
+      for (RelNode child : relNode.getInputs()) {
+        if (!noExchangeInSubtree(child)) {
+          return false;
+        }
       }
+      return true;
     }
-    return true;
   }
 
   public static String extractFunctionName(RexCall function) {
