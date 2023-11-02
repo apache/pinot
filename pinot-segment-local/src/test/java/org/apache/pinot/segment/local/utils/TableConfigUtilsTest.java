@@ -1710,9 +1710,21 @@ public class TableConfigUtilsTest {
     partialUpsertStratgies.put("myCol2", UpsertConfig.Strategy.IGNORE);
     UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     partialUpsertConfig.setPartialUpsertStrategies(partialUpsertStratgies);
-    partialUpsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
     partialUpsertConfig.setComparisonColumn("myCol2");
     TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setUpsertConfig(partialUpsertConfig)
+            .setNullHandlingEnabled(true)
+            .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+            .setStreamConfigs(streamConfigs).build();
+    try {
+      TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Partial-upsert table requires default-strategy");
+    }
+
+    partialUpsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
+    tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setUpsertConfig(partialUpsertConfig)
             .setNullHandlingEnabled(true)
             .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))

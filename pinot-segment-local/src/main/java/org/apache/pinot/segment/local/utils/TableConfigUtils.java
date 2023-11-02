@@ -849,6 +849,10 @@ public final class TableConfigUtils {
 
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     assert upsertConfig != null;
+
+    Preconditions.checkState(upsertConfig.getDefaultPartialUpsertStrategy() != null,
+        "Partial-upsert table requires default-strategy");
+
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
 
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
