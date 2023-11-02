@@ -198,6 +198,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     }
     return new RealtimeLuceneTextIndex(context.getFieldSpec().getName(), context.getConsumerDir(),
         context.getSegmentName(), config.getStopWordsInclude(), config.getStopWordsExclude(),
-        config.isLuceneUseCompoundFile(), config.getLuceneMaxBufferSizeMB());
+        config.isLuceneUseCompoundFile(), config.getLuceneMaxBufferSizeMB(), config.getLuceneAnalyzerFQCN());
   }
 }

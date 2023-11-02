@@ -61,6 +61,9 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
             Integer.parseInt(textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB));
       }
 
+      if (textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_FQCN) != null) {
+        _luceneAnalyzerFQCN = textIndexProperties.get(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_FQCN);
+      }
 
       for (Map.Entry<String, String> entry : textIndexProperties.entrySet()) {
         if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {

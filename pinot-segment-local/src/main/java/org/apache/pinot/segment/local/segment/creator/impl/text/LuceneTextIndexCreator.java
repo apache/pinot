@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -42,6 +44,8 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -50,6 +54,7 @@ import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCr
  * and realtime from {@link RealtimeLuceneTextIndex}
  */
 public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCreator.class);
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
 
   private final String _textColumn;
@@ -94,7 +99,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    */
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit,
       @Nullable List<String> stopWordsInclude, @Nullable List<String> stopWordsExclude, boolean useCompoundFile,
-      int maxBufferSizeMB) {
+      int maxBufferSizeMB, @Nonnull String luceneAnalyzerFQCN) {
     _textColumn = column;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
@@ -102,13 +107,21 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       File indexFile = getV1TextIndexFile(segmentIndexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
 
-      StandardAnalyzer standardAnalyzer =
-          TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(stopWordsInclude, stopWordsExclude);
-      IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+      Analyzer luceneAnalyzer;
+      if (luceneAnalyzerFQCN.isEmpty() || luceneAnalyzerFQCN.equals(StandardAnalyzer.class.getName())) {
+        luceneAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(stopWordsInclude, stopWordsExclude);
+      } else {
+        luceneAnalyzer = TextIndexUtils.getAnalyzerFromFQCN(luceneAnalyzerFQCN);
+      }
+
+      IndexWriterConfig indexWriterConfig = new IndexWriterConfig(luceneAnalyzer);
       indexWriterConfig.setRAMBufferSizeMB(maxBufferSizeMB);
       indexWriterConfig.setCommitOnClose(commit);
       indexWriterConfig.setUseCompoundFile(useCompoundFile);
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException(
+          "Failed to instantiate " + luceneAnalyzerFQCN + " lucene analyzer for column: " + column, e);
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while instantiating the LuceneTextIndexCreator for column: " + column, e);
@@ -118,7 +131,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   public LuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
     this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(),
         indexConfig.getStopWordsInclude(), indexConfig.getStopWordsExclude(), indexConfig.isLuceneUseCompoundFile(),
-        indexConfig.getLuceneMaxBufferSizeMB());
+        indexConfig.getLuceneMaxBufferSizeMB(), indexConfig.getLuceneAnalyzerFQCN());
   }
 
   public IndexWriter getIndexWriter() {

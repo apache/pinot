@@ -58,7 +58,7 @@ public class LuceneMutableTextIndexTest {
   public void setUp()
       throws Exception {
     _realtimeLuceneTextIndex =
-        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null, null, true, 500);
+        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null, null, true, 500, null);
     String[][] documents = getTextData();
     String[][] repeatedDocuments = getRepeatedData();
 

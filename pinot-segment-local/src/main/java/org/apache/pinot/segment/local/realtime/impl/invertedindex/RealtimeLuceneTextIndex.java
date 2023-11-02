@@ -22,7 +22,6 @@ import java.io.File;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -50,7 +49,6 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       RealtimeLuceneTextIndexSearcherPool.getInstance();
   private final LuceneTextIndexCreator _indexCreator;
   private SearcherManager _searcherManager;
-  private final StandardAnalyzer _analyzer = new StandardAnalyzer();
   private final String _column;
   private final String _segmentName;
 
@@ -62,9 +60,12 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
    * @param segmentName realtime segment name
    * @param stopWordsInclude the words to include in addition to the default stop word list
    * @param stopWordsExclude stop words to exclude from default stop words
+   * @param maxBufferSizeMB maximum size of the Lucene index buffer
+   * @param luceneAnalyzerFQCN fully qualified class name of the Lucene analyzer used for tokenization
    */
   public RealtimeLuceneTextIndex(String column, File segmentIndexDir, String segmentName,
-      List<String> stopWordsInclude, List<String> stopWordsExclude, boolean useCompoundFile, int maxBufferSizeMB) {
+      List<String> stopWordsInclude, List<String> stopWordsExclude, boolean useCompoundFile, int maxBufferSizeMB,
+      String luceneAnalyzerFQCN) {
     _column = column;
     _segmentName = segmentName;
     try {
@@ -78,7 +79,8 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       // for realtime
       _indexCreator =
           new LuceneTextIndexCreator(column, new File(segmentIndexDir.getAbsolutePath() + "/" + segmentName),
-              false /* commitOnClose */, stopWordsInclude, stopWordsExclude, useCompoundFile, maxBufferSizeMB);
+              false /* commitOnClose */, stopWordsInclude, stopWordsExclude, useCompoundFile, maxBufferSizeMB,
+              luceneAnalyzerFQCN);
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
     } catch (Exception e) {
@@ -120,7 +122,8 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     Callable<MutableRoaringBitmap> searchCallable = () -> {
       IndexSearcher indexSearcher = null;
       try {
-        Query query = new QueryParser(_column, _analyzer).parse(searchQuery);
+        Query query =
+            new QueryParser(_column, _indexCreator.getIndexWriter().getConfig().getAnalyzer()).parse(searchQuery);
         indexSearcher = _searcherManager.acquire();
         indexSearcher.search(query, docIDCollector);
         return getPinotDocIds(indexSearcher, docIDs);

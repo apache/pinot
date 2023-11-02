@@ -202,9 +202,9 @@ public class FilePerIndexDirectoryTest {
       throws IOException {
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true,
-            null, null, true, 500);
+            null, null, true, 500, null);
         LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true,
-            null, null, true, 500)) {
+            null, null, true, 500, null)) {
       PinotDataBuffer buf = fpi.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 1);
 
@@ -266,9 +266,9 @@ public class FilePerIndexDirectoryTest {
     // Write sth to buffers and flush them to index files on disk
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true,
-            null, null, true, 500);
+            null, null, true, 500, null);
         LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true,
-            null, null, true, 500)) {
+            null, null, true, 500, null)) {
       PinotDataBuffer buf = fpi.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 111);
       buf = fpi.newBuffer("col2", StandardIndexes.dictionary(), 1024);

@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -110,6 +111,12 @@ public class TextIndexUtils {
     String includeWords = columnProperties.getOrDefault(stopWordKey, "");
     return Arrays.stream(includeWords.split(FieldConfig.TEXT_INDEX_STOP_WORD_SEPERATOR))
         .map(String::trim).collect(Collectors.toList());
+  }
+
+  public static Analyzer getAnalyzerFromFQCN(@Nonnull String luceneAnalyzerFQCN) throws
+      ReflectiveOperationException {
+    // Support instantiation with default constructor for now unless customized
+    return (Analyzer) Class.forName(luceneAnalyzerFQCN).getConstructor().newInstance();
   }
 
   public static StandardAnalyzer getStandardAnalyzerWithCustomizedStopWords(@Nullable List<String> stopWordsInclude,
