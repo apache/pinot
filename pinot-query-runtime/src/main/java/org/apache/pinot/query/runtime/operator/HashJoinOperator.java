@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -191,7 +192,7 @@ public class HashJoinOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock() {
     try {
       if (_isTerminated) {
-        return setPartialResultExceptionToBlock(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
       if (!_isHashTableBuilt) {
         // Build JOIN hash table
@@ -202,7 +203,7 @@ public class HashJoinOperator extends MultiStageOperator {
       }
       TransferableBlock leftBlock = _leftTableOperator.nextBlock();
       // JOIN each left block with the right block.
-      return setPartialResultExceptionToBlock(buildJoinedDataBlock(leftBlock));
+      return buildJoinedDataBlock(leftBlock);
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
@@ -225,6 +226,8 @@ public class HashJoinOperator extends MultiStageOperator {
           // Just fill up the buffer.
           int remainingRows = _maxRowsInHashTable - _currentRowsInHashTable;
           container = container.subList(0, remainingRows);
+          OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
+          operatorStats.recordSingleStat(DataTable.MetadataKey.NUM_JOIN_LIMIT_REACHED.getName(), "true");
         }
       }
       // put all the rows into corresponding hash collections keyed by the key selector function.
@@ -298,13 +301,6 @@ public class HashJoinOperator extends MultiStageOperator {
     }
     // TODO: Rows can be empty here. Consider fetching another left block instead of returning empty block.
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
-  }
-
-  private TransferableBlock setPartialResultExceptionToBlock(TransferableBlock block) {
-    if (_resourceLimitExceededException != null) {
-      block.addException(_resourceLimitExceededException);
-    }
-    return block;
   }
 
   private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock) {
