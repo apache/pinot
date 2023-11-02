@@ -207,7 +207,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
         dataTableBuilder.setColumn(index, ((DoubleArrayList) result).elements());
         break;
       case STRING_ARRAY:
-        dataTableBuilder.setColumn(index, ((ObjectArrayList<String>) result).toArray(new String[0]));
+        dataTableBuilder.setColumn(index, ((ObjectArrayList<String>) result).elements());
         break;
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);

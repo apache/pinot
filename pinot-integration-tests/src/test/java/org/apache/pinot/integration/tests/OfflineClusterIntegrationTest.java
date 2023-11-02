@@ -314,9 +314,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Override
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
-    if (getNumServers() == 1) {
-      pinotQuery = "SET serverReturnFinalResult = true;" + pinotQuery;
-    }
     super.testQuery(pinotQuery, h2Query);
   }
 

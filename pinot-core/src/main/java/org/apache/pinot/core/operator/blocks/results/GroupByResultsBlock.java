@@ -19,6 +19,10 @@
 package org.apache.pinot.core.operator.blocks.results;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -240,13 +244,25 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         dataTableBuilder.setColumn(columnIndex, (ByteArray) value);
         break;
       case INT_ARRAY:
-        dataTableBuilder.setColumn(columnIndex, (int[]) value);
+        if (value instanceof IntArrayList) {
+          dataTableBuilder.setColumn(columnIndex, ((IntArrayList) value).elements());
+        } else {
+          dataTableBuilder.setColumn(columnIndex, (int[]) value);
+        }
         break;
       case LONG_ARRAY:
-        dataTableBuilder.setColumn(columnIndex, (long[]) value);
+        if (value instanceof LongArrayList) {
+          dataTableBuilder.setColumn(columnIndex, ((LongArrayList) value).elements());
+        } else {
+          dataTableBuilder.setColumn(columnIndex, (long[]) value);
+        }
         break;
       case FLOAT_ARRAY:
-        dataTableBuilder.setColumn(columnIndex, (float[]) value);
+        if (value instanceof FloatArrayList) {
+          dataTableBuilder.setColumn(columnIndex, ((FloatArrayList) value).elements());
+        } else {
+          dataTableBuilder.setColumn(columnIndex, (float[]) value);
+        }
         break;
       case DOUBLE_ARRAY:
         if (value instanceof DoubleArrayList) {
@@ -256,7 +272,12 @@ public class GroupByResultsBlock extends BaseResultsBlock {
         }
         break;
       case STRING_ARRAY:
-        dataTableBuilder.setColumn(columnIndex, (String[]) value);
+        if (value instanceof ObjectArrayList) {
+          //noinspection unchecked
+          dataTableBuilder.setColumn(columnIndex, ((ObjectArrayList<String>) value).elements());
+        } else {
+          dataTableBuilder.setColumn(columnIndex, (String[]) value);
+        }
         break;
       case OBJECT:
         dataTableBuilder.setColumn(columnIndex, value);

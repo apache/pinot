@@ -97,6 +97,7 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
@@ -684,7 +685,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(exceptions);
       }
 
-      // Set the maximum serialized response size per server
+      // Set the maximum serialized response size per server, and ask server to directly return final response when only
+      // one server is queried
       int numServers = 0;
       if (offlineRoutingTable != null) {
         numServers += offlineRoutingTable.size();
@@ -692,14 +694,29 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (realtimeRoutingTable != null) {
         numServers += realtimeRoutingTable.size();
       }
-
       if (offlineBrokerRequest != null) {
-        setMaxServerResponseSizeBytes(numServers, offlineBrokerRequest.getPinotQuery().getQueryOptions(),
-            offlineTableConfig);
+        Map<String, String> queryOptions = offlineBrokerRequest.getPinotQuery().getQueryOptions();
+        setMaxServerResponseSizeBytes(numServers, queryOptions, offlineTableConfig);
+        // Set the query option to directly return final result for single server query unless it is explicitly disabled
+        if (numServers == 1) {
+          if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
+              && offlineBrokerRequest != serverBrokerRequest) {
+            serverBrokerRequest.getPinotQuery().getQueryOptions()
+                .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+          }
+        }
       }
       if (realtimeBrokerRequest != null) {
-        setMaxServerResponseSizeBytes(numServers, realtimeBrokerRequest.getPinotQuery().getQueryOptions(),
-            realtimeTableConfig);
+        Map<String, String> queryOptions = realtimeBrokerRequest.getPinotQuery().getQueryOptions();
+        setMaxServerResponseSizeBytes(numServers, queryOptions, realtimeTableConfig);
+        // Set the query option to directly return final result for single server query unless it is explicitly disabled
+        if (numServers == 1) {
+          if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
+              && offlineBrokerRequest != serverBrokerRequest) {
+            serverBrokerRequest.getPinotQuery().getQueryOptions()
+                .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+          }
+        }
       }
 
       // Execute the query
@@ -1672,72 +1689,62 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
               timeSpentMs, queryTimeoutMs, tableNameWithType);
       throw new TimeoutException(errorMessage);
     }
-    queryOptions.put(Broker.Request.QueryOptionKey.TIMEOUT_MS, Long.toString(remainingTimeMs));
+    queryOptions.put(QueryOptionKey.TIMEOUT_MS, Long.toString(remainingTimeMs));
     return remainingTimeMs;
   }
 
   /**
    * Sets a query option indicating the maximum response size that can be sent from a server to the broker. This size
    * is measured for the serialized response.
+   *
+   * The overriding order of priority is:
+   * 1. QueryOption  -> maxServerResponseSizeBytes
+   * 2. QueryOption  -> maxQueryResponseSizeBytes
+   * 3. TableConfig  -> maxServerResponseSizeBytes
+   * 4. TableConfig  -> maxQueryResponseSizeBytes
+   * 5. BrokerConfig -> maxServerResponseSizeBytes
+   * 6. BrokerConfig -> maxServerResponseSizeBytes
    */
   private void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
-      TableConfig tableConfig) {
-    if (numServers == 0) {
-      return;
-    }
-
-    // The overriding order of priority is:
-    // 1. QueryOption  -> maxServerResponseSizeBytes
-    // 2. QueryOption  -> maxQueryResponseSizeBytes
-    // 3. TableConfig  -> maxServerResponseSizeBytes
-    // 4. TableConfig  -> maxQueryResponseSizeBytes
-    // 5. BrokerConfig -> maxServerResponseSizeBytes
-    // 6. BrokerConfig -> maxServerResponseSizeBytes
-
+      @Nullable TableConfig tableConfig) {
     // QueryOption
     if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
       return;
     }
-    Long maxQueryResponseSizeQOption = QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions);
-    if (maxQueryResponseSizeQOption != null) {
-      Long maxServerResponseSize = maxQueryResponseSizeQOption / numServers;
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxServerResponseSize));
+    Long maxQueryResponseSizeQueryOption = QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions);
+    if (maxQueryResponseSizeQueryOption != null) {
+      queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxQueryResponseSizeQueryOption / numServers));
       return;
     }
 
     // TableConfig
-    Preconditions.checkState(tableConfig != null);
-    QueryConfig queryConfig = tableConfig.getQueryConfig();
-    if (queryConfig != null && queryConfig.getMaxServerResponseSizeBytes() != null) {
-      Long maxServerResponseSize = queryConfig.getMaxServerResponseSizeBytes();
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxServerResponseSize));
-      return;
-    }
-    if (queryConfig != null && queryConfig.getMaxQueryResponseSizeBytes() != null) {
-      Long maxQueryResponseSize = queryConfig.getMaxQueryResponseSizeBytes();
-      Long maxServerResponseSize = maxQueryResponseSize / numServers;
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxServerResponseSize));
-      return;
+    if (tableConfig != null && tableConfig.getQueryConfig() != null) {
+      QueryConfig queryConfig = tableConfig.getQueryConfig();
+      if (queryConfig.getMaxServerResponseSizeBytes() != null) {
+        queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+            Long.toString(queryConfig.getMaxServerResponseSizeBytes()));
+        return;
+      }
+      if (queryConfig.getMaxQueryResponseSizeBytes() != null) {
+        queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+            Long.toString(queryConfig.getMaxQueryResponseSizeBytes() / numServers));
+        return;
+      }
     }
 
     // BrokerConfig
-    Long maxServerResponseSizeCfg = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES,
-        Broker.DEFAULT_MAX_SERVER_RESPONSE_SIZE_BYTES);
-    Long maxQueryResponseSizeCfg = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES,
-        Broker.DEFAULT_MAX_QUERY_RESPONSE_SIZE_BYTES);
-
-    if (maxServerResponseSizeCfg > 0) {
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxServerResponseSizeCfg));
+    Long maxServerResponseSizeBrokerConfig =
+        _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES, Long.class);
+    if (maxServerResponseSizeBrokerConfig != null) {
+      queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, Long.toString(maxServerResponseSizeBrokerConfig));
       return;
     }
-    if (maxQueryResponseSizeCfg > 0) {
-      Long maxServerResponseSize = maxQueryResponseSizeCfg / numServers;
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxServerResponseSize));
+    Long maxQueryResponseSizeBrokerConfig =
+        _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES, Long.class);
+    if (maxQueryResponseSizeBrokerConfig != null) {
+      queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxQueryResponseSizeBrokerConfig / numServers));
     }
   }
 
@@ -1769,7 +1776,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             numReplicaGroupsToQuery);
       }
     } catch (NumberFormatException e) {
-      String numReplicaGroupsToQuery = queryOptions.get(Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
+      String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
       throw new IllegalStateException(
           String.format("numReplicaGroups must be a positive number, got: %s", numReplicaGroupsToQuery));
     }
