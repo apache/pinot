@@ -47,6 +47,7 @@ public class ExecutionStats {
   private static final String BROKER_REDUCE_TIME_MS = "brokerReduceTimeMs";
   private static final String TIME_USED_MS = "timeUsedMs";
   private static final String PARTIAL_RESULT = "partialResult";
+  private static final String IS_ACCURATE_GROUPBY = "isAccurateGroupBy";
 
   private final JsonNode _brokerResponse;
 
@@ -111,6 +112,10 @@ public class ExecutionStats {
     return _brokerResponse.has(NUM_GROUPS_LIMIT_REACHED) && _brokerResponse.get(NUM_GROUPS_LIMIT_REACHED).asBoolean();
   }
 
+  public boolean isAccurateGroupBy() {
+    return _brokerResponse.has(IS_ACCURATE_GROUPBY) && _brokerResponse.get(IS_ACCURATE_GROUPBY).asBoolean();
+  }
+
   public boolean isPartialResult() {
     return _brokerResponse.has(PARTIAL_RESULT) && _brokerResponse.get(PARTIAL_RESULT).asBoolean();
   }
@@ -141,6 +146,7 @@ public class ExecutionStats {
     map.put(BROKER_REDUCE_TIME_MS, getBrokerReduceTimeMs() + "ms");
     map.put(TIME_USED_MS, getTimeUsedMs() + "ms");
     map.put(PARTIAL_RESULT, isPartialResult());
+    map.put(IS_ACCURATE_GROUPBY, isAccurateGroupBy());
     return map.toString();
   }
 }

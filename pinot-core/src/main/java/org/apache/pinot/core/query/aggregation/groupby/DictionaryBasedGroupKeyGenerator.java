@@ -98,6 +98,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private final int _globalGroupIdUpperBound;
   private final RawKeyHolder _rawKeyHolder;
 
+  private boolean _globalGroupKeyLimitReached;
+
+
   public DictionaryBasedGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold) {
     assert numGroupsLimit >= arrayBasedThreshold;
@@ -174,6 +177,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   @Override
   public int getGlobalGroupKeyUpperBound() {
     return _globalGroupIdUpperBound;
+  }
+
+  @Override
+  public boolean globalGroupKeyLimitReached() {
+    return _globalGroupKeyLimitReached;
   }
 
   @Override
@@ -294,14 +302,18 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     private void markGroups(int numDocs, int[] groupIds) {
-      if (_numKeys < _globalGroupIdUpperBound) {
-        for (int i = 0; i < numDocs; i++) {
-          if (!_flags[groupIds[i]]) {
-            _numKeys++;
-            _flags[groupIds[i]] = true;
-            if (_numKeys == _globalGroupIdUpperBound) {
-              return;
-            }
+      if (_numKeys >= _globalGroupIdUpperBound) {
+        _globalGroupKeyLimitReached = true;
+        return;
+      }
+
+      for (int i = 0; i < numDocs; i++) {
+        if (!_flags[groupIds[i]]) {
+          _numKeys++;
+          _flags[groupIds[i]] = true;
+          if (_numKeys == _globalGroupIdUpperBound) {
+            _globalGroupKeyLimitReached = true;
+            return;
           }
         }
       }
@@ -401,6 +413,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private void processSingleValue(int numDocs, int[] dictIds, int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         outGroupIds[i] = _groupIdMap.getGroupId(dictIds[i], _globalGroupIdUpperBound);
+        if (outGroupIds[i] == INVALID_ID) {
+          _globalGroupKeyLimitReached = true;
+        }
       }
     }
 
@@ -411,6 +426,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
           rawKey = rawKey * _cardinalities[j] + _singleValueDictIds[j][i];
         }
         outGroupIds[i] = _groupIdMap.getGroupId(rawKey, _globalGroupIdUpperBound);
+        if (outGroupIds[i] == INVALID_ID) {
+          _globalGroupKeyLimitReached = true;
+        }
       }
     }
 
@@ -421,6 +439,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         int length = groupIds.length;
         for (int j = 0; j < length; j++) {
           groupIds[j] = _groupIdMap.getGroupId(groupIds[j], _globalGroupIdUpperBound);
+          if (groupIds[j] == INVALID_ID) {
+            _globalGroupKeyLimitReached = true;
+          }
         }
         outGroupIds[i] = groupIds;
       }
@@ -632,6 +653,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         int id = _groupIdMap.putIfAbsent(rawKey, numGroups);
         return id == INVALID_ID ? numGroups : id;
       } else {
+        _globalGroupKeyLimitReached = true;
         return _groupIdMap.get(rawKey);
       }
     }
@@ -811,6 +833,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       if (numGroups < _globalGroupIdUpperBound) {
         return _groupIdMap.computeIntIfAbsent(rawKey, k -> numGroups);
       } else {
+        _globalGroupKeyLimitReached = true;
         return _groupIdMap.getInt(rawKey);
       }
     }

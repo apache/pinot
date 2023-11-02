@@ -80,6 +80,7 @@ public class DefaultRequestContext implements RequestScope {
   private long _explainPlanNumMatchAllFilterSegments;
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<String> _processingExceptions = new ArrayList<>();
+  private boolean _isAccurateGroupBy;
 
   public DefaultRequestContext() {
   }
@@ -338,6 +339,11 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public boolean isAccurateGroupBy() {
+    return _isAccurateGroupBy;
+  }
+
+  @Override
   public int getNumExceptions() {
     return _numExceptions;
   }
@@ -415,6 +421,11 @@ public class DefaultRequestContext implements RequestScope {
   @Override
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _isNumGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @Override
+  public void setIsAccurateGroupBy(boolean isAccurateGroupBy) {
+    _isAccurateGroupBy = isAccurateGroupBy;
   }
 
   @Override

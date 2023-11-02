@@ -53,6 +53,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   private final QueryContext _queryContext;
 
   private boolean _numGroupsLimitReached;
+  private boolean _isAccurateGroupBy;
   private int _numResizes;
   private long _resizeTimeMs;
 
@@ -118,8 +119,16 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     return _numGroupsLimitReached;
   }
 
+  public boolean isAccurateGroupBy() {
+    return _isAccurateGroupBy;
+  }
+
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  public void setIsAccurateGroupBy(boolean isAccurateGroupBy) {
+    _isAccurateGroupBy = isAccurateGroupBy;
   }
 
   public int getNumResizes() {

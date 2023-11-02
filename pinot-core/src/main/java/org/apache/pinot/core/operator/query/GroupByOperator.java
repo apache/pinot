@@ -108,7 +108,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     // Check if the groups limit is reached
-    boolean numGroupsLimitReached = groupByExecutor.getNumGroups() >= _queryContext.getNumGroupsLimit();
+    boolean numGroupsLimitReached = groupByExecutor.numGroupsLimitReached();
     Tracing.activeRecording().setNumGroups(_queryContext.getNumGroupsLimit(), groupByExecutor.getNumGroups());
 
     // Trim the groups when iff:
@@ -125,12 +125,14 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        resultsBlock.setIsAccurateGroupBy(false);
         return resultsBlock;
       }
     }
 
     GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, groupByExecutor.getResult(), _queryContext);
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+    resultsBlock.setIsAccurateGroupBy(!numGroupsLimitReached);
     return resultsBlock;
   }
 

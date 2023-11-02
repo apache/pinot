@@ -47,7 +47,8 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs",
     "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
     "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
-    "realtimeTotalCpuTimeNs", "brokerReduceTimeMs", "segmentStatistics", "traceInfo", "partialResult"})
+    "realtimeTotalCpuTimeNs", "brokerReduceTimeMs", "segmentStatistics", "traceInfo", "partialResult",
+    "isAccurateGroupBy"})
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
@@ -98,6 +99,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
   private List<String> _segmentStatistics = new ArrayList<>();
+  private boolean _isAccurateGroupBy = true;
 
   public BrokerResponseNative() {
   }
@@ -492,6 +494,17 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("numGroupsLimitReached")
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @JsonProperty("isAccurateGroupBy")
+  @Override
+  public boolean isAccurateGroupBy() {
+    return _isAccurateGroupBy;
+  }
+
+  @JsonProperty("isAccurateGroupBy")
+  public void setIsAccurateGroupBy(boolean isAccurateGroupBy) {
+    _isAccurateGroupBy = isAccurateGroupBy;
   }
 
   @JsonProperty("partialResult")

@@ -71,6 +71,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
   private volatile IndexedTable _indexedTable;
   private volatile boolean _numGroupsLimitReached;
+  private volatile boolean _isAccurateGroupBy;
+
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -100,6 +102,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
+    _isAccurateGroupBy = true;
   }
 
   /**
@@ -150,11 +153,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           }
         }
 
-        // Set groups limit reached flag.
-        if (resultsBlock.isNumGroupsLimitReached()) {
-          _numGroupsLimitReached = true;
-        }
-
         // Merge aggregation group-by result.
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
         Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
@@ -187,6 +185,14 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
             mergedKeys++;
           }
+        }
+
+        // Set groups limit reached flag.
+        if (resultsBlock.isNumGroupsLimitReached()) {
+          _numGroupsLimitReached = true;
+        }
+        if (!resultsBlock.isAccurateGroupBy()) {
+          _isAccurateGroupBy = false;
         }
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
@@ -246,6 +252,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
     GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable, _queryContext);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
+    _isAccurateGroupBy &= !_indexedTable.isResultTrimmed();
+    mergedBlock.setIsAccurateGroupBy(_isAccurateGroupBy);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
     return mergedBlock;

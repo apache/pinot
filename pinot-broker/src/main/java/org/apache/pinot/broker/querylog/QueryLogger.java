@@ -112,7 +112,7 @@ public class QueryLogger {
 
   private boolean shouldForceLog(QueryLogParams params) {
     return params._response.isNumGroupsLimitReached() || params._response.getExceptionsSize() > 0
-        || params._timeUsedMs > TimeUnit.SECONDS.toMillis(1);
+        || params._timeUsedMs > TimeUnit.SECONDS.toMillis(1) || !params._response.isAccurateGroupBy();
   }
 
   public static class QueryLogParams {
@@ -259,6 +259,12 @@ public class QueryLogger {
         } else {
           builder.append(CommonConstants.UNKNOWN);
         }
+      }
+    },
+    IS_ACCURATE_GROUPBY("isAccurateGroupBy") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.isAccurateGroupBy());
       }
     };
 
