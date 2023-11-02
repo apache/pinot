@@ -52,11 +52,11 @@ public class MinionConfTest {
     }
 
     // Check configs with new names that have the pinot.minion prefix.
-    PropertiesConfiguration config1 = new PropertiesConfiguration();
+    config = new PropertiesConfiguration();
     CommonsConfigurationUtils.loadPropertiesConfiguration(config,
         PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-new-minion.properties")
             .getFile());
-    rawCfg = new PinotConfiguration(config1);
+    rawCfg = new PinotConfiguration(config);
     final MinionConf newConfig = new MinionConf(rawCfg.toMap());
     for (String cfgKey : cfgKeys) {
       Assert.assertTrue(newConfig.subset(cfgKey).isEmpty(), cfgKey);

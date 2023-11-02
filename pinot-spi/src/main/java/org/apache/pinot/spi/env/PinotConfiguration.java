@@ -30,6 +30,7 @@ import org.apache.commons.configuration2.CompositeConfiguration;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.convert.DefaultListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
@@ -162,8 +163,11 @@ public class PinotConfiguration {
 
         .map(PinotConfiguration::loadProperties);
 
-    return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(MapConfiguration::new),
-        propertiesFromConfigPaths).collect(Collectors.toList());
+    return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(e -> {
+      MapConfiguration mapConfiguration = new MapConfiguration(e);
+      mapConfiguration.setListDelimiterHandler(new DefaultListDelimiterHandler(','));
+      return mapConfiguration;
+    }), propertiesFromConfigPaths).collect(Collectors.toList());
   }
 
   private static String getProperty(String name, Configuration configuration) {
