@@ -162,6 +162,7 @@ public class AggregateOperator extends MultiStageOperator {
         if (_groupByExecutor.isNumGroupsLimitReached()) {
           OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
           operatorStats.recordSingleStat(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+          _inputOperator.earlyTerminate();
         }
         return dataBlock;
       }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -37,6 +39,7 @@ import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -642,15 +645,20 @@ public class HashJoinOperatorTest {
         PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "1");
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, getJoinHints(hintsMap));
-    HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+
+    OpChainExecutionContext context = OperatorTestUtil.getDefaultContext();
+    HashJoinOperator join = new HashJoinOperator(context, _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     Mockito.verify(_rightOperator).earlyTerminate();
     Assert.assertFalse(result.isErrorBlock());
     Assert.assertEquals(result.getNumRows(), 1);
-    Assert.assertTrue(result.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
-        .contains("reach number of rows limit"));
+
+    String operatorId =
+        Joiner.on("_").join(HashJoinOperator.class.getSimpleName(), context.getStageId(), context.getServer());
+    OperatorStats operatorStats = context.getStats().getOperatorStats(context, operatorId);
+    Assert.assertEquals(operatorStats.getExecutionStats().get(DataTable.MetadataKey.NUM_JOIN_LIMIT_REACHED.getName()),
+        "true");
   }
 }
 // TODO: Add more inequi join tests.
