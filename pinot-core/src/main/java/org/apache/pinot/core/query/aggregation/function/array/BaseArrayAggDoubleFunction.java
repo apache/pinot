@@ -23,14 +23,15 @@ import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public abstract class BaseArrayAggDoubleFunction<I extends AbstractDoubleCollection>
     extends BaseArrayAggFunction<I, DoubleArrayList> {
-  public BaseArrayAggDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, FieldSpec.DataType.DOUBLE, nullHandlingEnabled);
+  public BaseArrayAggDoubleFunction(ExpressionContext expression, NullMode nullMode) {
+    super(expression, FieldSpec.DataType.DOUBLE, nullMode);
   }
 
   abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, double value);

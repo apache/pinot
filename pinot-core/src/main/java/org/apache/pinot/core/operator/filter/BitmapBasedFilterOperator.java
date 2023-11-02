@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -33,7 +34,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private final boolean _exclusive;
 
   public BitmapBasedFilterOperator(ImmutableRoaringBitmap docIds, boolean exclusive, int numDocs) {
-    super(numDocs, false);
+    super(numDocs, NullMode.NONE_NULLABLE);
     _docIds = docIds;
     _exclusive = exclusive;
   }

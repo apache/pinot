@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 public class NotFilterOperator extends BaseFilterOperator {
@@ -32,8 +33,8 @@ public class NotFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_NOT";
   private final BaseFilterOperator _filterOperator;
 
-  public NotFilterOperator(BaseFilterOperator filterOperator, int numDocs, boolean nullHandlingEnabled) {
-    super(numDocs, nullHandlingEnabled);
+  public NotFilterOperator(BaseFilterOperator filterOperator, int numDocs, NullMode nullMode) {
+    super(numDocs, nullMode);
     _filterOperator = filterOperator;
   }
 

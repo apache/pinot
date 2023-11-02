@@ -35,6 +35,7 @@ import org.apache.pinot.core.query.aggregation.function.array.ArrayAggLongFuncti
 import org.apache.pinot.core.query.aggregation.function.array.ArrayAggStringFunction;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelCountAggregationFunctionFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
@@ -51,7 +52,7 @@ public class AggregationFunctionFactory {
    * Given the function information, returns a new instance of the corresponding aggregation function.
    * <p>NOTE: Underscores in the function name are ignored.
    */
-  public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
+  public static AggregationFunction getAggregationFunction(FunctionContext function, NullMode nullMode) {
     try {
       String upperCaseFunctionName =
           AggregationFunctionType.getNormalizedAggregationFunctionName(function.getFunctionName());
@@ -195,18 +196,18 @@ public class AggregationFunctionFactory {
         AggregationFunctionType functionType = AggregationFunctionType.valueOf(upperCaseFunctionName);
         switch (functionType) {
           case COUNT:
-            return new CountAggregationFunction(arguments, nullHandlingEnabled);
+            return new CountAggregationFunction(arguments, nullMode);
           case MIN:
-            return new MinAggregationFunction(arguments, nullHandlingEnabled);
+            return new MinAggregationFunction(arguments, nullMode);
           case MAX:
-            return new MaxAggregationFunction(arguments, nullHandlingEnabled);
+            return new MaxAggregationFunction(arguments, nullMode);
           case SUM:
           case SUM0:
-            return new SumAggregationFunction(arguments, nullHandlingEnabled);
+            return new SumAggregationFunction(arguments, nullMode);
           case SUMPRECISION:
-            return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
+            return new SumPrecisionAggregationFunction(arguments, nullMode);
           case AVG:
-            return new AvgAggregationFunction(arguments, nullHandlingEnabled);
+            return new AvgAggregationFunction(arguments, nullMode);
           case MODE:
             return new ModeAggregationFunction(arguments);
           case FIRSTWITHTIME: {
@@ -257,16 +258,16 @@ public class AggregationFunctionFactory {
               switch (dataType) {
                 case BOOLEAN:
                 case INT:
-                  return new ArrayAggDistinctIntFunction(firstArgument, dataType, nullHandlingEnabled);
+                  return new ArrayAggDistinctIntFunction(firstArgument, dataType, nullMode);
                 case LONG:
                 case TIMESTAMP:
-                  return new ArrayAggDistinctLongFunction(firstArgument, dataType, nullHandlingEnabled);
+                  return new ArrayAggDistinctLongFunction(firstArgument, dataType, nullMode);
                 case FLOAT:
-                  return new ArrayAggDistinctFloatFunction(firstArgument, nullHandlingEnabled);
+                  return new ArrayAggDistinctFloatFunction(firstArgument, nullMode);
                 case DOUBLE:
-                  return new ArrayAggDistinctDoubleFunction(firstArgument, nullHandlingEnabled);
+                  return new ArrayAggDistinctDoubleFunction(firstArgument, nullMode);
                 case STRING:
-                  return new ArrayAggDistinctStringFunction(firstArgument, nullHandlingEnabled);
+                  return new ArrayAggDistinctStringFunction(firstArgument, nullMode);
                 default:
                   throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
               }
@@ -274,16 +275,16 @@ public class AggregationFunctionFactory {
             switch (dataType) {
               case BOOLEAN:
               case INT:
-                return new ArrayAggIntFunction(firstArgument, dataType, nullHandlingEnabled);
+                return new ArrayAggIntFunction(firstArgument, dataType, nullMode);
               case LONG:
               case TIMESTAMP:
-                return new ArrayAggLongFunction(firstArgument, dataType, nullHandlingEnabled);
+                return new ArrayAggLongFunction(firstArgument, dataType, nullMode);
               case FLOAT:
-                return new ArrayAggFloatFunction(firstArgument, nullHandlingEnabled);
+                return new ArrayAggFloatFunction(firstArgument, nullMode);
               case DOUBLE:
-                return new ArrayAggDoubleFunction(firstArgument, nullHandlingEnabled);
+                return new ArrayAggDoubleFunction(firstArgument, nullMode);
               case STRING:
-                return new ArrayAggStringFunction(firstArgument, nullHandlingEnabled);
+                return new ArrayAggStringFunction(firstArgument, nullMode);
               default:
                 throw new IllegalArgumentException("Unsupported data type for ARRAY_AGG: " + dataType);
             }
@@ -318,7 +319,7 @@ public class AggregationFunctionFactory {
           case MINMAXRANGE:
             return new MinMaxRangeAggregationFunction(arguments);
           case DISTINCTCOUNT:
-            return new DistinctCountAggregationFunction(arguments, nullHandlingEnabled);
+            return new DistinctCountAggregationFunction(arguments, nullMode);
           case DISTINCTCOUNTBITMAP:
             return new DistinctCountBitmapAggregationFunction(arguments);
           case SEGMENTPARTITIONEDDISTINCTCOUNT:
@@ -336,9 +337,9 @@ public class AggregationFunctionFactory {
           case DISTINCTCOUNTRAWTHETASKETCH:
             return new DistinctCountRawThetaSketchAggregationFunction(arguments);
           case DISTINCTSUM:
-            return new DistinctSumAggregationFunction(arguments, nullHandlingEnabled);
+            return new DistinctSumAggregationFunction(arguments, nullMode);
           case DISTINCTAVG:
-            return new DistinctAvgAggregationFunction(arguments, nullHandlingEnabled);
+            return new DistinctAvgAggregationFunction(arguments, nullMode);
           case IDSET:
             return new IdSetAggregationFunction(arguments);
           case COUNTMV:
@@ -382,17 +383,17 @@ public class AggregationFunctionFactory {
           case COVARSAMP:
             return new CovarianceAggregationFunction(arguments, true);
           case BOOLAND:
-            return new BooleanAndAggregationFunction(arguments, nullHandlingEnabled);
+            return new BooleanAndAggregationFunction(arguments, nullMode);
           case BOOLOR:
-            return new BooleanOrAggregationFunction(arguments, nullHandlingEnabled);
+            return new BooleanOrAggregationFunction(arguments, nullMode);
           case VARPOP:
-            return new VarianceAggregationFunction(arguments, false, false, nullHandlingEnabled);
+            return new VarianceAggregationFunction(arguments, false, false, nullMode);
           case VARSAMP:
-            return new VarianceAggregationFunction(arguments, true, false, nullHandlingEnabled);
+            return new VarianceAggregationFunction(arguments, true, false, nullMode);
           case STDDEVPOP:
-            return new VarianceAggregationFunction(arguments, false, true, nullHandlingEnabled);
+            return new VarianceAggregationFunction(arguments, false, true, nullMode);
           case STDDEVSAMP:
-            return new VarianceAggregationFunction(arguments, true, true, nullHandlingEnabled);
+            return new VarianceAggregationFunction(arguments, true, true, nullMode);
           case SKEWNESS:
             return new FourthMomentAggregationFunction(arguments, FourthMomentAggregationFunction.Type.SKEWNESS);
           case KURTOSIS:

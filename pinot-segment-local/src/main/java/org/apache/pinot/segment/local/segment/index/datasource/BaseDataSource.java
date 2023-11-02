@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.datasource;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -110,7 +111,24 @@ public abstract class BaseDataSource implements DataSource {
 
   @Nullable
   @Override
-  public NullValueVectorReader getNullValueVector() {
-    return getIndex(StandardIndexes.nullValueVector());
+  public NullValueVectorReader getNullValueVector(NullMode nullMode) {
+    switch (nullMode) {
+      case NONE_NULLABLE: {
+        return null;
+      }
+      case ALL_NULLABLE: {
+        return getIndex(StandardIndexes.nullValueVector());
+      }
+      case COLUMN_BASED: {
+        if (_dataSourceMetadata.getFieldSpec().getNullable()) {
+          return getIndex(StandardIndexes.nullValueVector());
+        } else {
+          return null;
+        }
+      }
+      default: {
+        throw new IllegalArgumentException("Mode " + nullMode + " is not recognized");
+      }
+    }
   }
 }

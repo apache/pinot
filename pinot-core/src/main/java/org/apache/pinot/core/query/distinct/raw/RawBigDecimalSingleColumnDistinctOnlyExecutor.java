@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.distinct.raw;
 import java.math.BigDecimal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -30,8 +31,8 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class RawBigDecimalSingleColumnDistinctOnlyExecutor extends BaseRawBigDecimalSingleColumnDistinctExecutor {
 
   public RawBigDecimalSingleColumnDistinctOnlyExecutor(ExpressionContext expression, DataType dataType, int limit,
-      boolean nullHandlingEnabled) {
-    super(expression, dataType, limit, nullHandlingEnabled);
+      NullMode nullMode) {
+    super(expression, dataType, limit, nullMode);
   }
 
   @Override

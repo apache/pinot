@@ -108,7 +108,7 @@ public class AggregationResultsBlock extends BaseResultsBlock {
     int numColumns = columnDataTypes.length;
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
     boolean returnFinalResult = _queryContext.isServerReturnFinalResult();
-    if (_queryContext.isNullHandlingEnabled()) {
+    if (_queryContext.getNullMode().nullAtQueryTime()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       for (int i = 0; i < numColumns; i++) {
         nullBitmaps[i] = new RoaringBitmap();

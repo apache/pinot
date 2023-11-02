@@ -50,7 +50,7 @@ public class DistinctResultsBlockMerger implements ResultsBlockMerger<DistinctRe
     if (!mergedDistinctTable.isMainTable()) {
       DistinctTable mainDistinctTable =
           new DistinctTable(distinctTableToMerge.getDataSchema(), _queryContext.getOrderByExpressions(),
-              _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
+              _queryContext.getLimit(), _queryContext.getNullMode());
       mainDistinctTable.mergeTable(mergedDistinctTable);
       mergedBlock.setDistinctTable(mainDistinctTable);
       mergedDistinctTable = mainDistinctTable;

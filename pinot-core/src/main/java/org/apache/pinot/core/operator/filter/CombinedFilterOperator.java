@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.trace.Tracing;
 
 
@@ -40,7 +41,7 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   public CombinedFilterOperator(BaseFilterOperator mainFilterOperator, BaseFilterOperator subFilterOperator,
       Map<String, String> queryOptions) {
     // This filter operator does not support AND/OR/NOT operations.
-    super(0, false);
+    super(0, NullMode.NONE_NULLABLE);
     assert !mainFilterOperator.isResultEmpty() && !mainFilterOperator.isResultMatchingAll()
         && !subFilterOperator.isResultEmpty() && !subFilterOperator.isResultMatchingAll();
     _mainFilterOperator = mainFilterOperator;

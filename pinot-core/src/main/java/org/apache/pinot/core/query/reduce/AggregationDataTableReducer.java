@@ -85,7 +85,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
       for (int i = 0; i < numAggregationFunctions; i++) {
         Object intermediateResultToMerge;
         ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
-        if (_queryContext.isNullHandlingEnabled()) {
+        if (_queryContext.getNullMode().nullAtQueryTime()) {
           RoaringBitmap nullBitmap = dataTable.getNullRowIds(i);
           if (nullBitmap != null && nullBitmap.contains(0)) {
             intermediateResultToMerge = null;
@@ -119,7 +119,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     Object[] finalResults = new Object[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
-      if (_queryContext.isNullHandlingEnabled()) {
+      if (_queryContext.getNullMode().nullAtQueryTime()) {
         RoaringBitmap nullBitmap = dataTable.getNullRowIds(i);
         if (nullBitmap != null && nullBitmap.contains(0)) {
           finalResults[i] = null;

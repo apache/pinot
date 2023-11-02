@@ -27,6 +27,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 /**
@@ -35,7 +36,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class DistinctSumMVAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
   public DistinctSumMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "DISTINCT_SUM_MV"), AggregationFunctionType.DISTINCTSUMMV, false);
+    super(verifySingleArgument(arguments, "DISTINCT_SUM_MV"), AggregationFunctionType.DISTINCTSUMMV,
+        NullMode.NONE_NULLABLE);
   }
 
   @Override

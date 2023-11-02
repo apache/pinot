@@ -50,6 +50,7 @@ import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -61,7 +62,8 @@ import org.roaringbitmap.RoaringBitmap;
 public class AggregateOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
-      new CountAggregationFunction(Collections.singletonList(ExpressionContext.forIdentifier("*")), false);
+      new CountAggregationFunction(Collections.singletonList(ExpressionContext.forIdentifier("*")),
+          NullMode.NONE_NULLABLE);
   private static final ExpressionContext PLACEHOLDER_IDENTIFIER = ExpressionContext.forIdentifier("__PLACEHOLDER__");
 
   private final MultiStageOperator _inputOperator;
@@ -248,7 +250,7 @@ public class AggregateOperator extends MultiStageOperator {
     }
 
     return AggregationFunctionFactory.getAggregationFunction(
-        new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
+        new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), NullMode.ALL_NULLABLE);
   }
 
   private static AggregationFunction<?, ?> getAggFunctionForIntermediateInput(RexExpression.FunctionCall functionCall,
@@ -266,7 +268,7 @@ public class AggregateOperator extends MultiStageOperator {
       return AggregationFunctionFactory.getAggregationFunction(
           new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, Collections.singletonList(
               ExpressionContext.forIdentifier(fromColIdToIdentifier(((RexExpression.InputRef) operand).getIndex())))),
-          true);
+          NullMode.ALL_NULLABLE);
     } else {
       int numExpectedArguments = numArgumentsLiteral.getIntValue();
       List<ExpressionContext> arguments = new ArrayList<>(numExpectedArguments);
@@ -281,7 +283,7 @@ public class AggregateOperator extends MultiStageOperator {
         }
       }
       return AggregationFunctionFactory.getAggregationFunction(
-          new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), true);
+          new FunctionContext(FunctionContext.Type.AGGREGATION, functionName, arguments), NullMode.ALL_NULLABLE);
     }
   }
 

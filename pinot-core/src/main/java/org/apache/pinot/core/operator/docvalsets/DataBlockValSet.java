@@ -24,6 +24,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
@@ -53,8 +54,15 @@ public class DataBlockValSet implements BlockValSet {
 
   @Nullable
   @Override
-  public RoaringBitmap getNullBitmap() {
-    return _nullBitmap;
+  public RoaringBitmap getNullBitmap(NullMode nullMode) {
+    switch (nullMode) {
+      case ALL_NULLABLE:
+      case COLUMN_BASED:
+        return _nullBitmap;
+      case NONE_NULLABLE:
+      default:
+        throw new IllegalArgumentException("Null mode " + nullMode + " is not supported in multistage");
+    }
   }
 
   @Override

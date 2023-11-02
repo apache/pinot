@@ -31,20 +31,21 @@ import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
 
-  public MaxAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    this(verifySingleArgument(arguments, "MAX"), nullHandlingEnabled);
+  public MaxAggregationFunction(List<ExpressionContext> arguments, NullMode nullMode) {
+    this(verifySingleArgument(arguments, "MAX"), nullMode);
   }
 
-  protected MaxAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+  protected MaxAggregationFunction(ExpressionContext expression, NullMode nullMode) {
     super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
   }
 
   @Override
@@ -54,7 +55,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return new ObjectAggregationResultHolder();
     }
     return new DoubleAggregationResultHolder(DEFAULT_INITIAL_VALUE);
@@ -62,7 +63,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
     }
     return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, DEFAULT_INITIAL_VALUE);
@@ -72,9 +73,9 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       // TODO: avoid the null bitmap check when it is null or empty for better performance.
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap == null) {
         nullBitmap = new RoaringBitmap();
       }
@@ -220,8 +221,8 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap == null) {
         nullBitmap = new RoaringBitmap();
       }
@@ -265,7 +266,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return aggregationResultHolder.getResult();
     }
     return aggregationResultHolder.getDoubleResult();
@@ -273,7 +274,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return groupByResultHolder.getResult(groupKey);
     }
     return groupByResultHolder.getDoubleResult(groupKey);
@@ -281,7 +282,7 @@ public class MaxAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double merge(Double intermediateMaxResult1, Double intermediateMaxResult2) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       if (intermediateMaxResult1 == null) {
         return intermediateMaxResult2;
       }

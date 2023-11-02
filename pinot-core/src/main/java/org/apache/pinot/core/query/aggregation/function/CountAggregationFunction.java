@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -40,20 +41,23 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   private static final ExpressionContext STAR_TREE_COUNT_STAR_EXPRESSION =
       ExpressionContext.forIdentifier(AggregationFunctionColumnPair.STAR);
 
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
 
-  public CountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    this(verifySingleArgument(arguments, "COUNT"), nullHandlingEnabled);
+  public CountAggregationFunction(List<ExpressionContext> arguments, NullMode nullMode) {
+    this(verifySingleArgument(arguments, "COUNT"), nullMode);
   }
 
-  protected CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+  protected CountAggregationFunction(ExpressionContext expression, NullMode nullMode) {
     super(expression);
     // Consider null values only when null handling is enabled and function is not COUNT(*)
     // Note COUNT on any literal gives same result as COUNT(*)
     // So allow for identifiers that are not * and functions, disable for literals and *
-    _nullHandlingEnabled = nullHandlingEnabled && (
-        (expression.getType() == ExpressionContext.Type.IDENTIFIER && !expression.getIdentifier().equals("*")) || (
-            expression.getType() == ExpressionContext.Type.FUNCTION));
+    if ((expression.getType() == ExpressionContext.Type.IDENTIFIER && !expression.getIdentifier().equals("*")) || (
+        expression.getType() == ExpressionContext.Type.FUNCTION)) {
+      _nullMode = nullMode;
+    } else {
+      _nullMode = NullMode.NONE_NULLABLE;
+    }
   }
 
   @Override
@@ -63,12 +67,12 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
 
   @Override
   public String getResultColumnName() {
-    return _nullHandlingEnabled ? super.getResultColumnName() : COUNT_STAR_RESULT_COLUMN_NAME;
+    return _nullMode.nullAtQueryTime() ? super.getResultColumnName() : COUNT_STAR_RESULT_COLUMN_NAME;
   }
 
   @Override
   public List<ExpressionContext> getInputExpressions() {
-    return _nullHandlingEnabled ? super.getInputExpressions() : Collections.emptyList();
+    return _nullMode.nullAtQueryTime() ? super.getInputExpressions() : Collections.emptyList();
   }
 
   @Override
@@ -86,10 +90,10 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     if (blockValSetMap.isEmpty()) {
       aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
-    } else if (_nullHandlingEnabled) {
+    } else if (_nullMode.nullAtQueryTime()) {
       assert blockValSetMap.size() == 1;
       BlockValSet blockValSet = blockValSetMap.values().iterator().next();
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       int numNulls = 0;
       if (nullBitmap != null) {
         numNulls = nullBitmap.getCardinality();
@@ -115,7 +119,7 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
         int groupKey = groupKeyArray[i];
         groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
       }
-    } else if (_nullHandlingEnabled) {
+    } else if (_nullMode.nullAtQueryTime()) {
       // In Presto, null values are not counted:
       // SELECT count(id) as count, key FROM (VALUES (null, 1), (null, 1), (null, 2), (1, 3), (null, 3)) AS t(id, key)
       // GROUP BY key ORDER BY key DESC;
@@ -126,7 +130,7 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
       //     0 |   1
       assert blockValSetMap.size() == 1;
       BlockValSet blockValSet = blockValSetMap.values().iterator().next();
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         if (nullBitmap.getCardinality() == length) {
           return;

@@ -34,6 +34,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.locationtech.jts.geom.Geometry;
@@ -58,7 +59,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
   public H3InclusionIndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate,
       int numDocs) {
-    super(numDocs, false);
+    super(numDocs, NullMode.NONE_NULLABLE);
     _segment = segment;
     _queryContext = queryContext;
     _predicate = predicate;

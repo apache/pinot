@@ -80,6 +80,6 @@ public class DistinctResultsBlock extends BaseResultsBlock {
       throws IOException {
     Collection<Object[]> rows = getRows();
     return SelectionOperatorUtils.getDataTableFromRows(rows, _distinctTable.getDataSchema(),
-        _queryContext.isNullHandlingEnabled());
+        _queryContext.getNullMode());
   }
 }

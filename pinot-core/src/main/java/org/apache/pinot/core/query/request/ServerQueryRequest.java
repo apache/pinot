@@ -108,7 +108,7 @@ public class ServerQueryRequest {
 
   private static QueryContext getQueryContext(PinotQuery pinotQuery) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(pinotQuery);
-    if (queryContext.isNullHandlingEnabled()) {
+    if (queryContext.getNullMode().nullAtQueryTime()) {
       Preconditions.checkState(DataTableBuilderFactory.getDataTableVersion() >= DataTableFactory.VERSION_4,
           "Null handling cannot be enabled for data table version smaller than 4");
     }

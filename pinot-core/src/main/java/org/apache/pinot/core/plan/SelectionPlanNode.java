@@ -36,6 +36,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
@@ -74,7 +75,7 @@ public class SelectionPlanNode implements PlanNode {
     int numOrderByExpressions = orderByExpressions.size();
     // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
     // expression the operator will return a block whose selection result is a priority queue.
-    int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions, _queryContext.isNullHandlingEnabled());
+    int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions, _queryContext.getNullMode());
     OrderByAlgorithm orderByAlgorithm = OrderByAlgorithm.fromQueryContext(_queryContext);
     if (sortedColumnsPrefixSize > 0 && orderByAlgorithm != OrderByAlgorithm.NAIVE) {
       int maxDocsPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
@@ -133,10 +134,10 @@ public class SelectionPlanNode implements PlanNode {
    * @return the max number that guarantees that from the first expression to the returned number, the index is already
    * sorted.
    */
-  private int getSortedColumnsPrefix(List<OrderByExpressionContext> orderByExpressions, boolean isNullHandlingEnabled) {
+  private int getSortedColumnsPrefix(List<OrderByExpressionContext> orderByExpressions, NullMode nullMode) {
     boolean asc = orderByExpressions.get(0).isAsc();
     for (int i = 0; i < orderByExpressions.size(); i++) {
-      if (!isSorted(orderByExpressions.get(i), asc, isNullHandlingEnabled)) {
+      if (!isSorted(orderByExpressions.get(i), asc, nullMode)) {
         return i;
       }
     }
@@ -144,7 +145,7 @@ public class SelectionPlanNode implements PlanNode {
     return orderByExpressions.size();
   }
 
-  private boolean isSorted(OrderByExpressionContext orderByExpression, boolean asc, boolean isNullHandlingEnabled) {
+  private boolean isSorted(OrderByExpressionContext orderByExpression, boolean asc, NullMode nullMode) {
     switch (orderByExpression.getExpression().getType()) {
       case LITERAL: {
         return true;
@@ -156,8 +157,8 @@ public class SelectionPlanNode implements PlanNode {
         String column = orderByExpression.getExpression().getIdentifier();
         DataSource dataSource = _indexSegment.getDataSource(column);
         // If there are null values, we cannot trust DataSourceMetadata.isSorted
-        if (isNullHandlingEnabled) {
-          NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+        if (nullMode.nullAtQueryTime()) {
+          NullValueVectorReader nullValueVector = dataSource.getNullValueVector(nullMode);
           if (nullValueVector != null && !nullValueVector.getNullBitmap().isEmpty()) {
             return false;
           }

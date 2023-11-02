@@ -38,6 +38,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -56,7 +57,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private final int _globalGroupIdUpperBound;
   // TODO(nhejazi): Most of the logic between _nullHandlingEnabled=true/false is not sharable, so consider making a
   //  base implementation, and 2 derived classes, one for null enabled, one for disabled.
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
 
   private Integer _groupIdForNullValue = null;
   private final boolean _isSingleValueExpression;
@@ -64,13 +65,13 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private int _numGroups = 0;
 
   public NoDictionarySingleColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
-      ExpressionContext groupByExpression, int numGroupsLimit, boolean nullHandlingEnabled) {
+      ExpressionContext groupByExpression, int numGroupsLimit, NullMode nullMode) {
     _groupByExpression = groupByExpression;
     ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
     _storedType = columnContext.getDataType().getStoredType();
     _groupKeyMap = createGroupKeyMap(_storedType);
     _globalGroupIdUpperBound = numGroupsLimit;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
     _isSingleValueExpression = columnContext.isSingleValue();
   }
 
@@ -82,8 +83,8 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   @Override
   public void generateKeysForBlock(ValueBlock valueBlock, int[] groupKeys) {
     BlockValSet blockValSet = valueBlock.getBlockValueSet(_groupByExpression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         generateKeysForBlockNullHandlingEnabled(valueBlock, groupKeys, nullBitmap);
         return;

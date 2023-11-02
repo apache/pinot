@@ -49,6 +49,7 @@ import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -75,7 +76,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
 
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
   // Deduped order-by expressions followed by output expressions from SelectionOperatorUtils.extractExpressions()
   private final List<ExpressionContext> _expressions;
   private final BaseProjectOperator<?> _projectOperator;
@@ -92,7 +93,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
-    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    _nullMode = queryContext.getNullMode();
     _expressions = expressions;
     _projectOperator = projectOperator;
 
@@ -106,8 +107,8 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
 
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
-    _comparator =
-        OrderByComparatorFactory.getComparator(_orderByExpressions, _orderByColumnContexts, _nullHandlingEnabled);
+    _comparator = OrderByComparatorFactory.getComparator(
+        _orderByExpressions, _orderByColumnContexts, _nullMode.nullAtQueryTime());
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         _comparator.reversed());
   }
@@ -150,10 +151,10 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       }
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = valueBlock.getNumDocs();
-      if (_nullHandlingEnabled) {
+      if (_nullMode.nullAtQueryTime()) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
         for (int i = 0; i < numExpressions; i++) {
-          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+          nullBitmaps[i] = blockValSets[i].getNullBitmap(_nullMode);
         }
         for (int rowId = 0; rowId < numDocsFetched; rowId++) {
           // Note: Everytime blockValueFetcher.getRow is called, a new row instance is created.
@@ -206,10 +207,10 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       int numDocsFetched = valueBlock.getNumDocs();
       int[] docIds = valueBlock.getDocIds();
-      if (_nullHandlingEnabled) {
+      if (_nullMode.nullAtQueryTime()) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numOrderByExpressions];
         for (int i = 0; i < numOrderByExpressions; i++) {
-          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+          nullBitmaps[i] = blockValSets[i].getNullBitmap(_nullMode);
         }
         for (int rowId = 0; rowId < numDocsFetched; rowId++) {
           Object[] row = new Object[numExpressions];
@@ -282,10 +283,10 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
       for (int i = 0; i < numDocsFetched; i++) {
         blockValueFetcher.getRow(i, rowList.get(rowBaseId + i), numOrderByExpressions);
       }
-      if (_nullHandlingEnabled) {
+      if (_nullMode.nullAtQueryTime()) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numNonOrderByExpressions];
         for (int i = 0; i < numNonOrderByExpressions; i++) {
-          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+          nullBitmaps[i] = blockValSets[i].getNullBitmap(_nullMode);
         }
         for (int i = 0; i < numDocsFetched; i++) {
           Object[] values = rowList.get(rowBaseId + i);

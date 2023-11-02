@@ -101,11 +101,12 @@ public class AggregationPlanNode implements PlanNode {
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
-    if (canOptimizeFilteredCount(filterOperator, aggregationFunctions) && !_queryContext.isNullHandlingEnabled()) {
+    if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)
+        && !_queryContext.getNullMode().nullAtQueryTime()) {
       return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
     }
 
-    if (filterOperator.isResultMatchingAll() && !_queryContext.isNullHandlingEnabled()) {
+    if (filterOperator.isResultMatchingAll() && !_queryContext.getNullMode().nullAtQueryTime()) {
       if (isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
         for (int i = 0; i < aggregationFunctions.length; i++) {
@@ -121,7 +122,7 @@ public class AggregationPlanNode implements PlanNode {
 
     // Use star-tree to solve the query if possible
     List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
-    if (starTrees != null && !_queryContext.isSkipStarTree() && !_queryContext.isNullHandlingEnabled()) {
+    if (starTrees != null && !_queryContext.isSkipStarTree() && !_queryContext.getNullMode().nullAtQueryTime()) {
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
           StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {

@@ -322,7 +322,8 @@ public class TransformFunctionFactory {
           transformFunctionArguments.add(TransformFunctionFactory.get(argument, columnContextMap, queryContext));
         }
         try {
-          transformFunction.init(transformFunctionArguments, columnContextMap, queryContext.isNullHandlingEnabled());
+          transformFunction.init(transformFunctionArguments, columnContextMap,
+              queryContext.getNullMode().nullAtQueryTime());
         } catch (Exception e) {
           throw new BadQueryRequestException("Caught exception while initializing transform function: " + functionName,
               e);
@@ -330,7 +331,8 @@ public class TransformFunctionFactory {
         return transformFunction;
       case IDENTIFIER:
         String columnName = expression.getIdentifier();
-        return new IdentifierTransformFunction(columnName, columnContextMap.get(columnName));
+        return new IdentifierTransformFunction(columnName, columnContextMap.get(columnName),
+            queryContext.getNullMode());
       case LITERAL:
         return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
             LiteralTransformFunction::new);

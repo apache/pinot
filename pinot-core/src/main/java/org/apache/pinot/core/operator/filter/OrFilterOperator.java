@@ -27,6 +27,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.AndDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.roaringbitmap.buffer.BufferFastAggregation;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -39,8 +40,8 @@ public class OrFilterOperator extends BaseFilterOperator {
   private final Map<String, String> _queryOptions;
 
   public OrFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
-      int numDocs, boolean nullHandlingEnabled) {
-    super(numDocs, nullHandlingEnabled);
+      int numDocs, NullMode nullMode) {
+    super(numDocs, nullMode);
     _filterOperators = filterOperators;
     _queryOptions = queryOptions;
   }

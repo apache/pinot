@@ -81,6 +81,7 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   @Override
   public DataTable getDataTable()
       throws IOException {
-    return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema, _queryContext.isNullHandlingEnabled());
+    return SelectionOperatorUtils.getDataTableFromRows(_rows, _dataSchema,
+        _queryContext.getNullMode());
   }
 }

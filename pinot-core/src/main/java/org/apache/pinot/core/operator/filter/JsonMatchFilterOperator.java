@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -42,7 +43,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
 
   public JsonMatchFilterOperator(JsonIndexReader jsonIndex, JsonMatchPredicate predicate,
       int numDocs) {
-    super(numDocs, false);
+    super(numDocs, NullMode.NONE_NULLABLE);
     _jsonIndex = jsonIndex;
     _predicate = predicate;
   }

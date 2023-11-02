@@ -31,6 +31,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import org.apache.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -58,25 +59,25 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   private final Object2IntOpenHashMap<FixedIntArray> _groupKeyMap;
   private final boolean[] _isSingleValueExpressions;
   private final int _globalGroupIdUpperBound;
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
 
   private int _numGroups = 0;
 
   public NoDictionaryMultiColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
-      ExpressionContext[] groupByExpressions, int numGroupsLimit, boolean nullHandlingEnabled) {
+      ExpressionContext[] groupByExpressions, int numGroupsLimit, NullMode nullMode) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
     _storedTypes = new DataType[_numGroupByExpressions];
     _dictionaries = new Dictionary[_numGroupByExpressions];
     _onTheFlyDictionaries = new ValueToIdMap[_numGroupByExpressions];
     _isSingleValueExpressions = new boolean[_numGroupByExpressions];
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
 
     for (int i = 0; i < _numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = groupByExpressions[i];
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
       _storedTypes[i] = columnContext.getDataType().getStoredType();
-      Dictionary dictionary = _nullHandlingEnabled ? null : columnContext.getDictionary();
+      Dictionary dictionary = _nullMode.nullAtQueryTime() ? null : columnContext.getDictionary();
       if (dictionary != null) {
         _dictionaries[i] = dictionary;
       } else {
@@ -131,10 +132,10 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     int[] keyValues = new int[_numGroupByExpressions];
     // note that we are mutating its backing array for memory efficiency
     FixedIntArray flyweightKey = new FixedIntArray(keyValues);
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[_numGroupByExpressions];
       for (int i = 0; i < _numGroupByExpressions; i++) {
-        nullBitmaps[i] = valueBlock.getBlockValueSet(_groupByExpressions[i]).getNullBitmap();
+        nullBitmaps[i] = valueBlock.getBlockValueSet(_groupByExpressions[i]).getNullBitmap(_nullMode);
       }
       for (int row = 0; row < numDocs; row++) {
         for (int col = 0; col < _numGroupByExpressions; col++) {

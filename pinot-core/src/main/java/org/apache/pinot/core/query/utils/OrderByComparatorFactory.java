@@ -22,6 +22,7 @@ import java.util.Comparator;
 import java.util.List;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.operator.ColumnContext;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
@@ -33,8 +34,19 @@ public class OrderByComparatorFactory {
   }
 
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
+      ColumnContext[] orderByColumnContexts, NullMode nullMode) {
+    return getComparator(orderByExpressions, orderByColumnContexts, nullMode.nullAtQueryTime(), 0,
+        orderByExpressions.size());
+  }
+
+  public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
       ColumnContext[] orderByColumnContexts, boolean nullHandlingEnabled) {
     return getComparator(orderByExpressions, orderByColumnContexts, nullHandlingEnabled, 0, orderByExpressions.size());
+  }
+
+  public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
+      ColumnContext[] orderByColumnContexts, NullMode nullMode, int from, int to) {
+    return getComparator(orderByExpressions, orderByColumnContexts, nullMode.nullAtQueryTime(), from, to);
   }
 
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
@@ -55,8 +67,19 @@ public class OrderByComparatorFactory {
   }
 
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
+      NullMode nullMode) {
+    return getComparator(orderByExpressions, nullMode, 0, orderByExpressions.size());
+  }
+
+  public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
       boolean nullHandlingEnabled) {
     return getComparator(orderByExpressions, nullHandlingEnabled, 0, orderByExpressions.size());
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
+      NullMode nullMode, int from, int to) {
+    return getComparator(orderByExpressions, nullMode.nullAtQueryTime(), from, to);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})

@@ -23,14 +23,15 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public class ArrayAggDistinctLongFunction extends BaseArrayAggLongFunction<LongOpenHashSet> {
   public ArrayAggDistinctLongFunction(ExpressionContext expression, FieldSpec.DataType dataType,
-      boolean nullHandlingEnabled) {
-    super(expression, dataType, nullHandlingEnabled);
+      NullMode nullMode) {
+    super(expression, dataType, nullMode);
   }
 
   @Override

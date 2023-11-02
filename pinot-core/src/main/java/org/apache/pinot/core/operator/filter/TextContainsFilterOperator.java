@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -41,7 +42,7 @@ public class TextContainsFilterOperator extends BaseFilterOperator {
   private final TextContainsPredicate _predicate;
 
   public TextContainsFilterOperator(TextIndexReader textIndexReader, TextContainsPredicate predicate, int numDocs) {
-    super(numDocs, false);
+    super(numDocs, NullMode.NONE_NULLABLE);
     _textIndexReader = textIndexReader;
     _predicate = predicate;
   }

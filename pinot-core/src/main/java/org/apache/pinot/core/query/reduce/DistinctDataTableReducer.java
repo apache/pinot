@@ -54,7 +54,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForDistinct(_queryContext, dataSchema);
     DistinctTable distinctTable =
         new DistinctTable(dataSchema, _queryContext.getOrderByExpressions(), _queryContext.getLimit(),
-            _queryContext.isNullHandlingEnabled());
+            _queryContext.getNullMode());
     if (distinctTable.hasOrderBy()) {
       addToOrderByDistinctTable(dataSchema, dataTableMap, distinctTable);
     } else {
@@ -69,7 +69,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       int numColumns = dataSchema.size();
       int numRows = dataTable.getNumberOfRows();
-      if (_queryContext.isNullHandlingEnabled()) {
+      if (_queryContext.getNullMode().nullAtQueryTime()) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
         for (int coldId = 0; coldId < numColumns; coldId++) {
           nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);
@@ -92,7 +92,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       int numColumns = dataSchema.size();
       int numRows = dataTable.getNumberOfRows();
-      if (_queryContext.isNullHandlingEnabled()) {
+      if (_queryContext.getNullMode().nullAtQueryTime()) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
         for (int coldId = 0; coldId < numColumns; coldId++) {
           nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);

@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -48,7 +49,8 @@ public class PinotSegmentColumnReader implements Closeable {
     Preconditions.checkArgument(_forwardIndexReader != null, "Forward index disabled for column: %s", column);
     _forwardIndexReaderContext = _forwardIndexReader.createContext();
     _dictionary = dataSource.getDictionary();
-    _nullValueVectorReader = dataSource.getNullValueVector();
+    // TODO: Verify whether this is the correct behavior
+    _nullValueVectorReader = dataSource.getNullValueVector(NullMode.ALL_NULLABLE);
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
       _maxNumValuesPerMVEntry = -1;

@@ -30,21 +30,22 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<AvgPair, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
 
-  public AvgAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    this(verifySingleArgument(arguments, "AVG"), nullHandlingEnabled);
+  public AvgAggregationFunction(List<ExpressionContext> arguments, NullMode nullMode) {
+    this(verifySingleArgument(arguments, "AVG"), nullMode);
   }
 
-  protected AvgAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+  protected AvgAggregationFunction(ExpressionContext expression, NullMode nullMode) {
     super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
   }
 
   @Override
@@ -66,8 +67,8 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
         return;
@@ -145,8 +146,8 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         aggregateGroupBySVNullHandlingEnabled(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
         return;
@@ -237,7 +238,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public AvgPair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     AvgPair avgPair = aggregationResultHolder.getResult();
     if (avgPair == null) {
-      return _nullHandlingEnabled ? null : new AvgPair(0.0, 0L);
+      return _nullMode.nullAtQueryTime() ? null : new AvgPair(0.0, 0L);
     }
     return avgPair;
   }
@@ -246,14 +247,14 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public AvgPair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     AvgPair avgPair = groupByResultHolder.getResult(groupKey);
     if (avgPair == null) {
-      return _nullHandlingEnabled ? null : new AvgPair(0.0, 0L);
+      return _nullMode.nullAtQueryTime() ? null : new AvgPair(0.0, 0L);
     }
     return avgPair;
   }
 
   @Override
   public AvgPair merge(AvgPair intermediateResult1, AvgPair intermediateResult2) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       if (intermediateResult1 == null) {
         return intermediateResult2;
       }

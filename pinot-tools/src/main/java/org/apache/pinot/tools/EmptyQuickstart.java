@@ -20,7 +20,9 @@ package org.apache.pinot.tools;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 
 
@@ -32,6 +34,12 @@ public class EmptyQuickstart extends Quickstart {
 
   public String[] getDefaultBatchTableDirectories() {
     return new String[]{};
+  }
+
+  protected Map<String, Object> getConfigOverrides() {
+    Map<String, Object> result = new HashMap<>(super.getConfigOverrides());
+    result.put("controller.disable.ingestion.groovy", "false");
+    return result;
   }
 
   public static void main(String[] args)

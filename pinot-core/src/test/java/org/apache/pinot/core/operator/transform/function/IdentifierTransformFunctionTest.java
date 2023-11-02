@@ -23,6 +23,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.mockito.Mock;
@@ -82,6 +83,9 @@ public class IdentifierTransformFunctionTest {
     when(_projectionBlock.getNumDocs()).thenReturn(NUM_DOCS);
     when(_blockValSet.getIntValuesSV()).thenReturn(INT_VALUES);
     when(_blockValSet.getNullBitmap()).thenReturn(NULL_BITMAP);
+    when(_blockValSet.getNullBitmap(NullMode.NONE_NULLABLE)).thenReturn(null);
+    when(_blockValSet.getNullBitmap(NullMode.ALL_NULLABLE)).thenReturn(NULL_BITMAP);
+    when(_blockValSet.getNullBitmap(NullMode.COLUMN_BASED)).thenReturn(NULL_BITMAP);
     when(_projectionBlock.getBlockValueSet(TEST_COLUMN_NAME)).thenReturn(_blockValSet);
     when(_columnContext.getDataSource()).thenReturn(_dataSource);
     when(_dataSource.getDictionary()).thenReturn(_dictionary);
@@ -99,7 +103,7 @@ public class IdentifierTransformFunctionTest {
   @Test
   public void testNullBitmap() {
     IdentifierTransformFunction identifierTransformFunction =
-        new IdentifierTransformFunction(TEST_COLUMN_NAME, _columnContext);
+        new IdentifierTransformFunction(TEST_COLUMN_NAME, _columnContext, NullMode.ALL_NULLABLE);
     RoaringBitmap bitmap = identifierTransformFunction.getNullBitmap(_projectionBlock);
     Assert.assertEquals(bitmap, NULL_BITMAP);
     Assert.assertEquals(identifierTransformFunction.transformToIntValuesSV(_projectionBlock), INT_VALUES);

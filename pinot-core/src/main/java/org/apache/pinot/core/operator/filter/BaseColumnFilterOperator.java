@@ -35,7 +35,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
   protected final DataSource _dataSource;
 
   protected BaseColumnFilterOperator(QueryContext queryContext, DataSource dataSource, int numDocs) {
-    super(numDocs, queryContext.isNullHandlingEnabled());
+    super(numDocs, queryContext.getNullMode());
     _queryContext = queryContext;
     _dataSource = dataSource;
   }
@@ -44,7 +44,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       ImmutableRoaringBitmap nullBitmap = getNullBitmap();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         return excludeNulls(getNextBlockWithoutNullHandling(), nullBitmap);
@@ -71,7 +71,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
 
   @Nullable
   private ImmutableRoaringBitmap getNullBitmap() {
-    NullValueVectorReader nullValueVector = _dataSource.getNullValueVector();
+    NullValueVectorReader nullValueVector = _dataSource.getNullValueVector(_nullMode);
     if (nullValueVector != null) {
       return nullValueVector.getNullBitmap();
     } else {

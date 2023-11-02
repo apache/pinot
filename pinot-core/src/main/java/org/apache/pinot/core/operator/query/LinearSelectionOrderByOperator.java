@@ -43,6 +43,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -63,7 +64,7 @@ import org.roaringbitmap.RoaringBitmap;
 public abstract class LinearSelectionOrderByOperator extends BaseOperator<SelectionResultsBlock> {
   protected final IndexSegment _indexSegment;
   protected final QueryContext _queryContext;
-  protected final boolean _nullHandlingEnabled;
+  protected final NullMode _nullMode;
   // Deduped order-by expressions followed by output expressions from SelectionOperatorUtils.extractExpressions()
   protected final List<ExpressionContext> _expressions;
   protected final List<ExpressionContext> _alreadySorted;
@@ -84,7 +85,7 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
-    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    _nullMode = queryContext.getNullMode();
     _expressions = expressions;
     _projectOperator = projectOperator;
 
@@ -102,16 +103,16 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     }
 
     _numRowsToKeep = queryContext.getOffset() + queryContext.getLimit();
-    _comparator = OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled);
+    _comparator = OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullMode);
 
     if (_toSort.isEmpty()) {
       _listBuilderSupplier = () -> new TotallySortedListBuilder(_numRowsToKeep);
     } else {
       Comparator<Object[]> sortedComparator =
-          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled, 0,
+          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullMode, 0,
               numSortedExpressions);
       Comparator<Object[]> unsortedComparator =
-          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullHandlingEnabled,
+          OrderByComparatorFactory.getComparator(_orderByExpressions, _columnContexts, _nullMode,
               numSortedExpressions, numOrderByExpressions);
       _listBuilderSupplier = () -> new PartiallySortedListBuilder(_numRowsToKeep, sortedComparator, unsortedComparator);
     }
@@ -141,12 +142,12 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     }
     RowBasedBlockValueFetcher blockValueFetcher = new RowBasedBlockValueFetcher(blockValSets);
 
-    if (!_nullHandlingEnabled) {
+    if (!_nullMode.nullAtQueryTime()) {
       return blockValueFetcher::getRow;
     }
     RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
     for (int i = 0; i < numExpressions; i++) {
-      nullBitmaps[i] = blockValSets[i].getNullBitmap();
+      nullBitmaps[i] = blockValSets[i].getNullBitmap(_nullMode);
     }
     return (docId) -> {
       Object[] row = blockValueFetcher.getRow(docId);

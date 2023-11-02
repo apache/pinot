@@ -35,6 +35,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.roaringbitmap.BatchIterator;
@@ -56,7 +57,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   private final Map<String, DataSource> _dataSourceMap;
   private final int _endDocId;
   private final int[] _docIdBuffer = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
   private final PredicateEvaluationResult _predicateEvaluationResult;
 
   private int _blockEndDocId = 0;
@@ -68,12 +69,12 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
 
   public ExpressionScanDocIdIterator(TransformFunction transformFunction,
       @Nullable PredicateEvaluator predicateEvaluator, Map<String, DataSource> dataSourceMap, int numDocs,
-      boolean nullHandlingEnabled, PredicateEvaluationResult predicateEvaluationResult) {
+      NullMode nullMode, PredicateEvaluationResult predicateEvaluationResult) {
     _transformFunction = transformFunction;
     _predicateEvaluator = predicateEvaluator;
     _dataSourceMap = dataSourceMap;
     _endDocId = numDocs;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
     _predicateEvaluationResult = predicateEvaluationResult;
   }
 
@@ -163,7 +164,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
       assert (_predicateEvaluator != null);
       if (resultMetadata.hasDictionary()) {
         int[] dictIds = _transformFunction.transformToDictIdsSV(projectionBlock);
-        if (_nullHandlingEnabled) {
+        if (_nullMode.nullAtQueryTime()) {
           nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -183,7 +184,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
         switch (resultMetadata.getDataType().getStoredType()) {
           case INT:
             int[] intValues = _transformFunction.transformToIntValuesSV(projectionBlock);
-            if (_nullHandlingEnabled) {
+            if (_nullMode.nullAtQueryTime()) {
               nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
             }
             if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -202,7 +203,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case LONG:
             long[] longValues = _transformFunction.transformToLongValuesSV(projectionBlock);
-            if (_nullHandlingEnabled) {
+            if (_nullMode.nullAtQueryTime()) {
               nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
             }
             if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -222,7 +223,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case FLOAT:
             float[] floatValues = _transformFunction.transformToFloatValuesSV(projectionBlock);
-            if (_nullHandlingEnabled) {
+            if (_nullMode.nullAtQueryTime()) {
               nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
             }
             if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -242,7 +243,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case DOUBLE:
             double[] doubleValues = _transformFunction.transformToDoubleValuesSV(projectionBlock);
-            if (_nullHandlingEnabled) {
+            if (_nullMode.nullAtQueryTime()) {
               nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
             }
             if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -262,7 +263,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case STRING:
             String[] stringValues = _transformFunction.transformToStringValuesSV(projectionBlock);
-            if (_nullHandlingEnabled) {
+            if (_nullMode.nullAtQueryTime()) {
               nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
             }
             if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -282,7 +283,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case BYTES:
             byte[][] bytesValues = _transformFunction.transformToBytesValuesSV(projectionBlock);
-            if (_nullHandlingEnabled) {
+            if (_nullMode.nullAtQueryTime()) {
               nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
             }
             if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -302,7 +303,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
             break;
           case BIG_DECIMAL:
             BigDecimal[] bigDecimalValues = _transformFunction.transformToBigDecimalValuesSV(projectionBlock);
-            if (_nullHandlingEnabled) {
+            if (_nullMode.nullAtQueryTime()) {
               nullBitmap = _transformFunction.getNullBitmap(projectionBlock);
             }
             if (nullBitmap != null && !nullBitmap.isEmpty()) {

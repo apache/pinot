@@ -28,18 +28,19 @@ import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregati
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public abstract class BaseArrayAggFunction<I, F extends Comparable> extends BaseSingleInputAggregationFunction<I, F> {
 
-  protected final boolean _nullHandlingEnabled;
+  protected final NullMode _nullMode;
   private final DataSchema.ColumnDataType _resultColumnType;
 
-  public BaseArrayAggFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
+  public BaseArrayAggFunction(ExpressionContext expression, FieldSpec.DataType dataType, NullMode nullMode) {
     super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
     _resultColumnType = DataSchema.ColumnDataType.fromDataTypeMV(dataType);
   }
 
@@ -72,8 +73,8 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable> extends Base
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         aggregateArrayWithNull(length, aggregationResultHolder, blockValSet, nullBitmap);
         return;
@@ -92,8 +93,8 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable> extends Base
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         aggregateArrayGroupBySVWithNull(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
         return;
@@ -112,8 +113,8 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable> extends Base
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         aggregateArrayGroupByMVWithNull(length, groupKeysArray, groupByResultHolder, blockValSet, nullBitmap);
         return;

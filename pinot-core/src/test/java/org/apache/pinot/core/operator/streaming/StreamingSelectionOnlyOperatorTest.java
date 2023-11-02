@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -73,7 +74,7 @@ public class StreamingSelectionOnlyOperatorTest {
   public void testNullHandling() {
     QueryContext queryContext =
         QueryContextConverterUtils.getQueryContext("SELECT * FROM testTable WHERE intColumn IS NULL");
-    queryContext.setNullHandlingEnabled(true);
+    queryContext.setNullMode(NullMode.ALL_NULLABLE);
     List<ExpressionContext> expressions =
         SelectionOperatorUtils.extractExpressions(queryContext, _segmentWithNullValues);
     BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_segmentWithNullValues, queryContext, expressions,

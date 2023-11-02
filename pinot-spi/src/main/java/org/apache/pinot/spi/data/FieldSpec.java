@@ -27,7 +27,6 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
@@ -101,7 +100,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected String _name;
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
-  protected Boolean _nullable = null;
+  protected boolean _nullable = false;
 
   // NOTE: This only applies to STRING column, which is the max number of characters
   private int _maxLength = DEFAULT_MAX_LENGTH;
@@ -305,22 +304,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   /**
    * Returns whether the column is nullable or not.
-   *
-   * This Java property itself is nullable. In case null is returned, actual nullability depends on the value of
-   * {@link IndexingConfig#isNullHandlingEnabled()}.
-   *
-   * @return true if the field is nullable, false if it is not and null if column level nullability should be delegated
-   * to {@link IndexingConfig#isNullHandlingEnabled()}.
    */
-  @Nullable
-  public Boolean getNullable() {
+  public boolean getNullable() {
     return _nullable;
   }
 
   /**
    * @see #getNullable()
    */
-  public void setNullable(@Nullable Boolean nullable) {
+  public void setNullable(boolean nullable) {
     _nullable = nullable;
   }
 
@@ -341,9 +333,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
     appendDefaultNullValue(jsonObject);
     appendTransformFunction(jsonObject);
-    if (_nullable != null) {
-      jsonObject.put("nullable", _nullable);
-    }
+    jsonObject.put("nullable", _nullable);
     return jsonObject;
   }
 

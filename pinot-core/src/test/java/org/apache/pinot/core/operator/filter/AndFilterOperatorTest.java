@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
@@ -41,7 +42,7 @@ public class AndFilterOperatorTest {
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(new TestFilterOperator(docIds1, numDocs));
     operators.add(new TestFilterOperator(docIds2, numDocs));
-    AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, false);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, NullMode.NONE_NULLABLE);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 3);
@@ -60,7 +61,7 @@ public class AndFilterOperatorTest {
     operators.add(new TestFilterOperator(docIds1, numDocs));
     operators.add(new TestFilterOperator(docIds2, numDocs));
     operators.add(new TestFilterOperator(docIds3, numDocs));
-    AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, false);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, NullMode.NONE_NULLABLE);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 3);
@@ -78,12 +79,12 @@ public class AndFilterOperatorTest {
     List<BaseFilterOperator> childOperators = new ArrayList<>();
     childOperators.add(new TestFilterOperator(docIds1, numDocs));
     childOperators.add(new TestFilterOperator(docIds2, numDocs));
-    AndFilterOperator childAndOperator = new AndFilterOperator(childOperators, null, numDocs, false);
+    AndFilterOperator childAndOperator = new AndFilterOperator(childOperators, null, numDocs, NullMode.NONE_NULLABLE);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childAndOperator);
     operators.add(new TestFilterOperator(docIds3, numDocs));
-    AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, false);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, NullMode.NONE_NULLABLE);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 3);
@@ -118,8 +119,10 @@ public class AndFilterOperatorTest {
               numDocs));
     }
 
-    AndFilterOperator andFilterOperator1 = new AndFilterOperator(childOperators1, null, numDocs, false);
-    AndFilterOperator andFilterOperator2 = new AndFilterOperator(childOperators2, null, numDocs, false);
+    AndFilterOperator andFilterOperator1 = new AndFilterOperator(childOperators1, null, numDocs,
+        NullMode.NONE_NULLABLE);
+    AndFilterOperator andFilterOperator2 = new AndFilterOperator(childOperators2, null, numDocs,
+        NullMode.NONE_NULLABLE);
     BlockDocIdIterator iterator1 = andFilterOperator1.getNextBlock().getBlockDocIdSet().iterator();
     BlockDocIdIterator iterator2 = andFilterOperator2.getNextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator1.next(), 0);
@@ -147,12 +150,12 @@ public class AndFilterOperatorTest {
     List<BaseFilterOperator> childOperators = new ArrayList<>();
     childOperators.add(new TestFilterOperator(docIds3, numDocs));
     childOperators.add(new TestFilterOperator(docIds2, numDocs));
-    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators, null, numDocs, false);
+    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators, null, numDocs, NullMode.NONE_NULLABLE);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childOrOperator);
     operators.add(new TestFilterOperator(docIds1, numDocs));
-    AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, false);
+    AndFilterOperator andOperator = new AndFilterOperator(operators, null, numDocs, NullMode.NONE_NULLABLE);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
     Assert.assertEquals(iterator.next(), 2);
@@ -172,7 +175,7 @@ public class AndFilterOperatorTest {
 
     AndFilterOperator andFilterOperator = new AndFilterOperator(
         Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
-            new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, true);
+            new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, NullMode.ALL_NULLABLE);
 
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), ImmutableList.of(1, 2));
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()), ImmutableList.of(0, 7, 8, 9));
@@ -186,7 +189,7 @@ public class AndFilterOperatorTest {
 
     AndFilterOperator andFilterOperator = new AndFilterOperator(
         Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), EmptyFilterOperator.getInstance()), null,
-        numDocs, true);
+        numDocs, NullMode.ALL_NULLABLE);
 
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getTrues()), Collections.emptyList());
     Assert.assertEquals(TestUtils.getDocIds(andFilterOperator.getFalses()),

@@ -30,6 +30,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.utils.StatisticalAggregationFunctionUtils;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -44,14 +45,14 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
   protected final boolean _isSample;
   protected final boolean _isStdDev;
-  protected final boolean _nullHandlingEnabled;
+  protected final NullMode _nullMode;
 
   public VarianceAggregationFunction(List<ExpressionContext> arguments, boolean isSample, boolean isStdDev,
-      boolean nullHandlingEnabled) {
+      NullMode nullMode) {
     super(verifySingleArgument(arguments, getFunctionName(isSample, isStdDev)));
     _isSample = isSample;
     _isStdDev = isStdDev;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
   }
 
   private static String getFunctionName(boolean isSample, boolean isStdDev) {
@@ -81,8 +82,8 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
     RoaringBitmap nullBitmap = null;
-    if (_nullHandlingEnabled) {
-      nullBitmap = blockValSetMap.get(_expression).getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      nullBitmap = blockValSetMap.get(_expression).getNullBitmap(_nullMode);
     }
 
     long count = 0;
@@ -108,7 +109,7 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
       }
     }
 
-    if (_nullHandlingEnabled && count == 0) {
+    if (_nullMode.nullAtQueryTime() && count == 0) {
       return;
     }
     setAggregationResult(aggregationResultHolder, count, sum, variance);
@@ -145,8 +146,8 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
     RoaringBitmap nullBitmap = null;
-    if (_nullHandlingEnabled) {
-      nullBitmap = blockValSetMap.get(_expression).getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      nullBitmap = blockValSetMap.get(_expression).getNullBitmap(_nullMode);
     }
     if (nullBitmap != null && !nullBitmap.isEmpty()) {
       for (int i = 0; i < length; i++) {
@@ -166,8 +167,8 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     double[] values = StatisticalAggregationFunctionUtils.getValSet(blockValSetMap, _expression);
     RoaringBitmap nullBitmap = null;
-    if (_nullHandlingEnabled) {
-      nullBitmap = blockValSetMap.get(_expression).getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      nullBitmap = blockValSetMap.get(_expression).getNullBitmap(_nullMode);
     }
     if (nullBitmap != null && !nullBitmap.isEmpty()) {
       for (int i = 0; i < length; i++) {
@@ -190,7 +191,7 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
   public VarianceTuple extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     VarianceTuple varianceTuple = aggregationResultHolder.getResult();
     if (varianceTuple == null) {
-      return _nullHandlingEnabled ? null : new VarianceTuple(0L, 0.0, 0.0);
+      return _nullMode.nullAtQueryTime() ? null : new VarianceTuple(0L, 0.0, 0.0);
     } else {
       return varianceTuple;
     }
@@ -203,7 +204,7 @@ public class VarianceAggregationFunction extends BaseSingleInputAggregationFunct
 
   @Override
   public VarianceTuple merge(VarianceTuple intermediateResult1, VarianceTuple intermediateResult2) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       if (intermediateResult1 == null) {
         return intermediateResult2;
       } else if (intermediateResult2 == null) {

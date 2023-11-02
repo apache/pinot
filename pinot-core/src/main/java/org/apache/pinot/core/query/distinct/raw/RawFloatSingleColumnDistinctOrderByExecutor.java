@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.floats.FloatPriorityQueue;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -33,8 +34,8 @@ public class RawFloatSingleColumnDistinctOrderByExecutor extends BaseRawFloatSin
   private final FloatPriorityQueue _priorityQueue;
 
   public RawFloatSingleColumnDistinctOrderByExecutor(ExpressionContext expression, DataType dataType,
-      OrderByExpressionContext orderByExpression, int limit, boolean nullHandlingEnabled) {
-    super(expression, dataType, limit, nullHandlingEnabled);
+      OrderByExpressionContext orderByExpression, int limit, NullMode nullMode) {
+    super(expression, dataType, limit, nullMode);
 
     assert orderByExpression.getExpression().equals(expression);
     int comparisonFactor = orderByExpression.isAsc() ? -1 : 1;

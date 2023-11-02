@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -53,7 +54,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
   private final BlockValSet[] _blockValSets;
   private final DataSchema _dataSchema;
   private final int _limit;
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
   private final RoaringBitmap[] _nullBitmaps;
 
   private int _numDocsScanned = 0;
@@ -64,7 +65,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
     _queryContext = queryContext;
     _expressions = expressions;
     _projectOperator = projectOperator;
-    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    _nullMode = queryContext.getNullMode();
 
     int numExpressions = expressions.size();
     _blockValSets = new BlockValSet[numExpressions];
@@ -78,7 +79,7 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
           DataSchema.ColumnDataType.fromDataType(columnContext.getDataType(), columnContext.isSingleValue());
     }
     _dataSchema = new DataSchema(columnNames, columnDataTypes);
-    _nullBitmaps = _nullHandlingEnabled ? new RoaringBitmap[numExpressions] : null;
+    _nullBitmaps = _nullMode.nullAtQueryTime() ? new RoaringBitmap[numExpressions] : null;
     _limit = queryContext.getLimit();
   }
 
@@ -101,9 +102,9 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
     int numDocs = valueBlock.getNumDocs();
     int numDocsToReturn = Math.min(_limit - _numDocsScanned, numDocs);
     List<Object[]> rows = new ArrayList<>(numDocsToReturn);
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       for (int i = 0; i < numExpressions; i++) {
-        _nullBitmaps[i] = _blockValSets[i].getNullBitmap();
+        _nullBitmaps[i] = _blockValSets[i].getNullBitmap(_nullMode);
       }
       for (int docId = 0; docId < numDocsToReturn; docId++) {
         Object[] values = blockValueFetcher.getRow(docId);

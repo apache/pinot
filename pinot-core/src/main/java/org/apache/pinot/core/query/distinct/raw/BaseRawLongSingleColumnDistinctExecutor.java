@@ -31,6 +31,7 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -42,17 +43,17 @@ abstract class BaseRawLongSingleColumnDistinctExecutor implements DistinctExecut
   final ExpressionContext _expression;
   final DataType _dataType;
   final int _limit;
-  final boolean _nullHandlingEnabled;
+  final NullMode _nullMode;
 
   final LongSet _valueSet;
   protected boolean _hasNull;
 
   BaseRawLongSingleColumnDistinctExecutor(ExpressionContext expression, DataType dataType, int limit,
-      boolean nullHandlingEnabled) {
+      NullMode nullMode) {
     _expression = expression;
     _dataType = dataType;
     _limit = limit;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
 
     _valueSet = new LongOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
@@ -70,7 +71,7 @@ abstract class BaseRawLongSingleColumnDistinctExecutor implements DistinctExecut
       records.add(new Record(new Object[]{null}));
     }
     assert records.size() - (_hasNull ? 1 : 0) <= _limit;
-    return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
+    return new DistinctTable(dataSchema, records, _nullMode);
   }
 
   @Override
@@ -79,8 +80,8 @@ abstract class BaseRawLongSingleColumnDistinctExecutor implements DistinctExecut
     int numDocs = valueBlock.getNumDocs();
     if (blockValueSet.isSingleValue()) {
       long[] values = blockValueSet.getLongValuesSV();
-      if (_nullHandlingEnabled) {
-        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap();
+      if (_nullMode.nullAtQueryTime()) {
+        RoaringBitmap nullBitmap = blockValueSet.getNullBitmap(_nullMode);
         for (int i = 0; i < numDocs; i++) {
           if (nullBitmap != null && nullBitmap.contains(i)) {
             _hasNull = true;

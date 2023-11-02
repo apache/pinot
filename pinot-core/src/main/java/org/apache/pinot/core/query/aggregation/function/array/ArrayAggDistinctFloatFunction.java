@@ -23,12 +23,13 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<FloatOpenHashSet> {
-  public ArrayAggDistinctFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, nullHandlingEnabled);
+  public ArrayAggDistinctFloatFunction(ExpressionContext expression, NullMode nullMode) {
+    super(expression, nullMode);
   }
 
   @Override

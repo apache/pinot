@@ -23,6 +23,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -30,8 +31,8 @@ import org.roaringbitmap.RoaringBitmap;
 public abstract class BaseArrayAggIntFunction<I extends AbstractIntCollection>
     extends BaseArrayAggFunction<I, IntArrayList> {
   public BaseArrayAggIntFunction(ExpressionContext expression, FieldSpec.DataType dataType,
-      boolean nullHandlingEnabled) {
-    super(expression, dataType, nullHandlingEnabled);
+      NullMode nullMode) {
+    super(expression, dataType, nullMode);
   }
 
   abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, int value);

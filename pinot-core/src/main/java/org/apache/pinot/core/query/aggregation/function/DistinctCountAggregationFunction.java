@@ -27,6 +27,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 /**
@@ -34,9 +35,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 public class DistinctCountAggregationFunction extends BaseDistinctAggregateAggregationFunction<Integer> {
 
-  public DistinctCountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(verifySingleArgument(arguments, "DISTINCT_COUNT"), AggregationFunctionType.DISTINCTCOUNT,
-        nullHandlingEnabled);
+  public DistinctCountAggregationFunction(List<ExpressionContext> arguments, NullMode nullMode) {
+    super(verifySingleArgument(arguments, "DISTINCT_COUNT"), AggregationFunctionType.DISTINCTCOUNT, nullMode);
   }
 
   @Override

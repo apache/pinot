@@ -26,13 +26,14 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
 
   public CountMVAggregationFunction(List<ExpressionContext> arguments) {
     // TODO(nhejazi): support proper null handling for aggregation functions on MV columns.
-    super(verifySingleArgument(arguments, "COUNT_MV"), false);
+    super(verifySingleArgument(arguments, "COUNT_MV"), NullMode.NONE_NULLABLE);
   }
 
   @Override

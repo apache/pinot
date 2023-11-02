@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -36,7 +37,8 @@ public class NotFilterOperatorTest {
     int[] docIds1 = new int[]{2, 3, 10, 15, 16, 17, 18, 21, 22, 23, 24, 26, 28};
     List<Integer> expectedResult = Arrays.asList(0, 1, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 19, 20, 25, 27, 29);
     Iterator<Integer> expectedIterator = expectedResult.iterator();
-    NotFilterOperator notFilterOperator = new NotFilterOperator(new TestFilterOperator(docIds1, 30), 30, false);
+    NotFilterOperator notFilterOperator = new NotFilterOperator(new TestFilterOperator(docIds1, 30), 30,
+        NullMode.NONE_NULLABLE);
     BlockDocIdIterator iterator = notFilterOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
     while ((docId = iterator.next()) != Constants.EOF) {
@@ -51,7 +53,7 @@ public class NotFilterOperatorTest {
     int[] nullDocIds = new int[]{4, 5, 6};
 
     NotFilterOperator notFilterOperator =
-        new NotFilterOperator(new TestFilterOperator(docIds, nullDocIds, numDocs), numDocs, true);
+        new NotFilterOperator(new TestFilterOperator(docIds, nullDocIds, numDocs), numDocs, NullMode.ALL_NULLABLE);
 
     Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getTrues()), ImmutableList.of(7, 8, 9));
     Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getFalses()), ImmutableList.of(0, 1, 2, 3));
@@ -61,7 +63,8 @@ public class NotFilterOperatorTest {
   public void testNotEmptyFilterOperator() {
     int numDocs = 5;
 
-    NotFilterOperator notFilterOperator = new NotFilterOperator(EmptyFilterOperator.getInstance(), numDocs, true);
+    NotFilterOperator notFilterOperator = new NotFilterOperator(EmptyFilterOperator.getInstance(), numDocs,
+        NullMode.ALL_NULLABLE);
 
     Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getTrues()), ImmutableList.of(0, 1, 2, 3, 4));
     Assert.assertEquals(TestUtils.getDocIds(notFilterOperator.getFalses()), Collections.emptyList());

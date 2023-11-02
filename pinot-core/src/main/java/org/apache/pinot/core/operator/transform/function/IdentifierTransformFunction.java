@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.evaluator.TransformEvaluator;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.roaringbitmap.RoaringBitmap;
@@ -39,12 +40,14 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
   private final String _columnName;
   private final Dictionary _dictionary;
   private final TransformResultMetadata _resultMetadata;
+  private final NullMode _nullMode;
 
-  public IdentifierTransformFunction(String columnName, ColumnContext columnContext) {
+  public IdentifierTransformFunction(String columnName, ColumnContext columnContext, NullMode nullMode) {
     _columnName = columnName;
     _dictionary = columnContext.getDictionary();
     _resultMetadata =
         new TransformResultMetadata(columnContext.getDataType(), columnContext.isSingleValue(), _dictionary != null);
+    _nullMode = nullMode;
   }
 
   public String getColumnName() {
@@ -210,6 +213,6 @@ public class IdentifierTransformFunction implements TransformFunction, PushDownT
 
   @Override
   public RoaringBitmap getNullBitmap(ValueBlock valueBlock) {
-    return valueBlock.getBlockValueSet(_columnName).getNullBitmap();
+    return valueBlock.getBlockValueSet(_columnName).getNullBitmap(_nullMode);
   }
 }

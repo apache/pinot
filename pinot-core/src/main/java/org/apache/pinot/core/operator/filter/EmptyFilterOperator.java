@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 /**
@@ -32,7 +33,7 @@ import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 public final class EmptyFilterOperator extends BaseFilterOperator {
   private EmptyFilterOperator() {
     // We will never call its getFalses() method.
-    super(0, false);
+    super(0, NullMode.NONE_NULLABLE);
   }
 
 

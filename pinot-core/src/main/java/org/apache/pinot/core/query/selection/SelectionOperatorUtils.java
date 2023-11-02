@@ -41,6 +41,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.trace.Tracing;
@@ -358,8 +359,9 @@ public class SelectionOperatorUtils {
    * This method is allowed to modify the given rows. Specifically, it may remove nulls cells from it.
    */
   public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema,
-      boolean nullHandlingEnabled)
+      NullMode nullMode)
       throws IOException {
+    boolean nullHandlingEnabled = nullMode.nullAtQueryTime();
     ColumnDataType[] storedColumnDataTypes = dataSchema.getStoredColumnDataTypes();
     int numColumns = storedColumnDataTypes.length;
 
@@ -541,12 +543,12 @@ public class SelectionOperatorUtils {
    * (Broker side)
    */
   public static List<Object[]> reduceWithoutOrdering(Collection<DataTable> dataTables, int limit,
-      boolean nullHandlingEnabled) {
+      NullMode nullMode) {
     List<Object[]> rows = new ArrayList<>(Math.min(limit, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY));
     for (DataTable dataTable : dataTables) {
       int numColumns = dataTable.getDataSchema().size();
       int numRows = dataTable.getNumberOfRows();
-      if (nullHandlingEnabled) {
+      if (nullMode.nullAtQueryTime()) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
         for (int coldId = 0; coldId < numColumns; coldId++) {
           nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);

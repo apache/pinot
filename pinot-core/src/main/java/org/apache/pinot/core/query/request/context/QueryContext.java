@@ -40,6 +40,7 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 /**
@@ -119,8 +120,7 @@ public class QueryContext {
   private int _minServerGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE;
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
-  // Whether null handling is enabled
-  private boolean _nullHandlingEnabled;
+  private NullMode _nullMode = NullMode.NONE_NULLABLE;
   // Whether server returns the final result
   private boolean _serverReturnFinalResult;
 
@@ -386,12 +386,24 @@ public class QueryContext {
     _groupTrimThreshold = groupTrimThreshold;
   }
 
+  /**
+   * Returns whether null should be handled or not.
+   *
+   * This method is here for compatibility reasons, but {@link #getNullMode()} describes the expected semantics in a
+   * more specific way.
+   * @deprecated Use {@link #getNullMode()} instead
+   */
+  @Deprecated
   public boolean isNullHandlingEnabled() {
-    return _nullHandlingEnabled;
+    return _nullMode == NullMode.ALL_NULLABLE || _nullMode == NullMode.COLUMN_BASED;
   }
 
-  public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
-    _nullHandlingEnabled = nullHandlingEnabled;
+  public NullMode getNullMode() {
+    return _nullMode;
+  }
+
+  public void setNullMode(NullMode nullMode) {
+    _nullMode = nullMode;
   }
 
   public boolean isServerReturnFinalResult() {
@@ -525,7 +537,11 @@ public class QueryContext {
           new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList, _filter,
               _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
               _expressionOverrideHints, _explain);
-      queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
+      if (QueryOptionsUtils.useColumnNulability(_queryOptions)) {
+        queryContext.setNullMode(NullMode.COLUMN_BASED);
+      } else if (QueryOptionsUtils.isNullHandlingEnabled(_queryOptions)) {
+        queryContext.setNullMode(NullMode.ALL_NULLABLE);
+      }
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));
 
       // Pre-calculate the aggregation functions and columns for the query
@@ -556,7 +572,7 @@ public class QueryContext {
         }
         int functionIndex = filteredAggregationFunctions.size();
         AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
+            AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext.getNullMode());
         filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
         filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
       }
@@ -577,7 +593,7 @@ public class QueryContext {
           FilterContext filter = pair.getRight();
           int functionIndex = filteredAggregationFunctions.size();
           AggregationFunction aggregationFunction =
-              AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext._nullHandlingEnabled);
+              AggregationFunctionFactory.getAggregationFunction(aggregation, queryContext.getNullMode());
           filteredAggregationFunctions.add(Pair.of(aggregationFunction, filter));
           filteredAggregationsIndexMap.put(Pair.of(aggregation, filter), functionIndex);
         }

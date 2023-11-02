@@ -32,6 +32,7 @@ import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.trace.Tracing;
 
@@ -63,7 +64,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     int limit = _queryContext.getLimit();
     int dictLength = dictionary.length();
     int numValuesToKeep = Math.min(limit, dictLength);
-    boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+    NullMode nullMode = _queryContext.getNullMode();
 
     // If ORDER BY is not present, we read the first limit values from the dictionary and return.
     // If ORDER BY is present and the dictionary is sorted, then we read the first/last limit values
@@ -71,21 +72,20 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
     DistinctTable distinctTable;
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     if (orderByExpressions == null) {
-      distinctTable =
-          new DistinctTable(dataSchema, iterateOnDictionary(dictionary, numValuesToKeep), nullHandlingEnabled);
+      distinctTable = new DistinctTable(dataSchema, iterateOnDictionary(dictionary, numValuesToKeep), nullMode);
       _numDocsScanned = numValuesToKeep;
     } else {
       if (dictionary.isSorted()) {
         if (orderByExpressions.get(0).isAsc()) {
           distinctTable =
-              new DistinctTable(dataSchema, iterateOnDictionary(dictionary, numValuesToKeep), nullHandlingEnabled);
+              new DistinctTable(dataSchema, iterateOnDictionary(dictionary, numValuesToKeep), nullMode);
         } else {
           distinctTable =
-              new DistinctTable(dataSchema, iterateOnDictionaryDesc(dictionary, numValuesToKeep), nullHandlingEnabled);
+              new DistinctTable(dataSchema, iterateOnDictionaryDesc(dictionary, numValuesToKeep), nullMode);
         }
         _numDocsScanned = numValuesToKeep;
       } else {
-        distinctTable = new DistinctTable(dataSchema, orderByExpressions, limit, nullHandlingEnabled);
+        distinctTable = new DistinctTable(dataSchema, orderByExpressions, limit, nullMode);
         for (int i = 0; i < dictLength; i++) {
           distinctTable.addWithOrderBy(new Record(new Object[]{dictionary.getInternal(i)}));
         }

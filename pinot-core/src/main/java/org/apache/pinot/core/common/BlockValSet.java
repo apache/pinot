@@ -20,6 +20,7 @@ package org.apache.pinot.core.common;
 
 import java.math.BigDecimal;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.roaringbitmap.RoaringBitmap;
@@ -32,10 +33,20 @@ import org.roaringbitmap.RoaringBitmap;
 public interface BlockValSet {
 
   /**
+   * An alias to {@link #getNullBitmap(NullMode) getNullBitmap(NullMode.ALL_NULLABLE)}
+   * @deprecated Use {@link #getNullBitmap(NullMode) getNullBitmap(NullMode.ALL_NULLABLE)} instead
+   */
+  @Nullable
+  @Deprecated
+  default RoaringBitmap getNullBitmap() {
+    return getNullBitmap(NullMode.ALL_NULLABLE);
+  }
+
+  /**
    * Returns the null value bitmap in the value set.
    */
   @Nullable
-  RoaringBitmap getNullBitmap();
+  RoaringBitmap getNullBitmap(NullMode nullMode);
 
   /**
    * Returns the data type of the values in the value set.

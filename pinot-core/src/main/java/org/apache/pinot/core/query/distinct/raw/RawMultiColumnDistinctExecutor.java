@@ -32,6 +32,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctExecutorUtils;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -44,14 +45,14 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
   private final List<ExpressionContext> _expressions;
   private final boolean _hasMVExpression;
   private final DistinctTable _distinctTable;
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
 
   public RawMultiColumnDistinctExecutor(List<ExpressionContext> expressions, boolean hasMVExpression,
       List<DataType> dataTypes, @Nullable List<OrderByExpressionContext> orderByExpressions,
-      boolean nullHandlingEnabled, int limit) {
+      NullMode nullMode, int limit) {
     _expressions = expressions;
     _hasMVExpression = hasMVExpression;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
 
     int numExpressions = expressions.size();
     String[] columnNames = new String[numExpressions];
@@ -61,7 +62,7 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
       columnDataTypes[i] = ColumnDataType.fromDataTypeSV(dataTypes.get(i));
     }
     DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
-    _distinctTable = new DistinctTable(dataSchema, orderByExpressions, limit, _nullHandlingEnabled);
+    _distinctTable = new DistinctTable(dataSchema, orderByExpressions, limit, _nullMode);
   }
 
   @Override
@@ -74,15 +75,15 @@ public class RawMultiColumnDistinctExecutor implements DistinctExecutor {
         blockValSets[i] = valueBlock.getBlockValueSet(_expressions.get(i));
       }
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numExpressions];
-      if (_nullHandlingEnabled) {
+      if (_nullMode.nullAtQueryTime()) {
         for (int i = 0; i < numExpressions; i++) {
-          nullBitmaps[i] = blockValSets[i].getNullBitmap();
+          nullBitmaps[i] = blockValSets[i].getNullBitmap(_nullMode);
         }
       }
       RowBasedBlockValueFetcher valueFetcher = new RowBasedBlockValueFetcher(blockValSets);
       for (int docId = 0; docId < numDocs; docId++) {
         Record record = new Record(valueFetcher.getRow(docId));
-        if (_nullHandlingEnabled) {
+        if (_nullMode.nullAtQueryTime()) {
           for (int i = 0; i < numExpressions; i++) {
             if (nullBitmaps[i] != null && nullBitmaps[i].contains(docId)) {
               record.getValues()[i] = null;

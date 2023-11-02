@@ -171,7 +171,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     if (havingFilter != null) {
       rows = new ArrayList<>();
       HavingFilterHandler havingFilterHandler =
-          new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.isNullHandlingEnabled());
+          new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.getNullMode().nullAtQueryTime());
       int processedRows = 0;
       while (rows.size() < limit && sortedIterator.hasNext()) {
         Object[] row = sortedIterator.next().getValues();
@@ -296,7 +296,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
           try {
             for (DataTable dataTable : reduceGroup) {
               try {
-                boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+                boolean nullHandlingEnabled = _queryContext.getNullMode().nullAtQueryTime();
                 RoaringBitmap[] nullBitmaps = null;
                 if (nullHandlingEnabled) {
                   nullBitmaps = new RoaringBitmap[_numColumns];
@@ -428,7 +428,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     if (havingFilter != null) {
       rows = new ArrayList<>();
       HavingFilterHandler havingFilterHandler =
-          new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.isNullHandlingEnabled());
+          new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.getNullMode().nullAtQueryTime());
       for (int i = 0; i < numRows; i++) {
         Object[] row = getConvertedRowWithFinalResult(dataTable, i);
         if (havingFilterHandler.isMatch(row)) {

@@ -75,8 +75,8 @@ public class FilterOperatorUtils {
       if (predicateEvaluator.isAlwaysFalse()) {
         return EmptyFilterOperator.getInstance();
       } else if (predicateEvaluator.isAlwaysTrue()) {
-        if (queryContext.isNullHandlingEnabled()) {
-          NullValueVectorReader nullValueVectorReader = dataSource.getNullValueVector();
+        if (queryContext.getNullMode().nullAtQueryTime()) {
+          NullValueVectorReader nullValueVectorReader = dataSource.getNullValueVector(queryContext.getNullMode());
           if (nullValueVectorReader != null) {
             ImmutableRoaringBitmap nullBitmap = nullValueVectorReader.getNullBitmap();
             if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -146,7 +146,7 @@ public class FilterOperatorUtils {
         // Return the AND filter operator with re-ordered child filter operators
         reorderAndFilterChildOperators(queryContext, childFilterOperators);
         return new AndFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
-            queryContext.isNullHandlingEnabled());
+            queryContext.getNullMode());
       }
     }
 
@@ -171,7 +171,7 @@ public class FilterOperatorUtils {
       } else {
         // Return the OR filter operator with child filter operators
         return new OrFilterOperator(childFilterOperators, queryContext.getQueryOptions(), numDocs,
-            queryContext.isNullHandlingEnabled());
+            queryContext.getNullMode());
       }
     }
 
@@ -184,7 +184,7 @@ public class FilterOperatorUtils {
         return new MatchAllFilterOperator(numDocs);
       }
 
-      return new NotFilterOperator(filterOperator, numDocs, queryContext.isNullHandlingEnabled());
+      return new NotFilterOperator(filterOperator, numDocs, queryContext.getNullMode());
     }
 
 

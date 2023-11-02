@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -60,9 +61,9 @@ public class ProjectionBlockValSet implements BlockValSet {
 
   @Nullable
   @Override
-  public RoaringBitmap getNullBitmap() {
+  public RoaringBitmap getNullBitmap(NullMode nullMode) {
     if (!_nullBitmapSet) {
-      NullValueVectorReader nullValueReader = _dataSource.getNullValueVector();
+      NullValueVectorReader nullValueReader = _dataSource.getNullValueVector(nullMode);
       ImmutableRoaringBitmap nullBitmap = nullValueReader != null ? nullValueReader.getNullBitmap() : null;
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         // Project null bitmap.

@@ -29,6 +29,7 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -83,7 +84,7 @@ public class SelectionOrderByOperatorTest {
             + "FROM testTable "
             + "ORDER BY col1, col2 "
             + "LIMIT 1");
-    queryContext.setNullHandlingEnabled(true);
+    queryContext.setNullMode(NullMode.ALL_NULLABLE);
     List<Object[]> rows = executeQuery(queryContext);
     assertNull(rows.get(0)[0], "Column 'col1' value should be 'null' when null handling is enabled");
     assertNull(rows.get(0)[1], "Column 'col2' value should be 'null' when null handling is enabled");
@@ -96,7 +97,7 @@ public class SelectionOrderByOperatorTest {
             + "FROM testTable "
             + "ORDER BY col1, col2 "
             + "LIMIT 1");
-    queryContext.setNullHandlingEnabled(false);
+    queryContext.setNullMode(NullMode.NONE_NULLABLE);
     List<Object[]> rows = executeQuery(queryContext);
     assertNotNull(rows.get(0)[0], "Column 'col1' value should not be 'null' when null handling is disabled");
     assertNotNull(rows.get(0)[1], "Column 'col2' value should not be 'null' when null handling is disabled");
@@ -109,7 +110,7 @@ public class SelectionOrderByOperatorTest {
             + "FROM testTable "
             + "ORDER BY col1 "
             + "LIMIT 1");
-    queryContext.setNullHandlingEnabled(true);
+    queryContext.setNullMode(NullMode.ALL_NULLABLE);
     List<Object[]> rows = executeQuery(queryContext);
     assertNull(rows.get(0)[0], "Column 'col1' value should be 'null' when null handling is enabled");
     assertNull(rows.get(0)[1], "Column 'col2' value should be 'null' when null handling is enabled");
@@ -122,7 +123,7 @@ public class SelectionOrderByOperatorTest {
             + "FROM testTable "
             + "ORDER BY col1 "
             + "LIMIT 1");
-    queryContext.setNullHandlingEnabled(false);
+    queryContext.setNullMode(NullMode.NONE_NULLABLE);
     List<Object[]> rows = executeQuery(queryContext);
     assertNotNull(rows.get(0)[0], "Column 'col1' value should not be 'null' when null handling is disabled");
     assertNotNull(rows.get(0)[1], "Column 'col2' value should not be 'null' when null handling is disabled");

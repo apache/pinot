@@ -114,7 +114,7 @@ public class ResultsBlockUtils {
     // NOTE: Use STRING column data type as default for distinct query
     Arrays.fill(columnDataTypes, ColumnDataType.STRING);
     DistinctTable distinctTable = new DistinctTable(new DataSchema(columns, columnDataTypes), Collections.emptySet(),
-        queryContext.isNullHandlingEnabled());
+        queryContext.getNullMode());
     return new DistinctResultsBlock(distinctTable, queryContext);
   }
 }

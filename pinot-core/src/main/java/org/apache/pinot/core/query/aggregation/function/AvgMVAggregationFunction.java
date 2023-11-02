@@ -25,12 +25,13 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 public class AvgMVAggregationFunction extends AvgAggregationFunction {
 
   public AvgMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "AVG_MV"), false);
+    super(verifySingleArgument(arguments, "AVG_MV"), NullMode.NONE_NULLABLE);
   }
 
   @Override

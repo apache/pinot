@@ -57,7 +57,7 @@ public class TypeFactory extends JavaTypeFactoryImpl {
     if (isArray) {
       type = createArrayType(type, -1);
     }
-    boolean isNullable = fieldSpec.getNullable() != null && fieldSpec.getNullable();
+    boolean isNullable = fieldSpec.getNullable();
     if (isNullable) {
       type = createTypeWithNullability(type, true);
     }

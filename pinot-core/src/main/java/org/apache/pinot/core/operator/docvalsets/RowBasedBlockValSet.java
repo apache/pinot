@@ -24,6 +24,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -73,8 +74,16 @@ public class RowBasedBlockValSet implements BlockValSet {
 
   @Nullable
   @Override
-  public RoaringBitmap getNullBitmap() {
-    return _nullBitmap;
+  public RoaringBitmap getNullBitmap(NullMode nullMode) {
+    switch (nullMode) {
+      case COLUMN_BASED:
+      case ALL_NULLABLE:
+        return _nullBitmap;
+      case NONE_NULLABLE:
+        return null;
+      default:
+        throw new IllegalArgumentException("Null mode " + nullMode + " is not supported");
+    }
   }
 
   @Override

@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
@@ -137,7 +138,7 @@ public class SegmentMetadataFetcher {
       indexStatus.put(INVERTED_INDEX, INDEX_AVAILABLE);
     }
 
-    if (Objects.isNull(dataSource.getNullValueVector())) {
+    if (Objects.isNull(dataSource.getNullValueVector(NullMode.ALL_NULLABLE))) {
       indexStatus.put(NULL_VALUE_VECTOR_READER, INDEX_NOT_AVAILABLE);
     } else {
       indexStatus.put(NULL_VALUE_VECTOR_READER, INDEX_AVAILABLE);

@@ -27,6 +27,7 @@ import java.util.OptionalInt;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -124,8 +125,8 @@ public class FilterOperatorUtilsTest {
     H3InclusionIndexFilterOperator h3Inclusion = mock(H3InclusionIndexFilterOperator.class);
     AndFilterOperator andFilterOperator = mock(AndFilterOperator.class);
     OrFilterOperator orFilterOperator = mock(OrFilterOperator.class);
-    NotFilterOperator notWithHighPriority = new NotFilterOperator(sorted, NUM_DOCS, false);
-    NotFilterOperator notWithLowPriority = new NotFilterOperator(orFilterOperator, NUM_DOCS, false);
+    NotFilterOperator notWithHighPriority = new NotFilterOperator(sorted, NUM_DOCS, NullMode.NONE_NULLABLE);
+    NotFilterOperator notWithLowPriority = new NotFilterOperator(orFilterOperator, NUM_DOCS, NullMode.NONE_NULLABLE);
 
     ExpressionFilterOperator expression = mock(ExpressionFilterOperator.class);
     BaseFilterOperator unknown = mock(BaseFilterOperator.class);
@@ -188,7 +189,7 @@ public class FilterOperatorUtilsTest {
       implements PrioritizedFilterOperator<FilterBlock> {
     public MockedPrioritizedFilterOperator() {
       // This filter operator does not support AND/OR/NOT operations.
-      super(0, false);
+      super(0, NullMode.NONE_NULLABLE);
     }
   }
 }

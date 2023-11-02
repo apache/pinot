@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.query.DistinctOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 
@@ -53,7 +54,8 @@ public class DistinctPlanNode implements PlanNode {
       if (column != null) {
         DataSource dataSource = _indexSegment.getDataSource(column);
         if (dataSource.getDictionary() != null) {
-          if (!_queryContext.isNullHandlingEnabled()) {
+          NullMode nullMode = _queryContext.getNullMode();
+          if (!nullMode.nullAtQueryTime()) {
             return new DictionaryBasedDistinctOperator(dataSource, _queryContext);
           }
           // If nullHandlingEnabled is set to true, and the column contains null values, call DistinctOperator instead
@@ -61,7 +63,7 @@ public class DistinctPlanNode implements PlanNode {
           // TODO: reserve special value in dictionary (e.g. -1) for null in the future so
           //  DictionaryBasedDistinctOperator can be reused since it is more efficient than DistinctOperator for
           //  dictionary-encoded columns.
-          NullValueVectorReader nullValueReader = dataSource.getNullValueVector();
+          NullValueVectorReader nullValueReader = dataSource.getNullValueVector(nullMode);
           if (nullValueReader == null || nullValueReader.getNullBitmap().isEmpty()) {
             return new DictionaryBasedDistinctOperator(dataSource, _queryContext);
           }

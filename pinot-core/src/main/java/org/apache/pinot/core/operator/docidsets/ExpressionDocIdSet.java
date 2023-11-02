@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.ExpressionScanDocIdIterator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -31,10 +32,10 @@ public final class ExpressionDocIdSet implements BlockDocIdSet {
   private final ExpressionScanDocIdIterator _docIdIterator;
 
   public ExpressionDocIdSet(TransformFunction transformFunction, @Nullable PredicateEvaluator predicateEvaluator,
-      Map<String, DataSource> dataSourceMap, int numDocs, boolean nullHandlingEnabled,
+      Map<String, DataSource> dataSourceMap, int numDocs, NullMode nullMode,
       ExpressionScanDocIdIterator.PredicateEvaluationResult predicateEvaluationResult) {
     _docIdIterator = new ExpressionScanDocIdIterator(transformFunction, predicateEvaluator, dataSourceMap, numDocs,
-        nullHandlingEnabled, predicateEvaluationResult);
+        nullMode, predicateEvaluationResult);
   }
 
   @Override

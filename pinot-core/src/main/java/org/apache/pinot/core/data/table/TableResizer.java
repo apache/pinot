@@ -93,7 +93,7 @@ public class TableResizer {
       comparators[i] = orderByExpression.isAsc() ? Comparator.naturalOrder() : Comparator.reverseOrder();
       nullComparisonResults[i] = orderByExpression.isNullsLast() ? -1 : 1;
     }
-    boolean nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    boolean nullHandlingEnabled = queryContext.getNullMode().nullAtQueryTime();
     if (nullHandlingEnabled) {
       _intermediateRecordComparator = (o1, o2) -> {
         for (int i = 0; i < _numOrderByExpressions; i++) {

@@ -73,7 +73,7 @@ public class SelectionOperatorService {
     assert queryContext.getOrderByExpressions() != null;
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
         OrderByComparatorFactory.getComparator(queryContext.getOrderByExpressions(),
-            _queryContext.isNullHandlingEnabled()).reversed());
+            _queryContext.getNullMode()).reversed());
   }
 
   /**
@@ -84,7 +84,7 @@ public class SelectionOperatorService {
   public void reduceWithOrdering(Collection<DataTable> dataTables) {
     for (DataTable dataTable : dataTables) {
       int numRows = dataTable.getNumberOfRows();
-      if (_queryContext.isNullHandlingEnabled()) {
+      if (_queryContext.getNullMode().nullAtQueryTime()) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
         for (int colId = 0; colId < nullBitmaps.length; colId++) {
           nullBitmaps[colId] = dataTable.getNullRowIds(colId);

@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.trace.FilterType;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -44,7 +45,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {
     // This filter operator does not support AND/OR/NOT operations.
-    super(0, false);
+    super(0, NullMode.NONE_NULLABLE);
     _textIndexReader = textIndexReader;
     _predicate = predicate;
     _numDocs = numDocs;

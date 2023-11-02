@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.Tracing;
@@ -49,13 +50,13 @@ import org.roaringbitmap.RoaringBitmap;
 public abstract class BaseDistinctAggregateAggregationFunction<T extends Comparable>
     extends BaseSingleInputAggregationFunction<Set, T> {
   private final AggregationFunctionType _functionType;
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
 
   protected BaseDistinctAggregateAggregationFunction(ExpressionContext expression,
-      AggregationFunctionType aggregationFunctionType, boolean nullHandlingEnabled) {
+      AggregationFunctionType aggregationFunctionType, NullMode nullMode) {
     super(expression);
     _functionType = aggregationFunctionType;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
   }
 
   @Override
@@ -151,8 +152,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      if (_nullHandlingEnabled) {
-        nullBitmap = blockValSet.getNullBitmap();
+      if (_nullMode.nullAtQueryTime()) {
+        nullBitmap = blockValSet.getNullBitmap(_nullMode);
       }
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -175,8 +176,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
       case INT:
         IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
         int[] intValues = blockValSet.getIntValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -193,8 +194,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
       case LONG:
         LongOpenHashSet longSet = (LongOpenHashSet) valueSet;
         long[] longValues = blockValSet.getLongValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -211,8 +212,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
       case FLOAT:
         FloatOpenHashSet floatSet = (FloatOpenHashSet) valueSet;
         float[] floatValues = blockValSet.getFloatValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -229,8 +230,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
       case DOUBLE:
         DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -248,8 +249,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         ObjectOpenHashSet<String> stringSet = (ObjectOpenHashSet<String>) valueSet;
         String[] stringValues = blockValSet.getStringValuesSV();
         //noinspection ManualArrayToCollectionCopy
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -266,8 +267,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
       case BYTES:
         ObjectOpenHashSet<ByteArray> bytesSet = (ObjectOpenHashSet<ByteArray>) valueSet;
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -373,8 +374,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      if (_nullHandlingEnabled) {
-        nullBitmap = blockValSet.getNullBitmap();
+      if (_nullMode.nullAtQueryTime()) {
+        nullBitmap = blockValSet.getNullBitmap(_nullMode);
       }
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -396,8 +397,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -413,8 +414,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -430,8 +431,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -448,8 +449,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -467,8 +468,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -486,8 +487,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
+        if (_nullMode.nullAtQueryTime()) {
+          nullBitmap = blockValSet.getNullBitmap(_nullMode);
         }
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
@@ -596,8 +597,8 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      if (_nullHandlingEnabled) {
-        nullBitmap = blockValSet.getNullBitmap();
+      if (_nullMode.nullAtQueryTime()) {
+        nullBitmap = blockValSet.getNullBitmap(_nullMode);
       }
       int[] dictIds = blockValSet.getDictionaryIdsSV();
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
@@ -619,7 +620,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
+        nullBitmap = blockValSet.getNullBitmap(_nullMode);
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -634,7 +635,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
+        nullBitmap = blockValSet.getNullBitmap(_nullMode);
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -649,7 +650,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
+        nullBitmap = blockValSet.getNullBitmap(_nullMode);
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -664,7 +665,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
+        nullBitmap = blockValSet.getNullBitmap(_nullMode);
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -679,7 +680,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
+        nullBitmap = blockValSet.getNullBitmap(_nullMode);
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {
@@ -694,7 +695,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
+        nullBitmap = blockValSet.getNullBitmap(_nullMode);
         if (nullBitmap != null && !nullBitmap.isEmpty()) {
           for (int i = 0; i < length; i++) {
             if (!nullBitmap.contains(i)) {

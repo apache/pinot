@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.distinct.DistinctExecutor;
 import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -41,17 +42,17 @@ abstract class BaseDictionaryBasedSingleColumnDistinctExecutor implements Distin
   final Dictionary _dictionary;
   final DataType _dataType;
   final int _limit;
-  final boolean _nullHandlingEnabled;
+  final NullMode _nullMode;
 
   final IntSet _dictIdSet;
 
   BaseDictionaryBasedSingleColumnDistinctExecutor(ExpressionContext expression, Dictionary dictionary,
-      DataType dataType, int limit, boolean nullHandlingEnabled) {
+      DataType dataType, int limit, NullMode nullMode) {
     _expression = expression;
     _dictionary = dictionary;
     _dataType = dataType;
     _limit = limit;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
 
     _dictIdSet = new IntOpenHashSet(Math.min(limit, MAX_INITIAL_CAPACITY));
   }
@@ -65,6 +66,6 @@ abstract class BaseDictionaryBasedSingleColumnDistinctExecutor implements Distin
     while (dictIdIterator.hasNext()) {
       records.add(new Record(new Object[]{_dictionary.getInternal(dictIdIterator.nextInt())}));
     }
-    return new DistinctTable(dataSchema, records, _nullHandlingEnabled);
+    return new DistinctTable(dataSchema, records, _nullMode);
   }
 }

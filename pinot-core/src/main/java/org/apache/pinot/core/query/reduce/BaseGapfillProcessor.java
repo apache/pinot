@@ -201,7 +201,7 @@ abstract class BaseGapfillProcessor {
       } else {
         FunctionContext functionContext = expressionContext.getFunction();
         AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext.isNullHandlingEnabled());
+            AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext.getNullMode());
         columnDataTypes[i] = aggregationFunction.getFinalResultColumnType();
         columnNames[i] = functionContext.toString();
       }

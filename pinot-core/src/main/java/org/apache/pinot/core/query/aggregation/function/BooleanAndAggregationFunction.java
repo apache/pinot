@@ -22,12 +22,13 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 public class BooleanAndAggregationFunction extends BaseBooleanAggregationFunction {
 
-  public BooleanAndAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(verifySingleArgument(arguments, "BOOL_AND"), nullHandlingEnabled, BooleanMerge.AND);
+  public BooleanAndAggregationFunction(List<ExpressionContext> arguments, NullMode nullMode) {
+    super(verifySingleArgument(arguments, "BOOL_AND"), nullMode, BooleanMerge.AND);
   }
 
   @Override

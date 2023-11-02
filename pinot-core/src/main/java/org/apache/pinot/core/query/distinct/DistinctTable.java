@@ -40,6 +40,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
@@ -77,11 +78,11 @@ public class DistinctTable {
    * Constructor of the main DistinctTable which can be used to add records and merge other DistinctTables.
    */
   public DistinctTable(DataSchema dataSchema, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
-      boolean nullHandlingEnabled) {
+      NullMode nullMode) {
     _dataSchema = dataSchema;
     _isMainTable = true;
     _limit = limit;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullHandlingEnabled = nullMode.nullAtQueryTime();
 
     // NOTE: When LIMIT is smaller than or equal to the MAX_INITIAL_CAPACITY, no resize is required.
     int initialCapacity = Math.min(limit, DistinctExecutor.MAX_INITIAL_CAPACITY);
@@ -147,10 +148,10 @@ public class DistinctTable {
   /**
    * Constructor of the wrapper DistinctTable which can only be merged into the main DistinctTable.
    */
-  public DistinctTable(DataSchema dataSchema, Collection<Record> records, boolean nullHandlingEnabled) {
+  public DistinctTable(DataSchema dataSchema, Collection<Record> records, NullMode nullMode) {
     _dataSchema = dataSchema;
     _records = records;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullHandlingEnabled = nullMode.nullAtQueryTime();
     _isMainTable = false;
     _limit = Integer.MIN_VALUE;
     _recordSet = null;
@@ -161,7 +162,7 @@ public class DistinctTable {
    * Constructor of the wrapper DistinctTable which can only be merged into the main DistinctTable.
    */
   public DistinctTable(DataSchema dataSchema, Collection<Record> records) {
-    this(dataSchema, records, false);
+    this(dataSchema, records, NullMode.NONE_NULLABLE);
   }
 
   /**

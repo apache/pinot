@@ -60,7 +60,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
     if (_queryContext.getOrderByExpressions() == null) {
       // Selection only
       List<Object[]> reducedRows = SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap.values(), limit,
-          _queryContext.isNullHandlingEnabled());
+          _queryContext.getNullMode());
       brokerResponseNative.setResultTable(
           SelectionOperatorUtils.renderResultTableWithoutOrdering(reducedRows, pair.getLeft(), pair.getRight()));
     } else {

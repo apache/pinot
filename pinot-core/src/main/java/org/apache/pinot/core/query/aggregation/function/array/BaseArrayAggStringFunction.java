@@ -23,14 +23,15 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public abstract class BaseArrayAggStringFunction<I extends AbstractObjectCollection<String>>
     extends BaseArrayAggFunction<I, ObjectArrayList<String>> {
-  public BaseArrayAggStringFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, FieldSpec.DataType.STRING, nullHandlingEnabled);
+  public BaseArrayAggStringFunction(ExpressionContext expression, NullMode nullMode) {
+    super(expression, FieldSpec.DataType.STRING, nullMode);
   }
 
   abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, String value);

@@ -292,14 +292,14 @@ public class FilterPlanNode implements PlanNode {
                   column);
               return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, numDocs);
             case IS_NULL:
-              NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+              NullValueVectorReader nullValueVector = dataSource.getNullValueVector(_queryContext.getNullMode());
               if (nullValueVector != null) {
                 return new BitmapBasedFilterOperator(nullValueVector.getNullBitmap(), false, numDocs);
               } else {
                 return EmptyFilterOperator.getInstance();
               }
             case IS_NOT_NULL:
-              nullValueVector = dataSource.getNullValueVector();
+              nullValueVector = dataSource.getNullValueVector(_queryContext.getNullMode());
               if (nullValueVector != null) {
                 return new BitmapBasedFilterOperator(nullValueVector.getNullBitmap(), true, numDocs);
               } else {

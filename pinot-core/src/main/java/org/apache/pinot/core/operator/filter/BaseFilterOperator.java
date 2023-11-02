@@ -25,6 +25,7 @@ import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.NotDocIdSet;
 import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 /**
@@ -32,11 +33,11 @@ import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
  */
 public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   protected final int _numDocs;
-  protected final boolean _nullHandlingEnabled;
+  protected final NullMode _nullMode;
 
-  public BaseFilterOperator(int numDocs, boolean nullHandlingEnabled) {
+  public BaseFilterOperator(int numDocs, NullMode nullMode) {
     _numDocs = numDocs;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
   }
 
   /**
@@ -102,7 +103,7 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
    * @return document IDs in which the predicate evaluates to false.
    */
   protected BlockDocIdSet getFalses() {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return new NotDocIdSet(new OrDocIdSet(Arrays.asList(getTrues(), getNulls()), _numDocs),
           _numDocs);
     } else {

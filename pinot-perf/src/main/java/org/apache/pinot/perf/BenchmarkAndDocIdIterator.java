@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.operator.filter.AndFilterOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Level;
@@ -61,7 +62,9 @@ public class BenchmarkAndDocIdIterator {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void benchAndFilterOperator(MyState myState, Blackhole bh) {
     for (int i = 0; i < 100; i++) {
-      bh.consume(new AndFilterOperator(myState._childOperators, null, NUM_DOCS, false).nextBlock().getBlockDocIdSet()
+      bh.consume(new AndFilterOperator(myState._childOperators, null, NUM_DOCS, NullMode.NONE_NULLABLE)
+          .nextBlock()
+          .getBlockDocIdSet()
           .iterator());
     }
   }
@@ -72,7 +75,9 @@ public class BenchmarkAndDocIdIterator {
   public void benchAndFilterOperatorDegenerate(MyState myState, Blackhole bh) {
     for (int i = 0; i < 100; i++) {
       bh.consume(
-          new AndFilterOperator(myState._childOperatorsNoOrdering, null, NUM_DOCS, false).nextBlock().getBlockDocIdSet()
+          new AndFilterOperator(myState._childOperatorsNoOrdering, null, NUM_DOCS, NullMode.NONE_NULLABLE)
+              .nextBlock()
+              .getBlockDocIdSet()
               .iterator());
     }
   }

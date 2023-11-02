@@ -31,20 +31,21 @@ import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public class SumAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
   private static final double DEFAULT_VALUE = 0.0;
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
 
-  public SumAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    this(verifySingleArgument(arguments, "SUM"), nullHandlingEnabled);
+  public SumAggregationFunction(List<ExpressionContext> arguments, NullMode nullMode) {
+    this(verifySingleArgument(arguments, "SUM"), nullMode);
   }
 
-  protected SumAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+  protected SumAggregationFunction(ExpressionContext expression, NullMode nullMode) {
     super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
   }
 
   @Override
@@ -54,7 +55,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return new ObjectAggregationResultHolder();
     }
     return new DoubleAggregationResultHolder(DEFAULT_VALUE);
@@ -62,7 +63,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
     }
     return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, DEFAULT_VALUE);
@@ -72,8 +73,8 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap == null) {
         nullBitmap = new RoaringBitmap();
       }
@@ -207,8 +208,8 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap == null) {
         nullBitmap = new RoaringBitmap();
       }
@@ -253,7 +254,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return aggregationResultHolder.getResult();
     }
     return aggregationResultHolder.getDoubleResult();
@@ -261,7 +262,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return groupByResultHolder.getResult(groupKey);
     }
     return groupByResultHolder.getDoubleResult(groupKey);
@@ -269,7 +270,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double merge(Double intermediateResult1, Double intermediateResult2) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       if (intermediateResult1 == null) {
         return intermediateResult2;
       }

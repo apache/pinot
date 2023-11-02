@@ -32,6 +32,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -49,9 +50,9 @@ import org.roaringbitmap.RoaringBitmap;
 public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
   private final Integer _precision;
   private final Integer _scale;
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
 
-  public SumPrecisionAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+  public SumPrecisionAggregationFunction(List<ExpressionContext> arguments, NullMode nullMode) {
     super(arguments.get(0));
 
     int numArguments = arguments.size();
@@ -67,7 +68,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       _precision = null;
       _scale = null;
     }
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
   }
 
   @Override
@@ -89,8 +90,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
         return;
@@ -242,8 +243,8 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap != null && !nullBitmap.isEmpty()) {
         aggregateGroupBySVNullHandlingEnabled(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
         return;
@@ -440,7 +441,7 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   public BigDecimal extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     BigDecimal result = aggregationResultHolder.getResult();
     if (result == null) {
-      return _nullHandlingEnabled ? null : BigDecimal.ZERO;
+      return _nullMode.nullAtQueryTime() ? null : BigDecimal.ZERO;
     }
     return result;
   }
@@ -449,14 +450,14 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   public BigDecimal extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     BigDecimal result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
-      return _nullHandlingEnabled ? null : BigDecimal.ZERO;
+      return _nullMode.nullAtQueryTime() ? null : BigDecimal.ZERO;
     }
     return result;
   }
 
   @Override
   public BigDecimal merge(BigDecimal intermediateResult1, BigDecimal intermediateResult2) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       if (intermediateResult1 == null) {
         return intermediateResult2;
       }

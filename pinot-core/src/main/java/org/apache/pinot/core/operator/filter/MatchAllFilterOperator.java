@@ -24,13 +24,14 @@ import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 public class MatchAllFilterOperator extends BaseFilterOperator {
   public static final String EXPLAIN_NAME = "FILTER_MATCH_ENTIRE_SEGMENT";
 
   public MatchAllFilterOperator(int numDocs) {
-    super(numDocs, false);
+    super(numDocs, NullMode.NONE_NULLABLE);
   }
 
   @Override

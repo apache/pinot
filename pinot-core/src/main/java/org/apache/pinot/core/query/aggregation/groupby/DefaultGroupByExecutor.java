@@ -32,6 +32,7 @@ import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 /**
@@ -52,7 +53,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][]);
 
   protected final AggregationFunction[] _aggregationFunctions;
-  protected final boolean _nullHandlingEnabled;
+  protected final NullMode _nullMode;
   protected final GroupKeyGenerator _groupKeyGenerator;
   protected final GroupByResultHolder[] _groupByResultHolders;
   protected final boolean _hasMVGroupByExpression;
@@ -74,7 +75,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       @Nullable GroupKeyGenerator groupKeyGenerator) {
     _aggregationFunctions = aggregationFunctions;
     assert _aggregationFunctions != null;
-    _nullHandlingEnabled = queryContext.isNullHandlingEnabled();
+    _nullMode = queryContext.getNullMode();
 
     boolean hasMVGroupByExpression = false;
     boolean hasNoDictionaryGroupByExpression = false;
@@ -91,16 +92,16 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     if (groupKeyGenerator != null) {
       _groupKeyGenerator = groupKeyGenerator;
     } else {
-      if (hasNoDictionaryGroupByExpression || _nullHandlingEnabled) {
+      if (hasNoDictionaryGroupByExpression || _nullMode.nullAtQueryTime()) {
         if (groupByExpressions.length == 1) {
           // TODO(nhejazi): support MV and dictionary based when null handling is enabled.
           _groupKeyGenerator =
               new NoDictionarySingleColumnGroupKeyGenerator(projectOperator, groupByExpressions[0], numGroupsLimit,
-                  _nullHandlingEnabled);
+                  _nullMode);
         } else {
           _groupKeyGenerator =
               new NoDictionaryMultiColumnGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
-                  _nullHandlingEnabled);
+                  _nullMode);
         }
       } else {
         _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,

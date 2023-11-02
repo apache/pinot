@@ -176,7 +176,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = _dataSchema.size();
     Iterator<Record> iterator = _table.iterator();
-    if (_queryContext.isNullHandlingEnabled()) {
+    if (_queryContext.getNullMode().nullAtQueryTime()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       Object[] nullPlaceholders = new Object[numColumns];
       for (int colId = 0; colId < numColumns; colId++) {

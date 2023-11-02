@@ -43,6 +43,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -199,14 +200,14 @@ public class NoDictionaryGroupKeyGeneratorTest {
     if (numGroupByColumns == 1) {
       groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(_projectOperator,
           ExpressionContext.forIdentifier(COLUMNS.get(groupByColumnIndexes[0])),
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false);
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, NullMode.NONE_NULLABLE);
     } else {
       ExpressionContext[] groupByExpressions = new ExpressionContext[numGroupByColumns];
       for (int i = 0; i < numGroupByColumns; i++) {
         groupByExpressions[i] = ExpressionContext.forIdentifier(COLUMNS.get(groupByColumnIndexes[i]));
       }
       groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(_projectOperator, groupByExpressions,
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false);
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, NullMode.NONE_NULLABLE);
     }
     groupKeyGenerator.generateKeysForBlock(_valueBlock, new int[NUM_RECORDS]);
 

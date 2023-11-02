@@ -37,6 +37,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.locationtech.jts.geom.Coordinate;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -58,7 +59,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   private final double _upperBound;
 
   public H3IndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
-    super(numDocs, false);
+    super(numDocs, NullMode.NONE_NULLABLE);
     _segment = segment;
     _queryContext = queryContext;
     _predicate = predicate;

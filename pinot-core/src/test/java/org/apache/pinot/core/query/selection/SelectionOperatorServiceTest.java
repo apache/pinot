@@ -31,6 +31,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
@@ -202,7 +203,7 @@ public class SelectionOperatorServiceTest {
     Collection<Object[]> rows = new ArrayList<>(2);
     rows.add(_row1);
     rows.add(_row2);
-    DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, _dataSchema, false);
+    DataTable dataTable = SelectionOperatorUtils.getDataTableFromRows(rows, _dataSchema, NullMode.NONE_NULLABLE);
     assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 0), _row1));
     assertTrue(Arrays.deepEquals(SelectionOperatorUtils.extractRowFromDataTable(dataTable, 1), _row2));
   }

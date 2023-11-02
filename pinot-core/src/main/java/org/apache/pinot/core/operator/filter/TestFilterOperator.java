@@ -24,6 +24,7 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 public class TestFilterOperator extends BaseFilterOperator {
@@ -33,13 +34,13 @@ public class TestFilterOperator extends BaseFilterOperator {
   private final int[] _nullDocIds;
 
   public TestFilterOperator(int[] trueDocIds, int[] nullDocIds, int numDocs) {
-    super(numDocs, true);
+    super(numDocs, NullMode.ALL_NULLABLE);
     _trueDocIds = trueDocIds;
     _nullDocIds = nullDocIds;
   }
 
   public TestFilterOperator(int[] docIds, int numDocs) {
-    super(numDocs, false);
+    super(numDocs, NullMode.NONE_NULLABLE);
     _trueDocIds = docIds;
     _nullDocIds = new int[0];
   }

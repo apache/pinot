@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -52,13 +53,13 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
     // get dataSchema
     _dataSchema = _dataSchema == null ? dataTable.getDataSchema() : _dataSchema;
     // TODO: For data table map with more than one data tables, remove conflicting data tables
-    reduceWithoutOrdering(dataTable, _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
+    reduceWithoutOrdering(dataTable, _queryContext.getLimit(), _queryContext.getNullMode());
   }
 
-  private void reduceWithoutOrdering(DataTable dataTable, int limit, boolean nullHandlingEnabled) {
+  private void reduceWithoutOrdering(DataTable dataTable, int limit, NullMode nullMode) {
     int numColumns = dataTable.getDataSchema().size();
     int numRows = dataTable.getNumberOfRows();
-    if (nullHandlingEnabled) {
+    if (nullMode.nullAtQueryTime()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       for (int coldId = 0; coldId < numColumns; coldId++) {
         nullBitmaps[coldId] = dataTable.getNullRowIds(coldId);

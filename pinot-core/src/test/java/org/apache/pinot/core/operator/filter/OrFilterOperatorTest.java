@@ -27,6 +27,7 @@ import java.util.TreeSet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -46,7 +47,7 @@ public class OrFilterOperatorTest {
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(new TestFilterOperator(docIds1, numDocs));
     operators.add(new TestFilterOperator(docIds2, numDocs));
-    OrFilterOperator orOperator = new OrFilterOperator(operators, null, numDocs, false);
+    OrFilterOperator orOperator = new OrFilterOperator(operators, null, numDocs, NullMode.NONE_NULLABLE);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
@@ -71,7 +72,7 @@ public class OrFilterOperatorTest {
     operators.add(new TestFilterOperator(docIds1, numDocs));
     operators.add(new TestFilterOperator(docIds2, numDocs));
     operators.add(new TestFilterOperator(docIds3, numDocs));
-    OrFilterOperator orOperator = new OrFilterOperator(operators, null, numDocs, false);
+    OrFilterOperator orOperator = new OrFilterOperator(operators, null, numDocs, NullMode.NONE_NULLABLE);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
@@ -95,12 +96,12 @@ public class OrFilterOperatorTest {
     List<BaseFilterOperator> childOperators = new ArrayList<>();
     childOperators.add(new TestFilterOperator(docIds1, numDocs));
     childOperators.add(new TestFilterOperator(docIds2, numDocs));
-    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators, null, numDocs, false);
+    OrFilterOperator childOrOperator = new OrFilterOperator(childOperators, null, numDocs, NullMode.NONE_NULLABLE);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childOrOperator);
     operators.add(new TestFilterOperator(docIds3, numDocs));
-    OrFilterOperator orOperator = new OrFilterOperator(operators, null, numDocs, false);
+    OrFilterOperator orOperator = new OrFilterOperator(operators, null, numDocs, NullMode.NONE_NULLABLE);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
     int docId;
@@ -119,7 +120,7 @@ public class OrFilterOperatorTest {
 
     OrFilterOperator orFilterOperator = new OrFilterOperator(
         Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs),
-            new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, true);
+            new TestFilterOperator(docIds2, nullDocIds2, numDocs)), null, numDocs, NullMode.ALL_NULLABLE);
 
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), ImmutableList.of(0, 1, 2, 3));
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), ImmutableList.of(8, 9));
@@ -133,7 +134,7 @@ public class OrFilterOperatorTest {
 
     OrFilterOperator orFilterOperator = new OrFilterOperator(
         Arrays.asList(new TestFilterOperator(docIds1, nullDocIds1, numDocs), EmptyFilterOperator.getInstance()), null,
-        numDocs, true);
+        numDocs, NullMode.ALL_NULLABLE);
 
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), Arrays.asList(1, 2, 3));
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Arrays.asList(0, 7, 8, 9));

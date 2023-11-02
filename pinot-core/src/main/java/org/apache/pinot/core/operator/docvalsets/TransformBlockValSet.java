@@ -25,6 +25,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.InvocationRecording;
@@ -54,12 +55,20 @@ public class TransformBlockValSet implements BlockValSet {
 
   @Nullable
   @Override
-  public RoaringBitmap getNullBitmap() {
-    if (!_nullBitmapSet) {
-      _nullBitmap = _transformFunction.getNullBitmap(_valueBlock);
-      _nullBitmapSet = true;
+  public RoaringBitmap getNullBitmap(NullMode nullMode) {
+    switch (nullMode) {
+      case COLUMN_BASED:
+      case ALL_NULLABLE:
+        if (!_nullBitmapSet) {
+          _nullBitmap = _transformFunction.getNullBitmap(_valueBlock);
+          _nullBitmapSet = true;
+        }
+        return _nullBitmap;
+      case NONE_NULLABLE:
+        return null;
+      default:
+        throw new IllegalArgumentException("Null mode " + nullMode + " is not supported");
     }
-    return _nullBitmap;
   }
 
   @Override

@@ -30,6 +30,7 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -100,7 +101,27 @@ public interface DataSource {
 
   /**
    * Returns null value vector for the column if exists, or {@code null} if not.
+   *
+   * The result is modified by the given null mode:
+   * <ol>
+   *   <li>In {@link NullMode#NONE_NULLABLE}, null is always returned.</li>
+   *   <li>In {@link NullMode#ALL_NULLABLE}, the null vector of the segment is returned.</li>
+   *   <li>In {@link NullMode#COLUMN_BASED}, the null vector of the segment is returned if and only if the field schema
+   *   is declared as {@link FieldSpec#getNullable() nullable}.</li>
+   * </ol>
    */
   @Nullable
-  NullValueVectorReader getNullValueVector();
+  NullValueVectorReader getNullValueVector(NullMode nullMode);
+
+  /**
+   * Like {@link #getNullValueVector(NullMode) getNullValueVector(NullMode.ALL_NULL}.
+   *
+   * This is the older method that didn't care about the null mode and instead delegated on whether there was a null
+   * vector in the segment or not.
+   *
+   * Ideally older code should be migrated to specify which null mode should be used.
+   */
+  default NullValueVectorReader getNullValueVector() {
+    return getNullValueVector(NullMode.ALL_NULLABLE);
+  }
 }

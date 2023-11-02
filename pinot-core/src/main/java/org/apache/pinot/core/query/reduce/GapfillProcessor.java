@@ -274,7 +274,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     for (int i = 1; i < dataSchema.getColumnNames().length; i++) {
       blockValSetMap.put(ExpressionContext.forIdentifier(dataSchema.getColumnName(i)),
           new RowBasedBlockValSet(dataSchema.getColumnDataType(i), bucketedRows, i,
-              _queryContext.isNullHandlingEnabled()));
+              _queryContext.getNullMode().nullAtQueryTime()));
     }
 
     for (int i = 0; i < _queryContext.getSelectExpressions().size(); i++) {
@@ -282,7 +282,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
       if (expressionContext.getType() == ExpressionContext.Type.FUNCTION) {
         FunctionContext functionContext = expressionContext.getFunction();
         AggregationFunction aggregationFunction =
-            AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext.isNullHandlingEnabled());
+            AggregationFunctionFactory.getAggregationFunction(functionContext, _queryContext.getNullMode());
         GroupByResultHolder groupByResultHolder =
             aggregationFunction.createGroupByResultHolder(groupKeyIndexes.size(), groupKeyIndexes.size());
         if (aggregationFunction instanceof CountAggregationFunction) {

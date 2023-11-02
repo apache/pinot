@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.IntGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -39,7 +40,7 @@ import org.roaringbitmap.RoaringBitmap;
 public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggregationFunction<Integer, Integer> {
 
   private final BooleanMerge _merger;
-  private final boolean _nullHandlingEnabled;
+  private final NullMode _nullMode;
 
   protected enum BooleanMerge {
     AND {
@@ -82,23 +83,23 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
     abstract int getDefaultValue();
   }
 
-  protected BaseBooleanAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled,
+  protected BaseBooleanAggregationFunction(ExpressionContext expression, NullMode nullMode,
       BooleanMerge merger) {
     super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullMode = nullMode;
     _merger = merger;
   }
 
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
-    return _nullHandlingEnabled
+    return _nullMode.nullAtQueryTime()
         ? new ObjectAggregationResultHolder()
         : new IntAggregateResultHolder(_merger.getDefaultValue());
   }
 
   @Override
   public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
-    return _nullHandlingEnabled
+    return _nullMode.nullAtQueryTime()
         ? new ObjectGroupByResultHolder(initialCapacity, maxCapacity)
         : new IntGroupByResultHolder(initialCapacity, maxCapacity, _merger.getDefaultValue());
   }
@@ -114,7 +115,7 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
     }
 
     int[] bools = blockValSet.getIntValuesSV();
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       int agg = getInt(aggregationResultHolder.getResult());
 
       // early terminate on a per-block level to allow the
@@ -123,7 +124,7 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
         return;
       }
 
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap == null) {
         nullBitmap = new RoaringBitmap();
       } else if (nullBitmap.getCardinality() > length) {
@@ -163,8 +164,8 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
     }
 
     int[] bools = blockValSet.getIntValuesSV();
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
+    if (_nullMode.nullAtQueryTime()) {
+      RoaringBitmap nullBitmap = blockValSet.getNullBitmap(_nullMode);
       if (nullBitmap == null) {
         nullBitmap = new RoaringBitmap();
       } else if (nullBitmap.getCardinality() > length) {
@@ -202,7 +203,7 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
 
   @Override
   public Integer extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return aggregationResultHolder.getResult();
     } else {
       return aggregationResultHolder.getIntResult();
@@ -211,7 +212,7 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
 
   @Override
   public Integer extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       return groupByResultHolder.getResult(groupKey);
     } else {
       return groupByResultHolder.getIntResult(groupKey);
@@ -220,7 +221,7 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
 
   @Override
   public Integer merge(Integer intermediateResult1, Integer intermediateResult2) {
-    if (_nullHandlingEnabled) {
+    if (_nullMode.nullAtQueryTime()) {
       if (intermediateResult1 == null) {
         return intermediateResult2;
       } else if (intermediateResult2 == null) {

@@ -52,7 +52,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
-    super(numDocs, queryContext.isNullHandlingEnabled());
+    super(numDocs, queryContext.getNullMode());
     _queryContext = queryContext;
 
     Set<String> columns = new HashSet<>();
@@ -85,14 +85,14 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       return new NotDocIdSet(getNulls(), _numDocs);
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-          _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE);
+          _queryContext.getNullMode(), ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE);
     }
   }
 
   @Override
   protected BlockDocIdSet getNulls() {
     return new ExpressionDocIdSet(_transformFunction, null, _dataSourceMap, _numDocs,
-        _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL);
+        _queryContext.getNullMode(), ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL);
   }
 
   @Override
@@ -103,7 +103,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       return getNulls();
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-          _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE);
+          _queryContext.getNullMode(), ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE);
     }
   }
 

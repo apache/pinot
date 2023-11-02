@@ -27,6 +27,7 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 
 
 /**
@@ -34,8 +35,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 public class DistinctAvgAggregationFunction extends BaseDistinctAggregateAggregationFunction<Double> {
 
-  public DistinctAvgAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(verifySingleArgument(arguments, "DISTINCT_AVG"), AggregationFunctionType.DISTINCTAVG, nullHandlingEnabled);
+  public DistinctAvgAggregationFunction(List<ExpressionContext> arguments, NullMode nullMode) {
+    super(verifySingleArgument(arguments, "DISTINCT_AVG"), AggregationFunctionType.DISTINCTAVG, nullMode);
   }
 
   @Override

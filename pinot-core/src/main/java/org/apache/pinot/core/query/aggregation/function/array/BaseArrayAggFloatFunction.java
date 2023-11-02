@@ -23,14 +23,15 @@ import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public abstract class BaseArrayAggFloatFunction<I extends AbstractFloatCollection>
     extends BaseArrayAggFunction<I, FloatArrayList> {
-  public BaseArrayAggFloatFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression, FieldSpec.DataType.FLOAT, nullHandlingEnabled);
+  public BaseArrayAggFloatFunction(ExpressionContext expression, NullMode nullMode) {
+    super(expression, FieldSpec.DataType.FLOAT, nullMode);
   }
 
   abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, float value);

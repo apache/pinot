@@ -23,13 +23,14 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.spi.datasource.NullMode;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
 
 
 public class ArrayAggLongFunction extends BaseArrayAggLongFunction<LongArrayList> {
-  public ArrayAggLongFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
-    super(expression, dataType, nullHandlingEnabled);
+  public ArrayAggLongFunction(ExpressionContext expression, FieldSpec.DataType dataType, NullMode nullMode) {
+    super(expression, dataType, nullMode);
   }
 
   @Override
