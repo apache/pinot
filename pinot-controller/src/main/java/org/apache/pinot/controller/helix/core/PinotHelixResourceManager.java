@@ -1597,7 +1597,7 @@ public class PinotHelixResourceManager {
     try {
       // Assign instances
       assignInstances(tableConfig, true);
-      LOGGER.info("Adding table {}: Assign instances", tableNameWithType);
+      LOGGER.info("Adding table {}: Assigned instances", tableNameWithType);
 
       if (tableType == TableType.OFFLINE) {
         // Add ideal state
