@@ -316,12 +316,22 @@ public class PinotClientRequest {
         try (RequestScope requestStatistics = Tracing.getTracer().createRequestScope()) {
           return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity,
               requestStatistics, httpHeaders);
+        } catch (Exception e) {
+          LOGGER.error("Error handling DQL request:\n{}\nException: {}", sqlRequestJson,
+              QueryException.getTruncatedStackTrace(e));
+          throw e;
         }
       case DML:
-        Map<String, String> headers = new HashMap<>();
-        httpRequesterIdentity.getHttpHeaders().entries()
-            .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
-        return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
+        try {
+          Map<String, String> headers = new HashMap<>();
+          httpRequesterIdentity.getHttpHeaders().entries()
+              .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
+          return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
+        } catch (Exception e) {
+          LOGGER.error("Error handling DQL request:\n{}\nException: {}", sqlRequestJson,
+              QueryException.getTruncatedStackTrace(e));
+          throw e;
+        }
       default:
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
             new UnsupportedOperationException("Unsupported SQL type - " + sqlType)));
