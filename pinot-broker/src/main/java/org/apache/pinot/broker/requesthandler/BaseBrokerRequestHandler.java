@@ -699,6 +699,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         setMaxServerResponseSizeBytes(numServers, queryOptions, offlineTableConfig);
         // Set the query option to directly return final result for single server query unless it is explicitly disabled
         if (numServers == 1) {
+          // Set the same flag in the original server request to be used in the reduce phase for hybrid table
           if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
               && offlineBrokerRequest != serverBrokerRequest) {
             serverBrokerRequest.getPinotQuery().getQueryOptions()
@@ -711,8 +712,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         setMaxServerResponseSizeBytes(numServers, queryOptions, realtimeTableConfig);
         // Set the query option to directly return final result for single server query unless it is explicitly disabled
         if (numServers == 1) {
+          // Set the same flag in the original server request to be used in the reduce phase for hybrid table
           if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
-              && offlineBrokerRequest != serverBrokerRequest) {
+              && realtimeBrokerRequest != serverBrokerRequest) {
             serverBrokerRequest.getPinotQuery().getQueryOptions()
                 .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
           }
