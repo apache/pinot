@@ -51,7 +51,6 @@ public class BrokerResponseStats extends BrokerResponseNative {
   private long _stageExecutionTimeMs = 0;
   private int _stageExecutionUnit = 0;
   private long _stageExecWallTimeMs = -1;
-  private boolean _maxRowsInJoinLimitReached = false;
   private Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private List<String> _tableNames = new ArrayList<>();
 
@@ -108,16 +107,6 @@ public class BrokerResponseStats extends BrokerResponseNative {
   @JsonProperty("stageExecutionUnit")
   public void setStageExecutionUnit(int stageExecutionUnit) {
     _stageExecutionUnit = stageExecutionUnit;
-  }
-
-  @JsonProperty("maxRowsInJoinLimitReached")
-  public boolean isMaxRowsInJoinLimitReached() {
-    return _maxRowsInJoinLimitReached;
-  }
-
-  @JsonProperty("maxRowsInJoinLimitReached")
-  public void setMaxRowsInJoinLimitReached(boolean maxRowsInJoinLimitReached) {
-    _maxRowsInJoinLimitReached = maxRowsInJoinLimitReached;
   }
 
   public String toJsonString()
