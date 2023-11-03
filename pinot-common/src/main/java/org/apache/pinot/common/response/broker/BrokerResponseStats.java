@@ -38,7 +38,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "stageExecWallTimeMs", "stageExecEndTimeMs", "numServersQueried", "numServersResponded", "numSegmentsQueried",
     "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
     "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
-    "numGroupsLimitReached", "numJoinLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs",
+    "numGroupsLimitReached", "maxRowsInJoinLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs",
     "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
     "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
     "realtimeTotalCpuTimeNs", "brokerReduceTimeMs", "traceInfo", "operatorStats", "tableNames"
@@ -51,7 +51,7 @@ public class BrokerResponseStats extends BrokerResponseNative {
   private long _stageExecutionTimeMs = 0;
   private int _stageExecutionUnit = 0;
   private long _stageExecWallTimeMs = -1;
-  private boolean _numJoinLimitReached = false;
+  private boolean _maxRowsInJoinLimitReached = false;
   private Map<String, Map<String, String>> _operatorStats = new HashMap<>();
   private List<String> _tableNames = new ArrayList<>();
 
@@ -110,14 +110,14 @@ public class BrokerResponseStats extends BrokerResponseNative {
     _stageExecutionUnit = stageExecutionUnit;
   }
 
-  @JsonProperty("numJoinLimitReached")
-  public boolean isNumJoinLimitReached() {
-    return _numJoinLimitReached;
+  @JsonProperty("maxRowsInJoinLimitReached")
+  public boolean isMaxRowsInJoinLimitReached() {
+    return _maxRowsInJoinLimitReached;
   }
 
-  @JsonProperty("numJoinLimitReached")
-  public void setNumJoinLimitReached(boolean numJoinLimitReached) {
-    _numJoinLimitReached = numJoinLimitReached;
+  @JsonProperty("maxRowsInJoinLimitReached")
+  public void setMaxRowsInJoinLimitReached(boolean maxRowsInJoinLimitReached) {
+    _maxRowsInJoinLimitReached = maxRowsInJoinLimitReached;
   }
 
   public String toJsonString()
