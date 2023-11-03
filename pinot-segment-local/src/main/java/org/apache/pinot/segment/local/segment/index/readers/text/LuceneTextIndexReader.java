@@ -190,7 +190,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
         throws Exception {
       int length = Integer.BYTES * numDocs;
       File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
-          column + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+          column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
       // The mapping is local to a segment. It is created on the server during segment load.
       // Unless we are running Pinot on Solaris/SPARC, the underlying architecture is
       // LITTLE_ENDIAN (Linux/x86). So use that as byte order.

@@ -53,7 +53,6 @@ public class V1Constants {
     public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
     public static final String LUCENE_TEXT_INDEX_FILE_EXTENSION = ".lucene.index";
     public static final String LUCENE_V9_FST_INDEX_FILE_EXTENSION = ".lucene.v9.fst";
-    public static final String LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.v9.mapping";
     public static final String LUCENE_V9_TEXT_INDEX_FILE_EXTENSION = ".lucene.v9.index";
   }
 

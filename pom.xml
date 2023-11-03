@@ -2028,6 +2028,7 @@
             <exclude>**/*.ser</exclude>
             <exclude>**/*.v1</exclude>
             <exclude>**/*.v2</exclude>
+            <exclude>**/Text.lucene.index/**</exclude>
             <exclude>**/appAssemblerScriptTemplate</exclude>
             <exclude>doap_Pinot.rdf</exclude>
 
