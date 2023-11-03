@@ -1614,7 +1614,7 @@ public class PinotHelixResourceManager {
       throw e;
     }
 
-    LOGGER.info("Adding table {} : Updating BrokerResource for table", tableNameWithType);
+    LOGGER.info("Adding table {}: Updating BrokerResource for table", tableNameWithType);
     List<String> brokers =
         HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig()));
     HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
@@ -1624,7 +1624,7 @@ public class PinotHelixResourceManager {
       return is;
     });
 
-    LOGGER.info("Adding table {} : Successfully added table", tableNameWithType);
+    LOGGER.info("Adding table {}: Successfully added table", tableNameWithType);
   }
 
   /**
