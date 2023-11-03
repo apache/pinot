@@ -1562,7 +1562,6 @@ public class PinotHelixResourceManager {
   public void addTable(TableConfig tableConfig)
       throws IOException {
     String tableNameWithType = tableConfig.getTableName();
-
     LOGGER.info("Adding table {}: Start", tableNameWithType);
 
     if (getTableConfig(tableNameWithType) != null) {
@@ -1596,17 +1595,19 @@ public class PinotHelixResourceManager {
       throw new RuntimeException("Failed to create table config for table: " + tableNameWithType);
     }
     try {
-      LOGGER.info("Adding table {}: Start adding table config", tableNameWithType);
       // Assign instances
       assignInstances(tableConfig, true);
+      LOGGER.info("Adding table {}: Assign instances", tableNameWithType);
+
       if (tableType == TableType.OFFLINE) {
         // Add ideal state
         _helixAdmin.addResource(_helixClusterName, tableNameWithType, idealState);
+        LOGGER.info("Adding table {}: Added ideal state for offline table", tableNameWithType);
       } else {
         // Add ideal state with the first CONSUMING segment
         _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState);
+        LOGGER.info("Adding table {}: Added ideal state with first consuming segment", tableNameWithType);
       }
-      LOGGER.info("Adding table {}: Added table config", tableNameWithType);
     } catch (Exception e) {
       LOGGER.error("Caught exception during offline table setup. Cleaning up table {}", tableNameWithType, e);
       deleteTable(tableNameWithType, tableType, null);
