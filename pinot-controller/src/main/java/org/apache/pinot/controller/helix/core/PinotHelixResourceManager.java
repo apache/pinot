@@ -1591,7 +1591,7 @@ public class PinotHelixResourceManager {
         "Invalid table type: %s", tableType);
 
     // Add table config
-    LOGGER.info("Adding table {}: Adding table configs", tableNameWithType);
+    LOGGER.info("Adding table {}: Creating table config in the property store", tableNameWithType);
     if (!ZKMetadataProvider.createTableConfig(_propertyStore, tableConfig)) {
       throw new RuntimeException("Failed to create table config for table: " + tableNameWithType);
     }
