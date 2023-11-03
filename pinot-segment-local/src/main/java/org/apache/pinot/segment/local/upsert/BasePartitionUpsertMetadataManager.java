@@ -51,6 +51,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BooleanUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -131,31 +132,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return null;
     }
     MutableRoaringBitmap queryableDocIds = new MutableRoaringBitmap();
-    PinotSegmentColumnReader deleteRecordColumnReader = new PinotSegmentColumnReader(segment, _deleteRecordColumn);
-    if (validDocIds != null) {
-      PeekableIntIterator iterator = validDocIds.getIntIterator();
-      while (iterator.hasNext()) {
-        int docId = iterator.next();
-        if (deleteRecordColumnReader.isNull(docId)) {
-          // defaultNullValue for deleteColumn is "false"
-          queryableDocIds.add(docId);
-        } else if (!(Boolean) deleteRecordColumnReader.getValue(docId)) {
+    try (PinotSegmentColumnReader deleteRecordColumnReader = new PinotSegmentColumnReader(segment,
+        _deleteRecordColumn)) {
+      PeekableIntIterator docIdIterator = validDocIds.getIntIterator();
+      while (docIdIterator.hasNext()) {
+        int docId = docIdIterator.next();
+        if (!BooleanUtils.toBoolean(deleteRecordColumnReader.getValue(docId))) {
           queryableDocIds.add(docId);
         }
       }
-    } else {
-      for (int docId = 0; docId < segment.getSegmentMetadata().getTotalDocs(); docId++) {
-        if (deleteRecordColumnReader.isNull(docId)) {
-          queryableDocIds.add(docId);
-        } else if (!(Boolean) deleteRecordColumnReader.getValue(docId)) {
-          queryableDocIds.add(docId);
-        }
-      }
-    }
-    try {
-      deleteRecordColumnReader.close();
     } catch (IOException e) {
-      _logger.warn("Failed to close deleteRecordColumnReader: {} ", segment.getSegmentName());
+      _logger.error("Failed to close column reader for delete record column: {} for segment: {} ", _deleteRecordColumn,
+          segment.getSegmentName(), e);
     }
     return queryableDocIds;
   }

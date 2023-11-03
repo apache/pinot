@@ -191,25 +191,13 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     queryableDocIds3.add(docIds3);
     verifyGetQueryableDocIds(true, deleteFlags3, validDocIdsSnapshot3, queryableDocIds3);
 
-    // No validDocIdsSnapshot found, treat all docs as valid
-    boolean[] deleteFlags4 = new boolean[]{false, false, false, false, false, false};
-    int[] docIds4 = new int[]{0, 1, 2, 3, 4, 5};
-    MutableRoaringBitmap queryableDocIds4 = new MutableRoaringBitmap();
-    queryableDocIds4.add(docIds4);
-    verifyGetQueryableDocIds(false, deleteFlags4, null, queryableDocIds4);
-
     // All records are deleted record.
-    boolean[] deleteFlags5 = new boolean[]{true, true, true, true, true, true};
-    int[] docIds5 = new int[]{2, 4, 5};
-    MutableRoaringBitmap validDocIdsSnapshot5 = new MutableRoaringBitmap();
-    validDocIdsSnapshot5.add(docIds5);
-    MutableRoaringBitmap queryableDocIds5 = new MutableRoaringBitmap();
-    verifyGetQueryableDocIds(false, deleteFlags5, validDocIdsSnapshot5, queryableDocIds5);
-
-    // All records are deleted, no validDocIdsSnapshot found
-    boolean[] deleteFlags6 = new boolean[]{true, true, true, true, true, true};
-    MutableRoaringBitmap queryableDocIds6 = new MutableRoaringBitmap();
-    verifyGetQueryableDocIds(false, deleteFlags6, null, queryableDocIds6);
+    boolean[] deleteFlags4 = new boolean[]{true, true, true, true, true, true};
+    int[] docIds4 = new int[]{2, 4, 5};
+    MutableRoaringBitmap validDocIdsSnapshot4 = new MutableRoaringBitmap();
+    validDocIdsSnapshot4.add(docIds4);
+    MutableRoaringBitmap queryableDocIds4 = new MutableRoaringBitmap();
+    verifyGetQueryableDocIds(false, deleteFlags4, validDocIdsSnapshot4, queryableDocIds4);
   }
 
   private void verifyAddReplaceRemoveSegment(HashFunction hashFunction, boolean enableSnapshot)
