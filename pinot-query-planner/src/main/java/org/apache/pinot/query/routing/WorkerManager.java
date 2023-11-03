@@ -237,7 +237,7 @@ public class WorkerManager {
     metadata.setWorkerIdToServerInstanceMap(workedIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
     metadata.setTimeBoundaryInfo(colocatedTableInfo._timeBoundaryInfo);
-    metadata.setPartitionedTableScan(true);
+    metadata.setPartitioned(metadata.isPartitioned());
     metadata.setPartitionParallelism(partitionParallelism);
   }
 
@@ -255,7 +255,7 @@ public class WorkerManager {
     // worker in the first child.
     if (!children.isEmpty()) {
       DispatchablePlanMetadata firstChildMetadata = metadataMap.get(children.get(0).getFragmentId());
-      if (firstChildMetadata.isPartitionedTableScan()) {
+      if (firstChildMetadata.isPartitioned() && firstChildMetadata.getScannedTables().size() > 0) {
         int partitionParallelism = firstChildMetadata.getPartitionParallelism();
         Map<Integer, QueryServerInstance> childWorkerIdToServerInstanceMap =
             firstChildMetadata.getWorkerIdToServerInstanceMap();

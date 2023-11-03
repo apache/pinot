@@ -47,6 +47,8 @@ public class MailboxSendNode extends AbstractPlanNode {
   private List<RelFieldCollation.Direction> _collationDirections;
   @ProtoProperties
   private boolean _isSortOnSender;
+  @ProtoProperties
+  private boolean _isPartitioned;
 
   public MailboxSendNode(int planFragmentId) {
     super(planFragmentId);
@@ -55,7 +57,7 @@ public class MailboxSendNode extends AbstractPlanNode {
   public MailboxSendNode(int planFragmentId, DataSchema dataSchema, int receiverStageId,
       RelDistribution.Type distributionType, PinotRelExchangeType exchangeType,
       @Nullable List<Integer> distributionKeys, @Nullable List<RelFieldCollation> fieldCollations,
-      boolean isSortOnSender) {
+      boolean isSortOnSender, boolean isPartitioned) {
     super(planFragmentId, dataSchema);
     _receiverStageId = receiverStageId;
     _distributionType = distributionType;
@@ -75,6 +77,7 @@ public class MailboxSendNode extends AbstractPlanNode {
       _collationDirections = Collections.emptyList();
     }
     _isSortOnSender = isSortOnSender;
+    _isPartitioned = isPartitioned;
   }
 
   public int getReceiverStageId() {
@@ -115,6 +118,10 @@ public class MailboxSendNode extends AbstractPlanNode {
 
   public boolean isSortOnSender() {
     return _isSortOnSender;
+  }
+
+  public boolean isPartitioned() {
+    return _isPartitioned;
   }
 
   @Override
