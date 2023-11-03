@@ -328,7 +328,7 @@ public class PinotClientRequest {
               .forEach(entry -> headers.put(entry.getKey(), entry.getValue()));
           return _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers);
         } catch (Exception e) {
-          LOGGER.error("Error handling DQL request:\n{}\nException: {}", sqlRequestJson,
+          LOGGER.error("Error handling DML request:\n{}\nException: {}", sqlRequestJson,
               QueryException.getTruncatedStackTrace(e));
           throw e;
         }
