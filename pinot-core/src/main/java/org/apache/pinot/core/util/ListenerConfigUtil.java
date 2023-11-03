@@ -62,6 +62,8 @@ public final class ListenerConfigUtil {
   private static final String DEFAULT_HOST = "0.0.0.0";
   private static final String DOT_ACCESS_PROTOCOLS = ".access.protocols";
   private static final String DOT_ACCESS_THREAD_POOL = ".http.server.thread.pool";
+  // some endpoints accept SQL as query string which may exceed the default 8K
+  private static final int MAX_HTTP_HEADER_SIZE = 64_000;
 
   private ListenerConfigUtil() {
     // left blank
@@ -239,6 +241,7 @@ public final class ListenerConfigUtil {
             .setUncaughtExceptionHandler(new JerseyProcessingUncaughtExceptionHandler()).build())
         .setCorePoolSize(listenerConfig.getThreadPoolConfig().getCorePoolSize())
         .setMaxPoolSize(listenerConfig.getThreadPoolConfig().getMaxPoolSize());
+    listener.setMaxHttpHeaderSize(MAX_HTTP_HEADER_SIZE);
 
     if (CommonConstants.HTTPS_PROTOCOL.equals(listenerConfig.getProtocol())) {
       listener.setSecure(true);
