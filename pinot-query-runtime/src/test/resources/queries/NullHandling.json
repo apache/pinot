@@ -93,7 +93,7 @@
     },
     "queries": [
       {
-        "description": "intCol1 IS NULL is always false",
+        "description": "intCol1 conserves NULLs",
         "comment": "Even when tableConfig nullHandlingEnabled is false, V2 respects column nullability",
         "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NULL",
         "h2Sql": "SELECT 0"
@@ -222,14 +222,12 @@
       },
 
       {
-        "description": "intCol1 IS NULL is always false",
-        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NULL",
-        "h2Sql": "SELECT 0"
+        "description": "intCol1 IS NULL is honored",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NULL"
       },
       {
-        "description": "intCol1 IS NOT NULL is always true",
-        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NOT NULL",
-        "h2Sql": "SELECT count(*) FROM {tbl1}"
+        "description": "intCol1 IS NOT NULL is honored",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NOT NULL"
       },
       {
         "description": "nIntCol1 IS NULL is honored",
@@ -287,24 +285,28 @@
       },
 
       {
-        "description": "null checks in aggregate are skipped on not nullable columns",
-        "comment": "Given intCol1 is not explicitly nullable, V2 removes the IS NOT NULL predicate",
-        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE intCol1 IS NOT NULL GROUP BY strCol2",
-        "h2Sql": "SELECT strCol2, COUNT(*) FROM {tbl1} GROUP BY strCol2"
+        "description": "null checks in aggregate are honored on implicit nullable columns",
+        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE intCol1 IS NOT NULL GROUP BY strCol2"
       },
       {
-        "description": "null checks in aggregate are honored on nullable columns",
+        "description": "null checks in aggregate are honored on explicit nullable columns",
         "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE nIntCol1 IS NOT NULL GROUP BY strCol2"
+      },
+      {
+        "description": "null checks in aggregate are skipped on not nullable columns",
+        "comment": "Given nnIntCol1 is not nullable, V2 removes the IS NOT NULL predicate",
+        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE nnIntCol1 IS NOT NULL GROUP BY strCol2",
+        "h2Sql": "SELECT strCol2, COUNT(*) FROM {tbl1} GROUP BY strCol2"
       },
 
       {
         "description": "aggregate with null checkers on key from group set are skipped on not nullable columns",
         "comment": "Given strCol2 is not explicitly nullable, V2 returns empty set",
-        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE strCol2 IS NULL GROUP BY strCol2",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE nnStrCol2 IS NULL GROUP BY strCol2",
         "h2Sql": "SELECT COUNT(*) FROM {tbl1} WHERE 1 = 0 GROUP BY strCol2"
       },
       {
-        "description": "aggregate with null checkers on key from group set are honored on not nullable columns",
+        "description": "aggregate with null checkers on key from group set are honored on nullable columns",
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE nStrCol2 IS NULL GROUP BY nStrCol2"
       }
     ]

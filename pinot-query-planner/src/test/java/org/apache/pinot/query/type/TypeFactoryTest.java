@@ -137,7 +137,7 @@ public class TypeFactoryTest {
   public void testNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
-        .addSingleValueDimension("col", dataType, true)
+        .addDimensionField("col", dataType, field -> field.setNullable(true))
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();

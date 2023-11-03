@@ -587,7 +587,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       @JsonProperty("isSingleValue")
       boolean _isSingleValue = true;
       @JsonProperty("nullable")
-      Boolean _nullable = null;
+      boolean _nullable = true;
     }
   }
 }

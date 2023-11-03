@@ -43,7 +43,6 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -82,15 +81,12 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   @Override
   public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
     return (TableConfig tableConfig, Schema schema) -> {
-      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-      boolean nullHandlingEnabled = indexingConfig != null && indexingConfig.isNullHandlingEnabled();
-
       Collection<FieldSpec> allFieldSpecs = schema.getAllFieldSpecs();
       Map<String, IndexConfig> configMap = Maps.newHashMapWithExpectedSize(allFieldSpecs.size());
 
       for (FieldSpec fieldSpec : allFieldSpecs) {
         IndexConfig indexConfig;
-        if (fieldSpec.getNullable() == Boolean.TRUE || fieldSpec.getNullable() == null && nullHandlingEnabled) {
+        if (fieldSpec.isNullable()) {
           indexConfig = IndexConfig.ENABLED;
         } else {
           indexConfig = IndexConfig.DISABLED;

@@ -37,6 +37,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -520,26 +521,57 @@ public final class Schema implements Serializable {
       return this;
     }
 
-    /**
-     * Add single value dimensionFieldSpec
-     */
-    public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType) {
-      return addSingleValueDimension(dimensionName, dataType, null);
+    public SchemaBuilder addMetricField(String name, DataType dataType) {
+      return addMetricField(name, dataType, ignore -> {
+      });
     }
 
-    public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, Boolean nullable) {
-      DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(dimensionName, dataType, true);
-      dimensionFieldSpec.setNullable(nullable);
-      _schema.addField(dimensionFieldSpec);
+    public SchemaBuilder addMetricField(String name, DataType dataType, Consumer<MetricFieldSpec> customizer) {
+      MetricFieldSpec fieldSpec = new MetricFieldSpec();
+      return addFieldSpec(fieldSpec, name, dataType, customizer);
+    }
+
+    public SchemaBuilder addDimensionField(String name, DataType dataType) {
+      return addDimensionField(name, dataType, ignore -> {
+      });
+    }
+
+    public SchemaBuilder addDimensionField(String name, DataType dataType, Consumer<DimensionFieldSpec> customizer) {
+      DimensionFieldSpec fieldSpec = new DimensionFieldSpec();
+      return addFieldSpec(fieldSpec, name, dataType, customizer);
+    }
+
+    public SchemaBuilder addDateTimeField(String name, DataType dataType) {
+      return addDateTimeField(name, dataType, ignore -> {
+      });
+    }
+
+    public SchemaBuilder addDateTimeField(String name, DataType dataType, Consumer<DateTimeFieldSpec> customizer) {
+      DateTimeFieldSpec fieldSpec = new DateTimeFieldSpec();
+      return addFieldSpec(fieldSpec, name, dataType, customizer);
+    }
+
+    private <E extends FieldSpec> SchemaBuilder addFieldSpec(E fieldSpec, String name, DataType dataType,
+        Consumer<E> customizer) {
+      fieldSpec.setName(name);
+      fieldSpec.setDataType(dataType);
+      customizer.accept(fieldSpec);
+      _schema.addField(fieldSpec);
       return this;
     }
 
     /**
-     * Add single value dimensionFieldSpec with a defaultNullValue.
+     * Add single value dimensionFieldSpec
+     */
+    public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType) {
+      _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true));
+      return this;
+    }
+    /**
+     * Add single value dimensionFieldSpec with a defaultNullValue
      */
     public SchemaBuilder addSingleValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
-      DimensionFieldSpec fieldSpec = new DimensionFieldSpec(dimensionName, dataType, true, defaultNullValue);
-      _schema.addField(fieldSpec);
+      _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, defaultNullValue));
       return this;
     }
 
@@ -550,9 +582,7 @@ public final class Schema implements Serializable {
         Object defaultNullValue) {
       Preconditions.checkArgument(dataType == DataType.STRING,
           "The maxLength field only applies to STRING field right now");
-      DimensionFieldSpec fieldSpec = new DimensionFieldSpec(dimensionName, dataType, true, maxLength,
-          defaultNullValue);
-      _schema.addField(fieldSpec);
+      _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true, maxLength, defaultNullValue));
       return this;
     }
 
@@ -560,13 +590,7 @@ public final class Schema implements Serializable {
      * Add multi value dimensionFieldSpec
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType) {
-      return addMultiValueDimension(dimensionName, dataType, null);
-    }
-
-    public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, Boolean nullable) {
-      DimensionFieldSpec fieldSpec = new DimensionFieldSpec(dimensionName, dataType, false);
-      fieldSpec.setNullable(nullable);
-      _schema.addField(fieldSpec);
+      _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false));
       return this;
     }
 
@@ -574,21 +598,18 @@ public final class Schema implements Serializable {
      * Add multi value dimensionFieldSpec with defaultNullValue
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, Object defaultNullValue) {
-      DimensionFieldSpec fieldSpec = new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue);
-      _schema.addField(fieldSpec);
+      _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, defaultNullValue));
       return this;
     }
 
     /**
-     * Add multi value dimensionFieldSpec with maxLength and a defaultNullValue*
+     * Add multi value dimensionFieldSpec with maxLength and a defaultNullValue
      */
     public SchemaBuilder addMultiValueDimension(String dimensionName, DataType dataType, int maxLength,
         Object defaultNullValue) {
       Preconditions.checkArgument(dataType == DataType.STRING,
           "The maxLength field only applies to STRING field right now");
-      DimensionFieldSpec fieldSpec =
-          new DimensionFieldSpec(dimensionName, dataType, false, maxLength, defaultNullValue);
-      _schema.addField(fieldSpec);
+      _schema.addField(new DimensionFieldSpec(dimensionName, dataType, false, maxLength, defaultNullValue));
       return this;
     }
 
@@ -596,13 +617,7 @@ public final class Schema implements Serializable {
      * Add metricFieldSpec
      */
     public SchemaBuilder addMetric(String metricName, DataType dataType) {
-      return addMetric(metricName, dataType, null);
-    }
-
-    public SchemaBuilder addMetric(String metricName, DataType dataType, Boolean nullable) {
-      MetricFieldSpec fieldSpec = new MetricFieldSpec(metricName, dataType);
-      fieldSpec.setNullable(nullable);
-      _schema.addField(fieldSpec);
+      _schema.addField(new MetricFieldSpec(metricName, dataType));
       return this;
     }
 
@@ -610,8 +625,7 @@ public final class Schema implements Serializable {
      * Add metricFieldSpec with defaultNullValue
      */
     public SchemaBuilder addMetric(String metricName, DataType dataType, Object defaultNullValue) {
-      MetricFieldSpec fieldSpec = new MetricFieldSpec(metricName, dataType, defaultNullValue);
-      _schema.addField(fieldSpec);
+      _schema.addField(new MetricFieldSpec(metricName, dataType, defaultNullValue));
       return this;
     }
 
