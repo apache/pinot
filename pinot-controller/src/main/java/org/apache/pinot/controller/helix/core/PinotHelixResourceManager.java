@@ -1576,7 +1576,7 @@ public class PinotHelixResourceManager {
           + "external view");
     }
 
-    LOGGER.info("Adding table {}: Validate table tenant config", tableNameWithType);
+    LOGGER.info("Adding table {}: Validate table configs", tableNameWithType);
     validateTableTenantConfig(tableConfig);
 
     IdealState idealState =
@@ -1591,6 +1591,7 @@ public class PinotHelixResourceManager {
         "Invalid table type: %s", tableType);
 
     // Add table config
+    LOGGER.info("Adding table {}: Adding table configs", tableNameWithType);
     if (!ZKMetadataProvider.createTableConfig(_propertyStore, tableConfig)) {
       throw new RuntimeException("Failed to create table config for table: " + tableNameWithType);
     }
