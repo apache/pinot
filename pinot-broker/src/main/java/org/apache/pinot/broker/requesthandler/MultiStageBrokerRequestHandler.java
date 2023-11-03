@@ -192,10 +192,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           stageIdStatsMap);
     } catch (TimeoutException e) {
       for (String table : tableNames) {
-        _brokerMetrics.addMeteredTableValue(getActualTableName(table, _tableCache),
-            BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
+        _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
       }
-      throw new RuntimeException(e);
+      LOGGER.warn("Timed out executing request {}: {}", requestId, query);
+      requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
+      return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
     } catch (Throwable t) {
       String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
       LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
