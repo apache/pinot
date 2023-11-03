@@ -113,13 +113,8 @@ public class SegmentDirectoryPaths {
   @Nullable
   @VisibleForTesting
   public static File findTextIndexDocIdMappingFile(File indexDir, String column) {
-    String file = column + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
-    File formatFile = findFormatFile(indexDir, file);
-    if (formatFile == null) {
-      file = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
-      formatFile = findFormatFile(indexDir, file);
-    }
-    return formatFile;
+    String file = column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION;
+    return findFormatFile(indexDir, file);
   }
 
   /**

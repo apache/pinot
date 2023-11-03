@@ -608,7 +608,7 @@ public class LoaderTest {
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
         SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
@@ -636,7 +636,7 @@ public class LoaderTest {
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
         SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
@@ -686,7 +686,7 @@ public class LoaderTest {
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), new SegmentMetadataImpl(_indexDir).getName());
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
         new SegmentMetadataImpl(_indexDir).getName());
     indexSegment.destroy();
@@ -712,7 +712,7 @@ public class LoaderTest {
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), new SegmentMetadataImpl(_indexDir).getName());
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
         new SegmentMetadataImpl(_indexDir).getName());
     indexSegment.destroy();
@@ -738,7 +738,7 @@ public class LoaderTest {
         TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION);
     Assert.assertEquals(textIndexFile.getParentFile().getName(), SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     Assert.assertEquals(textIndexDocIdMappingFile.getName(),
-        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+        TEXT_INDEX_COL_NAME + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     Assert.assertEquals(textIndexDocIdMappingFile.getParentFile().getName(),
         SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
     indexSegment.destroy();
