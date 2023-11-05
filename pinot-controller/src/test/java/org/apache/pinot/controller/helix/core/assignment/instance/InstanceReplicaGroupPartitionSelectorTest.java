@@ -64,7 +64,7 @@ public class InstanceReplicaGroupPartitionSelectorTest {
         new InstanceReplicaGroupPartitionConfig(true, 0, 2, 2, 1, 2, true, null);
 
     InstanceReplicaGroupPartitionSelector selector =
-        new InstanceReplicaGroupPartitionSelector(config, "tableNameBlah", existing);
+        new InstanceReplicaGroupPartitionSelector(config, "tableNameBlah", existing, true);
 
     String[] serverNames = {"rg0-0", "rg0-1", "rg1-0", "rg1-1"};
     String[] poolNumbers = {"0", "0", "1", "1"};

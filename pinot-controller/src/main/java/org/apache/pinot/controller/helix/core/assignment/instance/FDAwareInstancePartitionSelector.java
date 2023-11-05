@@ -50,8 +50,8 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
   private static final Logger LOGGER = LoggerFactory.getLogger(FDAwareInstancePartitionSelector.class);
 
   public FDAwareInstancePartitionSelector(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
-      String tableNameWithType, @Nullable InstancePartitions existingInstancePartitions) {
-    super(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions);
+      String tableNameWithType, @Nullable InstancePartitions existingInstancePartitions, boolean minimizeDataMovement) {
+    super(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions, minimizeDataMovement);
   }
 
   /**
@@ -152,7 +152,7 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
        * initialize the new replicaGroupBasedAssignmentState for assignment,
        * place existing instances in their corresponding positions
        */
-      if (_replicaGroupPartitionConfig.isMinimizeDataMovement() && _existingInstancePartitions != null) {
+      if (_minimizeDataMovement && _existingInstancePartitions != null) {
         int numExistingReplicaGroups = _existingInstancePartitions.getNumReplicaGroups();
         int numExistingPartitions = _existingInstancePartitions.getNumPartitions();
         /*
