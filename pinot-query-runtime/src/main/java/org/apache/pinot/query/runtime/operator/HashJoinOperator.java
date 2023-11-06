@@ -227,7 +227,7 @@ public class HashJoinOperator extends MultiStageOperator {
           int remainingRows = _maxRowsInHashTable - _currentRowsInHashTable;
           container = container.subList(0, remainingRows);
           OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
-          operatorStats.recordSingleStat(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_LIMIT_REACHED.getName(), "true");
+          operatorStats.recordSingleStat(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_REACHED.getName(), "true");
         }
       }
       // put all the rows into corresponding hash collections keyed by the key selector function.

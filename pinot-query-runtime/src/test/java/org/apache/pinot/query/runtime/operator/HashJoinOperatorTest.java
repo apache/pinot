@@ -658,7 +658,7 @@ public class HashJoinOperatorTest {
         Joiner.on("_").join(HashJoinOperator.class.getSimpleName(), context.getStageId(), context.getServer());
     OperatorStats operatorStats = context.getStats().getOperatorStats(context, operatorId);
     Assert.assertEquals(
-        operatorStats.getExecutionStats().get(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_LIMIT_REACHED.getName()), "true");
+        operatorStats.getExecutionStats().get(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_REACHED.getName()), "true");
   }
 }
 // TODO: Add more inequi join tests.

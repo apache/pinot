@@ -38,7 +38,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "stageExecWallTimeMs", "stageExecEndTimeMs", "numServersQueried", "numServersResponded", "numSegmentsQueried",
     "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
     "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
-    "numGroupsLimitReached", "maxRowsInJoinLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs",
+    "numGroupsLimitReached", "maxRowsInJoinReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs",
     "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
     "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
     "realtimeTotalCpuTimeNs", "brokerReduceTimeMs", "traceInfo", "operatorStats", "tableNames"

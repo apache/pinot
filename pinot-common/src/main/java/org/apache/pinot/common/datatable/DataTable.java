@@ -135,7 +135,7 @@ public interface DataTable {
     OPERATOR_ID(31, "operatorId", MetadataValueType.STRING),
     OPERATOR_EXEC_START_TIME_MS(32, "operatorExecStartTimeMs", MetadataValueType.LONG),
     OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG),
-    MAX_ROWS_IN_JOIN_LIMIT_REACHED(34, "maxRowsInJoinLimitReached", MetadataValueType.STRING);
+    MAX_ROWS_IN_JOIN_REACHED(34, "maxRowsInJoinReached", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
