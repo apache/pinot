@@ -49,6 +49,8 @@ public interface GroupByExecutor {
    */
   int getNumGroups();
 
+  boolean numGroupsLimitReached();
+
   /**
    * Trim the GroupBy result up to the threshold max(configurable_threshold * 5, minTrimSize)
    * TODO: benchmark the performance of PQ vs. topK

@@ -47,6 +47,7 @@ public abstract class IndexedTable extends BaseTable {
   protected final int _trimThreshold;
 
   protected Collection<Record> _topRecords;
+  protected boolean _isResultTrimmed;
   private int _numResizes;
   private long _resizeTimeNs;
 
@@ -121,7 +122,7 @@ public abstract class IndexedTable extends BaseTable {
    * Updates a record with existing key. Record with new key will be ignored.
    */
   protected void updateExistingRecord(Key key, Record newRecord) {
-    _lookupMap.computeIfPresent(key, (k, v) -> {
+    Record record = _lookupMap.computeIfPresent(key, (k, v) -> {
       Object[] existingValues = v.getValues();
       Object[] newValues = newRecord.getValues();
       int aggNum = 0;
@@ -130,6 +131,11 @@ public abstract class IndexedTable extends BaseTable {
       }
       return v;
     });
+
+    if (record == null) {
+      // Record not present.
+      _isResultTrimmed = true;
+    }
   }
 
   /**
@@ -137,6 +143,7 @@ public abstract class IndexedTable extends BaseTable {
    */
   protected void resize() {
     assert _hasOrderBy;
+    _isResultTrimmed = _lookupMap.size() > _trimSize;
     long startTimeNs = System.nanoTime();
     _tableResizer.resizeRecordsMap(_lookupMap, _trimSize);
     long resizeTimeNs = System.nanoTime() - startTimeNs;
@@ -147,6 +154,7 @@ public abstract class IndexedTable extends BaseTable {
   @Override
   public void finish(boolean sort, boolean storeFinalResult) {
     if (_hasOrderBy) {
+      _isResultTrimmed = _lookupMap.size() > _resultSize;
       long startTimeNs = System.nanoTime();
       _topRecords = _tableResizer.getTopRecords(_lookupMap, _resultSize, sort);
       long resizeTimeNs = System.nanoTime() - startTimeNs;
@@ -188,5 +196,9 @@ public abstract class IndexedTable extends BaseTable {
 
   public long getResizeTimeMs() {
     return TimeUnit.NANOSECONDS.toMillis(_resizeTimeNs);
+  }
+
+  public boolean isResultTrimmed() {
+    return _isResultTrimmed;
   }
 }

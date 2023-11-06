@@ -39,6 +39,13 @@ public interface GroupKeyGenerator {
   int getGlobalGroupKeyUpperBound();
 
   /**
+   * Returns whether the globalGroupKeyUpperBound was reached while processing the segment. This is used to indicate
+   * that the group by might not have perfectly accurate results.
+   * @return
+   */
+  boolean globalGroupKeyLimitReached();
+
+  /**
    * Generates group keys on the given value block and returns the result to the given buffer.
    * <p>This method is for situation where all the group-by columns are single-valued.
    *

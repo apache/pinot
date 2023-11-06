@@ -77,6 +77,8 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
 
   private volatile IndexedTable _indexedTable;
   private volatile boolean _numGroupsLimitReached;
+  private volatile boolean _isAccurateGroupBy;
+
 
   public StreamingGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
@@ -108,6 +110,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
     _opCompleted = false;
+    _isAccurateGroupBy = true;
   }
 
   @Override
@@ -182,6 +185,9 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
         if (resultsBlock.isNumGroupsLimitReached()) {
           _numGroupsLimitReached = true;
         }
+        if (!resultsBlock.isAccurateGroupBy()) {
+          _isAccurateGroupBy = false;
+        }
 
         // Merge aggregation group-by result.
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
@@ -251,6 +257,8 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
     }
     GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable, _queryContext);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
+    _isAccurateGroupBy &= !indexedTable.isResultTrimmed();
+    mergedBlock.setIsAccurateGroupBy(_isAccurateGroupBy);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
     return mergedBlock;

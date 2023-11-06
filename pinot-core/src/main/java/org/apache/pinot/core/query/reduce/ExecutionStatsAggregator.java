@@ -80,6 +80,8 @@ public class ExecutionStatsAggregator {
   private long _stageExecStartTimeMs = -1;
   private long _stageExecEndTimeMs = -1;
   private int _stageExecutionUnit = 0;
+  private boolean _isAccurateGroupBy = true;
+
 
   public ExecutionStatsAggregator(boolean enableTrace) {
     _enableTrace = enableTrace;
@@ -249,6 +251,7 @@ public class ExecutionStatsAggregator {
     }
     _numGroupsLimitReached |=
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
+    _isAccurateGroupBy &= Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.IS_ACCURATE_GROUP_BY.getName()));
 
 
     String numBlocksString = metadata.get(DataTable.MetadataKey.NUM_BLOCKS.getName());

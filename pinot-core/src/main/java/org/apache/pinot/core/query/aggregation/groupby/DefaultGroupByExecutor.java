@@ -86,8 +86,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _hasMVGroupByExpression = hasMVGroupByExpression;
 
     // Initialize group key generator
-    int numGroupsLimit = queryContext.getNumGroupsLimit();
-    int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
+    int numGroupsLimit = queryContext.getNumGroupsLimit();   // 100,000
+    int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity(); // 10,000
     if (groupKeyGenerator != null) {
       _groupKeyGenerator = groupKeyGenerator;
     } else {
@@ -168,6 +168,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   public int getNumGroups() {
     return _groupKeyGenerator.getNumKeys();
   }
+
+  @Override
+  public boolean numGroupsLimitReached() { return _groupKeyGenerator.globalGroupKeyLimitReached(); }
+
+
 
   @Override
   public Collection<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer) {

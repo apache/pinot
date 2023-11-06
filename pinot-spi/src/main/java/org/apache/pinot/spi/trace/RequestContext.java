@@ -127,6 +127,8 @@ public interface RequestContext {
 
   boolean isNumGroupsLimitReached();
 
+  boolean isAccurateGroupBy();
+
   int getNumExceptions();
 
   boolean hasValidTableName();
@@ -158,6 +160,8 @@ public interface RequestContext {
   void setNumServersResponded(int numServersResponded);
 
   void setNumGroupsLimitReached(boolean numGroupsLimitReached);
+
+  void setIsAccurateGroupBy(boolean isAccurateGroupBy);
 
   void setNumExceptions(int numExceptions);
 

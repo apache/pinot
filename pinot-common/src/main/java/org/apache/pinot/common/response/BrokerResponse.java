@@ -134,6 +134,11 @@ public interface BrokerResponse {
   boolean isNumGroupsLimitReached();
 
   /**
+   * Returns whether the groupBy results are perfectly accurate
+   */
+  boolean isAccurateGroupBy();
+
+  /**
    * Get number of exceptions recorded in the response.
    */
   int getExceptionsSize();

@@ -777,6 +777,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
       brokerResponse.setPartialResult(
           brokerResponse.isNumGroupsLimitReached() || brokerResponse.getExceptionsSize() > 0);
+      if (!brokerResponse.isAccurateGroupBy()) {
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_INACCURATE_GROUPBY, 1);
+      }
 
       // Set total query processing time
       long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
@@ -1652,6 +1655,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return true;
     }
 
+    if (!brokerResponse.isAccurateGroupBy()) {
+      return true;
+    }
+
     if (brokerResponse.getExceptionsSize() > 0) {
       return true;
     }
@@ -1856,6 +1863,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
     statistics.setProcessingExceptions(response.getProcessingExceptions().stream().map(Object::toString).collect(
         Collectors.toList()));
+    statistics.setIsAccurateGroupBy(response.isAccurateGroupBy());
   }
 
   private String getGlobalQueryId(long requestId) {

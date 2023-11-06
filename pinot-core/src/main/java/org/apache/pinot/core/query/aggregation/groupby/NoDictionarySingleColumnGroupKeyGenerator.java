@@ -62,6 +62,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private final boolean _isSingleValueExpression;
 
   private int _numGroups = 0;
+  private boolean _globalGroupKeyLimitReached;
 
   public NoDictionarySingleColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext groupByExpression, int numGroupsLimit, boolean nullHandlingEnabled) {
@@ -78,6 +79,9 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   public int getGlobalGroupKeyUpperBound() {
     return _globalGroupIdUpperBound;
   }
+
+  @Override
+  public boolean globalGroupKeyLimitReached() { return _globalGroupKeyLimitReached; }
 
   @Override
   public void generateKeysForBlock(ValueBlock valueBlock, int[] groupKeys) {
@@ -401,11 +405,12 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     if (_groupIdForNullValue != null) {
       return _groupIdForNullValue;
     }
-    if (_numGroups < _globalGroupIdUpperBound) {
-      _groupIdForNullValue = _numGroups++;
-      return _groupIdForNullValue;
+    if (_numGroups >= _globalGroupIdUpperBound) {
+      _globalGroupKeyLimitReached = true;
+      return INVALID_ID;
     }
-    return INVALID_ID;
+    _groupIdForNullValue = _numGroups++;
+    return _groupIdForNullValue;
   }
 
   @Override
@@ -416,56 +421,94 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private int getKeyForValue(int value) {
     Int2IntMap map = (Int2IntMap) _groupKeyMap;
     int groupId = map.get(value);
-    if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
-      groupId = _numGroups++;
-      map.put(value, groupId);
+    if (groupId != INVALID_ID) {
+      return groupId;
     }
+    if (_numGroups >= _globalGroupIdUpperBound) {
+      _globalGroupKeyLimitReached = true;
+      return INVALID_ID;
+    }
+
+    groupId = _numGroups++;
+    map.put(value, groupId);
     return groupId;
   }
 
   private int getKeyForValue(long value) {
     Long2IntMap map = (Long2IntMap) _groupKeyMap;
     int groupId = map.get(value);
-    if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
-      groupId = _numGroups++;
-      map.put(value, groupId);
+    if (groupId != INVALID_ID) {
+      return groupId;
     }
+    if (_numGroups >= _globalGroupIdUpperBound) {
+      _globalGroupKeyLimitReached = true;
+      return INVALID_ID;
+    }
+
+    groupId = _numGroups++;
+    map.put(value, groupId);
     return groupId;
   }
 
   private int getKeyForValue(float value) {
     Float2IntMap map = (Float2IntMap) _groupKeyMap;
     int groupId = map.get(value);
-    if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
-      groupId = _numGroups++;
-      map.put(value, groupId);
+    if (groupId != INVALID_ID) {
+      return groupId;
     }
+    if (_numGroups >= _globalGroupIdUpperBound) {
+      _globalGroupKeyLimitReached = true;
+      return INVALID_ID;
+    }
+
+    groupId = _numGroups++;
+    map.put(value, groupId);
     return groupId;
   }
 
   private int getKeyForValue(double value) {
     Double2IntMap map = (Double2IntMap) _groupKeyMap;
     int groupId = map.get(value);
-    if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
-      groupId = _numGroups++;
-      map.put(value, groupId);
+    if (groupId != INVALID_ID) {
+      return groupId;
     }
+    if (_numGroups >= _globalGroupIdUpperBound) {
+      _globalGroupKeyLimitReached = true;
+      return INVALID_ID;
+    }
+
+    groupId = _numGroups++;
+    map.put(value, groupId);
     return groupId;
   }
 
   private int getKeyForValue(BigDecimal value) {
     Object2IntMap<BigDecimal> map = (Object2IntMap<BigDecimal>) _groupKeyMap;
     int groupId = map.getInt(value);
-    if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
-      groupId = _numGroups++;
-      map.put(value, groupId);
+    if (groupId != INVALID_ID) {
+      return groupId;
     }
+    if (_numGroups >= _globalGroupIdUpperBound) {
+      _globalGroupKeyLimitReached = true;
+      return INVALID_ID;
+    }
+
+    groupId = _numGroups++;
+    map.put(value, groupId);
     return groupId;
   }
 
   private int getKeyForValue(String value) {
     Object2IntMap<String> map = (Object2IntMap<String>) _groupKeyMap;
     int groupId = map.getInt(value);
+    if (groupId != INVALID_ID) {
+      return groupId;
+    }
+    if (_numGroups >= _globalGroupIdUpperBound) {
+      _globalGroupKeyLimitReached = true;
+      return INVALID_ID;
+    }
+
     if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
       groupId = _numGroups++;
       map.put(value, groupId);
@@ -476,10 +519,16 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private int getKeyForValue(ByteArray value) {
     Object2IntMap<ByteArray> map = (Object2IntMap<ByteArray>) _groupKeyMap;
     int groupId = map.getInt(value);
-    if (groupId == INVALID_ID && _numGroups < _globalGroupIdUpperBound) {
-      groupId = _numGroups++;
-      map.put(value, groupId);
+    if (groupId != INVALID_ID) {
+      return groupId;
     }
+    if (_numGroups >= _globalGroupIdUpperBound) {
+      _globalGroupKeyLimitReached = true;
+      return INVALID_ID;
+    }
+
+    groupId = _numGroups++;
+    map.put(value, groupId);
     return groupId;
   }
 

@@ -72,6 +72,7 @@ public class SqlResultComparator {
   private static final String FIELD_NUM_ENTRIES_SCANNED_IN_FILTER = "numEntriesScannedInFilter";
   private static final String FIELD_NUM_ENTRIES_SCANNED_POST_FILTER = "numEntriesScannedPostFilter";
   private static final String FIELD_NUM_GROUPS_LIMIT_REACHED = "numGroupsLimitReached";
+  private static final String FIELD_IS_ACCURATE_GROUP_BY = "isAccurateGroupBy";
 
   private static final String FIELD_TYPE_INT = "INT";
   private static final String FIELD_TYPE_LONG = "LONG";
@@ -310,6 +311,17 @@ public class SqlResultComparator {
     if (actualNumGroupsLimitReached != expectedNumGroupsLimitReached) {
       LOGGER.error("The numGroupsLimitReached don't match! Actual: {}, Expected: {}", actualNumGroupsLimitReached,
           expectedNumGroupsLimitReached);
+      return false;
+    }
+    return true;
+  }
+
+  private static boolean isAccurateGroupByEqual(JsonNode actual, JsonNode expected) {
+    boolean actualIsAccurateGroupBy = actual.get(FIELD_IS_ACCURATE_GROUP_BY).asBoolean();
+    boolean expectedIsAccurateGroupBy = expected.get(FIELD_IS_ACCURATE_GROUP_BY).asBoolean();
+    if (actualIsAccurateGroupBy != expectedIsAccurateGroupBy) {
+      LOGGER.error("The isAccurateGroupBy field doesn't match! Actual: {}, Expected: {}", actualIsAccurateGroupBy,
+          expectedIsAccurateGroupBy);
       return false;
     }
     return true;

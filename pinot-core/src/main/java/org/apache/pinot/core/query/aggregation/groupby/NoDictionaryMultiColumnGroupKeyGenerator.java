@@ -61,6 +61,7 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   private final boolean _nullHandlingEnabled;
 
   private int _numGroups = 0;
+  private boolean _globalGroupKeyLimitReached;
 
   public NoDictionaryMultiColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext[] groupByExpressions, int numGroupsLimit, boolean nullHandlingEnabled) {
@@ -93,6 +94,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   @Override
   public int getGlobalGroupKeyUpperBound() {
     return _globalGroupIdUpperBound;
+  }
+
+  @Override
+  public boolean globalGroupKeyLimitReached() {
+    return _globalGroupKeyLimitReached;
   }
 
   @Override
@@ -341,6 +347,8 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       if (_numGroups < _globalGroupIdUpperBound) {
         groupId = _numGroups;
         _groupKeyMap.put(flyweight.clone(), _numGroups++);
+      } else {
+        _globalGroupKeyLimitReached = true;
       }
     }
     return groupId;
@@ -358,6 +366,8 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       if (_numGroups < _globalGroupIdUpperBound) {
         groupId = _numGroups;
         _groupKeyMap.put(keyList, _numGroups++);
+      } else {
+        _globalGroupKeyLimitReached = true;
       }
     }
     return groupId;
