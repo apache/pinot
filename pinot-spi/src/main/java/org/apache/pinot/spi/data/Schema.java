@@ -541,13 +541,16 @@ public final class Schema implements Serializable {
       return addFieldSpec(fieldSpec, name, dataType, customizer);
     }
 
-    public SchemaBuilder addDateTimeField(String name, DataType dataType) {
-      return addDateTimeField(name, dataType, ignore -> {
+    public SchemaBuilder addDateTimeField(String name, DataType dataType, String format, String granularity) {
+      return addDateTimeField(name, dataType, format, granularity, ignore -> {
       });
     }
 
-    public SchemaBuilder addDateTimeField(String name, DataType dataType, Consumer<DateTimeFieldSpec> customizer) {
+    public SchemaBuilder addDateTimeField(String name, DataType dataType, String format, String granularity,
+        Consumer<DateTimeFieldSpec> customizer) {
       DateTimeFieldSpec fieldSpec = new DateTimeFieldSpec();
+      fieldSpec.setFormat(format);
+      fieldSpec.setGranularity(granularity);
       return addFieldSpec(fieldSpec, name, dataType, customizer);
     }
 
