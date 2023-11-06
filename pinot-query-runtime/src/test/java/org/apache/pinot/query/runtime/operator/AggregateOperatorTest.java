@@ -18,17 +18,25 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -63,6 +71,12 @@ public class AggregateOperatorTest {
   public void tearDown()
       throws Exception {
     _mocks.close();
+  }
+
+  private static AbstractPlanNode.NodeHint getAggHints(Map<String, String> hintsMap) {
+    RelHint.Builder relHintBuilder = RelHint.builder(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
+    hintsMap.forEach(relHintBuilder::hintOption);
+    return new AbstractPlanNode.NodeHint(ImmutableList.of(relHintBuilder.build()));
   }
 
   @Test
@@ -254,6 +268,42 @@ public class AggregateOperatorTest {
     Assert.assertTrue(block.isErrorBlock(), "expected ERROR block from invalid computation");
     Assert.assertTrue(block.getExceptions().get(1000).contains("String cannot be cast to class"),
         "expected it to fail with class cast exception");
+  }
+
+  @Test
+  public void shouldHandleGroupLimitExceed() {
+    // Given:
+    List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
+    List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
+
+    DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
+    Mockito.when(_input.nextBlock())
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1.0}, new Object[]{3, 2.0}))
+        .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, 3.0}))
+        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+
+    DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
+    OpChainExecutionContext context = OperatorTestUtil.getDefaultContext();
+    Map<String, String> hintsMap = ImmutableMap.of(PinotHintOptions.AggregateOptions.NUM_GROUPS_LIMIT, "1");
+    AggregateOperator operator =
+        new AggregateOperator(context, _input, outSchema, calls, group, AggType.DIRECT, Collections.singletonList(-1),
+            getAggHints(hintsMap));
+
+    // When:
+    TransferableBlock block1 = operator.nextBlock();
+    TransferableBlock block2 = operator.nextBlock();
+
+    // Then
+    Mockito.verify(_input).earlyTerminate();
+
+    // Then:
+    Assert.assertTrue(block1.getNumRows() == 1, "when group limit reach it should only return that many groups");
+    Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
+    String operatorId =
+        Joiner.on("_").join(AggregateOperator.class.getSimpleName(), context.getStageId(), context.getServer());
+    OperatorStats operatorStats = context.getStats().getOperatorStats(context, operatorId);
+    Assert.assertEquals(operatorStats.getExecutionStats().get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()),
+        "true");
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {

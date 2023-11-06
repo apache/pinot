@@ -775,8 +775,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
             1);
       }
-      brokerResponse.setPartialResult(
-          brokerResponse.isNumGroupsLimitReached() || brokerResponse.getExceptionsSize() > 0);
+      brokerResponse.setPartialResult(isPartialResult(brokerResponse));
 
       // Set total query processing time
       long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
@@ -1820,6 +1819,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
       RequestContext requestContext)
       throws Exception;
+
+  protected static boolean isPartialResult(BrokerResponse brokerResponse) {
+    return brokerResponse.isNumGroupsLimitReached() || brokerResponse.isMaxRowsInJoinReached()
+        || brokerResponse.getExceptionsSize() > 0;
+  }
 
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setTotalDocs(response.getTotalDocs());

@@ -238,6 +238,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
     }
 
+    // Set partial result flag
+    brokerResponse.setPartialResult(isPartialResult(brokerResponse));
+
     // Set total query processing time
     // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(

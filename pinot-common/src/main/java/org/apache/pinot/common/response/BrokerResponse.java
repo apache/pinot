@@ -134,6 +134,11 @@ public interface BrokerResponse {
   boolean isNumGroupsLimitReached();
 
   /**
+   * Returns whether the limit for max rows in join has been reached.
+   */
+  boolean isMaxRowsInJoinReached();
+
+  /**
    * Get number of exceptions recorded in the response.
    */
   int getExceptionsSize();
