@@ -1562,6 +1562,8 @@ public class PinotHelixResourceManager {
   public void addTable(TableConfig tableConfig)
       throws IOException {
     String tableNameWithType = tableConfig.getTableName();
+    LOGGER.info("Adding table {}: Start", tableNameWithType);
+
     if (getTableConfig(tableNameWithType) != null) {
       throw new TableAlreadyExistsException("Table config for " + tableNameWithType
           + " already exists. If this is unexpected, try deleting the table to remove all metadata associated"
@@ -1573,6 +1575,8 @@ public class PinotHelixResourceManager {
           + "If the external view is not removed after a long time, try restarting the servers showing up in the "
           + "external view");
     }
+
+    LOGGER.info("Adding table {}: Validate table configs", tableNameWithType);
     validateTableTenantConfig(tableConfig);
 
     IdealState idealState =
@@ -1587,18 +1591,23 @@ public class PinotHelixResourceManager {
         "Invalid table type: %s", tableType);
 
     // Add table config
+    LOGGER.info("Adding table {}: Creating table config in the property store", tableNameWithType);
     if (!ZKMetadataProvider.createTableConfig(_propertyStore, tableConfig)) {
       throw new RuntimeException("Failed to create table config for table: " + tableNameWithType);
     }
     try {
       // Assign instances
       assignInstances(tableConfig, true);
+      LOGGER.info("Adding table {}: Assigned instances", tableNameWithType);
+
       if (tableType == TableType.OFFLINE) {
         // Add ideal state
         _helixAdmin.addResource(_helixClusterName, tableNameWithType, idealState);
+        LOGGER.info("Adding table {}: Added ideal state for offline table", tableNameWithType);
       } else {
         // Add ideal state with the first CONSUMING segment
         _pinotLLCRealtimeSegmentManager.setUpNewTable(tableConfig, idealState);
+        LOGGER.info("Adding table {}: Added ideal state with first consuming segment", tableNameWithType);
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception during offline table setup. Cleaning up table {}", tableNameWithType, e);
@@ -1606,7 +1615,7 @@ public class PinotHelixResourceManager {
       throw e;
     }
 
-    LOGGER.info("Updating BrokerResource for table: {}", tableNameWithType);
+    LOGGER.info("Adding table {}: Updating BrokerResource for table", tableNameWithType);
     List<String> brokers =
         HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.extractBrokerTag(tableConfig.getTenantConfig()));
     HelixHelper.updateIdealState(_helixZkManager, Helix.BROKER_RESOURCE_INSTANCE, is -> {
@@ -1616,7 +1625,7 @@ public class PinotHelixResourceManager {
       return is;
     });
 
-    LOGGER.info("Successfully added table: {}", tableNameWithType);
+    LOGGER.info("Adding table {}: Successfully added table", tableNameWithType);
   }
 
   /**
