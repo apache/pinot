@@ -57,6 +57,7 @@ public class AdhocTaskConfig extends BaseJsonConfig {
       @JsonProperty("taskConfigs") @Nullable Map<String, String> taskConfigs) {
     Preconditions.checkArgument(taskType != null, "'taskType' must be configured");
     Preconditions.checkArgument(tableName != null, "'tableName' must be configured");
+    Preconditions.checkArgument(taskName == null || !taskName.contains("/"), "'taskName' must not contain '/'");
     _taskType = taskType;
     _tableName = tableName;
     _taskName = taskName;
