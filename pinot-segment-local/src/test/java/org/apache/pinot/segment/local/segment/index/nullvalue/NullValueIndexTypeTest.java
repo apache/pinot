@@ -41,9 +41,9 @@ public class NullValueIndexTypeTest {
         new Object[] {false, true, IndexConfig.DISABLED},
         new Object[] {false, false, IndexConfig.DISABLED},
 
-        new Object[] {null, null, IndexConfig.DISABLED},
+        new Object[] {null, null, IndexConfig.ENABLED},
         new Object[] {null, true, IndexConfig.ENABLED},
-        new Object[] {null, false, IndexConfig.DISABLED}
+        new Object[] {null, false, IndexConfig.ENABLED}
     };
   }
 
