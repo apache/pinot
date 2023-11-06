@@ -56,7 +56,9 @@ public class NullValueIndexTypeTest {
     @Test(dataProvider = "provideCases", dataProviderClass = NullValueIndexTypeTest.class)
     public void isEnabledWhenNullable(Boolean fieldNullable, Boolean nullHandlingEnabled, IndexConfig expected) {
       FieldSpec dimStr = _schema.getFieldSpecFor("dimStr");
-      dimStr.setNullable(fieldNullable);
+      if (fieldNullable != null) {
+        dimStr.setNullable(fieldNullable);
+      }
 
       if (nullHandlingEnabled != null) {
         _tableConfig.getIndexingConfig().setNullHandlingEnabled(nullHandlingEnabled);
