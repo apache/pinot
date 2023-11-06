@@ -228,6 +228,8 @@ public class HashJoinOperator extends MultiStageOperator {
           container = container.subList(0, remainingRows);
           OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
           operatorStats.recordSingleStat(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_REACHED.getName(), "true");
+          // setting only the rightTableOperator to be early terminated and awaits EOS block next.
+          _rightTableOperator.earlyTerminate();
         }
       }
       // put all the rows into corresponding hash collections keyed by the key selector function.
@@ -241,10 +243,6 @@ public class HashJoinOperator extends MultiStageOperator {
         hashCollection.add(row);
       }
       _currentRowsInHashTable += container.size();
-      if (_currentRowsInHashTable == _maxRowsInHashTable) {
-        // setting only the rightTableOperator to be early terminated and awaits EOS block next.
-        _rightTableOperator.earlyTerminate();
-      }
       rightBlock = _rightTableOperator.nextBlock();
     }
     if (rightBlock.isErrorBlock()) {
