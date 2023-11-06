@@ -48,26 +48,48 @@ public class CommonsConfigurationUtils {
   private CommonsConfigurationUtils() {
   }
 
+  public static void setListDelimiterHandler(PropertiesConfiguration configuration, Character delimiter) {
+    configuration.setListDelimiterHandler(new DefaultListDelimiterHandler(delimiter));
+  }
+
   public static void setDefaultListDelimiterHandler(PropertiesConfiguration configuration) {
-    configuration.setListDelimiterHandler(new DefaultListDelimiterHandler(DEFAULT_LIST_DELIMITER));
+    setListDelimiterHandler(configuration, DEFAULT_LIST_DELIMITER);
   }
 
-  public static void loadPropertiesConfiguration(PropertiesConfiguration configuration, String path)
+  public static PropertiesConfiguration loadFromPath(String path) throws ConfigurationException {
+    return loadFromPath(path, false, false);
+  }
+
+  public static PropertiesConfiguration loadFromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
       throws ConfigurationException {
-    FileHandler fileHandler = new FileHandler(configuration);
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
+    FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(path);
+    return config;
   }
 
-  public static void loadPropertiesConfiguration(PropertiesConfiguration configuration, InputStream stream)
-      throws ConfigurationException {
-    FileHandler fileHandler = new FileHandler(configuration);
+  public static PropertiesConfiguration loadFromInputStream(InputStream stream) throws ConfigurationException {
+    return loadFromInputStream(stream, false, false);
+  }
+
+  public static PropertiesConfiguration loadFromInputStream(InputStream stream, boolean setIOFactory,
+      boolean setDefaultDelimiter) throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
+    FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(stream);
+    return config;
   }
 
-  public static void loadPropertiesConfiguration(PropertiesConfiguration configuration, File file)
-      throws ConfigurationException {
-    FileHandler fileHandler = new FileHandler(configuration);
+  public static PropertiesConfiguration loadFromFile(File file) throws ConfigurationException {
+    return loadFromFile(file, false, false);
+  }
+
+  public static PropertiesConfiguration loadFromFile(File file, boolean setIOFactory,
+      boolean setDefaultDelimiter) throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
+    FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(file);
+    return config;
   }
 
   /**
@@ -293,5 +315,21 @@ public class CommonsConfigurationUtils {
       value = value.substring(0, value.length() - 1);
     }
     return value.replace("\0\0", ",");
+  }
+
+  private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
+      boolean setDefaultDelimiter) {
+    PropertiesConfiguration config = new PropertiesConfiguration();
+
+    // setting IO Reader Factory
+    if (setIOFactory) {
+      config.setIOFactory(new ConfigFilePropertyReaderFactory());
+    }
+
+    // setting DEFAULT_LIST_DELIMITER
+    if (setDefaultDelimiter) {
+      CommonsConfigurationUtils.setDefaultListDelimiterHandler(config);
+    }
+    return config;
   }
 }

@@ -184,17 +184,14 @@ public class PinotConfiguration {
 
   private static Configuration loadProperties(String configPath) {
     try {
-      PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-
-      propertiesConfiguration.setIOFactory(new ConfigFilePropertyReaderFactory());
-      CommonsConfigurationUtils.setDefaultListDelimiterHandler(propertiesConfiguration);
+      PropertiesConfiguration propertiesConfiguration;
       if (configPath.startsWith("classpath:")) {
-        CommonsConfigurationUtils.loadPropertiesConfiguration(propertiesConfiguration,
-            PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())));
+        propertiesConfiguration = CommonsConfigurationUtils.loadFromInputStream(
+            PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())),
+            true, true);
       } else {
-        CommonsConfigurationUtils.loadPropertiesConfiguration(propertiesConfiguration, configPath);
+        propertiesConfiguration = CommonsConfigurationUtils.loadFromPath(configPath, true, true);
       }
-
       return propertiesConfiguration;
     } catch (ConfigurationException e) {
       throw new IllegalArgumentException("Could not read properties from " + configPath, e);

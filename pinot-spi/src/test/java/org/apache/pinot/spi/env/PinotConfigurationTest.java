@@ -179,11 +179,10 @@ public class PinotConfigurationTest {
   @Test
   public void assertPropertiesFromBaseConfiguration()
       throws ConfigurationException {
-    PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-    propertiesConfiguration.setIOFactory(new ConfigFilePropertyReaderFactory());
-    CommonsConfigurationUtils.setDefaultListDelimiterHandler(propertiesConfiguration);
-    CommonsConfigurationUtils.loadPropertiesConfiguration(propertiesConfiguration,
-        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile());
+    PropertiesConfiguration propertiesConfiguration = CommonsConfigurationUtils.loadFromPath(
+        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile(),
+        true, true);
+
     PinotConfiguration config = new PinotConfiguration(propertiesConfiguration);
 
     Assert.assertEquals(config.getProperty("pinot.server.storage.factory.class.s3"),
