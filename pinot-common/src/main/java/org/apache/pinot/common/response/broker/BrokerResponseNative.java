@@ -498,12 +498,12 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("maxRowsInJoinReached")
-  public boolean ismaxRowsInJoinReached() {
+  public boolean isMaxRowsInJoinReached() {
     return _maxRowsInJoinReached;
   }
 
   @JsonProperty("maxRowsInJoinReached")
-  public void setmaxRowsInJoinReached(boolean maxRowsInJoinReached) {
+  public void setMaxRowsInJoinReached(boolean maxRowsInJoinReached) {
     _maxRowsInJoinReached = maxRowsInJoinReached;
   }
 

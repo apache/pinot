@@ -111,7 +111,6 @@ public class HashJoinOperator extends MultiStageOperator {
   private final JoinOverFlowMode _joinOverflowMode;
 
   private int _currentRowsInHashTable = 0;
-  private ProcessingException _resourceLimitExceededException = null;
 
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftTableOperator,
       MultiStageOperator rightTableOperator, DataSchema leftSchema, JoinNode node) {
@@ -216,12 +215,13 @@ public class HashJoinOperator extends MultiStageOperator {
       List<Object[]> container = rightBlock.getContainer();
       // Row based overflow check.
       if (container.size() + _currentRowsInHashTable > _maxRowsInHashTable) {
-        _resourceLimitExceededException =
-            new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
-        _resourceLimitExceededException.setMessage(
-            "Cannot build in memory hash table for join operator, reach number of rows limit: " + _maxRowsInHashTable);
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          throw _resourceLimitExceededException;
+          ProcessingException resourceLimitExceededException =
+              new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
+          resourceLimitExceededException.setMessage(
+              "Cannot build in memory hash table for join operator, reach number of rows limit: "
+                  + _maxRowsInHashTable);
+          throw resourceLimitExceededException;
         } else {
           // Just fill up the buffer.
           int remainingRows = _maxRowsInHashTable - _currentRowsInHashTable;

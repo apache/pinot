@@ -309,7 +309,7 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setNumSegmentsMatched(_numSegmentsMatched);
     brokerResponseNative.setTotalDocs(_numTotalDocs);
     brokerResponseNative.setNumGroupsLimitReached(_numGroupsLimitReached);
-    brokerResponseNative.setmaxRowsInJoinReached(_maxRowsInJoinReached);
+    brokerResponseNative.setMaxRowsInJoinReached(_maxRowsInJoinReached);
     brokerResponseNative.setOfflineThreadCpuTimeNs(_offlineThreadCpuTimeNs);
     brokerResponseNative.setRealtimeThreadCpuTimeNs(_realtimeThreadCpuTimeNs);
     brokerResponseNative.setOfflineSystemActivitiesCpuTimeNs(_offlineSystemActivitiesCpuTimeNs);
@@ -373,7 +373,7 @@ public class ExecutionStatsAggregator {
 
     brokerResponseStats.setNumBlocks(_numBlocks);
     brokerResponseStats.setNumRows(_numRows);
-    brokerResponseStats.setmaxRowsInJoinReached(_maxRowsInJoinReached);
+    brokerResponseStats.setMaxRowsInJoinReached(_maxRowsInJoinReached);
     brokerResponseStats.setNumGroupsLimitReached(_numGroupsLimitReached);
     brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
     brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
