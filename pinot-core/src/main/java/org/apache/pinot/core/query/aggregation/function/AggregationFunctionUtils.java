@@ -216,21 +216,22 @@ public class AggregationFunctionUtils {
     // corresponding filter operator.
     Map<FilterContext, CombinedFilteredAggregationContext> filterOperators = new HashMap<>();
     List<AggregationFunction> nonFilteredFunctions = new ArrayList<>();
-    List<Pair<Predicate, PredicateEvaluator>> mainFilterPredicateEvaluators = mainFilterPlan.getPredicateEvaluators();
     for (Pair<AggregationFunction, FilterContext> functionFilterPair : queryContext.getFilteredAggregationFunctions()) {
       AggregationFunction aggregationFunction = functionFilterPair.getLeft();
       FilterContext filter = functionFilterPair.getRight();
       if (filter != null) {
         filterOperators.computeIfAbsent(filter, k -> {
           FilterPlanNode subFilterPlan = new FilterPlanNode(indexSegment, queryContext, filter);
+          BaseFilterOperator subFilterOperator = subFilterPlan.run();
           // TODO(egalpin): Possibly just use a single Set of all predicate evaluators across all filterContexts as
           //  it will have a smaller overall memory footprint
           List<Pair<Predicate, PredicateEvaluator>> combinedPredicateEvaluators =
-              new ArrayList<>(mainFilterPredicateEvaluators);
+              new ArrayList<>(mainFilterPlan.getPredicateEvaluators());
+          // N.B. subFilterPlan object will only have predicateEvaluators populated through the act of calling .run()
+          // on the plan
           combinedPredicateEvaluators.addAll(subFilterPlan.getPredicateEvaluators());
 
           BaseFilterOperator combinedFilterOperator;
-          BaseFilterOperator subFilterOperator = subFilterPlan.run();
           if (mainFilterOperator.isResultMatchingAll() || subFilterOperator.isResultEmpty()) {
             combinedFilterOperator = subFilterOperator;
           } else if (subFilterOperator.isResultMatchingAll()) {
@@ -256,10 +257,9 @@ public class AggregationFunctionUtils {
       } else {
         AggregationFunction[] aggregationFunctions =
             combinedFilteredAggregationContext.getAggregationFunctions().toArray(new AggregationFunction[0]);
-        Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
         ProjectionPlanNode projectionPlanNode = OperatorUtils.maybeGetStartreeProjectionOperator(queryContext,
             combinedFilteredAggregationContext.getFilterContext(), indexSegment, aggregationFunctions,
-            combinedFilteredAggregationContext.getPredicateEvaluatorMap(), filterOperator, List.copyOf(expressions));
+            combinedFilteredAggregationContext.getPredicateEvaluatorMap(), filterOperator, groupByExpressions);
         projectOperators.add(Pair.of(aggregationFunctions,
             Pair.of(projectionPlanNode.run(), projectionPlanNode instanceof StarTreeProjectPlanNode)));
       }
@@ -267,11 +267,10 @@ public class AggregationFunctionUtils {
 
     if (!nonFilteredFunctions.isEmpty()) {
       AggregationFunction[] aggregationFunctions = nonFilteredFunctions.toArray(new AggregationFunction[0]);
-      Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
       ProjectionPlanNode projectionPlanNode =
           OperatorUtils.maybeGetStartreeProjectionOperator(queryContext, queryContext.getFilter(), indexSegment,
               aggregationFunctions, mainFilterPlan.getPredicateEvaluators(), mainFilterOperator,
-              new ArrayList<>(expressions));
+              groupByExpressions);
       projectOperators.add(Pair.of(aggregationFunctions,
           Pair.of(projectionPlanNode.run(), projectionPlanNode instanceof StarTreeProjectPlanNode)));
     }
