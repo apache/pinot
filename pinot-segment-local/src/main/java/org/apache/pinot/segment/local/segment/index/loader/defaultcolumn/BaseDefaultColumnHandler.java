@@ -68,6 +68,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
@@ -530,9 +531,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
     }
 
-    if (_indexLoadingConfig.getTableConfig() != null
-        && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
-        && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled()) {
+    if (isNullable(fieldSpec)) {
       if (!_segmentWriter.hasIndexFor(column, StandardIndexes.nullValueVector())) {
         try (NullValueVectorCreator nullValueVectorCreator =
             new NullValueVectorCreator(_indexDir, fieldSpec.getName())) {
@@ -548,6 +547,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Add the column metadata information to the metadata properties.
     SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs,
         fieldSpec, true/*hasDictionary*/, dictionaryElementSize);
+  }
+
+  private boolean isNullable(FieldSpec fieldSpec) {
+    NullHandling nullHandling = _schema.getOptions().getNullHandling();
+    if (nullHandling.supportsV2()) {
+      return nullHandling.isNullable(fieldSpec);
+    } else {
+      return _indexLoadingConfig.getTableConfig() != null
+          && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
+          && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled();
+    }
   }
 
   /**
