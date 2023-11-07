@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.controller.recommender.exceptions.InvalidInputException;
 import org.apache.pinot.controller.recommender.io.metadata.FieldMetadata;
 import org.apache.pinot.controller.recommender.io.metadata.SchemaWithMetaData;
@@ -177,10 +178,11 @@ public class InputManager {
 
         // Flag the queries having in filter columns not appear in schema
         // to exclude user input like select i from tableName where a = xyz and t > 500
-        Set<String> filterColumns = new HashSet<>();
-        if (queryContext.getFilter() != null) {
+        FilterContext filter = queryContext.getFilter();
+        if (filter != null && !filter.isConstant()) {
+          Set<String> filterColumns = new HashSet<>();
           // get in filter column names, excluding literals, etc
-          queryContext.getFilter().getColumns(filterColumns);
+          filter.getColumns(filterColumns);
           // remove those appear in schema
           filterColumns.removeAll(_colNameToIntMap.keySet());
           // flag if there are columns left
