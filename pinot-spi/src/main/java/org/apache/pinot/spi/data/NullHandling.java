@@ -37,10 +37,52 @@ public abstract class NullHandling {
 
   public abstract boolean isNullable(FieldSpec spec);
 
+  /**
+   * Returns whether this NullHandling supports V2 or not.
+   *
+   * In order to support V2 a null handling must be able to decide whether a column is nullable or not given its
+   * {@link FieldSpec}.
+   *
+   * This predicate is both used as query and ingestion time.
+   *
+   * <table>
+   *   <thead>
+   *     <tr>
+   *       <th>Supports v2</th>
+   *       <th>Ingestion</th>
+   *       <th>Query</th>
+   *     </tr>
+   *   </thead>
+   *   <tbody>
+   *     <tr>
+   *       <td>Yes</td>
+   *       <td>
+   *         Null value vectors will be created for all columns in the table if and only
+   *         if {@link IndexingConfig#isNullHandlingEnabled()} (or equivalent method) is true.
+   *       </td>
+   *       <td>
+   *         If this method returns true: Null value vector buffers stored in the segment for all columns in the table
+   *         will be read if and only if {@link IndexingConfig#isNullHandlingEnabled()}} is true
+   *       </td>
+   *     </tr>
+   *     <tr>
+   *       <td>False</td>
+   *       <td>
+   *         Null value vectors will be created for a column if and only if {@link NullHandling#isNullable(FieldSpec)}
+   *         returns true for that column
+   *       </td>
+   *       <td>
+   *         Null value vector buffers stored in the segment for a column will be read if and only if
+   *         {@link NullHandling#isNullable(FieldSpec)} returns true for that column
+   *       </td>
+   *     </tr>
+   *   </tbody>
+   * </table>
+   */
   public abstract boolean supportsV2();
 
   /**
-   * This null handling mode indicatesthat nullability is defined by {@link IndexingConfig#isNullHandlingEnabled()}.
+   * This null handling mode indicates that nullability is defined by {@link IndexingConfig#isNullHandlingEnabled()}.
    *
    * For compatibility reasons this is the default mode, but it acts as all or nothing and it is recommended to
    * migrate to {@link ColumnBased}, which is more versatile.
