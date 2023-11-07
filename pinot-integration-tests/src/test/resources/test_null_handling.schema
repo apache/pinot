@@ -1,4 +1,10 @@
 {
+  "options": {
+    "nullHandling": {
+      "mode": "column",
+      "default": true
+    }
+  },
   "dimensionFieldSpecs": [
     {
       "dataType": "INT",
