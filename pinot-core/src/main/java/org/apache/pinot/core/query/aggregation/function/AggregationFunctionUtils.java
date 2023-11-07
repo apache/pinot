@@ -238,7 +238,7 @@ public class AggregationFunctionUtils {
               combinedFilterOperator = mainFilterOperator;
           } else {
             combinedFilterOperator =
-                new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext);
+                new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
           }
           return new CombinedFilteredAggregationContext(combinedFilterOperator, combinedPredicateEvaluators, filter);
         }).add(aggregationFunction);
