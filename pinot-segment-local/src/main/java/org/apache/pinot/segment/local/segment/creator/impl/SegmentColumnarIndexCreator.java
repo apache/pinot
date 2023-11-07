@@ -66,6 +66,7 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
+import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -105,7 +106,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private File _indexDir;
   private int _totalDocs;
   private int _docIdCounter;
-  private boolean _nullHandlingEnabled;
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
@@ -218,13 +218,21 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     // Although NullValueVector is implemented as an index, it needs to be treated in a different way than other indexes
-    _nullHandlingEnabled = _config.isNullHandlingEnabled();
-    if (_nullHandlingEnabled) {
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+    NullHandling nullHandling = schema.getOptions().getNullHandling();
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (isNullable(fieldSpec, nullHandling)) {
         // Initialize Null value vector map
         String columnName = fieldSpec.getName();
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
       }
+    }
+  }
+
+  private boolean isNullable(FieldSpec fieldSpec, NullHandling nullHandling) {
+    if (nullHandling.supportsV2()) {
+      return nullHandling.isNullable(fieldSpec);
+    } else {
+      return _config.isNullHandlingEnabled();
     }
   }
 
@@ -325,13 +333,11 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
     }
 
-    if (_nullHandlingEnabled) {
-      for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
-        String columnName = entry.getKey();
-        // If row has null value for given column name, add to null value vector
-        if (row.isNullValue(columnName)) {
-          _nullValueVectorCreatorMap.get(columnName).setNull(_docIdCounter);
-        }
+    for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
+      String columnName = entry.getKey();
+      // If row has null value for given column name, add to null value vector
+      if (row.isNullValue(columnName)) {
+        _nullValueVectorCreatorMap.get(columnName).setNull(_docIdCounter);
       }
     }
 
@@ -369,7 +375,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   private void indexColumnValue(PinotSegmentColumnReader colReader,
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex, String columnName, FieldSpec fieldSpec,
-      SegmentDictionaryCreator dictionaryCreator, int sourceDocId, int onDiskDocPos, NullValueVectorCreator nullVec)
+      SegmentDictionaryCreator dictionaryCreator, int sourceDocId, int onDiskDocPos,
+      @Nullable NullValueVectorCreator nullVec)
       throws IOException {
     Object columnValueToIndex = colReader.getValue(sourceDocId);
     if (columnValueToIndex == null) {
@@ -382,7 +389,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
     }
 
-    if (_nullHandlingEnabled) {
+    if (nullVec != null) {
       if (colReader.isNull(sourceDocId)) {
         nullVec.setNull(onDiskDocPos);
       }
