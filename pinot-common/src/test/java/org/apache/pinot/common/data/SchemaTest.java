@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.data;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.File;
 import java.math.BigDecimal;
 import java.net.URL;
@@ -28,11 +29,13 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
+import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -318,6 +321,30 @@ public class SchemaTest {
     schemaToCompare.setSchemaName("newSchema");
     String jsonSchemaToCompare = schemaToCompare.toSingleLineJsonString();
     Assert.assertNotEquals(jsonSchemaToCompare, jsonSchema);
+  }
+
+  @Test
+  public void testSerializeDeserializeOptions()
+      throws JsonProcessingException {
+    String json = "{\n"
+        + "  \"options\" : {\n"
+        + "    \"nullHandling\" : {\n"
+        + "      \"mode\" : \"column\",\n"
+        + "      \"default\" : true\n"
+        + "    }\n"
+        + "  },\n"
+        + "  \"primaryKeyColumns\" : null,\n"
+        + "  \"timeFieldSpec\" : null,\n"
+        + "  \"schemaName\" : null,\n"
+        + "  \"dimensionFieldSpecs\" : [ ],\n"
+        + "  \"metricFieldSpecs\" : [ ],\n"
+        + "  \"dateTimeFieldSpecs\" : [ ]\n"
+        + "}";
+    Schema schema = JsonUtils.stringToObject(json, Schema.class);
+    Assert.assertEquals(schema.getOptions().getNullHandling(), new NullHandling.ColumnBased(true));
+    String generatedJson = JsonUtils.objectToPrettyString(schema);
+
+    Assert.assertEquals(generatedJson, json);
   }
 
   @Test

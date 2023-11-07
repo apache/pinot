@@ -441,6 +441,7 @@ public final class Schema implements Serializable {
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("schemaName", _schemaName);
+    jsonObject.set("options", JsonUtils.objectToJsonNode(_options));
     if (!_dimensionFieldSpecs.isEmpty()) {
       ArrayNode jsonArray = JsonUtils.newArrayNode();
       for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
@@ -948,6 +949,7 @@ public final class Schema implements Serializable {
     return outerFunction;
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class Options implements Serializable {
     @JsonProperty("nullHandling")
     private NullHandling _nullHandling = NullHandling.TableBased.getInstance();
