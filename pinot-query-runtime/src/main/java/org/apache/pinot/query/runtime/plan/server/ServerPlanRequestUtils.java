@@ -149,8 +149,9 @@ public class ServerPlanRequestUtils {
 
     if (QueryOptionsUtils.isNullHandlingEnabled(pinotQuery.getQueryOptions())
         && !schema.getOptions().getNullHandling().supportsV2()) {
-      throw new IllegalStateException("Table " + tableConfig.getTableName() + " is not prepared to be used in "
-          + "multi-stage engine with null enable. Please configure column level nullability and reload the table");
+      String desc = tableConfig != null ? "Table " + tableConfig.getTableName() : "Schema " + schema.getSchemaName();
+      throw new IllegalStateException(desc + " is not prepared to be used in multi-stage engine with null enable. "
+          + "Please configure column level nullability and reload the table");
     }
 
     // 3. wrapped around in broker request
