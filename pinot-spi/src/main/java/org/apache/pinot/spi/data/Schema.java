@@ -948,7 +948,7 @@ public final class Schema implements Serializable {
     return outerFunction;
   }
 
-  public static class Options {
+  public static class Options implements Serializable {
     @JsonProperty("nullHandling")
     private NullHandling _nullHandling = NullHandling.TableBased.getInstance();
 

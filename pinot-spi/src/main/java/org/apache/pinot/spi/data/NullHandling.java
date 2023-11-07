@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeName;
+import java.io.Serializable;
 import java.util.Objects;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 
@@ -33,7 +34,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
     @JsonSubTypes.Type(value = NullHandling.TableBased.class, name = "table"),
     @JsonSubTypes.Type(value = NullHandling.ColumnBased.class, name = "column")
 })
-public abstract class NullHandling {
+public abstract class NullHandling implements Serializable {
 
   public abstract boolean isNullable(FieldSpec spec);
 
