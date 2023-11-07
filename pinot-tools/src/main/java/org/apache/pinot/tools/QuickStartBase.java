@@ -89,6 +89,7 @@ public abstract class QuickStartBase {
       .build();
 
   protected File _dataDir = FileUtils.getTempDirectory();
+  protected boolean _setCustomDataDir;
   protected String[] _bootstrapDataDirs;
   protected String _zkExternalAddress;
   protected String _configFilePath;
@@ -97,6 +98,7 @@ public abstract class QuickStartBase {
 
   public QuickStartBase setDataDir(String dataDir) {
     _dataDir = new File(dataDir);
+    _setCustomDataDir = true;
     return this;
   }
 
