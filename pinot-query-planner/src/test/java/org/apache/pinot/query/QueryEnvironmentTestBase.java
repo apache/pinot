@@ -69,32 +69,13 @@ public class QueryEnvironmentTestBase {
 
   static Schema.SchemaBuilder getSchemaBuilder(String schemaName) {
     return new Schema.SchemaBuilder()
-        .addDimensionField("col1", FieldSpec.DataType.STRING, field -> {
-          field.setDefaultNullValue("");
-          field.setNullable(false);
-        })
-        .addDimensionField("col2", FieldSpec.DataType.STRING, field -> {
-          field.setDefaultNullValue("");
-          field.setNullable(false);
-        })
-        .addDimensionField("col5", FieldSpec.DataType.BOOLEAN, field -> {
-          field.setDefaultNullValue(false);
-          field.setNullable(false);
-        })
-        .addDateTimeField("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS", field ->
-            field.setNullable(false))
-        .addMetricField("col3", FieldSpec.DataType.INT, field -> {
-          field.setDefaultNullValue(0);
-          field.setNullable(false);
-        })
-        .addMetricField("col4", FieldSpec.DataType.BIG_DECIMAL, field -> {
-          field.setDefaultNullValue(0);
-          field.setNullable(false);
-        })
-        .addMetricField("col6", FieldSpec.DataType.INT, field -> {
-          field.setDefaultNullValue(0);
-          field.setNullable(false);
-        })
+        .addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
+        .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
+        .addSingleValueDimension("col5", FieldSpec.DataType.BOOLEAN, false)
+        .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
+        .addMetric("col3", FieldSpec.DataType.INT, 0)
+        .addMetric("col4", FieldSpec.DataType.BIG_DECIMAL, 0)
+        .addMetric("col6", FieldSpec.DataType.INT, 0)
         .setSchemaName(schemaName);
   }
 

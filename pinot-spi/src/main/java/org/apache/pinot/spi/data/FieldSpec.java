@@ -100,7 +100,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected String _name;
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
-  protected boolean _nullable = true;
+  protected Boolean _nullable = null;
 
   // NOTE: This only applies to STRING column, which is the max number of characters
   private int _maxLength = DEFAULT_MAX_LENGTH;
@@ -305,14 +305,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   /**
    * Returns whether the column is nullable or not.
    */
-  public boolean isNullable() {
+  public Boolean isNullable() {
     return _nullable;
   }
 
   /**
    * @see #isNullable()
    */
-  public void setNullable(boolean nullable) {
+  public void setNullable(Boolean nullable) {
     _nullable = nullable;
   }
 

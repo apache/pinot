@@ -84,9 +84,11 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
       Collection<FieldSpec> allFieldSpecs = schema.getAllFieldSpecs();
       Map<String, IndexConfig> configMap = Maps.newHashMapWithExpectedSize(allFieldSpecs.size());
 
+      Schema.NullHandling nullHandling = schema.getOptions().getNullHandling();
+
       for (FieldSpec fieldSpec : allFieldSpecs) {
         IndexConfig indexConfig;
-        if (fieldSpec.isNullable()) {
+        if (nullHandling.isNullable(fieldSpec)) {
           indexConfig = IndexConfig.ENABLED;
         } else {
           indexConfig = IndexConfig.DISABLED;

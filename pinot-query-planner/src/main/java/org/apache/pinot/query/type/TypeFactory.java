@@ -19,6 +19,7 @@
 package org.apache.pinot.query.type;
 
 import java.util.Map;
+import java.util.function.Predicate;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
@@ -45,19 +46,25 @@ public class TypeFactory extends JavaTypeFactoryImpl {
 
   public RelDataType createRelDataTypeFromSchema(Schema schema) {
     Builder builder = new Builder(this);
+    Predicate<FieldSpec> isNullable;
+    if (schema.getOptions().getNullHandling().supportsV2()) {
+      isNullable = schema.getOptions().getNullHandling()::isNullable;
+    } else {
+      isNullable = fieldSpec -> false;
+    }
     for (Map.Entry<String, FieldSpec> e : schema.getFieldSpecMap().entrySet()) {
-      builder.add(e.getKey(), toRelDataType(e.getValue()));
+      builder.add(e.getKey(), toRelDataType(e.getValue(), isNullable));
     }
     return builder.build();
   }
 
-  private RelDataType toRelDataType(FieldSpec fieldSpec) {
+  private RelDataType toRelDataType(FieldSpec fieldSpec, Predicate<FieldSpec> isNullable) {
     RelDataType type = createSqlType(getSqlTypeName(fieldSpec));
     boolean isArray = !fieldSpec.isSingleValueField();
     if (isArray) {
       type = createArrayType(type, -1);
     }
-    if (fieldSpec.isNullable()) {
+    if (isNullable.test(fieldSpec)) {
       type = createTypeWithNullability(type, true);
     }
     return type;

@@ -45,15 +45,15 @@ public class TypeFactoryTest {
     JavaTypeFactory javaTypeFactory = new JavaTypeFactoryImpl(TYPE_SYSTEM);
 
     for (FieldSpec.DataType dataType : FieldSpec.DataType.values()) {
+      RelDataType basicType;
+      RelDataType arrayType = null;
       switch (dataType) {
         case INT: {
-          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.INTEGER);
-          cases.add(new Object[]{dataType, basicType, basicType});
+          basicType = javaTypeFactory.createSqlType(SqlTypeName.INTEGER);
           break;
         }
         case LONG: {
-          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.BIGINT);
-          cases.add(new Object[]{dataType, basicType, basicType});
+          basicType = javaTypeFactory.createSqlType(SqlTypeName.BIGINT);
           break;
         }
         // Map float and double to the same RelDataType so that queries like
@@ -68,92 +68,95 @@ public class TypeFactoryTest {
         // With float and double mapped to the same RelDataType, the behavior in multi-stage query engine will be the
         // same as the query in v1 query engine.
         case FLOAT: {
-          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.DOUBLE);
-          RelDataType arrayType = javaTypeFactory.createSqlType(SqlTypeName.REAL);
-          cases.add(new Object[]{dataType, basicType, arrayType});
+          basicType = javaTypeFactory.createSqlType(SqlTypeName.DOUBLE);
+          arrayType = javaTypeFactory.createSqlType(SqlTypeName.REAL);
           break;
         }
         case DOUBLE: {
-          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.DOUBLE);
-          cases.add(new Object[]{dataType, basicType, basicType});
+          basicType = javaTypeFactory.createSqlType(SqlTypeName.DOUBLE);
           break;
         }
         case BOOLEAN: {
-          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.BOOLEAN);
-          cases.add(new Object[]{dataType, basicType, basicType});
+          basicType = javaTypeFactory.createSqlType(SqlTypeName.BOOLEAN);
           break;
         }
         case TIMESTAMP: {
-          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.TIMESTAMP);
-          cases.add(new Object[]{dataType, basicType, basicType});
+          basicType = javaTypeFactory.createSqlType(SqlTypeName.TIMESTAMP);
           break;
         }
-        case STRING: {
-          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.VARCHAR);
-          cases.add(new Object[]{dataType, basicType, basicType});
+        case STRING:
+        case JSON: {
+          basicType = javaTypeFactory.createSqlType(SqlTypeName.VARCHAR);
           break;
         }
         case BYTES: {
-          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.VARBINARY);
-          cases.add(new Object[]{dataType, basicType, basicType});
+          basicType = javaTypeFactory.createSqlType(SqlTypeName.VARBINARY);
           break;
         }
         case BIG_DECIMAL: {
-          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.DECIMAL);
-          cases.add(new Object[]{dataType, basicType, basicType});
-          break;
-        }
-        case JSON: {
-          RelDataType basicType = javaTypeFactory.createSqlType(SqlTypeName.VARCHAR);
-          cases.add(new Object[]{dataType, basicType, basicType});
+          basicType = javaTypeFactory.createSqlType(SqlTypeName.DECIMAL);
           break;
         }
         case LIST:
         case STRUCT:
         case MAP:
         case UNKNOWN:
-          break;
+          continue;
         default:
           String message = String.format("Unsupported type: %s ", dataType);
           throw new UnsupportedOperationException(message);
       }
+      if (arrayType == null) {
+        arrayType = basicType;
+      }
+      cases.add(new Object[]{dataType, basicType, arrayType, Schema.NullHandling.TableBased.getInstance()});
+      cases.add(new Object[]{dataType, basicType, arrayType, new Schema.NullHandling.ColumnBased(true)});
+      cases.add(new Object[]{dataType, basicType, arrayType, new Schema.NullHandling.ColumnBased(false)});
     }
     return cases.iterator();
   }
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
+  public void testScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
+      Schema.NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addSingleValueDimension("col", dataType)
+        .withOptions(options -> options.setNullHandling(nullHandling))
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
     RelDataTypeField field = fieldList.get(0);
-    Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(scalarType, true));
+    boolean colNullable = isColNullable(testSchema, nullHandling);
+    Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(scalarType, colNullable));
   }
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
+  public void testNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
+      Schema.NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(true))
+        .withOptions(options -> options.setNullHandling(nullHandling))
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
     RelDataTypeField field = fieldList.get(0);
 
-    RelDataType expectedType = typeFactory.createTypeWithNullability(scalarType, true);
+    boolean colNullable = isColNullable(testSchema, nullHandling);
+    RelDataType expectedType = typeFactory.createTypeWithNullability(scalarType, colNullable);
 
     Assert.assertEquals(field.getType(), expectedType);
   }
 
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testNotNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
+  public void testNotNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
+      Schema.NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(false))
+        .withOptions(options -> options.setNullHandling(nullHandling))
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
@@ -162,50 +165,61 @@ public class TypeFactoryTest {
     Assert.assertEquals(field.getType(), scalarType);
   }
 
+  private boolean isColNullable(Schema schema, Schema.NullHandling nullHandling) {
+    return nullHandling.supportsV2() && nullHandling.isNullable(schema.getFieldSpecFor("col"));
+  }
+
   @Test(dataProvider = "relDataTypeConversion")
-  public void testArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
+  public void testArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
+      Schema.NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addMultiValueDimension("col", dataType)
+        .withOptions(options -> options.setNullHandling(nullHandling))
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
     RelDataTypeField field = fieldList.get(0);
 
-    RelDataType expectedType = typeFactory.createTypeWithNullability(typeFactory.createArrayType(arrayType, -1), true);
+    boolean nullable = isColNullable(testSchema, nullHandling);
+    RelDataType expectedType =
+        typeFactory.createTypeWithNullability(typeFactory.createArrayType(arrayType, -1), nullable);
 
     Assert.assertEquals(field.getType(), expectedType);
   }
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
+  public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
+      Schema.NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
           field.setNullable(true);
           field.setSingleValueField(false);
         })
+        .withOptions(options -> options.setNullHandling(nullHandling))
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
     RelDataTypeField field = fieldList.get(0);
 
-    RelDataType expectedType = typeFactory.createTypeWithNullability(
-        typeFactory.createArrayType(arrayType, -1),
-        true
-    );
+    boolean colNullable = isColNullable(testSchema, nullHandling);
+    RelDataType expectedType =
+        typeFactory.createTypeWithNullability(typeFactory.createArrayType(arrayType, -1), colNullable);
 
     Assert.assertEquals(field.getType(), expectedType);
   }
 
   @Test(dataProvider = "relDataTypeConversion")
-  public void testNotNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType) {
+  public void testNotNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
+      Schema.NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
           field.setNullable(false);
           field.setSingleValueField(false);
         })
+        .withOptions(options -> options.setNullHandling(nullHandling))
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
@@ -239,53 +253,53 @@ public class TypeFactoryTest {
       switch (field.getName()) {
         case "INT_COL":
           BasicSqlType intBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.INTEGER);
-          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(intBasicSqlType, true));
+          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(intBasicSqlType, false));
           checkPrecisionScale(field, intBasicSqlType);
           break;
         case "LONG_COL":
           BasicSqlType bigIntBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.BIGINT);
-          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(bigIntBasicSqlType, true));
+          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(bigIntBasicSqlType, false));
           checkPrecisionScale(field, bigIntBasicSqlType);
           break;
         case "FLOAT_COL":
         case "DOUBLE_COL":
           BasicSqlType doubleBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE);
-          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(doubleBasicSqlType, true));
+          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(doubleBasicSqlType, false));
           checkPrecisionScale(field, doubleBasicSqlType);
           break;
         case "STRING_COL":
         case "JSON_COL": {
           BasicSqlType basicType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR);
-          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(basicType, true));
+          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(basicType, false));
           break;
         }
         case "BYTES_COL":
           Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(
-              new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY), true));
+              new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY), false));
           break;
         case "INT_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.INTEGER), true));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.INTEGER), false));
           break;
         case "LONG_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.BIGINT), true));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.BIGINT), false));
           break;
         case "FLOAT_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.REAL), true));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.REAL), false));
           break;
         case "DOUBLE_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE), true));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE), false));
           break;
         case "STRING_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR), true));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR), false));
           break;
         case "BYTES_ARRAY_COL":
           Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY), true));
+              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY), false));
           break;
         default:
           Assert.fail("Unexpected column name: " + field.getName());
