@@ -79,11 +79,12 @@ public class RangeIndexRule extends AbstractRule {
   }
 
   public FixedLenBitset parseQuery(QueryContext queryContext) {
-    if (queryContext.getFilter() == null) {
+    FilterContext filter = queryContext.getFilter();
+    if (filter == null || filter.isConstant()) {
       return FixedLenBitset.IMMUTABLE_EMPTY_SET;
     }
 
-    return parsePredicateList(queryContext.getFilter());
+    return parsePredicateList(filter);
   }
 
   /**
