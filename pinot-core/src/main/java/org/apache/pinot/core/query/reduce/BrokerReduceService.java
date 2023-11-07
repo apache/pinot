@@ -110,7 +110,7 @@ public class BrokerReduceService extends BaseReduceService {
     try {
       dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
           new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
-              _groupByTrimThreshold), brokerMetrics);
+              _groupByTrimThreshold, _minGroupByTrimSize), brokerMetrics);
     } catch (EarlyTerminationException e) {
       brokerResponseNative.addToExceptions(
           new QueryProcessingException(QueryException.QUERY_CANCELLATION_ERROR_CODE, e.toString()));

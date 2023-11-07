@@ -250,8 +250,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // In case of single reduce thread, fall back to SimpleIndexedTable to avoid redundant locking/unlocking calls.
     int numReduceThreadsToUse = getNumReduceThreadsToUse(numDataTables, reducerContext.getMaxReduceThreadsPerQuery());
     int limit = _queryContext.getLimit();
-    // TODO: Make minTrimSize configurable
-    int trimSize = GroupByUtils.getTableCapacity(limit);
+    int trimSize = GroupByUtils.getTableCapacity(limit, reducerContext.getMinGroupByTrimSize());
     // NOTE: For query with HAVING clause, use trimSize as resultSize to ensure the result accuracy.
     // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
     int resultSize = _queryContext.getHavingFilter() != null ? trimSize : limit;

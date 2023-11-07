@@ -81,7 +81,7 @@ public class StreamingReduceService extends BaseReduceService {
     // Process server response.
     DataTableReducerContext dataTableReducerContext =
         new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
-            _groupByTrimThreshold);
+            _groupByTrimThreshold, _minGroupByTrimSize);
     StreamingReducer streamingReducer = ResultReducerFactory.getStreamingReducer(queryContext);
 
     streamingReducer.init(dataTableReducerContext);
