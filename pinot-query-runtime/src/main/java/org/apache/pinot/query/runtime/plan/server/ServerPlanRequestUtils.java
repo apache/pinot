@@ -263,13 +263,8 @@ public class ServerPlanRequestUtils {
       Expression leftExpr = pinotQuery.getSelectList().get(leftJoinKeys.get(i));
       if (dataContainer.size() == 0) {
         // put a constant false expression
-        Expression isNull = RequestUtils.getFunctionExpression(FilterKind.IS_NULL.name());
-        isNull.getFunctionCall().setOperands(Arrays.asList(leftExpr));
-        Expression isNotNull = RequestUtils.getFunctionExpression(FilterKind.IS_NOT_NULL.name());
-        isNotNull.getFunctionCall().setOperands(Arrays.asList(leftExpr));
-        Expression andExpr = RequestUtils.getFunctionExpression(FilterKind.AND.name());
-        andExpr.getFunctionCall().setOperands(Arrays.asList(isNull, isNotNull));
-        expressions.add(andExpr);
+        Expression constantFalseExpr = RequestUtils.getLiteralExpression(false);
+        expressions.add(constantFalseExpr);
       } else {
         int rightIdx = rightJoinKeys.get(i);
         Expression inFilterExpr = RequestUtils.getFunctionExpression(FilterKind.IN.name());
