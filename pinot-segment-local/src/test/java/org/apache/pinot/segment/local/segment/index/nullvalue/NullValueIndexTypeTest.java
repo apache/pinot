@@ -22,7 +22,7 @@ import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.NullHandling;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -32,9 +32,9 @@ public class NullValueIndexTypeTest {
 
   @DataProvider(name = "provideCases")
   public Object[][] provideCases() {
-    Schema.NullHandling.TableBased tableBased = Schema.NullHandling.TableBased.getInstance();
-    Schema.NullHandling.ColumnBased defaultFalse = new Schema.NullHandling.ColumnBased(false);
-    Schema.NullHandling.ColumnBased defaultTrue = new Schema.NullHandling.ColumnBased(true);
+    NullHandling.TableBased tableBased = NullHandling.TableBased.getInstance();
+    NullHandling.ColumnBased defaultFalse = new NullHandling.ColumnBased(false);
+    NullHandling.ColumnBased defaultTrue = new NullHandling.ColumnBased(true);
     return new Object[][] {
         // This is the semantic table, assuming a null bitmap buffer exists in the segment
         // NullHandling | setNullable | Index is enabled
@@ -59,7 +59,7 @@ public class NullValueIndexTypeTest {
     }
 
     @Test(dataProvider = "provideCases", dataProviderClass = NullValueIndexTypeTest.class)
-    public void isEnabledWhenNullable(Schema.NullHandling nullHandling, Boolean fieldNullable, IndexConfig expected) {
+    public void isEnabledWhenNullable(NullHandling nullHandling, Boolean fieldNullable, IndexConfig expected) {
       _schema.getOptions().setNullHandling(nullHandling);
 
       FieldSpec dimStr = _schema.getFieldSpecFor("dimStr");

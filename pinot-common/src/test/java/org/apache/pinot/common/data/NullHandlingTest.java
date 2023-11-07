@@ -20,21 +20,21 @@
 package org.apache.pinot.common.data;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class SchemaNullHandlingTest {
+public class NullHandlingTest {
 
   @Test
   void tableMode()
       throws JsonProcessingException {
     String json = "{\"mode\":\"table\"}";
-    Schema.NullHandling nullHandling = JsonUtils.stringToObject(json, Schema.NullHandling.class);
+    NullHandling nullHandling = JsonUtils.stringToObject(json, NullHandling.class);
 
-    Assert.assertSame(nullHandling, Schema.NullHandling.TableBased.getInstance());
+    Assert.assertSame(nullHandling, NullHandling.TableBased.getInstance());
 
     String serialized = JsonUtils.objectToString(nullHandling);
     Assert.assertEquals(serialized, json);
@@ -44,9 +44,9 @@ public class SchemaNullHandlingTest {
   void tableColumnDefaultFalse()
       throws JsonProcessingException {
     String json = "{\"mode\":\"column\",\"default\":false}";
-    Schema.NullHandling nullHandling = JsonUtils.stringToObject(json, Schema.NullHandling.class);
+    NullHandling nullHandling = JsonUtils.stringToObject(json, NullHandling.class);
 
-    Assert.assertEquals(nullHandling, new Schema.NullHandling.ColumnBased(false));
+    Assert.assertEquals(nullHandling, new NullHandling.ColumnBased(false));
 
     String serialized = JsonUtils.objectToString(nullHandling);
     Assert.assertEquals(serialized, json);
@@ -57,9 +57,9 @@ public class SchemaNullHandlingTest {
   void tableColumnDefaultTrue()
       throws JsonProcessingException {
     String json = "{\"mode\":\"column\",\"default\":true}";
-    Schema.NullHandling nullHandling = JsonUtils.stringToObject(json, Schema.NullHandling.class);
+    NullHandling nullHandling = JsonUtils.stringToObject(json, NullHandling.class);
 
-    Assert.assertEquals(nullHandling, new Schema.NullHandling.ColumnBased(true));
+    Assert.assertEquals(nullHandling, new NullHandling.ColumnBased(true));
 
     String serialized = JsonUtils.objectToString(nullHandling);
     Assert.assertEquals(serialized, json);

@@ -29,6 +29,7 @@ import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -109,16 +110,16 @@ public class TypeFactoryTest {
       if (arrayType == null) {
         arrayType = basicType;
       }
-      cases.add(new Object[]{dataType, basicType, arrayType, Schema.NullHandling.TableBased.getInstance()});
-      cases.add(new Object[]{dataType, basicType, arrayType, new Schema.NullHandling.ColumnBased(true)});
-      cases.add(new Object[]{dataType, basicType, arrayType, new Schema.NullHandling.ColumnBased(false)});
+      cases.add(new Object[]{dataType, basicType, arrayType, NullHandling.TableBased.getInstance()});
+      cases.add(new Object[]{dataType, basicType, arrayType, new NullHandling.ColumnBased(true)});
+      cases.add(new Object[]{dataType, basicType, arrayType, new NullHandling.ColumnBased(false)});
     }
     return cases.iterator();
   }
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      Schema.NullHandling nullHandling) {
+      NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addSingleValueDimension("col", dataType)
@@ -133,7 +134,7 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      Schema.NullHandling nullHandling) {
+      NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(true))
@@ -152,7 +153,7 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNotNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      Schema.NullHandling nullHandling) {
+      NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(false))
@@ -165,13 +166,13 @@ public class TypeFactoryTest {
     Assert.assertEquals(field.getType(), scalarType);
   }
 
-  private boolean isColNullable(Schema schema, Schema.NullHandling nullHandling) {
+  private boolean isColNullable(Schema schema, NullHandling nullHandling) {
     return nullHandling.supportsV2() && nullHandling.isNullable(schema.getFieldSpecFor("col"));
   }
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      Schema.NullHandling nullHandling) {
+      NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addMultiValueDimension("col", dataType)
@@ -190,7 +191,7 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      Schema.NullHandling nullHandling) {
+      NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
@@ -212,7 +213,7 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNotNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      Schema.NullHandling nullHandling) {
+      NullHandling nullHandling) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
@@ -253,29 +254,26 @@ public class TypeFactoryTest {
       switch (field.getName()) {
         case "INT_COL":
           BasicSqlType intBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.INTEGER);
-          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(intBasicSqlType, false));
+          Assert.assertEquals(field.getType(), intBasicSqlType);
           checkPrecisionScale(field, intBasicSqlType);
           break;
         case "LONG_COL":
           BasicSqlType bigIntBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.BIGINT);
-          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(bigIntBasicSqlType, false));
+          Assert.assertEquals(field.getType(), bigIntBasicSqlType);
           checkPrecisionScale(field, bigIntBasicSqlType);
           break;
         case "FLOAT_COL":
         case "DOUBLE_COL":
           BasicSqlType doubleBasicSqlType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE);
-          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(doubleBasicSqlType, false));
+          Assert.assertEquals(field.getType(), doubleBasicSqlType);
           checkPrecisionScale(field, doubleBasicSqlType);
           break;
         case "STRING_COL":
-        case "JSON_COL": {
-          BasicSqlType basicType = new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR);
-          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(basicType, false));
+        case "JSON_COL":
+          Assert.assertEquals(field.getType(), new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR));
           break;
-        }
         case "BYTES_COL":
-          Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(
-              new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY), false));
+          Assert.assertEquals(field.getType(), new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY));
           break;
         case "INT_ARRAY_COL":
           Assert.assertEquals(field.getType(),
