@@ -218,6 +218,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     // Although NullValueVector is implemented as an index, it needs to be treated in a different way than other indexes
+    // TODO(column-level-nullability): Is this still needed? Probably it can be moved to the normal loop
     NullHandling nullHandling = schema.getOptions().getNullHandling();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (isNullable(fieldSpec, nullHandling)) {
