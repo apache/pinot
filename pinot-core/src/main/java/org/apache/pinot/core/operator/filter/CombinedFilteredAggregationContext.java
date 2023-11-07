@@ -20,6 +20,8 @@ package org.apache.pinot.core.operator.filter;
 
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
@@ -29,22 +31,25 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 
 public class CombinedFilteredAggregationContext {
   private final BaseFilterOperator _baseFilterOperator;
-  private final FilterContext _filterContext;
+  private final FilterContext _mainFilterContext;
+  private final FilterContext _subFilterContext;
   private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators;
   private final List<AggregationFunction> _aggregationFunctions;
 
   public CombinedFilteredAggregationContext(BaseFilterOperator baseFilterOperator,
-      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, FilterContext filterContext,
-      List<AggregationFunction> aggregationFunctions) {
+      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, @Nullable FilterContext mainFilterContext,
+      @Nonnull FilterContext subFilterContext, List<AggregationFunction> aggregationFunctions) {
     _baseFilterOperator = baseFilterOperator;
     _predicateEvaluators = predicateEvaluators;
-    _filterContext = filterContext;
+    _mainFilterContext = mainFilterContext;
+    _subFilterContext = subFilterContext;
     _aggregationFunctions = aggregationFunctions;
   }
 
   public CombinedFilteredAggregationContext(BaseFilterOperator baseFilterOperator,
-      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, FilterContext filterContext) {
-    this(baseFilterOperator, predicateEvaluators, filterContext, new ArrayList<>());
+      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, @Nullable FilterContext mainFilterContext,
+      @Nonnull FilterContext subFilterContext) {
+    this(baseFilterOperator, predicateEvaluators, mainFilterContext, subFilterContext, new ArrayList<>());
   }
 
 
@@ -57,7 +62,10 @@ public class CombinedFilteredAggregationContext {
   }
 
   public FilterContext getFilterContext() {
-    return _filterContext;
+    if (_mainFilterContext == null) {
+      return _subFilterContext;
+    }
+    return new FilterContext(FilterContext.Type.AND, List.of(_mainFilterContext, _subFilterContext), null);
   }
 
   public List<AggregationFunction> getAggregationFunctions() {

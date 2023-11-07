@@ -240,7 +240,8 @@ public class AggregationFunctionUtils {
             combinedFilterOperator =
                 new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
           }
-          return new CombinedFilteredAggregationContext(combinedFilterOperator, combinedPredicateEvaluators, filter);
+          return new CombinedFilteredAggregationContext(combinedFilterOperator, combinedPredicateEvaluators,
+              queryContext.getFilter(), filter);
         }).add(aggregationFunction);
       } else {
         nonFilteredFunctions.add(aggregationFunction);

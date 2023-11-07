@@ -128,10 +128,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
           Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
   private static final String TEST_STAR_TREE_QUERY_1 = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'UA'";
+  private static final String TEST_STAR_TREE_QUERY_1_FILTER_INVERT =
+      "SELECT COUNT(*) FILTER (WHERE Carrier = 'UA') FROM mytable";
   private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_2 =
       new StarTreeIndexConfig(Collections.singletonList("DestState"), null,
           Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
   private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+  private static final String TEST_STAR_TREE_QUERY_FILTERED_AGG =
+      "SELECT COUNT(*), COUNT(*) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
+  // This query contains a filtered aggregation which cannot be solved with startree, but the COUNT(*) still should be
+  private static final String TEST_STAR_TREE_QUERY_FILTERED_AGG_MIXED =
+      "SELECT COUNT(*), AVG(ArrDelay) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
+  private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_3 =
+      new StarTreeIndexConfig(List.of("Carrier", "DestState"), null,
+          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
 
   // For default columns test
   private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
@@ -1345,6 +1355,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
     // Initially 'numDocsScanned' should be the same as 'COUNT(*)' result
     assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
+    // Verify that inverting the filter to be a filtered agg shows the identical results
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1_FILTER_INVERT);
+    assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
 
     // Update table config and trigger reload
     TableConfig tableConfig = getOfflineTableConfig();
@@ -1355,10 +1368,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadAllSegments(TEST_STAR_TREE_QUERY_1, false, numTotalDocs);
     // With star-tree, 'numDocsScanned' should be the same as number of segments (1 per segment)
     assertEquals(postQuery(TEST_STAR_TREE_QUERY_1).get("numDocsScanned").asLong(), NUM_SEGMENTS);
+    // Verify that inverting the filter to be a filtered agg shows the identical results
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1_FILTER_INVERT);
+    assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
+    assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS);
 
     // Reload again should have no effect
     reloadAllSegments(TEST_STAR_TREE_QUERY_1, false, numTotalDocs);
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
+    assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
+    assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS);
+    // Verify that inverting the filter to be a filtered agg shows the identical results
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1_FILTER_INVERT);
     assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
     assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS);
@@ -1438,6 +1461,55 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(secondQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), secondQueryResult);
     assertEquals(secondQueryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertEquals(secondQueryResponse.get("numDocsScanned").asInt(), secondQueryResult);
+
+    // Enforce a sleep here since segment reload is async and there is another back-to-back reload below.
+    // Otherwise, there is no way to tell whether the 1st reload on server side is finished,
+    // which may hit the race condition that the 1st reload finishes after the 2nd reload is fully done.
+    // 10 seconds are still better than hitting race condition which will time out after 10 minutes.
+    Thread.sleep(10_000L);
+
+    // Test the filtered agg (third) query
+    // TODO(egalpin): resume from here
+//    indexingConfig.setStarTreeIndexConfigs(null);
+//    updateTableConfig(tableConfig);
+//    reloadAllSegments(TEST_STAR_TREE_QUERY_FILTERED_AGG, false, numTotalDocs);
+    JsonNode thirdQueryResponse = postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG);
+    int thirdQueryResultA = thirdQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt();
+    int thirdQueryResultB = thirdQueryResponse.get("resultTable").get("rows").get(0).get(1).asInt();
+    assertEquals(thirdQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    // Initially 'numDocsScanned' should be the same as 'COUNT(*)' result
+    assertEquals(thirdQueryResponse.get("numDocsScanned").asInt(), thirdQueryResultA + thirdQueryResultB);
+
+    // Update table config with a different star-tree index config and trigger reload
+    indexingConfig.setStarTreeIndexConfigs(Collections.singletonList(STAR_TREE_INDEX_CONFIG_3));
+    indexingConfig.setEnableDynamicStarTreeCreation(true);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(TEST_STAR_TREE_QUERY_FILTERED_AGG, false, numTotalDocs);
+    // With star-tree, 'numDocsScanned' should be the same as number of segments * number of unique filter swimlanes
+    // leveraging ST (2 per segment for TEST_STAR_TREE_QUERY_FILTERED_AGG)
+    assertEquals(postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG).get("numDocsScanned").asLong(), NUM_SEGMENTS * 2);
+
+    // Reload again should have no effect
+    reloadAllSegments(TEST_STAR_TREE_QUERY_FILTERED_AGG, false, numTotalDocs);
+    thirdQueryResponse = postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG);
+    assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), thirdQueryResultA);
+    assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(1).asInt(), thirdQueryResultB);
+    assertEquals(thirdQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(thirdQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS * 2);
+
+    // Test query with mixture of aggs solvable/not solvable by ST but with different filter swimlanes. Confirm that
+    // those solvable by ST make use of ST
+    thirdQueryResponse = postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG_MIXED);
+    assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), thirdQueryResultA);
+    assertEquals(thirdQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(thirdQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS + thirdQueryResultB);
+
+    // Should be able to use the star-tree with an additional match-all predicate on another dimension
+    thirdQueryResponse = postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG + " AND DaysSinceEpoch > 16070");
+    assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), thirdQueryResultA);
+    assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(1).asInt(), thirdQueryResultB);
+    assertEquals(thirdQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(thirdQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS * 2);
   }
 
   /**
