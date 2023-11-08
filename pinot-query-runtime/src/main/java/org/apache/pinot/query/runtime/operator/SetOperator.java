@@ -50,6 +50,7 @@ public abstract class SetOperator extends MultiStageOperator {
   private final DataSchema _dataSchema;
 
   private boolean _isRightSetBuilt;
+  private boolean _isTerminated;
   private TransferableBlock _upstreamErrorBlock;
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
@@ -60,6 +61,8 @@ public abstract class SetOperator extends MultiStageOperator {
     _leftChildOperator = getChildOperators().get(0);
     _rightChildOperator = getChildOperators().get(1);
     _rightRowSet = new HashSet<>();
+    _isRightSetBuilt = false;
+    _isTerminated = false;
   }
 
   @Override
@@ -89,12 +92,23 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    // A blocking call to construct a set with all the right side rows.
-    if (!_isRightSetBuilt) {
-      constructRightBlockSet();
+    try {
+      if (_isTerminated) {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      }
+      if (!_isRightSetBuilt) {
+        // construct a SET with all the right side rows.
+        constructRightBlockSet();
+      }
+      if (_upstreamErrorBlock != null) {
+        return _upstreamErrorBlock;
+      }
+      // UNION each left block with the constructed right block set.
+      TransferableBlock leftBlock = _leftChildOperator.nextBlock();
+      return constructResultBlockSet(leftBlock);
+    } catch (Exception e) {
+      return TransferableBlockUtils.getErrorTransferableBlock(e);
     }
-    TransferableBlock leftBlock = _leftChildOperator.nextBlock();
-    return constructResultBlockSet(leftBlock);
   }
 
   protected void constructRightBlockSet() {

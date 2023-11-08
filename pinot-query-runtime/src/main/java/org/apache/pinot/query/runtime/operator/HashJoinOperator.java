@@ -201,7 +201,7 @@ public class HashJoinOperator extends MultiStageOperator {
         return _upstreamErrorBlock;
       }
       TransferableBlock leftBlock = _leftTableOperator.nextBlock();
-      // JOIN each left block with the right block.
+      // JOIN each left block with the constructed right hash table.
       return buildJoinedDataBlock(leftBlock);
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
