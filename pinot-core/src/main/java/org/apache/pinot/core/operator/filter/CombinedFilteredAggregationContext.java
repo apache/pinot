@@ -65,7 +65,7 @@ public class CombinedFilteredAggregationContext {
     if (_mainFilterContext == null) {
       return _subFilterContext;
     }
-    return new FilterContext(FilterContext.Type.AND, List.of(_mainFilterContext, _subFilterContext), null);
+    return FilterContext.forAnd(List.of(_mainFilterContext, _subFilterContext));
   }
 
   public List<AggregationFunction> getAggregationFunctions() {
