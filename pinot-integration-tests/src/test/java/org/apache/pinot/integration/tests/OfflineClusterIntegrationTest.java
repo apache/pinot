@@ -1450,10 +1450,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Thread.sleep(10_000L);
 
     // Test the filtered agg (third) query
-    // TODO(egalpin): resume from here
-//    indexingConfig.setStarTreeIndexConfigs(null);
-//    updateTableConfig(tableConfig);
-//    reloadAllSegments(TEST_STAR_TREE_QUERY_FILTERED_AGG, false, numTotalDocs);
     JsonNode thirdQueryResponse = postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG);
     int thirdQueryResultA = thirdQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt();
     int thirdQueryResultB = thirdQueryResponse.get("resultTable").get("rows").get(0).get(1).asInt();
@@ -1491,6 +1487,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(1).asInt(), thirdQueryResultB);
     assertEquals(thirdQueryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertEquals(thirdQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS * 2);
+
+    // Remove ST index configs so that other tests are not impacted by their presence
+    indexingConfig.setStarTreeIndexConfigs(null);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(TEST_STAR_TREE_QUERY_FILTERED_AGG, false, numTotalDocs);
+    Thread.sleep(10_000L);
   }
 
   /**
