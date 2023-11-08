@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.common.data;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Timestamp;
@@ -325,7 +326,7 @@ public class SchemaTest {
 
   @Test
   public void testSerializeDeserializeOptions()
-      throws JsonProcessingException {
+      throws IOException {
     String json = "{\n"
         + "  \"options\" : {\n"
         + "    \"nullHandling\" : {\n"
@@ -340,11 +341,13 @@ public class SchemaTest {
         + "  \"metricFieldSpecs\" : [ ],\n"
         + "  \"dateTimeFieldSpecs\" : [ ]\n"
         + "}";
-    Schema schema = JsonUtils.stringToObject(json, Schema.class);
-    Assert.assertEquals(schema.getOptions().getNullHandling(), new NullHandling.ColumnBased(true));
-    String generatedJson = JsonUtils.objectToPrettyString(schema);
+    JsonNode expectedNode = JsonUtils.stringToJsonNode(json);
 
-    Assert.assertEquals(generatedJson, json);
+    Schema schema = JsonUtils.jsonNodeToObject(expectedNode, Schema.class);
+    Assert.assertEquals(schema.getOptions().getNullHandling(), new NullHandling.ColumnBased(true));
+    JsonNode actualNode = JsonUtils.objectToJsonNode(schema);
+
+    Assert.assertEquals(actualNode, expectedNode);
   }
 
   @Test
