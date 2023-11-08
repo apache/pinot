@@ -19,8 +19,11 @@
 package org.apache.pinot.core.query.request;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
@@ -51,6 +54,7 @@ public class ServerQueryRequest {
   private final boolean _enableTrace;
   private final boolean _enableStreaming;
   private final List<String> _segmentsToQuery;
+  private final Set<String> _optionalSegments;
   private final QueryContext _queryContext;
 
   // Request id might not be unique across brokers or for request hitting a hybrid table. To solve that we may construct
@@ -71,6 +75,7 @@ public class ServerQueryRequest {
     _enableTrace = instanceRequest.isEnableTrace();
     _enableStreaming = enableStreaming;
     _segmentsToQuery = instanceRequest.getSearchSegments();
+    _optionalSegments = instanceRequest.getOptionalSegments();
     _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
@@ -88,6 +93,8 @@ public class ServerQueryRequest {
     _enableStreaming = Boolean.parseBoolean(metadata.get(Request.MetadataKeys.ENABLE_STREAMING));
 
     _segmentsToQuery = serverRequest.getSegmentsList();
+    // TODO: support optional segments for GrpcQueryServer
+    _optionalSegments = Collections.emptySet();
 
     BrokerRequest brokerRequest;
     String payloadType = metadata.getOrDefault(Request.MetadataKeys.PAYLOAD_TYPE, Request.PayloadType.SQL);
@@ -149,5 +156,9 @@ public class ServerQueryRequest {
 
   public TimerContext getTimerContext() {
     return _timerContext;
+  }
+
+  public Set<String> getOptionalSegments() {
+    return _optionalSegments;
   }
 }

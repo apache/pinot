@@ -89,7 +89,8 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
       @Nullable Map<ServerInstance, List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
+      @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
+      @Nullable Map<ServerInstance, List<String>> optionalSegments, long timeoutMs, ServerStats serverStats,
       RequestContext requestContext)
       throws Exception {
     // TODO: Support failure detection
@@ -106,8 +107,8 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
           requestContext.isSampledRequest());
     }
     final long startReduceTimeNanos = System.nanoTime();
-    BrokerResponseNative brokerResponse = _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest,
-        responseMap, timeoutMs, _brokerMetrics);
+    BrokerResponseNative brokerResponse =
+        _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
     requestContext.setReduceTimeNanos(System.nanoTime() - startReduceTimeNanos);
     return brokerResponse;
   }

@@ -225,7 +225,8 @@ public class BaseBrokerRequestHandlerTest {
               BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
               @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
               @Nullable BrokerRequest realtimeBrokerRequest,
-              @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
+              @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
+              @Nullable Map<ServerInstance, List<String>> optionalSegments, long timeoutMs, ServerStats serverStats,
               RequestContext requestContext)
               throws Exception {
             testRequestId[0] = requestId;

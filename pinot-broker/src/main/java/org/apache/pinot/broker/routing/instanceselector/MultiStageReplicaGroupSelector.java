@@ -82,14 +82,14 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
   @Override
   Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
-      Map<String, String> queryOptions) {
+      Map<String, String> queryOptions, Map<String, String> optionalSegmentToInstanceMap) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
     int replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
     for (int iteration = 0; iteration < instancePartitions.getNumReplicaGroups(); iteration++) {
       int replicaGroup = (replicaGroupSelected + iteration) % instancePartitions.getNumReplicaGroups();
       try {
-        return tryAssigning(segments, segmentStates, instancePartitions, replicaGroup);
+        return tryAssigning(segments, segmentStates, instancePartitions, replicaGroup, optionalSegmentToInstanceMap);
       } catch (Exception e) {
         LOGGER.warn("Unable to select replica-group {} for table: {}", replicaGroup, _tableNameWithType, e);
       }
@@ -103,7 +103,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * we throw an exception.
    */
   private Map<String, String> tryAssigning(List<String> segments, SegmentStates segmentStates,
-      InstancePartitions instancePartitions, int replicaId) {
+      InstancePartitions instancePartitions, int replicaId, Map<String, String> optionalSegmentToInstanceMap) {
     Set<String> instanceLookUpSet = new HashSet<>();
     for (int partition = 0; partition < instancePartitions.getNumPartitions(); partition++) {
       List<String> instances = instancePartitions.getInstances(partition, replicaId);
@@ -119,8 +119,11 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
         String instance = candidate.getInstance();
         if (instanceLookUpSet.contains(instance)) {
           found = true;
-          if (candidate.isOnline()) {
-            result.put(segment, instance);
+          result.put(segment, instance);
+          // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
+          // server can skip them upon any issue to process them.
+          if (!candidate.isOnline()) {
+            optionalSegmentToInstanceMap.put(segment, instance);
           }
           break;
         }

@@ -55,7 +55,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   @Override
   Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
-      Map<String, String> queryOptions) {
+      Map<String, String> queryOptions, Map<String, String> optionalSegmentToInstanceMap) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     if (_adaptiveServerSelector != null) {
       for (String segment : segments) {
@@ -70,8 +70,11 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
           candidateInstances.add(candidate.getInstance());
         }
         String selectedInstance = _adaptiveServerSelector.select(candidateInstances);
-        if (candidates.get(candidateInstances.indexOf(selectedInstance)).isOnline()) {
-          segmentToSelectedInstanceMap.put(segment, selectedInstance);
+        segmentToSelectedInstanceMap.put(segment, selectedInstance);
+        // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
+        // server can skip them upon any issue to process them.
+        if (!candidates.get(candidateInstances.indexOf(selectedInstance)).isOnline()) {
+          optionalSegmentToInstanceMap.put(segment, selectedInstance);
         }
       }
     } else {
@@ -84,8 +87,11 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         }
         int selectedIdx = requestId++ % candidates.size();
         SegmentInstanceCandidate selectedCandidate = candidates.get(selectedIdx);
-        if (selectedCandidate.isOnline()) {
-          segmentToSelectedInstanceMap.put(segment, selectedCandidate.getInstance());
+        segmentToSelectedInstanceMap.put(segment, selectedCandidate.getInstance());
+        // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
+        // server can skip them upon any issue to process them.
+        if (!selectedCandidate.isOnline()) {
+          optionalSegmentToInstanceMap.put(segment, selectedCandidate.getInstance());
         }
       }
     }

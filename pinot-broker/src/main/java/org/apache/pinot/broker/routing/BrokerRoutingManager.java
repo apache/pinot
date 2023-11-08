@@ -610,7 +610,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       return null;
     }
     InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest, requestId);
-    Map<String, String> segmentToInstanceMap = selectionResult.getSegmentToInstanceMap();
+    Map<ServerInstance, List<String>> serverInstanceToSegmentsMap =
+        getServerInstanceToSegmentsMap(tableNameWithType, selectionResult.getSegmentToInstanceMap());
+    Map<ServerInstance, List<String>> serverInstanceToOptionalSegmentsMap =
+        getServerInstanceToSegmentsMap(tableNameWithType, selectionResult.getOptionalSegmentToInstanceMap());
+    return new RoutingTable(serverInstanceToSegmentsMap, serverInstanceToOptionalSegmentsMap,
+        selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
+  }
+
+  private Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap(String tableNameWithType,
+      Map<String, String> segmentToInstanceMap) {
     Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = new HashMap<>();
     for (Map.Entry<String, String> entry : segmentToInstanceMap.entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
@@ -621,8 +630,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
       }
     }
-    return new RoutingTable(serverInstanceToSegmentsMap, selectionResult.getUnavailableSegments(),
-        selectionResult.getNumPrunedSegments());
+    return serverInstanceToSegmentsMap;
   }
 
   @Override

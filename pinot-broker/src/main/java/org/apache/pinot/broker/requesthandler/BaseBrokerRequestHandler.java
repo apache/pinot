@@ -594,6 +594,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       long routingStartTimeNs = System.nanoTime();
       Map<ServerInstance, List<String>> offlineRoutingTable = null;
       Map<ServerInstance, List<String>> realtimeRoutingTable = null;
+      Map<ServerInstance, List<String>> optionalSegments = null;
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
       if (offlineBrokerRequest != null) {
@@ -602,6 +603,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
           Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+          optionalSegments = routingTable.getServerInstanceToOptionalSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             offlineRoutingTable = serverInstanceToSegmentsMap;
           } else {
@@ -618,6 +620,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
           Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+          optionalSegments = routingTable.getServerInstanceToOptionalSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             realtimeRoutingTable = serverInstanceToSegmentsMap;
           } else {
@@ -752,16 +755,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         LOGGER.debug("Keep track of running query: {}", requestId);
         try {
           brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-              offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-              requestContext);
+              offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, optionalSegments, remainingTimeMs,
+              serverStats, requestContext);
         } finally {
           _queriesById.remove(requestId);
           LOGGER.debug("Remove track of running query: {}", requestId);
         }
       } else {
         brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-            offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
-            requestContext);
+            offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, optionalSegments, remainingTimeMs,
+            serverStats, requestContext);
       }
 
       brokerResponse.setExceptions(exceptions);
@@ -1816,7 +1819,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
       @Nullable Map<ServerInstance, List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
+      @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
+      @Nullable Map<ServerInstance, List<String>> optionalSegments, long timeoutMs, ServerStats serverStats,
       RequestContext requestContext)
       throws Exception;
 

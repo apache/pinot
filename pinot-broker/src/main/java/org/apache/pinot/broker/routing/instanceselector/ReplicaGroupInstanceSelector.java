@@ -70,7 +70,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   @Override
   Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
-      Map<String, String> queryOptions) {
+      Map<String, String> queryOptions, Map<String, String> optionalSegmentToInstanceMap) {
     if (_adaptiveServerSelector != null) {
       // Adaptive Server Selection is enabled.
       List<String> serverRankList = new ArrayList<>();
@@ -83,15 +83,17 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       for (Pair<String, Double> entry : serverRankListWithScores) {
         serverRankList.add(entry.getLeft());
       }
-      return selectServersUsingAdaptiveServerSelector(segments, requestId, segmentStates, serverRankList);
+      return selectServersUsingAdaptiveServerSelector(segments, requestId, segmentStates, serverRankList,
+          optionalSegmentToInstanceMap);
     } else {
       // Adaptive Server Selection is NOT enabled.
-      return selectServersUsingRoundRobin(segments, requestId, segmentStates, queryOptions);
+      return selectServersUsingRoundRobin(segments, requestId, segmentStates, queryOptions,
+          optionalSegmentToInstanceMap);
     }
   }
 
   private Map<String, String> selectServersUsingRoundRobin(List<String> segments, int requestId,
-      SegmentStates segmentStates, Map<String, String> queryOptions) {
+      SegmentStates segmentStates, Map<String, String> queryOptions, Map<String, String> optionalSegmentToInstanceMap) {
     Map<String, String> selectedServers = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
     int numReplicaGroups = numReplicaGroupsToQuery == null ? 1 : numReplicaGroupsToQuery;
@@ -107,10 +109,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       int numCandidates = candidates.size();
       int instanceIdx = (requestId + replicaOffset) % numCandidates;
       SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
-      // Only put online instance.
-      // This can only be offline when it is a new segment.
-      if (selectedInstance.isOnline()) {
-        selectedServers.put(segment, selectedInstance.getInstance());
+      selectedServers.put(segment, selectedInstance.getInstance());
+      // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
+      // server can skip them upon any issue to process them.
+      if (!selectedInstance.isOnline()) {
+        optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
       }
       if (numReplicaGroups > numCandidates) {
         numReplicaGroups = numCandidates;
@@ -121,7 +124,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   }
 
   private Map<String, String> selectServersUsingAdaptiveServerSelector(List<String> segments, int requestId,
-      SegmentStates segmentStates, List<String> serverRankList) {
+      SegmentStates segmentStates, List<String> serverRankList, Map<String, String> optionalSegmentToInstanceMap) {
     Map<String, String> selectedServers = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     for (String segment : segments) {
       // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
@@ -151,10 +154,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
           }
         }
       }
-      // Only put online instance.
-      // This can only be offline when it is a new segment.
-      if (selectedInstance.isOnline()) {
-        selectedServers.put(segment, selectedInstance.getInstance());
+      selectedServers.put(segment, selectedInstance.getInstance());
+      // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
+      // server can skip them upon any issue to process them.
+      if (!selectedInstance.isOnline()) {
+        optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
       }
     }
     return selectedServers;

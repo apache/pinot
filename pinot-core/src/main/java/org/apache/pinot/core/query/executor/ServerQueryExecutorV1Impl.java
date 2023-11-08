@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -200,6 +201,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
+    Set<String> optionalSegments = queryRequest.getOptionalSegments();
+    LOGGER.debug("Processing query: {} with segmentsToQuery: {}, optionalSegments: {}", requestId, segmentsToQuery,
+        optionalSegments);
     List<String> notAcquiredSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers =
         tableDataManager.acquireSegments(segmentsToQuery, notAcquiredSegments);
@@ -300,9 +304,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     // After step 2 but before step 4, segment will be missing on server side
     // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
     if (notAcquiredSegments.size() > 0) {
-      List<String> missingSegments =
-          notAcquiredSegments.stream().filter(segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName))
-              .collect(Collectors.toList());
+      // The optional segments are those newly created but not getting ONLINE in ExternalView. Previously, broker
+      // simply skips them when routing queries, but it's better to let server decide how to handel them. For example,
+      // for upsert table, it's possible that those segments are ingesting new records on servers already and start
+      // to invalidate old records in existing segments. If they are simply skipped, the query results can be wrong.
+      // Do not report error if the optional segments are missing.
+      List<String> missingSegments = notAcquiredSegments.stream().filter(
+          segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName) && optionalSegments != null
+              && !optionalSegments.contains(segmentName)).collect(Collectors.toList());
       int numMissingSegments = missingSegments.size();
       if (numMissingSegments > 0) {
         instanceResponse.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,

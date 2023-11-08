@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -77,15 +78,22 @@ public interface InstanceSelector {
   class SelectionResult {
     private final Map<String, String> _segmentToInstanceMap;
     private final List<String> _unavailableSegments;
+    private final Map<String, String> _optionalSegmentToInstanceMap;
     private int _numPrunedSegments;
 
     public SelectionResult(Map<String, String> segmentToInstanceMap, List<String> unavailableSegments) {
-      this(segmentToInstanceMap, unavailableSegments, 0);
+      this(segmentToInstanceMap, Collections.emptyMap(), unavailableSegments, 0);
     }
 
     public SelectionResult(Map<String, String> segmentToInstanceMap, List<String> unavailableSegments,
         int numPrunedSegments) {
+      this(segmentToInstanceMap, Collections.emptyMap(), unavailableSegments, numPrunedSegments);
+    }
+
+    public SelectionResult(Map<String, String> segmentToInstanceMap, Map<String, String> optionalSegmentToInstanceMap,
+        List<String> unavailableSegments, int numPrunedSegments) {
       _segmentToInstanceMap = segmentToInstanceMap;
+      _optionalSegmentToInstanceMap = optionalSegmentToInstanceMap;
       _unavailableSegments = unavailableSegments;
       _numPrunedSegments = numPrunedSegments;
     }
@@ -116,6 +124,10 @@ public interface InstanceSelector {
      */
     public void setNumPrunedSegments(int numPrunedSegments) {
       _numPrunedSegments = numPrunedSegments;
+    }
+
+    public Map<String, String> getOptionalSegmentToInstanceMap() {
+      return _optionalSegmentToInstanceMap;
     }
   }
 }
