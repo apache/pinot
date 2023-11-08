@@ -51,7 +51,6 @@ public class TransformOperator extends MultiStageOperator {
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
-  private TransferableBlock _upstreamErrorBlock;
 
   public TransformOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
       DataSchema resultSchema, List<RexExpression> transforms, DataSchema upstreamDataSchema) {
@@ -90,19 +89,9 @@ public class TransformOperator extends MultiStageOperator {
   }
 
   private TransferableBlock transform(TransferableBlock block) {
-    // TODO: Other operators keep the first erroneous block, while this keep the last.
-    //  We should decide what is what we want to do and be consistent with that.
-    if (block.isErrorBlock()) {
-      _upstreamErrorBlock = block;
-    }
-    if (_upstreamErrorBlock != null) {
-      return _upstreamErrorBlock;
-    }
-
-    if (TransferableBlockUtils.isEndOfStream(block)) {
+    if (block.isEndOfStreamBlock()) {
       return block;
     }
-
     List<Object[]> container = block.getContainer();
     List<Object[]> resultRows = new ArrayList<>(container.size());
     for (Object[] row : container) {
