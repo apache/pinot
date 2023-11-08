@@ -162,8 +162,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     for (int i = 0; i < NUM_QUERIES_TO_GENERATE; i += 2) {
-      testStarQuery(_starTree1QueryGenerator.nextQuery(), !useMultiStageQueryEngine);
-      testStarQuery(_starTree2QueryGenerator.nextQuery(), !useMultiStageQueryEngine);
+      testStarQuery(_starTree1QueryGenerator.nextQuery(), false);
+      testStarQuery(_starTree2QueryGenerator.nextQuery(), false);
     }
   }
 
@@ -200,11 +200,6 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     starQuery = "SELECT DepTimeBlk, COUNT(*) FILTER (WHERE CRSDepTime != 35) FROM mytable "
         + "GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
-  }
-
-  private void testStarQuery(String starQuery)
-      throws Exception {
-    testStarQuery(starQuery, true);
   }
 
   private void testStarQuery(String starQuery, boolean verifyPlan)
