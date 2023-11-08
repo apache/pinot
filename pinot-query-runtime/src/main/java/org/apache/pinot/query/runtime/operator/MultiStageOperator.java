@@ -22,6 +22,7 @@ import com.google.common.base.Joiner;
 import java.util.List;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
@@ -55,11 +56,19 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       if (shouldCollectStats()) {
         OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
         operatorStats.startTimer();
-        nextBlock = getNextBlock();
+        try {
+          nextBlock = getNextBlock();
+        } catch (Exception e) {
+          nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+        }
         operatorStats.recordRow(1, nextBlock.getNumRows());
         operatorStats.endTimer(nextBlock);
       } else {
-        nextBlock = getNextBlock();
+        try {
+          nextBlock = getNextBlock();
+        } catch (Exception e) {
+          nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+        }
       }
       return nextBlock;
     }
@@ -70,7 +79,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   }
 
   // Make it protected because we should always call nextBlock()
-  protected abstract TransferableBlock getNextBlock();
+  protected abstract TransferableBlock getNextBlock() throws Exception;
 
   protected void earlyTerminate() {
     _isEarlyTerminated = true;

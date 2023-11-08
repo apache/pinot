@@ -163,18 +163,14 @@ public class WindowAggregateOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    try {
-      if (_hasReturnedWindowAggregateBlock) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      }
-      TransferableBlock finalBlock = consumeInputBlocks();
-      if (finalBlock.isErrorBlock()) {
-        return finalBlock;
-      }
-      return produceWindowAggregatedBlock();
-    } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+    if (_hasReturnedWindowAggregateBlock) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
+    TransferableBlock finalBlock = consumeInputBlocks();
+    if (finalBlock.isErrorBlock()) {
+      return finalBlock;
+    }
+    return produceWindowAggregatedBlock();
   }
 
   private void validateAggregationCalls(String functionName,

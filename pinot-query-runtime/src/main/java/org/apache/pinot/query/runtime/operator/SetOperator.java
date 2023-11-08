@@ -92,23 +92,19 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    try {
-      if (_isTerminated) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      }
-      if (!_isRightSetBuilt) {
-        // construct a SET with all the right side rows.
-        constructRightBlockSet();
-      }
-      if (_upstreamErrorBlock != null) {
-        return _upstreamErrorBlock;
-      }
-      // UNION each left block with the constructed right block set.
-      TransferableBlock leftBlock = _leftChildOperator.nextBlock();
-      return constructResultBlockSet(leftBlock);
-    } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+    if (_isTerminated) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
+    if (!_isRightSetBuilt) {
+      // construct a SET with all the right side rows.
+      constructRightBlockSet();
+    }
+    if (_upstreamErrorBlock != null) {
+      return _upstreamErrorBlock;
+    }
+    // UNION each left block with the constructed right block set.
+    TransferableBlock leftBlock = _leftChildOperator.nextBlock();
+    return constructResultBlockSet(leftBlock);
   }
 
   protected void constructRightBlockSet() {
@@ -121,7 +117,11 @@ public abstract class SetOperator extends MultiStageOperator {
       }
       block = _rightChildOperator.nextBlock();
     }
-    _isRightSetBuilt = true;
+    if (block.isErrorBlock()) {
+      _upstreamErrorBlock = block;
+    } else {
+      _isRightSetBuilt = true;
+    }
   }
 
   protected TransferableBlock constructResultBlockSet(TransferableBlock leftBlock) {

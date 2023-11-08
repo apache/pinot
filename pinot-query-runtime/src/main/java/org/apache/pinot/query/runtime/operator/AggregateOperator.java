@@ -131,19 +131,15 @@ public class AggregateOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    try {
-      if (_hasConstructedAggregateBlock) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      }
-      TransferableBlock finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
-      // returning upstream error block if finalBlock contains error.
-      if (finalBlock.isErrorBlock()) {
-        return finalBlock;
-      }
-      return produceAggregatedBlock();
-    } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+    if (_hasConstructedAggregateBlock) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
+    TransferableBlock finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
+    // returning upstream error block if finalBlock contains error.
+    if (finalBlock.isErrorBlock()) {
+      return finalBlock;
+    }
+    return produceAggregatedBlock();
   }
 
   private TransferableBlock produceAggregatedBlock() {

@@ -108,19 +108,15 @@ public class SortOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    try {
-      if (_hasConstructedSortedBlock) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      }
-      TransferableBlock finalBlock = consumeInputBlocks();
-      // returning upstream error block if finalBlock contains error.
-      if (finalBlock.isErrorBlock()) {
-        return finalBlock;
-      }
-      return produceSortedBlock();
-    } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+    if (_hasConstructedSortedBlock) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
+    TransferableBlock finalBlock = consumeInputBlocks();
+    // returning upstream error block if finalBlock contains error.
+    if (finalBlock.isErrorBlock()) {
+      return finalBlock;
+    }
+    return produceSortedBlock();
   }
 
   private TransferableBlock produceSortedBlock() {

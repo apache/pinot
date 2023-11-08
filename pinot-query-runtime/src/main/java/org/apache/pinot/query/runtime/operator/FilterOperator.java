@@ -28,7 +28,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -78,15 +77,7 @@ public class FilterOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    try {
-      TransferableBlock block = _upstreamOperator.nextBlock();
-      return filter(block);
-    } catch (RuntimeException e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
-    }
-  }
-
-  private TransferableBlock filter(TransferableBlock block) {
+    TransferableBlock block = _upstreamOperator.nextBlock();
     if (block.isEndOfStreamBlock()) {
       return block;
     }
