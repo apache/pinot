@@ -51,4 +51,5 @@ struct InstanceRequest {
   3: optional list<string> searchSegments;
   4: optional bool enableTrace;
   5: optional string brokerId;
+  6: optional set<string> optionalSegments;
 }
