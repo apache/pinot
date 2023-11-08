@@ -16,18 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-/**
- * Merges 2 records and returns the merged record.
- * Overwrite the existing value for the given field. Then return the merged record.
- */
-public class OverwriteMerger implements PartialUpsertMerger {
-  OverwriteMerger() {
+
+
+public class MaxMerger implements PartialUpsertColumnMerger {
+
+  MaxMerger() {
   }
 
+  /**
+   * Keep the maximal value for the given field.
+   */
   @Override
   public Object merge(Object previousValue, Object currentValue) {
-    return currentValue;
+    return ((Comparable) previousValue).compareTo((Comparable) currentValue) > 0 ? previousValue : currentValue;
   }
 }

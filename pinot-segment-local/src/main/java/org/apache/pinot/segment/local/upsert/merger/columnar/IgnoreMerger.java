@@ -16,18 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-public class MinMerger implements PartialUpsertMerger {
 
-  MinMerger() {
+
+/**
+ * Merges 2 records and returns the merged record.
+ * By default, ignore the new value from incoming row. Then return the merged record.
+ */
+public class IgnoreMerger implements PartialUpsertColumnMerger {
+  IgnoreMerger() {
   }
 
-  /**
-   * Keep the minimal value for the given field.
-   */
   @Override
   public Object merge(Object previousValue, Object currentValue) {
-    return ((Comparable) previousValue).compareTo((Comparable) currentValue) < 0 ? previousValue : currentValue;
+    return previousValue;
   }
 }
