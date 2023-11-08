@@ -366,7 +366,7 @@ public enum TransformFunctionType {
     int outputFormatPos = 2;
     if (opBinding.getOperandCount() > outputFormatPos
         && opBinding.isOperandLiteral(outputFormatPos, false)) {
-      String outputFormatStr = opBinding.getOperandLiteralValue(outputFormatPos, String.class).toUpperCase();
+      String outputFormatStr = opBinding.getOperandLiteralValue(outputFormatPos, String.class);
       DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(outputFormatStr);
       if ((dateTimeFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.EPOCH) || (
           dateTimeFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.TIMESTAMP)) {
