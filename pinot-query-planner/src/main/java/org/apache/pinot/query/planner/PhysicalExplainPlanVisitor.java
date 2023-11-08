@@ -156,27 +156,23 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     MailboxSendNode sender = (MailboxSendNode) node.getSender();
     int senderStageId = node.getSenderStageId();
     DispatchablePlanFragment dispatchablePlanFragment = _dispatchableSubPlan.getQueryStageList().get(senderStageId);
-    Map<Integer, Map<String, List<String>>> segments = dispatchablePlanFragment.getWorkerIdToSegmentsMap();
 
     Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
         dispatchablePlanFragment.getServerInstanceToWorkerIdMap();
     Iterator<QueryServerInstance> iterator = serverInstanceToWorkerIdMap.keySet().iterator();
     while (iterator.hasNext()) {
       QueryServerInstance queryServerInstance = iterator.next();
-      for (int workerId : serverInstanceToWorkerIdMap.get(queryServerInstance)) {
-        if (segments.containsKey(workerId)) {
-          // always print out leaf stages
-          sender.visit(this, context.next(iterator.hasNext(), queryServerInstance, workerId));
+      List<Integer> workerIdList = serverInstanceToWorkerIdMap.get(queryServerInstance);
+      for (int idx = 0; idx < workerIdList.size(); idx++) {
+        int workerId = workerIdList.get(idx);
+        if (!iterator.hasNext() && idx == workerIdList.size() - 1) {
+          // always print out the last one
+          sender.visit(this, context.next(false, queryServerInstance, workerId));
         } else {
-          if (!iterator.hasNext()) {
-            // always print out the last one
-            sender.visit(this, context.next(false, queryServerInstance, workerId));
-          } else {
-            // only print short version of the sender node
-            appendMailboxSend(sender, context.next(true, queryServerInstance, workerId))
-                .append(" (Subtree Omitted)")
-                .append('\n');
-          }
+          // only print short version of the sender node
+          appendMailboxSend(sender, context.next(true, queryServerInstance, workerId))
+              .append(" (Subtree Omitted)")
+              .append('\n');
         }
       }
     }
