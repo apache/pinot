@@ -126,7 +126,17 @@ public class MailboxSendNode extends AbstractPlanNode {
 
   @Override
   public String explain() {
-    return "MAIL_SEND(" + _distributionType + ")";
+    StringBuilder sb = new StringBuilder();
+    sb.append("MAIL_SEND(");
+    sb.append(_distributionType);
+    sb.append(')');
+    if (isPartitioned()) {
+       sb.append("[PARTITIONED]");
+    }
+    if (isSortOnSender()) {
+      sb.append("[SORTED]");
+    }
+    return sb.toString();
   }
 
   @Override
