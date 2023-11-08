@@ -34,6 +34,7 @@ import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -62,7 +63,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     SCHEMA_BUILDER = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
-        .addMetric("col3", FieldSpec.DataType.INT, 0).setSchemaName("defaultSchemaName");
+        .addMetric("col3", FieldSpec.DataType.INT, 0).setSchemaName("defaultSchemaName")
+        .withOptions(options -> options.setNullHandling(new NullHandling.ColumnBased(false)));
   }
 
   public static List<GenericRow> buildRows(String tableName) {

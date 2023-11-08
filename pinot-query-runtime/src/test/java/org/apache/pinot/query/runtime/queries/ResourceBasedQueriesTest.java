@@ -54,7 +54,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -106,23 +105,22 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       if (testCase._ignored) {
         continue;
       }
-      boolean enableNullHandling = BooleanUtils.toBoolean(
-          testCase._extraProps.getOrDefault("EnableNullHandling", "false"));
 
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
       for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
-        boolean allowEmptySegment = !BooleanUtils.toBoolean(extractExtraProps(testCase._extraProps, "noEmptySegment"));
+        boolean allowEmptySegment = !testCase._extraProps.isNoEmptySegment();
         String tableName = testCaseName + "_" + tableEntry.getKey();
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
         String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
         Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
+        pinotSchema.getOptions().setNullHandling(testCase._extraProps.getNullHandling());
         schemaMap.put(tableName, pinotSchema);
         factory1.registerTable(pinotSchema, offlineTableName);
         factory2.registerTable(pinotSchema, offlineTableName);
         List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
         List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
-        if (enableNullHandling) {
+        if (testCase._extraProps.isEnableNullHandlingInTableConf()) {
           factory1.setNullHandlingForTable(offlineTableName);
           factory2.setNullHandlingForTable(offlineTableName);
         }

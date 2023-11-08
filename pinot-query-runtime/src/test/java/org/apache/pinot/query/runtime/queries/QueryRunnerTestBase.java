@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.query.runtime.queries;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.math.DoubleMath;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -61,10 +65,12 @@ import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -547,7 +553,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     @JsonProperty("queries")
     public List<Query> _queries;
     @JsonProperty("extraProps")
-    public Map<String, Object> _extraProps = Collections.emptyMap();
+    public ExtraProperties _extraProps = new ExtraProperties();
 
     public static class Table {
       @JsonProperty("schema")
@@ -588,6 +594,75 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       boolean _isSingleValue = true;
       @JsonProperty("nullable")
       boolean _nullable = true;
+    }
+
+    public static class ExtraProperties {
+      private boolean _enableNullHandlingInTableConf = false;
+      private boolean _noEmptySegment = false;
+      private NullHandling _nullHandling = new NullHandling.ColumnBased(false);
+      private Map<String, JsonNode> _unknownProps = new HashMap<>();
+
+      @JsonAnySetter
+      public void setAny(String key, JsonNode value) {
+        switch (key) {
+          case "EnableNullHandling":
+            _enableNullHandlingInTableConf = readBoolean(value);
+            break;
+          case "noEmptySegment":
+            _noEmptySegment = readBoolean(value);
+            break;
+          default:
+            _unknownProps.put(key, value);
+            break;
+        }
+      }
+
+      public <E> E getAny(String key, Class<E> asClass) {
+        JsonNode jsonNode = _unknownProps.get(key);
+        if (jsonNode == null) {
+          return null;
+        }
+        if (asClass.isAssignableFrom(Boolean.class)) {
+          return (E) (Boolean.valueOf(readBoolean(jsonNode)));
+        }
+        try {
+          return JsonUtils.jsonNodeToObject(jsonNode, asClass);
+        } catch (IOException ex) {
+          throw new UncheckedIOException(ex);
+        }
+      }
+
+      private boolean readBoolean(JsonNode node) {
+        if (node.isTextual()) {
+          return Boolean.parseBoolean(node.toString());
+        } else if (node.isBoolean()) {
+          return node.booleanValue();
+        }
+        throw new IllegalArgumentException("It is not well defined how to transform " + node + " to a boolean");
+      }
+
+      @JsonProperty("noEmptySegment")
+      public boolean isNoEmptySegment() {
+        return _noEmptySegment;
+      }
+
+      @JsonProperty("EnableNullHandling")
+      public boolean isEnableNullHandlingInTableConf() {
+        return _enableNullHandlingInTableConf;
+      }
+
+      public void setEnableNullHandlingInTableConf(boolean enableNullHandlingInTableConf) {
+        _enableNullHandlingInTableConf = enableNullHandlingInTableConf;
+      }
+
+      public void setNullHandling(NullHandling nullHandling) {
+        _nullHandling = nullHandling;
+      }
+
+      @JsonProperty("nullHandling")
+      public NullHandling getNullHandling() {
+        return _nullHandling;
+      }
     }
   }
 }
