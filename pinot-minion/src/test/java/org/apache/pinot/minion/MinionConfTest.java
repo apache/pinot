@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.minion;
 
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
@@ -38,9 +39,10 @@ public class MinionConfTest {
         CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER,
         CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_PINOT_CRYPTER
     };
-    PinotConfiguration rawCfg = new PinotConfiguration(new PropertiesConfiguration(
+    PropertiesConfiguration config = CommonsConfigurationUtils.loadFromPath(
         PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-old-minion.properties")
-            .getFile()));
+        .getFile());
+    PinotConfiguration rawCfg = new PinotConfiguration(config);
     final MinionConf oldConfig = new MinionConf(rawCfg.toMap());
     Assert.assertEquals(oldConfig.getMetricsPrefix(), "pinot.minion.old.custom.metrics.");
     for (String cfgKey : cfgKeys) {
@@ -49,9 +51,10 @@ public class MinionConfTest {
     }
 
     // Check configs with new names that have the pinot.minion prefix.
-    rawCfg = new PinotConfiguration(new PropertiesConfiguration(
+    config = CommonsConfigurationUtils.loadFromPath(
         PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-new-minion.properties")
-            .getFile()));
+            .getFile());
+    rawCfg = new PinotConfiguration(config);
     final MinionConf newConfig = new MinionConf(rawCfg.toMap());
     for (String cfgKey : cfgKeys) {
       Assert.assertTrue(newConfig.subset(cfgKey).isEmpty(), cfgKey);

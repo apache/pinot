@@ -24,7 +24,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
-import org.apache.commons.configuration.MapConfiguration;
+import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
