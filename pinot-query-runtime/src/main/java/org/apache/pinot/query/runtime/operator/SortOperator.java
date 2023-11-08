@@ -51,8 +51,7 @@ public class SortOperator extends MultiStageOperator {
   private final ArrayList<Object[]> _rows;
   private final int _numRowsToKeep;
 
-  private boolean _hasReturnedSortedBlock;
-  private TransferableBlock _upstreamErrorBlock;
+  private boolean _hasConstructedSortedBlock;
 
   public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
       List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
@@ -73,8 +72,7 @@ public class SortOperator extends MultiStageOperator {
     _fetch = fetch;
     _offset = Math.max(offset, 0);
     _dataSchema = dataSchema;
-    _upstreamErrorBlock = null;
-    _hasReturnedSortedBlock = false;
+    _hasConstructedSortedBlock = false;
     // Setting numRowsToKeep as default maximum on Broker if limit not set.
     // TODO: make this default behavior configurable.
     _numRowsToKeep = _fetch > 0 ? _fetch + _offset : defaultResponseLimit;
@@ -111,7 +109,14 @@ public class SortOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     try {
-      consumeInputBlocks();
+      if (_hasConstructedSortedBlock) {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      }
+      TransferableBlock finalBlock = consumeInputBlocks();
+      // returning upstream error block if finalBlock contains error.
+      if (finalBlock.isErrorBlock()) {
+        return finalBlock;
+      }
       return produceSortedBlock();
     } catch (Exception e) {
       return TransferableBlockUtils.getErrorTransferableBlock(e);
@@ -119,65 +124,53 @@ public class SortOperator extends MultiStageOperator {
   }
 
   private TransferableBlock produceSortedBlock() {
-    if (_upstreamErrorBlock != null) {
-      return _upstreamErrorBlock;
-    }
-
-    if (!_hasReturnedSortedBlock) {
-      _hasReturnedSortedBlock = true;
-      if (_priorityQueue == null) {
-        if (_rows.size() > _offset) {
-          List<Object[]> row = _rows.subList(_offset, _rows.size());
-          return new TransferableBlock(row, _dataSchema, DataBlock.Type.ROW);
-        } else {
-          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-        }
+    _hasConstructedSortedBlock = true;
+    if (_priorityQueue == null) {
+      if (_rows.size() > _offset) {
+        List<Object[]> row = _rows.subList(_offset, _rows.size());
+        return new TransferableBlock(row, _dataSchema, DataBlock.Type.ROW);
       } else {
-        LinkedList<Object[]> rows = new LinkedList<>();
-        while (_priorityQueue.size() > _offset) {
-          Object[] row = _priorityQueue.poll();
-          rows.addFirst(row);
-        }
-        if (rows.size() == 0) {
-          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-        } else {
-          return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
-        }
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
       }
     } else {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      LinkedList<Object[]> rows = new LinkedList<>();
+      while (_priorityQueue.size() > _offset) {
+        Object[] row = _priorityQueue.poll();
+        rows.addFirst(row);
+      }
+      if (rows.size() == 0) {
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      } else {
+        return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
+      }
     }
   }
 
-  private void consumeInputBlocks() {
-    if (!_hasReturnedSortedBlock) {
-      TransferableBlock block = _upstreamOperator.nextBlock();
-      while (block.isDataBlock()) {
-        List<Object[]> container = block.getContainer();
-        if (_priorityQueue == null) {
-          // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
-          int numRows = _rows.size();
-          if (numRows < _numRowsToKeep) {
-            if (numRows + container.size() < _numRowsToKeep) {
-              _rows.addAll(container);
-            } else {
-              _rows.addAll(container.subList(0, _numRowsToKeep - numRows));
-              LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
-                  _context.getId());
-              // setting operator to be early terminated and awaits EOS block next.
-              earlyTerminate();
-            }
-          }
-        } else {
-          for (Object[] row : container) {
-            SelectionOperatorUtils.addToPriorityQueue(row, _priorityQueue, _numRowsToKeep);
+  private TransferableBlock consumeInputBlocks() {
+    TransferableBlock block = _upstreamOperator.nextBlock();
+    while (block.isDataBlock()) {
+      List<Object[]> container = block.getContainer();
+      if (_priorityQueue == null) {
+        // TODO: when push-down properly, we shouldn't get more than _numRowsToKeep
+        int numRows = _rows.size();
+        if (numRows < _numRowsToKeep) {
+          if (numRows + container.size() < _numRowsToKeep) {
+            _rows.addAll(container);
+          } else {
+            _rows.addAll(container.subList(0, _numRowsToKeep - numRows));
+            LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
+                _context.getId());
+            // setting operator to be early terminated and awaits EOS block next.
+            earlyTerminate();
           }
         }
-        block = _upstreamOperator.nextBlock();
+      } else {
+        for (Object[] row : container) {
+          SelectionOperatorUtils.addToPriorityQueue(row, _priorityQueue, _numRowsToKeep);
+        }
       }
-      if (block.isErrorBlock()) {
-        _upstreamErrorBlock = block;
-      }
+      block = _upstreamOperator.nextBlock();
     }
+    return block;
   }
 }
