@@ -16,30 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-/**
- * Merges 2 records and returns the merged record.
- * Append the new value from incoming row to the existing value from multi-value field. Then return the merged record.
- * Append merger allows duplicated records in the multi-value field.
- */
-public class AppendMerger implements PartialUpsertMerger {
-  AppendMerger() {
+
+
+public class MinMerger implements PartialUpsertColumnMerger {
+
+  MinMerger() {
   }
 
   /**
-   * Append the new value from incoming row to the given multi-value field of previous record.
+   * Keep the minimal value for the given field.
    */
   @Override
   public Object merge(Object previousValue, Object currentValue) {
-    return append((Object[]) previousValue, (Object[]) currentValue);
-  }
-
-  private static Object append(Object[] a, Object[] b) {
-    Object[] merged = new Object[a.length + b.length];
-
-    System.arraycopy(a, 0, merged, 0, a.length);
-    System.arraycopy(b, 0, merged, a.length, b.length);
-    return merged;
+    return ((Comparable) previousValue).compareTo((Comparable) currentValue) < 0 ? previousValue : currentValue;
   }
 }

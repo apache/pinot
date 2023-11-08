@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.segment.local.upsert.merger.columnar;
 
 import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
-public class PartialUpsertMergerFactory {
-  private PartialUpsertMergerFactory() {
+public class PartialUpsertColumnMergerFactory {
+  private PartialUpsertColumnMergerFactory() {
   }
 
   private static final AppendMerger APPEND_MERGER = new AppendMerger();
@@ -33,7 +33,7 @@ public class PartialUpsertMergerFactory {
   private static final MinMerger MIN_MERGER = new MinMerger();
   private static final UnionMerger UNION_MERGER = new UnionMerger();
 
-  public static PartialUpsertMerger getMerger(UpsertConfig.Strategy strategy) {
+  public static PartialUpsertColumnMerger getMerger(UpsertConfig.Strategy strategy) {
     switch (strategy) {
       case APPEND:
         return APPEND_MERGER;
