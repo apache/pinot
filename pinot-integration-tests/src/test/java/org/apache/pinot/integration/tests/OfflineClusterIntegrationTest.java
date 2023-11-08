@@ -141,7 +141,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       "SELECT COUNT(*), AVG(ArrDelay) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
   private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_3 =
       new StarTreeIndexConfig(List.of("Carrier", "DestState"), null,
-          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
+          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
   // For default columns test
   private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
