@@ -76,6 +76,10 @@
               <groupId>com.zaxxer</groupId>
               <artifactId>HikariCP-java7</artifactId>
             </exclusion>
+            <exclusion>
+              <groupId>commons-logging</groupId>
+              <artifactId>commons-logging</artifactId>
+            </exclusion>
           </exclusions>
         </dependency>
 

@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.Callable;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -188,7 +189,8 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("POST",
         ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(),
-        makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
+        AuthProviderUtils.makeAuthHeaders(
+            AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
     LOGGER.info(res);
     return res.contains("successfully added");
   }
@@ -197,7 +199,8 @@ public class AddTableCommand extends AbstractBaseAdminCommand implements Command
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("PUT",
         ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsUpdate(tableName), node.toString(),
-        makeAuthHeaders(makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
+        AuthProviderUtils.makeAuthHeaders(
+            AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
     LOGGER.info(res);
     return res.contains("TableConfigs updated");
   }

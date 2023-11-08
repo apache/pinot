@@ -557,31 +557,52 @@ public class TableRebalancer {
       if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
         boolean hasPreConfiguredInstancePartitions =
             TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
-        if (hasPreConfiguredInstancePartitions) {
-          String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
-          InstancePartitions instancePartitions =
-              InstancePartitionsUtils.fetchInstancePartitionsWithRename(_helixManager.getHelixPropertyStore(),
-                  referenceInstancePartitionsName, instancePartitionsName);
-          boolean instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+        boolean isPreConfigurationBasedAssignment =
+            InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
+        InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
+        InstancePartitions instancePartitions;
+        boolean instancePartitionsUnchanged;
+        if (!hasPreConfiguredInstancePartitions) {
+          LOGGER.info("Reassigning {} instances for table: {}", instancePartitionsType, tableNameWithType);
+          // Assign instances with existing instance partition to null if bootstrap mode is enabled, so that the
+          // instance partition map can be fully recalculated.
+          instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType,
+              _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true),
+              bootstrap ? null : existingInstancePartitions);
+          instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
           if (!dryRun && !instancePartitionsUnchanged) {
-            LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
-                referenceInstancePartitionsName);
+            LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
             InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
                 instancePartitions);
           }
-          return Pair.of(instancePartitions, instancePartitionsUnchanged);
-        }
-        LOGGER.info("Reassigning {} instances for table: {}", instancePartitionsType, tableNameWithType);
-        InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
-        // Assign instances with existing instance partition to null if bootstrap mode is enabled, so that the instance
-        // partition map can be fully recalculated.
-        InstancePartitions instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType,
-            _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true),
-            bootstrap ? null : existingInstancePartitions);
-        boolean instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
-        if (!dryRun && !instancePartitionsUnchanged) {
-          LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
-          InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(), instancePartitions);
+        } else {
+          String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
+          if (isPreConfigurationBasedAssignment) {
+            InstancePartitions preConfiguredInstancePartitions =
+                InstancePartitionsUtils.fetchInstancePartitionsWithRename(_helixManager.getHelixPropertyStore(),
+                    referenceInstancePartitionsName, instancePartitionsName);
+            instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType,
+                _helixDataAccessor.getChildValues(_helixDataAccessor.keyBuilder().instanceConfigs(), true),
+                bootstrap ? null : existingInstancePartitions, preConfiguredInstancePartitions);
+            instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+            if (!dryRun && !instancePartitionsUnchanged) {
+              LOGGER.info("Persisting instance partitions: {} (based on {})", instancePartitions,
+                  preConfiguredInstancePartitions);
+              InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
+                  instancePartitions);
+            }
+          } else {
+            instancePartitions =
+                InstancePartitionsUtils.fetchInstancePartitionsWithRename(_helixManager.getHelixPropertyStore(),
+                    referenceInstancePartitionsName, instancePartitionsName);
+            instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+            if (!dryRun && !instancePartitionsUnchanged) {
+              LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
+                  referenceInstancePartitionsName);
+              InstancePartitionsUtils.persistInstancePartitions(_helixManager.getHelixPropertyStore(),
+                  instancePartitions);
+            }
+          }
         }
         return Pair.of(instancePartitions, instancePartitionsUnchanged);
       } else {

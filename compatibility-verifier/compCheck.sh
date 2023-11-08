@@ -219,6 +219,12 @@ function stopServices() {
   stopService server
   stopService zookeeper
   stopService kafka
+  echo "Controller logs:"
+  cat ${LOG_DIR}/controller.*.log
+  echo "Broker logs:"
+  cat ${LOG_DIR}/broker.*.log
+  echo "Server logs:"
+  cat ${LOG_DIR}/server.*.log
   echo "Cluster stopped."
 }
 

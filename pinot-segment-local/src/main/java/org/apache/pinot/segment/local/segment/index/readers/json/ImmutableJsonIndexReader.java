@@ -86,6 +86,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     FilterContext filter;
     try {
       filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+      Preconditions.checkArgument(!filter.isConstant());
     } catch (Exception e) {
       throw new BadQueryRequestException("Invalid json match filter: " + filterString);
     }

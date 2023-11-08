@@ -184,8 +184,34 @@ public class AggregationFunctionUtils {
         return dataTable.getString(rowId, colId);
       case BYTES:
         return dataTable.getBytes(rowId, colId).getBytes();
+      case INT_ARRAY:
+        return dataTable.getIntArray(rowId, colId);
+      case LONG_ARRAY:
+        return dataTable.getLongArray(rowId, colId);
+      case FLOAT_ARRAY:
+        return dataTable.getFloatArray(rowId, colId);
       case DOUBLE_ARRAY:
         return dataTable.getDoubleArray(rowId, colId);
+      case BOOLEAN_ARRAY: {
+        int[] intValues = dataTable.getIntArray(rowId, colId);
+        int numValues = intValues.length;
+        boolean[] booleanValues = new boolean[numValues];
+        for (int i = 0; i < numValues; i++) {
+          booleanValues[i] = intValues[i] == 1;
+        }
+        return booleanValues;
+      }
+      case TIMESTAMP_ARRAY: {
+        long[] longValues = dataTable.getLongArray(rowId, colId);
+        int numValues = longValues.length;
+        Timestamp[] timestampValues = new Timestamp[numValues];
+        for (int i = 0; i < numValues; i++) {
+          timestampValues[i] = new Timestamp(longValues[i]);
+        }
+        return timestampValues;
+      }
+      case STRING_ARRAY:
+        return dataTable.getStringArray(rowId, colId);
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
     }

@@ -49,6 +49,11 @@ public class StarTreeV2Constants {
     public static final String FUNCTION_COLUMN_PAIRS = "function.column.pairs";
     public static final String MAX_LEAF_RECORDS = "max.leaf.records";
     public static final String SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS = "skip.star.node.creation";
+    public static final String AGGREGATION_COUNT = "aggregation.count";
+    public static final String AGGREGATION_PREFIX = "aggregation.";
+    public static final String FUNCTION_TYPE = "function.type";
+    public static final String COLUMN_NAME = "column.name";
+    public static final String COMPRESSION_CODEC = "compression.codec";
 
     public static String getStarTreePrefix(int index) {
       return STAR_TREE_PREFIX + index;

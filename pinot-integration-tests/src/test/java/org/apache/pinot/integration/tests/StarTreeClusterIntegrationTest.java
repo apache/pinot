@@ -154,7 +154,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
         functionColumnPairs.add(new AggregationFunctionColumnPair(functionType, metric).toColumnName());
       }
     }
-    return new StarTreeIndexConfig(dimensions, null, functionColumnPairs, maxLeafRecords);
+    return new StarTreeIndexConfig(dimensions, null, functionColumnPairs, null, maxLeafRecords);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

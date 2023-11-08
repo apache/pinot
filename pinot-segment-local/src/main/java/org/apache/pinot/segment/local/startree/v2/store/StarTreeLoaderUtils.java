@@ -60,8 +60,7 @@ public class StarTreeLoaderUtils {
     for (int i = 0; i < numStarTrees; i++) {
       SegmentDirectory.Reader indexReader = segmentReader.getStarTreeIndexReader(i);
       // Load star-tree index
-      StarTree starTree =
-          new OffHeapStarTree(indexReader.getIndexFor(String.valueOf(i), StandardIndexes.inverted()));
+      StarTree starTree = new OffHeapStarTree(indexReader.getIndexFor(String.valueOf(i), StandardIndexes.inverted()));
 
       StarTreeV2Metadata starTreeMetadata = starTreeMetadataList.get(i);
       int numDocs = starTreeMetadata.getNumDocs();

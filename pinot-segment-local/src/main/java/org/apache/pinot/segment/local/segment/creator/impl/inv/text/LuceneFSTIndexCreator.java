@@ -56,7 +56,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    */
   public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries)
       throws IOException {
-    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
+    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION);
 
     _fstBuilder = new FSTBuilder();
     _dictId = 0;
@@ -97,7 +97,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
       fileOutputStream = new FileOutputStream(_fstIndexFile);
       FST<Long> fst = _fstBuilder.done();
       OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
-      fst.save(d);
+      fst.save(d, d);
     } finally {
       if (fileOutputStream != null) {
         fileOutputStream.close();

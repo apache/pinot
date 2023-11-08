@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -160,9 +160,9 @@ public class AggregateOperator extends MultiStageOperator {
       } else {
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
-          dataBlock.addException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE,
-              String.format("Reached numGroupsLimit of: %d for group-by, ignoring the extra groups",
-                  _groupByExecutor.getNumGroupsLimit()));
+          OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
+          operatorStats.recordSingleStat(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+          _inputOperator.earlyTerminate();
         }
         return dataBlock;
       }

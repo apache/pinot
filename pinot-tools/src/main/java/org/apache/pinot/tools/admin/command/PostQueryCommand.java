@@ -20,6 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
@@ -146,8 +147,8 @@ public class PostQueryCommand extends AbstractBaseAdminCommand implements Comman
       payload.putAll(_additionalOptions);
     }
     String request = JsonUtils.objectToString(payload);
-    return sendRequest("POST", url, request, makeAuthHeaders(makeAuthProvider(_authProvider,
-            _authTokenUrl, _authToken, _user, _password)));
+    return sendRequest("POST", url, request, AuthProviderUtils.makeAuthHeaders(
+        AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)));
   }
 
   @Override

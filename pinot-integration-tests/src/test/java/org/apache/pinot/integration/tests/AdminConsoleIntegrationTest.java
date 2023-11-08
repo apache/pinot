@@ -22,7 +22,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -79,8 +78,7 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
     // help and api map to the same content
     response = sendGetRequest(getBrokerBaseApiUrl() + "/api");
     Assert.assertEquals(response, expected);
-
-    String serverBaseApiUrl = "http://localhost:" + CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
+    String serverBaseApiUrl = "http://localhost:" + getServerAdminApiPort();
     // test server
     response = sendGetRequest(serverBaseApiUrl + "/help");
     expected = IOUtils

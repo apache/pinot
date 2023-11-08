@@ -72,11 +72,17 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
       Preconditions.checkState(numReplicaGroups > 0, "Number of replica-groups must be positive");
       Map<Integer, List<Integer>> poolToReplicaGroupIdsMap = new TreeMap<>();
       Map<Integer, Integer> replicaGroupIdToPoolMap = new TreeMap<>();
+      Map<Integer, Set<String>> poolToCandidateInstancesMap = new TreeMap<>();
       for (int replicaId = 0; replicaId < numReplicaGroups; replicaId++) {
         // Pick one pool for each replica-group based on the table name hash
         int pool = pools.get((tableNameHash + replicaId) % numPools);
         poolToReplicaGroupIdsMap.computeIfAbsent(pool, k -> new ArrayList<>()).add(replicaId);
         replicaGroupIdToPoolMap.put(replicaId, pool);
+
+        Set<String> candidateInstances =
+            poolToCandidateInstancesMap.computeIfAbsent(pool, k -> new LinkedHashSet<>());
+        List<InstanceConfig> instanceConfigsInPool = poolToInstanceConfigsMap.get(pool);
+        instanceConfigsInPool.forEach(k -> candidateInstances.add(k.getInstanceName()));
       }
       LOGGER.info("Selecting {} replica-groups from pool: {} for table: {}", numReplicaGroups, poolToReplicaGroupIdsMap,
           _tableNameWithType);
@@ -132,7 +138,6 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
         int existingNumReplicaGroups = _existingInstancePartitions.getNumReplicaGroups();
         int numCommonReplicaGroups = Math.min(numReplicaGroups, existingNumReplicaGroups);
 
-        Map<Integer, Set<String>> poolToCandidateInstancesMap = new TreeMap<>();
         Map<Integer, Set<String>> replicaGroupIdToExistingInstancesMap = new TreeMap<>();
         // Step 1: find out the replica groups and their existing instances,
         //   so that these instances can be filtered out and won't be chosen for the other replica group.
@@ -142,10 +147,6 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
             // Skip the replica group if it's no longer needed.
             continue;
           }
-          Set<String> candidateInstances =
-              poolToCandidateInstancesMap.computeIfAbsent(pool, k -> new LinkedHashSet<>());
-          List<InstanceConfig> instanceConfigsInPool = poolToInstanceConfigsMap.get(pool);
-          instanceConfigsInPool.forEach(k -> candidateInstances.add(k.getInstanceName()));
 
           for (int partitionId = 0; partitionId < existingNumPartitions; partitionId++) {
             List<String> existingInstances = _existingInstancePartitions.getInstances(partitionId, replicaGroupId);

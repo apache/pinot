@@ -97,7 +97,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   }
 
   public GrpcQueryClient getGrpcQueryClient() {
-    return new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
+    return new GrpcQueryClient("localhost", getServerGrpcPort());
   }
 
   @Test

@@ -31,16 +31,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.http.Header;
-import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.auth.BasicAuthUtils;
-import org.apache.pinot.common.auth.NullAuthProvider;
-import org.apache.pinot.common.auth.StaticTokenAuthProvider;
-import org.apache.pinot.common.auth.UrlAuthProvider;
-import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.tools.AbstractBaseCommand;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 
@@ -129,47 +121,5 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
   Map<String, Object> readConfigFromFile(String configFileName)
       throws ConfigurationException {
     return PinotConfigUtils.readConfigFromFile(configFileName);
-  }
-
-  /**
-   * Generate an (optional) HTTP Authorization header given an auth config
-   *
-   * @param authProvider auth provider
-   * @return list of headers
-   */
-  static List<Header> makeAuthHeaders(AuthProvider authProvider) {
-    return AuthProviderUtils.toRequestHeaders(authProvider);
-  }
-
-  /**
-   * Generate auth token from pass-thru token or generate basic auth from user/password pair
-   *
-   * @param provider optional provider
-   * @param tokenUrl optional token url
-   * @param authToken optional pass-thru token
-   * @param user optional username
-   * @param password optional password
-   * @return auth provider, or NullauthProvider if neither pass-thru token nor user info available
-   */
-  @Nullable
-  static AuthProvider makeAuthProvider(AuthProvider provider, String tokenUrl, String authToken, String user,
-      String password) {
-    if (provider != null) {
-      return provider;
-    }
-
-    if (StringUtils.isNotBlank(tokenUrl)) {
-      return new UrlAuthProvider(tokenUrl);
-    }
-
-    if (StringUtils.isNotBlank(authToken)) {
-      return new StaticTokenAuthProvider(authToken);
-    }
-
-    if (StringUtils.isNotBlank(user)) {
-      return new StaticTokenAuthProvider(BasicAuthUtils.toBasicAuthToken(user, password));
-    }
-
-    return new NullAuthProvider();
   }
 }

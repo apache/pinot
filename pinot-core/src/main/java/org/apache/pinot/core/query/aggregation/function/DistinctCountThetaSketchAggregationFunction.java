@@ -132,6 +132,7 @@ public class DistinctCountThetaSketchAggregationFunction
                 + "(filter expression)");
         FilterContext filter = RequestContextUtils.getFilter(
             CalciteSqlParser.compileToExpression(filterExpression.getLiteral().getStringValue()));
+        Preconditions.checkArgument(!filter.isConstant(), "Filter must not be constant: %s", filter);
         // NOTE: Collect expressions before constructing the FilterInfo so that expressionIndexMap always include the
         //       expressions in the filter.
         collectExpressions(filter, _inputExpressions, expressionIndexMap);
@@ -145,7 +146,6 @@ public class DistinctCountThetaSketchAggregationFunction
               + "expression)");
       Expression expr = CalciteSqlParser.compileToExpression(postAggregationExpression.getLiteral().getStringValue());
       _postAggregationExpression = RequestContextUtils.getExpression(expr);
-
 
       // Validate the post-aggregation expression
       _includeDefaultSketch = validatePostAggregationExpression(_postAggregationExpression, _filterEvaluators.size());
