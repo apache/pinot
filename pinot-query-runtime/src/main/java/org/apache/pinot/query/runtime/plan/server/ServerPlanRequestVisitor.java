@@ -44,6 +44,7 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -74,6 +75,10 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
         pinotQuery.setSelectList(
             CalciteRexExpressionParser.convertAggregateList(pinotQuery.getGroupByList(), node.getAggCalls(),
                 node.getFilterArgIndices(), pinotQuery));
+        if (node.getAggType() == AggregateNode.AggType.DIRECT) {
+          pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT,
+              "true");
+        }
         // there cannot be any more modification of PinotQuery post agg, thus this is the last one possible.
         context.setLeafStageBoundaryNode(node);
       }
