@@ -64,8 +64,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       Preconditions.checkArgument(partialUpsertStrategies != null,
           "Partial-upsert strategies must be configured for partial-upsert enabled table: %s", _tableNameWithType);
       partialUpsertHandler =
-          new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig.getDefaultPartialUpsertStrategy(),
-              comparisonColumns);
+          new PartialUpsertHandler(schema, comparisonColumns, upsertConfig);
     }
 
     String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
