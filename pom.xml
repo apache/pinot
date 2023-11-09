@@ -147,7 +147,7 @@
     <dropwizard-metrics.version>3.2.3</dropwizard-metrics.version>
     <snappy-java.version>1.1.1.7</snappy-java.version>
     <log4j.version>2.16.0</log4j.version>
-    <netty.version>4.1.42.Final</netty.version>
+    <netty.version>4.1.100.Final</netty.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
