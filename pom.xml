@@ -143,7 +143,7 @@
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
     <!-- hadoop-common, spark-core use commons-net -->
-    <commons-net.version>3.1</commons-net.version>
+    <commons-net.version>3.10.0</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.4</snappy-java.version>
