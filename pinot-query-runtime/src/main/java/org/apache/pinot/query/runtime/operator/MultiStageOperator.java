@@ -79,7 +79,8 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   }
 
   // Make it protected because we should always call nextBlock()
-  protected abstract TransferableBlock getNextBlock() throws Exception;
+  protected abstract TransferableBlock getNextBlock()
+      throws Exception;
 
   protected void earlyTerminate() {
     _isEarlyTerminated = true;
