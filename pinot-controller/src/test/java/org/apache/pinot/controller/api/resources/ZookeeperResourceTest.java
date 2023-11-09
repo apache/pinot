@@ -84,7 +84,7 @@ public class ZookeeperResourceTest {
         + "proidentsuntinculpaquiofficiadeseruntmollitanimidestlaborum";
 
     // make the content even more larger
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 10; i++) {
       lorem += lorem;
     }
     String largeData = "{\"id\" : \"QuickStartCluster\","
