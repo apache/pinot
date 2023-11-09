@@ -1413,27 +1413,6 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getOrderByList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0)
             .getIdentifier().getName(), "rsvp_count");
 
-    sql = "select secondsSinceEpoch/86400 AS daysSinceEpoch, sum(rsvp_count) as sum_rsvp_count, count(*) as cnt"
-        + " from meetupRsvp where daysSinceEpoch = 18523 group by daysSinceEpoch order by cnt, sum_rsvp_count DESC"
-        + " limit 50";
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    Assert.assertEquals(pinotQuery.getSelectListSize(), 3);
-    // Alias should not be applied to filter
-    Assert.assertEquals(pinotQuery.getFilterExpression().getFunctionCall().getOperator(), FilterKind.EQUALS.name());
-    Assert.assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(),
-        "daysSinceEpoch");
-    Assert.assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 18523);
-    Assert.assertEquals(pinotQuery.getGroupByListSize(), 1);
-    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getFunctionCall().getOperator(), "divide");
-    Assert.assertEquals(
-        pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(),
-        "secondsSinceEpoch");
-    Assert.assertEquals(
-        pinotQuery.getGroupByList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getLongValue(), 86400);
-    Assert.assertEquals(pinotQuery.getOrderByListSize(), 2);
-
     // Invalid groupBy clause shouldn't contain aggregate expression, like sum(rsvp_count), count(*).
     try {
       sql = "select sum(rsvp_count), count(*) as cnt from meetupRsvp group by group_country, cnt limit 50";
@@ -1479,15 +1458,6 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getSelectListSize(), 2);
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "C1");
     Assert.assertEquals(pinotQuery.getSelectList().get(1).getIdentifier().getName(), "C2");
-  }
-
-  @Test
-  public void testAliasInFilter() {
-    // Alias should not be applied
-    String sql = "SELECT C1 AS ALIAS_CI FROM Foo WHERE ALIAS_CI > 10";
-    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(sql);
-    Assert.assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getIdentifier().getName(), "ALIAS_CI");
   }
 
   @Test

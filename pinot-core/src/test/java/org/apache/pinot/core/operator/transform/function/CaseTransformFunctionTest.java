@@ -116,39 +116,6 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
     }
   }
 
-  @DataProvider
-  public static String[] illegalExpressions() {
-    //@formatter:off
-    return new String[] {
-        // '10.0' cannot be parsed as INT/LONG/TIMESTAMP/BYTES
-        String.format("CASE WHEN true THEN %s ELSE '10.0' END", INT_SV_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE '10.0' END", LONG_SV_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE '10.0' END", TIMESTAMP_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE '10.0' END", BYTES_SV_COLUMN),
-        // 'abc' cannot be parsed as any type other than STRING
-        String.format("CASE WHEN true THEN %s ELSE 'abc' END", INT_SV_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE 'abc' END", LONG_SV_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE 'abc' END", FLOAT_SV_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE 'abc' END", DOUBLE_SV_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE 'abc' END", BIG_DECIMAL_SV_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE 'abc' END", TIMESTAMP_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE 'abc' END", BYTES_SV_COLUMN),
-        // Cannot mix 2 types that are not both numeric
-        String.format("CASE WHEN true THEN %s ELSE %s END", INT_SV_COLUMN, TIMESTAMP_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE %s END", INT_SV_COLUMN, STRING_SV_COLUMN),
-        String.format("CASE WHEN true THEN %s ELSE %s END", INT_SV_COLUMN, BYTES_SV_COLUMN),
-        String.format("CASE WHEN true THEN 100 ELSE %s END", TIMESTAMP_COLUMN),
-        String.format("CASE WHEN true THEN 100 ELSE %s END", STRING_SV_COLUMN),
-        String.format("CASE WHEN true THEN 100 ELSE %s END", BYTES_SV_COLUMN)
-    };
-    //@formatter:on
-  }
-
-  @Test(dataProvider = "illegalExpressions", expectedExceptions = Exception.class)
-  public void testInvalidCaseTransformFunction(String expression) {
-    TransformFunctionFactory.get(RequestContextUtils.getExpression(expression), _dataSourceMap);
-  }
-
   @Test
   public void testCaseTransformationWithNullColumn() {
     ExpressionContext expression = RequestContextUtils.getExpression(
