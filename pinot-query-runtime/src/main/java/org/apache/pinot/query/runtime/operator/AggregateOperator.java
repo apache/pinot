@@ -70,7 +70,7 @@ public class AggregateOperator extends MultiStageOperator {
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
 
-  private boolean _hasReturnedAggregateBlock;
+  private boolean _hasConstructedAggregateBlock;
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator, DataSchema resultSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType, List<Integer> filterArgIndices,
@@ -131,26 +131,19 @@ public class AggregateOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    try {
-      TransferableBlock finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
-
-      // setting upstream error block
-      if (finalBlock.isErrorBlock()) {
-        return finalBlock;
-      }
-
-      if (!_hasReturnedAggregateBlock) {
-        return produceAggregatedBlock();
-      } else {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      }
-    } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+    if (_hasConstructedAggregateBlock) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
+    TransferableBlock finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
+    // returning upstream error block if finalBlock contains error.
+    if (finalBlock.isErrorBlock()) {
+      return finalBlock;
+    }
+    return produceAggregatedBlock();
   }
 
   private TransferableBlock produceAggregatedBlock() {
-    _hasReturnedAggregateBlock = true;
+    _hasConstructedAggregateBlock = true;
     if (_aggregationExecutor != null) {
       return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
     } else {
