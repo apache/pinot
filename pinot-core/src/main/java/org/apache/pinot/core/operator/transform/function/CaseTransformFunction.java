@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.RateLimiter;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +38,8 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.apache.pinot.spi.utils.TimestampUtils;
 import org.roaringbitmap.RoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -59,6 +62,9 @@ import org.roaringbitmap.RoaringBitmap;
  * PostgreSQL documentation: <a href="https://www.postgresql.org/docs/current/typeconv-union-case.html">CASE</a>
  */
 public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEnabledTransformFunction {
+  private static final Logger LOGGER = LoggerFactory.getLogger(CaseTransformFunction.class);
+  private static final RateLimiter LOG_RATE_LIMITER = RateLimiter.create(1.0);
+
   public static final String FUNCTION_NAME = "case";
 
   private List<TransformFunction> _whenStatements = new ArrayList<>();
@@ -147,10 +153,15 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
         checkLiteral(currentType, ((LiteralTransformFunction) newFunction).getStringLiteral());
       } else {
         // Only allow upcast from numeric to numeric: INT -> LONG -> FLOAT -> DOUBLE -> BIG_DECIMAL
-        Preconditions.checkArgument(currentType.isNumeric() && newType.isNumeric(), "Cannot upcast from %s to %s",
-            currentType, newType);
-        if (newType.ordinal() > currentType.ordinal()) {
-          currentTypeAndUnresolvedLiterals.setLeft(newType);
+        if (currentType.isNumeric() && newType.isNumeric()) {
+          if (newType.ordinal() > currentType.ordinal()) {
+            currentTypeAndUnresolvedLiterals.setLeft(newType);
+          }
+        } else {
+          if (LOG_RATE_LIMITER.tryAcquire()) {
+            LOGGER.error("LEGACY QUERY: Cannot upcast from {} to {}", currentType, newType);
+          }
+          currentTypeAndUnresolvedLiterals.setLeft(DataType.STRING);
         }
       }
     }
