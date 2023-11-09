@@ -25,6 +25,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
+import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -46,19 +47,7 @@ public class OpChainExecutionContext {
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
 
-  protected OpChainExecutionContext(OpChainExecutionContext that) {
-    _mailboxService = that._mailboxService;
-    _requestId = that._requestId;
-    _stageId = that._stageId;
-    _server = that._server;
-    _deadlineMs = that._deadlineMs;
-    _opChainMetadata = that._opChainMetadata;
-    _stageMetadata = that._stageMetadata;
-    _id = that._id;
-    _stats = that._stats;
-    _pipelineBreakerResult = that._pipelineBreakerResult;
-    _traceEnabled = that._traceEnabled;
-  }
+  private ServerPlanRequestContext _leafStageContext;
 
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
       VirtualServerAddress server, long deadlineMs, Map<String, String> opChainMetadata, StageMetadata stageMetadata,
@@ -121,5 +110,13 @@ public class OpChainExecutionContext {
 
   public boolean isTraceEnabled() {
     return _traceEnabled;
+  }
+
+  public ServerPlanRequestContext getLeafStageContext() {
+    return _leafStageContext;
+  }
+
+  public void setLeafStageContext(ServerPlanRequestContext leafStageContext) {
+    _leafStageContext = leafStageContext;
   }
 }

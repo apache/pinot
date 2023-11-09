@@ -57,15 +57,15 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * As of now, the reason why we use the plan visitor for server request is for additional support such as dynamic
  * filtering and other auxiliary functionalities.
  */
-public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpChainExecutionContext> {
+public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
   private static final ServerPlanRequestVisitor INSTANCE = new ServerPlanRequestVisitor();
 
-  static void walkStageNode(PlanNode node, ServerOpChainExecutionContext context) {
+  static void walkStageNode(PlanNode node, ServerPlanRequestContext context) {
     node.visit(INSTANCE, context);
   }
 
   @Override
-  public Void visitAggregate(AggregateNode node, ServerOpChainExecutionContext context) {
+  public Void visitAggregate(AggregateNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getGroupByList() == null) {
@@ -87,7 +87,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
   }
 
   @Override
-  public Void visitWindow(WindowNode node, ServerOpChainExecutionContext context) {
+  public Void visitWindow(WindowNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       // window node is not runnable on leaf, setting it to boundary directly
       context.setLeafStageBoundaryNode(node.getInputs().get(0));
@@ -96,7 +96,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
   }
 
   @Override
-  public Void visitSetOp(SetOpNode node, ServerOpChainExecutionContext context) {
+  public Void visitSetOp(SetOpNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       // Set node is not runnable on leaf, setting it to boundary directly
       context.setLeafStageBoundaryNode(node.getInputs().get(0));
@@ -105,12 +105,12 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
   }
 
   @Override
-  public Void visitExchange(ExchangeNode exchangeNode, ServerOpChainExecutionContext context) {
+  public Void visitExchange(ExchangeNode exchangeNode, ServerPlanRequestContext context) {
     throw new UnsupportedOperationException("Leaf stage should not visit ExchangeNode!");
   }
 
   @Override
-  public Void visitFilter(FilterNode node, ServerOpChainExecutionContext context) {
+  public Void visitFilter(FilterNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getFilterExpression() == null) {
@@ -124,7 +124,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
   }
 
   @Override
-  public Void visitJoin(JoinNode node, ServerOpChainExecutionContext context) {
+  public Void visitJoin(JoinNode node, ServerPlanRequestContext context) {
     // visit only the static side, turn the dynamic side into a lookup from the pipeline breaker resultDataContainer
     PlanNode staticSide = node.getInputs().get(0);
     PlanNode dynamicSide = node.getInputs().get(1);
@@ -133,7 +133,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
       staticSide = node.getInputs().get(1);
     }
     if (visit(staticSide, context)) {
-      PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
+      PipelineBreakerResult pipelineBreakerResult = context.getExecutionContext().getPipelineBreakerResult();
       int resultMapId = pipelineBreakerResult.getNodeIdMap().get(dynamicSide);
       List<TransferableBlock> transferableBlocks =
           pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
@@ -151,12 +151,12 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
   }
 
   @Override
-  public Void visitMailboxReceive(MailboxReceiveNode node, ServerOpChainExecutionContext context) {
+  public Void visitMailboxReceive(MailboxReceiveNode node, ServerPlanRequestContext context) {
     throw new UnsupportedOperationException("Leaf stage should not visit MailboxReceiveNode!");
   }
 
   @Override
-  public Void visitMailboxSend(MailboxSendNode node, ServerOpChainExecutionContext context) {
+  public Void visitMailboxSend(MailboxSendNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       context.setLeafStageBoundaryNode(node.getInputs().get(0));
     }
@@ -164,7 +164,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
   }
 
   @Override
-  public Void visitProject(ProjectNode node, ServerOpChainExecutionContext context) {
+  public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       pinotQuery.setSelectList(CalciteRexExpressionParser.convertProjectList(node.getProjects(), pinotQuery));
@@ -173,7 +173,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
   }
 
   @Override
-  public Void visitSort(SortNode node, ServerOpChainExecutionContext context) {
+  public Void visitSort(SortNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getOrderByList() == null) {
@@ -194,7 +194,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
   }
 
   @Override
-  public Void visitTableScan(TableScanNode node, ServerOpChainExecutionContext context) {
+  public Void visitTableScan(TableScanNode node, ServerPlanRequestContext context) {
     DataSource dataSource = new DataSource();
     // construct the PinotQuery object with raw table name.
     // later it will be converted into the actual table name with type.
@@ -207,11 +207,11 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerOpC
   }
 
   @Override
-  public Void visitValue(ValueNode node, ServerOpChainExecutionContext context) {
+  public Void visitValue(ValueNode node, ServerPlanRequestContext context) {
     throw new UnsupportedOperationException("Leaf stage should not visit ValueNode!");
   }
 
-  private boolean visit(PlanNode node, ServerOpChainExecutionContext context) {
+  private boolean visit(PlanNode node, ServerPlanRequestContext context) {
     node.visit(this, context);
     return context.getLeafStageBoundaryNode() == null;
   }

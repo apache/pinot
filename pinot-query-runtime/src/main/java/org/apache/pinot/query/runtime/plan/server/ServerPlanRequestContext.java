@@ -29,35 +29,40 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
 /**
- * Extension of the {@link OpChainExecutionContext} for {@link DistributedStagePlan} runs on leaf-stage.
+ * Context class for converting a {@link org.apache.pinot.query.runtime.plan.DistributedStagePlan} into
+ * {@link PinotQuery} to execute on server.
  *
- * The difference is that: on a leaf-stage server node, {@link PlanNode} are split into {@link PinotQuery} part and
- * {@link org.apache.pinot.query.runtime.operator.OpChain} part and are connected together in this context.
+ * On leaf-stage server node, {@link PlanNode} are split into {@link PinotQuery} part and
+ *     {@link org.apache.pinot.query.runtime.operator.OpChain} part.
  */
-public class ServerOpChainExecutionContext extends OpChainExecutionContext {
+public class ServerPlanRequestContext {
+  private final OpChainExecutionContext _executionContext;
   private final DistributedStagePlan _stagePlan;
-  private final QueryExecutor _queryExecutor;
+  private final QueryExecutor _leafQueryExecutor;
   private final ExecutorService _executorService;
 
   private final PinotQuery _pinotQuery;
   private PlanNode _leafStageBoundaryNode;
   private List<ServerQueryRequest> _serverQueryRequests;
 
-  public ServerOpChainExecutionContext(OpChainExecutionContext executionContext, DistributedStagePlan stagePlan,
+  public ServerPlanRequestContext(OpChainExecutionContext executionContext, DistributedStagePlan stagePlan,
       QueryExecutor leafQueryExecutor, ExecutorService executorService) {
-    super(executionContext);
+    _executionContext = executionContext;
     _stagePlan = stagePlan;
-    _queryExecutor = leafQueryExecutor;
+    _leafQueryExecutor = leafQueryExecutor;
     _executorService = executorService;
     _pinotQuery = new PinotQuery();
   }
 
+  public OpChainExecutionContext getExecutionContext() {
+    return _executionContext;
+  }
   public DistributedStagePlan getStagePlan() {
     return _stagePlan;
   }
 
-  public QueryExecutor getQueryExecutor() {
-    return _queryExecutor;
+  public QueryExecutor getLeafQueryExecutor() {
+    return _leafQueryExecutor;
   }
 
   public ExecutorService getExecutorService() {
