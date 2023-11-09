@@ -383,7 +383,9 @@ public class SelectionOperatorUtils {
       }
     }
 
+    int numRowsAdded = 0;
     for (Object[] row : rows) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numRowsAdded);
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
         Object columnValue = row[i];
@@ -438,6 +440,7 @@ public class SelectionOperatorUtils {
         }
       }
       dataTableBuilder.finishRow();
+      numRowsAdded++;
     }
 
     if (nullHandlingEnabled) {
