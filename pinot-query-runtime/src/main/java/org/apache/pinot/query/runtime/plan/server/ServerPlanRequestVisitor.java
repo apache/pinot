@@ -133,7 +133,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       staticSide = node.getInputs().get(1);
     }
     if (visit(staticSide, context)) {
-      PipelineBreakerResult pipelineBreakerResult = context.getExecutionContext().getPipelineBreakerResult();
+      PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
       int resultMapId = pipelineBreakerResult.getNodeIdMap().get(dynamicSide);
       List<TransferableBlock> transferableBlocks =
           pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());

@@ -92,13 +92,13 @@ public class ServerPlanRequestUtils {
       DistributedStagePlan distributedStagePlan, HelixManager helixManager, ServerMetrics serverMetrics,
       QueryExecutor leafQueryExecutor, ExecutorService executorService) {
     long queryArrivalTimeMs = System.currentTimeMillis();
-    ServerPlanRequestContext serverContext = new ServerPlanRequestContext(executionContext, distributedStagePlan,
-        leafQueryExecutor, executorService);
+    ServerPlanRequestContext serverContext = new ServerPlanRequestContext(distributedStagePlan, leafQueryExecutor,
+        executorService, executionContext.getPipelineBreakerResult());
     // 1. compile the PinotQuery
     constructPinotQueryPlan(serverContext);
     // 2. convert PinotQuery into InstanceRequest list (one for each physical table)
     List<InstanceRequest> instanceRequestList =
-        ServerPlanRequestUtils.constructServerQueryRequests(serverContext, distributedStagePlan,
+        ServerPlanRequestUtils.constructServerQueryRequests(executionContext, serverContext, distributedStagePlan,
             helixManager.getHelixPropertyStore());
     serverContext.setServerQueryRequests(instanceRequestList.stream()
         .map(instanceRequest -> new ServerQueryRequest(instanceRequest, serverMetrics, queryArrivalTimeMs, true))
@@ -118,13 +118,6 @@ public class ServerPlanRequestUtils {
   private static void constructPinotQueryPlan(ServerPlanRequestContext serverContext) {
     DistributedStagePlan stagePlan = serverContext.getStagePlan();
     PinotQuery pinotQuery = serverContext.getPinotQuery();
-    Integer leafNodeLimit =
-        QueryOptionsUtils.getMultiStageLeafLimit(serverContext.getExecutionContext().getOpChainMetadata());
-    if (leafNodeLimit != null) {
-      pinotQuery.setLimit(leafNodeLimit);
-    } else {
-      pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
-    }
     pinotQuery.setExplain(false);
     // visit the plan and create PinotQuery and determine the leaf stage boundary PlanNode.
     ServerPlanRequestVisitor.walkStageNode(stagePlan.getStageRoot(), serverContext);
@@ -137,8 +130,9 @@ public class ServerPlanRequestUtils {
    * @param helixPropertyStore helix property store used to fetch table config and schema for leaf-stage execution.
    * @return a list of server instance request to be run.
    */
-  public static List<InstanceRequest> constructServerQueryRequests(ServerPlanRequestContext serverContext,
-      DistributedStagePlan distributedStagePlan, ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
+  public static List<InstanceRequest> constructServerQueryRequests(OpChainExecutionContext executionContext,
+      ServerPlanRequestContext serverContext, DistributedStagePlan distributedStagePlan,
+      ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
     StageMetadata stageMetadata = distributedStagePlan.getStageMetadata();
     WorkerMetadata workerMetadata = distributedStagePlan.getCurrentWorkerMetadata();
     String rawTableName = StageMetadata.getTableName(stageMetadata);
@@ -147,6 +141,7 @@ public class ServerPlanRequestUtils {
     List<InstanceRequest> requests = new ArrayList<>();
     for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
       String tableType = tableEntry.getKey();
+      List<String> segmentList = tableEntry.getValue();
       // ZkHelixPropertyStore extends from ZkCacheBaseDataAccessor so it should not cause too much out-of-the-box
       // network traffic. but there's chance to improve this:
       // TODO: use TableDataManager: it is already getting tableConfig and Schema when processing segments.
@@ -155,15 +150,15 @@ public class ServerPlanRequestUtils {
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
         Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
-        requests.add(ServerPlanRequestUtils.compileInstanceRequest(serverContext, stageId, tableConfig, schema,
-            StageMetadata.getTimeBoundary(stageMetadata), TableType.OFFLINE, tableEntry.getValue()));
+        requests.add(ServerPlanRequestUtils.compileInstanceRequest(executionContext, serverContext, stageId,
+            tableConfig, schema, StageMetadata.getTimeBoundary(stageMetadata), TableType.OFFLINE, segmentList));
       } else if (TableType.REALTIME.name().equals(tableType)) {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
         Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
-        requests.add(ServerPlanRequestUtils.compileInstanceRequest(serverContext, stageId, tableConfig, schema,
-            StageMetadata.getTimeBoundary(stageMetadata), TableType.REALTIME, tableEntry.getValue()));
+        requests.add(ServerPlanRequestUtils.compileInstanceRequest(executionContext, serverContext, stageId,
+            tableConfig, schema, StageMetadata.getTimeBoundary(stageMetadata), TableType.REALTIME, segmentList));
       } else {
         throw new IllegalArgumentException("Unsupported table type key: " + tableType);
       }
@@ -174,17 +169,21 @@ public class ServerPlanRequestUtils {
   /**
    * Convert {@link PinotQuery} into an {@link InstanceRequest}.
    */
-  private static InstanceRequest compileInstanceRequest(ServerPlanRequestContext serverContext, int stageId,
-      TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo, TableType tableType,
-      List<String> segmentList) {
+  private static InstanceRequest compileInstanceRequest(OpChainExecutionContext executionContext,
+      ServerPlanRequestContext serverContext, int stageId, TableConfig tableConfig, Schema schema,
+      TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList) {
     // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
-    OpChainExecutionContext executionContext = serverContext.getExecutionContext();
     long requestId =
         (executionContext.getRequestId() << 16) + ((long) stageId << 8) + (tableType == TableType.REALTIME ? 1 : 0);
-    Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(executionContext.getOpChainMetadata());
-    LOGGER.debug("QueryID" + requestId + " leafNodeLimit:" + leafNodeLimit);
     // 1. make a deep copy of the pinotQuery and modify the PinotQuery accordingly
     PinotQuery pinotQuery = new PinotQuery(serverContext.getPinotQuery());
+    //  - attach leaf node limit
+    Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(executionContext.getOpChainMetadata());
+    if (leafNodeLimit != null) {
+      pinotQuery.setLimit(leafNodeLimit);
+    } else {
+      pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
+    }
     //   - attach table type
     DataSource dataSource = pinotQuery.getDataSource();
     String rawTableName = dataSource.getTableName();
@@ -204,7 +203,7 @@ public class ServerPlanRequestUtils {
     // 2. set pinot query options according to requestMetadataMap
     updateQueryOptions(pinotQuery, executionContext);
 
-    // 3. wrapped around in broker request
+    // 3. wrapped around in broker request and replace with actual table name with type.
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setPinotQuery(pinotQuery);
     QuerySource querySource = new QuerySource();

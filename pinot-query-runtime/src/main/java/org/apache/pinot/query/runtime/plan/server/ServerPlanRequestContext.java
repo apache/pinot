@@ -25,7 +25,7 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
-import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 
 
 /**
@@ -36,27 +36,24 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  *     {@link org.apache.pinot.query.runtime.operator.OpChain} part.
  */
 public class ServerPlanRequestContext {
-  private final OpChainExecutionContext _executionContext;
   private final DistributedStagePlan _stagePlan;
   private final QueryExecutor _leafQueryExecutor;
   private final ExecutorService _executorService;
+  private final PipelineBreakerResult _pipelineBreakerResult;
 
   private final PinotQuery _pinotQuery;
   private PlanNode _leafStageBoundaryNode;
   private List<ServerQueryRequest> _serverQueryRequests;
 
-  public ServerPlanRequestContext(OpChainExecutionContext executionContext, DistributedStagePlan stagePlan,
-      QueryExecutor leafQueryExecutor, ExecutorService executorService) {
-    _executionContext = executionContext;
+  public ServerPlanRequestContext(DistributedStagePlan stagePlan, QueryExecutor leafQueryExecutor,
+      ExecutorService executorService, PipelineBreakerResult pipelineBreakerResult) {
     _stagePlan = stagePlan;
     _leafQueryExecutor = leafQueryExecutor;
     _executorService = executorService;
+    _pipelineBreakerResult = pipelineBreakerResult;
     _pinotQuery = new PinotQuery();
   }
 
-  public OpChainExecutionContext getExecutionContext() {
-    return _executionContext;
-  }
   public DistributedStagePlan getStagePlan() {
     return _stagePlan;
   }
@@ -67,6 +64,10 @@ public class ServerPlanRequestContext {
 
   public ExecutorService getExecutorService() {
     return _executorService;
+  }
+
+  public PipelineBreakerResult getPipelineBreakerResult() {
+    return _pipelineBreakerResult;
   }
 
   public PinotQuery getPinotQuery() {
