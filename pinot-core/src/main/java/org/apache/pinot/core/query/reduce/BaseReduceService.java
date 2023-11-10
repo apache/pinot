@@ -50,15 +50,15 @@ public abstract class BaseReduceService {
 
   protected final ExecutorService _reduceExecutorService;
   protected final int _maxReduceThreadsPerQuery;
-  protected final int _groupByTrimThreshold;
-  protected final int _minGroupTrimSize;
+  protected final int _groupByTrimThresholdCfg;
+  protected final int _minGroupTrimSizeCfg;
 
   public BaseReduceService(PinotConfiguration config) {
     _maxReduceThreadsPerQuery = config.getProperty(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY,
         CommonConstants.Broker.DEFAULT_MAX_REDUCE_THREADS_PER_QUERY);
-    _groupByTrimThreshold = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD,
+    _groupByTrimThresholdCfg = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_GROUPBY_TRIM_THRESHOLD,
         CommonConstants.Broker.DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD);
-    _minGroupTrimSize = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MIN_GROUP_TRIM_SIZE,
+    _minGroupTrimSizeCfg = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MIN_GROUP_TRIM_SIZE,
         CommonConstants.Broker.DEFAULT_BROKER_MIN_GROUP_TRIM_SIZE);
 
     int numThreadsInExecutorService = Runtime.getRuntime().availableProcessors();
