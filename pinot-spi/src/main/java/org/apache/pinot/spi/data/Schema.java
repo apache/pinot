@@ -20,7 +20,6 @@ package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -68,7 +67,7 @@ public final class Schema implements Serializable {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
 
   private String _schemaName;
-  private Options _options = new Options();
+  private boolean _enableColumnBasedNullHandling;
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec _timeFieldSpec;
@@ -170,13 +169,12 @@ public final class Schema implements Serializable {
     _schemaName = schemaName;
   }
 
-  public Options getOptions() {
-    return _options;
+  public boolean isEnableColumnBasedNullHandling() {
+    return _enableColumnBasedNullHandling;
   }
 
-  public void setOptions(Options options) {
-    Preconditions.checkNotNull(options);
-    _options = options;
+  public void setEnableColumnBasedNullHandling(boolean enableColumnBasedNullHandling) {
+    _enableColumnBasedNullHandling = enableColumnBasedNullHandling;
   }
 
   public List<String> getPrimaryKeyColumns() {
@@ -441,7 +439,7 @@ public final class Schema implements Serializable {
   public ObjectNode toJsonObject() {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("schemaName", _schemaName);
-    jsonObject.set("options", JsonUtils.objectToJsonNode(_options));
+    jsonObject.set("enableColumnBasedNullHandling", JsonUtils.objectToJsonNode(_enableColumnBasedNullHandling));
     if (!_dimensionFieldSpecs.isEmpty()) {
       ArrayNode jsonArray = JsonUtils.newArrayNode();
       for (DimensionFieldSpec dimensionFieldSpec : _dimensionFieldSpecs) {
@@ -535,8 +533,8 @@ public final class Schema implements Serializable {
       return this;
     }
 
-    public SchemaBuilder withOptions(Consumer<Options> consumer) {
-      consumer.accept(_schema._options);
+    public SchemaBuilder withEnableColumnBasedNullHandling(boolean enableColumnBasedNullHandling) {
+      _schema.setEnableColumnBasedNullHandling(enableColumnBasedNullHandling);
       return this;
     }
 
@@ -947,19 +945,5 @@ public final class Schema implements Serializable {
         throw new IllegalStateException("Unsupported outgoingTimeUnit - " + outgoingTimeUnit);
     }
     return outerFunction;
-  }
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public static class Options implements Serializable {
-    @JsonProperty("nullHandling")
-    private NullHandling _nullHandling = NullHandling.TableBased.getInstance();
-
-    public NullHandling getNullHandling() {
-      return _nullHandling;
-    }
-
-    public void setNullHandling(NullHandling nullHandling) {
-      _nullHandling = nullHandling;
-    }
   }
 }

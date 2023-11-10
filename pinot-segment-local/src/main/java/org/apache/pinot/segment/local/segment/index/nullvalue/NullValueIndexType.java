@@ -45,7 +45,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -85,11 +84,11 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
       Collection<FieldSpec> allFieldSpecs = schema.getAllFieldSpecs();
       Map<String, IndexConfig> configMap = Maps.newHashMapWithExpectedSize(allFieldSpecs.size());
 
-      NullHandling nullHandling = schema.getOptions().getNullHandling();
+      boolean enableColumnBasedNullHandling = schema.isEnableColumnBasedNullHandling();
 
       for (FieldSpec fieldSpec : allFieldSpecs) {
         IndexConfig indexConfig;
-        if (nullHandling.isNullable(fieldSpec)) {
+        if (!enableColumnBasedNullHandling || fieldSpec.isNullable()) {
           indexConfig = IndexConfig.ENABLED;
         } else {
           indexConfig = IndexConfig.DISABLED;

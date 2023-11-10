@@ -148,7 +148,7 @@ public class ServerPlanRequestUtils {
     updateQueryOptions(pinotQuery, executionContext);
 
     if (QueryOptionsUtils.isNullHandlingEnabled(pinotQuery.getQueryOptions())
-        && !schema.getOptions().getNullHandling().supportsV2()) {
+        && !schema.isEnableColumnBasedNullHandling()) {
       String desc = tableConfig != null ? "Table " + tableConfig.getTableName() : "Schema " + schema.getSchemaName();
       throw new IllegalStateException(desc + " is not prepared to be used in multi-stage engine with null enable. "
           + "Please configure column level nullability and reload the table");

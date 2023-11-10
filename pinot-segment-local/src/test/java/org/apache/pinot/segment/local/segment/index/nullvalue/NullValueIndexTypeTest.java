@@ -22,7 +22,6 @@ import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.NullHandling;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -32,23 +31,14 @@ public class NullValueIndexTypeTest {
 
   @DataProvider(name = "provideCases")
   public Object[][] provideCases() {
-    NullHandling.TableBased tableBased = NullHandling.TableBased.getInstance();
-    NullHandling.ColumnBased defaultFalse = new NullHandling.ColumnBased(false);
-    NullHandling.ColumnBased defaultTrue = new NullHandling.ColumnBased(true);
     return new Object[][] {
         // This is the semantic table, assuming a null bitmap buffer exists in the segment
-        // NullHandling | setNullable | Index is enabled
-        new Object[] {tableBased, null, IndexConfig.ENABLED},
-        new Object[] {tableBased, false, IndexConfig.ENABLED},
-        new Object[] {tableBased, true, IndexConfig.ENABLED},
+        // columnNullHandling | field setNullable | Index is enabled
+        new Object[] {false, false, IndexConfig.ENABLED},
+        new Object[] {false, true, IndexConfig.ENABLED},
 
-        new Object[] {defaultFalse, null, IndexConfig.DISABLED},
-        new Object[] {defaultFalse, false, IndexConfig.DISABLED},
-        new Object[] {defaultFalse, true, IndexConfig.ENABLED},
-
-        new Object[] {defaultTrue, null, IndexConfig.ENABLED},
-        new Object[] {defaultTrue, false, IndexConfig.DISABLED},
-        new Object[] {defaultTrue, true, IndexConfig.ENABLED}
+        new Object[] {true, false, IndexConfig.DISABLED},
+        new Object[] {true, true, IndexConfig.ENABLED}
     };
   }
 
@@ -59,13 +49,11 @@ public class NullValueIndexTypeTest {
     }
 
     @Test(dataProvider = "provideCases", dataProviderClass = NullValueIndexTypeTest.class)
-    public void isEnabledWhenNullable(NullHandling nullHandling, Boolean fieldNullable, IndexConfig expected) {
-      _schema.getOptions().setNullHandling(nullHandling);
+    public void isEnabledWhenNullable(boolean columnNullHandling, boolean fieldNullable, IndexConfig expected) {
+      _schema.setEnableColumnBasedNullHandling(columnNullHandling);
 
       FieldSpec dimStr = _schema.getFieldSpecFor("dimStr");
-      if (fieldNullable != null) {
-        dimStr.setNullable(fieldNullable);
-      }
+      dimStr.setNullable(fieldNullable);
 
       assertEquals(expected);
     }

@@ -114,7 +114,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
         String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
         Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
-        pinotSchema.getOptions().setNullHandling(testCase._extraProps.getNullHandling());
+        pinotSchema.setEnableColumnBasedNullHandling(testCase._extraProps.isEnableNullHandlingInTableConf());
         schemaMap.put(tableName, pinotSchema);
         factory1.registerTable(pinotSchema, offlineTableName);
         factory2.registerTable(pinotSchema, offlineTableName);

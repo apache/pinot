@@ -30,7 +30,6 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -328,15 +327,10 @@ public class SchemaTest {
   public void testSerializeDeserializeOptions()
       throws IOException {
     String json = "{\n"
-        + "  \"options\" : {\n"
-        + "    \"nullHandling\" : {\n"
-        + "      \"mode\" : \"column\",\n"
-        + "      \"default\" : true\n"
-        + "    }\n"
-        + "  },\n"
         + "  \"primaryKeyColumns\" : null,\n"
         + "  \"timeFieldSpec\" : null,\n"
         + "  \"schemaName\" : null,\n"
+        + "  \"enableColumnBasedNullHandling\" : true,\n"
         + "  \"dimensionFieldSpecs\" : [ ],\n"
         + "  \"metricFieldSpecs\" : [ ],\n"
         + "  \"dateTimeFieldSpecs\" : [ ]\n"
@@ -344,10 +338,8 @@ public class SchemaTest {
     JsonNode expectedNode = JsonUtils.stringToJsonNode(json);
 
     Schema schema = JsonUtils.jsonNodeToObject(expectedNode, Schema.class);
-    Assert.assertEquals(schema.getOptions().getNullHandling(), new NullHandling.ColumnBased(true));
-    JsonNode actualNode = JsonUtils.objectToJsonNode(schema);
-
-    Assert.assertEquals(actualNode, expectedNode);
+    Assert.assertTrue(schema.isEnableColumnBasedNullHandling(), "Column null handling should be enabled");
+    Assert.assertEquals(JsonUtils.objectToPrettyString(schema), json);
   }
 
   @Test

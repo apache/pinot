@@ -65,7 +65,6 @@ import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -598,8 +597,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
 
     public static class ExtraProperties {
       private boolean _enableNullHandlingInTableConf = false;
+      private boolean _enableColumnNullHandling = false;
       private boolean _noEmptySegment = false;
-      private NullHandling _nullHandling = new NullHandling.ColumnBased(false);
       private Map<String, JsonNode> _unknownProps = new HashMap<>();
 
       @JsonAnySetter
@@ -655,13 +654,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         _enableNullHandlingInTableConf = enableNullHandlingInTableConf;
       }
 
-      public void setNullHandling(NullHandling nullHandling) {
-        _nullHandling = nullHandling;
-      }
-
-      @JsonProperty("nullHandling")
-      public NullHandling getNullHandling() {
-        return _nullHandling;
+      public void setEnableColumnNullHandling(boolean enableColumnNullHandling) {
+        _enableColumnNullHandling = enableColumnNullHandling;
       }
     }
   }

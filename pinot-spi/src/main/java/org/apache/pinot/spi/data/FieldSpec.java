@@ -100,7 +100,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected String _name;
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
-  protected Boolean _nullable = null;
+  protected boolean _nullable = true;
 
   // NOTE: This only applies to STRING column, which is the max number of characters
   private int _maxLength = DEFAULT_MAX_LENGTH;
@@ -305,6 +305,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   /**
    * Returns whether the column is nullable or not.
    */
+  @JsonIgnore
   public Boolean isNullable() {
     return _nullable;
   }
@@ -312,8 +313,17 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   /**
    * @see #isNullable()
    */
+  @JsonIgnore
   public void setNullable(Boolean nullable) {
     _nullable = nullable;
+  }
+
+  public boolean isNotNull() {
+    return !_nullable;
+  }
+
+  public void setNotNull(boolean notNull) {
+    _nullable = !notNull;
   }
 
   /**
@@ -333,7 +343,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
     appendDefaultNullValue(jsonObject);
     appendTransformFunction(jsonObject);
-    jsonObject.put("nullable", _nullable);
+    jsonObject.put("notNull", !_nullable);
     return jsonObject;
   }
 

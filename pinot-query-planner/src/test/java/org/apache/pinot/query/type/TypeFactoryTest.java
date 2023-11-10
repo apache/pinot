@@ -29,7 +29,6 @@ import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -110,41 +109,40 @@ public class TypeFactoryTest {
       if (arrayType == null) {
         arrayType = basicType;
       }
-      cases.add(new Object[]{dataType, basicType, arrayType, NullHandling.TableBased.getInstance()});
-      cases.add(new Object[]{dataType, basicType, arrayType, new NullHandling.ColumnBased(true)});
-      cases.add(new Object[]{dataType, basicType, arrayType, new NullHandling.ColumnBased(false)});
+      cases.add(new Object[]{dataType, basicType, arrayType, true});
+      cases.add(new Object[]{dataType, basicType, arrayType, false});
     }
     return cases.iterator();
   }
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      NullHandling nullHandling) {
+      boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addSingleValueDimension("col", dataType)
-        .withOptions(options -> options.setNullHandling(nullHandling))
+        .withEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
     RelDataTypeField field = fieldList.get(0);
-    boolean colNullable = isColNullable(testSchema, nullHandling);
+    boolean colNullable = isColNullable(testSchema);
     Assert.assertEquals(field.getType(), typeFactory.createTypeWithNullability(scalarType, colNullable));
   }
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      NullHandling nullHandling) {
+      boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(true))
-        .withOptions(options -> options.setNullHandling(nullHandling))
+        .withEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
     RelDataTypeField field = fieldList.get(0);
 
-    boolean colNullable = isColNullable(testSchema, nullHandling);
+    boolean colNullable = isColNullable(testSchema);
     RelDataType expectedType = typeFactory.createTypeWithNullability(scalarType, colNullable);
 
     Assert.assertEquals(field.getType(), expectedType);
@@ -153,11 +151,11 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNotNullableScalarTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      NullHandling nullHandling) {
+      boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(false))
-        .withOptions(options -> options.setNullHandling(nullHandling))
+        .withEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
@@ -166,23 +164,23 @@ public class TypeFactoryTest {
     Assert.assertEquals(field.getType(), scalarType);
   }
 
-  private boolean isColNullable(Schema schema, NullHandling nullHandling) {
-    return nullHandling.supportsV2() && nullHandling.isNullable(schema.getFieldSpecFor("col"));
+  private boolean isColNullable(Schema schema) {
+    return schema.isEnableColumnBasedNullHandling() && schema.getFieldSpecFor("col").isNullable();
   }
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      NullHandling nullHandling) {
+      boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addMultiValueDimension("col", dataType)
-        .withOptions(options -> options.setNullHandling(nullHandling))
+        .withEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
     RelDataTypeField field = fieldList.get(0);
 
-    boolean nullable = isColNullable(testSchema, nullHandling);
+    boolean nullable = isColNullable(testSchema);
     RelDataType expectedType =
         typeFactory.createTypeWithNullability(typeFactory.createArrayType(arrayType, -1), nullable);
 
@@ -191,20 +189,20 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      NullHandling nullHandling) {
+      boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
           field.setNullable(true);
           field.setSingleValueField(false);
         })
-        .withOptions(options -> options.setNullHandling(nullHandling))
+        .withEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
     RelDataTypeField field = fieldList.get(0);
 
-    boolean colNullable = isColNullable(testSchema, nullHandling);
+    boolean colNullable = isColNullable(testSchema);
     RelDataType expectedType =
         typeFactory.createTypeWithNullability(typeFactory.createArrayType(arrayType, -1), colNullable);
 
@@ -213,14 +211,14 @@ public class TypeFactoryTest {
 
   @Test(dataProvider = "relDataTypeConversion")
   public void testNotNullableArrayTypes(FieldSpec.DataType dataType, RelDataType scalarType, RelDataType arrayType,
-      NullHandling nullHandling) {
+      boolean columnNullMode) {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> {
           field.setNullable(false);
           field.setSingleValueField(false);
         })
-        .withOptions(options -> options.setNullHandling(nullHandling))
+        .withEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();

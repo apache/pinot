@@ -66,7 +66,6 @@ import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
-import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -219,9 +218,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     // Although NullValueVector is implemented as an index, it needs to be treated in a different way than other indexes
     // TODO(column-level-nullability): Is this still needed? Probably it can be moved to the normal loop
-    NullHandling nullHandling = schema.getOptions().getNullHandling();
+    boolean columnNullHandling = schema.isEnableColumnBasedNullHandling();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (isNullable(fieldSpec, nullHandling)) {
+      if (isNullable(fieldSpec, columnNullHandling)) {
         // Initialize Null value vector map
         String columnName = fieldSpec.getName();
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
@@ -229,9 +228,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
   }
 
-  private boolean isNullable(FieldSpec fieldSpec, NullHandling nullHandling) {
-    if (nullHandling.supportsV2()) {
-      return nullHandling.isNullable(fieldSpec);
+  private boolean isNullable(FieldSpec fieldSpec, boolean columnNullHandling) {
+    if (columnNullHandling) {
+      return fieldSpec.isNullable();
     } else {
       return _config.isNullHandlingEnabled();
     }

@@ -68,7 +68,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.NullHandling;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
@@ -550,9 +549,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
-    NullHandling nullHandling = _schema.getOptions().getNullHandling();
-    if (nullHandling.supportsV2()) {
-      return nullHandling.isNullable(fieldSpec);
+    if (_schema.isEnableColumnBasedNullHandling() && fieldSpec.isNullable()) {
+      return true;
     } else {
       return _indexLoadingConfig.getTableConfig() != null
           && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null

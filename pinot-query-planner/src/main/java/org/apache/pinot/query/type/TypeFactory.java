@@ -47,8 +47,8 @@ public class TypeFactory extends JavaTypeFactoryImpl {
   public RelDataType createRelDataTypeFromSchema(Schema schema) {
     Builder builder = new Builder(this);
     Predicate<FieldSpec> isNullable;
-    if (schema.getOptions().getNullHandling().supportsV2()) {
-      isNullable = schema.getOptions().getNullHandling()::isNullable;
+    if (schema.isEnableColumnBasedNullHandling()) {
+      isNullable = FieldSpec::isNullable;
     } else {
       isNullable = fieldSpec -> false;
     }
