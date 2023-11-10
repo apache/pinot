@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -914,9 +915,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
   /**
    * Test cases for fixing LLC segment by uploading to segment store if missing
    */
-  @Test
+  @Test(timeOut = 30_000L)
   public void testUploadToSegmentStore()
-      throws HttpErrorStatusException, IOException, URISyntaxException {
+      throws HttpErrorStatusException, IOException, URISyntaxException, InterruptedException {
     // mock the behavior for PinotHelixResourceManager
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     HelixManager helixManager = mock(HelixManager.class);
@@ -1035,6 +1036,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Verify the result
     segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig, segmentsZKMetadata);
+
+    // Block until all tasks have been able to complete
+    ThreadPoolExecutor deepStoreUploadExecutor = segmentManager.getDeepStoreUploadExecutor();
+    while (deepStoreUploadExecutor.getActiveCount() > 0) {
+      Thread.sleep(1000L);
+    }
+
     assertEquals(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(),
         expectedSegmentLocation);
