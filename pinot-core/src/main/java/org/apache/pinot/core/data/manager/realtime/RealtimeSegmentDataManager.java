@@ -1438,6 +1438,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setUpsertComparisonColumns(tableConfig.getUpsertComparisonColumns())
             .setUpsertDeleteRecordColumn(tableConfig.getUpsertDeleteRecordColumn())
+            .setUpsertOutOfOrderRecordColumn(tableConfig.getOutOfOrderRecordColumn())
+            .setUpsertDropOutOfOrderRecord(tableConfig.isDropOutOfOrderRecord())
             .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder

@@ -60,12 +60,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
-      @Nullable String outOfOrderRecordColumn, HashFunction hashFunction,
-      @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      boolean dropOutOfOrderRecord, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
+      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn,
-        outOfOrderRecordColumn, hashFunction, partialUpsertHandler, enableSnapshot, dropOutOfOrderRecord, metadataTTL,
-        tableIndexDir, serverMetrics);
+        hashFunction, partialUpsertHandler, enableSnapshot, metadataTTL, tableIndexDir, serverMetrics);
   }
 
   @Override
@@ -242,6 +240,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     persistWatermark(_largestSeenComparisonValue);
   }
 
+  // doAddRecord returns whether the event is out-of-order or not
   @Override
   protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     AtomicBoolean shouldDropRecord = new AtomicBoolean(false);
@@ -275,9 +274,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               return new RecordLocation(segment, newDocId, newComparisonValue);
             } else {
               handleOutOfOrderEvent(currentRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
-              // this is a out-of-order record, if upsert config _dropOutOfOrderRecord is true, then set
-              // shouldDropRecord to true. This method returns inverse of this value
-              shouldDropRecord.set(_dropOutOfOrderRecord);
+              // this is a out-of-order record then set value to true - this indicates whether out-of-order or not
+              shouldDropRecord.set(true);
               return currentRecordLocation;
             }
           } else {
@@ -290,12 +288,12 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
-    return !shouldDropRecord.get();
+    return shouldDropRecord.get();
   }
 
   @Override
   protected GenericRow doUpdateRecord(GenericRow record, RecordInfo recordInfo) {
-    assert _partialUpsertHandler != null || _outOfOrderRecordColumn != null;
+    assert _partialUpsertHandler != null;
     _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
         (pk, recordLocation) -> {
           // Read the previous record if the following conditions are met:
@@ -308,16 +306,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             ThreadSafeMutableRoaringBitmap currentQueryableDocIds = currentSegment.getQueryableDocIds();
             int currentDocId = recordLocation.getDocId();
             if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
-              // if partial-upsert, then only merge
-              if (_partialUpsertHandler != null) {
-                _reusePreviousRow.init(currentSegment, currentDocId);
-                _partialUpsertHandler.merge(_reusePreviousRow, record);
-              }
+              _reusePreviousRow.init(currentSegment, currentDocId);
+              _partialUpsertHandler.merge(_reusePreviousRow, record);
             }
-          }
-          if (_outOfOrderRecordColumn != null) {
-              record.putValue(_outOfOrderRecordColumn,
-                  recordInfo.getComparisonValue().compareTo(recordLocation.getComparisonValue()) < 0);
           }
           return recordLocation;
         });

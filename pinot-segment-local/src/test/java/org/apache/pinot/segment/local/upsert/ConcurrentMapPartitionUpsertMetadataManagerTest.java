@@ -49,7 +49,6 @@ import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -92,7 +91,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   public void testStartFinishOperation() {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, null, HashFunction.NONE, null, false, false, 0, INDEX_DIR,
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 0, INDEX_DIR,
             mock(ServerMetrics.class));
 
     // Start 2 operations
@@ -206,7 +205,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String comparisonColumn = "timeCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, null, hashFunction, null, false, false, 0, INDEX_DIR,
+            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
             mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
@@ -369,7 +368,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String deleteRecordColumn = "deleteCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), deleteRecordColumn, null, hashFunction, null, false, false, 0,
+            Collections.singletonList(comparisonColumn), deleteRecordColumn, hashFunction, null, false, 0,
             INDEX_DIR, mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
@@ -661,7 +660,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String comparisonColumn = "timeCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, null, hashFunction, null, false, false, 0, INDEX_DIR,
+            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
             mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -742,62 +741,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testAddOOORecordFullUpsert()
-      throws IOException {
-    verifyAddOOORecordFullUpsert(HashFunction.NONE);
-    verifyAddOOORecordFullUpsert(HashFunction.MD5);
-    verifyAddOOORecordFullUpsert(HashFunction.MURMUR3);
-  }
-
-  private void verifyAddOOORecordFullUpsert(HashFunction hashFunction)
-      throws IOException {
-    String comparisonColumn = "timeCol";
-    String outOfOrderRecordColumn = "outOfOrderRecordColumn";
-    String primaryKeyFieldName = "pk";
-    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
-            Collections.singletonList(primaryKeyFieldName), Collections.singletonList(comparisonColumn), null,
-            outOfOrderRecordColumn, hashFunction, null, false, false, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
-    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
-
-    // Add records to the segment
-    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
-    MutableSegment segment1 = mockMutableSegment(1, validDocIds1, null);
-    upsertMetadataManager.addRecord(segment1, new RecordInfo(makePrimaryKey(1), 0, new IntWrapper(100), false));
-    upsertMetadataManager.addRecord(segment1, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(120), false));
-
-    // segment1: 1 -> {0, 100}, 2 -> {1, 120}
-    checkRecordLocation(recordLocationMap, 1, segment1, 0, 100, hashFunction);
-    checkRecordLocation(recordLocationMap, 2, segment1, 1, 120, hashFunction);
-    assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
-
-    // calling updateRecord with OOO event to validate if outOfOrderRecordColumn gets set to true
-    GenericRow row = new GenericRow();
-    row.putValue(primaryKeyFieldName, 1);
-    row.putValue(comparisonColumn, 80);
-    GenericRow updatedRow = upsertMetadataManager.updateRecord(row,
-        new RecordInfo(makePrimaryKey(1), 1, new IntWrapper(80), false));
-
-    assertEquals(updatedRow.getValue(outOfOrderRecordColumn), true);
-
-    // calling updateRecord with not an OOO event to validate if outOfOrderRecordColumn gets set to false
-    row = new GenericRow();
-    row.putValue(primaryKeyFieldName, 2);
-    row.putValue(comparisonColumn, 140);
-    updatedRow = upsertMetadataManager.updateRecord(row,
-        new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(140), false));
-
-    assertEquals(updatedRow.getValue(outOfOrderRecordColumn), false);
-
-    // Stop the metadata manager
-    upsertMetadataManager.stop();
-
-    // Close the metadata manager
-    upsertMetadataManager.close();
-  }
-
-  @Test
   public void testAddOutOfOrderRecord()
       throws IOException {
     verifyAddOutOfOrderRecord(HashFunction.NONE);
@@ -808,10 +751,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private void verifyAddOutOfOrderRecord(HashFunction hashFunction)
       throws IOException {
     String comparisonColumn = "timeCol";
-    // here dropOutOfOrderRecord = true
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, null, hashFunction, null, false, true, 0, INDEX_DIR,
+            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
             mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -830,10 +772,10 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
     MutableSegment segment2 = mockMutableSegment(1, validDocIds2, null);
 
-    // new record, should return true to add it
-    boolean shouldAddRecord =
+    // new record, should return false for out of order event
+    boolean isOutOfOrderRecord =
         upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(3), 0, new IntWrapper(100), false));
-    assertTrue(shouldAddRecord);
+    assertFalse(isOutOfOrderRecord);
 
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
     // segment2: 3 -> {0, 100}
@@ -844,15 +786,15 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2});
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{0});
 
-    // send an out-of-order event, should return false to drop event
-    shouldAddRecord =
+    // send an out-of-order event, should return true for orderness of event
+    isOutOfOrderRecord =
         upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(80), false));
-    assertFalse(shouldAddRecord);
+    assertTrue(isOutOfOrderRecord);
 
     // ordered event for an existing key
-    shouldAddRecord =
+    isOutOfOrderRecord =
         upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(150), false));
-    assertTrue(shouldAddRecord);
+    assertFalse(isOutOfOrderRecord);
 
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}
     // segment2: 3 -> {0, 100}, 2 -> {1, 150}
@@ -879,7 +821,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String comparisonColumn = "timeCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, null, hashFunction, null, false, false, 0, INDEX_DIR,
+            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, INDEX_DIR,
             mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -935,8 +877,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String deleteColumn = "deleteCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), deleteColumn, null, hashFunction, null,
-            false, false, 0, INDEX_DIR, mock(ServerMetrics.class));
+            Collections.singletonList(comparisonColumn), deleteColumn, hashFunction, null,
+            false, 0, INDEX_DIR, mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // queryableDocIds is same as validDocIds in the absence of delete markers
@@ -1037,7 +979,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, null, HashFunction.NONE, null, false, false, 30, tableDir,
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 30, tableDir,
             mock(ServerMetrics.class));
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
@@ -1105,7 +1047,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, null, HashFunction.NONE, null, true, false, 30, tableDir,
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 30, tableDir,
             mock(ServerMetrics.class));
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
@@ -1178,7 +1120,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String deleteRecordColumn = "deleteCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), deleteRecordColumn, HashFunction.NONE, null, true, false, 30,
+            Collections.singletonList(comparisonColumn), deleteRecordColumn, HashFunction.NONE, null, true, 30,
             INDEX_DIR, mock(ServerMetrics.class));
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
@@ -1263,7 +1205,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     String deleteRecordColumn = "deleteCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), deleteRecordColumn, HashFunction.NONE, null, true, false, 30,
+            Collections.singletonList(comparisonColumn), deleteRecordColumn, HashFunction.NONE, null, true, 30,
             INDEX_DIR, mock(ServerMetrics.class));
 
     try (MockedConstruction<PinotSegmentColumnReader> deleteColReader = mockConstruction(PinotSegmentColumnReader.class,
@@ -1295,7 +1237,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, null, HashFunction.NONE, null, true, false, 30, tableDir,
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 30, tableDir,
             mock(ServerMetrics.class));
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
@@ -1356,7 +1298,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, null, HashFunction.NONE, null, true, false, 10, INDEX_DIR,
+            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 10, INDEX_DIR,
             mock(ServerMetrics.class));
 
     double currentTimeMs = System.currentTimeMillis();

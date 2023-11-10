@@ -165,6 +165,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final List<String> _upsertComparisonColumns;
   private final String _deleteRecordColumn;
+  private final String _upsertOutOfOrderRecordColumn;
+  private final boolean _upsertDropOutOfOrderRecord;
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
   // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
   //    ids for the consuming segment.
@@ -381,6 +383,8 @@ public class MutableSegmentImpl implements MutableSegment {
       _upsertComparisonColumns =
           upsertComparisonColumns != null ? upsertComparisonColumns : Collections.singletonList(_timeColumnName);
       _deleteRecordColumn = config.getUpsertDeleteRecordColumn();
+      _upsertOutOfOrderRecordColumn = config.getUpsertOutOfOrderRecordColumn();
+      _upsertDropOutOfOrderRecord = config.getUpsertDropOutOfOrderRecord();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       if (_deleteRecordColumn != null) {
         _queryableDocIds = new ThreadSafeMutableRoaringBitmap();
@@ -392,6 +396,8 @@ public class MutableSegmentImpl implements MutableSegment {
       _deleteRecordColumn = null;
       _validDocIds = null;
       _queryableDocIds = null;
+      _upsertOutOfOrderRecordColumn = null;
+      _upsertDropOutOfOrderRecord = false;
     }
   }
 
@@ -496,7 +502,11 @@ public class MutableSegmentImpl implements MutableSegment {
       // segment indexing or addNewRow call errors out in those scenario, there can be metadata inconsistency where
       // a key is pointing to some other key's docID
       // TODO fix this metadata mismatch scenario
-      if (_partitionUpsertMetadataManager.addRecord(this, recordInfo)) {
+      boolean isOutOfOrderRecord = _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+      if (_upsertOutOfOrderRecordColumn != null) {
+        updatedRow.putValue(_upsertOutOfOrderRecordColumn, isOutOfOrderRecord);
+      }
+      if (!isOutOfOrderRecord || !_upsertDropOutOfOrderRecord) {
         updateDictionary(updatedRow);
         addNewRow(numDocsIndexed, updatedRow);
         // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable

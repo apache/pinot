@@ -392,6 +392,17 @@ public class TableConfig extends BaseJsonConfig {
     return _upsertConfig == null ? null : _upsertConfig.getDeleteRecordColumn();
   }
 
+  @JsonIgnore
+  @Nullable
+  public String getOutOfOrderRecordColumn() {
+    return _upsertConfig == null ? null : _upsertConfig.getOutOfOrderRecordColumn();
+  }
+
+  @JsonIgnore
+  public boolean isDropOutOfOrderRecord() {
+    return _upsertConfig != null && _upsertConfig.isDropOutOfOrderRecord();
+  }
+
   @JsonProperty(TUNER_CONFIG_LIST_KEY)
   public List<TunerConfig> getTunerConfigsList() {
     return _tunerConfigList;
