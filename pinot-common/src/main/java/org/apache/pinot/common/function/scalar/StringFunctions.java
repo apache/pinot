@@ -21,9 +21,11 @@ package org.apache.pinot.common.function.scalar;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Base64;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -491,6 +493,37 @@ public class StringFunctions {
   @ScalarFunction
   public static byte[] toAscii(String input) {
     return input.getBytes(StandardCharsets.US_ASCII);
+  }
+
+  /**
+   * @param input UUID as string
+   * @return bytearray
+   * returns bytes and null on exception
+   */
+  @ScalarFunction
+  public static byte[] toUuidBytes(String input) {
+    try {
+      UUID uuid = UUID.fromString(input);
+      ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
+      bb.putLong(uuid.getMostSignificantBits());
+      bb.putLong(uuid.getLeastSignificantBits());
+      return bb.array();
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+  }
+
+  /**
+   * @param input UUID serialized to bytes
+   * @return String representation of UUID
+   * returns bytes and null on exception
+   */
+  @ScalarFunction
+  public static String fromUuidBytes(byte[] input) {
+    ByteBuffer bb = ByteBuffer.wrap(input);
+    long firstLong = bb.getLong();
+    long secondLong = bb.getLong();
+    return new UUID(firstLong, secondLong).toString();
   }
 
   /**
