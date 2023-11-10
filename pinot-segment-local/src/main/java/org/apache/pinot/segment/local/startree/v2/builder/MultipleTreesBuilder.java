@@ -27,8 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -85,7 +85,8 @@ public class MultipleTreesBuilder implements Closeable {
     _buildMode = buildMode;
     _segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     _metadataProperties =
-        CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+        CommonsConfigurationUtils.loadFromFile(
+            new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     _separator = getSeparator();
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
   }
@@ -106,7 +107,8 @@ public class MultipleTreesBuilder implements Closeable {
     _buildMode = buildMode;
     _segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     _metadataProperties =
-        CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+        CommonsConfigurationUtils.loadFromFile(
+            new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     Preconditions.checkState(!_metadataProperties.containsKey(MetadataKey.STAR_TREE_COUNT), "Star-tree already exists");
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     try {

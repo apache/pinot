@@ -26,8 +26,8 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -43,6 +43,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -254,7 +255,7 @@ public class DictionaryToRawIndexConverter {
   private void updateMetadata(File segmentDir, String[] columns, String tableName)
       throws IOException, ConfigurationException {
     File metadataFile = new File(segmentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-    PropertiesConfiguration properties = new PropertiesConfiguration(metadataFile);
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
 
     if (tableName != null) {
       properties
@@ -267,7 +268,7 @@ public class DictionaryToRawIndexConverter {
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), -1);
     }
-    properties.save();
+    CommonsConfigurationUtils.saveToFile(properties);
   }
 
   /**

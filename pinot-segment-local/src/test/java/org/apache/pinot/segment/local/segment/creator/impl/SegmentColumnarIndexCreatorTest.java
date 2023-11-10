@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -38,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -66,13 +67,13 @@ public class SegmentColumnarIndexCreatorTest {
   @Test
   public void testRemoveColumnMetadataInfo()
       throws Exception {
-    PropertiesConfiguration configuration = new PropertiesConfiguration(CONFIG_FILE);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.loadFromFile(CONFIG_FILE);
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "a", "foo");
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "b", "bar");
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "c", "foobar");
-    configuration.save();
+    CommonsConfigurationUtils.saveToFile(configuration);
 
-    configuration = new PropertiesConfiguration(CONFIG_FILE);
+    configuration = CommonsConfigurationUtils.loadFromFile(CONFIG_FILE);
     assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
     assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
     assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
@@ -80,9 +81,9 @@ public class SegmentColumnarIndexCreatorTest {
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
-    configuration.save();
+    CommonsConfigurationUtils.saveToFile(configuration);
 
-    configuration = new PropertiesConfiguration(CONFIG_FILE);
+    configuration = CommonsConfigurationUtils.loadFromFile(CONFIG_FILE);
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));

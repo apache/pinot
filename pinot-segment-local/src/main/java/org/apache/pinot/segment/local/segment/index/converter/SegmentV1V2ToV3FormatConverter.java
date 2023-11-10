@@ -30,8 +30,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -208,10 +208,10 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     File v2MetadataFile = new File(currentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     File v3MetadataFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
 
-    final PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(v2MetadataFile);
+    final PropertiesConfiguration properties = CommonsConfigurationUtils.loadFromFile(v2MetadataFile);
     // update the segment version
     properties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, SegmentVersion.v3.toString());
-    properties.save(v3MetadataFile);
+    CommonsConfigurationUtils.saveToFile(properties, v3MetadataFile);
   }
 
   private void copyCreationMetadataIfExists(File currentDir, File v3Dir)

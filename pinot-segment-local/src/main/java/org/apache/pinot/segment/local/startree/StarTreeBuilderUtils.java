@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
