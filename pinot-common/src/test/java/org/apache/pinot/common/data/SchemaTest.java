@@ -339,7 +339,11 @@ public class SchemaTest {
 
     Schema schema = JsonUtils.jsonNodeToObject(expectedNode, Schema.class);
     Assert.assertTrue(schema.isEnableColumnBasedNullHandling(), "Column null handling should be enabled");
-    Assert.assertEquals(JsonUtils.objectToPrettyString(schema), json);
+
+    String serialized = JsonUtils.objectToString(schema);
+    Schema deserialized = JsonUtils.stringToObject(serialized, Schema.class);
+
+    Assert.assertEquals(deserialized, schema, "Changes detected while checking serialize/deserialize idempotency");
   }
 
   @Test

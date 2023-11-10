@@ -447,7 +447,6 @@ public class FieldSpecTest {
     String serialized = JsonUtils.objectToString(fieldSpec);
     DimensionFieldSpec deserialized = JsonUtils.stringToObject(serialized, DimensionFieldSpec.class);
 
-    Assert.assertEquals(deserialized, fieldSpec,
-        "Changes detected while checking serialize/deserialize idempotency");
+    Assert.assertEquals(deserialized, fieldSpec, "Changes detected while checking serialize/deserialize idempotency");
   }
 }

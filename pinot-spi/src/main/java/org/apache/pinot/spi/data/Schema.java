@@ -58,8 +58,6 @@ import org.slf4j.LoggerFactory;
  * <p>There could be multiple DIMENSION or METRIC or DATE_TIME fields, but at most 1 TIME field.
  * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
  * <code>DataType</code>s will be converted to one of them.
- *
- * <p>The schema can be configured with different {@link Options}, including how to handle nulls</p>
  */
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -733,7 +731,8 @@ public final class Schema implements Serializable {
         && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec)
         && EqualityUtils.isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs)
         && EqualityUtils.isEqualIgnoreOrder(_complexFieldSpecs, that._complexFieldSpecs)
-        && EqualityUtils.isEqual(_primaryKeyColumns, that._primaryKeyColumns);
+        && EqualityUtils.isEqual(_primaryKeyColumns, that._primaryKeyColumns)
+        && EqualityUtils.isEqual(_enableColumnBasedNullHandling, that._enableColumnBasedNullHandling);
     //@formatter:on
   }
 
