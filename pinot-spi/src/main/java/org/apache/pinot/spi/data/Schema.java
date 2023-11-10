@@ -791,6 +791,7 @@ public final class Schema implements Serializable {
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _complexFieldSpecs);
     result = EqualityUtils.hashCodeOf(result, _primaryKeyColumns);
+    result = EqualityUtils.hashCodeOf(result, _enableColumnBasedNullHandling);
     return result;
   }
 
