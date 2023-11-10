@@ -134,7 +134,7 @@
     <swagger.version>1.6.9</swagger.version>
     <hadoop.version>3.2.4</hadoop.version>
     <antlr.version>4.6</antlr.version>
-    <jsonpath.version>2.7.0</jsonpath.version>
+    <jsonpath.version>2.8.0</jsonpath.version>
     <jsonsmart.version>2.5.0</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.30.0</calcite.version>
