@@ -30,6 +30,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -68,13 +71,14 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
+import static org.apache.pinot.spi.utils.CommonConstants.*;
 
 
 /**
@@ -283,6 +287,82 @@ public class PinotTenantRestletResource {
     } else {
       throw new ControllerApplicationException(LOGGER, "Invalid tenant type: " + tenantType,
           Response.Status.BAD_REQUEST);
+    }
+  }
+
+  @GET
+  @Path("/tenants/{tenantName}/instancePartitions")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE_PARTITIONS)
+  @Authenticate(AccessType.READ)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the instance partitions of a tenant")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+      @ApiResponse(code = 404, message = "Instance partitions not found")})
+  public InstancePartitions getInstancePartitions(
+      @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
+          allowableValues = "OFFLINE, CONSUMING, COMPLETED")
+      @QueryParam("instancePartitionType") String instancePartitionType) {
+    String tenantNameWithType = InstancePartitionsType.valueOf(instancePartitionType)
+        .getInstancePartitionsName(tenantName);
+    InstancePartitions instancePartitions =
+        InstancePartitionsUtils.fetchInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
+            tenantNameWithType);
+
+    if (instancePartitions == null) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to find the instance partitions for %s", tenantNameWithType),
+          Response.Status.NOT_FOUND);
+    } else {
+      return instancePartitions;
+    }
+  }
+
+  @PUT
+  @Path("/tenants/{tenantName}/instancePartitions")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_INSTANCE_PARTITIONS)
+  @Authenticate(AccessType.UPDATE)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Update an instance partition for a server type in a tenant")
+  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = InstancePartitions.class),
+      @ApiResponse(code = 400, message = "Failed to deserialize/validate the instance partitions"),
+      @ApiResponse(code = 500, message = "Error updating the tenant")})
+  public InstancePartitions assignInstancesPartitionMap(
+      @ApiParam(value = "Tenant name ", required = true) @PathParam("tenantName") String tenantName,
+      @ApiParam(value = "instancePartitionType (OFFLINE|CONSUMING|COMPLETED)", required = true,
+          allowableValues = "OFFLINE, CONSUMING, COMPLETED")
+      @QueryParam("instancePartitionType") String instancePartitionType,
+      String instancePartitionsStr) {
+    InstancePartitions instancePartitions;
+    try {
+      instancePartitions = JsonUtils.stringToObject(instancePartitionsStr, InstancePartitions.class);
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to deserialize the instance partitions",
+          Response.Status.BAD_REQUEST);
+    }
+
+    String inputTenantName = InstancePartitionsType.valueOf(instancePartitionType)
+        .getInstancePartitionsName(tenantName);
+
+    if (!instancePartitions.getInstancePartitionsName().equals(inputTenantName)) {
+      throw new ControllerApplicationException(LOGGER, "Instance partitions name mismatch, expected: "
+          + inputTenantName
+          + ", got: " + instancePartitions.getInstancePartitionsName(), Response.Status.BAD_REQUEST);
+    }
+
+    persistInstancePartitionsHelper(instancePartitions);
+    return instancePartitions;
+  }
+
+  private void persistInstancePartitionsHelper(InstancePartitions instancePartitions) {
+    try {
+      LOGGER.info("Persisting instance partitions: {}", instancePartitions);
+      InstancePartitionsUtils.persistInstancePartitions(_pinotHelixResourceManager.getPropertyStore(),
+          instancePartitions);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions",
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 

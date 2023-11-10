@@ -126,11 +126,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   // For star-tree triggering test
   private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_1 =
       new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
-          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
+          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_1 = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'UA'";
   private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_2 =
       new StarTreeIndexConfig(Collections.singletonList("DestState"), null,
-          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), 100);
+          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
 
   // For default columns test
@@ -314,9 +314,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Override
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
-    if (getNumServers() == 1) {
-      pinotQuery = "SET serverReturnFinalResult = true;" + pinotQuery;
-    }
     super.testQuery(pinotQuery, h2Query);
   }
 
@@ -626,9 +623,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     String queryWithOption = "SET maxServerResponseSizeBytes=1000; " + SELECT_STAR_QUERY;
     JsonNode response = postQuery(queryWithOption);
-    assert response.get("exceptions").size() > 0;
-    int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
-    assertEquals(errorCode, 503);
+    JsonNode exceptions = response.get("exceptions");
+    assertFalse(exceptions.isEmpty());
+    int errorCode = exceptions.get(0).get("errorCode").asInt();
+    assertEquals(errorCode, QueryException.QUERY_CANCELLATION_ERROR_CODE);
   }
 
   @Test
@@ -636,9 +634,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     String queryWithOption = "SET maxQueryResponseSizeBytes=1000; " + SELECT_STAR_QUERY;
     JsonNode response = postQuery(queryWithOption);
-    assert response.get("exceptions").size() > 0;
-    int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
-    assertEquals(errorCode, 503);
+    JsonNode exceptions = response.get("exceptions");
+    assertFalse(exceptions.isEmpty());
+    int errorCode = exceptions.get(0).get("errorCode").asInt();
+    assertEquals(errorCode, QueryException.QUERY_CANCELLATION_ERROR_CODE);
   }
 
   @Test
@@ -649,16 +648,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should return an exception
+        // Server should return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        assert response.get("exceptions").size() > 0;
-        int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
-        if (errorCode == 503) {
-          return true;
-        }
-        return false;
+        JsonNode exceptions = response.get("exceptions");
+        return !exceptions.isEmpty()
+            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
 
@@ -667,14 +663,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should not return an exception
+        // Server should not return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        if (response.get("exceptions").size() == 0) {
-          return true;
-        }
-        return false;
+        return response.get("exceptions").isEmpty();
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
   }
@@ -687,16 +680,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should return an exception
+        // Server should return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        assert response.get("exceptions").size() > 0;
-        int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
-        if (errorCode == 503) {
-          return true;
-        }
-        return false;
+        JsonNode exceptions = response.get("exceptions");
+        return !exceptions.isEmpty()
+            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
 
@@ -705,14 +695,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should not return an exception
+        // Server should not return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        if (response.get("exceptions").size() == 0) {
-          return true;
-        }
-        return false;
+        return response.get("exceptions").isEmpty();
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
   }
@@ -725,16 +712,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should return an exception
+        // Server should return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        assert response.get("exceptions").size() > 0;
-        int errorCode = response.get("exceptions").get(0).get("errorCode").asInt();
-        if (errorCode == 503) {
-          return true;
-        }
-        return false;
+        JsonNode exceptions = response.get("exceptions");
+        return !exceptions.isEmpty()
+            && exceptions.get(0).get("errorCode").asInt() == QueryException.QUERY_CANCELLATION_ERROR_CODE;
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
 
@@ -743,14 +727,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     TestUtils.waitForCondition(aVoid -> {
       try {
-        // Server should not return an exception
+        // Server should not return exception after the table config is picked up
         JsonNode response = postQuery(SELECT_STAR_QUERY);
-        if (response.get("exceptions").size() == 0) {
-          return true;
-        }
-        return false;
+        return response.get("exceptions").isEmpty();
       } catch (Exception e) {
-        return false;
+        throw new RuntimeException(e);
       }
     }, 60_000L, "Failed to execute query");
   }
@@ -1783,21 +1764,41 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testInBuiltVirtualColumns(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT $docId, $hostName, $segmentName FROM mytable";
+
+    String query = "SELECT $docId, $hostName, $segmentName FROM mytable LIMIT 10";
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
     assertEquals(dataSchema.get("columnNames").toString(), "[\"$docId\",\"$hostName\",\"$segmentName\"]");
     assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"STRING\",\"STRING\"]");
     JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 10);
     String expectedHostName = NetUtils.getHostnameOrAddress();
     String expectedSegmentNamePrefix = "mytable_";
     for (int i = 0; i < 10; i++) {
       JsonNode row = rows.get(i);
       assertEquals(row.get(0).asInt(), i);
       assertEquals(row.get(1).asText(), expectedHostName);
-      assertTrue(row.get(2).asText().startsWith(expectedSegmentNamePrefix));
+      String segmentName = row.get(2).asText();
+      assertTrue(segmentName.startsWith(expectedSegmentNamePrefix));
     }
+
+    // Collect all segment names
+    query = "SELECT DISTINCT $segmentName FROM mytable LIMIT 10000";
+    response = postQuery(query);
+    rows = response.get("resultTable").get("rows");
+    int numSegments = rows.size();
+    List<String> segmentNames = new ArrayList<>(numSegments);
+    for (int i = 0; i < numSegments; i++) {
+      segmentNames.add(rows.get(i).get(0).asText());
+    }
+    // Test IN clause on $segmentName
+    Collections.shuffle(segmentNames);
+    int numSegmentsToQuery = RANDOM.nextInt(numSegments) + 1;
+    query = "SELECT COUNT(*) FROM mytable WHERE $segmentName IN ('" + String.join("','",
+        segmentNames.subList(0, numSegmentsToQuery)) + "')";
+    response = postQuery(query);
+    assertEquals(response.get("numSegmentsMatched").asInt(), numSegmentsToQuery);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -3114,13 +3115,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testJDBCClient()
       throws Exception {
     String query = "SELECT count(*) FROM " + getTableName();
-    java.sql.Connection connection = getJDBCConnectionFromController(DEFAULT_CONTROLLER_PORT);
+    java.sql.Connection connection = getJDBCConnectionFromController(getControllerPort());
     Statement statement = connection.createStatement();
     ResultSet resultSet = statement.executeQuery(query);
     resultSet.first();
     Assert.assertTrue(resultSet.getLong(1) > 0);
 
-    connection = getJDBCConnectionFromBrokers(RANDOM.nextInt(), DEFAULT_BROKER_PORT);
+    connection = getJDBCConnectionFromBrokers(RANDOM.nextInt(), getRandomBrokerPort());
     statement = connection.createStatement();
     resultSet = statement.executeQuery(query);
     resultSet.first();

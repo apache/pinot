@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
@@ -81,13 +82,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final MailboxService _mailboxService;
   private final QueryDispatcher _queryDispatcher;
 
-
-  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
-      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
-      QueryQuotaManager queryQuotaManager, TableCache tableCache, BrokerMetrics brokerMetrics,
-      BrokerQueryEventListener brokerQueryEventListener) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache,
-        brokerMetrics, brokerQueryEventListener);
+  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      BrokerMetrics brokerMetrics, BrokerQueryEventListener brokerQueryEventListener) {
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, brokerMetrics,
+        brokerQueryEventListener);
     LOGGER.info("Using Multi-stage BrokerRequestHandler.");
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
@@ -170,7 +169,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     if (!hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders)) {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
-    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - compilationEndTimeNs);
 
     // Validate QPS quota
     if (hasExceededQPSQuota(tableNames, requestContext)) {
@@ -191,6 +189,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimeoutMs, queryOptions,
           stageIdStatsMap);
+    } catch (TimeoutException e) {
+      for (String table : tableNames) {
+        _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
+      }
+      LOGGER.warn("Timed out executing request {}: {}", requestId, query);
+      requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
+      return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
     } catch (Throwable t) {
       String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
       LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
@@ -233,6 +238,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
     }
 
+    // Set partial result flag
+    brokerResponse.setPartialResult(isPartialResult(brokerResponse));
+
     // Set total query processing time
     // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(
@@ -255,6 +263,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
    */
   private boolean hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
       RequestContext requestContext, HttpHeaders httpHeaders) {
+    final long startTimeNs = System.nanoTime();
     AccessControl accessControl = _accessControlFactory.create();
     boolean hasAccess = accessControl.hasAccess(requesterIdentity, tableNames) && tableNames.stream()
         .allMatch(table -> accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY));
@@ -262,9 +271,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
       requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
-      return false;
     }
-    return true;
+
+    updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
+
+    return hasAccess;
   }
 
   /**

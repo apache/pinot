@@ -31,7 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang3.StringUtils;
@@ -89,6 +89,7 @@ public abstract class QuickStartBase {
       .build();
 
   protected File _dataDir = FileUtils.getTempDirectory();
+  protected boolean _setCustomDataDir;
   protected String[] _bootstrapDataDirs;
   protected String _zkExternalAddress;
   protected String _configFilePath;
@@ -97,6 +98,7 @@ public abstract class QuickStartBase {
 
   public QuickStartBase setDataDir(String dataDir) {
     _dataDir = new File(dataDir);
+    _setCustomDataDir = true;
     return this;
   }
 

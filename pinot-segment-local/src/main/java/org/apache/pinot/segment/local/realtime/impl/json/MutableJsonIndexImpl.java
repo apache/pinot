@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.realtime.impl.json;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.IOException;
@@ -42,6 +43,7 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -118,6 +120,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     FilterContext filter;
     try {
       filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+      Preconditions.checkArgument(!filter.isConstant());
     } catch (Exception e) {
       throw new BadQueryRequestException("Invalid json match filter: " + filterString);
     }
@@ -292,6 +295,52 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     } else {
       throw new IllegalStateException("Unsupported json_match predicate type: " + predicate);
     }
+  }
+
+  @Override
+  public Map<String, RoaringBitmap> getMatchingDocsMap(String key) {
+    Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
+    _readLock.lock();
+    try {
+      for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
+        if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
+          continue;
+        }
+        MutableRoaringBitmap flattenedDocIds = entry.getValue().toMutableRoaringBitmap();
+        PeekableIntIterator it = flattenedDocIds.getIntIterator();
+        MutableRoaringBitmap postingList = new MutableRoaringBitmap();
+        while (it.hasNext()) {
+          postingList.add(_docIdMapping.getInt(it.next()));
+        }
+        String val = entry.getKey().substring(key.length() + 1);
+        matchingDocsMap.put(val, postingList.toRoaringBitmap());
+      }
+    } finally {
+      _readLock.unlock();
+    }
+    return matchingDocsMap;
+  }
+
+  @Override
+  public String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> matchingDocsMap) {
+    Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
+    RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
+
+    for (Map.Entry<String, RoaringBitmap> entry : matchingDocsMap.entrySet()) {
+      RoaringBitmap intersection = RoaringBitmap.and(entry.getValue(), docIdMask);
+      if (intersection.isEmpty()) {
+        continue;
+      }
+      for (int docId : intersection) {
+        docIdToValues.put(docId, entry.getKey());
+      }
+    }
+
+    String[] values = new String[docIds.length];
+    for (int i = 0; i < docIds.length; i++) {
+      values[i] = docIdToValues.get(docIds[i]);
+    }
+    return values;
   }
 
   @Override

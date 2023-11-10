@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -57,6 +58,23 @@ public class QueryEnvironmentTestBase {
           "d_REALTIME", ImmutableList.of("d2"), "d_OFFLINE", ImmutableList.of("d3"), "e_REALTIME",
           ImmutableList.of("e2"), "e_OFFLINE", ImmutableList.of("e3"));
   public static final Map<String, Schema> TABLE_SCHEMAS = new HashMap<>();
+  public static final Map<String, Pair<String, List<List<String>>>> PARTITIONED_SEGMENTS_MAP = new HashMap<>();
+  public static final int PARTITION_COUNT = 4;
+  public static final Map<String, String> PARTITIONED_TABLES =
+      ImmutableMap.of("a_REALTIME", "col2", "b_REALTIME", "col1");
+  static {
+    for (Map.Entry<String, String> e : PARTITIONED_TABLES.entrySet()) {
+      String tableName = e.getKey();
+      String partitionColumn = e.getValue();
+      List<List<String>> partitionIdToSegmentsMap = new ArrayList<>(PARTITION_COUNT);
+      partitionIdToSegmentsMap.add(SERVER1_SEGMENTS.getOrDefault(tableName, Collections.emptyList()));
+      partitionIdToSegmentsMap.add(SERVER2_SEGMENTS.getOrDefault(tableName, Collections.emptyList()));
+      for (int i = 2; i < PARTITION_COUNT; i++) {
+        partitionIdToSegmentsMap.add(new ArrayList<>());
+      }
+      PARTITIONED_SEGMENTS_MAP.put(tableName, Pair.of(partitionColumn, partitionIdToSegmentsMap));
+    }
+  }
 
   static {
     TABLE_SCHEMAS.put("a_REALTIME", getSchemaBuilder("a").build());
@@ -84,7 +102,8 @@ public class QueryEnvironmentTestBase {
   @BeforeClass
   public void setUp() {
     // the port doesn't matter as we are not actually making a server call.
-    _queryEnvironment = getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS, null);
+    _queryEnvironment =
+        getQueryEnvironment(3, 1, 2, TABLE_SCHEMAS, SERVER1_SEGMENTS, SERVER2_SEGMENTS, PARTITIONED_SEGMENTS_MAP);
   }
 
   @DataProvider(name = "testQueryDataProvider")

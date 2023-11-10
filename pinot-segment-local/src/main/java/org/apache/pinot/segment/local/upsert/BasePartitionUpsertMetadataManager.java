@@ -42,6 +42,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -50,6 +51,8 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BooleanUtils;
+import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +71,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
   protected final double _metadataTTL;
+  protected final boolean _dropOutOfOrderRecord;
   protected final File _tableIndexDir;
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
@@ -95,7 +99,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      boolean dropOutOfOrderRecord, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
@@ -105,6 +109,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _partialUpsertHandler = partialUpsertHandler;
     _enableSnapshot = enableSnapshot;
     _metadataTTL = metadataTTL;
+    _dropOutOfOrderRecord = dropOutOfOrderRecord;
     _tableIndexDir = tableIndexDir;
     _snapshotLock = enableSnapshot ? new ReentrantReadWriteLock() : null;
     _serverMetrics = serverMetrics;
@@ -119,6 +124,28 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   @Override
   public List<String> getPrimaryKeyColumns() {
     return _primaryKeyColumns;
+  }
+
+  @Nullable
+  protected MutableRoaringBitmap getQueryableDocIds(IndexSegment segment, MutableRoaringBitmap validDocIds) {
+    if (_deleteRecordColumn == null) {
+      return null;
+    }
+    MutableRoaringBitmap queryableDocIds = new MutableRoaringBitmap();
+    try (PinotSegmentColumnReader deleteRecordColumnReader = new PinotSegmentColumnReader(segment,
+        _deleteRecordColumn)) {
+      PeekableIntIterator docIdIterator = validDocIds.getIntIterator();
+      while (docIdIterator.hasNext()) {
+        int docId = docIdIterator.next();
+        if (!BooleanUtils.toBoolean(deleteRecordColumnReader.getValue(docId))) {
+          queryableDocIds.add(docId);
+        }
+      }
+    } catch (IOException e) {
+      _logger.error("Failed to close column reader for delete record column: {} for segment: {} ", _deleteRecordColumn,
+          segment.getSegmentName(), e);
+    }
+    return queryableDocIds;
   }
 
   @Override
@@ -138,15 +165,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");
-      // TODO: Support deletion for TTL. Need to construct queryableDocIds when adding segments out of TTL.
-      Preconditions.checkState(_deleteRecordColumn == null, "Upsert TTL doesn't work with record deletion");
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
       if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
         _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
         MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
         if (validDocIdsSnapshot != null) {
-          immutableSegment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot), null);
+          MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
+          immutableSegment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
+              new ThreadSafeMutableRoaringBitmap(queryableDocIds));
         } else {
           _logger.warn("Failed to find snapshot from segment: {} which is out of TTL, treating all documents as valid",
               segmentName);
@@ -317,24 +344,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
-  public void addRecord(MutableSegment segment, RecordInfo recordInfo) {
+  public boolean addRecord(MutableSegment segment, RecordInfo recordInfo) {
     _gotFirstConsumingSegment = true;
     if (!startOperation()) {
       _logger.debug("Skip adding record to segment: {} because metadata manager is already stopped",
           segment.getSegmentName());
-      return;
+      return false;
     }
     // NOTE: We don't acquire snapshot read lock here because snapshot is always taken before a new consuming segment
     //       starts consuming, so it won't overlap with this method
     try {
-      doAddRecord(segment, recordInfo);
+      boolean addRecord = doAddRecord(segment, recordInfo);
       _trackedSegments.add(segment);
+      return addRecord;
     } finally {
       finishOperation();
     }
   }
 
-  protected abstract void doAddRecord(MutableSegment segment, RecordInfo recordInfo);
+  protected abstract boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo);
 
   @Override
   public void replaceSegment(ImmutableSegment segment, IndexSegment oldSegment) {

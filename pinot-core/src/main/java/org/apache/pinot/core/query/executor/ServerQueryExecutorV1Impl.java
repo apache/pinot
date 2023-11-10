@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -28,7 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.QueryException;
@@ -349,12 +350,18 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       numTotalDocs += indexSegment.getSegmentMetadata().getTotalDocs();
     }
 
-    TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
+    List<IndexSegment> selectedSegments;
+    SegmentPrunerStatistics prunerStats = null;
+    if ((queryContext.getFilter() != null && queryContext.getFilter().isConstantFalse()) || (
+        queryContext.getHavingFilter() != null && queryContext.getHavingFilter().isConstantFalse())) {
+      selectedSegments = Collections.emptyList();
+    } else {
+      TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
+      prunerStats = new SegmentPrunerStatistics();
+      selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext, prunerStats, executorService);
+      segmentPruneTimer.stopAndRecord();
+    }
     int numTotalSegments = indexSegments.size();
-    SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
-    List<IndexSegment> selectedSegments =
-        _segmentPrunerService.prune(indexSegments, queryContext, prunerStats, executorService);
-    segmentPruneTimer.stopAndRecord();
     int numSelectedSegments = selectedSegments.size();
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
     InstanceResponseBlock instanceResponse;
@@ -383,7 +390,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     // Set the number of pruned segments. This count does not include the segments which returned empty filters
     int prunedSegments = numTotalSegments - numSelectedSegments;
     instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), String.valueOf(prunedSegments));
-    addPrunerStats(instanceResponse, prunerStats);
+    if (prunerStats != null) {
+      addPrunerStats(instanceResponse, prunerStats);
+    }
 
     return instanceResponse;
   }
@@ -512,7 +521,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       ExecutorService executorService)
       throws Exception {
     FilterContext filter = queryContext.getFilter();
-    if (filter != null) {
+    if (filter != null && !filter.isConstant()) {
       handleSubquery(filter, indexSegments, timerContext, executorService, queryContext.getEndTimeMs());
     }
   }

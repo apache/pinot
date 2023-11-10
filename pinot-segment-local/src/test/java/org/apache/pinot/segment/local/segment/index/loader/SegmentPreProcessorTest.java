@@ -1415,8 +1415,8 @@ public class SegmentPreProcessorTest {
     // V1 use separate file for each column index.
     File iiFile = new File(_indexDir, strColumn + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
     File rgFile = new File(_indexDir, strColumn + V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
-    File txtFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
-    File fstFile = new File(_indexDir, strColumn + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
+    File txtFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION);
+    File fstFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION);
     File bfFile = new File(_indexDir, strColumn + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
     assertFalse(iiFile.exists());
@@ -1846,7 +1846,7 @@ public class SegmentPreProcessorTest {
 
     // Update table config to convert dict to noDict for longCol and add the Startree index config
     StarTreeIndexConfig starTreeIndexConfig =
-        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), 1000);
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000);
     tableConfig.getIndexingConfig().setStarTreeIndexConfigs(List.of(starTreeIndexConfig));
     tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
     tableConfig.getIndexingConfig().setNoDictionaryColumns(List.of("longCol"));

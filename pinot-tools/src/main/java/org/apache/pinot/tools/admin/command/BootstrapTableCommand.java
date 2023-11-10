@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin.command;
 
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -139,6 +140,6 @@ public class BootstrapTableCommand extends AbstractBaseAdminCommand implements C
       _controllerHost = NetUtils.getHostAddress();
     }
     return new BootstrapTableTool(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort), _dir,
-        makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)).execute();
+        AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password)).execute();
   }
 }

@@ -41,6 +41,8 @@ import org.testng.annotations.Test;
 
 public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final String EXPLAIN_REGEX =
+      "EXPLAIN (IMPLEMENTATION )*PLAN (INCLUDING |EXCLUDING )*(ALL )*(ATTRIBUTES )*(AS DOT |AS JSON |AS TEXT )*FOR ";
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
 
@@ -53,7 +55,8 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
       Assert.assertEquals(explainedPlan, output,
           String.format("Test case %s for query %s (%s) doesn't match expected output: %s", testCaseName, description,
               query, output));
-      String queryWithoutExplainPlan = query.replace("EXPLAIN PLAN FOR ", "");
+      // use a regex to exclude the
+      String queryWithoutExplainPlan = query.replaceFirst(EXPLAIN_REGEX, "");
       DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(queryWithoutExplainPlan);
       Assert.assertNotNull(dispatchableSubPlan,
           String.format("Test case %s for query %s should not have a null QueryPlan",
@@ -68,7 +71,7 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
     try {
       long requestId = RANDOM_REQUEST_ID_GEN.nextLong();
       _queryEnvironment.explainQuery(query, requestId);
-      String queryWithoutExplainPlan = query.replace("EXPLAIN PLAN FOR ", "");
+      String queryWithoutExplainPlan = query.replaceFirst(EXPLAIN_REGEX, "");
       _queryEnvironment.planQuery(queryWithoutExplainPlan);
       Assert.fail("Query compilation should have failed with exception message pattern: " + expectedException);
     } catch (Exception e) {

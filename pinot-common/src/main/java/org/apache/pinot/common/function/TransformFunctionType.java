@@ -113,6 +113,11 @@ public enum TransformFunctionType {
           SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
           SqlTypeFamily.CHARACTER), ordinal -> ordinal > 2), "json_extract_scalar"),
+  JSON_EXTRACT_INDEX("jsonExtractIndex",
+      ReturnTypes.cascade(opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2,
+          SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER), ordinal -> ordinal > 2), "json_extract_index"),
   JSON_EXTRACT_KEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), "json_extract_key"),
 
@@ -128,6 +133,10 @@ public enum TransformFunctionType {
           SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
           SqlTypeFamily.CHARACTER)), "date_time_convert"),
+
+  DATE_TIME_CONVERT_WINDOW_HOP("dateTimeConvertWindowHop", ReturnTypes.TO_ARRAY, OperandTypes.family(
+      ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER)), "date_time_convert_window_hop"),
 
   DATE_TRUNC("dateTrunc",
       ReturnTypes.BIGINT_FORCE_NULLABLE,
@@ -357,7 +366,7 @@ public enum TransformFunctionType {
     int outputFormatPos = 2;
     if (opBinding.getOperandCount() > outputFormatPos
         && opBinding.isOperandLiteral(outputFormatPos, false)) {
-      String outputFormatStr = opBinding.getOperandLiteralValue(outputFormatPos, String.class).toUpperCase();
+      String outputFormatStr = opBinding.getOperandLiteralValue(outputFormatPos, String.class);
       DateTimeFormatSpec dateTimeFormatSpec = new DateTimeFormatSpec(outputFormatStr);
       if ((dateTimeFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.EPOCH) || (
           dateTimeFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.TIMESTAMP)) {

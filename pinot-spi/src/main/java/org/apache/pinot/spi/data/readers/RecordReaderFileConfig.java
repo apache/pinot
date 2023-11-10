@@ -34,6 +34,7 @@ public class RecordReaderFileConfig {
   public final File _dataFile;
   public final Set<String> _fieldsToRead;
   public final RecordReaderConfig _recordReaderConfig;
+  // Record Readers created/passed from clients.
   public final RecordReader _recordReader;
 
   // Pass in the info needed to initialize the reader

@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -70,7 +70,7 @@ public class AggregateOperator extends MultiStageOperator {
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
 
-  private boolean _hasReturnedAggregateBlock;
+  private boolean _hasConstructedAggregateBlock;
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator inputOperator, DataSchema resultSchema,
       List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType, List<Integer> filterArgIndices,
@@ -131,26 +131,19 @@ public class AggregateOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    try {
-      TransferableBlock finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
-
-      // setting upstream error block
-      if (finalBlock.isErrorBlock()) {
-        return finalBlock;
-      }
-
-      if (!_hasReturnedAggregateBlock) {
-        return produceAggregatedBlock();
-      } else {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      }
-    } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+    if (_hasConstructedAggregateBlock) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
+    TransferableBlock finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
+    // returning upstream error block if finalBlock contains error.
+    if (finalBlock.isErrorBlock()) {
+      return finalBlock;
+    }
+    return produceAggregatedBlock();
   }
 
   private TransferableBlock produceAggregatedBlock() {
-    _hasReturnedAggregateBlock = true;
+    _hasConstructedAggregateBlock = true;
     if (_aggregationExecutor != null) {
       return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
     } else {
@@ -160,9 +153,9 @@ public class AggregateOperator extends MultiStageOperator {
       } else {
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
-          dataBlock.addException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE,
-              String.format("Reached numGroupsLimit of: %d for group-by, ignoring the extra groups",
-                  _groupByExecutor.getNumGroupsLimit()));
+          OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
+          operatorStats.recordSingleStat(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+          _inputOperator.earlyTerminate();
         }
         return dataBlock;
       }

@@ -27,7 +27,6 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -51,7 +50,6 @@ public class TransformOperator extends MultiStageOperator {
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
-  private TransferableBlock _upstreamErrorBlock;
 
   public TransformOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
       DataSchema resultSchema, List<RexExpression> transforms, DataSchema upstreamDataSchema) {
@@ -81,28 +79,10 @@ public class TransformOperator extends MultiStageOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    try {
-      TransferableBlock block = _upstreamOperator.nextBlock();
-      return transform(block);
-    } catch (RuntimeException e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
-    }
-  }
-
-  private TransferableBlock transform(TransferableBlock block) {
-    // TODO: Other operators keep the first erroneous block, while this keep the last.
-    //  We should decide what is what we want to do and be consistent with that.
-    if (block.isErrorBlock()) {
-      _upstreamErrorBlock = block;
-    }
-    if (_upstreamErrorBlock != null) {
-      return _upstreamErrorBlock;
-    }
-
-    if (TransferableBlockUtils.isEndOfStream(block)) {
+    TransferableBlock block = _upstreamOperator.nextBlock();
+    if (block.isEndOfStreamBlock()) {
       return block;
     }
-
     List<Object[]> container = block.getContainer();
     List<Object[]> resultRows = new ArrayList<>(container.size());
     for (Object[] row : container) {

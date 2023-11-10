@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.util.Collections;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -150,7 +151,7 @@ public class DeleteSchemaCommand extends AbstractBaseAdminCommand implements Com
       fileUploadDownloadClient.getHttpClient().sendDeleteRequest(
           FileUploadDownloadClient.getDeleteSchemaURI(_controllerProtocol, _controllerHost,
               Integer.parseInt(_controllerPort), _schemaName), Collections.emptyMap(),
-          makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
+          AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
     } catch (Exception e) {
       LOGGER.error("Got Exception while deleting Pinot Schema: " + _schemaName, e);
       return false;

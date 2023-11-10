@@ -1574,10 +1574,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
 
           if (numPartitionGroups != numPartitions) {
-            _segmentLogger.warn(
+            _segmentLogger.info(
                 "Number of stream partitions: {} does not match number of partitions in the partition config: {}, "
                     + "using number of stream " + "partitions", numPartitionGroups, numPartitions);
-            _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
             numPartitions = numPartitionGroups;
           }
         } catch (Exception e) {

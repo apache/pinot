@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -86,6 +87,8 @@ public class PartialUpsertHandlerTest {
 
       ImmutableSegmentImpl segment = mock(ImmutableSegmentImpl.class);
       when(segment.getColumnNames()).thenReturn(Sets.newSet("field1", "field2", "hoursSinceEpoch"));
+      LazyRow prevRecord = new LazyRow();
+      prevRecord.init(segment, 1);
 
       GenericRow row = new GenericRow();
       if (isNewNull) {
@@ -93,7 +96,7 @@ public class PartialUpsertHandlerTest {
       } else {
         row.putValue(columnName, newValue);
       }
-      handler.merge(segment, 1, row);
+      handler.merge(prevRecord, row);
       assertEquals(row.getValue(columnName), expectedValue);
       assertEquals(row.isNullValue(columnName), isExpectedNull);
     }

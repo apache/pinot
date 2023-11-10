@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -288,6 +289,86 @@ public class JsonIndexTest {
 
   private MutableRoaringBitmap getMatchingDocIds(JsonIndexReader indexReader, String filter) {
     return indexReader.getMatchingDocIds(filter);
+  }
+
+  @Test
+  public void testGetValuesForKeyAndDocs()
+      throws Exception {
+    // @formatter: off
+    // CHECKSTYLE:OFF
+    String[] records = new String[] {
+        "{\"field1\":\"value1\",\"field2\":\"value2\",\"field3\":\"value3\"}",
+        "{\"field1\":\"value2\", \"field2\":[\"value1\",\"value2\"]}",
+        "{\"field1\":\"value1\",\"field2\":\"value4\"}",
+    };
+    // CHECKSTYLE:ON
+    // @formatter: on
+    String[] testKeys = new String[]{".field1", ".field2", ".field3", ".field4"};
+
+    String colName = "col";
+    try (
+        JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, new JsonIndexConfig());
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig())) {
+      for (String record : records) {
+        offHeapIndexCreator.add(record);
+        mutableJsonIndex.add(record);
+      }
+      offHeapIndexCreator.seal();
+
+      File offHeapIndexFile = new File(INDEX_DIR, colName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+      Assert.assertTrue(offHeapIndexFile.exists());
+
+      try (PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+          ImmutableJsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer,
+              records.length)) {
+
+        // No filtering
+        int[] docMask = new int[]{0, 1, 2};
+        String[][] expectedValues =
+            new String[][]{{"value1", "value2", "value1"}, {"value2", null, "value4"}, {"value3", null, null},
+                {null, null, null}};
+        for (int i = 0; i < testKeys.length; i++) {
+          Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingDocsMap(testKeys[i]);
+          String[] values = offHeapIndexReader.getValuesForKeyAndDocs(docMask, context);
+          Assert.assertEquals(values, expectedValues[i]);
+
+          context = mutableJsonIndex.getMatchingDocsMap(testKeys[i]);
+          values = mutableJsonIndex.getValuesForKeyAndDocs(docMask, context);
+          Assert.assertEquals(values, expectedValues[i]);
+        }
+
+        // Some filtering
+        docMask = new int[]{1, 2};
+        expectedValues = new String[][]{{"value2", "value1"}, {null, "value4"}, {null, null}, {null, null}};
+        for (int i = 0; i < testKeys.length; i++) {
+          Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingDocsMap(testKeys[i]);
+          String[] values = offHeapIndexReader.getValuesForKeyAndDocs(docMask, context);
+          Assert.assertEquals(values, expectedValues[i]);
+
+          context = mutableJsonIndex.getMatchingDocsMap(testKeys[i]);
+          values = mutableJsonIndex.getValuesForKeyAndDocs(docMask, context);
+          Assert.assertEquals(values, expectedValues[i]);
+        }
+
+        // Immutable index, context is reused for the second method call
+        Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingDocsMap(".field1");
+        docMask = new int[]{0};
+        String[] values = offHeapIndexReader.getValuesForKeyAndDocs(docMask, context);
+        Assert.assertEquals(values, new String[]{"value1"});
+        docMask = new int[]{1, 2};
+        values = offHeapIndexReader.getValuesForKeyAndDocs(docMask, context);
+        Assert.assertEquals(values, new String[]{"value2", "value1"});
+
+        // Mutable index, context is reused for the second method call
+        context = mutableJsonIndex.getMatchingDocsMap(".field1");;
+        docMask = new int[]{0};
+        values = mutableJsonIndex.getValuesForKeyAndDocs(docMask, context);
+        Assert.assertEquals(values, new String[]{"value1"});
+        docMask = new int[]{1, 2};
+        values = mutableJsonIndex.getValuesForKeyAndDocs(docMask, context);
+        Assert.assertEquals(values, new String[]{"value2", "value1"});
+      }
+    }
   }
 
   public static class ConfTest extends AbstractSerdeIndexContract {
