@@ -22,6 +22,7 @@ import java.io.File;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -48,5 +49,11 @@ public interface SegmentFetcher {
    * Fetches a segment to local from any uri in the given list.
    */
   void fetchSegmentToLocal(List<URI> uri, File dest)
+      throws Exception;
+
+  /**
+   * Fetches a given segment to local.
+   */
+  void fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
       throws Exception;
 }

@@ -411,6 +411,10 @@
       <groupId>com.github.seancfoley</groupId>
       <artifactId>ipaddress</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-core</artifactId>
+    </dependency>
   </dependencies>
   <profiles>
     <profile>
