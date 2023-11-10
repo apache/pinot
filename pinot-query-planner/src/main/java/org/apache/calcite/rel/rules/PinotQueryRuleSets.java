@@ -103,6 +103,7 @@ public class PinotQueryRuleSets {
   // The pruner rules run top-down to ensure Calcite restarts from root node after applying a transformation.
   public static final Collection<RelOptRule> PRUNE_RULES = ImmutableList.of(
       CoreRules.PROJECT_MERGE,
+      CoreRules.FILTER_MERGE,
       CoreRules.AGGREGATE_REMOVE,
       CoreRules.SORT_REMOVE,
       PruneEmptyRules.AGGREGATE_INSTANCE, PruneEmptyRules.FILTER_INSTANCE, PruneEmptyRules.JOIN_LEFT_INSTANCE,
