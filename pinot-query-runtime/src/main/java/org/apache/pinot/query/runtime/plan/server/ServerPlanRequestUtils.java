@@ -147,13 +147,6 @@ public class ServerPlanRequestUtils {
     // 2. set pinot query options according to requestMetadataMap
     updateQueryOptions(pinotQuery, executionContext);
 
-    if (QueryOptionsUtils.isNullHandlingEnabled(pinotQuery.getQueryOptions())
-        && !schema.isEnableColumnBasedNullHandling()) {
-      String desc = tableConfig != null ? "Table " + tableConfig.getTableName() : "Schema " + schema.getSchemaName();
-      throw new IllegalStateException(desc + " is not prepared to be used in multi-stage engine with null enable. "
-          + "Please configure column level nullability and reload the table");
-    }
-
     // 3. wrapped around in broker request
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setPinotQuery(pinotQuery);
