@@ -188,7 +188,7 @@
     <scala.version>2.12.18</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
-    <flink.version>1.12.0</flink.version>
+    <flink.version>1.17.1</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
 
     <proto.google.common.protos.version>2.9.6</proto.google.common.protos.version>
