@@ -43,7 +43,7 @@ public class FunctionDefinitionRegistryTest {
       // Geo functions are defined in pinot-core
       "geotoh3",
       // ArrayToMV and ArrayValueConstructor are placeholder functions without implementation
-      "arraytomv", "arrayvalueconstructor",
+      "arraytomv", "arrayvalueconstructor", "arraygenerate",
       // Scalar function
       "scalar",
       // Functions without scalar function counterpart as of now
