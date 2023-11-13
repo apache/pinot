@@ -90,14 +90,15 @@ public class QueryRouter {
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
       long timeoutMs) {
-    return submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
+    return submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable, null, realtimeBrokerRequest,
         realtimeRoutingTable, null, timeoutMs);
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
+      @Nullable Map<ServerInstance, List<String>> optionalOfflineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      @Nullable Map<ServerInstance, List<String>> optionalSegments, long timeoutMs) {
+      @Nullable Map<ServerInstance, List<String>> optionalRealtimeRoutingTable, long timeoutMs) {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     // can prefer but not require TLS until all servers guaranteed to be on TLS
@@ -111,7 +112,8 @@ public class QueryRouter {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
         InstanceRequest instanceRequest =
-            getInstanceRequest(requestId, offlineBrokerRequest, entry.getKey(), entry.getValue(), optionalSegments);
+            getInstanceRequest(requestId, offlineBrokerRequest, entry.getKey(), entry.getValue(),
+                optionalOfflineRoutingTable);
         requestMap.put(serverRoutingInstance, instanceRequest);
       }
     }
@@ -121,7 +123,8 @@ public class QueryRouter {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
         InstanceRequest instanceRequest =
-            getInstanceRequest(requestId, realtimeBrokerRequest, entry.getKey(), entry.getValue(), optionalSegments);
+            getInstanceRequest(requestId, realtimeBrokerRequest, entry.getKey(), entry.getValue(),
+                optionalRealtimeRoutingTable);
         requestMap.put(serverRoutingInstance, instanceRequest);
       }
     }

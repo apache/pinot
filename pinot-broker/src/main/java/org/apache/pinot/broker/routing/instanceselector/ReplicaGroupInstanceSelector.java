@@ -109,10 +109,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       int numCandidates = candidates.size();
       int instanceIdx = (requestId + replicaOffset) % numCandidates;
       SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
-      selectedServers.put(segment, selectedInstance.getInstance());
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
-      // server can skip them upon any issue to process them.
-      if (!selectedInstance.isOnline()) {
+      // broker or server can skip it upon any issue to process it.
+      if (selectedInstance.isOnline()) {
+        selectedServers.put(segment, selectedInstance.getInstance());
+      } else {
         optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
       }
       if (numReplicaGroups > numCandidates) {
@@ -154,10 +155,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
           }
         }
       }
-      selectedServers.put(segment, selectedInstance.getInstance());
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
-      // server can skip them upon any issue to process them.
-      if (!selectedInstance.isOnline()) {
+      // broker or server can skip it upon any issue to process it.
+      if (selectedInstance.isOnline()) {
+        selectedServers.put(segment, selectedInstance.getInstance());
+      } else {
         optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
       }
     }

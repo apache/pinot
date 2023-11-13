@@ -437,7 +437,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   /**
    * Selects the server instances for the given segments based on the request id and segment states. Returns a map
    * from segment to selected server instance hosting the segment. The optional segments are used to get the new
-   * segments that is not online yet. Instead of simply skipping them by broker at routing time, we can let servers
+   * segments that is not online yet. Instead of simply skipping them by broker at routing time, better let servers
    * decide how to handle them.
    */
   abstract Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,

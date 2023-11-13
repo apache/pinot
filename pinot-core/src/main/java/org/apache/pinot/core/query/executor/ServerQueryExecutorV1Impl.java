@@ -204,6 +204,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     Set<String> optionalSegments = queryRequest.getOptionalSegments();
     LOGGER.debug("Processing query: {} with segmentsToQuery: {}, optionalSegments: {}", requestId, segmentsToQuery,
         optionalSegments);
+    if (optionalSegments != null) {
+      segmentsToQuery.addAll(optionalSegments);
+    }
     List<String> notAcquiredSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers =
         tableDataManager.acquireSegments(segmentsToQuery, notAcquiredSegments);
@@ -310,8 +313,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // to invalidate old records in existing segments. If they are simply skipped, the query results can be wrong.
       // Do not report error if the optional segments are missing.
       List<String> missingSegments = notAcquiredSegments.stream().filter(
-          segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName) && optionalSegments != null
-              && !optionalSegments.contains(segmentName)).collect(Collectors.toList());
+          segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName) && (optionalSegments == null
+              || !optionalSegments.contains(segmentName))).collect(Collectors.toList());
       int numMissingSegments = missingSegments.size();
       if (numMissingSegments > 0) {
         instanceResponse.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,

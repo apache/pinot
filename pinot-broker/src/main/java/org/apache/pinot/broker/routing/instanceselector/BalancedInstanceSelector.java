@@ -70,10 +70,11 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
           candidateInstances.add(candidate.getInstance());
         }
         String selectedInstance = _adaptiveServerSelector.select(candidateInstances);
-        segmentToSelectedInstanceMap.put(segment, selectedInstance);
         // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
-        // server can skip them upon any issue to process them.
-        if (!candidates.get(candidateInstances.indexOf(selectedInstance)).isOnline()) {
+        // broker or server can skip it upon any issue to process it.
+        if (candidates.get(candidateInstances.indexOf(selectedInstance)).isOnline()) {
+          segmentToSelectedInstanceMap.put(segment, selectedInstance);
+        } else {
           optionalSegmentToInstanceMap.put(segment, selectedInstance);
         }
       }
@@ -87,10 +88,11 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         }
         int selectedIdx = requestId++ % candidates.size();
         SegmentInstanceCandidate selectedCandidate = candidates.get(selectedIdx);
-        segmentToSelectedInstanceMap.put(segment, selectedCandidate.getInstance());
         // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
-        // server can skip them upon any issue to process them.
-        if (!selectedCandidate.isOnline()) {
+        // broker or server can skip it upon any issue to process it.
+        if (selectedCandidate.isOnline()) {
+          segmentToSelectedInstanceMap.put(segment, selectedCandidate.getInstance());
+        } else {
           optionalSegmentToInstanceMap.put(segment, selectedCandidate.getInstance());
         }
       }

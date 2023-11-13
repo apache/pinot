@@ -119,10 +119,11 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
         String instance = candidate.getInstance();
         if (instanceLookUpSet.contains(instance)) {
           found = true;
-          result.put(segment, instance);
           // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
-          // server can skip them upon any issue to process them.
-          if (!candidate.isOnline()) {
+          // broker or server can skip it upon any issue to process it.
+          if (candidate.isOnline()) {
+            result.put(segment, instance);
+          } else {
             optionalSegmentToInstanceMap.put(segment, instance);
           }
           break;

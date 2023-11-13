@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.request;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -93,7 +92,7 @@ public class ServerQueryRequest {
 
     _segmentsToQuery = serverRequest.getSegmentsList();
     // TODO: support optional segments for GrpcQueryServer
-    _optionalSegments = Collections.emptySet();
+    _optionalSegments = null;
 
     BrokerRequest brokerRequest;
     String payloadType = metadata.getOrDefault(Request.MetadataKeys.PAYLOAD_TYPE, Request.PayloadType.SQL);
