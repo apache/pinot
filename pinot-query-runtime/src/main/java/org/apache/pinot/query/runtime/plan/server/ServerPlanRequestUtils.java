@@ -25,9 +25,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.stream.Collectors;
+import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -37,12 +41,17 @@ import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -73,22 +82,66 @@ public class ServerPlanRequestUtils {
   private static final QueryOptimizer QUERY_OPTIMIZER = new QueryOptimizer();
 
   /**
-   * Entry point to construct a {@link ServerPlanRequestContext} for executing leaf-stage runner.
+   * main entry point for compiling leaf-stage {@link DistributedStagePlan}.
    *
-   * @param executionContext execution context of the stage.
-   * @param distributedStagePlan distributed stage plan of the stage.
-   * @param helixPropertyStore helix property store used to fetch table config and schema for leaf-stage execution.
-   * @return a list of server plan request context to be run
+   * @param executionContext the execution context used by the leaf-stage execution engine.
+   * @param distributedStagePlan the distribute stage plan on the leaf.
+   * @return an opChain that executes the leaf-stage, with the leaf-stage execution encapsulated within.
    */
-  public static List<ServerPlanRequestContext> constructServerQueryRequests(OpChainExecutionContext executionContext,
-      DistributedStagePlan distributedStagePlan, ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
+  public static OpChain compileLeafStage(OpChainExecutionContext executionContext,
+      DistributedStagePlan distributedStagePlan, HelixManager helixManager, ServerMetrics serverMetrics,
+      QueryExecutor leafQueryExecutor, ExecutorService executorService) {
+    long queryArrivalTimeMs = System.currentTimeMillis();
+    ServerPlanRequestContext serverContext = new ServerPlanRequestContext(distributedStagePlan, leafQueryExecutor,
+        executorService, executionContext.getPipelineBreakerResult());
+    // 1. compile the PinotQuery
+    constructPinotQueryPlan(serverContext);
+    // 2. convert PinotQuery into InstanceRequest list (one for each physical table)
+    List<InstanceRequest> instanceRequestList =
+        ServerPlanRequestUtils.constructServerQueryRequests(executionContext, serverContext, distributedStagePlan,
+            helixManager.getHelixPropertyStore());
+    serverContext.setServerQueryRequests(instanceRequestList.stream()
+        .map(instanceRequest -> new ServerQueryRequest(instanceRequest, serverMetrics, queryArrivalTimeMs, true))
+        .collect(Collectors.toList()));
+    // compile the OpChain
+    executionContext.setLeafStageContext(serverContext);
+    return PhysicalPlanVisitor.walkPlanNode(distributedStagePlan.getStageRoot(), executionContext);
+  }
+
+  /**
+   * First step of Server physical plan - construct {@link PinotQuery} and determine the leaf-stage boundary
+   * {@link PlanNode}.
+   *
+   * It constructs the content for {@link ServerPlanRequestContext#getPinotQuery()} and set the boundary via:
+   *   {@link ServerPlanRequestContext#setLeafStageBoundaryNode(PlanNode)}.
+   */
+  private static void constructPinotQueryPlan(ServerPlanRequestContext serverContext) {
+    DistributedStagePlan stagePlan = serverContext.getStagePlan();
+    PinotQuery pinotQuery = serverContext.getPinotQuery();
+    pinotQuery.setExplain(false);
+    // visit the plan and create PinotQuery and determine the leaf stage boundary PlanNode.
+    ServerPlanRequestVisitor.walkStageNode(stagePlan.getStageRoot(), serverContext);
+  }
+
+  /**
+   * Entry point to construct a list of {@link InstanceRequest}s for executing leaf-stage v1 runner.
+   *
+   * @param serverContext the server opChain execution context of the stage.
+   * @param helixPropertyStore helix property store used to fetch table config and schema for leaf-stage execution.
+   * @return a list of server instance request to be run.
+   */
+  public static List<InstanceRequest> constructServerQueryRequests(OpChainExecutionContext executionContext,
+      ServerPlanRequestContext serverContext, DistributedStagePlan distributedStagePlan,
+      ZkHelixPropertyStore<ZNRecord> helixPropertyStore) {
     StageMetadata stageMetadata = distributedStagePlan.getStageMetadata();
     WorkerMetadata workerMetadata = distributedStagePlan.getCurrentWorkerMetadata();
     String rawTableName = StageMetadata.getTableName(stageMetadata);
+    int stageId = distributedStagePlan.getStageId();
     Map<String, List<String>> tableToSegmentListMap = WorkerMetadata.getTableSegmentsMap(workerMetadata);
-    List<ServerPlanRequestContext> requests = new ArrayList<>();
+    List<InstanceRequest> requests = new ArrayList<>();
     for (Map.Entry<String, List<String>> tableEntry : tableToSegmentListMap.entrySet()) {
       String tableType = tableEntry.getKey();
+      List<String> segmentList = tableEntry.getValue();
       // ZkHelixPropertyStore extends from ZkCacheBaseDataAccessor so it should not cause too much out-of-the-box
       // network traffic. but there's chance to improve this:
       // TODO: use TableDataManager: it is already getting tableConfig and Schema when processing segments.
@@ -97,15 +150,15 @@ public class ServerPlanRequestUtils {
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
         Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
             TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName));
-        requests.add(ServerPlanRequestUtils.build(executionContext, distributedStagePlan, tableConfig, schema,
-            StageMetadata.getTimeBoundary(stageMetadata), TableType.OFFLINE, tableEntry.getValue()));
+        requests.add(ServerPlanRequestUtils.compileInstanceRequest(executionContext, serverContext, stageId,
+            tableConfig, schema, StageMetadata.getTimeBoundary(stageMetadata), TableType.OFFLINE, segmentList));
       } else if (TableType.REALTIME.name().equals(tableType)) {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
         Schema schema = ZKMetadataProvider.getTableSchema(helixPropertyStore,
             TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName));
-        requests.add(ServerPlanRequestUtils.build(executionContext, distributedStagePlan, tableConfig, schema,
-            StageMetadata.getTimeBoundary(stageMetadata), TableType.REALTIME, tableEntry.getValue()));
+        requests.add(ServerPlanRequestUtils.compileInstanceRequest(executionContext, serverContext, stageId,
+            tableConfig, schema, StageMetadata.getTimeBoundary(stageMetadata), TableType.REALTIME, segmentList));
       } else {
         throw new IllegalArgumentException("Unsupported table type key: " + tableType);
       }
@@ -113,32 +166,35 @@ public class ServerPlanRequestUtils {
     return requests;
   }
 
-  private static ServerPlanRequestContext build(OpChainExecutionContext executionContext,
-      DistributedStagePlan stagePlan, TableConfig tableConfig, Schema schema, TimeBoundaryInfo timeBoundaryInfo,
-      TableType tableType, List<String> segmentList) {
-    // Before-visit: construct the ServerPlanRequestContext baseline
+  /**
+   * Convert {@link PinotQuery} into an {@link InstanceRequest}.
+   */
+  private static InstanceRequest compileInstanceRequest(OpChainExecutionContext executionContext,
+      ServerPlanRequestContext serverContext, int stageId, TableConfig tableConfig, Schema schema,
+      TimeBoundaryInfo timeBoundaryInfo, TableType tableType, List<String> segmentList) {
     // Making a unique requestId for leaf stages otherwise it causes problem on stats/metrics/tracing.
-    long requestId = (executionContext.getRequestId() << 16) + ((long) stagePlan.getStageId() << 8) + (
-        tableType == TableType.REALTIME ? 1 : 0);
-    PinotQuery pinotQuery = new PinotQuery();
+    long requestId =
+        (executionContext.getRequestId() << 16) + ((long) stageId << 8) + (tableType == TableType.REALTIME ? 1 : 0);
+    // 1. make a deep copy of the pinotQuery and modify the PinotQuery accordingly
+    PinotQuery pinotQuery = new PinotQuery(serverContext.getPinotQuery());
+    //  - attach leaf node limit
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(executionContext.getOpChainMetadata());
     if (leafNodeLimit != null) {
       pinotQuery.setLimit(leafNodeLimit);
     } else {
       pinotQuery.setLimit(DEFAULT_LEAF_NODE_LIMIT);
     }
-    LOGGER.debug("QueryID" + requestId + " leafNodeLimit:" + leafNodeLimit);
-    pinotQuery.setExplain(false);
-    ServerPlanRequestContext serverContext = new ServerPlanRequestContext(executionContext, pinotQuery, tableType);
-
-    // visit the plan and create query physical plan.
-    ServerPlanRequestVisitor.walkStageNode(stagePlan.getStageRoot(), serverContext);
-
-    // Post-visit: finalize context.
-    // 1. global rewrite/optimize
+    //   - attach table type
+    DataSource dataSource = pinotQuery.getDataSource();
+    String rawTableName = dataSource.getTableName();
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(rawTableName);
+    dataSource.setTableName(tableNameWithType);
+    pinotQuery.setDataSource(dataSource);
+    //   - attach time boundary.
     if (timeBoundaryInfo != null) {
       attachTimeBoundary(pinotQuery, timeBoundaryInfo, tableType == TableType.OFFLINE);
     }
+    //   - perform global rewrite/optimize
     for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
       pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
@@ -147,15 +203,12 @@ public class ServerPlanRequestUtils {
     // 2. set pinot query options according to requestMetadataMap
     updateQueryOptions(pinotQuery, executionContext);
 
-    // 3. wrapped around in broker request
+    // 3. wrapped around in broker request and replace with actual table name with type.
     BrokerRequest brokerRequest = new BrokerRequest();
     brokerRequest.setPinotQuery(pinotQuery);
-    DataSource dataSource = pinotQuery.getDataSource();
-    if (dataSource != null) {
-      QuerySource querySource = new QuerySource();
-      querySource.setTableName(dataSource.getTableName());
-      brokerRequest.setQuerySource(querySource);
-    }
+    QuerySource querySource = new QuerySource();
+    querySource.setTableName(dataSource.getTableName());
+    brokerRequest.setQuerySource(querySource);
 
     // 3. create instance request with segmentList
     InstanceRequest instanceRequest = new InstanceRequest();
@@ -165,8 +218,7 @@ public class ServerPlanRequestUtils {
     instanceRequest.setSearchSegments(segmentList);
     instanceRequest.setQuery(brokerRequest);
 
-    serverContext.setInstanceRequest(instanceRequest);
-    return serverContext;
+    return instanceRequest;
   }
 
   /**
@@ -211,13 +263,19 @@ public class ServerPlanRequestUtils {
     List<Expression> expressions = new ArrayList<>();
     for (int i = 0; i < leftJoinKeys.size(); i++) {
       Expression leftExpr = pinotQuery.getSelectList().get(leftJoinKeys.get(i));
-      int rightIdx = rightJoinKeys.get(i);
-      Expression inFilterExpr = RequestUtils.getFunctionExpression(FilterKind.IN.name());
-      List<Expression> operands = new ArrayList<>(dataContainer.size() + 1);
-      operands.add(leftExpr);
-      operands.addAll(computeInOperands(dataContainer, dataSchema, rightIdx));
-      inFilterExpr.getFunctionCall().setOperands(operands);
-      expressions.add(inFilterExpr);
+      if (dataContainer.size() == 0) {
+        // put a constant false expression
+        Expression constantFalseExpr = RequestUtils.getLiteralExpression(false);
+        expressions.add(constantFalseExpr);
+      } else {
+        int rightIdx = rightJoinKeys.get(i);
+        Expression inFilterExpr = RequestUtils.getFunctionExpression(FilterKind.IN.name());
+        List<Expression> operands = new ArrayList<>(dataContainer.size() + 1);
+        operands.add(leftExpr);
+        operands.addAll(computeInOperands(dataContainer, dataSchema, rightIdx));
+        inFilterExpr.getFunctionCall().setOperands(operands);
+        expressions.add(inFilterExpr);
+      }
     }
     attachFilterExpression(pinotQuery, FilterKind.AND, expressions);
   }
