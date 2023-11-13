@@ -381,6 +381,26 @@
       {
         "description": "join with mixed equality and inequality conditions",
         "sql": "SELECT * FROM {tbl1} JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 AND {tbl1}.intCol1 > {tbl2}.doubleCol1"
+      },
+      {
+        "description": "join with push-down filter pass lower aggregate",
+        "sql": "SELECT * FROM (SELECT {tbl1}.strCol1, SUM({tbl1}.intCol1) FROM {tbl1} JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 WHERE {tbl2}.intCol1 > {tbl2}.doubleCol1 GROUP BY 1) WHERE strCol1 NOT IN ('bar', 'alice')"
+      },
+      {
+        "description": "semi-join with push-down filter pass lower aggregate",
+        "sql": "SELECT * FROM (SELECT {tbl1}.strCol1, SUM({tbl1}.intCol1) FROM {tbl1} WHERE {tbl1}.strCol1 IN (SELECT {tbl2}.strCol1 FROM {tbl2} WHERE {tbl2}.intCol1 > {tbl2}.doubleCol1) GROUP BY 1) WHERE strCol1 NOT IN ('bar', 'alice')"
+      },
+      {
+        "description": "join with push-down filter pass lower aggregate with having filter",
+        "sql": "SELECT * FROM (SELECT {tbl1}.strCol1, SUM({tbl1}.intCol1) FROM {tbl1} JOIN {tbl2} ON {tbl1}.strCol1 = {tbl2}.strCol1 WHERE {tbl2}.intCol1 > {tbl2}.doubleCol1 GROUP BY 1 HAVING COUNT(*) > 1) WHERE strCol1 NOT IN ('bar', 'alice')"
+      },
+      {
+        "description": "semi-join with push-down filter pass lower aggregate with having filter",
+        "sql": "SELECT * FROM (SELECT {tbl1}.strCol1, SUM({tbl1}.intCol1) FROM {tbl1} WHERE {tbl1}.strCol1 IN (SELECT {tbl2}.strCol1 FROM {tbl2} WHERE {tbl2}.intCol1 > {tbl2}.doubleCol1) GROUP BY 1 HAVING COUNT(*) > 1) WHERE strCol1 NOT IN ('bar', 'alice')"
+      },
+      {
+        "description": "nested query with push-down filter pass inner aggregate",
+        "sql": "SELECT * FROM (SELECT {tbl1}.strCol1, SUM({tbl1}.intCol1) FROM {tbl1} GROUP BY {tbl1}.strCol1 HAVING COUNT(*) > 1) WHERE strCol1 NOT IN ('bar', 'alice')"
       }
     ]
   },
