@@ -774,7 +774,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     // new record, should return false for out of order event
     boolean isOutOfOrderRecord =
-        upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(3), 0, new IntWrapper(100), false));
+        !upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(3), 0, new IntWrapper(100), false));
     assertFalse(isOutOfOrderRecord);
 
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
@@ -788,12 +788,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
     // send an out-of-order event, should return true for orderness of event
     isOutOfOrderRecord =
-        upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(80), false));
+        !upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(80), false));
     assertTrue(isOutOfOrderRecord);
 
     // ordered event for an existing key
     isOutOfOrderRecord =
-        upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(150), false));
+        !upsertMetadataManager.addRecord(segment2, new RecordInfo(makePrimaryKey(2), 1, new IntWrapper(150), false));
     assertFalse(isOutOfOrderRecord);
 
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}

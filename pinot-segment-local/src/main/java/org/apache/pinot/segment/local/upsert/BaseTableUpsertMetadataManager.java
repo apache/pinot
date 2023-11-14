@@ -65,7 +65,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected List<String> _primaryKeyColumns;
   protected List<String> _comparisonColumns;
   protected String _deleteRecordColumn;
-  protected String _outOfOrderRecordColumn;
   protected HashFunction _hashFunction;
   protected PartialUpsertHandler _partialUpsertHandler;
   protected boolean _enableSnapshot;
@@ -74,7 +73,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected ServerMetrics _serverMetrics;
   protected HelixManager _helixManager;
   protected ExecutorService _segmentPreloadExecutor;
-  protected boolean _dropOutOfOrderRecord;
 
   private volatile boolean _isPreloading = false;
 
@@ -100,7 +98,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     }
 
     _deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
-    _outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
     _hashFunction = upsertConfig.getHashFunction();
 
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
@@ -114,7 +111,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();
     _metadataTTL = upsertConfig.getMetadataTTL();
-    _dropOutOfOrderRecord = upsertConfig.isDropOutOfOrderRecord();
     _tableIndexDir = tableDataManager.getTableDataDir();
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;

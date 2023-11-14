@@ -1694,6 +1694,29 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       Assert.fail("Shouldn't fail table creation when delete column type is boolean.");
     }
+
+    // upsert out-of-order configs
+    String outOfOrderRecordColumn = "outOfOrderRecordColumn";
+    boolean dropOutOfOrderRecord = true;
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension(outOfOrderRecordColumn, FieldSpec.DataType.BOOLEAN).build();
+    streamConfigs = getStreamConfigs();
+    streamConfigs.put("stream.kafka.consumer.type", "simple");
+
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDropOutOfOrderRecord(dropOutOfOrderRecord);
+    upsertConfig.setOutOfOrderRecordColumn(outOfOrderRecordColumn);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
+    }
   }
 
   @Test

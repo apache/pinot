@@ -204,7 +204,7 @@ public class RealtimeSegmentConfig {
     return _upsertOutOfOrderRecordColumn;
   }
 
-  public boolean getUpsertDropOutOfOrderRecord() {
+  public boolean isUpsertDropOutOfOrderRecord() {
     return _upsertDropOutOfOrderRecord;
   }
 

@@ -384,7 +384,7 @@ public class MutableSegmentImpl implements MutableSegment {
           upsertComparisonColumns != null ? upsertComparisonColumns : Collections.singletonList(_timeColumnName);
       _deleteRecordColumn = config.getUpsertDeleteRecordColumn();
       _upsertOutOfOrderRecordColumn = config.getUpsertOutOfOrderRecordColumn();
-      _upsertDropOutOfOrderRecord = config.getUpsertDropOutOfOrderRecord();
+      _upsertDropOutOfOrderRecord = config.isUpsertDropOutOfOrderRecord();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       if (_deleteRecordColumn != null) {
         _queryableDocIds = new ThreadSafeMutableRoaringBitmap();
@@ -502,7 +502,7 @@ public class MutableSegmentImpl implements MutableSegment {
       // segment indexing or addNewRow call errors out in those scenario, there can be metadata inconsistency where
       // a key is pointing to some other key's docID
       // TODO fix this metadata mismatch scenario
-      boolean isOutOfOrderRecord = _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+      boolean isOutOfOrderRecord = !_partitionUpsertMetadataManager.addRecord(this, recordInfo);
       if (_upsertOutOfOrderRecordColumn != null) {
         updatedRow.putValue(_upsertOutOfOrderRecordColumn, isOutOfOrderRecord);
       }

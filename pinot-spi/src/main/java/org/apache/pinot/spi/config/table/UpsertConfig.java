@@ -192,15 +192,11 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   public void setDeleteRecordColumn(String deleteRecordColumn) {
-    if (deleteRecordColumn != null) {
-      _deleteRecordColumn = deleteRecordColumn;
-    }
+    _deleteRecordColumn = deleteRecordColumn;
   }
 
   public void setOutOfOrderRecordColumn(String outOfOrderRecordColumn) {
-    if (outOfOrderRecordColumn != null) {
-      _outOfOrderRecordColumn = outOfOrderRecordColumn;
-    }
+    _outOfOrderRecordColumn = outOfOrderRecordColumn;
   }
 
   public void setEnableSnapshot(boolean enableSnapshot) {

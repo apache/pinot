@@ -240,10 +240,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     persistWatermark(_largestSeenComparisonValue);
   }
 
-  // doAddRecord returns whether the event is out-of-order or not
   @Override
   protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
-    AtomicBoolean shouldDropRecord = new AtomicBoolean(false);
+    AtomicBoolean isOutOfOrderRecord = new AtomicBoolean(false);
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     int newDocId = recordInfo.getDocId();
@@ -275,7 +274,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             } else {
               handleOutOfOrderEvent(currentRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
               // this is a out-of-order record then set value to true - this indicates whether out-of-order or not
-              shouldDropRecord.set(true);
+              isOutOfOrderRecord.set(true);
               return currentRecordLocation;
             }
           } else {
@@ -288,7 +287,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
-    return shouldDropRecord.get();
+    return !isOutOfOrderRecord.get();
   }
 
   @Override
