@@ -202,15 +202,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
     Set<String> optionalSegments = queryRequest.getOptionalSegments();
-    LOGGER.debug("Processing query: {} with segmentsToQuery: {}, optionalSegments: {}", requestId, segmentsToQuery,
-        optionalSegments);
-    if (optionalSegments != null) {
-      segmentsToQuery.addAll(optionalSegments);
-    }
     List<String> notAcquiredSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers =
-        tableDataManager.acquireSegments(segmentsToQuery, notAcquiredSegments);
+        tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
     int numSegmentsAcquired = segmentDataManagers.size();
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Processing requestId: {} with segmentsToQuery: {}, optionalSegments: {} and acquiredSegments: {}",
+          requestId, segmentsToQuery, optionalSegments,
+          segmentDataManagers.stream().map(SegmentDataManager::getSegmentName).collect(Collectors.toList()));
+    }
     List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsAcquired);
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       indexSegments.add(segmentDataManager.getSegment());
@@ -312,9 +312,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       // for upsert table, it's possible that those segments are ingesting new records on servers already and start
       // to invalidate old records in existing segments. If they are simply skipped, the query results can be wrong.
       // Do not report error if the optional segments are missing.
-      List<String> missingSegments = notAcquiredSegments.stream().filter(
-          segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName) && (optionalSegments == null
-              || !optionalSegments.contains(segmentName))).collect(Collectors.toList());
+      List<String> missingSegments =
+          notAcquiredSegments.stream().filter(segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName))
+              .collect(Collectors.toList());
       int numMissingSegments = missingSegments.size();
       if (numMissingSegments > 0) {
         instanceResponse.addException(QueryException.getException(QueryException.SERVER_SEGMENT_MISSING_ERROR,

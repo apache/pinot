@@ -606,7 +606,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
           Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
-          // Optional routing table goes with non-optional one. If non-optional one is null, we skip optional one.
+          // To make it simple for changes to be backward compatible, we skip servers that only have optional segments.
+          // TODO: handle servers only have optional segments too.
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             offlineRoutingTable = serverInstanceToSegmentsMap;
             optionalOfflineRoutingTable = routingTable.getServerInstanceToOptionalSegmentsMap();
