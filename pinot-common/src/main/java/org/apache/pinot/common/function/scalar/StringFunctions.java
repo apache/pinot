@@ -501,7 +501,7 @@ public class StringFunctions {
    * returns bytes and null on exception
    */
   @ScalarFunction
-  public static byte[] toUuidBytes(String input) {
+  public static byte[] toUUIDBytes(String input) {
     try {
       UUID uuid = UUID.fromString(input);
       ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
@@ -519,7 +519,7 @@ public class StringFunctions {
    * returns bytes and null on exception
    */
   @ScalarFunction
-  public static String fromUuidBytes(byte[] input) {
+  public static String fromUUIDBytes(byte[] input) {
     ByteBuffer bb = ByteBuffer.wrap(input);
     long firstLong = bb.getLong();
     long secondLong = bb.getLong();
