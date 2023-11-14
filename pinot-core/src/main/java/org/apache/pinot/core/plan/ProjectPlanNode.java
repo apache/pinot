@@ -19,8 +19,8 @@
 package org.apache.pinot.core.plan;
 
 import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -63,7 +63,7 @@ public class ProjectPlanNode implements PlanNode {
 
   @Override
   public BaseProjectOperator<?> run() {
-    Set<String> projectionColumns = new LinkedHashSet<>();
+    Set<String> projectionColumns = new HashSet<>();
     boolean hasNonIdentifierExpression = false;
     for (ExpressionContext expression : _expressions) {
       expression.getColumns(projectionColumns);
@@ -71,7 +71,7 @@ public class ProjectPlanNode implements PlanNode {
         hasNonIdentifierExpression = true;
       }
     }
-    Map<String, DataSource> dataSourceMap = new LinkedHashMap<>(HashUtil.getHashMapCapacity(projectionColumns.size()));
+    Map<String, DataSource> dataSourceMap = new HashMap<>(HashUtil.getHashMapCapacity(projectionColumns.size()));
     projectionColumns.forEach(column -> dataSourceMap.put(column, _indexSegment.getDataSource(column)));
     // NOTE: Skip creating DocIdSetOperator when maxDocsPerCall is 0 (for selection query with LIMIT 0)
     DocIdSetOperator docIdSetOperator =
