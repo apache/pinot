@@ -67,17 +67,21 @@
       }
     ]
   },
-  "nullable_columns": {
+  "table_level_null_handling": {
+    "extraProps": {
+      "EnableColumnNullHandling": false,
+      "EnableTableNullHandling": true
+    },
     "tables": {
       "tbl1" : {
         "schema": [
           {"name": "strCol1", "type": "STRING"},
           {"name": "intCol1", "type": "INT"},
-          {"name": "nIntCol1", "type": "INT", "nullable": true},
-          {"name": "nnIntCol1", "type": "INT", "nullable": false},
+          {"name": "nIntCol1", "type": "INT", "notNull": false},
+          {"name": "nnIntCol1", "type": "INT", "notNull": true},
           {"name": "strCol2", "type": "STRING"},
-          {"name": "nStrCol2", "type": "STRING", "nullable": true},
-          {"name": "nnStrCol2", "type": "STRING", "nullable": false}
+          {"name": "nStrCol2", "type": "STRING", "notNull": false},
+          {"name": "nnStrCol2", "type": "STRING", "notNull": true}
         ],
         "inputs": [
           ["foo", 1, 1, 1, "foo", "foo", "foo"],
@@ -127,20 +131,16 @@
       },
 
       {
-        "description": "intCol1 IS NULL is honored",
-        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NULL"
+        "description": "nIntCol1 IS NULL is always false",
+        "comment": "When column level nullability is disabled, V2 considers all columns not nullable",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nIntCol1 IS NULL",
+        "h2Sql": "SELECT 0"
       },
       {
-        "description": "intCol1 IS NOT NULL is honored",
-        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NOT NULL"
-      },
-      {
-        "description": "nIntCol1 IS NULL is honored",
-        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nIntCol1 IS NULL"
-      },
-      {
-        "description": "nIntCol1 IS NOT NULL is honored",
-        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nIntCol1 IS NOT NULL"
+        "description": "nIntCol1 IS NOT NULL is always true",
+        "comment": "When column level nullability is disabled, V2 considers all columns not nullable",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nIntCol1 IS NOT NULL",
+        "h2Sql": "SELECT count(*) FROM {tbl1}"
       },
       {
         "description": "nnIntCol1 IS NULL is always false",
@@ -152,9 +152,25 @@
         "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nnIntCol1 IS NOT NULL",
         "h2Sql": "SELECT count(*) FROM {tbl1}"
       },
+      {
+        "description": "intCol1 IS NULL is always false",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NULL",
+        "h2Sql": "SELECT 0"
+      },
+      {
+        "description": "intCol1 IS NULL is always true",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NOT NULL",
+        "h2Sql": "SELECT count(*) FROM {tbl1}"
+      },
 
       {
-        "description": "When projected with enableNullHandling=true, intCol1 is considered -2147483648",
+        "description": "Leaf stages may return nulls",
+        "sql": "SET enableNullHandling=true; SELECT nStrCol2 FROM {tbl1} WHERE nIntCol1 = 4 and nStrCol2 IS NOT NULL",
+        "h2Sql": "SELECT null"
+      },
+
+      {
+        "description": "When projected with enableNullHandling=true, intCol1 is considered null",
         "sql": "SET enableNullHandling=true; SELECT intCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
         "h2Sql": "SELECT null FROM {tbl1} WHERE strCol1 = 'bob'"
       },
@@ -174,9 +190,9 @@
         "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
       },
       {
-        "description": "When projected with enableNullHandling=true, nnIntCol1 is considered -2147483648",
+        "description": "When projected with enableNullHandling=true, nnIntCol1 is considered null",
         "sql": "SET enableNullHandling=true; SELECT nnIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
-        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+        "h2Sql": "SELECT null FROM {tbl1} WHERE strCol1 = 'bob'"
       },
       {
         "description": "When projected with enableNullHandling=false, nnIntCol1 is considered -2147483648",
@@ -190,15 +206,17 @@
       },
 
       {
-        "description": "null checks in aggregate are honored on implicit nullable columns",
-        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE intCol1 IS NOT NULL GROUP BY strCol2"
+        "description": "null checks in aggregate are skipped in implicit nullable columns",
+        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE intCol1 IS NOT NULL GROUP BY strCol2",
+        "h2Sql": "SELECT strCol2, COUNT(*) FROM {tbl1} GROUP BY strCol2"
       },
       {
-        "description": "null checks in aggregate are honored on explicit nullable columns",
-        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE nIntCol1 IS NOT NULL GROUP BY strCol2"
+        "description": "null checks in aggregate are skipped in explicit nullable columns",
+        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE nIntCol1 IS NOT NULL GROUP BY strCol2",
+        "h2Sql": "SELECT strCol2, COUNT(*) FROM {tbl1} GROUP BY strCol2"
       },
       {
-        "description": "null checks in aggregate are skipped on not nullable columns",
+        "description": "null checks in aggregate are skipped in not nullable columns",
         "comment": "Given nnIntCol1 is not nullable, V2 removes the IS NOT NULL predicate",
         "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE nnIntCol1 IS NOT NULL GROUP BY strCol2",
         "h2Sql": "SELECT strCol2, COUNT(*) FROM {tbl1} GROUP BY strCol2"
@@ -208,36 +226,45 @@
         "description": "aggregate with null checkers on key from group set are skipped on not nullable columns",
         "comment": "Given strCol2 is not explicitly nullable, V2 returns empty set",
         "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE nnStrCol2 IS NULL GROUP BY strCol2",
-        "h2Sql": "SELECT COUNT(*) FROM {tbl1} WHERE 1 = 0 GROUP BY strCol2"
+        "h2Sql": "SELECT 0 FROM {tbl1} WHERE false GROUP BY strCol2"
       },
       {
-        "description": "aggregate with null checkers on key from group set are honored on nullable columns",
-        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE nStrCol2 IS NULL GROUP BY nStrCol2"
+        "description": "aggregate with null checkers on key from group set are skipped on nullable columns",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE nStrCol2 IS NULL GROUP BY nStrCol2",
+        "h2Sql": "SELECT 0 FROM {tbl1} WHERE false GROUP BY strCol2"
       }
     ]
   },
   "column_level_null_handling": {
+    "extraProps": {
+      "EnableColumnNullHandling": true,
+      "EnableTableNullHandling": false
+    },
     "tables": {
       "tbl1" : {
         "schema": [
           {"name": "strCol1", "type": "STRING"},
-          {"name": "intCol1", "type": "INT", "nullable": true},
-          {"name": "strCol2", "type": "STRING", "nullable": true}
+          {"name": "intCol1", "type": "INT"},
+          {"name": "nIntCol1", "type": "INT", "notNull": false},
+          {"name": "nnIntCol1", "type": "INT", "notNull": true},
+          {"name": "strCol2", "type": "STRING"},
+          {"name": "nStrCol2", "type": "STRING", "notNull": false},
+          {"name": "nnStrCol2", "type": "STRING", "notNull": true}
         ],
         "inputs": [
-          ["foo", 1, "foo"],
-          ["bar", 2, "alice"],
-          ["alice", 3, null],
-          ["bob", 4, null],
-          ["bob", null, null]
+          ["foo", 1, 1, 1, "foo", "foo", "foo"],
+          ["bar", 2, 2, 2, "alice", "alice", "alice"],
+          ["alice", 2, 2, 2, null, null, null],
+          [null, 4, 4, 4, null, null, null],
+          ["bob", null, null, null, null, null, null]
         ]
       },
       "tbl2" : {
         "schema": [
           {"name": "strCol1", "type": "STRING"},
-          {"name": "strCol2", "type": "STRING", "nullable": true},
+          {"name": "strCol2", "type": "STRING", "notNull": false},
           {"name": "intCol1", "type": "INT"},
-          {"name": "doubleCol1", "type": "DOUBLE", "nullable": true}
+          {"name": "doubleCol1", "type": "DOUBLE", "notNull": false}
         ],
         "inputs": [
           ["foo", "bob", 3, 3.1416],
@@ -284,7 +311,100 @@
       },
       {
         "description": "select only with NULL handling",
-        "sql": "SET enableNullHandling=true; SELECT * FROM {tbl1} WHERE strCol2 IS NULL AND intCol1 IS NOT NULL"
+        "sql": "SET enableNullHandling=true; SELECT strCol1, intCol1, nIntCol1, nnIntCol1, strCol2, nStrCol2, nnStrCol2 FROM {tbl1} WHERE nStrCol2 IS NULL AND nIntCol1 IS NOT NULL",
+        "h2Sql": "SELECT strCol1, intCol1, nIntCol1, nnIntCol1, strCol2, nStrCol2, 'null' FROM {tbl1} WHERE nStrCol2 IS NULL AND nIntCol1 IS NOT NULL"
+      },
+
+      {
+        "description": "Leaf stages should not return nulls",
+        "comment": "Result is the string 'null', not the value null",
+        "sql": "SET enableNullHandling=true; SELECT nnStrCol2 FROM {tbl1} WHERE nIntCol1 = 4",
+        "h2Sql": "SELECT 'null'"
+      },
+
+      {
+        "description": "nIntCol1 IS NULL is honored",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nIntCol1 IS NULL"
+      },
+      {
+        "description": "nIntCol1 IS NOT NULL is honored",
+        "comment": "When column level nullability is disabled, V2 considers all columns not nullable",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nIntCol1 IS NOT NULL"
+      },
+      {
+        "description": "nnIntCol1 IS NULL is always false",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nnIntCol1 IS NULL",
+        "h2Sql": "SELECT 0"
+      },
+      {
+        "description": "nnIntCol1 IS NOT NULL is always true",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE nnIntCol1 IS NOT NULL",
+        "h2Sql": "SELECT count(*) FROM {tbl1}"
+      },
+      {
+        "description": "(IS NULL) Column with no explicit nullability are treated as nullable",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NULL"
+      },
+      {
+        "description": "(IS NOT NULL) Column with no explicit nullability are treated as nullable",
+        "sql": "SET enableNullHandling=true; SELECT count(*) FROM {tbl1} WHERE intCol1 IS NOT NULL"
+      },
+
+      {
+        "description": "aggregate with null checkers on key from group set are skipped on not nullable columns",
+        "comment": "Given strCol2 is not explicitly nullable, V2 considers the where predicate always false",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE nnStrCol2 IS NULL GROUP BY strCol2",
+        "h2Sql": "SELECT COUNT(*) FROM {tbl1} WHERE false GROUP BY strCol2"
+      },
+      {
+        "description": "aggregate with null checkers on key from group set are honored on nullable columns",
+        "sql": "SET enableNullHandling=true; SELECT COUNT(*) FROM {tbl1} WHERE nStrCol2 IS NULL GROUP BY nStrCol2"
+      },
+
+      {
+        "description": "null checks in aggregate are honored in implicit nullable columns",
+        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE intCol1 IS NOT NULL GROUP BY strCol2"
+      },
+      {
+        "description": "null checks in aggregate are honored in explicit nullable columns",
+        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE nIntCol1 IS NOT NULL GROUP BY strCol2"
+      },
+      {
+        "description": "null checks in aggregate are skipped in not nullable columns",
+        "comment": "Given nnIntCol1 is not nullable, V2 removes the IS NOT NULL predicate",
+        "sql": "SET enableNullHandling=true; SELECT strCol2, COUNT(*) FROM {tbl1} WHERE nnIntCol1 IS NOT NULL GROUP BY strCol2",
+        "h2Sql": "SELECT strCol2, COUNT(*) FROM {tbl1} GROUP BY strCol2"
+      },
+
+      {
+        "description": "When projected with enableNullHandling=true, intCol1 is considered null",
+        "sql": "SET enableNullHandling=true; SELECT intCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT null FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=false, intCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=false; SELECT intCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=true, nIntCol1 is considered null",
+        "sql": "SET enableNullHandling=true; SELECT nIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT null FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=false, nIntCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=false; SELECT nIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=true, nnIntCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=true; SELECT nnIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
+      },
+      {
+        "description": "When projected with enableNullHandling=false, nnIntCol1 is considered -2147483648",
+        "sql": "SET enableNullHandling=false; SELECT nnIntCol1 FROM {tbl1} WHERE strCol1 = 'bob'",
+        "h2Sql": "SELECT -2147483648 FROM {tbl1} WHERE strCol1 = 'bob'"
       }
     ]
   }

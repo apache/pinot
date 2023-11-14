@@ -73,6 +73,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
   private static final String IGNORE_FILTER_PROPERTY = "pinot.runIgnored";
   private static final int DEFAULT_NUM_PARTITIONS = 4;
+  private static final boolean REPORT_IGNORES = false;
 
   private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
   private boolean _isRunIgnored;
@@ -114,13 +115,14 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
         String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
         Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
-        pinotSchema.setEnableColumnBasedNullHandling(testCase._extraProps.isEnableNullHandlingInTableConf());
+        pinotSchema.setEnableColumnBasedNullHandling(testCase._extraProps.isEnableColumnNullHandling());
         schemaMap.put(tableName, pinotSchema);
         factory1.registerTable(pinotSchema, offlineTableName);
         factory2.registerTable(pinotSchema, offlineTableName);
         List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
         List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
-        if (testCase._extraProps.isEnableNullHandlingInTableConf()) {
+        if (testCase._extraProps.isEnableNullHandlingInTableConf()
+            || testCase._extraProps.isEnableColumnNullHandling()) {
           factory1.setNullHandlingForTable(offlineTableName);
           factory2.setNullHandlingForTable(offlineTableName);
         }
@@ -377,6 +379,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
+        if (!REPORT_IGNORES && queryCase._ignored) {
+          continue;
+        }
         if (queryCase._outputs != null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
@@ -417,6 +422,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
+        if (!REPORT_IGNORES && queryCase._ignored) {
+          continue;
+        }
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)
@@ -453,6 +461,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       String testCaseName = testCaseEntry.getKey();
       List<QueryTestCase.Query> queryCases = testCaseEntry.getValue()._queries;
       for (QueryTestCase.Query queryCase : queryCases) {
+        if (!REPORT_IGNORES && queryCase._ignored) {
+          continue;
+        }
         if (queryCase._outputs == null) {
           String sql = replaceTableName(testCaseName, queryCase._sql);
           String h2Sql = queryCase._h2Sql != null ? replaceTableName(testCaseName, queryCase._h2Sql)

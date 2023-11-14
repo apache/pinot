@@ -119,7 +119,6 @@
       {
         "comments": "table aren't actually partitioned by val thus all segments can produce duplicate results, thus [[8]]",
         "sql": "SELECT SEGMENT_PARTITIONED_DISTINCT_COUNT(val) FROM {tbl1}",
-        "ignored": true,
         "outputs": [[8]]
       },
       {
