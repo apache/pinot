@@ -308,7 +308,7 @@ io.netty:netty-all:4.1.79.Final
 io.netty:netty-buffer:4.1.79.Final
 io.netty:netty-codec-dns:4.1.79.Final
 io.netty:netty-codec-haproxy:4.1.79.Final
-io.netty:netty-codec-http2:4.1.79.Final
+io.netty:netty-codec-http2:4.1.100.Final
 io.netty:netty-codec-http:4.1.79.Final
 io.netty:netty-codec-memcache:4.1.79.Final
 io.netty:netty-codec-mqtt:4.1.79.Final
