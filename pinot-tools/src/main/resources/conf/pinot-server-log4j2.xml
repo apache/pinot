@@ -53,5 +53,8 @@
       <AppenderRef ref="console"/>
     </Logger>
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>
+    <Logger name="org.apache.kafka">
+      <level value="error" />
+    </Logger>
   </Loggers>
 </Configuration>
