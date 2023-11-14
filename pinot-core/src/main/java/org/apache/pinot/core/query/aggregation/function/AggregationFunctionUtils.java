@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.CustomObject;
@@ -40,7 +41,6 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
-import org.apache.pinot.core.operator.filter.CombinedFilteredAggregationContext;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.query.OperatorUtils;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
@@ -214,6 +214,55 @@ public class AggregationFunctionUtils {
         return dataTable.getStringArray(rowId, colId);
       default:
         throw new IllegalStateException("Illegal column data type in final result: " + columnDataType);
+    }
+  }
+
+
+  public static class CombinedFilteredAggregationContext {
+    private final BaseFilterOperator _baseFilterOperator;
+    private final FilterContext _mainFilterContext;
+    private final FilterContext _subFilterContext;
+    private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators;
+    private final List<AggregationFunction> _aggregationFunctions;
+
+    public CombinedFilteredAggregationContext(BaseFilterOperator baseFilterOperator,
+        List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, @Nullable FilterContext mainFilterContext,
+        @Nonnull FilterContext subFilterContext, List<AggregationFunction> aggregationFunctions) {
+      _baseFilterOperator = baseFilterOperator;
+      _predicateEvaluators = predicateEvaluators;
+      _mainFilterContext = mainFilterContext;
+      _subFilterContext = subFilterContext;
+      _aggregationFunctions = aggregationFunctions;
+    }
+
+    public CombinedFilteredAggregationContext(BaseFilterOperator baseFilterOperator,
+        List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, @Nullable FilterContext mainFilterContext,
+        @Nonnull FilterContext subFilterContext) {
+      this(baseFilterOperator, predicateEvaluators, mainFilterContext, subFilterContext, new ArrayList<>());
+    }
+
+
+    public BaseFilterOperator getBaseFilterOperator() {
+      return _baseFilterOperator;
+    }
+
+    public List<Pair<Predicate, PredicateEvaluator>> getPredicateEvaluatorMap() {
+      return _predicateEvaluators;
+    }
+
+    public FilterContext getFilterContext() {
+      if (_mainFilterContext == null) {
+        return _subFilterContext;
+      }
+      return FilterContext.forAnd(List.of(_mainFilterContext, _subFilterContext));
+    }
+
+    public List<AggregationFunction> getAggregationFunctions() {
+      return _aggregationFunctions;
+    }
+
+    public void add(AggregationFunction aggregationFunction) {
+      _aggregationFunctions.add(aggregationFunction);
     }
   }
 
