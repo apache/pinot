@@ -306,7 +306,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    * Returns whether the column is nullable or not.
    */
   @JsonIgnore
-  public Boolean isNullable() {
+  public boolean isNullable() {
     return _nullable;
   }
 
