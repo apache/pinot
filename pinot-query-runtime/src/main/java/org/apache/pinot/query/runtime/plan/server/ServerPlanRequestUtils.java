@@ -120,8 +120,8 @@ public class ServerPlanRequestUtils {
     DistributedStagePlan stagePlan = serverContext.getStagePlan();
     PinotQuery pinotQuery = serverContext.getPinotQuery();
     pinotQuery.setExplain(false);
-    //  - attach leaf node limit it not set
-      Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadata);
+    // attach leaf node limit it not set
+    Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadata);
     if (leafNodeLimit != null) {
       pinotQuery.setLimit(leafNodeLimit);
     } else {
