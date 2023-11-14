@@ -502,6 +502,7 @@ public class SketchFunctions {
    *
    * This adds the P value into the serialized byte stream, so it can be used easily
    */
+  @ScalarFunction
   public static byte[] fromULL(byte[] input) {
     UltraLogLog ull = UltraLogLog.wrap(input);
     return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(ull);
