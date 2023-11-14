@@ -724,9 +724,17 @@ public final class TableConfigUtils {
             "The delete record column must be a single-valued BOOLEAN column");
       }
 
+      String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
       Preconditions.checkState(
-          upsertConfig.getOutOfOrderRecordColumn() == null || !upsertConfig.isDropOutOfOrderRecord(),
+          outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),
           "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
+
+      if (outOfOrderRecordColumn != null) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(outOfOrderRecordColumn);
+        Preconditions.checkState(
+            fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
+            "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
+      }
     }
 
     Preconditions.checkState(
