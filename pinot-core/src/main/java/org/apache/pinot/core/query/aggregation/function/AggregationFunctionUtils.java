@@ -26,7 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.CustomObject;
@@ -227,7 +226,7 @@ public class AggregationFunctionUtils {
 
     public CombinedFilteredAggregationContext(BaseFilterOperator baseFilterOperator,
         List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, @Nullable FilterContext mainFilterContext,
-        @Nonnull FilterContext subFilterContext, List<AggregationFunction> aggregationFunctions) {
+        FilterContext subFilterContext, List<AggregationFunction> aggregationFunctions) {
       _baseFilterOperator = baseFilterOperator;
       _predicateEvaluators = predicateEvaluators;
       _mainFilterContext = mainFilterContext;
@@ -237,7 +236,7 @@ public class AggregationFunctionUtils {
 
     public CombinedFilteredAggregationContext(BaseFilterOperator baseFilterOperator,
         List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, @Nullable FilterContext mainFilterContext,
-        @Nonnull FilterContext subFilterContext) {
+        FilterContext subFilterContext) {
       this(baseFilterOperator, predicateEvaluators, mainFilterContext, subFilterContext, new ArrayList<>());
     }
 
