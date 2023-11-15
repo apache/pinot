@@ -19,9 +19,11 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -31,6 +33,7 @@ import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.TransientConsumerException;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
@@ -64,10 +67,22 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   @Override
   public int fetchPartitionCount(long timeoutMillis) {
     try {
-      return _pulsarClient.getPartitionsForTopic(_topic).get().size();
+      return _pulsarClient.getPartitionsForTopic(_topic).get(timeoutMillis, TimeUnit.MILLISECONDS).size();
+    } catch (TimeoutException e) {
+      throw new TransientConsumerException(e);
     } catch (Exception e) {
-      throw new RuntimeException("Cannot fetch partitions for topic: " + _topic, e);
+      throw new RuntimeException("Failed to fetch partitions for topic: " + _topic, e);
     }
+  }
+
+  @Override
+  public Set<Integer> fetchPartitionIds(long timeoutMillis) {
+    int partitionCount = fetchPartitionCount(timeoutMillis);
+    Set<Integer> partitionIds = Sets.newHashSetWithExpectedSize(partitionCount);
+    for (int i = 0; i < partitionCount; i++) {
+      partitionIds.add(i);
+    }
+    return partitionIds;
   }
 
   /**

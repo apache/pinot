@@ -21,6 +21,7 @@ package org.apache.pinot.broker.broker;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -75,6 +76,11 @@ public class FakeStreamConsumerFactory extends StreamConsumerFactory {
     @Override
     public int fetchPartitionCount(long timeoutMillis) {
       return 1;
+    }
+
+    @Override
+    public Set<Integer> fetchPartitionIds(long timeoutMillis) {
+      return Collections.singleton(0);
     }
 
     @Override
