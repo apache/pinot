@@ -175,9 +175,6 @@ public class QueryOptionsUtils {
 
   @Nullable
   public static Integer getMinBrokerGroupTrimSize(Map<String, String> queryOptions) {
-    if (queryOptions == null) {
-      return null;
-    }
     String minBrokerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE);
     return minBrokerGroupTrimSizeString != null ? Integer.parseInt(minBrokerGroupTrimSizeString) : null;
   }
@@ -215,9 +212,6 @@ public class QueryOptionsUtils {
 
   @Nullable
   public static Integer getGroupTrimThreshold(Map<String, String> queryOptions) {
-    if (queryOptions == null) {
-      return null;
-    }
     String groupByTrimThreshold = queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
     return groupByTrimThreshold != null ? Integer.parseInt(groupByTrimThreshold) : null;
   }

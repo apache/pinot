@@ -144,11 +144,15 @@ public class BrokerReduceService extends BaseReduceService {
     QueryContext serverQueryContext = QueryContextConverterUtils.getQueryContext(serverBrokerRequest.getPinotQuery());
     DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(serverQueryContext);
 
-    Integer minGroupTrimSizeQueryOption = QueryOptionsUtils.getMinBrokerGroupTrimSize(queryOptions);
-    int minGroupTrimSize = minGroupTrimSizeQueryOption != null ? minGroupTrimSizeQueryOption : _minGroupTrimSizeCfg;
-    Integer groupTrimThresholdQueryOption = QueryOptionsUtils.getGroupTrimThreshold(queryOptions);
+    Integer minGroupTrimSizeQueryOption = null;
+    Integer groupTrimThresholdQueryOption = null;
+    if (queryOptions != null) {
+      minGroupTrimSizeQueryOption = QueryOptionsUtils.getMinBrokerGroupTrimSize(queryOptions);
+      groupTrimThresholdQueryOption = QueryOptionsUtils.getGroupTrimThreshold(queryOptions);
+    }
+    int minGroupTrimSize = minGroupTrimSizeQueryOption != null ? minGroupTrimSizeQueryOption : _minGroupTrimSize;
     int groupTrimThreshold =
-        groupTrimThresholdQueryOption != null ? groupTrimThresholdQueryOption : _groupByTrimThresholdCfg;
+        groupTrimThresholdQueryOption != null ? groupTrimThresholdQueryOption : _groupByTrimThreshold;
 
     try {
       dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
