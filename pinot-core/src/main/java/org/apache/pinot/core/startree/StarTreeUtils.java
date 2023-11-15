@@ -32,13 +32,17 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 
 
@@ -278,6 +282,41 @@ public class StarTreeUtils {
         return pair.getValue();
       }
     }
+    return null;
+  }
+
+  @Nullable
+  public static BaseProjectOperator<?> createStarTreeBasedProjectOperator(
+      IndexSegment indexSegment,
+      QueryContext queryContext,
+      FilterContext filterContext,
+      AggregationFunction[] aggregationFunctions,
+      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
+
+    ExpressionContext[] groupByExpressions = null;
+    if (queryContext.getGroupByExpressions() != null) {
+      groupByExpressions = queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
+    }
+
+    List<StarTreeV2> starTrees = indexSegment.getStarTrees();
+    if (starTrees != null && !queryContext.isSkipStarTree() && !queryContext.isNullHandlingEnabled()) {
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
+      if (aggregationFunctionColumnPairs != null) {
+        Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
+            StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, filterContext, predicateEvaluators);
+        if (predicateEvaluatorsMap != null) {
+          for (StarTreeV2 starTreeV2 : starTrees) {
+            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,
+                groupByExpressions, predicateEvaluatorsMap.keySet())) {
+              return new StarTreeProjectPlanNode(queryContext, starTreeV2, aggregationFunctionColumnPairs,
+                  groupByExpressions, predicateEvaluatorsMap).run();
+            }
+          }
+        }
+      }
+    }
+
     return null;
   }
 }

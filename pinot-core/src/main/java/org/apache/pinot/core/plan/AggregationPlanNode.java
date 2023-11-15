@@ -20,6 +20,7 @@ package org.apache.pinot.core.plan;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
@@ -30,11 +31,10 @@ import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
 import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
-import org.apache.pinot.core.operator.query.OperatorUtils;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
+import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -115,11 +115,23 @@ public class AggregationPlanNode implements PlanNode {
       }
     }
 
-    ProjectionPlanNode projectPlanNode =
-        OperatorUtils.maybeGetStartreeProjectionOperator(_queryContext, _queryContext.getFilter(), _indexSegment,
-            aggregationFunctions, filterPlanNode.getPredicateEvaluators(), filterOperator, null);
-    return new AggregationOperator(_queryContext, projectPlanNode.run(), numTotalDocs,
-        projectPlanNode instanceof StarTreeProjectPlanNode);
+    BaseProjectOperator<?> projectOperator;
+    boolean canUseStarTree = false;
+    projectOperator =
+        StarTreeUtils.createStarTreeBasedProjectOperator(_indexSegment, _queryContext, _queryContext.getFilter(),
+            aggregationFunctions, filterPlanNode.getPredicateEvaluators());
+
+    if (projectOperator != null) {
+      canUseStarTree = true;
+    } else {
+      Set<ExpressionContext> expressionsToTransform =
+          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, _queryContext.getGroupByExpressions());
+      projectOperator =
+          new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+              filterOperator).run();
+    }
+
+    return new AggregationOperator(_queryContext, projectOperator, numTotalDocs, canUseStarTree);
   }
 
   /**

@@ -32,7 +32,7 @@ import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.transform.TransformOperator;
-import org.apache.pinot.core.plan.ProjectionPlanNode;
+import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -40,7 +40,7 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
-public class StarTreeProjectPlanNode implements ProjectionPlanNode {
+public class StarTreeProjectPlanNode implements PlanNode {
   private final QueryContext _queryContext;
   private final StarTreeV2 _starTreeV2;
   private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
