@@ -124,7 +124,6 @@
       {
         "comments": "table aren't actually partitioned by val thus all segments can produce duplicate results, thus [[b, 5], [a, 4]]",
         "sql": "SELECT groupingCol, SEGMENT_PARTITIONED_DISTINCT_COUNT(val) FROM {tbl1} GROUP BY groupingCol",
-        "ignored": true,
         "outputs": [["b", 5], ["a", 4]]
       },
       {
@@ -138,7 +137,6 @@
       {
         "comments": "table aren't actually partitioned by val thus all segments can produce duplicate results, thus [[b, 5], [a, 4]]",
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ groupingCol, SEGMENT_PARTITIONED_DISTINCT_COUNT(val) FROM {tbl1} GROUP BY groupingCol",
-        "ignored": true,
         "outputs": [["b", 5], ["a", 4]]
       },
       {
