@@ -36,7 +36,9 @@ abstract class InstancePartitionSelector {
     _replicaGroupPartitionConfig = replicaGroupPartitionConfig;
     _tableNameWithType = tableNameWithType;
     _existingInstancePartitions = existingInstancePartitions;
-    _minimizeDataMovement = minimizeDataMovement;
+    // For backward compatibility, enable minimize data movement when it is enabled in top level or instance
+    // partition selector level.
+    _minimizeDataMovement = minimizeDataMovement || replicaGroupPartitionConfig.isMinimizeDataMovement();
   }
 
   /**
