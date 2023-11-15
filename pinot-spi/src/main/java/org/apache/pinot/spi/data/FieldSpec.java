@@ -100,7 +100,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected String _name;
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
-  protected boolean _nullable = true;
+  protected boolean _notNull = false;
 
   // NOTE: This only applies to STRING column, which is the max number of characters
   private int _maxLength = DEFAULT_MAX_LENGTH;
@@ -307,7 +307,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    */
   @JsonIgnore
   public boolean isNullable() {
-    return _nullable;
+    return !_notNull;
   }
 
   /**
@@ -315,15 +315,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    */
   @JsonIgnore
   public void setNullable(Boolean nullable) {
-    _nullable = nullable;
+    _notNull = !nullable;
   }
 
   public boolean isNotNull() {
-    return !_nullable;
+    return _notNull;
   }
 
   public void setNotNull(boolean notNull) {
-    _nullable = !notNull;
+    _notNull = notNull;
   }
 
   /**
@@ -343,7 +343,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
     appendDefaultNullValue(jsonObject);
     appendTransformFunction(jsonObject);
-    jsonObject.put("notNull", !_nullable);
+    jsonObject.put("notNull", _notNull);
     return jsonObject;
   }
 
@@ -409,7 +409,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
         .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
         && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider)
-        && EqualityUtils.isEqual(_nullable, that._nullable);
+        && EqualityUtils.isEqual(_notNull, that._notNull);
   }
 
   @Override
@@ -421,7 +421,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     result = EqualityUtils.hashCodeOf(result, _maxLength);
     result = EqualityUtils.hashCodeOf(result, _transformFunction);
     result = EqualityUtils.hashCodeOf(result, _virtualColumnProvider);
-    result = EqualityUtils.hashCodeOf(result, _nullable);
+    result = EqualityUtils.hashCodeOf(result, _notNull);
     return result;
   }
 
