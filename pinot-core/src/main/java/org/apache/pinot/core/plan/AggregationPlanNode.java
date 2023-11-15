@@ -101,12 +101,12 @@ public class AggregationPlanNode implements PlanNode {
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
-    if (canOptimizeFilteredCount(filterOperator, aggregationFunctions) && !_queryContext.isNullHandlingEnabled()) {
-      return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
-    }
+    if (!_queryContext.isNullHandlingEnabled()) {
+      if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
+        return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
+      }
 
-    if (filterOperator.isResultMatchingAll() && !_queryContext.isNullHandlingEnabled()) {
-      if (isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
+      if (filterOperator.isResultMatchingAll() && isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
         for (int i = 0; i < aggregationFunctions.length; i++) {
           List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
@@ -117,31 +117,32 @@ public class AggregationPlanNode implements PlanNode {
         }
         return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
       }
-    }
 
-    // Use star-tree to solve the query if possible
-    List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
-    if (starTrees != null && !_queryContext.isSkipStarTree() && !_queryContext.isNullHandlingEnabled()) {
-      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
-      if (aggregationFunctionColumnPairs != null) {
-        Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
-                filterPlanNode.getPredicateEvaluators());
-        if (predicateEvaluatorsMap != null) {
-          for (StarTreeV2 starTreeV2 : starTrees) {
-            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
-                predicateEvaluatorsMap.keySet())) {
-              BaseProjectOperator<?> projectOperator =
-                  new StarTreeProjectPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs, null,
-                      predicateEvaluatorsMap).run();
-              return new AggregationOperator(_queryContext, projectOperator, numTotalDocs, true);
+      // Use star-tree to solve the query if possible
+      List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
+      if (!filterOperator.isResultEmpty() && starTrees != null && !_queryContext.isSkipStarTree()) {
+        AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+            StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
+        if (aggregationFunctionColumnPairs != null) {
+          Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
+              StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
+                  filterPlanNode.getPredicateEvaluators());
+          if (predicateEvaluatorsMap != null) {
+            for (StarTreeV2 starTreeV2 : starTrees) {
+              if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
+                  predicateEvaluatorsMap.keySet())) {
+                BaseProjectOperator<?> projectOperator =
+                    new StarTreeProjectPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs, null,
+                        predicateEvaluatorsMap).run();
+                return new AggregationOperator(_queryContext, projectOperator, numTotalDocs, true);
+              }
             }
           }
         }
       }
     }
 
+    // TODO: Do not create ProjectOperator when filter result is empty
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
     BaseProjectOperator<?> projectOperator =

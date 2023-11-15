@@ -78,7 +78,8 @@ public class GroupByPlanNode implements PlanNode {
 
     // Use star-tree to solve the query if possible
     List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
-    if (starTrees != null && !_queryContext.isSkipStarTree()) {
+    if (!_queryContext.isNullHandlingEnabled() && !filterOperator.isResultEmpty() && starTrees != null
+        && !_queryContext.isSkipStarTree()) {
       AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
           StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
       if (aggregationFunctionColumnPairs != null) {
@@ -99,6 +100,7 @@ public class GroupByPlanNode implements PlanNode {
       }
     }
 
+    // TODO: Do not create ProjectOperator when filter result is empty
     Set<ExpressionContext> expressionsToTransform =
         AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressionsList);
     BaseProjectOperator<?> projectOperator =

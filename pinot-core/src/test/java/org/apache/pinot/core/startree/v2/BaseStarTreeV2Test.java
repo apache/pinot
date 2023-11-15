@@ -111,6 +111,9 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String QUERY_FILTER_OR_MULTIPLE_DIMENSIONS = " WHERE d1 > 10 OR d2 < 50";
   private static final String QUERY_FILTER_OR_ON_AND = " WHERE (d1 > 10 AND d1 < 50) OR d1 < 50";
   private static final String QUERY_FILTER_OR_ON_NOT = " WHERE (NOT d1 > 10) OR d1 < 50";
+  // Always false filters
+  private static final String QUERY_FILTER_ALWAYS_FALSE = " WHERE d1 > 100";
+  private static final String QUERY_FILTER_OR_ALWAYS_FALSE = " WHERE d1 > 100 OR d1 < 0";
 
   private static final String QUERY_GROUP_BY = " GROUP BY d2";
   private static final String FILTER_AGG_CLAUSE = " FILTER(WHERE d1 > 10)";
@@ -188,6 +191,8 @@ abstract class BaseStarTreeV2Test<R, A> {
     testUnsupportedFilter(query + QUERY_FILTER_OR_MULTIPLE_DIMENSIONS);
     testUnsupportedFilter(query + QUERY_FILTER_OR_ON_AND);
     testUnsupportedFilter(query + QUERY_FILTER_OR_ON_NOT);
+    testUnsupportedFilter(query + QUERY_FILTER_ALWAYS_FALSE);
+    testUnsupportedFilter(query + QUERY_FILTER_OR_ALWAYS_FALSE);
   }
 
   @Test
