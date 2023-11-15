@@ -117,8 +117,8 @@ public class StarTreeUtils {
           Predicate predicate = filterNode.getPredicate();
           PredicateEvaluator predicateEvaluator = getPredicateEvaluator(indexSegment, predicate,
               predicateEvaluatorMapping);
-          if (predicateEvaluator == null) {
-            // The predicate cannot be solved with star-tree
+          // Do not use star-tree when the predicate cannot be solved with star-tree or is always false
+          if (predicateEvaluator == null || predicateEvaluator.isAlwaysFalse()) {
             return null;
           }
           if (!predicateEvaluator.isAlwaysTrue()) {
@@ -210,6 +210,10 @@ public class StarTreeUtils {
         predicateEvaluators.add(predicateEvaluator);
       }
     }
+    // When all predicates are always false, do not use star-tree
+    if (predicateEvaluators.isEmpty()) {
+      return null;
+    }
     return Pair.of(identifier, predicateEvaluators);
   }
 
@@ -230,7 +234,6 @@ public class StarTreeUtils {
           if (!extractOrClausePredicates(child, predicates)) {
             return false;
           }
-          predicates.add(child.getPredicate());
           break;
         case PREDICATE:
           predicates.add(child.getPredicate());
