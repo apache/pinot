@@ -155,14 +155,11 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     waitForRebalanceToComplete(rebalanceResult, 600_000L);
     waitForAllDocsLoaded(600_000L);
 
-    _resourceManager.disableInstance(serverStarter1.getInstanceId());
-    _resourceManager.disableInstance(serverStarter2.getInstanceId());
-
-    _resourceManager.dropInstance(serverStarter1.getInstanceId());
-    _resourceManager.dropInstance(serverStarter2.getInstanceId());
-
     serverStarter1.stop();
     serverStarter2.stop();
+    TestUtils.waitForCondition(aVoid -> _resourceManager.dropInstance(serverStarter1.getInstanceId()).isSuccessful()
+            && _resourceManager.dropInstance(serverStarter2.getInstanceId()).isSuccessful(), 60_000L,
+        "Failed to drop servers");
   }
 
   @Test

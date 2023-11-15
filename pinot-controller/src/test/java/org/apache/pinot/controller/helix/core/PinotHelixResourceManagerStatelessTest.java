@@ -187,7 +187,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     }, 60_000L, "Failed to update the admin port");
 
     // Remove the new added server
-    _helixResourceManager.dropInstance(serverName);
+    assertTrue(_helixResourceManager.dropInstance(serverName).isSuccessful());
     TestUtils.waitForCondition(aVoid -> {
       try {
         _helixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(serverName));
@@ -220,7 +220,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertTrue(allInstances.contains(instanceName));
 
     // Remove the added instance
-    _helixResourceManager.dropInstance(instanceName);
+    assertTrue(_helixResourceManager.dropInstance(instanceName).isSuccessful());
     allInstances = _helixResourceManager.getAllInstances();
     assertFalse(allInstances.contains(instanceName));
   }

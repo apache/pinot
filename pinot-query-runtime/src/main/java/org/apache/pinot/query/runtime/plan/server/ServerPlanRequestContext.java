@@ -18,47 +18,75 @@
  */
 package org.apache.pinot.query.runtime.plan.server;
 
-import org.apache.pinot.common.request.InstanceRequest;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 
 
 /**
  * Context class for converting a {@link org.apache.pinot.query.runtime.plan.DistributedStagePlan} into
  * {@link PinotQuery} to execute on server.
+ *
+ * On leaf-stage server node, {@link PlanNode} are split into {@link PinotQuery} part and
+ *     {@link org.apache.pinot.query.runtime.operator.OpChain} part.
  */
 public class ServerPlanRequestContext {
-  private final OpChainExecutionContext _executionContext;
-  private final TableType _tableType;
+  private final DistributedStagePlan _stagePlan;
+  private final QueryExecutor _leafQueryExecutor;
+  private final ExecutorService _executorService;
+  private final PipelineBreakerResult _pipelineBreakerResult;
 
-  private PinotQuery _pinotQuery;
-  private InstanceRequest _instanceRequest;
+  private final PinotQuery _pinotQuery;
+  private PlanNode _leafStageBoundaryNode;
+  private List<ServerQueryRequest> _serverQueryRequests;
 
-  public ServerPlanRequestContext(OpChainExecutionContext executionContext, PinotQuery pinotQuery,
-      TableType tableType) {
-    _executionContext = executionContext;
-    _pinotQuery = pinotQuery;
-    _tableType = tableType;
+  public ServerPlanRequestContext(DistributedStagePlan stagePlan, QueryExecutor leafQueryExecutor,
+      ExecutorService executorService, PipelineBreakerResult pipelineBreakerResult) {
+    _stagePlan = stagePlan;
+    _leafQueryExecutor = leafQueryExecutor;
+    _executorService = executorService;
+    _pipelineBreakerResult = pipelineBreakerResult;
+    _pinotQuery = new PinotQuery();
   }
 
-  public OpChainExecutionContext getExecutionContext() {
-    return _executionContext;
+  public DistributedStagePlan getStagePlan() {
+    return _stagePlan;
   }
 
-  public TableType getTableType() {
-    return _tableType;
+  public QueryExecutor getLeafQueryExecutor() {
+    return _leafQueryExecutor;
+  }
+
+  public ExecutorService getExecutorService() {
+    return _executorService;
+  }
+
+  public PipelineBreakerResult getPipelineBreakerResult() {
+    return _pipelineBreakerResult;
   }
 
   public PinotQuery getPinotQuery() {
     return _pinotQuery;
   }
 
-  public void setInstanceRequest(InstanceRequest instanceRequest) {
-    _instanceRequest = instanceRequest;
+  public PlanNode getLeafStageBoundaryNode() {
+    return _leafStageBoundaryNode;
   }
 
-  public InstanceRequest getInstanceRequest() {
-    return _instanceRequest;
+  public void setLeafStageBoundaryNode(PlanNode leafStageBoundaryNode) {
+    _leafStageBoundaryNode = leafStageBoundaryNode;
+  }
+
+  public List<ServerQueryRequest> getServerQueryRequests() {
+    return _serverQueryRequests;
+  }
+
+  public void setServerQueryRequests(List<ServerQueryRequest> serverQueryRequests) {
+    _serverQueryRequests = serverQueryRequests;
   }
 }
