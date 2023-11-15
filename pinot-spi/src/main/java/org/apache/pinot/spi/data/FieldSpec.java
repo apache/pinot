@@ -44,7 +44,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  * <p>- <code>IsSingleValueField</code>: single-value or multi-value field.
  * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
  * <p>- <code>VirtualColumnProvider</code>: the virtual column provider to use for this field.
- * <p>- <code>Nullable</code>: whether the column is nullable or not. Defaults to null
+ * <p>- <code>NotNull</code>: whether the column accepts nulls or not. Defaults to false.
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
