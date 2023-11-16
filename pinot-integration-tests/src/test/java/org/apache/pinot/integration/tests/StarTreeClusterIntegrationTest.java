@@ -38,9 +38,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.junit.Assert.assertFalse;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertFalse;
 
 
 /**
@@ -215,8 +215,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
               || starPlan.toString().contains("FILTER_EMPTY")
               || starPlan.toString().contains("ALL_SEGMENTS_PRUNED_ON_SERVER"),
           "StarTree query did not indicate use of StarTree index in query plan. Plan: " + starPlan);
-      assertFalse("Reference query indicated use of StarTree index in query plan. Plan: " + referencePlan,
-          referencePlan.toString().contains(filterStartreeIndex));
+      assertFalse(referencePlan.toString().contains(filterStartreeIndex),
+          "Reference query indicated use of StarTree index in query plan. Plan: " + referencePlan);
     }
 
     JsonNode starResponse = postQuery(starQuery);
