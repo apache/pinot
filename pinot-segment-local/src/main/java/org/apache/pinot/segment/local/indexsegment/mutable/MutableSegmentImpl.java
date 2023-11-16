@@ -504,7 +504,7 @@ public class MutableSegmentImpl implements MutableSegment {
       // TODO fix this metadata mismatch scenario
       boolean isOutOfOrderRecord = !_partitionUpsertMetadataManager.addRecord(this, recordInfo);
       if (_upsertOutOfOrderRecordColumn != null) {
-        updatedRow.putValue(_upsertOutOfOrderRecordColumn, BooleanUtils.toInt(String.valueOf(isOutOfOrderRecord)));
+        updatedRow.putValue(_upsertOutOfOrderRecordColumn, BooleanUtils.toInt(isOutOfOrderRecord));
       }
       if (!isOutOfOrderRecord || !_upsertDropOutOfOrderRecord) {
         updateDictionary(updatedRow);

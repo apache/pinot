@@ -360,7 +360,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  // doAddRecord returns whether the event is out-of-order or not, if out-of-order returns false else true
+  /**
+   Returns {@code true} when the record is added to the upsert metadata manager,
+   {@code false} when the record is out-of-order thus not added.
+   */
   protected abstract boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo);
 
   @Override

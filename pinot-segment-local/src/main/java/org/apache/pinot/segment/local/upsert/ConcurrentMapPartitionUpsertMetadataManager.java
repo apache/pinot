@@ -240,6 +240,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     persistWatermark(_largestSeenComparisonValue);
   }
 
+  /**
+   Returns {@code true} when the record is added to the upsert metadata manager,
+   {@code false} when the record is out-of-order thus not added.
+   */
   @Override
   protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
     AtomicBoolean isOutOfOrderRecord = new AtomicBoolean(false);
