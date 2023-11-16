@@ -1239,7 +1239,7 @@
       <dependency>
         <groupId>com.google.code.gson</groupId>
         <artifactId>gson</artifactId>
-        <version>2.2.4</version>
+        <version>2.10.1</version>
       </dependency>
       <!-- kafka_2.10 & jmh-core use jopt-simple -->
       <dependency>
