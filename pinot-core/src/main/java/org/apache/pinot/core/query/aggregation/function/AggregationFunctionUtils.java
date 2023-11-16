@@ -315,9 +315,9 @@ public class AggregationFunctionUtils {
         Pair<BaseProjectOperator<?>, Boolean> projectOperatorStPair =
             createProjectOperatorStPair(indexSegment, queryContext,
                 combinedFilteredAggregationContext._combinedFilterContext, aggregationFunctions,
-                combinedFilteredAggregationContext._predicateEvaluators, combinedFilteredAggregationContext._baseFilterOperator);
+                combinedFilteredAggregationContext._predicateEvaluators,
+                combinedFilteredAggregationContext._baseFilterOperator);
         projectOperators.add(Pair.of(aggregationFunctions, projectOperatorStPair));
-
       }
     }
 
@@ -354,7 +354,8 @@ public class AggregationFunctionUtils {
       canUseStarTree = true;
     } else {
       Set<ExpressionContext> expressionsToTransform =
-          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, queryContext.getGroupByExpressions());
+          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions,
+              queryContext.getGroupByExpressions());
       projectOperator =
           new ProjectPlanNode(indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
               baseFilterOperator).run();
