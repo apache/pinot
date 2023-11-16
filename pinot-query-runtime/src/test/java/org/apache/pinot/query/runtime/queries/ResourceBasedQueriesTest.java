@@ -73,7 +73,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
   private static final String IGNORE_FILTER_PROPERTY = "pinot.runIgnored";
   private static final int DEFAULT_NUM_PARTITIONS = 4;
-  private static final boolean REPORT_IGNORES = false;
+  private static final boolean REPORT_IGNORES = true;
 
   private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
   private boolean _isRunIgnored;
