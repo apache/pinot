@@ -312,56 +312,22 @@ public class AggregationFunctionUtils {
       } else {
         AggregationFunction[] aggregationFunctions =
             combinedFilteredAggregationContext._aggregationFunctions.toArray(new AggregationFunction[0]);
-//        ProjectionPlanNode projectionPlanNode = OperatorUtils.maybeGetStartreeProjectionOperator(queryContext,
-//            combinedFilteredAggregationContext._combinedFilterContext, indexSegment, aggregationFunctions,
-//            combinedFilteredAggregationContext._predicateEvaluators, filterOperator, groupByExpressions);
-//        projectOperators.add(Pair.of(aggregationFunctions,
-//            Pair.of(projectionPlanNode.run(), projectionPlanNode instanceof StarTreeProjectPlanNode)));
+        Pair<BaseProjectOperator<?>, Boolean> projectOperatorStPair =
+            createProjectOperatorStPair(indexSegment, queryContext,
+                combinedFilteredAggregationContext._combinedFilterContext, aggregationFunctions,
+                combinedFilteredAggregationContext._predicateEvaluators, combinedFilteredAggregationContext._baseFilterOperator);
+        projectOperators.add(Pair.of(aggregationFunctions, projectOperatorStPair));
 
-        BaseProjectOperator<?> projectOperator;
-        projectOperator = StarTreeUtils.createStarTreeBasedProjectOperator(indexSegment, queryContext,
-            combinedFilteredAggregationContext._combinedFilterContext, aggregationFunctions,
-            combinedFilteredAggregationContext._predicateEvaluators);
-
-        if (projectOperator != null) {
-          // Can use StarTree project operator
-          projectOperators.add(Pair.of(aggregationFunctions,Pair.of(projectOperator, true)));
-        } else {
-          Set<ExpressionContext> expressionsToTransform =
-              AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
-          projectOperator =
-              new ProjectPlanNode(indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-                  filterOperator).run();
-          projectOperators.add(Pair.of(aggregationFunctions,Pair.of(projectOperator, false)));
-        }
       }
     }
 
     if (!nonFilteredFunctions.isEmpty()) {
       AggregationFunction[] aggregationFunctions = nonFilteredFunctions.toArray(new AggregationFunction[0]);
-//      ProjectionPlanNode projectionPlanNode =
-//          OperatorUtils.maybeGetStartreeProjectionOperator(queryContext, queryContext.getFilter(), indexSegment,
-//              aggregationFunctions, mainFilterPlan.getPredicateEvaluators(), mainFilterOperator,
-//              groupByExpressions);
-//      projectOperators.add(Pair.of(aggregationFunctions,
-//          Pair.of(projectionPlanNode.run(), projectionPlanNode instanceof StarTreeProjectPlanNode)));
-
-      BaseProjectOperator<?> projectOperator;
-      projectOperator = StarTreeUtils.createStarTreeBasedProjectOperator(indexSegment, queryContext,
-          queryContext.getFilter(), aggregationFunctions,
-          mainFilterPlan.getPredicateEvaluators());
-
-      if (projectOperator != null) {
-        // Can use StarTree project operator
-        projectOperators.add(Pair.of(aggregationFunctions,Pair.of(projectOperator, true)));
-      } else {
-        Set<ExpressionContext> expressionsToTransform =
-            AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
-        projectOperator =
-            new ProjectPlanNode(indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-                mainFilterOperator).run();
-        projectOperators.add(Pair.of(aggregationFunctions,Pair.of(projectOperator, false)));
-      }
+      Pair<BaseProjectOperator<?>, Boolean> projectOperatorStPair =
+          createProjectOperatorStPair(indexSegment, queryContext,
+              queryContext.getFilter(), aggregationFunctions,
+              mainFilterPlan.getPredicateEvaluators(), mainFilterOperator);
+      projectOperators.add(Pair.of(aggregationFunctions, projectOperatorStPair));
     }
 
     return projectOperators;
@@ -373,5 +339,27 @@ public class AggregationFunctionUtils {
       columnName += " FILTER(WHERE " + filter + ")";
     }
     return columnName;
+  }
+
+  public static Pair<BaseProjectOperator<?>, Boolean> createProjectOperatorStPair(IndexSegment indexSegment,
+      QueryContext queryContext, FilterContext filterContext, AggregationFunction[] aggregationFunctions,
+      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, BaseFilterOperator baseFilterOperator) {
+
+    boolean canUseStarTree = false;
+    BaseProjectOperator<?> projectOperator =
+        StarTreeUtils.createStarTreeBasedProjectOperator(indexSegment, queryContext, filterContext,
+            aggregationFunctions, predicateEvaluators);
+
+    if (projectOperator != null) {
+      canUseStarTree = true;
+    } else {
+      Set<ExpressionContext> expressionsToTransform =
+          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, queryContext.getGroupByExpressions());
+      projectOperator =
+          new ProjectPlanNode(indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+              baseFilterOperator).run();
+    }
+
+    return Pair.of(projectOperator, canUseStarTree);
   }
 }

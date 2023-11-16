@@ -115,23 +115,13 @@ public class AggregationPlanNode implements PlanNode {
       }
     }
 
-    BaseProjectOperator<?> projectOperator;
-    boolean canUseStarTree = false;
-    projectOperator =
-        StarTreeUtils.createStarTreeBasedProjectOperator(_indexSegment, _queryContext, _queryContext.getFilter(),
-            aggregationFunctions, filterPlanNode.getPredicateEvaluators());
+    Pair<BaseProjectOperator<?>, Boolean> projectOperatorStPair =
+        AggregationFunctionUtils.createProjectOperatorStPair(_indexSegment, _queryContext,
+            _queryContext.getFilter(), aggregationFunctions,
+            filterPlanNode.getPredicateEvaluators(), filterOperator);
 
-    if (projectOperator != null) {
-      canUseStarTree = true;
-    } else {
-      Set<ExpressionContext> expressionsToTransform =
-          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, _queryContext.getGroupByExpressions());
-      projectOperator =
-          new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-              filterOperator).run();
-    }
-
-    return new AggregationOperator(_queryContext, projectOperator, numTotalDocs, canUseStarTree);
+    return new AggregationOperator(_queryContext, projectOperatorStPair.getLeft(), numTotalDocs,
+        projectOperatorStPair.getRight());
   }
 
   /**

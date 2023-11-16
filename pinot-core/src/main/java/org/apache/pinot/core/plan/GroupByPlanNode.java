@@ -72,22 +72,12 @@ public class GroupByPlanNode implements PlanNode {
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
-    BaseProjectOperator<?> projectOperator;
-    boolean canUseStarTree = false;
-    projectOperator =
-        StarTreeUtils.createStarTreeBasedProjectOperator(_indexSegment, _queryContext, _queryContext.getFilter(),
-            aggregationFunctions, filterPlanNode.getPredicateEvaluators());
+    Pair<BaseProjectOperator<?>, Boolean> projectOperatorStPair =
+        AggregationFunctionUtils.createProjectOperatorStPair(_indexSegment, _queryContext,
+            _queryContext.getFilter(), aggregationFunctions,
+            filterPlanNode.getPredicateEvaluators(), filterOperator);
 
-    if (projectOperator != null) {
-      canUseStarTree = true;
-    } else {
-      Set<ExpressionContext> expressionsToTransform =
-          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, _queryContext.getGroupByExpressions());
-      projectOperator =
-          new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-              filterOperator).run();
-    }
-
-    return new GroupByOperator(_queryContext, groupByExpressions, projectOperator, numTotalDocs, canUseStarTree);
+    return new GroupByOperator(_queryContext, groupByExpressions, projectOperatorStPair.getLeft(), numTotalDocs,
+        projectOperatorStPair.getRight());
   }
 }
