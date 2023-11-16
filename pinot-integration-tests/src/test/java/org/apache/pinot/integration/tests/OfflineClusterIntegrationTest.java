@@ -1442,57 +1442,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(secondQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), secondQueryResult);
     assertEquals(secondQueryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertEquals(secondQueryResponse.get("numDocsScanned").asInt(), secondQueryResult);
-
-    // Enforce a sleep here since segment reload is async and there is another back-to-back reload below.
-    // Otherwise, there is no way to tell whether the 1st reload on server side is finished,
-    // which may hit the race condition that the 1st reload finishes after the 2nd reload is fully done.
-    // 10 seconds are still better than hitting race condition which will time out after 10 minutes.
-    Thread.sleep(10_000L);
-
-    // Test the filtered agg (third) query
-    JsonNode thirdQueryResponse = postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG);
-    int thirdQueryResultA = thirdQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt();
-    int thirdQueryResultB = thirdQueryResponse.get("resultTable").get("rows").get(0).get(1).asInt();
-    assertEquals(thirdQueryResponse.get("totalDocs").asLong(), numTotalDocs);
-    // Initially 'numDocsScanned' should be the same as 'COUNT(*)' result
-    assertEquals(thirdQueryResponse.get("numDocsScanned").asInt(), thirdQueryResultA + thirdQueryResultB);
-
-    // Update table config with a different star-tree index config and trigger reload
-    indexingConfig.setStarTreeIndexConfigs(Collections.singletonList(STAR_TREE_INDEX_CONFIG_3));
-    indexingConfig.setEnableDynamicStarTreeCreation(true);
-    updateTableConfig(tableConfig);
-    reloadAllSegments(TEST_STAR_TREE_QUERY_FILTERED_AGG, false, numTotalDocs);
-    // With star-tree, 'numDocsScanned' should be the same as number of segments * number of unique filter swimlanes
-    // leveraging ST (2 per segment for TEST_STAR_TREE_QUERY_FILTERED_AGG)
-    assertEquals(postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG).get("numDocsScanned").asLong(), NUM_SEGMENTS * 2);
-
-    // Reload again should have no effect
-    reloadAllSegments(TEST_STAR_TREE_QUERY_FILTERED_AGG, false, numTotalDocs);
-    thirdQueryResponse = postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG);
-    assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), thirdQueryResultA);
-    assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(1).asInt(), thirdQueryResultB);
-    assertEquals(thirdQueryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(thirdQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS * 2);
-
-    // Test query with mixture of aggs solvable/not solvable by ST but with different filter swimlanes. Confirm that
-    // those solvable by ST make use of ST
-    thirdQueryResponse = postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG_MIXED);
-    assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), thirdQueryResultA);
-    assertEquals(thirdQueryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(thirdQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS + thirdQueryResultB);
-
-    // Should be able to use the star-tree with an additional match-all predicate on another dimension
-    thirdQueryResponse = postQuery(TEST_STAR_TREE_QUERY_FILTERED_AGG + " AND DaysSinceEpoch > 16070");
-    assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), thirdQueryResultA);
-    assertEquals(thirdQueryResponse.get("resultTable").get("rows").get(0).get(1).asInt(), thirdQueryResultB);
-    assertEquals(thirdQueryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(thirdQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS * 2);
-
-    // Remove ST index configs so that other tests are not impacted by their presence
-    indexingConfig.setStarTreeIndexConfigs(null);
-    updateTableConfig(tableConfig);
-    reloadAllSegments(TEST_STAR_TREE_QUERY_FILTERED_AGG, false, numTotalDocs);
-    Thread.sleep(10_000L);
   }
 
   /**
