@@ -222,6 +222,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     JsonNode starResponse = postQuery(starQuery);
     String referenceQuery = disableStarTree + starQuery;
     JsonNode referenceResponse = postQuery(referenceQuery);
+    assertEquals(starResponse.get("exceptions").size(), 0);
+    assertEquals(referenceResponse.get("exceptions").size(), 0);
     assertEquals(starResponse.get("resultTable"), referenceResponse.get("resultTable"), String.format(
         "Query comparison failed for: \n"
             + "Star Query: %s\nStar Response: %s\nReference Query: %s\nReference Response: %s\nRandom Seed: %d",

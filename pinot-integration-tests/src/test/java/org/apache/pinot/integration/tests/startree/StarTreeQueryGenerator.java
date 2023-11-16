@@ -45,6 +45,7 @@ public class StarTreeQueryGenerator {
   private static final String IN = " IN ";
   private static final String NOT_IN = " NOT IN ";
   private static final String AND = " AND ";
+  private static final String FILTER_WHERE = " FILTER (WHERE %s)";
 
   private static final int MAX_NUM_AGGREGATIONS = 5;
   private static final int MAX_NUM_PREDICATES = 10;
@@ -82,6 +83,16 @@ public class StarTreeQueryGenerator {
         metricColumn);
   }
 
+  private String generateFilteredAggregation(String metricColumn) {
+    StringBuilder filteredAgg = new StringBuilder(generateAggregation(metricColumn));
+    String predicates = generatePredicateExpressions();
+    if (predicates == null) {
+      return filteredAgg.toString();
+    }
+    filteredAgg.append(String.format(FILTER_WHERE, predicates));
+    return filteredAgg.toString();
+  }
+
   /**
    * Generate the aggregation section of the query, returns at least one aggregation.
    *
@@ -92,7 +103,11 @@ public class StarTreeQueryGenerator {
     int numMetrics = _metricColumns.size();
     String[] aggregations = new String[numAggregations];
     for (int i = 0; i < numAggregations; i++) {
-      aggregations[i] = generateAggregation(_metricColumns.get(_random.nextInt(numMetrics)));
+      if (i % 3 == 0) {
+        aggregations[i] = generateFilteredAggregation(_metricColumns.get(_random.nextInt(numMetrics)));
+      } else {
+        aggregations[i] = generateAggregation(_metricColumns.get(_random.nextInt(numMetrics)));
+      }
     }
     return StringUtils.join(aggregations, ", ");
   }
@@ -212,19 +227,29 @@ public class StarTreeQueryGenerator {
     return stringBuilder.append(')').toString();
   }
 
+  @Nullable
+  private String generatePredicates() {
+    String predicates = generatePredicateExpressions();
+    if (predicates == null) {
+      return null;
+    }
+
+    return WHERE + predicates;
+  }
+
   /**
    * Randomly generate the WHERE clause of the query, may return {@code null}.
    *
    * @return all predicates.
    */
   @Nullable
-  private String generatePredicates() {
+  private String generatePredicateExpressions() {
     int numPredicates = _random.nextInt(MAX_NUM_PREDICATES + 1);
     if (numPredicates == 0) {
       return null;
     }
 
-    StringBuilder stringBuilder = new StringBuilder(WHERE);
+    StringBuilder stringBuilder = new StringBuilder();
 
     int numDimensions = _singleValueDimensionColumns.size();
     for (int i = 0; i < numPredicates; i++) {
