@@ -76,7 +76,7 @@ public class FilterPlanNode implements PlanNode {
   public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext, @Nullable FilterContext filter) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
-    _filter = filter;
+    _filter = filter != null ? filter : _queryContext.getFilter();
   }
 
   @Override
@@ -96,9 +96,8 @@ public class FilterPlanNode implements PlanNode {
     }
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
 
-    FilterContext filter = _filter != null ? _filter : _queryContext.getFilter();
-    if (filter != null) {
-      BaseFilterOperator filterOperator = constructPhysicalOperator(filter, numDocs);
+    if (_filter != null) {
+      BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
       if (queryableDocIdSnapshot != null) {
         BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
