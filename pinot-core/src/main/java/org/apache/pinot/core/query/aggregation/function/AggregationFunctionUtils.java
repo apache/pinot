@@ -343,12 +343,17 @@ public class AggregationFunctionUtils {
 
   public static Pair<BaseProjectOperator<?>, Boolean> createProjectOperatorStPair(IndexSegment indexSegment,
       QueryContext queryContext, FilterContext filterContext, AggregationFunction[] aggregationFunctions,
-      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, BaseFilterOperator baseFilterOperator) {
+      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators, BaseFilterOperator filterOperator) {
 
+    BaseProjectOperator<?> projectOperator = null;
     boolean canUseStarTree = false;
-    BaseProjectOperator<?> projectOperator =
-        StarTreeUtils.createStarTreeBasedProjectOperator(indexSegment, queryContext, filterContext,
-            aggregationFunctions, predicateEvaluators);
+
+    // TODO: Do not create ProjectOperator when filter result is empty
+    if (!filterOperator.isResultEmpty()) {
+      projectOperator =
+          StarTreeUtils.createStarTreeBasedProjectOperator(indexSegment, queryContext, filterContext,
+              aggregationFunctions, predicateEvaluators);
+    }
 
     if (projectOperator != null) {
       canUseStarTree = true;
@@ -358,7 +363,7 @@ public class AggregationFunctionUtils {
               queryContext.getGroupByExpressions());
       projectOperator =
           new ProjectPlanNode(indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-              baseFilterOperator).run();
+              filterOperator).run();
     }
 
     return Pair.of(projectOperator, canUseStarTree);

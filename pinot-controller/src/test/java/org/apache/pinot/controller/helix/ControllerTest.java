@@ -608,7 +608,8 @@ public class ControllerTest {
 
   public void stopAndDropFakeInstance(String instanceId) {
     stopFakeInstance(instanceId);
-    _helixResourceManager.dropInstance(instanceId);
+    TestUtils.waitForCondition(aVoid -> _helixResourceManager.dropInstance(instanceId).isSuccessful(), 60_000L,
+        "Failed to drop fake instance: " + instanceId);
   }
 
   public static Schema createDummySchema(String tableName) {

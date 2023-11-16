@@ -526,17 +526,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         immutableSegment.getSegmentMetadata().getTotalDocs());
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
-    SegmentDataManager oldSegmentManager = registerSegment(segmentName, newSegmentManager);
+    // Register the new segment after it is fully initialized by partitionUpsertMetadataManager, e.g. to fill up its
+    // validDocId bitmap. Otherwise, the query can return wrong results, if accessing the premature segment.
+    SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
     if (oldSegmentManager == null) {
       if (_tableUpsertMetadataManager.isPreloading()) {
         partitionUpsertMetadataManager.preloadSegment(immutableSegment);
       } else {
         partitionUpsertMetadataManager.addSegment(immutableSegment);
       }
+      registerSegment(segmentName, newSegmentManager);
       _logger.info("Added new immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
     } else {
       IndexSegment oldSegment = oldSegmentManager.getSegment();
       partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+      registerSegment(segmentName, newSegmentManager);
       _logger.info("Replaced {} segment: {} of upsert-enabled table: {}",
           oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, _tableNameWithType);
       releaseSegment(oldSegmentManager);

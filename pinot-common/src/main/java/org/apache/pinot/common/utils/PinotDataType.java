@@ -974,7 +974,7 @@ public enum PinotDataType {
         // String does not represent a well-formed JSON. Ignore this exception because we are going to try to convert
         // Java String object to JSON string.
       } catch (Exception e) {
-          throw new RuntimeException("Unable to convert String into JSON. Input value: " + value, e);
+        throw new RuntimeException("Unable to convert String into JSON. Input value: " + value, e);
       }
     }
 
@@ -1232,7 +1232,7 @@ public enum PinotDataType {
       return (boolean[]) value;
     }
     if (isSingleValue()) {
-      return new boolean[] {toBoolean(value)};
+      return new boolean[]{toBoolean(value)};
     } else {
       Object[] valueArray = toObjectArray(value);
       int length = valueArray.length;
@@ -1250,7 +1250,7 @@ public enum PinotDataType {
       return (Timestamp[]) value;
     }
     if (isSingleValue()) {
-      return new Timestamp[] {toTimestamp(value)};
+      return new Timestamp[]{toTimestamp(value)};
     } else {
       Object[] valueArray = toObjectArray(value);
       int length = valueArray.length;
@@ -1476,6 +1476,8 @@ public enum PinotDataType {
         return JSON;
       case BYTES:
         return BYTES;
+      case OBJECT:
+        return OBJECT;
       case INT_ARRAY:
         return PRIMITIVE_INT_ARRAY;
       case LONG_ARRAY:

@@ -25,6 +25,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
+import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -45,6 +46,8 @@ public class OpChainExecutionContext {
   private final OpChainStats _stats;
   private final PipelineBreakerResult _pipelineBreakerResult;
   private final boolean _traceEnabled;
+
+  private ServerPlanRequestContext _leafStageContext;
 
   public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId,
       VirtualServerAddress server, long deadlineMs, Map<String, String> opChainMetadata, StageMetadata stageMetadata,
@@ -107,5 +110,13 @@ public class OpChainExecutionContext {
 
   public boolean isTraceEnabled() {
     return _traceEnabled;
+  }
+
+  public ServerPlanRequestContext getLeafStageContext() {
+    return _leafStageContext;
+  }
+
+  public void setLeafStageContext(ServerPlanRequestContext leafStageContext) {
+    _leafStageContext = leafStageContext;
   }
 }

@@ -42,6 +42,7 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.Table;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -180,6 +181,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     ColumnDataType[] storedColumnDataTypes = _dataSchema.getStoredColumnDataTypes();
     int numColumns = _dataSchema.size();
     Iterator<Record> iterator = _table.iterator();
+    int numRowsAdded = 0;
     if (_queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = new RoaringBitmap[numColumns];
       Object[] nullPlaceholders = new Object[numColumns];
@@ -189,6 +191,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
       }
       int rowId = 0;
       while (iterator.hasNext()) {
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numRowsAdded);
         dataTableBuilder.startRow();
         Object[] values = iterator.next().getValues();
         for (int colId = 0; colId < numColumns; colId++) {
@@ -200,6 +203,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
           setDataTableColumn(storedColumnDataTypes[colId], dataTableBuilder, colId, value);
         }
         dataTableBuilder.finishRow();
+        numRowsAdded++;
         rowId++;
       }
       for (RoaringBitmap nullBitmap : nullBitmaps) {
@@ -207,12 +211,14 @@ public class GroupByResultsBlock extends BaseResultsBlock {
       }
     } else {
       while (iterator.hasNext()) {
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numRowsAdded);
         dataTableBuilder.startRow();
         Object[] values = iterator.next().getValues();
         for (int colId = 0; colId < numColumns; colId++) {
           setDataTableColumn(storedColumnDataTypes[colId], dataTableBuilder, colId, values[colId]);
         }
         dataTableBuilder.finishRow();
+        numRowsAdded++;
       }
     }
     return dataTableBuilder.build();

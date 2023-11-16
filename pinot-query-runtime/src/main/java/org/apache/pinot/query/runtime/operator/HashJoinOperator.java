@@ -188,24 +188,21 @@ public class HashJoinOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
-    try {
-      if (_isTerminated) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-      }
-      if (!_isHashTableBuilt) {
-        // Build JOIN hash table
-        buildBroadcastHashTable();
-      }
-      if (_upstreamErrorBlock != null) {
-        return _upstreamErrorBlock;
-      }
-      TransferableBlock leftBlock = _leftTableOperator.nextBlock();
-      // JOIN each left block with the right block.
-      return buildJoinedDataBlock(leftBlock);
-    } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+  protected TransferableBlock getNextBlock()
+      throws ProcessingException {
+    if (_isTerminated) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
+    if (!_isHashTableBuilt) {
+      // Build JOIN hash table
+      buildBroadcastHashTable();
+    }
+    if (_upstreamErrorBlock != null) {
+      return _upstreamErrorBlock;
+    }
+    TransferableBlock leftBlock = _leftTableOperator.nextBlock();
+    // JOIN each left block with the constructed right hash table.
+    return buildJoinedDataBlock(leftBlock);
   }
 
   private void buildBroadcastHashTable()
