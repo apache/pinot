@@ -279,6 +279,16 @@ public class StreamConfigTest {
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(),
         StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES);
+
+    // If size based threshold is set, then rows must be 0
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "1000000");
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE, "100M");
+    try {
+      new StreamConfig(tableName, streamConfigMap);
+      fail("Invalid config: flush threshold rows must be 0, when flush threshold size is set.");
+    } catch (Exception e) {
+      // Expected
+    }
   }
 
   /**

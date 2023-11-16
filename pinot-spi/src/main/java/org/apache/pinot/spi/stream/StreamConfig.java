@@ -172,7 +172,7 @@ public class StreamConfig {
 
     _flushThresholdRows = extractFlushThresholdRows(streamConfigMap);
     _flushThresholdTimeMillis = extractFlushThresholdTimeMillis(streamConfigMap);
-    _flushThresholdSegmentSizeBytes = extractFlushThresholdSegmentSize(streamConfigMap);
+    _flushThresholdSegmentSizeBytes = extractFlushThresholdSegmentSize(streamConfigMap, _flushThresholdRows);
     _serverUploadToDeepStore = Boolean.parseBoolean(
         streamConfigMap.getOrDefault(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE,
             DEFAULT_SERVER_UPLOAD_TO_DEEPSTORE));
@@ -216,7 +216,7 @@ public class StreamConfig {
     return _serverUploadToDeepStore;
   }
 
-  private long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {
+  private long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap, final int flushThresholdRows) {
     long segmentSizeBytes = -1;
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE;
     String flushThresholdSegmentSizeStr = streamConfigMap.get(key);
@@ -235,6 +235,9 @@ public class StreamConfig {
       }
     }
     if (segmentSizeBytes > 0) {
+      Preconditions.checkState(flushThresholdRows == 0,
+          String.format("Invalid config: %s=%d, it must be 0 for size based segment to work.",
+              StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, flushThresholdRows));
       return segmentSizeBytes;
     } else {
       return DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES;

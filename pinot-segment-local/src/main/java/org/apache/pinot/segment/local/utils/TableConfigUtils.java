@@ -157,7 +157,7 @@ public final class TableConfigUtils {
           // Validate that StreamConfig can be created
           streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
         } catch (Exception e) {
-          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
+          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map: " + e.getMessage(), e);
         }
         validateDecoder(streamConfig);
       }
