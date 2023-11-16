@@ -51,6 +51,9 @@
         ]
       },
       {
+        "sql": "SELECT {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ GROUP BY {tbl1}.name"
+      },
+      {
         "description": "explain plan with join with colocated tables, not on partition key",
         "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, a.col3, b.col3 FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */ ON a.col1 = b.col2 WHERE b.col3 > 0",
         "output": [
@@ -135,7 +138,7 @@
       },
       {
         "description": "explain plan with semi-join + group-by with colocated tables",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, COUNT(*)  FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT b.col1    FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */    WHERE b.col1 = 'z' )  GROUP BY a.col1",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, COUNT(*) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT b.col1    FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */    WHERE b.col1 = 'z' )  GROUP BY a.col1",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -162,8 +165,36 @@
         ]
       },
       {
-        "description": "explain plan with direct group-by with pre-partitioned tables",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3)  FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  GROUP BY a.col2",
+        "description": "explain plan with semi-join + group-by with colocated tables with colocated hints",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ a.col1, COUNT(*) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT b.col1    FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */    WHERE b.col1 = 'z' )  GROUP BY a.col1",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
+          "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:2|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:2|[0] AGGREGATE_FINAL\n",
+          "        └── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            ├── [2]@localhost:2|[2] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            ├── [2]@localhost:2|[3] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            ├── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            └── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]}\n",
+          "                └── [2]@localhost:1|[1] AGGREGATE_LEAF\n",
+          "                    └── [2]@localhost:1|[1] JOIN\n",
+          "                        ├── [2]@localhost:1|[1] PROJECT\n",
+          "                        │   └── [2]@localhost:1|[1] TABLE SCAN (a) null\n",
+          "                        └── [2]@localhost:1|[1] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "                            ├── [3]@localhost:2|[2] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[2]@localhost:2|[2]} (Subtree Omitted)\n",
+          "                            ├── [3]@localhost:2|[3] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[2]@localhost:2|[3]} (Subtree Omitted)\n",
+          "                            ├── [3]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[2]@localhost:1|[0]} (Subtree Omitted)\n",
+          "                            └── [3]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[2]@localhost:1|[1]}\n",
+          "                                └── [3]@localhost:1|[1] PROJECT\n",
+          "                                    └── [3]@localhost:1|[1] FILTER\n",
+          "                                        └── [3]@localhost:1|[1] TABLE SCAN (b) null\n",
+          ""
+        ]
+      },
+      {
+        "description": "explain plan with direct group-by with pre-partitioned tables on partition key",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  GROUP BY a.col2",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:2|[2] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -182,8 +213,45 @@
         ]
       },
       {
+        "description": "explain plan with direct group-by with pre-partitioned tables on non-partition key",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  GROUP BY a.col1",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
+          "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:2|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:2|[0] AGGREGATE_FINAL\n",
+          "        └── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            ├── [2]@localhost:2|[2] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            ├── [2]@localhost:2|[3] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            ├── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            └── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]}\n",
+          "                └── [2]@localhost:1|[1] AGGREGATE_LEAF\n",
+          "                    └── [2]@localhost:1|[1] TABLE SCAN (a) null\n",
+          ""
+        ]
+      },
+      {
+        "description": "explain plan with direct group-by with pre-partitioned tables on both partition and non-partition key",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  GROUP BY a.col1, a.col2",
+        "comments": "TODO: currently we do not support minimum hash-set thus we repartition from col2 to (col1, col2), but once we support this should not have repartitioning.",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
+          "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:2|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:2|[0] AGGREGATE_FINAL\n",
+          "        └── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            ├── [2]@localhost:2|[2] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            ├── [2]@localhost:2|[3] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            ├── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            └── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]}\n",
+          "                └── [2]@localhost:1|[1] AGGREGATE_LEAF\n",
+          "                    └── [2]@localhost:1|[1] TABLE SCAN (a) null\n",
+          ""
+        ]
+      },
+      {
         "description": "explain plan with direct inner join + group-by with colocated tables on join key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3)  FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */    ON a.col2 = b.col1  WHERE b.col3 > 0  GROUP BY a.col2",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */    ON a.col2 = b.col1  WHERE b.col3 > 0  GROUP BY a.col2",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -250,7 +318,6 @@
       {
         "description": "explain plan with semi join from grouped right table, then group-by with colocated tables on join key",
         "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3)  FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT col2    FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */    WHERE b.col3 > 0    GROUP BY col2 HAVING COUNT(*) > 1 )  GROUP BY a.col2",
-        "comment": "TODO: exchange on top of SEMI-JOIN should be removed, now it is guaranteed to be partitioned",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:2|[2] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -287,7 +354,6 @@
       {
         "description": "explain plan with semi join from grouped right table, then group-by with colocated tables on non-join key",
         "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, SUM(a.col3)  FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT col1    FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */    WHERE b.col3 > 0    GROUP BY col1 HAVING COUNT(*) > 1 )  GROUP BY a.col1",
-        "comment": "TODO: exchange on top of SEMI-JOIN should be removed, now it is guaranteed to be partitioned",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
