@@ -803,7 +803,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
-        return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList(), numPrunedSegments);
+        return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyMap(),
+            Collections.emptyList(), numPrunedSegments);
       }
     }
   }

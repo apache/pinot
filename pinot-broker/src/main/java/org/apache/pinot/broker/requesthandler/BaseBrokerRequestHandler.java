@@ -43,6 +43,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
@@ -592,12 +593,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Calculate routing table for the query
       // TODO: Modify RoutingManager interface to directly take PinotQuery
       long routingStartTimeNs = System.nanoTime();
-      Map<ServerInstance, List<String>> offlineRoutingTable = null;
-      Map<ServerInstance, List<String>> realtimeRoutingTable = null;
-      Map<ServerInstance, List<String>> optionalOfflineRoutingTable = null;
-      Map<ServerInstance, List<String>> optionalRealtimeRoutingTable = null;
-      Set<ServerInstance> offlineServerInstances = null;
-      Set<ServerInstance> realtimeServerInstances = null;
+      Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable = null;
+      Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable = null;
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
       if (offlineBrokerRequest != null) {
@@ -605,14 +602,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
-          Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
-          // To make it simple for changes to be backward compatible, we skip servers that only have optional segments.
-          // TODO: handle servers only have optional segments too.
+          Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
+              routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             offlineRoutingTable = serverInstanceToSegmentsMap;
-            optionalOfflineRoutingTable = routingTable.getServerInstanceToOptionalSegmentsMap();
-            offlineServerInstances = new HashSet<>(offlineRoutingTable.keySet());
-            offlineServerInstances.addAll(optionalOfflineRoutingTable.keySet());
           } else {
             offlineBrokerRequest = null;
           }
@@ -626,12 +619,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         RoutingTable routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest, requestId);
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
-          Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+          Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
+              routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             realtimeRoutingTable = serverInstanceToSegmentsMap;
-            optionalRealtimeRoutingTable = routingTable.getServerInstanceToOptionalSegmentsMap();
-            realtimeServerInstances = new HashSet<>(realtimeRoutingTable.keySet());
-            realtimeServerInstances.addAll(optionalRealtimeRoutingTable.keySet());
           } else {
             realtimeBrokerRequest = null;
           }
@@ -701,10 +692,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // one server is queried
       int numServers = 0;
       if (offlineRoutingTable != null) {
-        numServers += offlineServerInstances.size();
+        numServers += offlineRoutingTable.size();
       }
       if (realtimeRoutingTable != null) {
-        numServers += realtimeServerInstances.size();
+        numServers += realtimeRoutingTable.size();
       }
       if (offlineBrokerRequest != null) {
         Map<String, String> queryOptions = offlineBrokerRequest.getPinotQuery().getQueryOptions();
@@ -748,8 +739,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
           // For OFFLINE and HYBRID tables, don't send EXPLAIN query to realtime servers.
           realtimeBrokerRequest = null;
           realtimeRoutingTable = null;
-          optionalRealtimeRoutingTable = null;
-          realtimeServerInstances = null;
         }
       }
       BrokerResponseNative brokerResponse;
@@ -762,20 +751,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         //       can always list the running queries and cancel query again until it ends. Just that such race
         //       condition makes cancel API less reliable. This should be rare as it assumes sending queries out to
         //       servers takes time, but will address later if needed.
-        _queriesById.put(requestId, new QueryServers(query, offlineServerInstances, realtimeServerInstances));
+        _queriesById.put(requestId, new QueryServers(query, offlineRoutingTable, realtimeRoutingTable));
         LOGGER.debug("Keep track of running query: {}", requestId);
         try {
           brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-              offlineRoutingTable, optionalOfflineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable,
-              optionalRealtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
+              offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
+              requestContext);
         } finally {
           _queriesById.remove(requestId);
           LOGGER.debug("Remove track of running query: {}", requestId);
         }
       } else {
         brokerResponse = processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest,
-            offlineRoutingTable, optionalOfflineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable,
-            optionalRealtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
+            offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
+            requestContext);
       }
 
       brokerResponse.setExceptions(exceptions);
@@ -1829,11 +1818,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-      @Nullable Map<ServerInstance, List<String>> optionalOfflineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      @Nullable Map<ServerInstance, List<String>> optionalRealtimeRoutingTable, long timeoutMs, ServerStats serverStats,
-      RequestContext requestContext)
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+      ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
   protected static boolean isPartialResult(BrokerResponse brokerResponse) {
@@ -1904,14 +1892,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     final String _query;
     final Set<ServerInstance> _servers = new HashSet<>();
 
-    QueryServers(String query, @Nullable Set<ServerInstance> offlineServerInstances,
-        @Nullable Set<ServerInstance> realtimeServerInstances) {
+    QueryServers(String query, @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+        @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable) {
       _query = query;
-      if (offlineServerInstances != null) {
-        _servers.addAll(offlineServerInstances);
+      if (offlineRoutingTable != null) {
+        _servers.addAll(offlineRoutingTable.keySet());
       }
-      if (realtimeServerInstances != null) {
-        _servers.addAll(realtimeServerInstances);
+      if (realtimeRoutingTable != null) {
+        _servers.addAll(realtimeRoutingTable.keySet());
       }
     }
   }

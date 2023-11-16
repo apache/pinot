@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -199,7 +200,7 @@ public class BaseBrokerRequestHandlerTest {
     RoutingTable rt = mock(RoutingTable.class);
     when(rt.getServerInstanceToSegmentsMap()).thenReturn(
         Collections.singletonMap(new ServerInstance(new InstanceConfig("server01_9000")),
-            Collections.singletonList("segment01")));
+            Pair.of(Collections.singletonList("segment01"), null)));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);
@@ -223,11 +224,9 @@ public class BaseBrokerRequestHandlerTest {
           @Override
           protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
               BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-              @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-              @Nullable Map<ServerInstance, List<String>> optionalOfflineRoutingTable,
+              @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
               @Nullable BrokerRequest realtimeBrokerRequest,
-              @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-              @Nullable Map<ServerInstance, List<String>> optionalRealtimeRoutingTable, long timeoutMs,
+              @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
               ServerStats serverStats, RequestContext requestContext)
               throws Exception {
             testRequestId[0] = requestId;

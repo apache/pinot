@@ -151,7 +151,7 @@ public class MockInstanceDataManagerFactory {
     Map<String, SegmentDataManager> segmentDataManagerMap =
         segmentList.stream().collect(Collectors.toMap(IndexSegment::getSegmentName, ImmutableSegmentDataManager::new));
     TableDataManager tableDataManager = mock(TableDataManager.class);
-    // TODO: support optional segments for multi-stage engine as well, but for now, it's always null.
+    // TODO: support optional segments for multi-stage engine, but for now, it's always null.
     when(tableDataManager.acquireSegments(anyList(), eq(null), anyList())).thenAnswer(invocation -> {
       List<String> segments = invocation.getArgument(0);
       return segments.stream().map(segmentDataManagerMap::get).collect(Collectors.toList());

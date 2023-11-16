@@ -42,6 +42,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -111,9 +112,9 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<String, Map<ServerInstance, List<String>>> getRoutingTable(
+  public Map<String, Map<ServerInstance, Pair<List<String>, List<String>>>> getRoutingTable(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
-    Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
+    Map<String, Map<ServerInstance, Pair<List<String>, List<String>>>> result = new TreeMap<>();
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -148,7 +149,7 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<ServerInstance, List<String>> getRoutingTableForQuery(
+  public Map<ServerInstance, Pair<List<String>, List<String>>> getRoutingTableForQuery(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query,
       @Context HttpHeaders httpHeaders) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);

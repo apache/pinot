@@ -22,7 +22,6 @@ import com.google.common.cache.LoadingCache;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -172,7 +171,7 @@ public interface TableDataManager {
   List<SegmentDataManager> acquireSegments(List<String> segmentNames, List<String> missingSegments);
 
   default List<SegmentDataManager> acquireSegments(List<String> segmentNames,
-      @Nullable Set<String> optionalSegmentNames, List<String> missingSegments) {
+      @Nullable List<String> optionalSegmentNames, List<String> missingSegments) {
     return acquireSegments(segmentNames, missingSegments);
   }
 

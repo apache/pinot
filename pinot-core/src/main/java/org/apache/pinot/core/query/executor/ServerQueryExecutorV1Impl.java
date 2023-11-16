@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -201,7 +200,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
-    Set<String> optionalSegments = queryRequest.getOptionalSegments();
+    List<String> optionalSegments = queryRequest.getOptionalSegments();
     List<String> notAcquiredSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers =
         tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);

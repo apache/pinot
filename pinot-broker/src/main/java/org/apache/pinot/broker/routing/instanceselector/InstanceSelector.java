@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -81,15 +80,6 @@ public interface InstanceSelector {
     private final Map<String, String> _optionalSegmentToInstanceMap;
     private int _numPrunedSegments;
 
-    public SelectionResult(Map<String, String> segmentToInstanceMap, List<String> unavailableSegments) {
-      this(segmentToInstanceMap, Collections.emptyMap(), unavailableSegments, 0);
-    }
-
-    public SelectionResult(Map<String, String> segmentToInstanceMap, List<String> unavailableSegments,
-        int numPrunedSegments) {
-      this(segmentToInstanceMap, Collections.emptyMap(), unavailableSegments, numPrunedSegments);
-    }
-
     public SelectionResult(Map<String, String> segmentToInstanceMap, Map<String, String> optionalSegmentToInstanceMap,
         List<String> unavailableSegments, int numPrunedSegments) {
       _segmentToInstanceMap = segmentToInstanceMap;
@@ -103,6 +93,14 @@ public interface InstanceSelector {
      */
     public Map<String, String> getSegmentToInstanceMap() {
       return _segmentToInstanceMap;
+    }
+
+    /**
+     * Returns the map from optional segment to selected server instance hosting the optional segment.
+     * Optional segments can be skipped by broker or server upon any issue w/o failing the query.
+     */
+    public Map<String, String> getOptionalSegmentToInstanceMap() {
+      return _optionalSegmentToInstanceMap;
     }
 
     /**
@@ -124,10 +122,6 @@ public interface InstanceSelector {
      */
     public void setNumPrunedSegments(int numPrunedSegments) {
       _numPrunedSegments = numPrunedSegments;
-    }
-
-    public Map<String, String> getOptionalSegmentToInstanceMap() {
-      return _optionalSegmentToInstanceMap;
     }
   }
 }

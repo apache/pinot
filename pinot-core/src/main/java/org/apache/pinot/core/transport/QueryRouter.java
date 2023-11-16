@@ -19,14 +19,13 @@
 package org.apache.pinot.core.transport;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.DataTable;
@@ -90,15 +89,30 @@ public class QueryRouter {
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
       long timeoutMs) {
-    return submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable, null, realtimeBrokerRequest,
-        realtimeRoutingTable, null, timeoutMs);
+    Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTableWithOptionalSegments = null;
+    if (offlineRoutingTable != null) {
+      offlineRoutingTableWithOptionalSegments = new HashMap<>();
+      for (Map.Entry<ServerInstance, List<String>> entry : offlineRoutingTable.entrySet()) {
+        offlineRoutingTableWithOptionalSegments.put(entry.getKey(), Pair.of(entry.getValue(), null));
+      }
+    }
+    Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTableWithOptionalSegments = null;
+    if (realtimeRoutingTable != null) {
+      realtimeRoutingTableWithOptionalSegments = new HashMap<>();
+      for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
+        realtimeRoutingTableWithOptionalSegments.put(entry.getKey(), Pair.of(entry.getValue(), null));
+      }
+    }
+    return submitQueryWithOptionalSegments(requestId, rawTableName, offlineBrokerRequest,
+        offlineRoutingTableWithOptionalSegments, realtimeBrokerRequest, realtimeRoutingTableWithOptionalSegments,
+        timeoutMs);
   }
 
-  public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-      @Nullable Map<ServerInstance, List<String>> optionalOfflineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      @Nullable Map<ServerInstance, List<String>> optionalRealtimeRoutingTable, long timeoutMs) {
+  public AsyncQueryResponse submitQueryWithOptionalSegments(long requestId, String rawTableName,
+      @Nullable BrokerRequest offlineBrokerRequest,
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs) {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     // can prefer but not require TLS until all servers guaranteed to be on TLS
@@ -108,23 +122,19 @@ public class QueryRouter {
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
     if (offlineBrokerRequest != null) {
       assert offlineRoutingTable != null;
-      for (Map.Entry<ServerInstance, List<String>> entry : offlineRoutingTable.entrySet()) {
+      for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> entry : offlineRoutingTable.entrySet()) {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
-        InstanceRequest instanceRequest =
-            getInstanceRequest(requestId, offlineBrokerRequest, entry.getKey(), entry.getValue(),
-                optionalOfflineRoutingTable);
+        InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
         requestMap.put(serverRoutingInstance, instanceRequest);
       }
     }
     if (realtimeBrokerRequest != null) {
       assert realtimeRoutingTable != null;
-      for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
+      for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> entry : realtimeRoutingTable.entrySet()) {
         ServerRoutingInstance serverRoutingInstance =
             entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
-        InstanceRequest instanceRequest =
-            getInstanceRequest(requestId, realtimeBrokerRequest, entry.getKey(), entry.getValue(),
-                optionalRealtimeRoutingTable);
+        InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
         requestMap.put(serverRoutingInstance, instanceRequest);
       }
     }
@@ -210,8 +220,8 @@ public class QueryRouter {
     _asyncQueryResponseMap.remove(requestId);
   }
 
-  private InstanceRequest getInstanceRequest(long requestId, BrokerRequest brokerRequest, ServerInstance serverInstance,
-      List<String> segments, @Nullable Map<ServerInstance, List<String>> optionalSegments) {
+  private InstanceRequest getInstanceRequest(long requestId, BrokerRequest brokerRequest,
+      Pair<List<String>, List<String>> segments) {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setRequestId(requestId);
     instanceRequest.setQuery(brokerRequest);
@@ -219,12 +229,9 @@ public class QueryRouter {
     if (queryOptions != null) {
       instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
     }
-    instanceRequest.setSearchSegments(segments);
+    instanceRequest.setSearchSegments(segments.getLeft());
     instanceRequest.setBrokerId(_brokerId);
-    Set<String> optionalSegmentSet =
-        optionalSegments != null && optionalSegments.containsKey(serverInstance) ? new HashSet<>(
-            optionalSegments.get(serverInstance)) : null;
-    instanceRequest.setOptionalSegments(optionalSegmentSet);
+    instanceRequest.setOptionalSegments(segments.getRight());
     return instanceRequest;
   }
 }

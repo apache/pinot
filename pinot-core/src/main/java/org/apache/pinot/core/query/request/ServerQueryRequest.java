@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.request;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
@@ -52,7 +51,7 @@ public class ServerQueryRequest {
   private final boolean _enableTrace;
   private final boolean _enableStreaming;
   private final List<String> _segmentsToQuery;
-  private final Set<String> _optionalSegments;
+  private final List<String> _optionalSegments;
   private final QueryContext _queryContext;
 
   // Request id might not be unique across brokers or for request hitting a hybrid table. To solve that we may construct
@@ -144,6 +143,10 @@ public class ServerQueryRequest {
     return _segmentsToQuery;
   }
 
+  public List<String> getOptionalSegments() {
+    return _optionalSegments;
+  }
+
   public QueryContext getQueryContext() {
     return _queryContext;
   }
@@ -154,9 +157,5 @@ public class ServerQueryRequest {
 
   public TimerContext getTimerContext() {
     return _timerContext;
-  }
-
-  public Set<String> getOptionalSegments() {
-    return _optionalSegments;
   }
 }

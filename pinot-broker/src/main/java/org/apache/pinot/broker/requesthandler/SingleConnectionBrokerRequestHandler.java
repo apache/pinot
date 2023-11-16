@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.failuredetector.FailureDetector;
 import org.apache.pinot.broker.failuredetector.FailureDetectorFactory;
@@ -101,11 +102,10 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-      @Nullable Map<ServerInstance, List<String>> optionalOfflineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      @Nullable Map<ServerInstance, List<String>> optionalRealtimeRoutingTable, long timeoutMs, ServerStats serverStats,
-      RequestContext requestContext)
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+      ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     if (requestContext.isSampledRequest()) {
@@ -115,9 +115,8 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     String rawTableName = TableNameBuilder.extractRawTableName(serverBrokerRequest.getQuerySource().getTableName());
     long scatterGatherStartTimeNs = System.nanoTime();
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable,
-            optionalOfflineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, optionalRealtimeRoutingTable,
-            timeoutMs);
+        _queryRouter.submitQueryWithOptionalSegments(requestId, rawTableName, offlineBrokerRequest, offlineRoutingTable,
+            realtimeBrokerRequest, realtimeRoutingTable, timeoutMs);
     _failureDetector.notifyQuerySubmitted(asyncQueryResponse);
     Map<ServerRoutingInstance, ServerResponse> finalResponses = asyncQueryResponse.getFinalResponses();
     if (asyncQueryResponse.getStatus() == QueryResponse.Status.TIMED_OUT) {
