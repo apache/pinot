@@ -129,10 +129,14 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     assertEquals(tables.get(0).asText(), offlineTableName2);
 
     // Remove the tables and brokers
+    DEFAULT_INSTANCE.waitForEVToAppear(OFFLINE_TABLE_NAME);
+    DEFAULT_INSTANCE.waitForEVToAppear(offlineTableName2);
     DEFAULT_INSTANCE.dropOfflineTable(RAW_TABLE_NAME);
     DEFAULT_INSTANCE.deleteSchema(RAW_TABLE_NAME);
     DEFAULT_INSTANCE.dropOfflineTable(rawTableName2);
     DEFAULT_INSTANCE.deleteSchema(rawTableName2);
+    DEFAULT_INSTANCE.waitForEVToDisappear(OFFLINE_TABLE_NAME);
+    DEFAULT_INSTANCE.waitForEVToDisappear(offlineTableName2);
     sendDeleteRequest(_urlBuilder.forInstance("Broker_1.2.3.4_1234"));
     sendDeleteRequest(_urlBuilder.forInstance("Broker_2.3.4.5_2345"));
   }
@@ -210,6 +214,7 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     // Delete table and schema
     DEFAULT_INSTANCE.dropOfflineTable(RAW_TABLE_NAME);
     DEFAULT_INSTANCE.deleteSchema(RAW_TABLE_NAME);
+    DEFAULT_INSTANCE.waitForEVToDisappear(OFFLINE_TABLE_NAME);
   }
 
   @AfterClass
