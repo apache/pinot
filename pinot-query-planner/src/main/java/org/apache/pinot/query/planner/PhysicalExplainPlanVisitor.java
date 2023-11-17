@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.query.planner;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -37,6 +40,7 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.VirtualServerAddress;
 
 
 /**
@@ -92,6 +96,15 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
         .toString();
   }
 
+  /**
+   * This wrapper prints out contextual info from {@link Context} before invoking {@link PlanNode#explain()}.
+   * The format of the contextual info is always:
+   *   "`PREFIX`[`FRAGMENT_ID`]@`HOSTNAME`:`PORT`|[`WORKER_ID`(s)] `EXPLAIN`"
+   *
+   * @param node the {@link PlanNode} to be explained
+   * @param context the {@link Context} to be wrapped in front ot plan node explain.
+   * @return stringify format of the explained result wrapped with contextual info.
+   */
   private StringBuilder appendInfo(PlanNode node, Context context) {
     int planFragmentId = node.getPlanFragmentId();
     context._builder
@@ -102,7 +115,9 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
         .append(context._host.getHostname())
         .append(':')
         .append(context._host.getQueryServicePort())
-        .append(' ')
+        .append("|[")
+        .append(context._workerId)
+        .append("] ")
         .append(node.explain());
     return context._builder;
   }
@@ -185,16 +200,26 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     return node.getInputs().get(0).visit(this, context.next(false, context._host, context._workerId));
   }
 
+  /**
+   * Print out mailbox sending info.
+   *
+   * Noted that when print out mailbox sending info. the receiving side follows the contextual info format defined in
+   * {@link PhysicalExplainPlanVisitor#appendInfo(PlanNode, Context)}.
+   *
+   * e.g. the RECEIVERs are printed as:
+   *   "{[`FRAGMENT_ID`]@`HOSTNAME`:`PORT`|[`WORKER_ID`(s)]}" and are comma-separated.
+   */
   private StringBuilder appendMailboxSend(MailboxSendNode node, Context context) {
     appendInfo(node, context);
 
     int receiverStageId = node.getReceiverStageId();
-    Map<QueryServerInstance, List<Integer>> servers =
-        _dispatchableSubPlan.getQueryStageList().get(receiverStageId)
-            .getServerInstanceToWorkerIdMap();
+    List<VirtualServerAddress> serverAddressList =
+        _dispatchableSubPlan.getQueryStageList().get(node.getPlanFragmentId())
+            .getWorkerMetadataList().get(context._workerId)
+            .getMailBoxInfosMap().get(receiverStageId).getVirtualAddressList();
+    List<String> serverInstanceToWorkerIdList = stringifyVirtualServerAddresses(serverAddressList);
     context._builder.append("->");
-    String receivers = servers.entrySet().stream()
-        .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+    String receivers = serverInstanceToWorkerIdList.stream()
         .map(s -> "[" + receiverStageId + "]@" + s)
         .collect(Collectors.joining(",", "{", "}"));
     return context._builder.append(receivers);
@@ -252,7 +277,23 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     }
   }
 
+  public static List<String> stringifyVirtualServerAddresses(List<VirtualServerAddress> serverAddressList) {
+    // using tree map to ensure print order.
+    Map<QueryServerInstance, List<Integer>> serverToWorkerIdMap = new TreeMap<>(
+        Comparator.comparing(QueryServerInstance::toString));
+    for (VirtualServerAddress serverAddress : serverAddressList) {
+      QueryServerInstance server = new QueryServerInstance(serverAddress.hostname(), serverAddress.port(), -1);
+      List<Integer> workerIds = serverToWorkerIdMap.getOrDefault(server, new ArrayList<>());
+      workerIds.add(serverAddress.workerId());
+      serverToWorkerIdMap.put(server, workerIds);
+    }
+    return serverToWorkerIdMap.entrySet().stream()
+        .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
+        .collect(Collectors.toList());
+  }
+
   public static String stringifyQueryServerInstanceToWorkerIdsEntry(Map.Entry<QueryServerInstance, List<Integer>> e) {
-    return e.getKey() + "|" + e.getValue();
+    QueryServerInstance server = e.getKey();
+    return server.getHostname() + ":" + server.getQueryServicePort() + "|" + e.getValue();
   }
 }
