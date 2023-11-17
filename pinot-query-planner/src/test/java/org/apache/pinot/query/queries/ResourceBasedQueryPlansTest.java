@@ -86,7 +86,7 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
     }
   }
 
-  @DataProvider(parallel = true)
+  @DataProvider
   private static Object[][] testResourceQueryPlannerTestCaseProviderHappyPath()
       throws Exception {
     Map<String, QueryPlanTestCase> testCaseMap = getTestCases();
@@ -115,7 +115,7 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
     return providerContent.toArray(new Object[][]{});
   }
 
-  @DataProvider(parallel = true)
+  @DataProvider
   private static Object[][] testResourceQueryPlannerTestCaseProviderExceptions()
       throws Exception {
     Map<String, QueryPlanTestCase> testCaseMap = getTestCases();
