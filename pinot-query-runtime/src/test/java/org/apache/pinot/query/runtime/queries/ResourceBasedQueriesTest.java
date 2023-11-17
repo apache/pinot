@@ -262,7 +262,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     // query pinot
     runQuery(sql, expect, null).ifPresent(resultTable -> {
       try {
-        compareRowEquals(resultTable, queryH2(h2Sql), sql, keepOutputRowOrder);
+        compareRowEquals(resultTable, queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
       }
@@ -274,7 +274,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
       throws Exception {
     runQuery(sql, expect, null).ifPresent(
-        resultTable -> compareRowEquals(resultTable, expectedRows, sql, keepOutputRowOrder));
+        resultTable -> compareRowEquals(resultTable, expectedRows, keepOutputRowOrder));
   }
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
