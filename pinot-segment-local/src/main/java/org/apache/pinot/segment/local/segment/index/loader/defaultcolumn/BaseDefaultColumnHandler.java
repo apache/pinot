@@ -549,8 +549,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
-    if (_schema.isEnableColumnBasedNullHandling() && fieldSpec.isNullable()) {
-      return true;
+    if (_schema.isEnableColumnBasedNullHandling()) {
+      return fieldSpec.isNullable();
     } else {
       return _indexLoadingConfig.getTableConfig() != null
           && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
