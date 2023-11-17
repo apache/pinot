@@ -61,9 +61,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      boolean dropOutOfOrderRecord, double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
-    super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction,
-        partialUpsertHandler, enableSnapshot, dropOutOfOrderRecord, metadataTTL, tableIndexDir, serverMetrics);
+      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+    super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn,
+        hashFunction, partialUpsertHandler, enableSnapshot, metadataTTL, tableIndexDir, serverMetrics);
   }
 
   @Override
@@ -240,9 +240,13 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     persistWatermark(_largestSeenComparisonValue);
   }
 
+  /**
+   Returns {@code true} when the record is added to the upsert metadata manager,
+   {@code false} when the record is out-of-order thus not added.
+   */
   @Override
   protected boolean doAddRecord(MutableSegment segment, RecordInfo recordInfo) {
-    AtomicBoolean shouldDropRecord = new AtomicBoolean(false);
+    AtomicBoolean isOutOfOrderRecord = new AtomicBoolean(false);
     ThreadSafeMutableRoaringBitmap validDocIds = Objects.requireNonNull(segment.getValidDocIds());
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     int newDocId = recordInfo.getDocId();
@@ -273,9 +277,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               return new RecordLocation(segment, newDocId, newComparisonValue);
             } else {
               handleOutOfOrderEvent(currentRecordLocation.getComparisonValue(), recordInfo.getComparisonValue());
-              // this is a out-of-order record, if upsert config _dropOutOfOrderRecord is true, then set
-              // shouldDropRecord to true. This method returns inverse of this value
-              shouldDropRecord.set(_dropOutOfOrderRecord);
+              // this is a out-of-order record then set value to true - this indicates whether out-of-order or not
+              isOutOfOrderRecord.set(true);
               return currentRecordLocation;
             }
           } else {
@@ -288,7 +291,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     // Update metrics
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
         _primaryKeyToRecordLocationMap.size());
-    return !shouldDropRecord.get();
+    return !isOutOfOrderRecord.get();
   }
 
   @Override

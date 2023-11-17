@@ -73,7 +73,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected ServerMetrics _serverMetrics;
   protected HelixManager _helixManager;
   protected ExecutorService _segmentPreloadExecutor;
-  protected boolean _dropOutOfOrderRecord;
 
   private volatile boolean _isPreloading = false;
 
@@ -112,7 +111,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();
     _metadataTTL = upsertConfig.getMetadataTTL();
-    _dropOutOfOrderRecord = upsertConfig.isDropOutOfOrderRecord();
     _tableIndexDir = tableDataManager.getTableDataDir();
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
