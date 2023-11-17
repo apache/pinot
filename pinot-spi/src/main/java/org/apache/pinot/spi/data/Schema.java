@@ -585,6 +585,7 @@ public final class Schema implements Serializable {
       _schema.addField(new DimensionFieldSpec(dimensionName, dataType, true));
       return this;
     }
+
     /**
      * Add single value dimensionFieldSpec with a defaultNullValue
      */
