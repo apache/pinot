@@ -40,7 +40,6 @@ import org.apache.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.mapping.Mappings;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
-import org.checkerframework.checker.nullness.qual.Nullable;
 
 
 /**
@@ -107,7 +106,7 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
       return computeCurrentDistribution(node);
     } else if (node instanceof LogicalProject) {
       assert inputs.size() == 1;
-      @Nullable RelDistribution inputRelDistribution = input.getTraitSet().getDistribution();
+      RelDistribution inputRelDistribution = input.getTraitSet().getDistribution();
       LogicalProject project = (LogicalProject) node;
       try {
         if (inputRelDistribution != null) {
@@ -118,13 +117,13 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
       }
     } else if (node instanceof LogicalFilter) {
       assert inputs.size() == 1;
-      @Nullable RelDistribution inputRelDistribution = input.getTraitSet().getDistribution();
+      RelDistribution inputRelDistribution = input.getTraitSet().getDistribution();
       if (inputRelDistribution != null) {
         return inputRelDistribution;
       }
     } else if (node instanceof LogicalAggregate) {
       assert inputs.size() == 1;
-      @Nullable RelDistribution inputRelDistribution = inputs.get(0).getTraitSet().getDistribution();
+      RelDistribution inputRelDistribution = inputs.get(0).getTraitSet().getDistribution();
       if (inputRelDistribution != null) {
         // create a mapping that only contains the group set
         LogicalAggregate agg = (LogicalAggregate) node;
@@ -135,7 +134,7 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
     } else if (node instanceof LogicalJoin) {
       // TODO: we only map a single RelTrait from the LEFT table, later we should support RIGHT table as well
       assert inputs.size() == 2;
-      @Nullable RelDistribution inputRelDistribution = inputs.get(0).getTraitSet().getDistribution();
+      RelDistribution inputRelDistribution = inputs.get(0).getTraitSet().getDistribution();
       if (inputRelDistribution != null) {
         // Since we only support LEFT RelTrait propagation, the inputRelDistribution can directly be applied
         // b/c the Join node always puts left relation RowTypes then right relation RowTypes sequentially.
