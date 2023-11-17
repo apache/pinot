@@ -231,6 +231,11 @@ public class FilterPlanNode implements PlanNode {
         assert childFilters.size() == 1;
         BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilters.get(0), numDocs);
         return FilterOperatorUtils.getNotFilterOperator(_queryContext, childFilterOperator, numDocs);
+      case CONSTANT:
+        if (filter.isConstantTrue()) {
+          return new MatchAllFilterOperator(numDocs);
+        }
+        return EmptyFilterOperator.getInstance();
       case PREDICATE:
         Predicate predicate = filter.getPredicate();
         ExpressionContext lhs = predicate.getLhs();
