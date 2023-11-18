@@ -45,7 +45,7 @@ public class StarTreeQueryGenerator {
   private static final String IN = " IN ";
   private static final String NOT_IN = " NOT IN ";
   private static final String AND = " AND ";
-  private static final String FILTER_WHERE = " FILTER (WHERE %s)";
+  private static final String FILTER = " FILTER (%s)";
 
   private static final int MAX_NUM_AGGREGATIONS = 5;
   private static final int MAX_NUM_PREDICATES = 10;
@@ -85,11 +85,11 @@ public class StarTreeQueryGenerator {
 
   private String generateFilteredAggregation(String metricColumn) {
     StringBuilder filteredAgg = new StringBuilder(generateAggregation(metricColumn));
-    String predicates = generatePredicateExpressions();
+    String predicates = generatePredicates();
     if (predicates == null) {
       return filteredAgg.toString();
     }
-    filteredAgg.append(String.format(FILTER_WHERE, predicates));
+    filteredAgg.append(String.format(FILTER, predicates));
     return filteredAgg.toString();
   }
 
@@ -227,29 +227,19 @@ public class StarTreeQueryGenerator {
     return stringBuilder.append(')').toString();
   }
 
-  @Nullable
-  private String generatePredicates() {
-    String predicates = generatePredicateExpressions();
-    if (predicates == null) {
-      return null;
-    }
-
-    return WHERE + predicates;
-  }
-
   /**
    * Randomly generate the WHERE clause of the query, may return {@code null}.
    *
    * @return all predicates.
    */
   @Nullable
-  private String generatePredicateExpressions() {
+  private String generatePredicates() {
     int numPredicates = _random.nextInt(MAX_NUM_PREDICATES + 1);
     if (numPredicates == 0) {
       return null;
     }
 
-    StringBuilder stringBuilder = new StringBuilder();
+    StringBuilder stringBuilder = new StringBuilder(WHERE);
 
     int numDimensions = _singleValueDimensionColumns.size();
     for (int i = 0; i < numPredicates; i++) {

@@ -20,10 +20,8 @@ package org.apache.pinot.core.plan;
 
 import java.util.EnumSet;
 import java.util.List;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -32,6 +30,7 @@ import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -74,10 +73,8 @@ public class AggregationPlanNode implements PlanNode {
    * Build the operator to be used for filtered aggregations
    */
   private FilteredAggregationOperator buildFilteredAggOperator() {
-    List<Pair<AggregationFunction[], Pair<BaseProjectOperator<?>, Boolean>>> projectOperators =
-        // TODO(egalpin): maybe change this to use ProjectionPlanNode instead of BaseProjectOperator
-        AggregationFunctionUtils.buildFilteredAggregateProjectOperators(_indexSegment, _queryContext);
-    return new FilteredAggregationOperator(_queryContext, projectOperators,
+    return new FilteredAggregationOperator(_queryContext,
+        AggregationFunctionUtils.buildFilteredAggregationInfos(_indexSegment, _queryContext),
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
@@ -87,11 +84,10 @@ public class AggregationPlanNode implements PlanNode {
    * aggregates code will be invoked
    */
   public Operator<AggregationResultsBlock> buildNonFilteredAggOperator() {
-    assert _queryContext.getAggregationFunctions() != null;
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
 
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
@@ -113,13 +109,10 @@ public class AggregationPlanNode implements PlanNode {
       }
     }
 
-    Pair<BaseProjectOperator<?>, Boolean> projectOperatorStPair =
-        AggregationFunctionUtils.createProjectOperatorStPair(_indexSegment, _queryContext,
-            _queryContext.getFilter(), aggregationFunctions,
-            filterPlanNode.getPredicateEvaluators(), filterOperator);
-
-    return new AggregationOperator(_queryContext, projectOperatorStPair.getLeft(), numTotalDocs,
-        projectOperatorStPair.getRight());
+    AggregationInfo aggregationInfo =
+        AggregationFunctionUtils.buildAggregationInfo(_indexSegment, _queryContext, aggregationFunctions,
+            _queryContext.getFilter(), filterOperator, filterPlanNode.getPredicateEvaluators());
+    return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
   }
 
   /**

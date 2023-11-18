@@ -56,8 +56,8 @@ public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
   }
 
   public StarTreeGroupByExecutor(QueryContext queryContext, AggregationFunction[] aggregationFunctions,
-        ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator,
-        @Nullable GroupKeyGenerator groupKeyGenerator) {
+      ExpressionContext[] groupByExpressions, BaseProjectOperator<?> projectOperator,
+      @Nullable GroupKeyGenerator groupKeyGenerator) {
     super(queryContext, aggregationFunctions, groupByExpressions, projectOperator, groupKeyGenerator);
 
     assert aggregationFunctions != null;

@@ -119,8 +119,8 @@ public class StarTreeUtils {
           return null;
         case PREDICATE:
           Predicate predicate = filterNode.getPredicate();
-          PredicateEvaluator predicateEvaluator = getPredicateEvaluator(indexSegment, predicate,
-              predicateEvaluatorMapping);
+          PredicateEvaluator predicateEvaluator =
+              getPredicateEvaluator(indexSegment, predicate, predicateEvaluatorMapping);
           // Do not use star-tree when the predicate cannot be solved with star-tree or is always false
           if (predicateEvaluator == null || predicateEvaluator.isAlwaysFalse()) {
             return null;
@@ -281,45 +281,44 @@ public class StarTreeUtils {
         break;
     }
     for (Pair<Predicate, PredicateEvaluator> pair : predicatesEvaluatorMapping) {
-      if (pair.getKey().equals(predicate)) {
+      if (pair.getKey() == predicate) {
         return pair.getValue();
       }
     }
     return null;
   }
 
+  /**
+   * Returns a {@link BaseProjectOperator} when the filter can be solved with star-tree, or {@code null} otherwise.
+   */
   @Nullable
-  public static BaseProjectOperator<?> createStarTreeBasedProjectOperator(
-      IndexSegment indexSegment,
-      QueryContext queryContext,
-      FilterContext filterContext,
-      AggregationFunction[] aggregationFunctions,
+  public static BaseProjectOperator<?> createStarTreeBasedProjectOperator(IndexSegment indexSegment,
+      QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
       List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
-
-    ExpressionContext[] groupByExpressions = null;
-    if (queryContext.getGroupByExpressions() != null) {
-      groupByExpressions = queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
-    }
-
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
-    if (starTrees != null && !queryContext.isSkipStarTree() && !queryContext.isNullHandlingEnabled()) {
-      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-          StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
-      if (aggregationFunctionColumnPairs != null) {
-        Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-            StarTreeUtils.extractPredicateEvaluatorsMap(indexSegment, filterContext, predicateEvaluators);
-        if (predicateEvaluatorsMap != null) {
-          for (StarTreeV2 starTreeV2 : starTrees) {
-            if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs,
-                groupByExpressions, predicateEvaluatorsMap.keySet())) {
-              return new StarTreeProjectPlanNode(queryContext, starTreeV2, aggregationFunctionColumnPairs,
-                  groupByExpressions, predicateEvaluatorsMap).run();
-            }
-          }
-        }
+    if (starTrees == null || queryContext.isSkipStarTree() || queryContext.isNullHandlingEnabled()) {
+      return null;
+    }
+    AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+        extractAggregationFunctionPairs(aggregationFunctions);
+    if (aggregationFunctionColumnPairs == null) {
+      return null;
+    }
+    Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
+        extractPredicateEvaluatorsMap(indexSegment, filter, predicateEvaluators);
+    if (predicateEvaluatorsMap == null) {
+      return null;
+    }
+    ExpressionContext[] groupByExpressions =
+        queryContext.getGroupByExpressions() != null ? queryContext.getGroupByExpressions()
+            .toArray(new ExpressionContext[0]) : null;
+    for (StarTreeV2 starTreeV2 : starTrees) {
+      if (isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, groupByExpressions,
+          predicateEvaluatorsMap.keySet())) {
+        return new StarTreeProjectPlanNode(queryContext, starTreeV2, aggregationFunctionColumnPairs, groupByExpressions,
+            predicateEvaluatorsMap).run();
       }
     }
-
     return null;
   }
 }

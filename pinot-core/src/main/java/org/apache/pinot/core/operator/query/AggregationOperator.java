@@ -28,6 +28,7 @@ import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.query.aggregation.AggregationExecutor;
 import org.apache.pinot.core.query.aggregation.DefaultAggregationExecutor;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeAggregationExecutor;
 
@@ -42,18 +43,17 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final BaseProjectOperator<?> _projectOperator;
-  private final long _numTotalDocs;
   private final boolean _useStarTree;
+  private final long _numTotalDocs;
 
   private int _numDocsScanned = 0;
 
-  public AggregationOperator(QueryContext queryContext, BaseProjectOperator<?> projectOperator, long numTotalDocs,
-      boolean useStarTree) {
+  public AggregationOperator(QueryContext queryContext, AggregationInfo aggregationInfo, long numTotalDocs) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
-    _projectOperator = projectOperator;
+    _projectOperator = aggregationInfo.getProjectOperator();
+    _useStarTree = aggregationInfo.isUseStarTree();
     _numTotalDocs = numTotalDocs;
-    _useStarTree = useStarTree;
   }
 
   @Override
