@@ -32,6 +32,7 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -39,10 +40,12 @@ import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.CombinedFilterOperator;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.FilterPlanNode;
 import org.apache.pinot.core.plan.ProjectPlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -211,14 +214,69 @@ public class AggregationFunctionUtils {
     }
   }
 
+  public static class AggregationInfo {
+    private final AggregationFunction[] _functions;
+    private final BaseProjectOperator<?> _projectOperator;
+    private final boolean _useStarTree;
+
+    public AggregationInfo(AggregationFunction[] functions, BaseProjectOperator<?> projectOperator,
+        boolean useStarTree) {
+      _functions = functions;
+      _projectOperator = projectOperator;
+      _useStarTree = useStarTree;
+    }
+
+    public AggregationFunction[] getFunctions() {
+      return _functions;
+    }
+
+    public BaseProjectOperator<?> getProjectOperator() {
+      return _projectOperator;
+    }
+
+    public boolean isUseStarTree() {
+      return _useStarTree;
+    }
+  }
+
   /**
-   * Build pairs of filtered aggregation functions and corresponding project operator.
+   * Builds {@link AggregationInfo} for aggregations.
    */
-  public static List<Pair<AggregationFunction[], BaseProjectOperator<?>>> buildFilteredAggregateProjectOperators(
-      IndexSegment indexSegment, QueryContext queryContext) {
+  public static AggregationInfo buildAggregationInfo(IndexSegment indexSegment, QueryContext queryContext,
+      AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter, BaseFilterOperator filterOperator,
+      List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
+    BaseProjectOperator<?> projectOperator = null;
+
+    // TODO: Create a short-circuit ProjectOperator when filter result is empty
+    if (!filterOperator.isResultEmpty()) {
+      projectOperator =
+          StarTreeUtils.createStarTreeBasedProjectOperator(indexSegment, queryContext, aggregationFunctions, filter,
+              predicateEvaluators);
+    }
+
+    if (projectOperator != null) {
+      return new AggregationInfo(aggregationFunctions, projectOperator, true);
+    } else {
+      Set<ExpressionContext> expressionsToTransform =
+          AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions,
+              queryContext.getGroupByExpressions());
+      projectOperator =
+          new ProjectPlanNode(indexSegment, queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
+              filterOperator).run();
+      return new AggregationInfo(aggregationFunctions, projectOperator, false);
+    }
+  }
+
+  /**
+   * Builds swim-lanes (list of {@link AggregationInfo}) for filtered aggregations.
+   */
+  public static List<AggregationInfo> buildFilteredAggregationInfos(IndexSegment indexSegment,
+      QueryContext queryContext) {
     assert queryContext.getAggregationFunctions() != null && queryContext.getFilteredAggregationFunctions() != null;
 
-    BaseFilterOperator mainFilterOperator = new FilterPlanNode(indexSegment, queryContext).run();
+    FilterPlanNode mainFilterPlan = new FilterPlanNode(indexSegment, queryContext);
+    BaseFilterOperator mainFilterOperator = mainFilterPlan.run();
+    List<Pair<Predicate, PredicateEvaluator>> mainPredicateEvaluators = mainFilterPlan.getPredicateEvaluators();
 
     // No need to process sub-filters when main filter has empty result
     if (mainFilterOperator.isResultEmpty()) {
@@ -228,68 +286,88 @@ public class AggregationFunctionUtils {
       BaseProjectOperator<?> projectOperator =
           new ProjectPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
               mainFilterOperator).run();
-      return Collections.singletonList(Pair.of(aggregationFunctions, projectOperator));
+      return Collections.singletonList(new AggregationInfo(aggregationFunctions, projectOperator, false));
     }
 
     // For each aggregation function, check if the aggregation function is a filtered aggregate. If so, populate the
     // corresponding filter operator.
-    Map<FilterContext, Pair<BaseFilterOperator, List<AggregationFunction>>> filterOperators = new HashMap<>();
+    Map<FilterContext, FilteredAggregationContext> filteredAggregationContexts = new HashMap<>();
     List<AggregationFunction> nonFilteredFunctions = new ArrayList<>();
+    FilterContext mainFilter = queryContext.getFilter();
     for (Pair<AggregationFunction, FilterContext> functionFilterPair : queryContext.getFilteredAggregationFunctions()) {
       AggregationFunction aggregationFunction = functionFilterPair.getLeft();
       FilterContext filter = functionFilterPair.getRight();
       if (filter != null) {
-        filterOperators.computeIfAbsent(filter, k -> {
-          BaseFilterOperator combinedFilterOperator;
-          BaseFilterOperator subFilterOperator = new FilterPlanNode(indexSegment, queryContext, filter).run();
-          if (mainFilterOperator.isResultMatchingAll()) {
-            combinedFilterOperator = subFilterOperator;
+        filteredAggregationContexts.computeIfAbsent(filter, k -> {
+          FilterContext combinedFilter;
+          if (mainFilter == null) {
+            combinedFilter = filter;
           } else {
-            if (subFilterOperator.isResultEmpty()) {
-              combinedFilterOperator = subFilterOperator;
-            } else if (subFilterOperator.isResultMatchingAll()) {
-              combinedFilterOperator = mainFilterOperator;
-            } else {
-              combinedFilterOperator =
-                  new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
-            }
+            combinedFilter = FilterContext.forAnd(List.of(mainFilter, filter));
           }
-          return Pair.of(combinedFilterOperator, new ArrayList<>());
-        }).getRight().add(aggregationFunction);
+
+          FilterPlanNode subFilterPlan = new FilterPlanNode(indexSegment, queryContext, filter);
+          BaseFilterOperator subFilterOperator = subFilterPlan.run();
+          BaseFilterOperator combinedFilterOperator;
+          if (mainFilterOperator.isResultMatchingAll() || subFilterOperator.isResultEmpty()) {
+            combinedFilterOperator = subFilterOperator;
+          } else if (subFilterOperator.isResultMatchingAll()) {
+            combinedFilterOperator = mainFilterOperator;
+          } else {
+            combinedFilterOperator =
+                new CombinedFilterOperator(mainFilterOperator, subFilterOperator, queryContext.getQueryOptions());
+          }
+
+          List<Pair<Predicate, PredicateEvaluator>> subPredicateEvaluators = subFilterPlan.getPredicateEvaluators();
+          List<Pair<Predicate, PredicateEvaluator>> combinedPredicateEvaluators =
+              new ArrayList<>(mainPredicateEvaluators.size() + subPredicateEvaluators.size());
+          combinedPredicateEvaluators.addAll(mainPredicateEvaluators);
+          combinedPredicateEvaluators.addAll(subPredicateEvaluators);
+
+          return new FilteredAggregationContext(combinedFilter, combinedFilterOperator, combinedPredicateEvaluators);
+        })._aggregationFunctions.add(aggregationFunction);
       } else {
         nonFilteredFunctions.add(aggregationFunction);
       }
     }
 
-    // Create the project operators
-    List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators = new ArrayList<>();
-    List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
-    for (Pair<BaseFilterOperator, List<AggregationFunction>> filterOperatorFunctionsPair : filterOperators.values()) {
-      BaseFilterOperator filterOperator = filterOperatorFunctionsPair.getLeft();
+    List<AggregationInfo> aggregationInfos = new ArrayList<>();
+    for (FilteredAggregationContext filteredAggregationContext : filteredAggregationContexts.values()) {
+      BaseFilterOperator filterOperator = filteredAggregationContext._filterOperator;
       if (filterOperator == mainFilterOperator) {
         // This can happen when the sub filter matches all documents, and we can treat the function as non-filtered
-        nonFilteredFunctions.addAll(filterOperatorFunctionsPair.getRight());
+        nonFilteredFunctions.addAll(filteredAggregationContext._aggregationFunctions);
       } else {
         AggregationFunction[] aggregationFunctions =
-            filterOperatorFunctionsPair.getRight().toArray(new AggregationFunction[0]);
-        Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
-        BaseProjectOperator<?> projectOperator =
-            new ProjectPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-                filterOperator).run();
-        projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
+            filteredAggregationContext._aggregationFunctions.toArray(new AggregationFunction[0]);
+        aggregationInfos.add(
+            buildAggregationInfo(indexSegment, queryContext, aggregationFunctions, filteredAggregationContext._filter,
+                filteredAggregationContext._filterOperator, filteredAggregationContext._predicateEvaluators));
       }
     }
 
     if (!nonFilteredFunctions.isEmpty()) {
       AggregationFunction[] aggregationFunctions = nonFilteredFunctions.toArray(new AggregationFunction[0]);
-      Set<ExpressionContext> expressions = collectExpressionsToTransform(aggregationFunctions, groupByExpressions);
-      BaseProjectOperator<?> projectOperator =
-          new ProjectPlanNode(indexSegment, queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-              mainFilterOperator).run();
-      projectOperators.add(Pair.of(aggregationFunctions, projectOperator));
+      aggregationInfos.add(
+          buildAggregationInfo(indexSegment, queryContext, aggregationFunctions, mainFilter, mainFilterOperator,
+              mainPredicateEvaluators));
     }
 
-    return projectOperators;
+    return aggregationInfos;
+  }
+
+  private static class FilteredAggregationContext {
+    final FilterContext _filter;
+    final BaseFilterOperator _filterOperator;
+    final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators;
+    final List<AggregationFunction> _aggregationFunctions = new ArrayList<>();
+
+    public FilteredAggregationContext(FilterContext filter, BaseFilterOperator filterOperator,
+        List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
+      _filter = filter;
+      _filterOperator = filterOperator;
+      _predicateEvaluators = predicateEvaluators;
+    }
   }
 
   public static String getResultColumnName(AggregationFunction aggregationFunction, @Nullable FilterContext filter) {
