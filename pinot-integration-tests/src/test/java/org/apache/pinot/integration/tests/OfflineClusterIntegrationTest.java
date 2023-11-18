@@ -311,6 +311,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
+  @BeforeMethod
+  public void resetMultiStageMode() {
+    setUseMultiStageQueryEngine(false);
+  }
+
   @Override
   protected void testQuery(String pinotQuery, String h2Query)
       throws Exception {
@@ -2853,6 +2858,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     jsonNode = postQuery("SELECT count(*) FROM mytable WHERE substr(OriginState, 0, 1) = substr(DestState, 0, 1)");
     assertEquals(getType(jsonNode, 0), "LONG");
     assertEquals(getLongCellValue(jsonNode, 0, 0), 19755);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testDifferentSchema(boolean useMultiStageQueryEngine)
+      throws Exception {
+    // This query is one of the ones used on testNonScanAggregationQueries
+    String tableName = getTableName();
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT MIN_MAX_RANGE(ArrTime) FROM " + tableName;
+    String h2Query = "SELECT MAX(ArrTime)-MIN(ArrTime) FROM " + tableName;
+    testNonScanAggregationQuery(query, h2Query);
   }
 
   /**
