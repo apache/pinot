@@ -157,10 +157,16 @@ public final class TableConfigUtils {
           // Validate that StreamConfig can be created
           streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
         } catch (Exception e) {
-          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map: " + e.getMessage(),
-              e);
+          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
         }
         validateDecoder(streamConfig);
+        // if segmentSizeBytes is specified, rows must be zero.
+        if (streamConfigMap.containsKey(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE) ||
+            streamConfigMap.containsKey(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE)) {
+          Preconditions.checkState(streamConfig.getFlushThresholdRows() == 0,
+              String.format("Invalid config: %s=%d, it must be set to 0 for size based segment threshold to work.",
+                  StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, streamConfig.getFlushThresholdRows()));
+        }
       }
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
