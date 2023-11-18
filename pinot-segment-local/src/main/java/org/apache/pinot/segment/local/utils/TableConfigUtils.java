@@ -161,8 +161,8 @@ public final class TableConfigUtils {
         }
         validateDecoder(streamConfig);
         // if segmentSizeBytes is specified, rows must be zero.
-        if (streamConfigMap.containsKey(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE) ||
-            streamConfigMap.containsKey(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE)) {
+        if (streamConfigMap.containsKey(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE)
+            || streamConfigMap.containsKey(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE)) {
           Preconditions.checkState(streamConfig.getFlushThresholdRows() == 0,
               String.format("Invalid config: %s=%d, it must be set to 0 for size based segment threshold to work.",
                   StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, streamConfig.getFlushThresholdRows()));
