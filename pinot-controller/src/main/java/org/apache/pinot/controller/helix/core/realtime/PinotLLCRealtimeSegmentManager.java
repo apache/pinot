@@ -25,6 +25,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -173,6 +174,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
   private final ThreadPoolExecutor _deepStoreUploadExecutor;
+  private final Set<String> _deepStoreUploadExecutorPendingSegments;
 
   private volatile boolean _isStopping = false;
 
@@ -200,6 +202,7 @@ public class PinotLLCRealtimeSegmentManager {
     _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
     _deepStoreUploadExecutor = _isDeepStoreLLCSegmentUploadRetryEnabled ? initDeepStoreUploadExecutorService(
         controllerConf.getDeepStoreRetryUploadParallelism()) : null;
+    _deepStoreUploadExecutorPendingSegments = _isDeepStoreLLCSegmentUploadRetryEnabled ? new HashSet<>() : null;
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -1429,6 +1432,12 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.warn("Failed checking segment deep store URL for segment {}", segmentName);
       }
 
+      // Skip the fix if an upload is already queued for this segment
+      if (_deepStoreUploadExecutorPendingSegments.contains(segmentName)) {
+        continue;
+      }
+      _deepStoreUploadExecutorPendingSegments.add(segmentName);
+
       // create Runnable to perform the upload
       Runnable uploadRunnable = () -> {
         try {
@@ -1467,6 +1476,7 @@ public class PinotLLCRealtimeSegmentManager {
               ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_ERROR, 1L);
           LOGGER.error("Failed to upload segment {} to deep store", segmentName, e);
         } finally {
+          _deepStoreUploadExecutorPendingSegments.remove(segmentName);
           // Monitoring in case segment upload retry is lagging
           int queueSize = _deepStoreUploadExecutor.getQueue().size();
           _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
