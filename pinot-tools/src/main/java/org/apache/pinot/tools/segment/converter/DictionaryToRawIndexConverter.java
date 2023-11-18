@@ -268,7 +268,7 @@ public class DictionaryToRawIndexConverter {
       properties.setProperty(
           V1Constants.MetadataKeys.Column.getKeyFor(column, V1Constants.MetadataKeys.Column.BITS_PER_ELEMENT), -1);
     }
-    CommonsConfigurationUtils.saveToFile(properties);
+    CommonsConfigurationUtils.saveToExistingFile(properties);
   }
 
   /**

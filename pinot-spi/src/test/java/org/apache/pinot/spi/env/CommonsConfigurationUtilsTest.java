@@ -94,13 +94,17 @@ public class CommonsConfigurationUtilsTest {
   private void testPropertyValueWithSpecialCharacters(String value)
       throws ConfigurationException {
     String replacedValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(value);
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.loadFromFile(CONFIG_FILE);
+
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true);
+    configuration.setIOFactory(new PropertiesConfiguration.JupIOFactory(false));
     configuration.setProperty(PROPERTY_KEY, replacedValue);
     String recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
-    CommonsConfigurationUtils.saveToFile(configuration);
-    configuration = CommonsConfigurationUtils.loadFromFile(CONFIG_FILE);
+    CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true);
+    configuration.setIOFactory(new PropertiesConfiguration.JupIOFactory(false));
+
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);

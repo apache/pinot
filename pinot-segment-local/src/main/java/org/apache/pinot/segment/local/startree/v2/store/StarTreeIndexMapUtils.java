@@ -161,7 +161,7 @@ public class StarTreeIndexMapUtils {
         configuration.addProperty(key.getPropertyName(i, SIZE_SUFFIX), value._size);
       }
     }
-    CommonsConfigurationUtils.saveToFile(configuration, indexMapFile);
+    CommonsConfigurationUtils.saveToExistingFile(configuration, indexMapFile);
   }
 
   /**

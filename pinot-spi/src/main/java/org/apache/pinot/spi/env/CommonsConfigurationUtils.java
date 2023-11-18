@@ -31,8 +31,6 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder;
-import org.apache.commons.configuration2.builder.fluent.Parameters;
 import org.apache.commons.configuration2.convert.DefaultListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.io.FileHandler;
@@ -47,24 +45,19 @@ public class CommonsConfigurationUtils {
   private CommonsConfigurationUtils() {
   }
 
-  public static void setListDelimiterHandler(PropertiesConfiguration configuration, Character delimiter) {
-    configuration.setListDelimiterHandler(new DefaultListDelimiterHandler(delimiter));
+  public static PropertiesConfiguration fromFile(File file, boolean setJupIOFactory) {
+    try {
+      return loadFromFile(file, false, false, setJupIOFactory);
+    } catch (ConfigurationException e) {
+      throw new RuntimeException(e);
+    }
   }
-
-  public static void setDefaultListDelimiterHandler(PropertiesConfiguration configuration) {
-    setListDelimiterHandler(configuration, DEFAULT_LIST_DELIMITER);
-  }
-
-  public static PropertiesConfiguration loadFromPath(String path) throws ConfigurationException {
-    return loadFromPath(path, false, false);
-  }
-
-  public static PropertiesConfiguration loadFromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
-      throws ConfigurationException {
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
-    FileHandler fileHandler = new FileHandler(config);
-    fileHandler.load(path);
-    return config;
+  public static PropertiesConfiguration fromFile(File file) {
+    try {
+      return loadFromFile(file, false, false, false);
+    } catch (ConfigurationException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public static PropertiesConfiguration fromInputStream(InputStream stream) {
@@ -75,45 +68,49 @@ public class CommonsConfigurationUtils {
     }
   }
 
+  public static PropertiesConfiguration loadFromPath(String path) throws ConfigurationException {
+    return loadFromPath(path, false, false);
+  }
+
+  public static PropertiesConfiguration loadFromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
+      throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, false);
+    FileHandler fileHandler = new FileHandler(config);
+    fileHandler.load(path);
+    return config;
+  }
+
+
   public static PropertiesConfiguration loadFromInputStream(InputStream stream) throws ConfigurationException {
     return loadFromInputStream(stream, false, false);
   }
 
   public static PropertiesConfiguration loadFromInputStream(InputStream stream, boolean setIOFactory,
       boolean setDefaultDelimiter) throws ConfigurationException {
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, false);
     FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(stream);
     return config;
   }
 
-  public static FileBasedConfigurationBuilder<PropertiesConfiguration> getPropertiesConfigurationBuilder(File file) {
-    Parameters params = new Parameters();
-    return new FileBasedConfigurationBuilder<>(PropertiesConfiguration.class)
-        .configure(params.fileBased().setFile(file));
-  }
-
-  public static PropertiesConfiguration fromFile(File file) {
-    try {
-      return loadFromFile(file, false, false);
-    } catch (ConfigurationException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   public static PropertiesConfiguration loadFromFile(File file) throws ConfigurationException {
-    return loadFromFile(file, false, false);
+    return loadFromFile(file, false, false, false);
   }
 
   public static PropertiesConfiguration loadFromFile(File file, boolean setIOFactory,
-      boolean setDefaultDelimiter) throws ConfigurationException {
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
+      boolean setDefaultDelimiter, boolean setJupIOFactory) throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, setJupIOFactory);
     FileHandler fileHandler = new FileHandler(config);
-    fileHandler.load(file);
+    // check if file exits, load the properties otherwise set the file.
+    if (file.exists()) {
+      fileHandler.load(file);
+    } else {
+      fileHandler.setFile(file);
+    }
     return config;
   }
 
-  public static void saveToFile(PropertiesConfiguration propertiesConfiguration, File file) {
+  public static void saveToExistingFile(PropertiesConfiguration propertiesConfiguration, File file) {
     try {
       FileHandler fileHandler = new FileHandler(propertiesConfiguration);
       fileHandler.save(file);
@@ -122,7 +119,17 @@ public class CommonsConfigurationUtils {
     }
   }
 
-  public static void saveToFile(PropertiesConfiguration propertiesConfiguration) {
+  public static void saveToFile(PropertiesConfiguration propertiesConfiguration, File file) {
+    try {
+      FileHandler fileHandler = new FileHandler(propertiesConfiguration);
+      fileHandler.setFile(file);
+      fileHandler.save();
+    } catch (ConfigurationException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static void saveToExistingFile(PropertiesConfiguration propertiesConfiguration) {
     try {
       FileHandler fileHandler = new FileHandler(propertiesConfiguration);
       File propertiesFile = fileHandler.getFile();
@@ -246,12 +253,14 @@ public class CommonsConfigurationUtils {
   }
 
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
-      boolean setDefaultDelimiter) {
+      boolean setDefaultDelimiter, boolean setJupIOFactory) {
     PropertiesConfiguration config = new PropertiesConfiguration();
 
     // setting IO Reader Factory
     if (setIOFactory) {
       config.setIOFactory(new ConfigFilePropertyReaderFactory());
+    } else if (setJupIOFactory) {
+      config.setIOFactory(new PropertiesConfiguration.JupIOFactory(true));
     }
 
     // setting DEFAULT_LIST_DELIMITER
@@ -259,5 +268,13 @@ public class CommonsConfigurationUtils {
       CommonsConfigurationUtils.setDefaultListDelimiterHandler(config);
     }
     return config;
+  }
+
+  private static void setListDelimiterHandler(PropertiesConfiguration configuration, Character delimiter) {
+    configuration.setListDelimiterHandler(new DefaultListDelimiterHandler(delimiter));
+  }
+
+  private static void setDefaultListDelimiterHandler(PropertiesConfiguration configuration) {
+    setListDelimiterHandler(configuration, DEFAULT_LIST_DELIMITER);
   }
 }

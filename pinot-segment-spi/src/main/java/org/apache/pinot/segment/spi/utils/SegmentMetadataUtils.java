@@ -46,7 +46,7 @@ public class SegmentMetadataUtils {
   }
 
   public static void savePropertiesConfiguration(PropertiesConfiguration propertiesConfiguration) {
-    CommonsConfigurationUtils.saveToFile(propertiesConfiguration);
+    CommonsConfigurationUtils.saveToExistingFile(propertiesConfiguration);
   }
 
   public static SegmentMetadata updateMetadataProperties(SegmentDirectory segmentDirectory,
