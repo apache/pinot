@@ -80,6 +80,10 @@ public class PinotHintOptions {
      *   BREAK: Break right table build process, continue to perform JOIN operation, results might be partial.
      */
     public static final String JOIN_OVERFLOW_MODE = "join_overflow_mode";
+    /**
+     * Indicat that the join operator(s) within a certain selection scope are colocated
+     */
+    public static final String IS_COLOCATED_BY_JOIN_KEYS = "is_colocated_by_join_keys";
   }
 
   public static class TableHintOptions {

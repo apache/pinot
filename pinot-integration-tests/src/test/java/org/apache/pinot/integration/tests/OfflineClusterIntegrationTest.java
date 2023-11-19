@@ -128,10 +128,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       new StarTreeIndexConfig(Collections.singletonList("Carrier"), null,
           Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_1 = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'UA'";
+  private static final String TEST_STAR_TREE_QUERY_1_FILTER_INVERT =
+      "SELECT COUNT(*) FILTER (WHERE Carrier = 'UA') FROM mytable";
   private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_2 =
       new StarTreeIndexConfig(Collections.singletonList("DestState"), null,
           Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
+  private static final String TEST_STAR_TREE_QUERY_FILTERED_AGG =
+      "SELECT COUNT(*), COUNT(*) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
+  // This query contains a filtered aggregation which cannot be solved with startree, but the COUNT(*) still should be
+  private static final String TEST_STAR_TREE_QUERY_FILTERED_AGG_MIXED =
+      "SELECT COUNT(*), AVG(ArrDelay) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
+  private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_3 =
+      new StarTreeIndexConfig(List.of("Carrier", "DestState"), null,
+          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
   // For default columns test
   private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
@@ -309,12 +319,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, getHelixClusterName(),
               instance, resourcesToMonitor, 100.0))));
     }
-  }
-
-  @Override
-  protected void testQuery(String pinotQuery, String h2Query)
-      throws Exception {
-    super.testQuery(pinotQuery, h2Query);
   }
 
   private void testQueryError(String query, int errorCode)
@@ -1326,6 +1330,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
     // Initially 'numDocsScanned' should be the same as 'COUNT(*)' result
     assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), firstQueryResult);
+    // Verify that inverting the filter to be a filtered agg shows the identical results
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1_FILTER_INVERT);
+    assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
 
     // Update table config and trigger reload
     TableConfig tableConfig = getOfflineTableConfig();
@@ -1336,10 +1343,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadAllSegments(TEST_STAR_TREE_QUERY_1, false, numTotalDocs);
     // With star-tree, 'numDocsScanned' should be the same as number of segments (1 per segment)
     assertEquals(postQuery(TEST_STAR_TREE_QUERY_1).get("numDocsScanned").asLong(), NUM_SEGMENTS);
+    // Verify that inverting the filter to be a filtered agg shows the identical results
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1_FILTER_INVERT);
+    assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
+    assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS);
 
     // Reload again should have no effect
     reloadAllSegments(TEST_STAR_TREE_QUERY_1, false, numTotalDocs);
     firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1);
+    assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
+    assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
+    assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS);
+    // Verify that inverting the filter to be a filtered agg shows the identical results
+    firstQueryResponse = postQuery(TEST_STAR_TREE_QUERY_1_FILTER_INVERT);
     assertEquals(firstQueryResponse.get("resultTable").get("rows").get(0).get(0).asInt(), firstQueryResult);
     assertEquals(firstQueryResponse.get("totalDocs").asLong(), numTotalDocs);
     assertEquals(firstQueryResponse.get("numDocsScanned").asInt(), NUM_SEGMENTS);
@@ -1441,10 +1458,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    *   <li>"NewAddedMVStringDimension", DIMENSION, STRING, multi-value, default ("null")</li>
    *   <li>"NewAddedSVJSONDimension", DIMENSION, JSON, single-value, default ("null")</li>
    *   <li>"NewAddedSVBytesDimension", DIMENSION, BYTES, single-value, default (byte[0])</li>
-   *   <li>"NewAddedDerivedHoursSinceEpoch", DATE_TIME, INT, single-value, default (Integer.MIN_VALUE)</li>
-   *   <li>"NewAddedDerivedTimestamp", DATE_TIME, TIMESTAMP, single-value, default (EPOCH)</li>
-   *   <li>"NewAddedDerivedSVBooleanDimension", DIMENSION, BOOLEAN, single-value, default (false)</li>
-   *   <li>"NewAddedDerivedMVStringDimension", DATE_TIME, STRING, multi-value</li>
+   *   <li>"NewAddedDerivedHoursSinceEpoch", DATE_TIME, INT, single-value, DaysSinceEpoch * 24</li>
+   *   <li>"NewAddedDerivedTimestamp", DATE_TIME, TIMESTAMP, single-value, DaysSinceEpoch * 24 * 3600 * 1000</li>
+   *   <li>"NewAddedDerivedSVBooleanDimension", DIMENSION, BOOLEAN, single-value, ActualElapsedTime > 0</li>
+   *   <li>"NewAddedDerivedMVStringDimension", DIMENSION, STRING, multi-value, split(DestCityName, ', ')</li>
+   *   <li>"NewAddedDerivedDivAirportSeqIDs", DIMENSION, INT, multi-value, DivAirportSeqIDs</li>
+   *   <li>"NewAddedDerivedDivAirportSeqIDsString", DIMENSION, STRING, multi-value, DivAirportSeqIDs</li>
    * </ul>
    */
   @Test(dependsOnMethods = "testAggregateMetadataAPI", dataProvider = "useBothQueryEngines")
@@ -1457,7 +1476,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadWithExtraColumns();
     JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 98);
+    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 100);
 
     testNewAddedColumns();
     testExpressionOverride();
@@ -1535,6 +1554,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     schema.addField(new DateTimeFieldSpec("NewAddedDerivedTimestamp", DataType.TIMESTAMP, "TIMESTAMP", "1:DAYS"));
     schema.addField(new DimensionFieldSpec("NewAddedDerivedSVBooleanDimension", DataType.BOOLEAN, true));
     schema.addField(new DimensionFieldSpec("NewAddedDerivedMVStringDimension", DataType.STRING, false));
+    schema.addField(new DimensionFieldSpec("NewAddedDerivedDivAirportSeqIDs", DataType.INT, false));
+    schema.addField(new DimensionFieldSpec("NewAddedDerivedDivAirportSeqIDsString", DataType.STRING, false));
     addSchema(schema);
 
     TableConfig tableConfig = getOfflineTableConfig();
@@ -1542,7 +1563,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "DaysSinceEpoch * 24"),
             new TransformConfig("NewAddedDerivedTimestamp", "DaysSinceEpoch * 24 * 3600 * 1000"),
             new TransformConfig("NewAddedDerivedSVBooleanDimension", "ActualElapsedTime > 0"),
-            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')"));
+            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')"),
+            new TransformConfig("NewAddedDerivedDivAirportSeqIDs", "DivAirportSeqIDs"),
+            new TransformConfig("NewAddedDerivedDivAirportSeqIDsString", "DivAirportSeqIDs"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -1644,6 +1667,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
     testQuery(pinotQuery, h2Query);
 
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE DivAirportSeqIDs > 1100000";
+    JsonNode response = postQuery(pinotQuery);
+    JsonNode rows = response.get("resultTable").get("rows");
+    long count = rows.get(0).get(0).asLong();
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedDivAirportSeqIDs > 1100000";
+    response = postQuery(pinotQuery);
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asLong(), count);
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE CAST(NewAddedDerivedDivAirportSeqIDsString AS INT) > 1100000";
+    response = postQuery(pinotQuery);
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asLong(), count);
+
     // Test queries with new added metric column in aggregation function
     pinotQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable WHERE DaysSinceEpoch <= 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312";
@@ -1661,8 +1697,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Test other query forms with new added columns
     pinotQuery =
         "SELECT NewAddedMVStringDimension, SUM(NewAddedFloatMetric) FROM mytable GROUP BY NewAddedMVStringDimension";
-    JsonNode response = postQuery(pinotQuery);
-    JsonNode rows = response.get("resultTable").get("rows");
+    response = postQuery(pinotQuery);
+    rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
     JsonNode row = rows.get(0);
     assertEquals(row.size(), 2);

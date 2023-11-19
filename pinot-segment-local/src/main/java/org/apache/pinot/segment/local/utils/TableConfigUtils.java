@@ -160,6 +160,13 @@ public final class TableConfigUtils {
           throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
         }
         validateDecoder(streamConfig);
+        // if segmentSizeBytes is specified, rows must be zero.
+        if (streamConfigMap.containsKey(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE)
+            || streamConfigMap.containsKey(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE)) {
+          Preconditions.checkState(streamConfig.getFlushThresholdRows() == 0,
+              String.format("Invalid config: %s=%d, it must be set to 0 for size based segment threshold to work.",
+                  StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, streamConfig.getFlushThresholdRows()));
+        }
       }
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
@@ -722,6 +729,18 @@ public final class TableConfigUtils {
         Preconditions.checkState(
             fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
             "The delete record column must be a single-valued BOOLEAN column");
+      }
+
+      String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
+      Preconditions.checkState(
+          outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),
+          "outOfOrderRecordColumn and dropOutOfOrderRecord shouldn't exist together for upsert table");
+
+      if (outOfOrderRecordColumn != null) {
+        FieldSpec fieldSpec = schema.getFieldSpecFor(outOfOrderRecordColumn);
+        Preconditions.checkState(
+            fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
+            "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
       }
     }
 

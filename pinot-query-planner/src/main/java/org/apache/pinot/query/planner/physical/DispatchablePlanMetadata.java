@@ -68,8 +68,8 @@ public class DispatchablePlanMetadata implements Serializable {
   // whether a stage requires singleton instance to execute, e.g. stage contains global reduce (sort/agg) operator.
   private boolean _requiresSingletonInstance;
 
-  // whether a stage is partitioned table scan
-  private boolean _isPartitionedTableScan;
+  // whether a stage is partitioned by the same way the sending exchange is desired
+  private boolean _isPartitioned;
   private int _partitionParallelism;
 
   public DispatchablePlanMetadata() {
@@ -136,12 +136,12 @@ public class DispatchablePlanMetadata implements Serializable {
     _requiresSingletonInstance = _requiresSingletonInstance || newRequireInstance;
   }
 
-  public boolean isPartitionedTableScan() {
-    return _isPartitionedTableScan;
+  public boolean isPartitioned() {
+    return _isPartitioned;
   }
 
-  public void setPartitionedTableScan(boolean isPartitionedTableScan) {
-    _isPartitionedTableScan = isPartitionedTableScan;
+  public void setPartitioned(boolean isPartitioned) {
+    _isPartitioned = isPartitioned;
   }
 
   public int getPartitionParallelism() {

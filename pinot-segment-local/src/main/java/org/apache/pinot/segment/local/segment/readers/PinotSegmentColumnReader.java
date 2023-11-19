@@ -96,11 +96,41 @@ public class PinotSegmentColumnReader implements Closeable {
         return _dictionary.get(_forwardIndexReader.getDictId(docId, _forwardIndexReaderContext));
       } else {
         int numValues = _forwardIndexReader.getDictIdMV(docId, _dictIdBuffer, _forwardIndexReaderContext);
-        Object[] values = new Object[numValues];
-        for (int i = 0; i < numValues; i++) {
-          values[i] = _dictionary.get(_dictIdBuffer[i]);
+        DataType storedType = _dictionary.getValueType();
+        switch (storedType) {
+          case INT: {
+            Integer[] values = new Integer[numValues];
+            _dictionary.readIntValues(_dictIdBuffer, numValues, values);
+            return values;
+          }
+          case LONG: {
+            Long[] values = new Long[numValues];
+            _dictionary.readLongValues(_dictIdBuffer, numValues, values);
+            return values;
+          }
+          case FLOAT: {
+            Float[] values = new Float[numValues];
+            _dictionary.readFloatValues(_dictIdBuffer, numValues, values);
+            return values;
+          }
+          case DOUBLE: {
+            Double[] values = new Double[numValues];
+            _dictionary.readDoubleValues(_dictIdBuffer, numValues, values);
+            return values;
+          }
+          case STRING: {
+            String[] values = new String[numValues];
+            _dictionary.readStringValues(_dictIdBuffer, numValues, values);
+            return values;
+          }
+          case BYTES: {
+            byte[][] values = new byte[numValues][];
+            _dictionary.readBytesValues(_dictIdBuffer, numValues, values);
+            return values;
+          }
+          default:
+            throw new IllegalStateException("Unsupported MV type: " + storedType);
         }
-        return values;
       }
     } else {
       // Raw index based

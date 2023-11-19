@@ -155,8 +155,15 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     PinotLogicalExchange right = (PinotLogicalExchange) (join.getRight() instanceof HepRelVertex
         ? ((HepRelVertex) join.getRight()).getCurrentRel() : join.getRight());
 
-    PinotLogicalExchange dynamicBroadcastExchange =
-        PinotLogicalExchange.create(right.getInput(), RelDistributions.BROADCAST_DISTRIBUTED,
+    // when colocated join hint is given, dynamic broadcast exchange can be hash-distributed b/c
+    //    1. currently, dynamic broadcast only works against main table off leaf-stage; (e.g. receive node on leaf)
+    //    2. when hash key are the same but hash functions are different, it can be done via normal hash shuffle.
+    boolean isColocatedJoin = PinotHintStrategyTable.isHintOptionTrue(join.getHints(),
+        PinotHintOptions.JOIN_HINT_OPTIONS, PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
+    PinotLogicalExchange dynamicBroadcastExchange = isColocatedJoin
+        ? PinotLogicalExchange.create(right.getInput(), RelDistributions.hash(join.analyzeCondition().rightKeys),
+        PinotRelExchangeType.PIPELINE_BREAKER)
+        : PinotLogicalExchange.create(right.getInput(), RelDistributions.BROADCAST_DISTRIBUTED,
             PinotRelExchangeType.PIPELINE_BREAKER);
     Join dynamicFilterJoin =
         new LogicalJoin(join.getCluster(), join.getTraitSet(), left.getInput(), dynamicBroadcastExchange,

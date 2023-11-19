@@ -100,7 +100,7 @@ public class PinotLogicalQueryPlanner {
       PlanNode subPlanRootSenderNode =
           new MailboxSendNode(subPlanRoot.getPlanFragmentId(), subPlanRoot.getDataSchema(), 0,
               RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
-              false);
+              false, false);
       subPlanRootSenderNode.addInput(subPlanRoot);
       PlanFragment planFragment1 =
           new PlanFragment(1, subPlanRootSenderNode, new PlanFragmentMetadata(), new ArrayList<>());

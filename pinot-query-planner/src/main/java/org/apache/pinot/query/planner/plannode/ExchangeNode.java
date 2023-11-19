@@ -49,6 +49,9 @@ public class ExchangeNode extends AbstractPlanNode {
   private boolean _isSortOnReceiver = false;
 
   @ProtoProperties
+  private boolean _isPartitioned = false;
+
+  @ProtoProperties
   private List<RelFieldCollation> _collations;
 
   /**
@@ -63,13 +66,14 @@ public class ExchangeNode extends AbstractPlanNode {
 
   public ExchangeNode(int currentStageId, DataSchema dataSchema, PinotRelExchangeType exchangeType,
       Set<String> tableNames, RelDistribution distribution, List<RelFieldCollation> collations, boolean isSortOnSender,
-      boolean isSortOnReceiver) {
+      boolean isSortOnReceiver, boolean isPartitioned) {
     super(currentStageId, dataSchema);
     _exchangeType = exchangeType;
     _keys = distribution.getKeys();
     _distributionType = distribution.getType();
     _isSortOnSender = isSortOnSender;
     _isSortOnReceiver = isSortOnReceiver;
+    _isPartitioned = isPartitioned;
     _collations = collations;
     _tableNames = tableNames;
   }
@@ -102,6 +106,10 @@ public class ExchangeNode extends AbstractPlanNode {
 
   public boolean isSortOnReceiver() {
     return _isSortOnReceiver;
+  }
+
+  public boolean isPartitioned() {
+    return _isPartitioned;
   }
 
   public List<RelFieldCollation> getCollations() {
