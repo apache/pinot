@@ -321,12 +321,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
   }
 
-  @Override
-  protected void testQuery(String pinotQuery, String h2Query)
-      throws Exception {
-    super.testQuery(pinotQuery, h2Query);
-  }
-
   private void testQueryError(String query, int errorCode)
       throws Exception {
     JsonNode response = postQuery(query);
@@ -1464,10 +1458,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    *   <li>"NewAddedMVStringDimension", DIMENSION, STRING, multi-value, default ("null")</li>
    *   <li>"NewAddedSVJSONDimension", DIMENSION, JSON, single-value, default ("null")</li>
    *   <li>"NewAddedSVBytesDimension", DIMENSION, BYTES, single-value, default (byte[0])</li>
-   *   <li>"NewAddedDerivedHoursSinceEpoch", DATE_TIME, INT, single-value, default (Integer.MIN_VALUE)</li>
-   *   <li>"NewAddedDerivedTimestamp", DATE_TIME, TIMESTAMP, single-value, default (EPOCH)</li>
-   *   <li>"NewAddedDerivedSVBooleanDimension", DIMENSION, BOOLEAN, single-value, default (false)</li>
-   *   <li>"NewAddedDerivedMVStringDimension", DATE_TIME, STRING, multi-value</li>
+   *   <li>"NewAddedDerivedHoursSinceEpoch", DATE_TIME, INT, single-value, DaysSinceEpoch * 24</li>
+   *   <li>"NewAddedDerivedTimestamp", DATE_TIME, TIMESTAMP, single-value, DaysSinceEpoch * 24 * 3600 * 1000</li>
+   *   <li>"NewAddedDerivedSVBooleanDimension", DIMENSION, BOOLEAN, single-value, ActualElapsedTime > 0</li>
+   *   <li>"NewAddedDerivedMVStringDimension", DIMENSION, STRING, multi-value, split(DestCityName, ', ')</li>
+   *   <li>"NewAddedDerivedDivAirportSeqIDs", DIMENSION, INT, multi-value, DivAirportSeqIDs</li>
+   *   <li>"NewAddedDerivedDivAirportSeqIDsString", DIMENSION, STRING, multi-value, DivAirportSeqIDs</li>
    * </ul>
    */
   @Test(dependsOnMethods = "testAggregateMetadataAPI", dataProvider = "useBothQueryEngines")
@@ -1480,7 +1476,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadWithExtraColumns();
     JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 98);
+    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 100);
 
     testNewAddedColumns();
     testExpressionOverride();
@@ -1558,6 +1554,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     schema.addField(new DateTimeFieldSpec("NewAddedDerivedTimestamp", DataType.TIMESTAMP, "TIMESTAMP", "1:DAYS"));
     schema.addField(new DimensionFieldSpec("NewAddedDerivedSVBooleanDimension", DataType.BOOLEAN, true));
     schema.addField(new DimensionFieldSpec("NewAddedDerivedMVStringDimension", DataType.STRING, false));
+    schema.addField(new DimensionFieldSpec("NewAddedDerivedDivAirportSeqIDs", DataType.INT, false));
+    schema.addField(new DimensionFieldSpec("NewAddedDerivedDivAirportSeqIDsString", DataType.STRING, false));
     addSchema(schema);
 
     TableConfig tableConfig = getOfflineTableConfig();
@@ -1565,7 +1563,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         Arrays.asList(new TransformConfig("NewAddedDerivedHoursSinceEpoch", "DaysSinceEpoch * 24"),
             new TransformConfig("NewAddedDerivedTimestamp", "DaysSinceEpoch * 24 * 3600 * 1000"),
             new TransformConfig("NewAddedDerivedSVBooleanDimension", "ActualElapsedTime > 0"),
-            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')"));
+            new TransformConfig("NewAddedDerivedMVStringDimension", "split(DestCityName, ', ')"),
+            new TransformConfig("NewAddedDerivedDivAirportSeqIDs", "DivAirportSeqIDs"),
+            new TransformConfig("NewAddedDerivedDivAirportSeqIDsString", "DivAirportSeqIDs"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -1667,6 +1667,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
     testQuery(pinotQuery, h2Query);
 
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE DivAirportSeqIDs > 1100000";
+    JsonNode response = postQuery(pinotQuery);
+    JsonNode rows = response.get("resultTable").get("rows");
+    long count = rows.get(0).get(0).asLong();
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedDivAirportSeqIDs > 1100000";
+    response = postQuery(pinotQuery);
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asLong(), count);
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE CAST(NewAddedDerivedDivAirportSeqIDsString AS INT) > 1100000";
+    response = postQuery(pinotQuery);
+    rows = response.get("resultTable").get("rows");
+    assertEquals(rows.get(0).get(0).asLong(), count);
+
     // Test queries with new added metric column in aggregation function
     pinotQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable WHERE DaysSinceEpoch <= 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312";
@@ -1684,8 +1697,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Test other query forms with new added columns
     pinotQuery =
         "SELECT NewAddedMVStringDimension, SUM(NewAddedFloatMetric) FROM mytable GROUP BY NewAddedMVStringDimension";
-    JsonNode response = postQuery(pinotQuery);
-    JsonNode rows = response.get("resultTable").get("rows");
+    response = postQuery(pinotQuery);
+    rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
     JsonNode row = rows.get(0);
     assertEquals(row.size(), 2);
