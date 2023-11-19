@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.env;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.InputStream;
 import java.util.Arrays;
@@ -123,18 +122,6 @@ public class CommonsConfigurationUtils {
     try {
       FileHandler fileHandler = new FileHandler(propertiesConfiguration);
       fileHandler.setFile(file);
-      fileHandler.save();
-    } catch (ConfigurationException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public static void saveToExistingFile(PropertiesConfiguration propertiesConfiguration) {
-    try {
-      FileHandler fileHandler = new FileHandler(propertiesConfiguration);
-      File propertiesFile = fileHandler.getFile();
-      Preconditions.checkState(propertiesFile != null,
-          "Cannot save PropertiesConfiguration not loaded from file");
       fileHandler.save();
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);

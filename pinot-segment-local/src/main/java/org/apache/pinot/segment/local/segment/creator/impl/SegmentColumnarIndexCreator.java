@@ -458,8 +458,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   private void writeMetadata()
       throws ConfigurationException {
-    PropertiesConfiguration properties =
-        CommonsConfigurationUtils.loadFromFile(new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
+    File metadataFile = new File(_indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+    PropertiesConfiguration properties = CommonsConfigurationUtils.loadFromFile(metadataFile);
 
     properties.setProperty(SEGMENT_CREATOR_VERSION, _config.getCreatorVersion());
     properties.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
@@ -554,7 +554,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
     }
 
-    CommonsConfigurationUtils.saveToExistingFile(properties);
+    //builder.save();
+    CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 
   public static void addColumnMetadataInfo(PropertiesConfiguration properties, String column,

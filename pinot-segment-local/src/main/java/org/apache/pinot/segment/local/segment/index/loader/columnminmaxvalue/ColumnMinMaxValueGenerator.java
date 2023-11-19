@@ -82,7 +82,7 @@ public class ColumnMinMaxValueGenerator {
       addColumnMinMaxValueForColumn(column);
     }
     if (_minMaxValueAdded) {
-      SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties);
+      SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties, _segmentMetadata.getIndexDir());
     }
   }
 

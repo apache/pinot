@@ -211,7 +211,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, dateTimeColumns);
 
     // Save the new metadata
-    SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties);
+    SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties, _segmentMetadata.getIndexDir());
   }
 
   /**

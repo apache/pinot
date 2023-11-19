@@ -262,7 +262,7 @@ public class StarTreeBuilderUtils {
     // Remove the star-tree metadata
     PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     metadataProperties.subset(StarTreeV2Constants.MetadataKey.STAR_TREE_SUBSET).clear();
-    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties);
+    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, indexDir);
 
     // Remove the index file and index map file
     File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);

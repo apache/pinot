@@ -1906,7 +1906,7 @@ public class SegmentPreProcessorTest {
         configuration.clearProperty(key);
       }
     }
-    SegmentMetadataUtils.savePropertiesConfiguration(configuration);
+    SegmentMetadataUtils.savePropertiesConfiguration(configuration, indexDir);
   }
 
   private static Map<String, Consumer<IndexLoadingConfig>> createConfigPrepFunctions() {
