@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
@@ -99,7 +98,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    */
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit,
       @Nullable List<String> stopWordsInclude, @Nullable List<String> stopWordsExclude, boolean useCompoundFile,
-      int maxBufferSizeMB, @Nonnull String luceneAnalyzerFQCN) {
+      int maxBufferSizeMB, @Nullable String luceneAnalyzerFQCN) {
     _textColumn = column;
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
@@ -108,7 +107,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       _indexDirectory = FSDirectory.open(indexFile.toPath());
 
       Analyzer luceneAnalyzer;
-      if (luceneAnalyzerFQCN.isEmpty() || luceneAnalyzerFQCN.equals(StandardAnalyzer.class.getName())) {
+      if (null == luceneAnalyzerFQCN || luceneAnalyzerFQCN.isEmpty()
+              || luceneAnalyzerFQCN.equals(StandardAnalyzer.class.getName())) {
         luceneAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(stopWordsInclude, stopWordsExclude);
       } else {
         luceneAnalyzer = TextIndexUtils.getAnalyzerFromFQCN(luceneAnalyzerFQCN);
