@@ -208,7 +208,19 @@ public interface Dictionary extends IndexReader {
     }
   }
 
+  default void readIntValues(int[] dictIds, int length, Integer[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getIntValue(dictIds[i]);
+    }
+  }
+
   default void readLongValues(int[] dictIds, int length, long[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getLongValue(dictIds[i]);
+    }
+  }
+
+  default void readLongValues(int[] dictIds, int length, Long[] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = getLongValue(dictIds[i]);
     }
@@ -220,7 +232,19 @@ public interface Dictionary extends IndexReader {
     }
   }
 
+  default void readFloatValues(int[] dictIds, int length, Float[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getFloatValue(dictIds[i]);
+    }
+  }
+
   default void readDoubleValues(int[] dictIds, int length, double[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = getDoubleValue(dictIds[i]);
+    }
+  }
+
+  default void readDoubleValues(int[] dictIds, int length, Double[] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = getDoubleValue(dictIds[i]);
     }
