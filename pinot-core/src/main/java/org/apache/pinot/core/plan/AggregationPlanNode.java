@@ -20,12 +20,8 @@ package org.apache.pinot.core.plan;
 
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -34,15 +30,11 @@ import org.apache.pinot.core.operator.query.FilteredAggregationOperator;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.startree.CompositePredicateEvaluator;
-import org.apache.pinot.core.startree.StarTreeUtils;
-import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
@@ -81,9 +73,8 @@ public class AggregationPlanNode implements PlanNode {
    * Build the operator to be used for filtered aggregations
    */
   private FilteredAggregationOperator buildFilteredAggOperator() {
-    List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators =
-        AggregationFunctionUtils.buildFilteredAggregateProjectOperators(_indexSegment, _queryContext);
-    return new FilteredAggregationOperator(_queryContext, projectOperators,
+    return new FilteredAggregationOperator(_queryContext,
+        AggregationFunctionUtils.buildFilteredAggregationInfos(_indexSegment, _queryContext),
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
@@ -93,11 +84,10 @@ public class AggregationPlanNode implements PlanNode {
    * aggregates code will be invoked
    */
   public Operator<AggregationResultsBlock> buildNonFilteredAggOperator() {
-    assert _queryContext.getAggregationFunctions() != null;
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
 
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-
     FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
@@ -117,38 +107,12 @@ public class AggregationPlanNode implements PlanNode {
         }
         return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
       }
-
-      // Use star-tree to solve the query if possible
-      List<StarTreeV2> starTrees = _indexSegment.getStarTrees();
-      if (!filterOperator.isResultEmpty() && starTrees != null && !_queryContext.isSkipStarTree()) {
-        AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
-            StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
-        if (aggregationFunctionColumnPairs != null) {
-          Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
-              StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, _queryContext.getFilter(),
-                  filterPlanNode.getPredicateEvaluators());
-          if (predicateEvaluatorsMap != null) {
-            for (StarTreeV2 starTreeV2 : starTrees) {
-              if (StarTreeUtils.isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumnPairs, null,
-                  predicateEvaluatorsMap.keySet())) {
-                BaseProjectOperator<?> projectOperator =
-                    new StarTreeProjectPlanNode(_queryContext, starTreeV2, aggregationFunctionColumnPairs, null,
-                        predicateEvaluatorsMap).run();
-                return new AggregationOperator(_queryContext, projectOperator, numTotalDocs, true);
-              }
-            }
-          }
-        }
-      }
     }
 
-    // TODO: Do not create ProjectOperator when filter result is empty
-    Set<ExpressionContext> expressionsToTransform =
-        AggregationFunctionUtils.collectExpressionsToTransform(aggregationFunctions, null);
-    BaseProjectOperator<?> projectOperator =
-        new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform, DocIdSetPlanNode.MAX_DOC_PER_CALL,
-            filterOperator).run();
-    return new AggregationOperator(_queryContext, projectOperator, numTotalDocs, false);
+    AggregationInfo aggregationInfo =
+        AggregationFunctionUtils.buildAggregationInfo(_indexSegment, _queryContext, aggregationFunctions,
+            _queryContext.getFilter(), filterOperator, filterPlanNode.getPredicateEvaluators());
+    return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
   }
 
   /**
