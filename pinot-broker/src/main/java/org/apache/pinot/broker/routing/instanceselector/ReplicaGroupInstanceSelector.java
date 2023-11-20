@@ -69,8 +69,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   }
 
   @Override
-  Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
-      Map<String, String> queryOptions, Map<String, String> optionalSegmentToInstanceMap) {
+  Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+      SegmentStates segmentStates, Map<String, String> queryOptions) {
     if (_adaptiveServerSelector != null) {
       // Adaptive Server Selection is enabled.
       List<String> serverRankList = new ArrayList<>();
@@ -83,18 +83,17 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       for (Pair<String, Double> entry : serverRankListWithScores) {
         serverRankList.add(entry.getLeft());
       }
-      return selectServersUsingAdaptiveServerSelector(segments, requestId, segmentStates, serverRankList,
-          optionalSegmentToInstanceMap);
+      return selectServersUsingAdaptiveServerSelector(segments, requestId, segmentStates, serverRankList);
     } else {
       // Adaptive Server Selection is NOT enabled.
-      return selectServersUsingRoundRobin(segments, requestId, segmentStates, queryOptions,
-          optionalSegmentToInstanceMap);
+      return selectServersUsingRoundRobin(segments, requestId, segmentStates, queryOptions);
     }
   }
 
-  private Map<String, String> selectServersUsingRoundRobin(List<String> segments, int requestId,
-      SegmentStates segmentStates, Map<String, String> queryOptions, Map<String, String> optionalSegmentToInstanceMap) {
-    Map<String, String> selectedServers = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+  private Pair<Map<String, String>, Map<String, String>> selectServersUsingRoundRobin(List<String> segments,
+      int requestId, SegmentStates segmentStates, Map<String, String> queryOptions) {
+    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
     int numReplicaGroups = numReplicaGroupsToQuery == null ? 1 : numReplicaGroupsToQuery;
     int replicaOffset = 0;
@@ -112,7 +111,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
-        selectedServers.put(segment, selectedInstance.getInstance());
+        segmentToSelectedInstanceMap.put(segment, selectedInstance.getInstance());
       } else {
         optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
       }
@@ -121,12 +120,13 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
       replicaOffset = (replicaOffset + 1) % numReplicaGroups;
     }
-    return selectedServers;
+    return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
-  private Map<String, String> selectServersUsingAdaptiveServerSelector(List<String> segments, int requestId,
-      SegmentStates segmentStates, List<String> serverRankList, Map<String, String> optionalSegmentToInstanceMap) {
-    Map<String, String> selectedServers = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+  private Pair<Map<String, String>, Map<String, String>> selectServersUsingAdaptiveServerSelector(List<String> segments,
+      int requestId, SegmentStates segmentStates, List<String> serverRankList) {
+    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     for (String segment : segments) {
       // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
       // not been updated (we update all components for routing in sequence)
@@ -158,12 +158,12 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
-        selectedServers.put(segment, selectedInstance.getInstance());
+        segmentToSelectedInstanceMap.put(segment, selectedInstance.getInstance());
       } else {
         optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
       }
     }
-    return selectedServers;
+    return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
   private List<String> fetchCandidateServersForQuery(List<String> segments, SegmentStates segmentStates) {

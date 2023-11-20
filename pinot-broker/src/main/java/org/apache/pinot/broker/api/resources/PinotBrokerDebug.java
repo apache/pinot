@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiConsumer;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -112,16 +113,48 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<String, Map<ServerInstance, Pair<List<String>, List<String>>>> getRoutingTable(
+  public Map<String, Map<ServerInstance, List<String>>> getRoutingTable(
+      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
+    Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
+    getRoutingTable(tableName, (tableNameWithType, routingTable) -> result.put(tableNameWithType,
+        routingTable.getServerInstanceToSegmentsMap(false)));
+    if (!result.isEmpty()) {
+      return result;
+    } else {
+      throw new WebApplicationException("Cannot find routing for table: " + tableName, Response.Status.NOT_FOUND);
+    }
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/v2/debug/routingTable/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_ROUTING_TABLE)
+  @ApiOperation(value = "Get the routing table for a table, including optional segments")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 404, message = "Routing not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<String, Map<ServerInstance, Pair<List<String>, List<String>>>> getRoutingTableWithOptionalSegments(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
     Map<String, Map<ServerInstance, Pair<List<String>, List<String>>>> result = new TreeMap<>();
+    getRoutingTable(tableName, (tableNameWithType, routingTable) -> result.put(tableNameWithType,
+        routingTable.getServerInstanceToSegmentsMap()));
+    if (!result.isEmpty()) {
+      return result;
+    } else {
+      throw new WebApplicationException("Cannot find routing for table: " + tableName, Response.Status.NOT_FOUND);
+    }
+  }
+
+  private void getRoutingTable(String tableName, BiConsumer<String, RoutingTable> consumer) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType != TableType.REALTIME) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       RoutingTable routingTable = _routingManager.getRoutingTable(
           CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + offlineTableName), getRequestId());
       if (routingTable != null) {
-        result.put(offlineTableName, routingTable.getServerInstanceToSegmentsMap());
+        consumer.accept(offlineTableName, routingTable);
       }
     }
     if (tableType != TableType.OFFLINE) {
@@ -129,13 +162,8 @@ public class PinotBrokerDebug {
       RoutingTable routingTable = _routingManager.getRoutingTable(
           CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + realtimeTableName), getRequestId());
       if (routingTable != null) {
-        result.put(realtimeTableName, routingTable.getServerInstanceToSegmentsMap());
+        consumer.accept(realtimeTableName, routingTable);
       }
-    }
-    if (!result.isEmpty()) {
-      return result;
-    } else {
-      throw new WebApplicationException("Cannot find routing for table: " + tableName, Response.Status.NOT_FOUND);
     }
   }
 
@@ -149,11 +177,44 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 404, message = "Routing not found"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<ServerInstance, Pair<List<String>, List<String>>> getRoutingTableForQuery(
+  public Map<ServerInstance, List<String>> getRoutingTableForQuery(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query,
       @Context HttpHeaders httpHeaders) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    checkAccessControl(brokerRequest, httpHeaders);
+    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());
+    if (routingTable != null) {
+      return routingTable.getServerInstanceToSegmentsMap(false);
+    } else {
+      throw new WebApplicationException("Cannot find routing for query: " + query, Response.Status.NOT_FOUND);
+    }
+  }
 
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/v2/debug/routingTable/sql")
+  @ManualAuthorization
+  @ApiOperation(value = "Get the routing table for a query, including optional segments")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Routing table"),
+      @ApiResponse(code = 404, message = "Routing not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<ServerInstance, Pair<List<String>, List<String>>> getRoutingTableForQueryWithOptionalSegments(
+      @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query,
+      @Context HttpHeaders httpHeaders) {
+    Map<ServerInstance, Pair<List<String>, List<String>>> result;
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
+    checkAccessControl(brokerRequest, httpHeaders);
+    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());
+    if (routingTable != null) {
+      return routingTable.getServerInstanceToSegmentsMap();
+    } else {
+      throw new WebApplicationException("Cannot find routing for query: " + query, Response.Status.NOT_FOUND);
+    }
+  }
+
+  private void checkAccessControl(BrokerRequest brokerRequest, HttpHeaders httpHeaders) {
     // TODO: Handle nested queries
     if (brokerRequest.isSetQuerySource() && brokerRequest.getQuerySource().isSetTableName()) {
       if (!_accessControlFactory.create()
@@ -163,13 +224,6 @@ public class PinotBrokerDebug {
       }
     } else {
       throw new WebApplicationException("Table name is not set in the query", Response.Status.BAD_REQUEST);
-    }
-
-    RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());
-    if (routingTable != null) {
-      return routingTable.getServerInstanceToSegmentsMap();
-    } else {
-      throw new WebApplicationException("Cannot find routing for query: " + query, Response.Status.NOT_FOUND);
     }
   }
 

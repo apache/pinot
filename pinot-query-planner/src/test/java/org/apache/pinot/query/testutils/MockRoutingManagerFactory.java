@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.config.provider.TableCache;
@@ -56,7 +57,7 @@ public class MockRoutingManagerFactory {
   private final Map<String, Schema> _schemaMap;
   private final Set<String> _hybridTables;
   private final Map<String, ServerInstance> _serverInstances;
-  private final Map<String, Map<ServerInstance, List<String>>> _tableServerSegmentsMap;
+  private final Map<String, Map<ServerInstance, Pair<List<String>, List<String>>>> _tableServerSegmentsMap;
 
   public MockRoutingManagerFactory(int... ports) {
     _tableNameMap = new HashMap<>();
@@ -87,16 +88,15 @@ public class MockRoutingManagerFactory {
   public void registerSegment(int insertToServerPort, String tableNameWithType, String segmentName) {
     ServerInstance serverInstance = _serverInstances.get(toHostname(insertToServerPort));
     _tableServerSegmentsMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>())
-        .computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(segmentName);
+        .computeIfAbsent(serverInstance, k -> Pair.of(new ArrayList<>(), null)).getLeft().add(segmentName);
   }
 
   public RoutingManager buildRoutingManager(@Nullable Map<String, TablePartitionInfo> partitionInfoMap) {
     Map<String, RoutingTable> routingTableMap = new HashMap<>();
-    for (Map.Entry<String, Map<ServerInstance, List<String>>> tableEntry : _tableServerSegmentsMap.entrySet()) {
-      String tableNameWithType = tableEntry.getKey();
-      RoutingTable fakeRoutingTable = new RoutingTable(tableEntry.getValue(), Collections.emptyList(), 0);
+    _tableServerSegmentsMap.forEach((tableNameWithType, serverSegmentsMap) -> {
+      RoutingTable fakeRoutingTable = new RoutingTable(serverSegmentsMap, Collections.emptyList(), 0);
       routingTableMap.put(tableNameWithType, fakeRoutingTable);
-    }
+    });
     return new FakeRoutingManager(routingTableMap, _hybridTables, partitionInfoMap, _serverInstances);
   }
 

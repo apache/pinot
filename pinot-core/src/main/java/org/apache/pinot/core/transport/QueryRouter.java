@@ -86,29 +86,6 @@ public class QueryRouter {
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
-      @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable,
-      long timeoutMs) {
-    Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTableWithOptionalSegments = null;
-    if (offlineRoutingTable != null) {
-      offlineRoutingTableWithOptionalSegments = new HashMap<>();
-      for (Map.Entry<ServerInstance, List<String>> entry : offlineRoutingTable.entrySet()) {
-        offlineRoutingTableWithOptionalSegments.put(entry.getKey(), Pair.of(entry.getValue(), null));
-      }
-    }
-    Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTableWithOptionalSegments = null;
-    if (realtimeRoutingTable != null) {
-      realtimeRoutingTableWithOptionalSegments = new HashMap<>();
-      for (Map.Entry<ServerInstance, List<String>> entry : realtimeRoutingTable.entrySet()) {
-        realtimeRoutingTableWithOptionalSegments.put(entry.getKey(), Pair.of(entry.getValue(), null));
-      }
-    }
-    return submitQueryWithOptionalSegments(requestId, rawTableName, offlineBrokerRequest,
-        offlineRoutingTableWithOptionalSegments, realtimeBrokerRequest, realtimeRoutingTableWithOptionalSegments,
-        timeoutMs);
-  }
-
-  public AsyncQueryResponse submitQueryWithOptionalSegments(long requestId, String rawTableName,
       @Nullable BrokerRequest offlineBrokerRequest,
       @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,

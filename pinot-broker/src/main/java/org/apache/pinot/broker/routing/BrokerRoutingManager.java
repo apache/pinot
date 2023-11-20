@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -614,7 +615,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         getServerInstanceToSegmentsMap(tableNameWithType, selectionResult.getSegmentToInstanceMap());
     Map<ServerInstance, List<String>> serverInstanceToOptionalSegmentsMap =
         getServerInstanceToSegmentsMap(tableNameWithType, selectionResult.getOptionalSegmentToInstanceMap());
-    return new RoutingTable(serverInstanceToSegmentsMap, serverInstanceToOptionalSegmentsMap,
+    return new RoutingTable(merge(serverInstanceToSegmentsMap, serverInstanceToOptionalSegmentsMap),
         selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
   }
 
@@ -631,6 +632,21 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
     }
     return serverInstanceToSegmentsMap;
+  }
+
+  private static Map<ServerInstance, Pair<List<String>, List<String>>> merge(
+      Map<ServerInstance, List<String>> serverInstanceToSegmentsMap,
+      Map<ServerInstance, List<String>> serverInstanceToOptionalSegmentsMap) {
+    // Loop over the non-optional serverInstanceToSegmentsMap, so servers that only have optional segments are skipped.
+    // This makes the support of optional segments backward compatible easily, because just as before servers always
+    // get some non-optional segments to process the query.
+    // TODO: support when servers only have some optional segments to process.
+    Map<ServerInstance, Pair<List<String>, List<String>>> merged = new HashMap<>();
+    serverInstanceToSegmentsMap.forEach((k, v) -> {
+      List<String> optionalSegments = serverInstanceToOptionalSegmentsMap.get(k);
+      merged.put(k, Pair.of(v, optionalSegments));
+    });
+    return merged;
   }
 
   @Override
@@ -803,7 +819,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
-        return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyMap(),
+        return new InstanceSelector.SelectionResult(Pair.of(Collections.emptyMap(), Collections.emptyMap()),
             Collections.emptyList(), numPrunedSegments);
       }
     }

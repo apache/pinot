@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
@@ -75,15 +76,13 @@ public interface InstanceSelector {
   Set<String> getServingInstances();
 
   class SelectionResult {
-    private final Map<String, String> _segmentToInstanceMap;
+    private final Pair<Map<String, String>, Map<String, String>/*optional segments*/> _segmentToInstanceMap;
     private final List<String> _unavailableSegments;
-    private final Map<String, String> _optionalSegmentToInstanceMap;
     private int _numPrunedSegments;
 
-    public SelectionResult(Map<String, String> segmentToInstanceMap, Map<String, String> optionalSegmentToInstanceMap,
+    public SelectionResult(Pair<Map<String, String>, Map<String, String>> segmentToInstanceMap,
         List<String> unavailableSegments, int numPrunedSegments) {
       _segmentToInstanceMap = segmentToInstanceMap;
-      _optionalSegmentToInstanceMap = optionalSegmentToInstanceMap;
       _unavailableSegments = unavailableSegments;
       _numPrunedSegments = numPrunedSegments;
     }
@@ -92,7 +91,7 @@ public interface InstanceSelector {
      * Returns the map from segment to selected server instance hosting the segment.
      */
     public Map<String, String> getSegmentToInstanceMap() {
-      return _segmentToInstanceMap;
+      return _segmentToInstanceMap.getLeft();
     }
 
     /**
@@ -100,7 +99,7 @@ public interface InstanceSelector {
      * Optional segments can be skipped by broker or server upon any issue w/o failing the query.
      */
     public Map<String, String> getOptionalSegmentToInstanceMap() {
-      return _optionalSegmentToInstanceMap;
+      return _segmentToInstanceMap.getRight();
     }
 
     /**

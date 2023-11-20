@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.routing;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,34 +30,25 @@ public class RoutingTable {
   // the newly created consuming segments. Such segments were simply skipped by brokers at query routing time, but that
   // had caused wrong query results, particularly for upsert tables. Instead, we should pass such segments to servers
   // and let them decide how to handle them, e.g. skip them upon issues or include them for better query results.
-  private final Map<ServerInstance, Pair<List<String>/*non-optional segments*/, List<String>/*optional segments*/>>
-      _serverInstanceToSegmentsMap;
+  private final Map<ServerInstance, Pair<List<String>, List<String>/*optional segments*/>> _serverInstanceToSegmentsMap;
   private final List<String> _unavailableSegments;
   private final int _numPrunedSegments;
 
-  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap, List<String> unavailableSegments,
-      int numPrunedSegments) {
-    this(serverInstanceToSegmentsMap, Collections.emptyMap(), unavailableSegments, numPrunedSegments);
-  }
-
-  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap,
-      Map<ServerInstance, List<String>> serverInstanceToOptionalSegmentsMap, List<String> unavailableSegments,
-      int numPrunedSegments) {
-    _serverInstanceToSegmentsMap = new HashMap<>();
-    // Loop over the serverInstanceToSegmentsMap, so that servers that only have optional segments are skipped.
-    // This makes the support of optional segments backward compatible easily, because just as before servers always
-    // get some non-optional segments to process the query.
-    // TODO: support when servers only have some optional segments to process.
-    serverInstanceToSegmentsMap.forEach((k, v) -> {
-      List<String> optionalSegments = serverInstanceToOptionalSegmentsMap.get(k);
-      _serverInstanceToSegmentsMap.put(k, Pair.of(v, optionalSegments));
-    });
+  public RoutingTable(Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap,
+      List<String> unavailableSegments, int numPrunedSegments) {
+    _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
     _unavailableSegments = unavailableSegments;
     _numPrunedSegments = numPrunedSegments;
   }
 
   public Map<ServerInstance, Pair<List<String>, List<String>>> getServerInstanceToSegmentsMap() {
     return _serverInstanceToSegmentsMap;
+  }
+
+  public Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap(boolean optionalSegments) {
+    Map<ServerInstance, List<String>> ret = new HashMap<>();
+    _serverInstanceToSegmentsMap.forEach((k, v) -> ret.put(k, optionalSegments ? v.getRight() : v.getLeft()));
+    return ret;
   }
 
   public List<String> getUnavailableSegments() {
