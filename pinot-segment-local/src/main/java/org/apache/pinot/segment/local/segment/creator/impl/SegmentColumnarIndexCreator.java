@@ -132,10 +132,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     for (String columnName : indexConfigs.keySet()) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-      if (fieldSpec == null) {
-        Preconditions.checkState(schema.hasColumn(columnName),
-            "Cannot create index for column: %s because it is not in schema", columnName);
-      }
+      Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in the schema", columnName);
       if (fieldSpec.isVirtualColumn()) {
         LOGGER.warn("Ignoring index creation for virtual column " + columnName);
         continue;
@@ -206,7 +203,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (oldFwdCreator != null) {
         Object fakeForwardValue = calculateRawValueForTextIndex(dictEnabledColumn, config, fieldSpec);
         if (fakeForwardValue != null) {
-          @SuppressWarnings("unchecked")
           ForwardIndexCreator castedOldFwdCreator = (ForwardIndexCreator) oldFwdCreator;
           SameValueForwardIndexCreator fakeValueFwdCreator =
               new SameValueForwardIndexCreator(fakeForwardValue, castedOldFwdCreator);
@@ -217,10 +213,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     // Although NullValueVector is implemented as an index, it needs to be treated in a different way than other indexes
-    // TODO(column-level-nullability): Is this still needed? Probably it can be moved to the normal loop
-    boolean columnNullHandling = schema.isEnableColumnBasedNullHandling();
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (isNullable(fieldSpec, columnNullHandling)) {
+      if (isNullable(fieldSpec)) {
         // Initialize Null value vector map
         String columnName = fieldSpec.getName();
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
@@ -228,12 +222,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
   }
 
-  private boolean isNullable(FieldSpec fieldSpec, boolean columnNullHandling) {
-    if (columnNullHandling) {
-      return fieldSpec.isNullable();
-    } else {
-      return _config.isNullHandlingEnabled();
-    }
+  private boolean isNullable(FieldSpec fieldSpec) {
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isNullHandlingEnabled();
   }
 
   private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,
@@ -334,10 +324,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
-      String columnName = entry.getKey();
       // If row has null value for given column name, add to null value vector
-      if (row.isNullValue(columnName)) {
-        _nullValueVectorCreatorMap.get(columnName).setNull(_docIdCounter);
+      if (row.isNullValue(entry.getKey())) {
+        entry.getValue().setNull(_docIdCounter);
       }
     }
 

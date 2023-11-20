@@ -31,14 +31,17 @@ public class NullValueIndexTypeTest {
 
   @DataProvider(name = "provideCases")
   public Object[][] provideCases() {
-    return new Object[][] {
+    return new Object[][]{
         // This is the semantic table, assuming a null bitmap buffer exists in the segment
-        // columnNullHandling | field setNullable | Index is enabled
-        new Object[] {false, false, IndexConfig.ENABLED},
-        new Object[] {false, true, IndexConfig.ENABLED},
+        // enableColumnBasedNullHandling | table nullable | column nullable | expected index config
+        new Object[]{false, false, false, IndexConfig.DISABLED}, new Object[]{
+        false, false, true, IndexConfig.DISABLED
+    }, new Object[]{false, true, false, IndexConfig.ENABLED}, new Object[]{
+        false, true, true, IndexConfig.ENABLED
+    },
 
-        new Object[] {true, false, IndexConfig.DISABLED},
-        new Object[] {true, true, IndexConfig.ENABLED}
+        new Object[]{true, false, false, IndexConfig.DISABLED}, new Object[]{true, false, true, IndexConfig.ENABLED},
+        new Object[]{true, true, false, IndexConfig.DISABLED}, new Object[]{true, true, true, IndexConfig.ENABLED}
     };
   }
 
@@ -49,12 +52,13 @@ public class NullValueIndexTypeTest {
     }
 
     @Test(dataProvider = "provideCases", dataProviderClass = NullValueIndexTypeTest.class)
-    public void isEnabledWhenNullable(boolean columnNullHandling, boolean fieldNullable, IndexConfig expected) {
-      _tableConfig.getIndexingConfig().setNullHandlingEnabled(true);
-      _schema.setEnableColumnBasedNullHandling(columnNullHandling);
+    public void isEnabledWhenNullable(boolean enableColumnBasedNullHandling, boolean tableNullable,
+        boolean fieldNullable, IndexConfig expected) {
+      _schema.setEnableColumnBasedNullHandling(enableColumnBasedNullHandling);
+      _tableConfig.getIndexingConfig().setNullHandlingEnabled(tableNullable);
 
-      FieldSpec dimStr = _schema.getFieldSpecFor("dimStr");
-      dimStr.setNullable(fieldNullable);
+      FieldSpec fieldSpec = _schema.getFieldSpecFor("dimStr");
+      fieldSpec.setNullable(fieldNullable);
 
       assertEquals(expected);
     }

@@ -206,10 +206,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows, boolean keepOutputRowsInOrder) {
     List<Object[]> resultRows = resultTable.getRows();
     int numRows = resultRows.size();
-    assertEquals(numRows, expectedRows.size(), String.format("Mismatched number of results. Rows expected: %s, "
-            + "Rows found: %s",
-        expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
-        resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n"))));
+    assertEquals(numRows, expectedRows.size(),
+        String.format("Mismatched number of results.\nExpected Rows:\n%s\nActual Rows:\n%s",
+            expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
+            resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n"))));
 
     DataSchema dataSchema = resultTable.getDataSchema();
     resultRows.forEach(row -> canonicalizeRow(dataSchema, row));
@@ -222,12 +222,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       Object[] resultRow = resultRows.get(i);
       Object[] expectedRow = expectedRows.get(i);
       assertEquals(resultRow.length, expectedRow.length,
-          String.format("Unexpected row size mismatch. Expected: %s, Actual: %s",
+          String.format("Mismatched row size at row id: %d. Expected Row: %s, Actual Row: %s", i,
               Arrays.toString(expectedRow), Arrays.toString(resultRow)));
       for (int j = 0; j < resultRow.length; j++) {
         assertTrue(typeCompatibleFuzzyEquals(dataSchema.getColumnDataType(j), resultRow[j], expectedRow[j]),
-            "Not match at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow)
-                + " Actual: " + Arrays.toString(resultRow));
+            String.format("Mismatched value at row id: %d, column id: %d. Expected Row: %s, Actual Row: %s", i, j,
+                Arrays.toString(expectedRow), Arrays.toString(resultRow)));
       }
     }
   }
@@ -593,17 +593,18 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
 
     public static class ExtraProperties {
-      private boolean _enableNullHandlingInTableConf = false;
-      private boolean _enableColumnNullHandling = false;
+      private boolean _enableColumnBasedNullHandling = false;
       private boolean _noEmptySegment = false;
-      private Map<String, JsonNode> _unknownProps = new HashMap<>();
+      private final Map<String, JsonNode> _unknownProps = new HashMap<>();
 
-      @JsonAnySetter
-      public void setAny(String key, JsonNode value) {
-        _unknownProps.put(key, value);
+      public boolean isEnableColumnBasedNullHandling() {
+        return _enableColumnBasedNullHandling;
       }
 
-      @JsonProperty("noEmptySegment")
+      public void setEnableColumnBasedNullHandling(boolean enableColumnBasedNullHandling) {
+        _enableColumnBasedNullHandling = enableColumnBasedNullHandling;
+      }
+
       public boolean isNoEmptySegment() {
         return _noEmptySegment;
       }
@@ -612,22 +613,13 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
         _noEmptySegment = noEmptySegment;
       }
 
-      @JsonProperty("EnableTableNullHandling")
-      public boolean isEnableNullHandlingInTableConf() {
-        return _enableNullHandlingInTableConf;
+      public Map<String, JsonNode> getUnknownProps() {
+        return _unknownProps;
       }
 
-      public void setEnableNullHandlingInTableConf(boolean enableNullHandlingInTableConf) {
-        _enableNullHandlingInTableConf = enableNullHandlingInTableConf;
-      }
-
-      @JsonProperty("EnableColumnNullHandling")
-      public boolean isEnableColumnNullHandling() {
-        return _enableColumnNullHandling;
-      }
-
-      public void setEnableColumnNullHandling(boolean enableColumnNullHandling) {
-        _enableColumnNullHandling = enableColumnNullHandling;
+      @JsonAnySetter
+      public void setAny(String key, JsonNode value) {
+        _unknownProps.put(key, value);
       }
     }
   }

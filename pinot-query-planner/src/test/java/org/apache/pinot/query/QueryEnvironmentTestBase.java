@@ -234,17 +234,9 @@ public class QueryEnvironmentTestBase {
   public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
       Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
       @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap) {
-    return getQueryEnvironment(reducerPort, port1, port2, schemaMap, segmentMap1, segmentMap2, partitionedSegmentsMap,
-        Collections.emptyMap());
-  }
-
-  public static QueryEnvironment getQueryEnvironment(int reducerPort, int port1, int port2,
-      Map<String, Schema> schemaMap, Map<String, List<String>> segmentMap1, Map<String, List<String>> segmentMap2,
-      @Nullable Map<String, Pair<String, List<List<String>>>> partitionedSegmentsMap,
-      Map<String, Boolean> nullHandlingMap) {
     MockRoutingManagerFactory factory = new MockRoutingManagerFactory(port1, port2);
     for (Map.Entry<String, Schema> entry : schemaMap.entrySet()) {
-      factory.registerTable(entry.getValue(), entry.getKey(), nullHandlingMap.getOrDefault(entry.getKey(), false));
+      factory.registerTable(entry.getValue(), entry.getKey());
     }
     for (Map.Entry<String, List<String>> entry : segmentMap1.entrySet()) {
       for (String segment : entry.getValue()) {

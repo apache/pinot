@@ -531,8 +531,13 @@ public final class Schema implements Serializable {
       return this;
     }
 
-    public SchemaBuilder withEnableColumnBasedNullHandling(boolean enableColumnBasedNullHandling) {
+    public SchemaBuilder setEnableColumnBasedNullHandling(boolean enableColumnBasedNullHandling) {
       _schema.setEnableColumnBasedNullHandling(enableColumnBasedNullHandling);
+      return this;
+    }
+
+    public SchemaBuilder addField(FieldSpec fieldSpec) {
+      _schema.addField(fieldSpec);
       return this;
     }
 
@@ -543,7 +548,7 @@ public final class Schema implements Serializable {
 
     public SchemaBuilder addMetricField(String name, DataType dataType, Consumer<MetricFieldSpec> customizer) {
       MetricFieldSpec fieldSpec = new MetricFieldSpec();
-      return addFieldSpec(fieldSpec, name, dataType, customizer);
+      return addField(fieldSpec, name, dataType, customizer);
     }
 
     public SchemaBuilder addDimensionField(String name, DataType dataType) {
@@ -553,7 +558,7 @@ public final class Schema implements Serializable {
 
     public SchemaBuilder addDimensionField(String name, DataType dataType, Consumer<DimensionFieldSpec> customizer) {
       DimensionFieldSpec fieldSpec = new DimensionFieldSpec();
-      return addFieldSpec(fieldSpec, name, dataType, customizer);
+      return addField(fieldSpec, name, dataType, customizer);
     }
 
     public SchemaBuilder addDateTimeField(String name, DataType dataType, String format, String granularity) {
@@ -566,10 +571,10 @@ public final class Schema implements Serializable {
       DateTimeFieldSpec fieldSpec = new DateTimeFieldSpec();
       fieldSpec.setFormat(format);
       fieldSpec.setGranularity(granularity);
-      return addFieldSpec(fieldSpec, name, dataType, customizer);
+      return addField(fieldSpec, name, dataType, customizer);
     }
 
-    private <E extends FieldSpec> SchemaBuilder addFieldSpec(E fieldSpec, String name, DataType dataType,
+    private <E extends FieldSpec> SchemaBuilder addField(E fieldSpec, String name, DataType dataType,
         Consumer<E> customizer) {
       fieldSpec.setName(name);
       fieldSpec.setDataType(dataType);

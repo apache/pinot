@@ -121,7 +121,7 @@ public class TypeFactoryTest {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addSingleValueDimension("col", dataType)
-        .withEnableColumnBasedNullHandling(columnNullMode)
+        .setEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
@@ -136,7 +136,7 @@ public class TypeFactoryTest {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(true))
-        .withEnableColumnBasedNullHandling(columnNullMode)
+        .setEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
@@ -155,7 +155,7 @@ public class TypeFactoryTest {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addDimensionField("col", dataType, field -> field.setNullable(false))
-        .withEnableColumnBasedNullHandling(columnNullMode)
+        .setEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
@@ -174,7 +174,7 @@ public class TypeFactoryTest {
     TypeFactory typeFactory = new TypeFactory(TYPE_SYSTEM);
     Schema testSchema = new Schema.SchemaBuilder()
         .addMultiValueDimension("col", dataType)
-        .withEnableColumnBasedNullHandling(columnNullMode)
+        .setEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
@@ -196,7 +196,7 @@ public class TypeFactoryTest {
           field.setNullable(true);
           field.setSingleValueField(false);
         })
-        .withEnableColumnBasedNullHandling(columnNullMode)
+        .setEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();
@@ -218,7 +218,7 @@ public class TypeFactoryTest {
           field.setNullable(false);
           field.setSingleValueField(false);
         })
-        .withEnableColumnBasedNullHandling(columnNullMode)
+        .setEnableColumnBasedNullHandling(columnNullMode)
         .build();
     RelDataType relDataTypeFromSchema = typeFactory.createRelDataTypeFromSchema(testSchema);
     List<RelDataTypeField> fieldList = relDataTypeFromSchema.getFieldList();

@@ -68,10 +68,6 @@
     ]
   },
   "table_level_null_handling": {
-    "extraProps": {
-      "EnableColumnNullHandling": false,
-      "EnableTableNullHandling": true
-    },
     "tables": {
       "tbl1" : {
         "schema": [
@@ -237,8 +233,7 @@
   },
   "column_level_null_handling": {
     "extraProps": {
-      "EnableColumnNullHandling": true,
-      "EnableTableNullHandling": false
+      "enableColumnBasedNullHandling": true
     },
     "tables": {
       "tbl1" : {

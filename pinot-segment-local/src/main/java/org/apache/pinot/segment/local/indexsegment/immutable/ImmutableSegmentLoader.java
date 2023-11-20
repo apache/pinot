@@ -73,10 +73,11 @@ public class ImmutableSegmentLoader {
   }
 
   /**
-   * Loads the segment with empty schema and IndexLoadingConfig. This method is used to
-   * access the segment without modifying it, i.e. in read-only mode.
+   * Loads the segment with specified table config and schema.
+   * This method is used to access the segment without modifying it, i.e. in read-only mode.
    */
-  public static ImmutableSegment load(File indexDir, ReadMode readMode, Schema schema, TableConfig tableConfig)
+  public static ImmutableSegment load(File indexDir, ReadMode readMode, TableConfig tableConfig,
+      @Nullable Schema schema)
       throws Exception {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     defaultIndexLoadingConfig.setReadMode(readMode);
