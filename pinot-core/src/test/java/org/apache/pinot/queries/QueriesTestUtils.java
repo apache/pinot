@@ -90,6 +90,11 @@ public class QueriesTestUtils {
     validateRows(brokerResponse.getResultTable().getRows(), expectedRows);
   }
 
+  public static void testExplainSegmentsResult(BrokerResponseNative brokerResponse, ResultTable expectedResultTable) {
+    assertEquals(brokerResponse.getResultTable().getDataSchema(), expectedResultTable.getDataSchema());
+    validateExplainedRows(brokerResponse.getResultTable().getRows(), expectedResultTable.getRows());
+  }
+
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, ResultTable expectedResultTable) {
     validateResultTable(brokerResponse.getResultTable(), expectedResultTable);
   }
@@ -128,6 +133,26 @@ public class QueriesTestUtils {
   private static void validateResultTable(ResultTable actual, ResultTable expected) {
     assertEquals(actual.getDataSchema(), expected.getDataSchema());
     validateRows(actual.getRows(), expected.getRows());
+  }
+
+  private static void validateExplainedRows(List<Object[]> actual, List<Object[]> expected) {
+    assertEquals(actual.size(), expected.size());
+    // Sorting here to eliminate the nondeternism of nested sql calls
+    for (int j = 0; j < actual.size(); j++) {
+      Object[] act = actual.get(j);
+      Object[] exp = expected.get(j);
+      String attributeToSort = "PROJECT";
+      assertEquals(act.length, exp.length);
+      if (act[0].toString().startsWith(attributeToSort)) {
+        char[] act0 = act[0].toString().toCharArray();
+        char[] exp0 = exp[0].toString().toCharArray();
+        Arrays.sort(act0);
+        Arrays.sort(exp0);
+        act[0] = new String(act0);
+        exp[0] = new String(exp0);
+      }
+      assertEquals(act, exp);
+    }
   }
 
   private static void validateRows(List<Object[]> actual, List<Object[]> expected) {

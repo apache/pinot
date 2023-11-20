@@ -416,7 +416,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         _brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap,
             CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS, null);
 
-    QueriesTestUtils.testInterSegmentsResult(brokerResponse, expected);
+    QueriesTestUtils.testExplainSegmentsResult(brokerResponse, expected);
   }
 
   private ServerQueryRequest getQueryRequest(InstanceRequest instanceRequest) {
