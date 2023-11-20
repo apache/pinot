@@ -118,7 +118,6 @@ public class MockRoutingManagerFactory {
       String tableName = TableNameBuilder.extractRawTableName(tableNameWithType);
       return new TableConfigBuilder(TableType.OFFLINE)
           .setTableName(tableName)
-//          .setSchemaName(_schemaMap.get(tableName).getSchemaName())
           .setTimeColumnName("ts")
           .setNullHandlingEnabled(_nullHandlingMap.get(tableName))
           .build();

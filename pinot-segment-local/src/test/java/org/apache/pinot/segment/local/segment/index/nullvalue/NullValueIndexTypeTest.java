@@ -50,6 +50,7 @@ public class NullValueIndexTypeTest {
 
     @Test(dataProvider = "provideCases", dataProviderClass = NullValueIndexTypeTest.class)
     public void isEnabledWhenNullable(boolean columnNullHandling, boolean fieldNullable, IndexConfig expected) {
+      _tableConfig.getIndexingConfig().setNullHandlingEnabled(true);
       _schema.setEnableColumnBasedNullHandling(columnNullHandling);
 
       FieldSpec dimStr = _schema.getFieldSpecFor("dimStr");
