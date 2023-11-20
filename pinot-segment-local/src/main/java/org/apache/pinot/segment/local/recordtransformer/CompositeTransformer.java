@@ -68,13 +68,18 @@ public class CompositeTransformer implements RecordTransformer {
    *     Optional {@link SanitizationTransformer} after {@link NullValueTransformer} so that before sanitation, all
    *     values are non-null and follow the data types defined in the schema
    *   </li>
+   *   <li>
+   *     {@link SpecialValueTransformer} after {@link DataTypeTransformer} so that we already have the values complying
+   *      with the schema before handling special values
+   *   </li>
    * </ul>
    */
   public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema) {
     return Stream.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
-        new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
-        new TimeValidationTransformer(tableConfig, schema), new NullValueTransformer(tableConfig, schema),
-        new SanitizationTransformer(schema)).filter(t -> !t.isNoOp()).collect(Collectors.toList());
+            new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
+            new TimeValidationTransformer(tableConfig, schema), new NullValueTransformer(tableConfig, schema),
+            new SpecialValueTransformer(schema), new SanitizationTransformer(schema)).filter(t -> !t.isNoOp())
+        .collect(Collectors.toList());
   }
 
   public static CompositeTransformer getDefaultTransformer(TableConfig tableConfig, Schema schema) {
