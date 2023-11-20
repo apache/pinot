@@ -51,6 +51,13 @@ public class RecordTransformerTest {
       .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
       .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING)
       .addMultiValueDimension("mvString1", DataType.STRING).addMultiValueDimension("mvString2", DataType.STRING)
+      // For negative zero and NaN conversions
+      .addSingleValueDimension("svFloatNegativeZero", DataType.FLOAT)
+      .addMultiValueDimension("mvFloatNegativeZero", DataType.FLOAT)
+      .addSingleValueDimension("svDoubleNegativeZero", DataType.DOUBLE)
+      .addMultiValueDimension("mvDoubleNegativeZero", DataType.DOUBLE)
+      .addSingleValueDimension("svFloatNaN", DataType.FLOAT).addMultiValueDimension("mvFloatNaN", DataType.FLOAT)
+      .addSingleValueDimension("svDoubleNaN", DataType.DOUBLE).addMultiValueDimension("mvDoubleNaN", DataType.DOUBLE)
       .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
@@ -82,6 +89,14 @@ public class RecordTransformerTest {
     record.putValue("mvString1", new Object[]{"123", 123, 123L, 123f, 123.0});
     record.putValue("mvString2", new Object[]{123, 123L, 123f, 123.0, "123"});
     record.putValue("svNullString", null);
+    record.putValue("svFloatNegativeZero", -0.00f);
+    record.putValue("svDoubleNegativeZero", -0.00d);
+    record.putValue("mvFloatNegativeZero", new Float[]{-0.0f, 1.0f, 0.0f, 3.0f});
+    record.putValue("mvDoubleNegativeZero", new Double[]{-0.0d, 1.0d, 0.0d, 3.0d});
+    record.putValue("svFloatNaN", Float.NaN);
+    record.putValue("svDoubleNaN", Double.NaN);
+    record.putValue("mvFloatNaN", new Float[]{-0.0f, Float.NaN, 2.0f});
+    record.putValue("mvDoubleNaN", new Double[]{-0.0d, Double.NaN, 2.0d});
     return record;
   }
 
@@ -251,6 +266,28 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
+    }
+  }
+
+  @Test
+  public void testSpecialValueTransformer() {
+    RecordTransformer transformer = new SpecialValueTransformer(SCHEMA);
+    GenericRow record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(Float.floatToRawIntBits((float) record.getValue("svFloatNegativeZero")),
+          Float.floatToRawIntBits(0.0f));
+      assertEquals(Double.doubleToRawLongBits((double) record.getValue("svDoubleNegativeZero")),
+          Double.doubleToRawLongBits(0.0d));
+      assertEquals(record.getValue("mvFloatNegativeZero"), new Float[]{0.0f, 1.0f, 0.0f, 3.0f});
+      assertEquals(record.getValue("mvDoubleNegativeZero"), new Double[]{0.0d, 1.0d, 0.0d, 3.0d});
+      assertEquals(record.getValue("svFloatNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
+      assertEquals(record.getValue("svDoubleNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+      assertEquals(record.getValue("mvFloatNaN"),
+          new Float[]{0.0f, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT, 2.0f});
+      assertEquals(record.getValue("mvDoubleNaN"),
+          new Double[]{0.0d, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE, 2.0d});
     }
   }
 
@@ -530,6 +567,18 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
+      assertEquals(Float.floatToRawIntBits((float) record.getValue("svFloatNegativeZero")),
+          Float.floatToRawIntBits(0.0f));
+      assertEquals(Double.doubleToRawLongBits((double) record.getValue("svDoubleNegativeZero")),
+          Double.doubleToRawLongBits(0.0d));
+      assertEquals(record.getValue("mvFloatNegativeZero"), new Float[]{0.0f, 1.0f, 0.0f, 3.0f});
+      assertEquals(record.getValue("mvDoubleNegativeZero"), new Double[]{0.0d, 1.0d, 0.0d, 3.0d});
+      assertEquals(record.getValue("svFloatNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
+      assertEquals(record.getValue("svDoubleNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+      assertEquals(record.getValue("mvFloatNaN"),
+          new Float[]{0.0f, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT, 2.0f});
+      assertEquals(record.getValue("mvDoubleNaN"),
+          new Double[]{0.0d, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE, 2.0d});
     }
 
     // Test empty record
