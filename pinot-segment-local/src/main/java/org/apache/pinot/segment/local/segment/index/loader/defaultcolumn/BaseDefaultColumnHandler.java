@@ -530,9 +530,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       }
     }
 
-    if (_indexLoadingConfig.getTableConfig() != null
-        && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
-        && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled()) {
+    if (isNullable(fieldSpec)) {
       if (!_segmentWriter.hasIndexFor(column, StandardIndexes.nullValueVector())) {
         try (NullValueVectorCreator nullValueVectorCreator =
             new NullValueVectorCreator(_indexDir, fieldSpec.getName())) {
@@ -548,6 +546,16 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Add the column metadata information to the metadata properties.
     SegmentColumnarIndexCreator.addColumnMetadataInfo(_segmentProperties, column, columnIndexCreationInfo, totalDocs,
         fieldSpec, true/*hasDictionary*/, dictionaryElementSize);
+  }
+
+  private boolean isNullable(FieldSpec fieldSpec) {
+    if (_schema.isEnableColumnBasedNullHandling()) {
+      return fieldSpec.isNullable();
+    } else {
+      return _indexLoadingConfig.getTableConfig() != null
+          && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
+          && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled();
+    }
   }
 
   /**

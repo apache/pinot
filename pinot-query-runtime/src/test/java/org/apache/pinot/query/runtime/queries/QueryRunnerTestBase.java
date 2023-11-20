@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.query.runtime.queries;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.math.DoubleMath;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -204,9 +206,10 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows, boolean keepOutputRowsInOrder) {
     List<Object[]> resultRows = resultTable.getRows();
     int numRows = resultRows.size();
-    assertEquals(numRows, expectedRows.size(), String.format("Mismatched number of results. expected: %s, actual: %s",
-        expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
-        resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n"))));
+    assertEquals(numRows, expectedRows.size(),
+        String.format("Mismatched number of results.\nExpected Rows:\n%s\nActual Rows:\n%s",
+            expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
+            resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n"))));
 
     DataSchema dataSchema = resultTable.getDataSchema();
     resultRows.forEach(row -> canonicalizeRow(dataSchema, row));
@@ -219,12 +222,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       Object[] resultRow = resultRows.get(i);
       Object[] expectedRow = expectedRows.get(i);
       assertEquals(resultRow.length, expectedRow.length,
-          String.format("Unexpected row size mismatch. Expected: %s, Actual: %s", Arrays.toString(expectedRow),
-              Arrays.toString(resultRow)));
+          String.format("Mismatched row size at row id: %d. Expected Row: %s, Actual Row: %s", i,
+              Arrays.toString(expectedRow), Arrays.toString(resultRow)));
       for (int j = 0; j < resultRow.length; j++) {
         assertTrue(typeCompatibleFuzzyEquals(dataSchema.getColumnDataType(j), resultRow[j], expectedRow[j]),
-            "Not match at (" + i + "," + j + ")! Expected: " + Arrays.toString(expectedRow) + " Actual: "
-                + Arrays.toString(resultRow));
+            String.format("Mismatched value at row id: %d, column id: %d. Expected Row: %s, Actual Row: %s", i, j,
+                Arrays.toString(expectedRow), Arrays.toString(resultRow)));
       }
     }
   }
@@ -407,7 +410,11 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     // TODO: ts is built-in, but we should allow user overwrite
     builder.addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:SECONDS");
     builder.setSchemaName(schemaName);
-    return builder.build();
+    Schema schema = builder.build();
+    for (QueryTestCase.ColumnAndType columnAndType : columnAndTypes) {
+      schema.getFieldSpecMap().get(columnAndType._name).setNotNull(columnAndType._notNull);
+    }
+    return schema;
   }
 
   protected List<GenericRow> toRow(List<QueryTestCase.ColumnAndType> columnAndTypes, List<List<Object>> value) {
@@ -540,7 +547,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     @JsonProperty("queries")
     public List<Query> _queries;
     @JsonProperty("extraProps")
-    public Map<String, Object> _extraProps = Collections.emptyMap();
+    public ExtraProperties _extraProps = new ExtraProperties();
 
     public static class Table {
       @JsonProperty("schema")
@@ -581,6 +588,39 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       String _type;
       @JsonProperty("isSingleValue")
       boolean _isSingleValue = true;
+      @JsonProperty("notNull")
+      boolean _notNull = false;
+    }
+
+    public static class ExtraProperties {
+      private boolean _enableColumnBasedNullHandling = false;
+      private boolean _noEmptySegment = false;
+      private final Map<String, JsonNode> _unknownProps = new HashMap<>();
+
+      public boolean isEnableColumnBasedNullHandling() {
+        return _enableColumnBasedNullHandling;
+      }
+
+      public void setEnableColumnBasedNullHandling(boolean enableColumnBasedNullHandling) {
+        _enableColumnBasedNullHandling = enableColumnBasedNullHandling;
+      }
+
+      public boolean isNoEmptySegment() {
+        return _noEmptySegment;
+      }
+
+      public void setNoEmptySegment(boolean noEmptySegment) {
+        _noEmptySegment = noEmptySegment;
+      }
+
+      public Map<String, JsonNode> getUnknownProps() {
+        return _unknownProps;
+      }
+
+      @JsonAnySetter
+      public void setAny(String key, JsonNode value) {
+        _unknownProps.put(key, value);
+      }
     }
   }
 }

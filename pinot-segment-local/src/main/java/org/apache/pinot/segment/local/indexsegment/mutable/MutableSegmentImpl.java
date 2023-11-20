@@ -256,8 +256,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     Set<IndexType> specialIndexes =
-        Sets.newHashSet(StandardIndexes.dictionary(), // dictionaries implement other contract
-            StandardIndexes.nullValueVector()); // null value vector implement other contract
+        Sets.newHashSet(StandardIndexes.dictionary(), // dictionary implements other contract
+            StandardIndexes.nullValueVector()); // null value vector implements other contract
 
     // Initialize for each column
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
@@ -336,7 +336,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Null value vector
-      MutableNullValueVector nullValueVector = _nullHandlingEnabled ? new MutableNullValueVector() : null;
+      MutableNullValueVector nullValueVector = isNullable(fieldSpec) ? new MutableNullValueVector() : null;
 
       Map<IndexType, MutableIndex> mutableIndexes = new HashMap<>();
       for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
@@ -399,6 +399,10 @@ public class MutableSegmentImpl implements MutableSegment {
       _upsertOutOfOrderRecordColumn = null;
       _upsertDropOutOfOrderRecord = false;
     }
+  }
+
+  private boolean isNullable(FieldSpec fieldSpec) {
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _nullHandlingEnabled;
   }
 
   private <C extends IndexConfig> void addMutableIndex(Map<IndexType, MutableIndex> mutableIndexes,
@@ -658,7 +662,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Update the null value vector even if a null value is somehow produced
-      if (_nullHandlingEnabled && row.isNullValue(column)) {
+      if (indexContainer._nullValueVector != null && row.isNullValue(column)) {
         indexContainer._nullValueVector.setNull(docId);
       }
 

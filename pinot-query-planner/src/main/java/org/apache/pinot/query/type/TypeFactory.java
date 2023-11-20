@@ -19,6 +19,7 @@
 package org.apache.pinot.query.type;
 
 import java.util.Map;
+import java.util.function.Predicate;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
@@ -31,8 +32,8 @@ import org.apache.pinot.spi.data.Schema;
  * Extends Java-base TypeFactory from Calcite.
  *
  * <p>{@link JavaTypeFactoryImpl} is used here because we are not overriding much of the TypeFactory methods
- * required by Calcite. We will start extending {@link SqlTypeFactoryImpl} or even {@link RelDataTypeFactory}
- * when necessary for Pinot to override such mechanism.
+ * required by Calcite. We will start extending {@link org.apache.calcite.sql.type.SqlTypeFactoryImpl} or even
+ * {@link org.apache.calcite.rel.type.RelDataTypeFactory} when necessary for Pinot to override such mechanism.
  *
  * <p>Noted that {@link JavaTypeFactoryImpl} is subject to change. Please pay extra attention to this class when
  * upgrading Calcite versions.
@@ -45,20 +46,36 @@ public class TypeFactory extends JavaTypeFactoryImpl {
 
   public RelDataType createRelDataTypeFromSchema(Schema schema) {
     Builder builder = new Builder(this);
+    Predicate<FieldSpec> isNullable;
+    if (schema.isEnableColumnBasedNullHandling()) {
+      isNullable = FieldSpec::isNullable;
+    } else {
+      isNullable = fieldSpec -> false;
+    }
     for (Map.Entry<String, FieldSpec> e : schema.getFieldSpecMap().entrySet()) {
-      builder.add(e.getKey(), toRelDataType(e.getValue()));
+      builder.add(e.getKey(), toRelDataType(e.getValue(), isNullable));
     }
     return builder.build();
   }
 
-  private RelDataType toRelDataType(FieldSpec fieldSpec) {
+  private RelDataType toRelDataType(FieldSpec fieldSpec, Predicate<FieldSpec> isNullable) {
+    RelDataType type = createSqlType(getSqlTypeName(fieldSpec));
+    boolean isArray = !fieldSpec.isSingleValueField();
+    if (isArray) {
+      type = createArrayType(type, -1);
+    }
+    if (isNullable.test(fieldSpec)) {
+      type = createTypeWithNullability(type, true);
+    }
+    return type;
+  }
+
+  private SqlTypeName getSqlTypeName(FieldSpec fieldSpec) {
     switch (fieldSpec.getDataType()) {
       case INT:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.INTEGER)
-            : createArrayType(createSqlType(SqlTypeName.INTEGER), -1);
+        return SqlTypeName.INTEGER;
       case LONG:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BIGINT)
-            : createArrayType(createSqlType(SqlTypeName.BIGINT), -1);
+        return SqlTypeName.BIGINT;
       // Map float and double to the same RelDataType so that queries like
       // `select count(*) from table where aFloatColumn = 0.05` works correctly in multi-stage query engine.
       //
@@ -71,34 +88,32 @@ public class TypeFactory extends JavaTypeFactoryImpl {
       // With float and double mapped to the same RelDataType, the behavior in multi-stage query engine will be the same
       // as the query in v1 query engine.
       case FLOAT:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
-            : createArrayType(createSqlType(SqlTypeName.REAL), -1);
+        if (fieldSpec.isSingleValueField()) {
+          return SqlTypeName.DOUBLE;
+        } else {
+          // TODO: This may be wrong. The reason why we want to use DOUBLE in single value float may also apply here
+          return SqlTypeName.REAL;
+        }
       case DOUBLE:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DOUBLE)
-            : createArrayType(createSqlType(SqlTypeName.DOUBLE), -1);
+        return SqlTypeName.DOUBLE;
       case BOOLEAN:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.BOOLEAN)
-            : createArrayType(createSqlType(SqlTypeName.BOOLEAN), -1);
+        return SqlTypeName.BOOLEAN;
       case TIMESTAMP:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.TIMESTAMP)
-            : createArrayType(createSqlType(SqlTypeName.TIMESTAMP), -1);
+        return SqlTypeName.TIMESTAMP;
       case STRING:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARCHAR)
-            : createArrayType(createSqlType(SqlTypeName.VARCHAR), -1);
+        return SqlTypeName.VARCHAR;
       case BYTES:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.VARBINARY)
-            : createArrayType(createSqlType(SqlTypeName.VARBINARY), -1);
+        return SqlTypeName.VARBINARY;
       case BIG_DECIMAL:
-        return fieldSpec.isSingleValueField() ? createSqlType(SqlTypeName.DECIMAL)
-            : createArrayType(createSqlType(SqlTypeName.DECIMAL), -1);
+        return SqlTypeName.DECIMAL;
       case JSON:
-        return createSqlType(SqlTypeName.VARCHAR);
+        return SqlTypeName.VARCHAR;
       case LIST:
         // TODO: support LIST, MV column should go fall into this category.
       case STRUCT:
       case MAP:
       default:
-        String message = String.format("Unsupported type: %s ", fieldSpec.getDataType().toString());
+        String message = String.format("Unsupported type: %s ", fieldSpec.getDataType());
         throw new UnsupportedOperationException(message);
     }
   }

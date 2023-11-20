@@ -105,7 +105,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private File _indexDir;
   private int _totalDocs;
   private int _docIdCounter;
-  private boolean _nullHandlingEnabled;
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
@@ -133,10 +132,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     for (String columnName : indexConfigs.keySet()) {
       FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-      if (fieldSpec == null) {
-        Preconditions.checkState(schema.hasColumn(columnName),
-            "Cannot create index for column: %s because it is not in schema", columnName);
-      }
+      Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in the schema", columnName);
       if (fieldSpec.isVirtualColumn()) {
         LOGGER.warn("Ignoring index creation for virtual column " + columnName);
         continue;
@@ -207,7 +203,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       if (oldFwdCreator != null) {
         Object fakeForwardValue = calculateRawValueForTextIndex(dictEnabledColumn, config, fieldSpec);
         if (fakeForwardValue != null) {
-          @SuppressWarnings("unchecked")
           ForwardIndexCreator castedOldFwdCreator = (ForwardIndexCreator) oldFwdCreator;
           SameValueForwardIndexCreator fakeValueFwdCreator =
               new SameValueForwardIndexCreator(fakeForwardValue, castedOldFwdCreator);
@@ -218,14 +213,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     // Although NullValueVector is implemented as an index, it needs to be treated in a different way than other indexes
-    _nullHandlingEnabled = _config.isNullHandlingEnabled();
-    if (_nullHandlingEnabled) {
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (isNullable(fieldSpec)) {
         // Initialize Null value vector map
         String columnName = fieldSpec.getName();
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
       }
     }
+  }
+
+  private boolean isNullable(FieldSpec fieldSpec) {
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isNullHandlingEnabled();
   }
 
   private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,
@@ -325,13 +323,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       }
     }
 
-    if (_nullHandlingEnabled) {
-      for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
-        String columnName = entry.getKey();
-        // If row has null value for given column name, add to null value vector
-        if (row.isNullValue(columnName)) {
-          _nullValueVectorCreatorMap.get(columnName).setNull(_docIdCounter);
-        }
+    for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
+      // If row has null value for given column name, add to null value vector
+      if (row.isNullValue(entry.getKey())) {
+        entry.getValue().setNull(_docIdCounter);
       }
     }
 
@@ -369,7 +364,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   private void indexColumnValue(PinotSegmentColumnReader colReader,
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex, String columnName, FieldSpec fieldSpec,
-      SegmentDictionaryCreator dictionaryCreator, int sourceDocId, int onDiskDocPos, NullValueVectorCreator nullVec)
+      SegmentDictionaryCreator dictionaryCreator, int sourceDocId, int onDiskDocPos,
+      @Nullable NullValueVectorCreator nullVec)
       throws IOException {
     Object columnValueToIndex = colReader.getValue(sourceDocId);
     if (columnValueToIndex == null) {
@@ -382,7 +378,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
     }
 
-    if (_nullHandlingEnabled) {
+    if (nullVec != null) {
       if (colReader.isNull(sourceDocId)) {
         nullVec.setNull(onDiskDocPos);
       }

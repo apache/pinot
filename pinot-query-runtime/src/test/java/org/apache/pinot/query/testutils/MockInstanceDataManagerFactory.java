@@ -65,7 +65,7 @@ public class MockInstanceDataManagerFactory {
   // Key is registered table (with or without type)
   private final Map<String, Schema> _registeredSchemaMap;
 
-  private String _serverName;
+  private final String _serverName;
 
   public MockInstanceDataManagerFactory(String serverName) {
     _serverName = serverName;
@@ -162,8 +162,8 @@ public class MockInstanceDataManagerFactory {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     // TODO: plugin table config constructor
-    TableConfig tableConfig =
-        new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts").build();
+    TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts")
+        .setNullHandlingEnabled(true).build();
     Schema schema = _schemaMap.get(rawTableName);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(indexDir.getPath());
@@ -174,7 +174,7 @@ public class MockInstanceDataManagerFactory {
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
-      return ImmutableSegmentLoader.load(new File(indexDir, segmentName), ReadMode.mmap);
+      return ImmutableSegmentLoader.load(new File(indexDir, segmentName), ReadMode.mmap, tableConfig, schema);
     } catch (Exception e) {
       throw new RuntimeException("Unable to construct immutable segment from records", e);
     }
