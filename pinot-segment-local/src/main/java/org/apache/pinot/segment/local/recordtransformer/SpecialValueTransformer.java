@@ -26,7 +26,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * The {@code SpecialValueTransformer} class will transform special values the values to follow certain rules including:
+ * The {@code SpecialValueTransformer} class will transform special values according to the following rules:
  * <ul>
  *   <li>Negative zero (-0.0) should be converted to 0.0</li>
  *   <li>NaN should be converted to default null</li>
