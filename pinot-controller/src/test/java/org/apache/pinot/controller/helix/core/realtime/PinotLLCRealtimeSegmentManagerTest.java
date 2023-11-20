@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -1218,6 +1219,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
           segmentAssignment, instancePartitionsMap);
       updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), null, newSegmentName,
           segmentAssignment, instancePartitionsMap);
+    }
+
+    @Override
+    Set<Integer> getPartitionIds(StreamConfig streamConfig) {
+      if (_partitionGroupMetadataList != null) {
+        throw new UnsupportedOperationException();
+      }
+      return IntStream.range(0, _numPartitions).boxed().collect(Collectors.toSet());
     }
 
     @Override
