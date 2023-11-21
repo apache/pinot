@@ -31,8 +31,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
@@ -173,7 +173,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final int _deepstoreUploadRetryTimeoutMs;
   private final FileUploadDownloadClient _fileUploadDownloadClient;
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
-  private final ThreadPoolExecutor _deepStoreUploadExecutor;
+  private final ExecutorService _deepStoreUploadExecutor;
   private final Set<String> _deepStoreUploadExecutorPendingSegments;
 
   private volatile boolean _isStopping = false;
@@ -200,7 +200,7 @@ public class PinotLLCRealtimeSegmentManager {
     _isTmpSegmentAsyncDeletionEnabled = controllerConf.isTmpSegmentAsyncDeletionEnabled();
     _deepstoreUploadRetryTimeoutMs = controllerConf.getDeepStoreRetryUploadTimeoutMs();
     _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
-    _deepStoreUploadExecutor = _isDeepStoreLLCSegmentUploadRetryEnabled ? initDeepStoreUploadExecutorService(
+    _deepStoreUploadExecutor = _isDeepStoreLLCSegmentUploadRetryEnabled ? Executors.newFixedThreadPool(
         controllerConf.getDeepStoreRetryUploadParallelism()) : null;
     _deepStoreUploadExecutorPendingSegments = _isDeepStoreLLCSegmentUploadRetryEnabled ? new HashSet<>() : null;
   }
@@ -216,16 +216,6 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   FileUploadDownloadClient initFileUploadDownloadClient() {
     return new FileUploadDownloadClient();
-  }
-
-  /**
-   * Creates an auto-scaling Executor where max threads = uploadParallelism.
-   * As deep store upload can be an intermittent process, threads are given up if inactive for over 10 seconds
-   */
-  ThreadPoolExecutor initDeepStoreUploadExecutorService(int uploadParallelism) {
-    LOGGER.info("initializing deepStoreUploadExecutor with parallelism = {}", uploadParallelism);
-    return new ThreadPoolExecutor(0, uploadParallelism, 10, TimeUnit.SECONDS,
-        new LinkedBlockingQueue<>());
   }
 
   /**
@@ -1478,9 +1468,9 @@ public class PinotLLCRealtimeSegmentManager {
         } finally {
           _deepStoreUploadExecutorPendingSegments.remove(segmentName);
           // Monitoring in case segment upload retry is lagging
-          int queueSize = _deepStoreUploadExecutor.getQueue().size();
-          _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
-              ControllerGauge.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE, queueSize);
+          int queueSize = _deepStoreUploadExecutorPendingSegments.size();
+          _controllerMetrics.setOrUpdateGauge(
+              ControllerGauge.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE.getGaugeName(), queueSize);
         }
       };
 
@@ -1490,8 +1480,8 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  ThreadPoolExecutor getDeepStoreUploadExecutor() {
-    return _deepStoreUploadExecutor;
+  Set<String> getDeepStoreUploadExecutorPendingSegments() {
+    return _deepStoreUploadExecutorPendingSegments;
   }
 
   /**

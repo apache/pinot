@@ -31,9 +31,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -81,6 +81,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.util.TestUtils;
 import org.apache.zookeeper.data.Stat;
 import org.joda.time.Interval;
 import org.testng.Assert;
@@ -1038,10 +1039,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig, segmentsZKMetadata);
 
     // Block until all tasks have been able to complete
-    ThreadPoolExecutor deepStoreUploadExecutor = segmentManager.getDeepStoreUploadExecutor();
-    while (deepStoreUploadExecutor.getActiveCount() > 0) {
-      Thread.sleep(1000L);
-    }
+    Set<String> deepStoreUploadExecutor = segmentManager.getDeepStoreUploadExecutorPendingSegments();
+    TestUtils.waitForCondition(aVoid -> deepStoreUploadExecutor.isEmpty(), 30_000L,
+        "Timed out waiting for upload retry tasks to finish");
 
     assertEquals(
         segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(),
