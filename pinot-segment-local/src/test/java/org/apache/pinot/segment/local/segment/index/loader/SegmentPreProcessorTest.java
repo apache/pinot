@@ -1899,7 +1899,7 @@ public class SegmentPreProcessorTest {
   private static void removeMinMaxValuesFromMetadataFile(File indexDir) {
     PropertiesConfiguration configuration = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     Iterator<String> keys = configuration.getKeys();
-    LinkedList<String> keysToClear =  new LinkedList<>();
+    LinkedList<String> keysToClear = new LinkedList<>();
     while (keys.hasNext()) {
       String key = keys.next();
       if (key.endsWith(V1Constants.MetadataKeys.Column.MIN_VALUE) || key.endsWith(
@@ -1908,7 +1908,7 @@ public class SegmentPreProcessorTest {
         keysToClear.add(key);
       }
     }
-    for(String key: keysToClear) {
+    for (String key: keysToClear) {
       configuration.clearProperty(key);
     }
     SegmentMetadataUtils.savePropertiesConfiguration(configuration, indexDir);
