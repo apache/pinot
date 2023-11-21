@@ -152,7 +152,7 @@
     <log4j.version>2.20.0</log4j.version>
     <slf4j.version>2.0.9</slf4j.version>
     <netty.version>4.1.100.Final</netty.version>
-    <reactivestreams.version>1.0.3</reactivestreams.version>
+    <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.26</jmh.version>
