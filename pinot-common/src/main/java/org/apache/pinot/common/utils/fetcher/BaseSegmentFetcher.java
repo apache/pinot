@@ -20,12 +20,13 @@ package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
 import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.core.util.PeerServerSegmentFinder;
+import org.apache.pinot.common.utils.PeerServerSegmentFinder;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -114,13 +115,21 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   @Override
   public void fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
       throws Exception {
-    Random r = new Random();
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
       // First find servers hosting the segment in ONLINE state.
       List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, helixManager);
+      // Shuffle the list of URIs
+      Collections.shuffle(peerSegmentURIs);
       // Next fetch the segment.
-      fetchSegmentToLocalWithoutRetry(peerSegmentURIs.get(r.nextInt(peerSegmentURIs.size())), dest);
-      return true;
+      for (URI uri: peerSegmentURIs) {
+        try {
+          fetchSegmentToLocalWithoutRetry(uri, dest);
+          return true;
+        } catch (Exception e) {
+        }
+      }
+      // None of the URI work
+      return false;
     });
   }
 
