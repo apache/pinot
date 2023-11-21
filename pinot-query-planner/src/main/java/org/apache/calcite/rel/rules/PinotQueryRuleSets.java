@@ -50,14 +50,12 @@ public class PinotQueryRuleSets {
           CoreRules.PROJECT_SET_OP_TRANSPOSE,
 
           // aggregation and projection rules
-          CoreRules.AGGREGATE_PROJECT_MERGE, CoreRules.AGGREGATE_PROJECT_PULL_UP_CONSTANTS,
+          CoreRules.AGGREGATE_PROJECT_PULL_UP_CONSTANTS,
           // push a projection past a filter or vice versa
           CoreRules.PROJECT_FILTER_TRANSPOSE, CoreRules.FILTER_PROJECT_TRANSPOSE,
           // push a projection to the children of a join
           // push all expressions to handle the time indicator correctly
           CoreRules.JOIN_CONDITION_PUSH,
-          // merge projections
-          CoreRules.PROJECT_MERGE,
           // remove identity project
           CoreRules.PROJECT_REMOVE,
 
@@ -102,6 +100,7 @@ public class PinotQueryRuleSets {
 
   // The pruner rules run top-down to ensure Calcite restarts from root node after applying a transformation.
   public static final Collection<RelOptRule> PRUNE_RULES = ImmutableList.of(
+      CoreRules.AGGREGATE_PROJECT_MERGE,
       CoreRules.PROJECT_MERGE,
       CoreRules.FILTER_MERGE,
       CoreRules.AGGREGATE_REMOVE,
