@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1898,13 +1899,17 @@ public class SegmentPreProcessorTest {
   private static void removeMinMaxValuesFromMetadataFile(File indexDir) {
     PropertiesConfiguration configuration = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     Iterator<String> keys = configuration.getKeys();
+    LinkedList<String> keysToClear =  new LinkedList<>();
     while (keys.hasNext()) {
       String key = keys.next();
       if (key.endsWith(V1Constants.MetadataKeys.Column.MIN_VALUE) || key.endsWith(
           V1Constants.MetadataKeys.Column.MAX_VALUE) || key.endsWith(
           V1Constants.MetadataKeys.Column.MIN_MAX_VALUE_INVALID)) {
-        configuration.clearProperty(key);
+        keysToClear.add(key);
       }
+    }
+    for(String key: keysToClear) {
+      configuration.clearProperty(key);
     }
     SegmentMetadataUtils.savePropertiesConfiguration(configuration, indexDir);
   }

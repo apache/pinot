@@ -45,8 +45,10 @@ public class SegmentMetadataUtils {
     return getPropertiesConfiguration(indexDir);
   }
 
-  public static void savePropertiesConfiguration(PropertiesConfiguration propertiesConfiguration, File file) {
-    CommonsConfigurationUtils.saveToExistingFile(propertiesConfiguration, file);
+  public static void savePropertiesConfiguration(PropertiesConfiguration propertiesConfiguration, File indexDir) {
+    File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
+    Preconditions.checkNotNull(metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
+    CommonsConfigurationUtils.saveToExistingFile(propertiesConfiguration, metadataFile);
   }
 
   public static SegmentMetadata updateMetadataProperties(SegmentDirectory segmentDirectory,
@@ -57,7 +59,7 @@ public class SegmentMetadataUtils {
     for (Map.Entry<String, String> entry : metadataProperties.entrySet()) {
       propertiesConfiguration.setProperty(entry.getKey(), entry.getValue());
     }
-    SegmentMetadataUtils.savePropertiesConfiguration(propertiesConfiguration, segmentMetadata.getIndexDir());
+    savePropertiesConfiguration(propertiesConfiguration, segmentMetadata.getIndexDir());
     segmentDirectory.reloadMetadata();
     return segmentDirectory.getSegmentMetadata();
   }

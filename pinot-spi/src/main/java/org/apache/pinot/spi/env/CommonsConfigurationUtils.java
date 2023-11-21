@@ -112,7 +112,8 @@ public class CommonsConfigurationUtils {
   public static void saveToExistingFile(PropertiesConfiguration propertiesConfiguration, File file) {
     try {
       FileHandler fileHandler = new FileHandler(propertiesConfiguration);
-      fileHandler.save(file);
+      fileHandler.setFile(file);
+      fileHandler.save();
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
