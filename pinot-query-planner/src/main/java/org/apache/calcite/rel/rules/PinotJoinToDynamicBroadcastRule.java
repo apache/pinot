@@ -142,9 +142,13 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     RelNode right = join.getRight() instanceof HepRelVertex ? ((HepRelVertex) join.getRight()).getCurrentRel()
         : join.getRight();
     return left instanceof Exchange && right instanceof Exchange
+        // left side can be pushed as dynamic exchange
         && PinotRuleUtils.canPushDynamicBroadcastToLeaf(left.getInput(0))
         // default enable dynamic broadcast for SEMI join unless other join strategy were specified
-        && (!explicitOtherStrategy && join.getJoinType() == JoinRelType.SEMI && joinInfo.nonEquiConditions.isEmpty());
+        && !explicitOtherStrategy
+        // condition for SEMI join
+        && join.getJoinType() == JoinRelType.SEMI && joinInfo.nonEquiConditions.isEmpty()
+        && joinInfo.leftKeys.size() == 1;
   }
 
   @Override
