@@ -132,7 +132,7 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     ((ImmutableSegmentImpl) _upsertIndexSegment).enableUpsert(
         new ConcurrentMapPartitionUpsertMetadataManager("testTable_REALTIME", 0, Collections.singletonList("column6"),
             Collections.singletonList("daysSinceEpoch"), null, HashFunction.NONE, null,
-            false, 0, INDEX_DIR, serverMetrics), new ThreadSafeMutableRoaringBitmap(), null);
+            false, 0, 0, INDEX_DIR, serverMetrics), new ThreadSafeMutableRoaringBitmap(), null);
   }
 
   @AfterClass

@@ -681,6 +681,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _partitionUpsertMetadataManager.takeSnapshot();
           // If upsertTTL is enabled, we will remove expired primary keys from upsertMetadata after taking snapshot.
           _partitionUpsertMetadataManager.removeExpiredPrimaryKeys();
+          _partitionUpsertMetadataManager.removeExpiredDeletedKeys();
         }
 
         while (!_state.isFinal()) {

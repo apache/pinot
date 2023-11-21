@@ -731,6 +731,21 @@ public final class TableConfigUtils {
             "The delete record column must be a single-valued BOOLEAN column");
       }
 
+      double deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
+      if (deletedKeysTTL > 0) {
+        Preconditions.checkState(deleteRecordColumn != null,
+            "Deleted Keys TTL can only be enabled with deleteRecordColumn set.");
+        if (CollectionUtils.isNotEmpty(comparisonColumns)) {
+          Preconditions.checkState(comparisonColumns.size() == 1,
+                  "Deleted Keys TTL does not work with multiple comparison columns.");
+          String comparisonColumn = comparisonColumns.get(0);
+          DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
+          Preconditions.checkState(comparisonColumnDataType.isNumeric(),
+                  "Deleted Keys TTL must have comparison column: %s in numeric type, found: %s.",
+                  comparisonColumn, comparisonColumnDataType);
+        }
+      }
+
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
       Preconditions.checkState(
           outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),

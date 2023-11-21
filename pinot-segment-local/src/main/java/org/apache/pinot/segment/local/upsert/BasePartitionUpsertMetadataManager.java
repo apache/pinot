@@ -71,6 +71,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
   protected final double _metadataTTL;
+  protected final double _deletedKeysTTL;
   protected final File _tableIndexDir;
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
@@ -98,7 +99,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      double metadataTTL, double deletedKeysTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
@@ -108,6 +109,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _partialUpsertHandler = partialUpsertHandler;
     _enableSnapshot = enableSnapshot;
     _metadataTTL = metadataTTL;
+    _deletedKeysTTL = deletedKeysTTL;
     _tableIndexDir = tableIndexDir;
     _snapshotLock = enableSnapshot ? new ReentrantReadWriteLock() : null;
     _serverMetrics = serverMetrics;
@@ -115,6 +117,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (metadataTTL > 0) {
       _largestSeenComparisonValue = loadWatermark();
     } else {
+      _largestSeenComparisonValue = Double.MIN_VALUE;
       deleteWatermark();
     }
   }
@@ -157,15 +160,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
         _tableNameWithType);
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+    double maxComparisonValue =
+        ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
+            .getMaxValue()).doubleValue();
+
+    if (_deletedKeysTTL > 0 && maxComparisonValue > _largestSeenComparisonValue) {
+      _largestSeenComparisonValue = maxComparisonValue;
+    }
 
     // Skip adding segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
-    if (_largestSeenComparisonValue > 0) {
+    if (_metadataTTL > 0 && _largestSeenComparisonValue > 0) {
       Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");
-      Number maxComparisonValue =
-          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-      if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
+      if (maxComparisonValue < _largestSeenComparisonValue - _metadataTTL) {
         _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
         MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
         if (validDocIdsSnapshot != null) {
@@ -489,7 +497,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     // Skip removing segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
-    if (_largestSeenComparisonValue > 0) {
+    if (_metadataTTL > 0 && _largestSeenComparisonValue > 0) {
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
       if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
@@ -699,6 +707,27 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       finishOperation();
     }
   }
+
+  @Override
+  public void removeExpiredDeletedKeys() {
+    if (_deletedKeysTTL <= 0) {
+      return;
+    }
+    if (!startOperation()) {
+      _logger.info("Skip removing expired deleted primary keys because metadata manager is already stopped");
+      return;
+    }
+    try {
+      doRemoveExpiredDeletedKeys();
+    } finally {
+      finishOperation();
+    }
+  }
+
+  /**
+   * Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL) and deleted.
+   */
+  protected abstract void doRemoveExpiredDeletedKeys();
 
   /**
    * Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL).
