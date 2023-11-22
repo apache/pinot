@@ -1156,6 +1156,11 @@ public final class TableConfigUtils {
                       && fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
                   "FST Index is only supported for single value string columns");
               break;
+            case INVERTED:
+              Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
+                  "Cannot create an Inverted Index on column: " + fieldConfig.getName() + ", specified as "
+                      + "a non dictionary column");
+              break;
             case TEXT:
               Preconditions.checkState(fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
                   "TEXT Index is only supported for string columns");
