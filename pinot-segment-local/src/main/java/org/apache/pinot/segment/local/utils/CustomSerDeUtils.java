@@ -243,9 +243,14 @@ public class CustomSerDeUtils {
 
     @Override
     public byte[] serialize(Sketch value) {
-      // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
-      //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
-      return value.compact(false, null).toByteArray();
+      // The serializer should respect existing ordering to enable "early stop"
+      // optimisations on unions.
+      boolean shouldCompact = !value.isCompact();
+      boolean shouldOrder = value.isOrdered();
+      if (shouldCompact) {
+        return value.compact(shouldOrder, null).toByteArray();
+      }
+      return value.toByteArray();
     }
 
     @Override

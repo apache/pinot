@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.datasketches.common.ResizeFactor;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.AnotB;
 import org.apache.datasketches.theta.Intersection;
@@ -48,6 +49,7 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -68,29 +70,36 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
  *     'dimName=''course'' AND dimValue=''math''', 'SET_INTERSECT($1,$2)')
  *   </li>
  * </ul>
- * Currently there is only 1 parameter for the function:
+ * Currently, there are 5 parameters to the function:
  * <ul>
  *   <li>
  *     nominalEntries: The nominal entries used to create the sketch. (Default 4096)
+ *     resizeFactor: Controls the size multiple that affects how fast the internal cache grows (Default 2^3=8)
+ *     sampleProbability: Sets the upfront uniform sampling probability, p. (Default 1.0)
+ *     intermediateOrdering: Whether compacted sketches should be ordered. (Default false)
+ *     accumulatorThreshold: How many sketches should be kept in memory before merging. (Default 2)
  *   </li>
  * </ul>
  * <p>E.g. DISTINCT_COUNT_THETA_SKETCH(col, 'nominalEntries=8192')
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class DistinctCountThetaSketchAggregationFunction
-    extends BaseSingleInputAggregationFunction<List<Sketch>, Comparable> {
+    extends BaseSingleInputAggregationFunction<List<ThetaSketchAccumulator>, Comparable> {
   private static final String SET_UNION = "setunion";
   private static final String SET_INTERSECT = "setintersect";
   private static final String SET_DIFF = "setdiff";
   private static final String DEFAULT_SKETCH_IDENTIFIER = "$0";
-  private static final Sketch EMPTY_SKETCH = new UpdateSketchBuilder().build().compact();
+  private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
+  private static final boolean DEFAULT_INTERMEDIATE_ORDERING = false;
 
   private final List<ExpressionContext> _inputExpressions;
   private final boolean _includeDefaultSketch;
   private final List<FilterEvaluator> _filterEvaluators;
   private final ExpressionContext _postAggregationExpression;
   private final UpdateSketchBuilder _updateSketchBuilder = new UpdateSketchBuilder();
-  private final SetOperationBuilder _setOperationBuilder = new SetOperationBuilder();
+  protected final SetOperationBuilder _setOperationBuilder = new SetOperationBuilder();
+  protected boolean _intermediateOrdering = DEFAULT_INTERMEDIATE_ORDERING;
+  protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
 
   public DistinctCountThetaSketchAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
@@ -102,9 +111,22 @@ public class DistinctCountThetaSketchAggregationFunction
       Preconditions.checkArgument(paramsExpression.getType() == ExpressionContext.Type.LITERAL,
           "Second argument of DISTINCT_COUNT_THETA_SKETCH aggregation function must be literal (parameters)");
       Parameters parameters = new Parameters(paramsExpression.getLiteral().getStringValue());
+      // Allows the user to trade-off memory usage for merge CPU; higher values use more memory
+      _accumulatorThreshold = parameters.getAccumulatorThreshold();
+      // Ordering controls whether intermediate compact sketches are ordered in set operations
+      _intermediateOrdering = parameters.getIntermediateOrdering();
+      // Nominal entries controls sketch accuracy and size
       int nominalEntries = parameters.getNominalEntries();
       _updateSketchBuilder.setNominalEntries(nominalEntries);
       _setOperationBuilder.setNominalEntries(nominalEntries);
+      // P sets the initial value of Theta, defaults to 1.0
+      float p = parameters.getP();
+      _setOperationBuilder.setP(p);
+      _updateSketchBuilder.setP(p);
+      // Resize factor controls the size multiple that affects how fast the internal cache grows
+      ResizeFactor rf = parameters.getResizeFactor();
+      _setOperationBuilder.setResizeFactor(rf);
+      _updateSketchBuilder.setResizeFactor(rf);
     }
 
     if (numArguments < 4) {
@@ -401,20 +423,20 @@ public class DistinctCountThetaSketchAggregationFunction
       }
     } else {
       // Serialized sketch
-      List<Union> unions = getUnions(aggregationResultHolder);
+      List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(aggregationResultHolder);
       Sketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       if (_includeDefaultSketch) {
-        Union defaultUnion = unions.get(0);
+        ThetaSketchAccumulator defaultThetaAccumulator = thetaSketchAccumulators.get(0);
         for (Sketch sketch : sketches) {
-          defaultUnion.union(sketch);
+          defaultThetaAccumulator.apply(sketch);
         }
       }
       for (int i = 0; i < numFilters; i++) {
         FilterEvaluator filterEvaluator = _filterEvaluators.get(i);
-        Union union = unions.get(i + 1);
+        ThetaSketchAccumulator thetaSketchAccumulator = thetaSketchAccumulators.get(i + 1);
         for (int j = 0; j < length; j++) {
           if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
-            union.union(sketches[j]);
+            thetaSketchAccumulator.apply(sketches[j]);
           }
         }
       }
@@ -631,14 +653,14 @@ public class DistinctCountThetaSketchAggregationFunction
       // Serialized sketch
       Sketch[] sketches = deserializeSketches((byte[][]) valueArrays[0], length);
       for (int i = 0; i < length; i++) {
-        List<Union> unions = getUnions(groupByResultHolder, groupKeyArray[i]);
+        List<ThetaSketchAccumulator> thetaSketchAccumulators = getUnions(groupByResultHolder, groupKeyArray[i]);
         Sketch sketch = sketches[i];
         if (_includeDefaultSketch) {
-          unions.get(0).union(sketch);
+          thetaSketchAccumulators.get(0).apply(sketch);
         }
         for (int j = 0; j < numFilters; j++) {
           if (_filterEvaluators.get(j).evaluate(singleValues, valueTypes, valueArrays, i)) {
-            unions.get(j + 1).union(sketch);
+            thetaSketchAccumulators.get(j + 1).apply(sketch);
           }
         }
       }
@@ -907,7 +929,7 @@ public class DistinctCountThetaSketchAggregationFunction
       if (_includeDefaultSketch) {
         for (int i = 0; i < length; i++) {
           for (int groupKey : groupKeysArray[i]) {
-            getUnions(groupByResultHolder, groupKey).get(0).union(sketches[i]);
+            getUnions(groupByResultHolder, groupKey).get(0).apply(sketches[i]);
           }
         }
       }
@@ -916,7 +938,7 @@ public class DistinctCountThetaSketchAggregationFunction
         for (int j = 0; j < length; j++) {
           if (filterEvaluator.evaluate(singleValues, valueTypes, valueArrays, j)) {
             for (int groupKey : groupKeysArray[i]) {
-              getUnions(groupByResultHolder, groupKey).get(i + 1).union(sketches[i]);
+              getUnions(groupByResultHolder, groupKey).get(i + 1).apply(sketches[i]);
             }
           }
         }
@@ -925,57 +947,70 @@ public class DistinctCountThetaSketchAggregationFunction
   }
 
   @Override
-  public List<Sketch> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public List<ThetaSketchAccumulator> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     List result = aggregationResultHolder.getResult();
     if (result == null) {
       int numSketches = _filterEvaluators.size() + 1;
-      List<Sketch> sketches = new ArrayList<>(numSketches);
+      List<ThetaSketchAccumulator> sketches = new ArrayList<>(numSketches);
       for (int i = 0; i < numSketches; i++) {
-        sketches.add(EMPTY_SKETCH);
+        sketches.add(new ThetaSketchAccumulator(_setOperationBuilder, _intermediateOrdering, _accumulatorThreshold));
       }
       return sketches;
     }
 
     if (result.get(0) instanceof Sketch) {
-      return result;
+      int numSketches = result.size();
+      ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(numSketches);
+      for (Object o : result) {
+        ThetaSketchAccumulator thetaSketchAccumulator =
+            new ThetaSketchAccumulator(_setOperationBuilder, _intermediateOrdering, _accumulatorThreshold);
+        thetaSketchAccumulator.apply((Sketch) o);
+        thetaSketchAccumulators.add(thetaSketchAccumulator);
+      }
+      return thetaSketchAccumulators;
     } else {
-      return convertToSketches(result);
+      return result;
     }
   }
 
   @Override
-  public List<Sketch> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public List<ThetaSketchAccumulator> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     List result = groupByResultHolder.getResult(groupKey);
+
     if (result.get(0) instanceof Sketch) {
-      return result;
-    } else {
-      return convertToSketches(result);
+      int numSketches = result.size();
+      ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(numSketches);
+      for (Object o : result) {
+        ThetaSketchAccumulator thetaSketchAccumulator =
+            new ThetaSketchAccumulator(_setOperationBuilder, _intermediateOrdering, _accumulatorThreshold);
+        thetaSketchAccumulator.apply((Sketch) o);
+        thetaSketchAccumulators.add(thetaSketchAccumulator);
+      }
+      return thetaSketchAccumulators;
     }
+
+    return result;
   }
 
   @Override
-  public List<Sketch> merge(List<Sketch> sketches1, List<Sketch> sketches2) {
-    int numSketches = sketches1.size();
-    List<Sketch> mergedSketches = new ArrayList<>(numSketches);
-    for (int i = 0; i < numSketches; i++) {
-      Sketch sketch1 = sketches1.get(i);
-      Sketch sketch2 = sketches2.get(i);
-      if (sketch1.isEmpty()) {
-        mergedSketches.add(sketch2);
+  public List<ThetaSketchAccumulator> merge(List<ThetaSketchAccumulator> acc1, List<ThetaSketchAccumulator> acc2) {
+    int numAccumulators = acc1.size();
+    List<ThetaSketchAccumulator> mergedAccumulators = new ArrayList<>(numAccumulators);
+    for (int i = 0; i < numAccumulators; i++) {
+      ThetaSketchAccumulator thetaSketchAccumulator1 = acc1.get(i);
+      ThetaSketchAccumulator thetaSketchAccumulator2 = acc2.get(i);
+      if (thetaSketchAccumulator1.isEmpty()) {
+        mergedAccumulators.add(thetaSketchAccumulator1);
         continue;
       }
-      if (sketch2.isEmpty()) {
-        mergedSketches.add(sketch1);
+      if (thetaSketchAccumulator2.isEmpty()) {
+        mergedAccumulators.add(thetaSketchAccumulator2);
         continue;
       }
-      Union union = _setOperationBuilder.buildUnion();
-      union.union(sketch1);
-      union.union(sketch2);
-      // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
-      //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
-      mergedSketches.add(union.getResult(false, null));
+      thetaSketchAccumulator1.merge(thetaSketchAccumulator2);
+      mergedAccumulators.add(thetaSketchAccumulator1);
     }
-    return mergedSketches;
+    return mergedAccumulators;
   }
 
   @Override
@@ -989,8 +1024,18 @@ public class DistinctCountThetaSketchAggregationFunction
   }
 
   @Override
-  public Comparable extractFinalResult(List<Sketch> sketches) {
-    return Math.round(evaluatePostAggregationExpression(_postAggregationExpression, sketches).getEstimate());
+  public Comparable extractFinalResult(List<ThetaSketchAccumulator> accumulators) {
+    int numAccumulators = accumulators.size();
+    List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
+
+    for (ThetaSketchAccumulator accumulator : accumulators) {
+      accumulator.setOrdered(_intermediateOrdering);
+      accumulator.setThreshold(_accumulatorThreshold);
+      accumulator.setSetOperationBuilder(_setOperationBuilder);
+      mergedSketches.add(accumulator.getResult());
+    }
+
+    return Math.round(evaluatePostAggregationExpression(_postAggregationExpression, mergedSketches).getEstimate());
   }
 
   /**
@@ -1172,8 +1217,8 @@ public class DistinctCountThetaSketchAggregationFunction
   /**
    * Returns the Union list from the result holder or creates a new one if it does not exist.
    */
-  private List<Union> getUnions(AggregationResultHolder aggregationResultHolder) {
-    List<Union> unions = aggregationResultHolder.getResult();
+  private List<ThetaSketchAccumulator> getUnions(AggregationResultHolder aggregationResultHolder) {
+    List<ThetaSketchAccumulator> unions = aggregationResultHolder.getResult();
     if (unions == null) {
       unions = buildUnions();
       aggregationResultHolder.setValue(unions);
@@ -1196,8 +1241,8 @@ public class DistinctCountThetaSketchAggregationFunction
   /**
    * Returns the Union list for the given group key or creates a new one if it does not exist.
    */
-  private List<Union> getUnions(GroupByResultHolder groupByResultHolder, int groupKey) {
-    List<Union> unions = groupByResultHolder.getResult(groupKey);
+  private List<ThetaSketchAccumulator> getUnions(GroupByResultHolder groupByResultHolder, int groupKey) {
+    List<ThetaSketchAccumulator> unions = groupByResultHolder.getResult(groupKey);
     if (unions == null) {
       unions = buildUnions();
       groupByResultHolder.setValueForKey(groupKey, unions);
@@ -1220,11 +1265,13 @@ public class DistinctCountThetaSketchAggregationFunction
   /**
    * Builds the Union list.
    */
-  private List<Union> buildUnions() {
+  private List<ThetaSketchAccumulator> buildUnions() {
     int numUnions = _filterEvaluators.size() + 1;
-    List<Union> unions = new ArrayList<>(numUnions);
+    List<ThetaSketchAccumulator> unions = new ArrayList<>(numUnions);
     for (int i = 0; i < numUnions; i++) {
-      unions.add(_setOperationBuilder.buildUnion());
+      ThetaSketchAccumulator thetaSketchAccumulator =
+          new ThetaSketchAccumulator(_setOperationBuilder, _intermediateOrdering, _accumulatorThreshold);
+      unions.add(thetaSketchAccumulator);
     }
     return unions;
   }
@@ -1236,20 +1283,6 @@ public class DistinctCountThetaSketchAggregationFunction
     Sketch[] sketches = new Sketch[length];
     for (int i = 0; i < length; i++) {
       sketches[i] = Sketch.wrap(Memory.wrap(serializedSketches[i]));
-    }
-    return sketches;
-  }
-
-  /**
-   * Converts the given Unions to Sketches.
-   */
-  private List<Sketch> convertToSketches(List<Union> unions) {
-    int numUnions = unions.size();
-    List<Sketch> sketches = new ArrayList<>(numUnions);
-    for (Union union : unions) {
-      // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
-      //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
-      sketches.add(union.getResult(false, null));
     }
     return sketches;
   }
@@ -1269,8 +1302,6 @@ public class DistinctCountThetaSketchAggregationFunction
       return sketches.get(extractSketchId(expression.getIdentifier()));
     }
 
-    // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
-    //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
     FunctionContext function = expression.getFunction();
     String functionName = function.getFunctionName();
     List<ExpressionContext> arguments = function.getArguments();
@@ -1280,32 +1311,41 @@ public class DistinctCountThetaSketchAggregationFunction
         for (ExpressionContext argument : arguments) {
           union.union(evaluatePostAggregationExpression(argument, sketches));
         }
-        return union.getResult(false, null);
+        return union.getResult(_intermediateOrdering, null);
       case SET_INTERSECT:
         Intersection intersection = _setOperationBuilder.buildIntersection();
         for (ExpressionContext argument : arguments) {
           intersection.intersect(evaluatePostAggregationExpression(argument, sketches));
         }
-        return intersection.getResult(false, null);
+        return intersection.getResult(_intermediateOrdering, null);
       case SET_DIFF:
         AnotB diff = _setOperationBuilder.buildANotB();
         diff.setA(evaluatePostAggregationExpression(arguments.get(0), sketches));
         diff.notB(evaluatePostAggregationExpression(arguments.get(1), sketches));
-        return diff.getResult(false, null, false);
+        return diff.getResult(_intermediateOrdering, null, false);
       default:
         throw new IllegalStateException();
     }
   }
 
   /**
-   * Helper class to wrap the theta-sketch parameters.
+   * Helper class to wrap the theta-sketch parameters.  The initial values for the parameters are set to the
+   * same defaults in the Apache Datasketches library.
    */
   private static class Parameters {
     private static final char PARAMETER_DELIMITER = ';';
     private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
     private static final String NOMINAL_ENTRIES_KEY = "nominalEntries";
+    private static final String RESIZE_FACTOR_KEY = "resizeFactor";
+    private static final String SAMPLE_PROBABILITY_KEY = "sampleProbability";
+    private static final String INTERMEDIATE_ORDERING_KEY = "intermediateOrdering";
+    private static final String ACCUMULATOR_THRESHOLD_KEY = "accumulatorThreshold";
 
+    private int _resizeFactor = ResizeFactor.X8.getValue();
     private int _nominalEntries = ThetaUtil.DEFAULT_NOMINAL_ENTRIES;
+    private int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
+    private boolean _intermediateOrdering = DEFAULT_INTERMEDIATE_ORDERING;
+    private float _p = 1.0F;
 
     Parameters(String parametersString) {
       StringUtils.deleteWhitespace(parametersString);
@@ -1317,6 +1357,14 @@ public class DistinctCountThetaSketchAggregationFunction
         String value = keyAndValue[1];
         if (key.equalsIgnoreCase(NOMINAL_ENTRIES_KEY)) {
           _nominalEntries = Integer.parseInt(value);
+        } else if (key.equalsIgnoreCase(SAMPLE_PROBABILITY_KEY)) {
+          _p = Float.parseFloat(value);
+        } else if (key.equalsIgnoreCase(RESIZE_FACTOR_KEY)) {
+          _resizeFactor = Integer.parseInt(value);
+        } else if (key.equalsIgnoreCase(INTERMEDIATE_ORDERING_KEY)) {
+          _intermediateOrdering = Boolean.parseBoolean(value);
+        } else if (key.equalsIgnoreCase(ACCUMULATOR_THRESHOLD_KEY)) {
+          _accumulatorThreshold = Integer.parseInt(value);
         } else {
           throw new IllegalArgumentException("Invalid parameter key: " + key);
         }
@@ -1325,6 +1373,22 @@ public class DistinctCountThetaSketchAggregationFunction
 
     int getNominalEntries() {
       return _nominalEntries;
+    }
+
+    float getP() {
+      return _p;
+    }
+
+    boolean getIntermediateOrdering() {
+      return _intermediateOrdering;
+    }
+
+    int getAccumulatorThreshold() {
+      return _accumulatorThreshold;
+    }
+
+    ResizeFactor getResizeFactor() {
+      return ResizeFactor.getRF(_resizeFactor);
     }
   }
 
