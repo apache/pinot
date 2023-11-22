@@ -1230,6 +1230,21 @@ public class TableConfigUtilsTest {
           "Cannot create an Inverted index on column myCol2 specified in the " + "noDictionaryColumns config");
     }
 
+    // Tests the case when the field-config list marks a column as raw (non-dictionary) and enables
+    // inverted index on it
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
+    try {
+      FieldConfig fieldConfig = new FieldConfig.Builder("myCol2")
+          .withIndexTypes(Arrays.asList(FieldConfig.IndexType.INVERTED))
+          .withEncodingType(FieldConfig.EncodingType.RAW).build();
+      tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
+      TableConfigUtils.validate(tableConfig, schema);
+      Assert.fail("Should not be able to disable dictionary but keep inverted index");
+    } catch (Exception e) {
+      Assert.assertEquals(e.getMessage(),
+          "Cannot create an Inverted Index on column: myCol2, specified as a non dictionary column");
+    }
+
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setNoDictionaryColumns(Arrays.asList("myCol2")).build();
     try {
