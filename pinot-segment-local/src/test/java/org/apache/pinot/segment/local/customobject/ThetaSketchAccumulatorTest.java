@@ -30,16 +30,16 @@ import org.testng.annotations.Test;
 
 
 public class ThetaSketchAccumulatorTest {
-  private SetOperationBuilder setOperationBuilder;
+  private SetOperationBuilder _setOperationBuilder;
 
   @BeforeMethod
   public void setUp() {
-    setOperationBuilder = new SetOperationBuilder();
+    _setOperationBuilder = new SetOperationBuilder();
   }
 
   @Test
   public void testEmptyAccumulator() {
-    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(setOperationBuilder, false, 2);
+    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, false, 2);
     Assert.assertTrue(accumulator.isEmpty());
     Assert.assertEquals(accumulator.getResult().getEstimate(), 0.0);
   }
@@ -50,7 +50,7 @@ public class ThetaSketchAccumulatorTest {
     IntStream.range(0, 1000).forEach(input::update);
     Sketch sketch = input.compact();
 
-    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(setOperationBuilder, false, 2);
+    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, false, 2);
     accumulator.apply(sketch);
 
     Assert.assertFalse(accumulator.isEmpty());
@@ -66,9 +66,9 @@ public class ThetaSketchAccumulatorTest {
     IntStream.range(1000, 2000).forEach(input2::update);
     Sketch sketch2 = input2.compact();
 
-    ThetaSketchAccumulator accumulator1 = new ThetaSketchAccumulator(setOperationBuilder, true, 3);
+    ThetaSketchAccumulator accumulator1 = new ThetaSketchAccumulator(_setOperationBuilder, true, 3);
     accumulator1.apply(sketch1);
-    ThetaSketchAccumulator accumulator2 = new ThetaSketchAccumulator(setOperationBuilder, true, 3);
+    ThetaSketchAccumulator accumulator2 = new ThetaSketchAccumulator(_setOperationBuilder, true, 3);
     accumulator2.apply(sketch2);
     accumulator1.merge(accumulator2);
 
@@ -84,7 +84,7 @@ public class ThetaSketchAccumulatorTest {
     IntStream.range(1000, 2000).forEach(input2::update);
     Sketch sketch2 = input2.compact();
 
-    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(setOperationBuilder, true, 3);
+    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, true, 3);
     accumulator.apply(sketch1);
     accumulator.apply(sketch2);
 
@@ -93,8 +93,8 @@ public class ThetaSketchAccumulatorTest {
 
   @Test
   public void testUnionWithEmptyInput() {
-    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(setOperationBuilder, true, 3);
-    ThetaSketchAccumulator emptyAccumulator = new ThetaSketchAccumulator(setOperationBuilder, true, 3);
+    ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, true, 3);
+    ThetaSketchAccumulator emptyAccumulator = new ThetaSketchAccumulator(_setOperationBuilder, true, 3);
 
     accumulator.merge(emptyAccumulator);
 
