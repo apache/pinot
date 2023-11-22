@@ -48,6 +48,7 @@ import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -150,34 +151,41 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverConf = serverConf.clone();
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
-    ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
+    ZkClient zkClient = ServiceStartableUtils.getZKClient(_serverConf, _zkAddress);
+    try {
+      ServiceStartableUtils.applyClusterConfig(_serverConf, zkClient, _helixClusterName, ServiceRole.SERVER);
+      _hostname = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
+          _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
+              : NetUtils.getHostAddress());
+      // Override multi-stage query runner hostname if not set explicitly
+      if (!_serverConf.containsKey(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME)) {
+        _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _hostname);
+      }
+      _port = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
+
+      _instanceId = _serverConf.getProperty(Server.CONFIG_OF_INSTANCE_ID);
+      if (_instanceId != null) {
+        // NOTE:
+        //   - Force all instances to have the same prefix in order to derive the instance type based on the instance id
+        //   - Only log a warning instead of throw exception here for backward-compatibility
+        if (!_instanceId.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
+          Preconditions.checkState(InstanceTypeUtils.isServer(_instanceId), "Invalid instance id '%s' for server",
+              _instanceId);
+          LOGGER.warn("Instance id '{}' does not have prefix '{}'", _instanceId, Helix.PREFIX_OF_SERVER_INSTANCE);
+        }
+      } else {
+        _instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + _hostname + "_" + _port;
+        // NOTE: Need to add the instance id to the config because it is required in HelixInstanceDataManagerConfig
+        _serverConf.addProperty(Server.CONFIG_OF_INSTANCE_ID, _instanceId);
+      }
+      ServiceStartableUtils.overrideTenantConfigs(_instanceId, zkClient, _helixClusterName, _serverConf);
+    } finally {
+      zkClient.close();
+    }
 
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
-    _hostname = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
-        _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
-            : NetUtils.getHostAddress());
-    // Override multi-stage query runner hostname if not set explicitly
-    if (!_serverConf.containsKey(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME)) {
-      _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _hostname);
-    }
-    _port = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
 
-    _instanceId = _serverConf.getProperty(Server.CONFIG_OF_INSTANCE_ID);
-    if (_instanceId != null) {
-      // NOTE:
-      //   - Force all instances to have the same prefix in order to derive the instance type based on the instance id
-      //   - Only log a warning instead of throw exception here for backward-compatibility
-      if (!_instanceId.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        Preconditions.checkState(InstanceTypeUtils.isServer(_instanceId), "Invalid instance id '%s' for server",
-            _instanceId);
-        LOGGER.warn("Instance id '{}' does not have prefix '{}'", _instanceId, Helix.PREFIX_OF_SERVER_INSTANCE);
-      }
-    } else {
-      _instanceId = Helix.PREFIX_OF_SERVER_INSTANCE + _hostname + "_" + _port;
-      // NOTE: Need to add the instance id to the config because it is required in HelixInstanceDataManagerConfig
-      _serverConf.addProperty(Server.CONFIG_OF_INSTANCE_ID, _instanceId);
-    }
     if (_serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT) == 0) {
       _serverConf.setProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, NetUtils.findOpenPort());
