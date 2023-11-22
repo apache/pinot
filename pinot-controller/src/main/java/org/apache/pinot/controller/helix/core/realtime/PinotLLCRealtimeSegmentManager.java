@@ -821,6 +821,13 @@ public class PinotLLCRealtimeSegmentManager {
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1L);
       throw e;
     }
+    // We know that we have successfully set the idealstate to be OFFLINE.
+    // We can now do a best effort to reset the externalview to be OFFLINE if it is in ERROR state.
+    // If the externalview is not in error state, then this reset will be ignored by the helix participant
+    // in the server when it receives the ERROR to OFFLINE state transition.
+    _helixAdmin.resetPartition(_helixManager.getClusterName(), instanceName,
+        TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName()),
+        Collections.singletonList(segmentName));
   }
 
   /**

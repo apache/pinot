@@ -1134,16 +1134,40 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  // Inform the controller that the server had to stop consuming due to an error.
-  protected void postStopConsumedMsg(String reason) {
-    do {
+  private static class ConsumptionStopIndicator {
+    final StreamPartitionMsgOffset _offset;
+    final String _segmentName;
+    final String _instanceId;
+    final Logger _logger;
+    final ServerSegmentCompletionProtocolHandler _protocolHandler;
+    final String _reason;
+    private ConsumptionStopIndicator(StreamPartitionMsgOffset offset, String segmentName, String instanceId,
+        ServerSegmentCompletionProtocolHandler protocolHandler, String reason, Logger logger) {
+      _offset = offset;
+      _segmentName = segmentName;
+      _instanceId = instanceId;
+      _protocolHandler = protocolHandler;
+      _logger = logger;
+      _reason = reason;
+    }
+
+    SegmentCompletionProtocol.Response postSegmentStoppedConsuming() {
       SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-      params.withStreamPartitionMsgOffset(_currentOffset.toString()).withReason(reason).withSegmentName(_segmentNameStr)
+      params.withStreamPartitionMsgOffset(_offset.toString()).withReason(_reason).withSegmentName(_segmentName)
           .withInstanceId(_instanceId);
 
       SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(params);
+      _logger.info("Got response {}", response.toJsonString());
+      return response;
+    }
+  }
+  // Inform the controller that the server had to stop consuming due to an error.
+  protected void postStopConsumedMsg(String reason) {
+    ConsumptionStopIndicator indicator = new ConsumptionStopIndicator(_currentOffset,
+        _segmentNameStr, _instanceId, _protocolHandler, reason, _segmentLogger);
+    do {
+      SegmentCompletionProtocol.Response response = indicator.postSegmentStoppedConsuming();
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
-        _segmentLogger.info("Got response {}", response.toJsonString());
         break;
       }
       Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
@@ -1491,9 +1515,26 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
           "Failed to initialize segment data manager", e));
       _segmentLogger.warn(
-          "Calling controller to mark the segment as OFFLINE in Ideal State because of initialization error: '{}'",
+          "Scheduling task to call controller to mark the segment as OFFLINE in Ideal State due"
+           + "to initialization error: '{}'",
           e.getMessage());
-      postStopConsumedMsg("Consuming segment initialization error");
+      // Since we are going to throw exception from this thread (helix execution thread), the externalview
+      // entry for this segment will be ERROR. We allow time for Helix to make this transition, and then
+      // invoke controller API mark it OFFLINE in the idealstate.
+      new Thread(() -> {
+        ConsumptionStopIndicator indicator = new ConsumptionStopIndicator(_currentOffset, _segmentNameStr, _instanceId,
+            _protocolHandler, "Consuming segment initialization error", _segmentLogger);
+        try {
+          // Allow 30s for Helix to mark currentstate and externalview to ERROR, because
+          // we are about to receive an ERROR->OFFLINE state transition once we call
+          // postSegmentStoppedConsuming() method.
+          Thread.sleep(30_000);
+          indicator.postSegmentStoppedConsuming();
+        } catch (InterruptedException ie) {
+          // We got interrupted trying to post stop-consumed message. Give up at this point
+          return;
+        }
+      }).start();
       throw e;
     }
   }
