@@ -1039,8 +1039,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig, segmentsZKMetadata);
 
     // Block until all tasks have been able to complete
-    Set<String> deepStoreUploadExecutor = segmentManager.getDeepStoreUploadExecutorPendingSegments();
-    TestUtils.waitForCondition(aVoid -> deepStoreUploadExecutor.isEmpty(), 30_000L,
+    TestUtils.waitForCondition(aVoid -> segmentManager.deepStoreUploadExecutorPendingSegmentsIsEmpty(), 30_000L,
         "Timed out waiting for upload retry tasks to finish");
 
     assertEquals(

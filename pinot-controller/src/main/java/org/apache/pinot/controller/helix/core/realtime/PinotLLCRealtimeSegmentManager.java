@@ -202,7 +202,8 @@ public class PinotLLCRealtimeSegmentManager {
     _fileUploadDownloadClient = _isDeepStoreLLCSegmentUploadRetryEnabled ? initFileUploadDownloadClient() : null;
     _deepStoreUploadExecutor = _isDeepStoreLLCSegmentUploadRetryEnabled ? Executors.newFixedThreadPool(
         controllerConf.getDeepStoreRetryUploadParallelism()) : null;
-    _deepStoreUploadExecutorPendingSegments = _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
+    _deepStoreUploadExecutorPendingSegments =
+        _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -1480,8 +1481,8 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  Set<String> getDeepStoreUploadExecutorPendingSegments() {
-    return _deepStoreUploadExecutorPendingSegments;
+  boolean deepStoreUploadExecutorPendingSegmentsIsEmpty() {
+    return _deepStoreUploadExecutorPendingSegments.isEmpty();
   }
 
   /**
