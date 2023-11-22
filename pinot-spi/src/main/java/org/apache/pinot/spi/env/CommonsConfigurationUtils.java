@@ -87,6 +87,7 @@ public class CommonsConfigurationUtils {
   public static PropertiesConfiguration loadFromInputStream(InputStream stream, boolean setIOFactory,
       boolean setDefaultDelimiter) throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, false);
+    config.setThrowExceptionOnMissing(false);
     FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(stream);
     return config;
@@ -255,6 +256,7 @@ public class CommonsConfigurationUtils {
     if (setDefaultDelimiter) {
       CommonsConfigurationUtils.setDefaultListDelimiterHandler(config);
     }
+    config.setThrowExceptionOnMissing(false);
     return config;
   }
 
