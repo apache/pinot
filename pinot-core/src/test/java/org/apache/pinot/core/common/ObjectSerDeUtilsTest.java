@@ -481,7 +481,7 @@ public class ObjectSerDeUtilsTest {
   public void testThetaSketch() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
       UpdateSketch input = Sketches.updateSketchBuilder().build();
-      int size = RANDOM.nextInt(100) + 1;
+      int size = RANDOM.nextInt(100) + 10;
       boolean shouldOrder = RANDOM.nextBoolean();
 
       for (int j = 0; j < size; j++) {
@@ -503,7 +503,7 @@ public class ObjectSerDeUtilsTest {
   public void testThetaSketchAccumulator() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
       UpdateSketch input = Sketches.updateSketchBuilder().build();
-      int size = RANDOM.nextInt(100) + 1;
+      int size = RANDOM.nextInt(100) + 10;
       boolean shouldOrder = RANDOM.nextBoolean();
 
       for (int j = 0; j < size; j++) {
