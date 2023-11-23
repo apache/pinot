@@ -825,9 +825,14 @@ public class PinotLLCRealtimeSegmentManager {
     // We can now do a best effort to reset the externalview to be OFFLINE if it is in ERROR state.
     // If the externalview is not in error state, then this reset will be ignored by the helix participant
     // in the server when it receives the ERROR to OFFLINE state transition.
-    _helixAdmin.resetPartition(_helixManager.getClusterName(), instanceName,
-        TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName()),
-        Collections.singletonList(segmentName));
+    // Helix throws an exception if we try to reset state of a partition that is NOT in ERROR state in EV,
+    // So, if any exceptions are thrown, ignore it here.
+    try {
+      _helixAdmin.resetPartition(_helixManager.getClusterName(), instanceName, TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName()),
+          Collections.singletonList(segmentName));
+    } catch (Exception e) {
+      // Ignore
+    }
   }
 
   /**
