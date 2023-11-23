@@ -828,7 +828,8 @@ public class PinotLLCRealtimeSegmentManager {
     // Helix throws an exception if we try to reset state of a partition that is NOT in ERROR state in EV,
     // So, if any exceptions are thrown, ignore it here.
     try {
-      _helixAdmin.resetPartition(_helixManager.getClusterName(), instanceName, TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName()),
+      _helixAdmin.resetPartition(_helixManager.getClusterName(), instanceName,
+          TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName()),
           Collections.singletonList(segmentName));
     } catch (Exception e) {
       // Ignore
