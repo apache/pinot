@@ -305,9 +305,9 @@ public class RecordTransformerTest {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.INT)
         .addSingleValueDimension("svDouble", DataType.DOUBLE)
         .addSingleValueDimension("expressionTestColumn", DataType.INT)
-        .addSingleValueDimension("svNaN", DataType.FLOAT).addMultiValueDimension("mvNaN",DataType.FLOAT)
+        .addSingleValueDimension("svNaN", DataType.FLOAT).addMultiValueDimension("mvNaN", DataType.FLOAT)
         .addSingleValueDimension("emptyDimensionForNullValueTransformer", DataType.FLOAT)
-        .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
+        .addSingleValueDimension("svStringNull", DataType.STRING)
         .addSingleValueDimension("indexableExtras", DataType.JSON)
         .addDateTime("timeCol", DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS").build();
 
@@ -326,7 +326,7 @@ public class RecordTransformerTest {
     List<RecordTransformer> currentListOfTransformers =
         CompositeTransformer.getDefaultTransformers(tableConfig, schema);
 
-    // Create a list of transformers to compare.
+    // Create a list of transformers in the original order to compare.
     List<RecordTransformer> expectedListOfTransformers =
         List.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
             new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
@@ -352,14 +352,15 @@ public class RecordTransformerTest {
 
     // Data for SpecialValue Transformer.
     record.putValue("svNaN", Float.NaN);
-    record.putValue("mvNaN",new Float[]{1.0f,Float.NaN,2.0f});
+    record.putValue("mvNaN", new Float[]{1.0f, Float.NaN, 2.0f});
 
     // Data for sanitization transformer.
-    record.putValue("svStringWithNullCharacters", "1\0002\0003");
+    record.putValue("svStringNull", null);
 
     for (int i = 0; i < NUMBER_OF_TRANSFORMERS; i++) {
+      GenericRow copyRecord = record.copy();
       GenericRow currentRecord = currentListOfTransformers.get(i).transform(record);
-      GenericRow expectedRecord = expectedListOfTransformers.get(i).transform(record);
+      GenericRow expectedRecord = expectedListOfTransformers.get(i).transform(copyRecord);
       assertEquals(currentRecord, expectedRecord);
       record = expectedRecord;
     }
@@ -652,7 +653,8 @@ public class RecordTransformerTest {
           new Float[]{0.0f, 2.0f});
       assertEquals(record.getValue("mvDoubleNaN"),
           new Double[]{0.0d, 2.0d});
-      assertEquals(new ArrayList<>(record.getNullValueFields()), new ArrayList<>(Arrays.asList("svFloatNaN","svDoubleNaN")));
+      assertEquals(new ArrayList<>(record.getNullValueFields()),
+          new ArrayList<>(Arrays.asList("svFloatNaN", "svDoubleNaN")));
     }
 
     // Test empty record
