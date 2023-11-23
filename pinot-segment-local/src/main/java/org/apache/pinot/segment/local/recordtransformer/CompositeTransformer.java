@@ -70,15 +70,16 @@ public class CompositeTransformer implements RecordTransformer {
    *   </li>
    *   <li>
    *     {@link SpecialValueTransformer} after {@link DataTypeTransformer} so that we already have the values complying
-   *      with the schema before handling special values
+   *      with the schema before handling special values and before {@link NullValueTransformer} so that it transforms
+   *      all the null values properly
    *   </li>
    * </ul>
    */
   public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema) {
     return Stream.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
             new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
-            new TimeValidationTransformer(tableConfig, schema), new NullValueTransformer(tableConfig, schema),
-            new SpecialValueTransformer(schema), new SanitizationTransformer(schema)).filter(t -> !t.isNoOp())
+            new TimeValidationTransformer(tableConfig, schema), new SpecialValueTransformer(schema),
+            new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(schema)).filter(t -> !t.isNoOp())
         .collect(Collectors.toList());
   }
 
