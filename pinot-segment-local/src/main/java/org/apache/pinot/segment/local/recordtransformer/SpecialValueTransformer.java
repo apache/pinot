@@ -35,8 +35,9 @@ import org.slf4j.LoggerFactory;
  *   <li>Negative zero (-0.0) should be converted to 0.0</li>
  *   <li>NaN should be converted to default null</li>
  * </ul>
- * <p>NOTE: should put this after the {@link DataTypeTransformer} so that all values follow the data types in
- * {@link FieldSpec}.
+ * <p>NOTE: should put this after the {@link DataTypeTransformer} so that we already have the values complying
+ * with the schema before handling special values and before {@link NullValueTransformer} so that it transforms
+ * all the null values properly.
  */
 public class SpecialValueTransformer implements RecordTransformer {
 
