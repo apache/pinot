@@ -97,7 +97,7 @@ public class SpecialValueTransformer implements RecordTransformer {
             negativeZeroNanSanitizedValues.add(nanTransformedValue);
           }
         }
-        record.putValue(element,negativeZeroNanSanitizedValues.toArray());
+        record.putValue(element, negativeZeroNanSanitizedValues.toArray());
       } else {
         // Single-valued column.
         Object zeroTransformedValue = transformNegativeZero(value);
