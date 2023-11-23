@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -65,10 +67,10 @@ public class SpecialValueTransformer implements RecordTransformer {
   private Object transformNaN(Object value) {
     if ((value instanceof Float) && ((Float) value).isNaN()) {
       LOGGER.info("Float.NaN detected, converting to default null.");
-      value = FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT;
+      value = null;
     } else if ((value instanceof Double) && ((Double) value).isNaN()) {
       LOGGER.info("Double.NaN detected, converting to default null.");
-      value = FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE;
+      value = null;
     }
     return value;
   }
@@ -86,12 +88,16 @@ public class SpecialValueTransformer implements RecordTransformer {
         // Multi-valued column.
         Object[] values = (Object[]) value;
         int numValues = values.length;
-        for (int i = 0; i < numValues; i++) {
-          if (values[i] != null) {
-            values[i] = transformNegativeZero(values[i]);
-            values[i] = transformNaN(values[i]);
+        List<Object> negativeZeroNanSanitizedValues = new ArrayList<>(numValues);
+        int numberOfElements = values.length;
+        for (Object o : values) {
+          Object zeroTransformedValue = transformNegativeZero(o);
+          Object nanTransformedValue = transformNaN(zeroTransformedValue);
+          if (nanTransformedValue != null) {
+            negativeZeroNanSanitizedValues.add(nanTransformedValue);
           }
         }
+        record.putValue(element,negativeZeroNanSanitizedValues.toArray());
       } else {
         // Single-valued column.
         Object zeroTransformedValue = transformNegativeZero(value);

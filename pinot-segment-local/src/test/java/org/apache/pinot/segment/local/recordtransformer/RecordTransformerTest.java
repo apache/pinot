@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -286,12 +288,12 @@ public class RecordTransformerTest {
           Double.doubleToRawLongBits(0.0d));
       assertEquals(record.getValue("mvFloatNegativeZero"), new Float[]{0.0f, 1.0f, 0.0f, 3.0f});
       assertEquals(record.getValue("mvDoubleNegativeZero"), new Double[]{0.0d, 1.0d, 0.0d, 3.0d});
-      assertEquals(record.getValue("svFloatNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
-      assertEquals(record.getValue("svDoubleNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+      assertNull(record.getValue("svFloatNaN"));
+      assertNull(record.getValue("svDoubleNaN"));
       assertEquals(record.getValue("mvFloatNaN"),
-          new Float[]{0.0f, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT, 2.0f});
+          new Float[]{0.0f, 2.0f});
       assertEquals(record.getValue("mvDoubleNaN"),
-          new Double[]{0.0d, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE, 2.0d});
+          new Double[]{0.0d, 2.0d});
     }
   }
 
@@ -302,7 +304,8 @@ public class RecordTransformerTest {
     // Build Schema and ingestionConfig in such a way that all the transformers are loaded.
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.INT)
         .addSingleValueDimension("svDouble", DataType.DOUBLE)
-        .addSingleValueDimension("expressionTestColumn", DataType.INT).addSingleValueDimension("svNaN", DataType.FLOAT)
+        .addSingleValueDimension("expressionTestColumn", DataType.INT)
+        .addSingleValueDimension("svNaN", DataType.FLOAT).addMultiValueDimension("mvNaN",DataType.FLOAT)
         .addSingleValueDimension("emptyDimensionForNullValueTransformer", DataType.FLOAT)
         .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
         .addSingleValueDimension("indexableExtras", DataType.JSON)
@@ -327,8 +330,8 @@ public class RecordTransformerTest {
     List<RecordTransformer> expectedListOfTransformers =
         List.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
             new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
-            new TimeValidationTransformer(tableConfig, schema), new NullValueTransformer(tableConfig, schema),
-            new SpecialValueTransformer(schema), new SanitizationTransformer(schema));
+            new TimeValidationTransformer(tableConfig, schema), new SpecialValueTransformer(schema),
+            new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(schema));
 
     // Check that the number of current transformers match the expected number of transformers.
     assertEquals(currentListOfTransformers.size(), NUMBER_OF_TRANSFORMERS);
@@ -349,6 +352,7 @@ public class RecordTransformerTest {
 
     // Data for SpecialValue Transformer.
     record.putValue("svNaN", Float.NaN);
+    record.putValue("mvNaN",new Float[]{1.0f,Float.NaN,2.0f});
 
     // Data for sanitization transformer.
     record.putValue("svStringWithNullCharacters", "1\0002\0003");
@@ -645,10 +649,10 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svFloatNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
       assertEquals(record.getValue("svDoubleNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
       assertEquals(record.getValue("mvFloatNaN"),
-          new Float[]{0.0f, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT, 2.0f});
+          new Float[]{0.0f, 2.0f});
       assertEquals(record.getValue("mvDoubleNaN"),
-          new Double[]{0.0d, FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE, 2.0d});
-      assertTrue(record.getNullValueFields().isEmpty());
+          new Double[]{0.0d, 2.0d});
+      assertEquals(new ArrayList<>(record.getNullValueFields()), new ArrayList<>(Arrays.asList("svFloatNaN","svDoubleNaN")));
     }
 
     // Test empty record
