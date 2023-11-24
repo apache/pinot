@@ -24,7 +24,7 @@ import java.util.List;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
+import org.apache.pinot.segment.local.customobject.ThetaUnionWrap;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -49,15 +49,12 @@ public class DistinctCountRawThetaSketchAggregationFunction extends DistinctCoun
   }
 
   @Override
-  public String extractFinalResult(List<ThetaSketchAccumulator> accumulators) {
-    int numAccumulators = accumulators.size();
-    List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
+  public String extractFinalResult(List<ThetaUnionWrap> unionWraps) {
+    int numUnionWraps = unionWraps.size();
+    List<Sketch> mergedSketches = new ArrayList<>(numUnionWraps);
 
-    for (ThetaSketchAccumulator accumulator : accumulators) {
-      accumulator.setOrdered(_intermediateOrdering);
-      accumulator.setThreshold(_accumulatorThreshold);
-      accumulator.setSetOperationBuilder(_setOperationBuilder);
-      mergedSketches.add(accumulator.getResult());
+    for (ThetaUnionWrap unionWrap : unionWraps) {
+      mergedSketches.add(unionWrap.getResult());
     }
 
     Sketch sketch = evaluatePostAggregationExpression(mergedSketches);
