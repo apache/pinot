@@ -197,7 +197,7 @@ public class StreamOp extends BaseOp {
 
       // get original rows
       existingTotalDoc = fetchExistingTotalDocs(tableName);
-      LOGGER.warn( String.format("produceData existingTotalDoc %d", existingTotalDoc));
+      LOGGER.warn(String.format("produceData existingTotalDoc %d", existingTotalDoc));
 
       // push csv data to kafka
       Properties publisherProps = new Properties();
@@ -270,7 +270,7 @@ public class StreamOp extends BaseOp {
       throws Exception {
     String query = "SELECT count(*) FROM " + tableName;
     JsonNode response = Utils.postSqlQuery(query, ClusterDescriptor.getInstance().getBrokerUrl());
-    LOGGER.warn( String.format("fetchExistingTotalDocs response %s", response));
+    LOGGER.warn(String.format("fetchExistingTotalDocs response %s", response));
     if (response == null) {
       String errorMsg = String.format("Failed to query Table: %s", tableName);
       LOGGER.error(errorMsg);
