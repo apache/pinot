@@ -116,6 +116,37 @@ public class PartitionFunctionTest {
   }
 
   /**
+   * Unit test for {@link Murmur3PartitionFunction}.
+   * <ul>
+   *   <li> Tests that partition values are in expected range. </li>
+   *   <li> Tests that toString returns expected string. </li>
+   * </ul>
+   */
+  @Test
+  public void testMurmur3Partitioner() {
+    long seed = System.currentTimeMillis();
+    Random random = new Random(seed);
+
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
+
+      String functionName = "Murmur3";
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
+
+      testBasicProperties(partitionFunction, functionName, numPartitions);
+
+      for (int j = 0; j < NUM_ROUNDS; j++) {
+        int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
+        int partition1 = partitionFunction.getPartition(value);
+        int partition2 = partitionFunction.getPartition(Integer.toString(value));
+        assertEquals(partition1, partition2);
+        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+      }
+    }
+  }
+
+  /**
    * Unit test for {@link MurmurPartitionFunction}.
    * <ul>
    *   <li> Tests that partition values are in expected range. </li>
