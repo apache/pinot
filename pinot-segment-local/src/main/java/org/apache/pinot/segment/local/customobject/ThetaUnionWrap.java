@@ -36,7 +36,7 @@ import org.apache.datasketches.theta.Union;
  * optimisation allows the input to be merged quickly without having to scan all the retained items in the input sketch.
  */
 public class ThetaUnionWrap {
-  private Union _union;
+  private final Union _union;
   // Log-base 2 of the Resize Factor.
   private int _lgRf = 3;
   // Log-base 2 Nominal Entries
@@ -46,7 +46,7 @@ public class ThetaUnionWrap {
   private boolean _ordered = false;
   private boolean _isEmpty = true;
 
-  public ThetaUnionWrap(SetOperationBuilder setOperationBuilder, boolean ordered) {
+  public ThetaUnionWrap(@Nonnull SetOperationBuilder setOperationBuilder, boolean ordered) {
     _p = setOperationBuilder.getP();
     _lgNoms = setOperationBuilder.getLgNominalEntries();
     _lgRf = setOperationBuilder.getResizeFactor().lg();
@@ -63,11 +63,11 @@ public class ThetaUnionWrap {
     return _union.getResult(_ordered, null);
   }
 
-  public void apply(Sketch sketch) {
+  public void apply(@Nonnull Sketch sketch) {
     internalAdd(sketch);
   }
 
-  public void merge(ThetaUnionWrap thetaUnion) {
+  public void merge(@Nonnull ThetaUnionWrap thetaUnion) {
     if (thetaUnion.isEmpty()) {
       return;
     }
@@ -96,7 +96,7 @@ public class ThetaUnionWrap {
 
   @Nonnull
   public static ThetaUnionWrap fromByteBuffer(ByteBuffer byteBuffer) {
-    Float p = byteBuffer.getFloat();
+    float p = byteBuffer.getFloat();
     int lgRf = byteBuffer.get() & 0xFF;
     int lgNoms = byteBuffer.get() & 0xFF;
     boolean ordered = byteBuffer.get() != 0;
