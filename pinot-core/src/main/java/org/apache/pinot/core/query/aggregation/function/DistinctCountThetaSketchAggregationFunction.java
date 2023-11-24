@@ -75,7 +75,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
  *   <li>
  *     nominalEntries: The nominal entries used to create the sketch. (Default 4096)
  *     resizeFactor: Controls the size multiple that affects how fast the internal cache grows (Default 2^3=8)
- *     sampleProbability: Sets the upfront uniform sampling probability, p. (Default 1.0)
+ *     samplingProbability: Sets the upfront uniform sampling probability, p. (Default 1.0)
  *     intermediateOrdering: Whether compacted sketches should be ordered. (Default false)
  *   </li>
  * </ul>
@@ -112,8 +112,8 @@ public class DistinctCountThetaSketchAggregationFunction
       int nominalEntries = parameters.getNominalEntries();
       _updateSketchBuilder.setNominalEntries(nominalEntries);
       _setOperationBuilder.setNominalEntries(nominalEntries);
-      // P sets the initial value of Theta, defaults to 1.0
-      float p = parameters.getP();
+      // Sampling probability sets the initial value of Theta, defaults to 1.0
+      float p = parameters.getSamplingProbability();
       _setOperationBuilder.setP(p);
       _updateSketchBuilder.setP(p);
       // Resize factor controls the size multiple that affects how fast the internal cache grows
@@ -1326,13 +1326,13 @@ public class DistinctCountThetaSketchAggregationFunction
     private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
     private static final String NOMINAL_ENTRIES_KEY = "nominalEntries";
     private static final String RESIZE_FACTOR_KEY = "resizeFactor";
-    private static final String SAMPLE_PROBABILITY_KEY = "sampleProbability";
+    private static final String SAMPLING_PROBABILITY_KEY = "samplingProbability";
     private static final String INTERMEDIATE_ORDERING_KEY = "intermediateOrdering";
 
     private int _resizeFactor = ResizeFactor.X8.getValue();
     private int _nominalEntries = ThetaUtil.DEFAULT_NOMINAL_ENTRIES;
     private boolean _intermediateOrdering = DEFAULT_INTERMEDIATE_ORDERING;
-    private float _p = 1.0F;
+    private float _samplingProbability = 1.0F;
 
     Parameters(String parametersString) {
       StringUtils.deleteWhitespace(parametersString);
@@ -1344,8 +1344,8 @@ public class DistinctCountThetaSketchAggregationFunction
         String value = keyAndValue[1];
         if (key.equalsIgnoreCase(NOMINAL_ENTRIES_KEY)) {
           _nominalEntries = Integer.parseInt(value);
-        } else if (key.equalsIgnoreCase(SAMPLE_PROBABILITY_KEY)) {
-          _p = Float.parseFloat(value);
+        } else if (key.equalsIgnoreCase(SAMPLING_PROBABILITY_KEY)) {
+          _samplingProbability = Float.parseFloat(value);
         } else if (key.equalsIgnoreCase(RESIZE_FACTOR_KEY)) {
           _resizeFactor = Integer.parseInt(value);
         } else if (key.equalsIgnoreCase(INTERMEDIATE_ORDERING_KEY)) {
@@ -1360,8 +1360,8 @@ public class DistinctCountThetaSketchAggregationFunction
       return _nominalEntries;
     }
 
-    float getP() {
-      return _p;
+    float getSamplingProbability() {
+      return _samplingProbability;
     }
 
     boolean getIntermediateOrdering() {
