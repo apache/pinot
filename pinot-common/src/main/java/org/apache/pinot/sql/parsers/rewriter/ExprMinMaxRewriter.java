@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
@@ -107,7 +108,8 @@ public class ExprMinMaxRewriter implements QueryRewriter {
       operands.add(RequestUtils.getLiteralExpression((int) exprMinMaxFunctionIDMap.get(measuringColumns)));
       operands.add(RequestUtils.getLiteralExpression(measuringColumns.size()));
       operands.addAll(measuringColumns);
-      operands.addAll(projectionColumns);
+      Set<Expression> sortedProjectionColumns = new TreeSet<>(projectionColumns);
+      operands.addAll(sortedProjectionColumns);
       functionExpression.getFunctionCall().setOperands(operands);
       selectList.add(functionExpression);
     }
