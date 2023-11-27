@@ -116,6 +116,82 @@ public class PartitionFunctionTest {
   }
 
   /**
+   * Unit test for {@link Murmur3PartitionFunction}.
+   * <ul>
+   *   <li> Tests that partition values are in expected range. </li>
+   *   <li> Tests that toString returns expected string. </li>
+   *   <li> Tests that the partition numbers returned by partition function with null functionConfig and
+   *   functionConfig with empty seed value are equal</li>
+   * </ul>
+   */
+  @Test
+  public void testMurmur3Partitioner() {
+    long seed = System.currentTimeMillis();
+    Random random = new Random(seed);
+
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      int numPartitions = random.nextInt(MAX_NUM_PARTITIONS) + 1;
+
+      String functionName = "MurMUr3";
+      String valueTobeHashed = String.valueOf(random.nextInt());
+      Map<String, String> functionConfig = new HashMap<>();
+
+      // Create partition function with function config as null.
+      PartitionFunction partitionFunction1 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, null);
+
+      // Check getName and toString equivalence.
+      assertEquals(partitionFunction1.getName(), partitionFunction1.toString());
+
+      // Get partition number with random value.
+      int partitionNumWithNullConfig = partitionFunction1.getPartition(valueTobeHashed);
+
+      // Create partition function with function config present but no seed value present.
+      PartitionFunction partitionFunction2 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+
+      // Get partition number with random value.
+      int partitionNumWithNoSeedValue = partitionFunction2.getPartition(valueTobeHashed);
+
+      // The partition number with null function config and function config with empty seed value should be equal.
+      assertEquals(partitionNumWithNullConfig, partitionNumWithNoSeedValue);
+
+      // Put random seed value in "seed" field in the function config.
+      functionConfig.put("seed", Integer.toString(random.nextInt()));
+
+      // Create partition function with function config present but random seed value present in function config.
+      PartitionFunction partitionFunction3 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+
+      testBasicProperties(partitionFunction1, functionName, numPartitions);
+      testBasicProperties(partitionFunction2, functionName, numPartitions);
+      testBasicProperties(partitionFunction3, functionName, numPartitions);
+
+      for (int j = 0; j < NUM_ROUNDS; j++) {
+        int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
+
+        // check for the partition function with function config as null.
+        int partition1 = partitionFunction1.getPartition(value);
+        int partition2 = partitionFunction1.getPartition(Integer.toString(value));
+        assertEquals(partition1, partition2);
+        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+
+        // check for the partition function with non-null function config but without seed value.
+        partition1 = partitionFunction2.getPartition(value);
+        partition2 = partitionFunction2.getPartition(Integer.toString(value));
+        assertEquals(partition1, partition2);
+        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+
+        // check for the partition function with non-null function config and with seed value.
+        partition1 = partitionFunction3.getPartition(value);
+        partition2 = partitionFunction3.getPartition(Integer.toString(value));
+        assertEquals(partition1, partition2);
+        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+      }
+    }
+  }
+
+  /**
    * Unit test for {@link MurmurPartitionFunction}.
    * <ul>
    *   <li> Tests that partition values are in expected range. </li>
