@@ -58,7 +58,8 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
   Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
       SegmentStates segmentStates, Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
-    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
+    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
     if (_adaptiveServerSelector != null) {
       for (String segment : segments) {
         List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);

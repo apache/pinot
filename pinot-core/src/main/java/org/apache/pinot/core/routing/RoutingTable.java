@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.routing;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
@@ -43,12 +42,6 @@ public class RoutingTable {
 
   public Map<ServerInstance, Pair<List<String>, List<String>>> getServerInstanceToSegmentsMap() {
     return _serverInstanceToSegmentsMap;
-  }
-
-  public Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap(boolean optionalSegments) {
-    Map<ServerInstance, List<String>> ret = new HashMap<>();
-    _serverInstanceToSegmentsMap.forEach((k, v) -> ret.put(k, optionalSegments ? v.getRight() : v.getLeft()));
-    return ret;
   }
 
   public List<String> getUnavailableSegments() {

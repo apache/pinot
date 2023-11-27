@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
@@ -208,7 +209,12 @@ public class QueryRouter {
     }
     instanceRequest.setSearchSegments(segments.getLeft());
     instanceRequest.setBrokerId(_brokerId);
-    instanceRequest.setOptionalSegments(segments.getRight());
+    if (CollectionUtils.isNotEmpty(segments.getRight())) {
+      // Don't set this field, i.e. leave it as null, if there is no optional segment at all, to be more backward
+      // compatible, as there are places like in multi-staged query engine where this field is not set today when
+      // creating the InstanceRequest.
+      instanceRequest.setOptionalSegments(segments.getRight());
+    }
     return instanceRequest;
   }
 }

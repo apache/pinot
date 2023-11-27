@@ -200,7 +200,7 @@ public class BaseBrokerRequestHandlerTest {
     RoutingTable rt = mock(RoutingTable.class);
     when(rt.getServerInstanceToSegmentsMap()).thenReturn(
         Collections.singletonMap(new ServerInstance(new InstanceConfig("server01_9000")),
-            Pair.of(Collections.singletonList("segment01"), null)));
+            Pair.of(Collections.singletonList("segment01"), Collections.emptyList())));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);

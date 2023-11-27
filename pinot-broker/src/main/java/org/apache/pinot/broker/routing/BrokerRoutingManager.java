@@ -611,12 +611,38 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       return null;
     }
     InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest, requestId);
-    Map<ServerInstance, List<String>> serverInstanceToSegmentsMap =
-        getServerInstanceToSegmentsMap(tableNameWithType, selectionResult.getSegmentToInstanceMap());
-    Map<ServerInstance, List<String>> serverInstanceToOptionalSegmentsMap =
-        getServerInstanceToSegmentsMap(tableNameWithType, selectionResult.getOptionalSegmentToInstanceMap());
-    return new RoutingTable(merge(serverInstanceToSegmentsMap, serverInstanceToOptionalSegmentsMap),
+    return new RoutingTable(getServerInstanceToSegmentsMap(tableNameWithType, selectionResult),
         selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
+  }
+
+  private Map<ServerInstance, Pair<List<String>, List<String>>> getServerInstanceToSegmentsMap(String tableNameWithType,
+      InstanceSelector.SelectionResult selectionResult) {
+    Map<ServerInstance, Pair<List<String>, List<String>>> merged = new HashMap<>();
+    for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
+      if (serverInstance != null) {
+        Pair<List<String>, List<String>> pair =
+            merged.computeIfAbsent(serverInstance, k -> Pair.of(new ArrayList<>(), new ArrayList<>()));
+        pair.getLeft().add(entry.getKey());
+      } else {
+        // Should not happen in normal case unless encountered unexpected exception when updating routing entries
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
+      }
+    }
+    for (Map.Entry<String, String> entry : selectionResult.getOptionalSegmentToInstanceMap().entrySet()) {
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
+      if (serverInstance != null) {
+        Pair<List<String>, List<String>> pair = merged.get(serverInstance);
+        // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
+        // to process, to be backward compatible.
+        // TODO: allow servers only with optional segments
+        if (pair != null) {
+          pair.getRight().add(entry.getKey());
+        }
+      }
+      // TODO: Report missing server metrics when we allow servers only with optional segments.
+    }
+    return merged;
   }
 
   private Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap(String tableNameWithType,

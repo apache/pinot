@@ -27,6 +27,7 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -117,7 +118,7 @@ public class PinotBrokerDebug {
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName) {
     Map<String, Map<ServerInstance, List<String>>> result = new TreeMap<>();
     getRoutingTable(tableName, (tableNameWithType, routingTable) -> result.put(tableNameWithType,
-        routingTable.getServerInstanceToSegmentsMap(false)));
+        removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap())));
     if (!result.isEmpty()) {
       return result;
     } else {
@@ -127,7 +128,7 @@ public class PinotBrokerDebug {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/v2/debug/routingTable/{tableName}")
+  @Path("/debug/routingTableWithOptionalSegments/{tableName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_ROUTING_TABLE)
   @ApiOperation(value = "Get the routing table for a table, including optional segments")
   @ApiResponses(value = {
@@ -167,6 +168,13 @@ public class PinotBrokerDebug {
     }
   }
 
+  private static Map<ServerInstance, List<String>> removeOptionalSegments(
+      Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap) {
+    Map<ServerInstance, List<String>> ret = new HashMap<>();
+    serverInstanceToSegmentsMap.forEach((k, v) -> ret.put(k, v.getLeft()));
+    return ret;
+  }
+
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/debug/routingTable/sql")
@@ -184,7 +192,7 @@ public class PinotBrokerDebug {
     checkAccessControl(brokerRequest, httpHeaders);
     RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());
     if (routingTable != null) {
-      return routingTable.getServerInstanceToSegmentsMap(false);
+      return removeOptionalSegments(routingTable.getServerInstanceToSegmentsMap());
     } else {
       throw new WebApplicationException("Cannot find routing for query: " + query, Response.Status.NOT_FOUND);
     }
@@ -192,7 +200,7 @@ public class PinotBrokerDebug {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/v2/debug/routingTable/sql")
+  @Path("/debug/routingTableWithOptionalSegments/sql")
   @ManualAuthorization
   @ApiOperation(value = "Get the routing table for a query, including optional segments")
   @ApiResponses(value = {

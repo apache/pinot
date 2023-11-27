@@ -93,7 +93,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   private Pair<Map<String, String>, Map<String, String>> selectServersUsingRoundRobin(List<String> segments,
       int requestId, SegmentStates segmentStates, Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
-    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
+    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
     Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
     int numReplicaGroups = numReplicaGroupsToQuery == null ? 1 : numReplicaGroupsToQuery;
     int replicaOffset = 0;
@@ -126,7 +127,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
   private Pair<Map<String, String>, Map<String, String>> selectServersUsingAdaptiveServerSelector(List<String> segments,
       int requestId, SegmentStates segmentStates, List<String> serverRankList) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
-    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
+    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
     for (String segment : segments) {
       // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
       // not been updated (we update all components for routing in sequence)
