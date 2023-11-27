@@ -49,10 +49,8 @@ public class PinotQueryRuleSets {
           // push project through set operation
           CoreRules.PROJECT_SET_OP_TRANSPOSE,
 
-          // aggregation and projection rules
-          CoreRules.AGGREGATE_PROJECT_PULL_UP_CONSTANTS,
-          // push a projection past a filter or vice versa
-          CoreRules.PROJECT_FILTER_TRANSPOSE, CoreRules.FILTER_PROJECT_TRANSPOSE,
+          // push a filter past a project
+          CoreRules.FILTER_PROJECT_TRANSPOSE,
           // push a projection to the children of a join
           // push all expressions to handle the time indicator correctly
           CoreRules.JOIN_CONDITION_PUSH,
