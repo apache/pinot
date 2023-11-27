@@ -21,6 +21,7 @@ package org.apache.pinot.plugin.stream.pulsar;
 import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -75,7 +76,7 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     final MessageId endMessageId =
         endMsgOffset == null ? MessageId.latest : ((MessageIdStreamOffset) endMsgOffset).getMessageId();
 
-    List<PulsarStreamMessage> messagesList = new ArrayList<>();
+    List<PulsarStreamMessage> messagesList = Collections.synchronizedList(new ArrayList<>());
     Future<PulsarMessageBatch> pulsarResultFuture =
         _executorService.submit(() -> fetchMessages(startMessageId, endMessageId, messagesList));
 
