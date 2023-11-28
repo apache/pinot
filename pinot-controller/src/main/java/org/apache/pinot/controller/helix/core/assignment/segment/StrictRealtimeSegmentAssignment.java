@@ -58,7 +58,14 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
  */
 public class StrictRealtimeSegmentAssignment extends RealtimeSegmentAssignment {
 
-  // Cache segment partition id to avoid ZK reads
+  // Cache segment partition id to avoid ZK reads.
+  // NOTE:
+  // 1. This cache is used for table rebalance only, but not segment assignment. During rebalance, rebalanceTable() can
+  //    be invoked multiple times when the ideal state changes during the rebalance process.
+  // 2. The cache won't be refreshed when an existing segment is replaced with a segment from a different partition.
+  //    Replacing a segment with a segment from a different partition should not be allowed for upsert table because it
+  //    will cause the segment being served by the wrong servers. If this happens during the table rebalance, another
+  //    rebalance might be needed to fix the assignment.
   private final Object2IntOpenHashMap<String> _segmentPartitionIdMap = new Object2IntOpenHashMap<>();
 
   @Override
