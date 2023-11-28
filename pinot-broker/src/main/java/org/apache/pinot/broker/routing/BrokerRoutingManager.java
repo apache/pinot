@@ -645,36 +645,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     return merged;
   }
 
-  private Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap(String tableNameWithType,
-      Map<String, String> segmentToInstanceMap) {
-    Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = new HashMap<>();
-    for (Map.Entry<String, String> entry : segmentToInstanceMap.entrySet()) {
-      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
-      if (serverInstance != null) {
-        serverInstanceToSegmentsMap.computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(entry.getKey());
-      } else {
-        // Should not happen in normal case unless encountered unexpected exception when updating routing entries
-        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
-      }
-    }
-    return serverInstanceToSegmentsMap;
-  }
-
-  private static Map<ServerInstance, Pair<List<String>, List<String>>> merge(
-      Map<ServerInstance, List<String>> serverInstanceToSegmentsMap,
-      Map<ServerInstance, List<String>> serverInstanceToOptionalSegmentsMap) {
-    // Loop over the non-optional serverInstanceToSegmentsMap, so servers that only have optional segments are skipped.
-    // This makes the support of optional segments backward compatible easily, because just as before servers always
-    // get some non-optional segments to process the query.
-    // TODO: support when servers only have some optional segments to process.
-    Map<ServerInstance, Pair<List<String>, List<String>>> merged = new HashMap<>();
-    serverInstanceToSegmentsMap.forEach((k, v) -> {
-      List<String> optionalSegments = serverInstanceToOptionalSegmentsMap.get(k);
-      merged.put(k, Pair.of(v, optionalSegments));
-    });
-    return merged;
-  }
-
   @Override
   public Map<String, ServerInstance> getEnabledServerInstanceMap() {
     return _enabledServerInstanceMap;

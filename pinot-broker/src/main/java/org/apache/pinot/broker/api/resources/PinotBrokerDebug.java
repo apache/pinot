@@ -211,7 +211,6 @@ public class PinotBrokerDebug {
   public Map<ServerInstance, Pair<List<String>, List<String>>> getRoutingTableForQueryWithOptionalSegments(
       @ApiParam(value = "SQL query (table name should have type suffix)") @QueryParam("query") String query,
       @Context HttpHeaders httpHeaders) {
-    Map<ServerInstance, Pair<List<String>, List<String>>> result;
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
     checkAccessControl(brokerRequest, httpHeaders);
     RoutingTable routingTable = _routingManager.getRoutingTable(brokerRequest, getRequestId());

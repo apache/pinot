@@ -211,7 +211,7 @@ public class QueryRouter {
     instanceRequest.setBrokerId(_brokerId);
     if (CollectionUtils.isNotEmpty(segments.getRight())) {
       // Don't set this field, i.e. leave it as null, if there is no optional segment at all, to be more backward
-      // compatible, as there are places like in multi-staged query engine where this field is not set today when
+      // compatible, as there are places like in multi-stage query engine where this field is not set today when
       // creating the InstanceRequest.
       instanceRequest.setOptionalSegments(segments.getRight());
     }
