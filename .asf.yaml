@@ -17,8 +17,15 @@
 # under the License.
 #
 
+# Please refer https://cwiki.apache.org/confluence/display/INFRA/Git+-+.asf.yaml+features
+
 github:
   description: "Apache Pinot - A realtime distributed OLAP datastore"
   homepage: https://pinot.apache.org/
   labels:
     - java
+  del_branch_on_merge: true
+  enabled_merge_buttons:
+    squash: true
+    merge: false
+    rebase: false

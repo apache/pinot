@@ -19,12 +19,17 @@
 package org.apache.pinot.segment.local.recordtransformer;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -51,6 +56,13 @@ public class RecordTransformerTest {
       .addSingleValueDimension("svStringWithNullCharacters", DataType.STRING)
       .addSingleValueDimension("svStringWithLengthLimit", DataType.STRING)
       .addMultiValueDimension("mvString1", DataType.STRING).addMultiValueDimension("mvString2", DataType.STRING)
+      // For negative zero and NaN conversions
+      .addSingleValueDimension("svFloatNegativeZero", DataType.FLOAT)
+      .addMultiValueDimension("mvFloatNegativeZero", DataType.FLOAT)
+      .addSingleValueDimension("svDoubleNegativeZero", DataType.DOUBLE)
+      .addMultiValueDimension("mvDoubleNegativeZero", DataType.DOUBLE)
+      .addSingleValueDimension("svFloatNaN", DataType.FLOAT).addMultiValueDimension("mvFloatNaN", DataType.FLOAT)
+      .addSingleValueDimension("svDoubleNaN", DataType.DOUBLE).addMultiValueDimension("mvDoubleNaN", DataType.DOUBLE)
       .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
@@ -62,6 +74,7 @@ public class RecordTransformerTest {
 
   // Transform multiple times should return the same result
   private static final int NUM_ROUNDS = 5;
+  private static final int NUMBER_OF_TRANSFORMERS = 8;
 
   private static GenericRow getRecord() {
     GenericRow record = new GenericRow();
@@ -82,6 +95,14 @@ public class RecordTransformerTest {
     record.putValue("mvString1", new Object[]{"123", 123, 123L, 123f, 123.0});
     record.putValue("mvString2", new Object[]{123, 123L, 123f, 123.0, "123"});
     record.putValue("svNullString", null);
+    record.putValue("svFloatNegativeZero", -0.00f);
+    record.putValue("svDoubleNegativeZero", -0.00d);
+    record.putValue("mvFloatNegativeZero", new Float[]{-0.0f, 1.0f, 0.0f, 3.0f});
+    record.putValue("mvDoubleNegativeZero", new Double[]{-0.0d, 1.0d, 0.0d, 3.0d});
+    record.putValue("svFloatNaN", Float.NaN);
+    record.putValue("svDoubleNaN", Double.NaN);
+    record.putValue("mvFloatNaN", new Float[]{-0.0f, Float.NaN, 2.0f});
+    record.putValue("mvDoubleNaN", new Double[]{-0.0d, Double.NaN, 2.0d});
     return record;
   }
 
@@ -251,6 +272,97 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
       assertTrue(record.getNullValueFields().isEmpty());
+    }
+  }
+
+  @Test
+  public void testSpecialValueTransformer() {
+    RecordTransformer transformer = new SpecialValueTransformer(SCHEMA);
+    GenericRow record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(Float.floatToRawIntBits((float) record.getValue("svFloatNegativeZero")),
+          Float.floatToRawIntBits(0.0f));
+      assertEquals(Double.doubleToRawLongBits((double) record.getValue("svDoubleNegativeZero")),
+          Double.doubleToRawLongBits(0.0d));
+      assertEquals(record.getValue("mvFloatNegativeZero"), new Float[]{0.0f, 1.0f, 0.0f, 3.0f});
+      assertEquals(record.getValue("mvDoubleNegativeZero"), new Double[]{0.0d, 1.0d, 0.0d, 3.0d});
+      assertNull(record.getValue("svFloatNaN"));
+      assertNull(record.getValue("svDoubleNaN"));
+      assertEquals(record.getValue("mvFloatNaN"),
+          new Float[]{0.0f, 2.0f});
+      assertEquals(record.getValue("mvDoubleNaN"),
+          new Double[]{0.0d, 2.0d});
+    }
+  }
+
+  @Test
+  public void testOrderForTransformers() {
+    // This test checks that the specified order is maintained for different transformers.
+
+    // Build Schema and ingestionConfig in such a way that all the transformers are loaded.
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("svInt", DataType.INT)
+        .addSingleValueDimension("svDouble", DataType.DOUBLE)
+        .addSingleValueDimension("expressionTestColumn", DataType.INT)
+        .addSingleValueDimension("svNaN", DataType.FLOAT).addMultiValueDimension("mvNaN", DataType.FLOAT)
+        .addSingleValueDimension("emptyDimensionForNullValueTransformer", DataType.FLOAT)
+        .addSingleValueDimension("svStringNull", DataType.STRING)
+        .addSingleValueDimension("indexableExtras", DataType.JSON)
+        .addDateTime("timeCol", DataType.TIMESTAMP, "1:MILLISECONDS:TIMESTAMP", "1:MILLISECONDS").build();
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
+            .setTimeColumnName("timeCol").build();
+    ingestionConfig.setFilterConfig(new FilterConfig("svInt = 123 AND svDouble <= 200"));
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig("expressionTestColumn", "plus(x,10)")));
+    ingestionConfig.setSchemaConformingTransformerConfig(
+        new SchemaConformingTransformerConfig("indexableExtras", null, null, null));
+    ingestionConfig.setRowTimeValueCheck(true);
+    ingestionConfig.setContinueOnError(false);
+
+    // Get the list of transformers.
+    List<RecordTransformer> currentListOfTransformers =
+        CompositeTransformer.getDefaultTransformers(tableConfig, schema);
+
+    // Create a list of transformers in the original order to compare.
+    List<RecordTransformer> expectedListOfTransformers =
+        List.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
+            new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
+            new TimeValidationTransformer(tableConfig, schema), new SpecialValueTransformer(schema),
+            new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(schema));
+
+    // Check that the number of current transformers match the expected number of transformers.
+    assertEquals(currentListOfTransformers.size(), NUMBER_OF_TRANSFORMERS);
+
+    GenericRow record = new GenericRow();
+
+    // Data for expression Transformer.
+    record.putValue("expressionTestColumn", 100);
+
+    // Data for filter transformer.
+    record.putValue("svDouble", 123d);
+
+    // Data for DataType Transformer.
+    record.putValue("svInt", (byte) 123);
+
+    // Data for TimeValidation transformer.
+    record.putValue("timeCol", System.currentTimeMillis());
+
+    // Data for SpecialValue Transformer.
+    record.putValue("svNaN", Float.NaN);
+    record.putValue("mvNaN", new Float[]{1.0f, Float.NaN, 2.0f});
+
+    // Data for sanitization transformer.
+    record.putValue("svStringNull", null);
+
+    for (int i = 0; i < NUMBER_OF_TRANSFORMERS; i++) {
+      GenericRow copyRecord = record.copy();
+      GenericRow currentRecord = currentListOfTransformers.get(i).transform(record);
+      GenericRow expectedRecord = expectedListOfTransformers.get(i).transform(copyRecord);
+      assertEquals(currentRecord, expectedRecord);
+      record = expectedRecord;
     }
   }
 
@@ -529,7 +641,20 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvString1"), new Object[]{"123", "123", "123", "123.0", "123.0"});
       assertEquals(record.getValue("mvString2"), new Object[]{"123", "123", "123.0", "123.0", "123"});
       assertNull(record.getValue("$virtual"));
-      assertTrue(record.getNullValueFields().isEmpty());
+      assertEquals(Float.floatToRawIntBits((float) record.getValue("svFloatNegativeZero")),
+          Float.floatToRawIntBits(0.0f));
+      assertEquals(Double.doubleToRawLongBits((double) record.getValue("svDoubleNegativeZero")),
+          Double.doubleToRawLongBits(0.0d));
+      assertEquals(record.getValue("mvFloatNegativeZero"), new Float[]{0.0f, 1.0f, 0.0f, 3.0f});
+      assertEquals(record.getValue("mvDoubleNegativeZero"), new Double[]{0.0d, 1.0d, 0.0d, 3.0d});
+      assertEquals(record.getValue("svFloatNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT);
+      assertEquals(record.getValue("svDoubleNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
+      assertEquals(record.getValue("mvFloatNaN"),
+          new Float[]{0.0f, 2.0f});
+      assertEquals(record.getValue("mvDoubleNaN"),
+          new Double[]{0.0d, 2.0d});
+      assertEquals(new ArrayList<>(record.getNullValueFields()),
+          new ArrayList<>(Arrays.asList("svFloatNaN", "svDoubleNaN")));
     }
 
     // Test empty record
