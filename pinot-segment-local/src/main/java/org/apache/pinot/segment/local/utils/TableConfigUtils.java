@@ -51,6 +51,8 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -943,8 +945,8 @@ public final class TableConfigUtils {
    * Also ensures proper dependency between index types (eg: Inverted Index columns
    * cannot be present in no-dictionary columns).
    */
-  private static void validateIndexingConfig(@Nullable IndexingConfig indexingConfig, @Nullable Schema schema) {
-    if (indexingConfig == null || schema == null) {
+  private static void validateIndexingConfig(IndexingConfig indexingConfig, @Nullable Schema schema) {
+    if (schema == null) {
       return;
     }
     ArrayListMultimap<String, String> columnNameToConfigMap = ArrayListMultimap.create();
@@ -1115,59 +1117,69 @@ public final class TableConfigUtils {
    * Validates index compatibility for forward index disabled columns
    */
   private static void validateFieldConfigList(@Nullable List<FieldConfig> fieldConfigList,
-      @Nullable IndexingConfig indexingConfigs, @Nullable Schema schema) {
-    if (fieldConfigList == null || schema == null) {
+      IndexingConfig indexingConfig, @Nullable Schema schema) {
+    if (fieldConfigList == null) {
       return;
     }
+    assert indexingConfig != null;
 
     for (FieldConfig fieldConfig : fieldConfigList) {
       String columnName = fieldConfig.getName();
-      FieldSpec fieldConfigColSpec = schema.getFieldSpecFor(columnName);
-      Preconditions.checkState(fieldConfigColSpec != null,
-          "Column Name " + columnName + " defined in field config list must be a valid column defined in the schema");
-
-      if (indexingConfigs != null) {
-        List<String> noDictionaryColumns = indexingConfigs.getNoDictionaryColumns();
-        switch (fieldConfig.getEncodingType()) {
-          case DICTIONARY:
-            if (noDictionaryColumns != null) {
-              Preconditions.checkArgument(!noDictionaryColumns.contains(columnName),
-                  "FieldConfig encoding type is different from indexingConfig for column: " + columnName);
-            }
-            Preconditions.checkArgument(fieldConfig.getCompressionCodec() == null,
-                "Set compression codec to null for dictionary encoding type");
-            break;
-          default:
-            break;
-        }
-
-        // Validate the forward index disabled compatibility with other indexes if enabled for this column
-        validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfigs, noDictionaryColumns,
-            schema);
+      EncodingType encodingType = fieldConfig.getEncodingType();
+      Preconditions.checkArgument(encodingType != null, "Encoding type must be specified for column: %s", columnName);
+      CompressionCodec compressionCodec = fieldConfig.getCompressionCodec();
+      switch (encodingType) {
+        case RAW:
+          Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToRawIndex(),
+              "Compression codec: %s is not applicable to raw index", compressionCodec);
+          break;
+        case DICTIONARY:
+          Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex(),
+              "Compression codec: %s is not applicable to dictionary encoded index", compressionCodec);
+          List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
+          Preconditions.checkArgument(noDictionaryColumns == null || !noDictionaryColumns.contains(columnName),
+              "FieldConfig encoding type is different from indexingConfig for column: %s", columnName);
+          Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
+          Preconditions.checkArgument(noDictionaryConfig == null || !noDictionaryConfig.containsKey(columnName),
+              "FieldConfig encoding type is different from indexingConfig for column: %s", columnName);
+          break;
+        default:
+          break;
       }
+
+      if (schema == null) {
+        return;
+      }
+      FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+      Preconditions.checkState(fieldSpec != null,
+          "Column: %s defined in field config list must be a valid column defined in the schema", columnName);
+
+      // Validate the forward index disabled compatibility with other indexes if enabled for this column
+      validateForwardIndexDisabledIndexCompatibility(columnName, fieldConfig, indexingConfig, schema);
 
       if (CollectionUtils.isNotEmpty(fieldConfig.getIndexTypes())) {
         for (FieldConfig.IndexType indexType : fieldConfig.getIndexTypes()) {
           switch (indexType) {
-            case FST:
-              Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
-                  "FST Index is only enabled on dictionary encoded columns");
-              Preconditions.checkState(fieldConfigColSpec.isSingleValueField()
-                      && fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
-                  "FST Index is only supported for single value string columns");
-              break;
             case INVERTED:
-              Preconditions.checkArgument(fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY,
-                  "Cannot create an Inverted Index on column: " + fieldConfig.getName() + ", specified as "
-                      + "a non dictionary column");
+              Preconditions.checkState(fieldConfig.getEncodingType() == EncodingType.DICTIONARY,
+                  "Cannot create inverted index on column: %s, it can only be applied to dictionary encoded columns",
+                  columnName);
               break;
             case TEXT:
-              Preconditions.checkState(fieldConfigColSpec.getDataType().getStoredType() == DataType.STRING,
-                  "TEXT Index is only supported for string columns");
+              Preconditions.checkState(fieldSpec.getDataType().getStoredType() == DataType.STRING,
+                  "Cannot create text index on column: %s, it can only be applied to string columns", columnName);
+              break;
+            case FST:
+              Preconditions.checkState(
+                  fieldConfig.getEncodingType() == EncodingType.DICTIONARY && fieldSpec.isSingleValueField()
+                      && fieldSpec.getDataType().getStoredType() == DataType.STRING,
+                  "Cannot create FST index on column: %s, it can only be applied to dictionary encoded single value "
+                      + "string columns", columnName);
               break;
             case TIMESTAMP:
-              Preconditions.checkState(fieldConfigColSpec.getDataType() == DataType.TIMESTAMP,
-                  "TIMESTAMP Index is only supported for timestamp columns");
+              Preconditions.checkState(fieldSpec.getDataType() == DataType.TIMESTAMP,
+                  "Cannot create timestamp index on column: %s, it can only be applied to timestamp columns",
+                  columnName);
               break;
             default:
               break;
@@ -1189,7 +1201,7 @@ public final class TableConfigUtils {
    * back or generate a new index for existing segments is to either refresh or back-fill the segments.
    */
   private static void validateForwardIndexDisabledIndexCompatibility(String columnName, FieldConfig fieldConfig,
-      IndexingConfig indexingConfigs, List<String> noDictionaryColumns, Schema schema) {
+      IndexingConfig indexingConfig, Schema schema) {
     Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
     if (fieldConfigProperties == null) {
       return;
@@ -1204,26 +1216,24 @@ public final class TableConfigUtils {
 
     FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
     // Check for the range index since the index itself relies on the existence of the forward index to work.
-    if (indexingConfigs.getRangeIndexColumns() != null && indexingConfigs.getRangeIndexColumns().contains(columnName)) {
+    if (indexingConfig.getRangeIndexColumns() != null && indexingConfig.getRangeIndexColumns().contains(columnName)) {
       Preconditions.checkState(fieldSpec.isSingleValueField(), String.format("Feature not supported for multi-value "
           + "columns with range index. Cannot disable forward index for column %s. Disable range index on this "
           + "column to use this feature", columnName));
-      Preconditions.checkState(indexingConfigs.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION,
+      Preconditions.checkState(indexingConfig.getRangeIndexVersion() == BitSlicedRangeIndexCreator.VERSION,
           String.format("Feature not supported for single-value columns with range index version < 2. Cannot disable "
               + "forward index for column %s. Either disable range index or create range index with"
               + " version >= 2 to use this feature", columnName));
     }
 
-    Preconditions.checkState(
-        !indexingConfigs.isOptimizeDictionaryForMetrics() && !indexingConfigs.isOptimizeDictionary(), String.format(
+    Preconditions.checkState(!indexingConfig.isOptimizeDictionaryForMetrics() && !indexingConfig.isOptimizeDictionary(),
+        String.format(
             "Dictionary override optimization options (OptimizeDictionary, optimizeDictionaryForMetrics)"
                 + " not supported with forward index for column: %s, disabled", columnName));
 
-    boolean hasDictionary =
-        fieldConfig.getEncodingType() == FieldConfig.EncodingType.DICTIONARY || noDictionaryColumns == null
-            || !noDictionaryColumns.contains(columnName);
+    boolean hasDictionary = fieldConfig.getEncodingType() == EncodingType.DICTIONARY;
     boolean hasInvertedIndex =
-        indexingConfigs.getInvertedIndexColumns() != null && indexingConfigs.getInvertedIndexColumns()
+        indexingConfig.getInvertedIndexColumns() != null && indexingConfig.getInvertedIndexColumns()
             .contains(columnName);
 
     if (!hasDictionary || !hasInvertedIndex) {

@@ -64,6 +64,8 @@ import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -154,7 +156,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   private static final String COLUMN_LENGTH_MAP_KEY = "columnLengthMap";
   private static final String COLUMN_CARDINALITY_MAP_KEY = "columnCardinalityMap";
   private static final String MAX_NUM_MULTI_VALUES_MAP_KEY = "maxNumMultiValuesMap";
-  private static final int DISK_SIZE_IN_BYTES = 20798784;
+  private static final int DISK_SIZE_IN_BYTES = 20277762;
   private static final int NUM_ROWS = 115545;
 
   private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
@@ -176,6 +178,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @Override
   protected String getSchemaFileName() {
     return _schemaFileName;
+  }
+
+  @Override
+  protected List<FieldConfig> getFieldConfigs() {
+    return Collections.singletonList(
+        new FieldConfig("DivAirports", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
+            CompressionCodec.MV_ENTRY_DICT, null));
   }
 
   @BeforeClass
@@ -645,7 +654,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testMaxQueryResponseSizeTableConfig() throws Exception {
+  public void testMaxQueryResponseSizeTableConfig()
+      throws Exception {
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, 1000L, null));
     updateTableConfig(tableConfig);
@@ -677,7 +687,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testMaxServerResponseSizeTableConfig() throws Exception {
+  public void testMaxServerResponseSizeTableConfig()
+      throws Exception {
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, null, 1000L));
     updateTableConfig(tableConfig);
@@ -709,7 +720,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testMaxResponseSizeTableConfigOrdering() throws Exception {
+  public void testMaxResponseSizeTableConfigOrdering()
+      throws Exception {
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setQueryConfig(new QueryConfig(null, false, null, null, 1000000L, 1000L));
     updateTableConfig(tableConfig);
@@ -1569,12 +1581,39 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     tableConfig.setIngestionConfig(ingestionConfig);
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    assertNotNull(fieldConfigList);
+    fieldConfigList.add(
+        new FieldConfig("NewAddedDerivedDivAirportSeqIDs", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
+            CompressionCodec.MV_ENTRY_DICT, null));
+    fieldConfigList.add(new FieldConfig("NewAddedDerivedDivAirportSeqIDsString", FieldConfig.EncodingType.DICTIONARY,
+        Collections.emptyList(), CompressionCodec.MV_ENTRY_DICT, null));
     updateTableConfig(tableConfig);
 
     // Trigger reload
     reloadAllSegments(TEST_EXTRA_COLUMNS_QUERY, false, numTotalDocs);
     assertEquals(postQuery(TEST_EXTRA_COLUMNS_QUERY).get("resultTable").get("rows").get(0).get(0).asLong(),
         numTotalDocs);
+
+    // Verify the index sizes
+    JsonNode columnIndexSizeMap = JsonUtils.stringToJsonNode(sendGetRequest(
+            getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DivAirportSeqIDs"
+                + "&columns=NewAddedDerivedDivAirportSeqIDs&columns=NewAddedDerivedDivAirportSeqIDsString"))
+        .get("columnIndexSizeMap");
+    assertEquals(columnIndexSizeMap.size(), 3);
+    JsonNode originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");
+    JsonNode derivedColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDs");
+    JsonNode derivedStringColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDsString");
+
+    // Derived int column should have the same dictionary size as the original column
+    double originalColumnDictionarySize = originalColumnIndexSizes.get("dictionary").asDouble();
+    assertEquals(derivedColumnIndexSizes.get("dictionary").asDouble(), originalColumnDictionarySize);
+    // Derived string column should have larger dictionary size than the original column
+    assertTrue(derivedStringColumnIndexSizes.get("dictionary").asDouble() > originalColumnDictionarySize);
+    // Both derived columns should have smaller forward index size than the original column because of compression
+    double derivedColumnForwardIndexSize = derivedColumnIndexSizes.get("forward_index").asDouble();
+    assertTrue(derivedColumnForwardIndexSize < originalColumnIndexSizes.get("forward_index").asDouble());
+    assertEquals(derivedStringColumnIndexSizes.get("forward_index").asDouble(), derivedColumnForwardIndexSize);
   }
 
   private void reloadWithMissingColumns()
@@ -1582,6 +1621,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Remove columns from the table config first to pass the validation of the table config
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setIngestionConfig(null);
+    tableConfig.setFieldConfigList(getFieldConfigs());
     updateTableConfig(tableConfig);
 
     // Need to first delete then add the schema because removing columns is backward-incompatible change

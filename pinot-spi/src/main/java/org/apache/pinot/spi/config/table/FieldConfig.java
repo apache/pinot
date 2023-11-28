@@ -119,7 +119,29 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   public enum CompressionCodec {
-    PASS_THROUGH, SNAPPY, ZSTANDARD, LZ4
+    PASS_THROUGH(true, false),
+    SNAPPY(true, false),
+    ZSTANDARD(true, false),
+    LZ4(true, false),
+
+    // For MV dictionary encoded forward index, add a second level dictionary encoding for the multi-value entries
+    MV_ENTRY_DICT(false, true);
+
+    private final boolean _applicableToRawIndex;
+    private final boolean _applicableToDictEncodedIndex;
+
+    CompressionCodec(boolean applicableToRawIndex, boolean applicableToDictEncodedIndex) {
+      _applicableToRawIndex = applicableToRawIndex;
+      _applicableToDictEncodedIndex = applicableToDictEncodedIndex;
+    }
+
+    public boolean isApplicableToRawIndex() {
+      return _applicableToRawIndex;
+    }
+
+    public boolean isApplicableToDictEncodedIndex() {
+      return _applicableToDictEncodedIndex;
+    }
   }
 
   public String getName() {
