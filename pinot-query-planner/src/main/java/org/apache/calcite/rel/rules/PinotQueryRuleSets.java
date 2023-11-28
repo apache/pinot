@@ -51,8 +51,7 @@ public class PinotQueryRuleSets {
 
           // push a filter past a project
           CoreRules.FILTER_PROJECT_TRANSPOSE,
-          // push a projection to the children of a join
-          // push all expressions to handle the time indicator correctly
+          // push parts of the join condition to its inputs
           CoreRules.JOIN_CONDITION_PUSH,
           // remove identity project
           CoreRules.PROJECT_REMOVE,
@@ -62,14 +61,19 @@ public class PinotQueryRuleSets {
           // push project through WINDOW
           CoreRules.PROJECT_WINDOW_TRANSPOSE,
 
-          // TODO: Revisit and see if they can be replaced with CoreRules.PROJECT_REDUCE_EXPRESSIONS and
-          //       CoreRules.FILTER_REDUCE_EXPRESSIONS
+          // literal rules
+          // TODO: Revisit and see if they can be replaced with
+          //     CoreRules.PROJECT_REDUCE_EXPRESSIONS and
+          //     CoreRules.FILTER_REDUCE_EXPRESSIONS
           PinotEvaluateLiteralRule.Project.INSTANCE, PinotEvaluateLiteralRule.Filter.INSTANCE,
 
+          // sort join rules
           // TODO: evaluate the SORT_JOIN_TRANSPOSE and SORT_JOIN_COPY rules
 
           // join rules
           CoreRules.JOIN_PUSH_EXPRESSIONS,
+
+          // join and semi-join rules
           CoreRules.PROJECT_TO_SEMI_JOIN,
           PinotAggregateToSemiJoinRule.INSTANCE,
 
