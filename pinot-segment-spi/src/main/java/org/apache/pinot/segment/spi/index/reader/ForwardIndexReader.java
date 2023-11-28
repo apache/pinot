@@ -25,6 +25,7 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -57,9 +58,17 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   /**
    * Returns the compression type (if valid). Only valid for RAW forward index columns implemented in
    * BaseChunkForwardIndexReader.
-   * @return
    */
+  @Nullable
   default ChunkCompressionType getCompressionType() {
+    return null;
+  }
+
+  /**
+   * Returns the compression type for dictionary encoded forward index.
+   */
+  @Nullable
+  default DictIdCompressionType getDictIdCompressionType() {
     return null;
   }
 
