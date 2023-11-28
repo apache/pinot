@@ -109,6 +109,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "users", username, params.toString());
   }
 
+  public String forPeriodTaskRun(String taskName) {
+    return StringUtil.join("/", _baseUrl, "periodictask", "run?taskname=" + taskName);
+  }
+
   public String forUpdateUserConfig(String username, String componentTypeStr, boolean passwordChanged) {
     StringBuilder params = new StringBuilder();
     if (StringUtils.isNotBlank(username)) {
