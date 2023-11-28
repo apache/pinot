@@ -23,12 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -37,7 +32,6 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
-import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Reader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,19 +103,21 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     CompletableFuture<Boolean> hasMessagesFut = _reader.hasMessageAvailableAsync();
     CompletableFuture<Message<byte[]>> messageFut = hasMessagesFut.thenCompose(msgAvailable ->
         (msgAvailable)? _reader.readNextAsync() : CompletableFuture.completedFuture(null));
-    CompletableFuture<Void> handleMessageFut = messageFut.thenCompose(messageOrNull -> {
-      if (messageOrNull == null) {
-        return CompletableFuture.completedFuture(null);
-      }
-      if (endMessageId != null) {
-        if (messageOrNull.getMessageId().compareTo(endMessageId) > 0) {
-          return CompletableFuture.completedFuture(null);
-        }
-      }
-      messages.add(PulsarUtils.buildPulsarStreamMessage(messageOrNull, _enableKeyValueStitch, _pulsarMetadataExtractor));
-      return fetchNextMessageAndAddToCollection(endMessageId, messages);
-    });
+    CompletableFuture<Void> handleMessageFut = messageFut.thenCompose(messageOrNull ->
+        readMessageAndFetchNextOrComplete(endMessageId, messages, messageOrNull));
     return handleMessageFut;
+  }
+
+  public CompletableFuture<Void> readMessageAndFetchNextOrComplete(MessageId endMessageId,
+      Collection<PulsarStreamMessage> messages, Message<byte[]> messageOrNull) {
+    if (messageOrNull == null) {
+      return CompletableFuture.completedFuture(null);
+    }
+    if (endMessageId != null && messageOrNull.getMessageId().compareTo(endMessageId) > 0) {
+      return CompletableFuture.completedFuture(null);
+    }
+    messages.add(PulsarUtils.buildPulsarStreamMessage(messageOrNull, _enableKeyValueStitch, _pulsarMetadataExtractor));
+    return fetchNextMessageAndAddToCollection(endMessageId, messages);
   }
 
   private Iterable<PulsarStreamMessage> buildOffsetFilteringIterable(final Iterable<PulsarStreamMessage> messageAndOffsets,
