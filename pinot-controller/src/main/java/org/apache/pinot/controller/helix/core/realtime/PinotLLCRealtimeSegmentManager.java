@@ -827,10 +827,13 @@ public class PinotLLCRealtimeSegmentManager {
     // in the server when it receives the ERROR to OFFLINE state transition.
     // Helix throws an exception if we try to reset state of a partition that is NOT in ERROR state in EV,
     // So, if any exceptions are thrown, ignore it here.
+    // TODO: https://github.com/apache/pinot/issues/12055
+    // If we have reaosn codes, then the server can indicate to us the reason (in this case, consumer was never
+    // created, OR consumer was created but could not consume the segment compeltely), and we can call reset()
+    // in one of the cases and not the other.
     try {
       _helixAdmin.resetPartition(_helixManager.getClusterName(), instanceName,
-          TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName()),
-          Collections.singletonList(segmentName));
+          realtimeTableName, Collections.singletonList(segmentName));
     } catch (Exception e) {
       // Ignore
     }
