@@ -21,10 +21,14 @@ package org.apache.pinot.plugin.stream.pulsar;
 import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
@@ -45,7 +49,6 @@ import org.slf4j.LoggerFactory;
 public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnectionHandler
     implements PartitionGroupConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarPartitionLevelConsumer.class);
-  private final ExecutorService _executorService;
   private final Reader _reader;
   private boolean _enableKeyValueStitch;
 
@@ -58,7 +61,6 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
             config.getInitialMessageId());
     LOGGER.info("Created pulsar reader with id {} for topic {} partition {}", _reader, _config.getPulsarTopicName(),
         partitionGroupConsumptionStatus.getPartitionGroupId());
-    _executorService = Executors.newSingleThreadExecutor();
     _enableKeyValueStitch = _config.getEnableKeyValueStitch();
   }
 
@@ -75,56 +77,54 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     final MessageId endMessageId =
         endMsgOffset == null ? MessageId.latest : ((MessageIdStreamOffset) endMsgOffset).getMessageId();
 
-    List<PulsarStreamMessage> messagesList = new ArrayList<>();
-    Future<PulsarMessageBatch> pulsarResultFuture =
-        _executorService.submit(() -> fetchMessages(startMessageId, endMessageId, messagesList));
+    final Collection<PulsarStreamMessage> messages = Collections.synchronizedList(new ArrayList<>());
+
+    CompletableFuture<PulsarMessageBatch> pulsarResultFuture = fetchMessagesAsync(startMessageId, endMessageId, messages)
+        .orTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
+        .handle((v, t) -> {
+          if (! (t instanceof TimeoutException)) {
+            LOGGER.warn("Error while fetching records from Pulsar", t);
+          }
+          return new PulsarMessageBatch(buildOffsetFilteringIterable(messages, startMessageId, endMessageId),
+              _enableKeyValueStitch);
+        });
 
     try {
-      return pulsarResultFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
-    } catch (TimeoutException e) {
-      // The fetchMessages has thrown an exception. Most common cause is the timeout.
-      // We return the records fetched till now along with the next start offset.
-      pulsarResultFuture.cancel(true);
-      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId),
-          _enableKeyValueStitch);
+      return pulsarResultFuture.get();
     } catch (Exception e) {
       LOGGER.warn("Error while fetching records from Pulsar", e);
-      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId),
+      return new PulsarMessageBatch(buildOffsetFilteringIterable(messages, startMessageId, endMessageId),
           _enableKeyValueStitch);
     }
   }
 
-  public PulsarMessageBatch fetchMessages(MessageId startMessageId, MessageId endMessageId,
-      List<PulsarStreamMessage> messagesList) {
-    try {
-      _reader.seek(startMessageId);
+  public CompletableFuture<Void> fetchMessagesAsync(MessageId startMessageId, MessageId endMessageId,
+      Collection<PulsarStreamMessage> messages) {
+      CompletableFuture<Void> seekFut = _reader.seekAsync(startMessageId);
+      return seekFut.thenCompose((v) -> fetchNextMessageAndAddToCollection(endMessageId, messages));
+  }
 
-      while (_reader.hasMessageAvailable()) {
-        Message<byte[]> nextMessage = _reader.readNext();
-
-        if (endMessageId != null) {
-          if (nextMessage.getMessageId().compareTo(endMessageId) > 0) {
-            break;
-          }
-        }
-        messagesList.add(
-            PulsarUtils.buildPulsarStreamMessage(nextMessage, _enableKeyValueStitch, _pulsarMetadataExtractor));
-
-        if (Thread.interrupted()) {
-          break;
+  public CompletableFuture<Void> fetchNextMessageAndAddToCollection(MessageId endMessageId,
+      Collection<PulsarStreamMessage> messages) {
+    CompletableFuture<Boolean> hasMessagesFut = _reader.hasMessageAvailableAsync();
+    CompletableFuture<Message<byte[]>> messageFut = hasMessagesFut.thenCompose(msgAvailable ->
+        (msgAvailable)? _reader.readNextAsync() : CompletableFuture.completedFuture(null));
+    CompletableFuture<Void> handleMessageFut = messageFut.thenCompose(messageOrNull -> {
+      if (messageOrNull == null) {
+        return CompletableFuture.completedFuture(null);
+      }
+      if (endMessageId != null) {
+        if (messageOrNull.getMessageId().compareTo(endMessageId) > 0) {
+          return CompletableFuture.completedFuture(null);
         }
       }
-
-      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId),
-          _enableKeyValueStitch);
-    } catch (PulsarClientException e) {
-      LOGGER.warn("Error consuming records from Pulsar topic", e);
-      return new PulsarMessageBatch(buildOffsetFilteringIterable(messagesList, startMessageId, endMessageId),
-          _enableKeyValueStitch);
-    }
+      messages.add(PulsarUtils.buildPulsarStreamMessage(messageOrNull, _enableKeyValueStitch, _pulsarMetadataExtractor));
+      return fetchNextMessageAndAddToCollection(endMessageId, messages);
+    });
+    return handleMessageFut;
   }
 
-  private Iterable<PulsarStreamMessage> buildOffsetFilteringIterable(final List<PulsarStreamMessage> messageAndOffsets,
+  private Iterable<PulsarStreamMessage> buildOffsetFilteringIterable(final Iterable<PulsarStreamMessage> messageAndOffsets,
       final MessageId startOffset, final MessageId endOffset) {
     return Iterables.filter(messageAndOffsets, input -> {
       // Filter messages that are either null or have an offset ∉ [startOffset, endOffset]
@@ -138,18 +138,6 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
       throws IOException {
     _reader.close();
     super.close();
-    shutdownAndAwaitTermination();
   }
 
-  void shutdownAndAwaitTermination() {
-    _executorService.shutdown();
-    try {
-      if (!_executorService.awaitTermination(60, TimeUnit.SECONDS)) {
-        _executorService.shutdownNow();
-      }
-    } catch (InterruptedException ie) {
-      _executorService.shutdownNow();
-      Thread.currentThread().interrupt();
-    }
-  }
 }
