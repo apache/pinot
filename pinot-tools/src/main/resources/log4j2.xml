@@ -62,7 +62,7 @@
   <Loggers>
     <Root level="info" additivity="false">
       <AppenderRef ref="pinotLog"/>
-      <AppenderRef ref="console" level="info"/>
+      <AppenderRef ref="console" level="error"/>
     </Root>
     <Logger name="org.apache.pinot.tools.admin" level="info" additivity="false">
       <AppenderRef ref="console"/>

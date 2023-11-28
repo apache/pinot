@@ -51,12 +51,32 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   private final Directory _indexDirectory;
   private final IndexWriter _indexWriter;
   private final String _vectorColumn;
+  private final VectorSimilarityFunction _vectorSimilarityFunction;
+  private final int _vectorDimension;
 
   private int _nextDocId = 0;
 
   public HnswVectorIndexCreator(String column, File segmentIndexDir, boolean commit, boolean useCompoundFile,
       int maxBufferSizeMB, VectorIndexConfig vectorIndexConfig) {
     _vectorColumn = column;
+    _vectorDimension = vectorIndexConfig.getVectorDimension();
+    VectorIndexConfig.VectorDistanceFunction vectorDistanceFunction = vectorIndexConfig.getVectorDistanceFunction();
+    switch (vectorDistanceFunction) {
+      case COSINE:
+        _vectorSimilarityFunction = VectorSimilarityFunction.COSINE;
+        break;
+      case EUCLIDEAN:
+        _vectorSimilarityFunction = VectorSimilarityFunction.EUCLIDEAN;
+        break;
+      case DOT_PRODUCT:
+        _vectorSimilarityFunction = VectorSimilarityFunction.DOT_PRODUCT;
+        break;
+      case INNER_PRODUCT:
+        _vectorSimilarityFunction = VectorSimilarityFunction.MAXIMUM_INNER_PRODUCT;
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported vector distance function: " + vectorDistanceFunction);
+    }
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
@@ -77,10 +97,6 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
     }
   }
 
-  public IndexWriter getIndexWriter() {
-    return _indexWriter;
-  }
-
   @Override
   public void add(@Nonnull Object value, int dictId)
       throws IOException {
@@ -89,22 +105,28 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
 
   @Override
   public void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
-    if (values instanceof Float[]) {
-      float[] floatValues = new float[values.length];
+    Object value0 = values[0];
+    if (value0 instanceof Float) {
+      float[] floatValues = new float[_vectorDimension];
       for (int i = 0; i < values.length; i++) {
         floatValues[i] = (Float) values[i];
       }
       add(floatValues);
-    } else if (values instanceof Float[][]) {
-      add((Float[][]) values, values.length);
-    } else if (values instanceof float[][]) {
-      add((float[][]) values, values.length);
-    } else {
-      float[][] vectors = new float[values.length][];
-      for (int i = 0; i < values.length; i++) {
-        vectors[i] = (float[]) values[i];
+    } else if (value0 instanceof Float[]) {
+      for (Object value : values) {
+        float[] floatValues = new float[_vectorDimension];
+        for (int j = 0; j < ((Float[]) value).length; j++) {
+          floatValues[j] = ((Float[]) value)[j];
+        }
+        add(floatValues);
       }
-      add(vectors, values.length);
+    } else if (value0 instanceof float[]) {
+      for (Object value : values) {
+        add((float[]) value);
+      }
+    } else {
+      throw new UnsupportedOperationException(
+          "Unsupported value class: " + value0.getClass() + " for column: " + _vectorColumn);
     }
   }
 
@@ -112,51 +134,8 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   public void add(float[] document) {
     // text index on SV column
     Document docToIndex = new Document();
-    docToIndex.add(new XKnnFloatVectorField(_vectorColumn, document, VectorSimilarityFunction.COSINE));
+    docToIndex.add(new XKnnFloatVectorField(_vectorColumn, document, _vectorSimilarityFunction));
     docToIndex.add(new StoredField(VECTOR_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
-    try {
-      _indexWriter.addDocument(docToIndex);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while adding a new document to the Lucene index for column: " + _vectorColumn, e);
-    }
-  }
-
-  public void add(float[][] documents, int length) {
-    Document docToIndex = new Document();
-
-    // Whenever multiple fields with the same name appear in one document, both the
-    // inverted index and term vectors will logically append the tokens of the
-    // field to one another, in the order the fields were added.
-    for (int i = 0; i < length; i++) {
-      docToIndex.add(new XKnnFloatVectorField(_vectorColumn, documents[i], VectorSimilarityFunction.COSINE));
-    }
-    docToIndex.add(new StoredField(VECTOR_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
-
-    try {
-      _indexWriter.addDocument(docToIndex);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Caught exception while adding a new document to the Lucene index for column: " + _vectorColumn, e);
-    }
-  }
-
-
-  public void add(Float[][] documents, int length) {
-    Document docToIndex = new Document();
-
-    // Whenever multiple fields with the same name appear in one document, both the
-    // inverted index and term vectors will logically append the tokens of the
-    // field to one another, in the order the fields were added.
-    for (int i = 0; i < length; i++) {
-      float[] document = new float[documents[i].length];
-      for (int j = 0; j < documents[i].length; j++) {
-        document[j] = documents[i][j];
-      }
-      docToIndex.add(new XKnnFloatVectorField(_vectorColumn, document, VectorSimilarityFunction.COSINE));
-    }
-    docToIndex.add(new StoredField(VECTOR_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
-
     try {
       _indexWriter.addDocument(docToIndex);
     } catch (Exception e) {

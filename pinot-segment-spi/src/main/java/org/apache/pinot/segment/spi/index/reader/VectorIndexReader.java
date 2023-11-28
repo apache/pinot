@@ -22,6 +22,15 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
+/**
+ * Reader for vector index.
+ */
 public interface VectorIndexReader extends IndexReader {
-  ImmutableRoaringBitmap getDocIds(float[] value, int topK);
+  /**
+   * Returns the bitmap of top k closest vectors from the given vector.
+   * @param vector vector to search
+   * @param topK number of closest vectors to return
+   * @return bitmap of top k closest vectors
+   */
+  ImmutableRoaringBitmap getDocIds(float[] vector, int topK);
 }

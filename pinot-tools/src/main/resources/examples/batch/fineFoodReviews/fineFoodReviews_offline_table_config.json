@@ -38,6 +38,7 @@
       "properties": {
         "vectorIndexType": "HNSW",
         "vectorDimension": 1536,
+        "vectorDistanceFunction": "COSINE",
         "version": 1
       }
     }

@@ -26,19 +26,23 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 /**
  * Config for vector index. Since this is generic configs for vector index, the only common fields are version,
- * vectorIndexType and vectorDimension. All the special configs for different vector index types should be put in
- * properties.
+ * vectorIndexType, vectorDimension, distance function. All the other configs are specific to the index type should
+ * be put in properties.
  */
 public class VectorIndexConfig extends IndexConfig {
   public static final VectorIndexConfig DISABLED = new VectorIndexConfig(true);
   private static final String VECTOR_INDEX_TYPE = "vectorIndexType";
   private static final String VECTOR_DIMENSION = "vectorDimension";
+  private static final String VECTOR_DISTANCE_FUNCTION = "vectorDistanceFunction";
   private static final String VERSION = "version";
   private static final String DEFAULT_VERSION = "1";
+  private static final VectorDistanceFunction DEFAULT_VECTOR_DISTANCE_FUNCTION =
+      VectorDistanceFunction.COSINE;
 
   private String _vectorIndexType;
   private int _vectorDimension;
   private int _version;
+  private VectorDistanceFunction _vectorDistanceFunction;
   private Map<String, String> _properties;
 
   /**
@@ -58,6 +62,8 @@ public class VectorIndexConfig extends IndexConfig {
     Preconditions.checkArgument(properties.containsKey(VECTOR_DIMENSION),
         "Properties must contain vector dimension");
     _vectorDimension = Integer.parseInt(properties.get(VECTOR_DIMENSION));
+    _vectorDistanceFunction = properties.containsKey(VECTOR_DISTANCE_FUNCTION) ? VectorDistanceFunction.valueOf(
+        properties.get(VECTOR_DISTANCE_FUNCTION)) : DEFAULT_VECTOR_DISTANCE_FUNCTION;
     _version = Integer.parseInt(properties.getOrDefault(VERSION, DEFAULT_VERSION));
     _properties = properties;
   }
@@ -80,6 +86,16 @@ public class VectorIndexConfig extends IndexConfig {
     return this;
   }
 
+  public VectorDistanceFunction getVectorDistanceFunction() {
+    return _vectorDistanceFunction;
+  }
+
+  public VectorIndexConfig setVectorDistanceFunction(
+      VectorDistanceFunction vectorDistanceFunction) {
+    _vectorDistanceFunction = vectorDistanceFunction;
+    return this;
+  }
+
   public int getVersion() {
     return _version;
   }
@@ -96,5 +112,9 @@ public class VectorIndexConfig extends IndexConfig {
   public VectorIndexConfig setProperties(Map<String, String> properties) {
     _properties = properties;
     return this;
+  }
+
+  public enum VectorDistanceFunction {
+    COSINE, INNER_PRODUCT, EUCLIDEAN, DOT_PRODUCT
   }
 }

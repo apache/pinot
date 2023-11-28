@@ -165,7 +165,7 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         .isSingleValueField()) {
       return null;
     }
-    return new MutableVectorIndex();
+    return new MutableVectorIndex(config);
   }
 
   public enum IndexType {
