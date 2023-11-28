@@ -1516,7 +1516,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           "Failed to initialize segment data manager", e));
       _segmentLogger.warn(
           "Scheduling task to call controller to mark the segment as OFFLINE in Ideal State due"
-           + "to initialization error: '{}'",
+           + " to initialization error: '{}'",
           e.getMessage());
       // Since we are going to throw exception from this thread (helix execution thread), the externalview
       // entry for this segment will be ERROR. We allow time for Helix to make this transition, and then
