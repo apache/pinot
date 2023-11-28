@@ -88,7 +88,7 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
-import org.apache.pinot.segment.local.customobject.ThetaUnionWrap;
+import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -156,7 +156,7 @@ public class ObjectSerDeUtils {
     FloatArrayList(44),
     StringArrayList(45),
     UltraLogLog(46),
-    ThetaUnionWrap(47);
+    ThetaSketchAccumulator(47);
 
     private final int _value;
 
@@ -275,8 +275,8 @@ public class ObjectSerDeUtils {
         return ObjectType.CompressedProbabilisticCounting;
       } else if (value instanceof UltraLogLog) {
         return ObjectType.UltraLogLog;
-      } else if (value instanceof ThetaUnionWrap) {
-        return ObjectType.ThetaUnionWrap;
+      } else if (value instanceof ThetaSketchAccumulator) {
+        return ObjectType.ThetaSketchAccumulator;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -1590,21 +1590,30 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<ThetaUnionWrap> DATA_SKETCH_THETA_UNION_WRAP_SER_DE =
-      new ObjectSerDe<ThetaUnionWrap>() {
+  public static final ObjectSerDe<ThetaSketchAccumulator> DATA_SKETCH_SKETCH_ACCUMULATOR_SER_DE =
+      new ObjectSerDe<ThetaSketchAccumulator>() {
 
         @Override
-        public byte[] serialize(ThetaUnionWrap thetaUnionWrap) {
-          return thetaUnionWrap.toBytes();
+        public byte[] serialize(ThetaSketchAccumulator thetaSketchBuffer) {
+          Sketch sketch = thetaSketchBuffer.getResult();
+          return sketch.toByteArray();
         }
 
         @Override
-        public ThetaUnionWrap deserialize(byte[] bytes) {
-          return ThetaUnionWrap.fromBytes(bytes);
+        public ThetaSketchAccumulator deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
         }
 
-        public ThetaUnionWrap deserialize(ByteBuffer byteBuffer) {
-          return ThetaUnionWrap.fromByteBuffer(byteBuffer);
+        // Note: The accumulator is designed to serialize as a sketch and should
+        // not be deserialized in practice.
+        @Override
+        public ThetaSketchAccumulator deserialize(ByteBuffer byteBuffer) {
+          ThetaSketchAccumulator thetaSketchAccumulator = new ThetaSketchAccumulator();
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          Sketch sketch = Sketch.wrap(Memory.wrap(bytes));
+          thetaSketchAccumulator.apply(sketch);
+          return thetaSketchAccumulator;
         }
       };
 
@@ -1658,7 +1667,7 @@ public class ObjectSerDeUtils {
       FLOAT_ARRAY_LIST_SER_DE,
       STRING_ARRAY_LIST_SER_DE,
       ULTRA_LOG_LOG_OBJECT_SER_DE,
-      DATA_SKETCH_THETA_UNION_WRAP_SER_DE,
+      DATA_SKETCH_SKETCH_ACCUMULATOR_SER_DE,
   };
   //@formatter:on
 

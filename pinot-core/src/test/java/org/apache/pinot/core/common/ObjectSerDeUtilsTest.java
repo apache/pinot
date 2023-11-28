@@ -53,7 +53,7 @@ import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
-import org.apache.pinot.segment.local.customobject.ThetaUnionWrap;
+import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.annotations.Test;
@@ -500,7 +500,7 @@ public class ObjectSerDeUtilsTest {
   }
 
   @Test
-  public void testThetaUnionWrap() {
+  public void testThetaSketchAccumulator() {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
       UpdateSketch input = Sketches.updateSketchBuilder().build();
       int size = RANDOM.nextInt(100) + 10;
@@ -511,16 +511,16 @@ public class ObjectSerDeUtilsTest {
       }
 
       SetOperationBuilder setOperationBuilder = new SetOperationBuilder();
-      ThetaUnionWrap thetaUnionWrap = new ThetaUnionWrap(setOperationBuilder, shouldOrder);
+      ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(setOperationBuilder, shouldOrder, 2);
       Sketch sketch = input.compact(shouldOrder, null);
-      thetaUnionWrap.apply(sketch);
+      accumulator.apply(sketch);
 
-      byte[] bytes = ObjectSerDeUtils.serialize(thetaUnionWrap);
-      ThetaUnionWrap actual =
-          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.ThetaUnionWrap);
+      byte[] bytes = ObjectSerDeUtils.serialize(accumulator);
+      ThetaSketchAccumulator actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.ThetaSketchAccumulator);
 
       assertEquals(actual.getResult().getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
-      assertEquals(actual.getResult().toByteArray().length, sketch.toByteArray().length, ERROR_MESSAGE);
+      assertEquals(actual.getResult().toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
       assertEquals(actual.getResult().isOrdered(), shouldOrder, ERROR_MESSAGE);
     }
   }
