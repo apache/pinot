@@ -37,7 +37,7 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <http.client.version>4.5.13</http.client.version>
     <http.core.version>4.4.13</http.core.version>
-    <s3mock.version>2.12.2</s3mock.version>
+    <s3mock.version>3.2.0</s3mock.version>
     <javax.version>3.1.0</javax.version>
     <phase.prop>package</phase.prop>
   </properties>
