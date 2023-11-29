@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
@@ -100,6 +101,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentCreator _indexCreator;
   private SegmentIndexCreationInfo _segmentIndexCreationInfo;
   private Schema _dataSchema;
+  private RecordEnricherPipeline _recordEnricherPipeline;
   private TransformPipeline _transformPipeline;
   private IngestionSchemaValidator _ingestionSchemaValidator;
   private int _totalDocs = 0;
@@ -168,6 +170,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
+      RecordEnricherPipeline enricherPipeline,
       TransformPipeline transformPipeline)
       throws Exception {
     _config = config;
@@ -178,6 +181,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (config.isFailOnEmptySegment()) {
       Preconditions.checkState(_recordReader.hasNext(), "No record in data source");
     }
+    _recordEnricherPipeline = enricherPipeline;
     _transformPipeline = transformPipeline;
     // Use the same transform pipeline if the data source is backed by a record reader
     if (dataSource instanceof RecordReaderSegmentCreationDataSource) {
@@ -244,6 +248,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
           // Should not be needed anymore.
           // Add row to indexes
+          _recordEnricherPipeline.run(decodedRow);
           _transformPipeline.processRow(decodedRow, reusedResult);
 
           recordReadStopTime = System.nanoTime();
