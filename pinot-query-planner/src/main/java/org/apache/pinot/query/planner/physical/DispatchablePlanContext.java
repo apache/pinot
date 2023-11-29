@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.planner.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.MailboxMetadata;

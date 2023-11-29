@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner;
+package org.apache.pinot.query.planner.physical;
 
 import java.util.List;
 import java.util.Map;

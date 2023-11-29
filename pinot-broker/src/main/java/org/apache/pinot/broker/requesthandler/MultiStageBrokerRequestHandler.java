@@ -61,7 +61,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.DispatchableSubPlan;
+import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
