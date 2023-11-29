@@ -122,7 +122,8 @@ public class QueryEnvironment {
             // SUB-QUERY Threshold is useless as we are encoding all IN clause in-line anyway
             .withInSubQueryThreshold(Integer.MAX_VALUE)
             .addRelBuilderConfigTransform(c -> c.withPushJoinCondition(true))
-            .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true)))
+            .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true))
+            .addRelBuilderConfigTransform(c -> c.withPruneInputOfAggregate(false)))
         .build();
     _optProgram = getOptProgram();
     _traitProgram = getTraitProgram();
