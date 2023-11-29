@@ -113,4 +113,20 @@ public class PulsarConfigTest {
     Assert.assertFalse(pulsarConfig.isPopulateMetadata());
     Assert.assertEquals(metadataFieldsToExtract.size(), 0);
   }
+
+  @Test
+  public void testParsingConfigForOAuth() throws Exception {
+    Map<String, String> streamConfigMap = getCommonStreamConfigMap();
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_ISSUER_URL),
+        "http://auth.test.com");
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_CREDS_FILE_PATH),
+        "file:///tmp/creds.json");
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_AUDIENCE),
+        "urn:test:test");
+    StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
+    PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
+    Assert.assertEquals(pulsarConfig.getIssuerUrl(), "http://auth.test.com");
+    Assert.assertEquals(pulsarConfig.getCredentialsFilePath(), "file:///tmp/creds.json");
+    Assert.assertEquals(pulsarConfig.getAudience(), "urn:test:test");
+  }
 }
