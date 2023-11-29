@@ -50,6 +50,14 @@ public final class FixedBitIntReaderWriter implements Closeable {
     _dataBitSet.writeInt(startIndex, _numBitsPerValue, length, values);
   }
 
+  public int getStartByteOffset(int index) {
+    return (int) (((long) index * _numBitsPerValue) / Byte.SIZE);
+  }
+
+  public int getEndByteOffset(int index) {
+    return (int) (((long) (index + 1) * _numBitsPerValue - 1) / Byte.SIZE) + 1;
+  }
+
   @Override
   public void close() {
     _dataBitSet.close();

@@ -30,6 +30,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -270,6 +271,10 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         }
       }
     }
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
+          _oldSegmentCandidatesMap.keySet());
+    }
   }
 
   /**
@@ -408,10 +413,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     // Copy the volatile reference so that segmentToInstanceMap and unavailableSegments can have a consistent view of
     // the state.
     SegmentStates segmentStates = _segmentStates;
-    Map<String, String> segmentToInstanceMap = select(segments, requestIdInt, segmentStates, queryOptions);
+    Pair<Map<String, String>, Map<String, String>> segmentToInstanceMap =
+        select(segments, requestIdInt, segmentStates, queryOptions);
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
     if (unavailableSegments.isEmpty()) {
-      return new SelectionResult(segmentToInstanceMap, Collections.emptyList());
+      return new SelectionResult(segmentToInstanceMap, Collections.emptyList(), 0);
     } else {
       List<String> unavailableSegmentsForRequest = new ArrayList<>();
       for (String segment : segments) {
@@ -419,7 +425,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           unavailableSegmentsForRequest.add(segment);
         }
       }
-      return new SelectionResult(segmentToInstanceMap, unavailableSegmentsForRequest);
+      return new SelectionResult(segmentToInstanceMap, unavailableSegmentsForRequest, 0);
     }
   }
 
@@ -429,9 +435,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   /**
-   * Selects the server instances for the given segments based on the request id and segment states. Returns a map
-   * from segment to selected server instance hosting the segment.
+   * Selects the server instances for the given segments based on the request id and segment states. Returns two maps
+   * from segment to selected server instance hosting the segment. The 2nd map is for optional segments. The optional
+   * segments are used to get the new segments that is not online yet. Instead of simply skipping them by broker at
+   * routing time, we can send them to servers and let servers decide how to handle them.
    */
-  abstract Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
-      Map<String, String> queryOptions);
+  abstract Pair<Map<String, String>, Map<String, String>/*optional segments*/> select(List<String> segments,
+      int requestId, SegmentStates segmentStates, Map<String, String> queryOptions);
 }

@@ -46,6 +46,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -150,7 +151,8 @@ public class MockInstanceDataManagerFactory {
     Map<String, SegmentDataManager> segmentDataManagerMap =
         segmentList.stream().collect(Collectors.toMap(IndexSegment::getSegmentName, ImmutableSegmentDataManager::new));
     TableDataManager tableDataManager = mock(TableDataManager.class);
-    when(tableDataManager.acquireSegments(anyList(), anyList())).thenAnswer(invocation -> {
+    // TODO: support optional segments for multi-stage engine, but for now, it's always null.
+    when(tableDataManager.acquireSegments(anyList(), eq(null), anyList())).thenAnswer(invocation -> {
       List<String> segments = invocation.getArgument(0);
       return segments.stream().map(segmentDataManagerMap::get).collect(Collectors.toList());
     });

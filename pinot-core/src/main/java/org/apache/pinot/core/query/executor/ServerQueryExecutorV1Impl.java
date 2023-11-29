@@ -200,10 +200,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
+    List<String> optionalSegments = queryRequest.getOptionalSegments();
     List<String> notAcquiredSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers =
-        tableDataManager.acquireSegments(segmentsToQuery, notAcquiredSegments);
+        tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
     int numSegmentsAcquired = segmentDataManagers.size();
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Processing requestId: {} with segmentsToQuery: {}, optionalSegments: {} and acquiredSegments: {}",
+          requestId, segmentsToQuery, optionalSegments,
+          segmentDataManagers.stream().map(SegmentDataManager::getSegmentName).collect(Collectors.toList()));
+    }
     List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsAcquired);
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       indexSegments.add(segmentDataManager.getSegment());

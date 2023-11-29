@@ -462,7 +462,12 @@ abstract class BaseStarTreeV2Test<R, A> {
    */
   CompressionCodec getCompressionCodec() {
     CompressionCodec[] compressionCodecs = CompressionCodec.values();
-    return compressionCodecs[RANDOM.nextInt(compressionCodecs.length)];
+    while (true) {
+      CompressionCodec compressionCodec = compressionCodecs[RANDOM.nextInt(compressionCodecs.length)];
+      if (compressionCodec.isApplicableToRawIndex()) {
+        return compressionCodec;
+      }
+    }
   }
 
   abstract ValueAggregator<R, A> getValueAggregator();
