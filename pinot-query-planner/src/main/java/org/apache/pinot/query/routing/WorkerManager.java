@@ -30,6 +30,7 @@ import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TablePartitionInfo;
@@ -145,11 +146,12 @@ public class WorkerManager {
       String tableType = routingEntry.getKey();
       RoutingTable routingTable = routingEntry.getValue();
       // for each server instance, attach all table types and their associated segment list.
-      for (Map.Entry<ServerInstance, List<String>> serverEntry : routingTable.getServerInstanceToSegmentsMap()
-          .entrySet()) {
-        serverInstanceToSegmentsMap.putIfAbsent(serverEntry.getKey(), new HashMap<>());
-        Map<String, List<String>> tableTypeToSegmentListMap = serverInstanceToSegmentsMap.get(serverEntry.getKey());
-        Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue()) == null,
+      Map<ServerInstance, Pair<List<String>, List<String>>> segmentsMap = routingTable.getServerInstanceToSegmentsMap();
+      for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> serverEntry : segmentsMap.entrySet()) {
+        Map<String, List<String>> tableTypeToSegmentListMap =
+            serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
+        // TODO: support optional segments for multi-stage engine.
+        Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getLeft()) == null,
             "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
       }
 

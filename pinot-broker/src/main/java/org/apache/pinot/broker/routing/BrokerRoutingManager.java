@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.HelixConstants.ChangeType;
@@ -610,19 +611,38 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       return null;
     }
     InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest, requestId);
-    Map<String, String> segmentToInstanceMap = selectionResult.getSegmentToInstanceMap();
-    Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = new HashMap<>();
-    for (Map.Entry<String, String> entry : segmentToInstanceMap.entrySet()) {
+    return new RoutingTable(getServerInstanceToSegmentsMap(tableNameWithType, selectionResult),
+        selectionResult.getUnavailableSegments(), selectionResult.getNumPrunedSegments());
+  }
+
+  private Map<ServerInstance, Pair<List<String>, List<String>>> getServerInstanceToSegmentsMap(String tableNameWithType,
+      InstanceSelector.SelectionResult selectionResult) {
+    Map<ServerInstance, Pair<List<String>, List<String>>> merged = new HashMap<>();
+    for (Map.Entry<String, String> entry : selectionResult.getSegmentToInstanceMap().entrySet()) {
       ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
       if (serverInstance != null) {
-        serverInstanceToSegmentsMap.computeIfAbsent(serverInstance, k -> new ArrayList<>()).add(entry.getKey());
+        Pair<List<String>, List<String>> pair =
+            merged.computeIfAbsent(serverInstance, k -> Pair.of(new ArrayList<>(), new ArrayList<>()));
+        pair.getLeft().add(entry.getKey());
       } else {
         // Should not happen in normal case unless encountered unexpected exception when updating routing entries
         _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.SERVER_MISSING_FOR_ROUTING, 1L);
       }
     }
-    return new RoutingTable(serverInstanceToSegmentsMap, selectionResult.getUnavailableSegments(),
-        selectionResult.getNumPrunedSegments());
+    for (Map.Entry<String, String> entry : selectionResult.getOptionalSegmentToInstanceMap().entrySet()) {
+      ServerInstance serverInstance = _enabledServerInstanceMap.get(entry.getValue());
+      if (serverInstance != null) {
+        Pair<List<String>, List<String>> pair = merged.get(serverInstance);
+        // Skip servers that don't have non-optional segments, so that servers always get some non-optional segments
+        // to process, to be backward compatible.
+        // TODO: allow servers only with optional segments
+        if (pair != null) {
+          pair.getRight().add(entry.getKey());
+        }
+      }
+      // TODO: Report missing server metrics when we allow servers only with optional segments.
+    }
+    return merged;
   }
 
   @Override
@@ -795,7 +815,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         selectionResult.setNumPrunedSegments(numPrunedSegments);
         return selectionResult;
       } else {
-        return new InstanceSelector.SelectionResult(Collections.emptyMap(), Collections.emptyList(), numPrunedSegments);
+        return new InstanceSelector.SelectionResult(Pair.of(Collections.emptyMap(), Collections.emptyMap()),
+            Collections.emptyList(), numPrunedSegments);
       }
     }
   }

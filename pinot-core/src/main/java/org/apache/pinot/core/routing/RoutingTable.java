@@ -20,22 +20,27 @@ package org.apache.pinot.core.routing;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
 public class RoutingTable {
-  private final Map<ServerInstance, List<String>> _serverInstanceToSegmentsMap;
+  // Optional segments are those not online as in ExternalView but might have been online on servers already, e.g.
+  // the newly created consuming segments. Such segments were simply skipped by brokers at query routing time, but that
+  // had caused wrong query results, particularly for upsert tables. Instead, we should pass such segments to servers
+  // and let them decide how to handle them, e.g. skip them upon issues or include them for better query results.
+  private final Map<ServerInstance, Pair<List<String>, List<String>/*optional segments*/>> _serverInstanceToSegmentsMap;
   private final List<String> _unavailableSegments;
   private final int _numPrunedSegments;
 
-  public RoutingTable(Map<ServerInstance, List<String>> serverInstanceToSegmentsMap, List<String> unavailableSegments,
-      int numPrunedSegments) {
+  public RoutingTable(Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap,
+      List<String> unavailableSegments, int numPrunedSegments) {
     _serverInstanceToSegmentsMap = serverInstanceToSegmentsMap;
     _unavailableSegments = unavailableSegments;
     _numPrunedSegments = numPrunedSegments;
   }
 
-  public Map<ServerInstance, List<String>> getServerInstanceToSegmentsMap() {
+  public Map<ServerInstance, Pair<List<String>, List<String>>> getServerInstanceToSegmentsMap() {
     return _serverInstanceToSegmentsMap;
   }
 

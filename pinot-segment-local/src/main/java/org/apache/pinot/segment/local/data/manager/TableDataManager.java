@@ -170,6 +170,11 @@ public interface TableDataManager {
    */
   List<SegmentDataManager> acquireSegments(List<String> segmentNames, List<String> missingSegments);
 
+  default List<SegmentDataManager> acquireSegments(List<String> segmentNames,
+      @Nullable List<String> optionalSegmentNames, List<String> missingSegments) {
+    return acquireSegments(segmentNames, missingSegments);
+  }
+
   /**
    * Acquires the segments with the given segment name.
    * <p>It is the caller's responsibility to return the segments by calling {@link #releaseSegment(SegmentDataManager)}.
