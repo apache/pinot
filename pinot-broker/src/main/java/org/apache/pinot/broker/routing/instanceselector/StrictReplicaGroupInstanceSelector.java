@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -91,15 +90,14 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
 
   // These 3 variables are the cached states to help accelerate the change processing
   private Set<String> _enabledInstances;
-  // For old segments, all candidates are online. Reduce this map to reduce garbage
   private final Map<String, List<SegmentInstanceCandidate>> _oldSegmentCandidatesMap = new HashMap<>();
   private Map<String, NewSegmentState> _newSegmentStateMap;
 
-  // The key is the set of instances hosting the same group of segments, like [S1, S2, S3] in the comment above.
+  // Key is the set of instances hosting the same group of segments, like [S1, S2, S3] in the comment above.
   private final Map<Set<String>, InstanceGroup> _instanceGroups = new HashMap<>();
 
   // Use _segmentGroupStates to hold many segment states as needed for instance selection (multi-threaded) and make
-  // it volatile to update the states atomically, so that instance selection is done with a consistent view of states.
+  // it volatile to update those states atomically so that instance selection is done with a consistent snapshot.
   private volatile SegmentGroupStates _segmentGroupStates;
 
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
@@ -143,19 +141,10 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
         (brokerRequest.getPinotQuery() != null && brokerRequest.getPinotQuery().getQueryOptions() != null)
             ? brokerRequest.getPinotQuery().getQueryOptions() : Collections.emptyMap();
     int requestIdInt = (int) (requestId % MAX_REQUEST_ID);
-    Set<String> unavailableSegments = new HashSet<>();
-    Map<String, String> segmentToInstanceMap = select(segments, requestIdInt, unavailableSegments, queryOptions);
-    if (unavailableSegments.isEmpty()) {
-      return new SelectionResult(segmentToInstanceMap, Collections.emptyList());
-    } else {
-      List<String> unavailableSegmentsForRequest = new ArrayList<>();
-      for (String segment : segments) {
-        if (unavailableSegments.contains(segment)) {
-          unavailableSegmentsForRequest.add(segment);
-        }
-      }
-      return new SelectionResult(segmentToInstanceMap, unavailableSegmentsForRequest);
-    }
+    List<String> unavailableSegments = new ArrayList<>();
+    Pair<Map<String, String>, Map<String, String>> segmentToInstanceMap =
+        select(segments, requestIdInt, unavailableSegments, queryOptions);
+    return new SelectionResult(segmentToInstanceMap, unavailableSegments, 0);
   }
 
   @Override
@@ -248,8 +237,8 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
     _segmentGroupStates = new SegmentGroupStates(_instanceGroups, servingInstances);
   }
 
-  private Map<String, String> select(List<String> segments, int requestId, Set<String> unavailableSegments,
-      Map<String, String> queryOptions) {
+  private Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+      List<String> unavailableSegments, Map<String, String> queryOptions) {
     SegmentGroupStates segmentGroupStates = _segmentGroupStates;
     if (_adaptiveServerSelector == null) {
       // Adaptive Server Selection is NOT enabled.
@@ -269,9 +258,12 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
         serverRankList, queryOptions);
   }
 
-  private static Map<String, String> selectServersUsingRoundRobin(SegmentGroupStates segmentGroupStates,
-      List<String> segments, int requestId, Set<String> unavailableSegments, Map<String, String> queryOptions) {
-    Map<String, String> selectedServers = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+  private static Pair<Map<String, String>, Map<String, String>> selectServersUsingRoundRobin(
+      SegmentGroupStates segmentGroupStates, List<String> segments, int requestId, List<String> unavailableSegments,
+      Map<String, String> queryOptions) {
+    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
+    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
     boolean useCompleteReplicaGroup = QueryOptionsUtils.isUseCompleteReplicaGroup(queryOptions);
     Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
     int numReplicaGroups = numReplicaGroupsToQuery == null ? 1 : numReplicaGroupsToQuery;
@@ -288,22 +280,31 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
       if (selectedInstanceIdx == -1) {
         int availableInstanceCnt = instanceGroup.getNumAvailableInstances(useCompleteReplicaGroup);
         if (availableInstanceCnt == 0) {
+          if (!instanceGroup.isNewSegment(segment)) {
+            unavailableSegments.add(segment);
+          }
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug(
+                "No available instance for {} segment: {} from instanceGroup: {} with useCompleteReplicaGroup: {}",
+                instanceGroup.isNewSegment(segment) ? "new" : "old", segment, instanceGroup.getId(),
+                useCompleteReplicaGroup);
+          }
           continue;
         }
         selectedInstanceIdx = (requestId + replicaOffset) % availableInstanceCnt;
         indexCache[instanceGroup.getId()] = selectedInstanceIdx;
       }
       String selectedInstance = instanceGroup.getInstance(selectedInstanceIdx, useCompleteReplicaGroup);
-      InstanceSegmentStates instanceSegmentStates = instanceGroup.getInstanceSegmentStates(selectedInstance);
-      if (instanceSegmentStates.isAvailableSegment(segment)) {
-        selectedServers.put(segment, selectedInstance);
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Selected instance: {} for segment: {} from instanceGroup: {} with useCompleteReplicaGroup: {}",
+            selectedInstance, segment, instanceGroup.getId(), useCompleteReplicaGroup);
       }
+      checkSegmentState(segment, selectedInstance, instanceGroup, segmentToSelectedInstanceMap,
+          optionalSegmentToInstanceMap, unavailableSegments);
       // Round robin selection across segment groups.
       replicaOffset = (replicaOffset + 1) % numReplicaGroups;
     }
-    collectUnavailableSegments(unavailableSegments, segmentGroupStates.getInstanceGroups(), indexCache,
-        useCompleteReplicaGroup);
-    return selectedServers;
+    return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
   private static List<String> fetchCandidateServersForQuery(SegmentGroupStates segmentGroupStates,
@@ -317,11 +318,13 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
     return new ArrayList<>(candidateServers);
   }
 
-  private static Map<String, String> selectServersUsingAdaptiveServerSelector(SegmentGroupStates segmentGroupStates,
-      List<String> segments, int requestId, Set<String> unavailableSegments, List<String> serverRankList,
-      Map<String, String> queryOptions) {
+  private static Pair<Map<String, String>, Map<String, String>> selectServersUsingAdaptiveServerSelector(
+      SegmentGroupStates segmentGroupStates, List<String> segments, int requestId, List<String> unavailableSegments,
+      List<String> serverRankList, Map<String, String> queryOptions) {
     // Copy the volatile reference to get a consistent view of the states to complete the selection.
-    Map<String, String> selectedServers = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
+    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
     boolean useCompleteReplicaGroup = QueryOptionsUtils.isUseCompleteReplicaGroup(queryOptions);
     int[] indexCache = initInstanceIndexCache(segmentGroupStates.getInstanceGroupCount());
     Map<String, InstanceGroup> segmentInstanceGroupMap = segmentGroupStates.getSegmentInstanceGroupMap();
@@ -336,6 +339,9 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
       if (selectedInstanceIdx == -1) {
         int availableInstanceCnt = instanceGroup.getNumAvailableInstances(useCompleteReplicaGroup);
         if (availableInstanceCnt == 0) {
+          if (!instanceGroup.isNewSegment(segment)) {
+            unavailableSegments.add(segment);
+          }
           continue;
         }
         selectedInstanceIdx = selectInstanceAdaptively(instanceGroup, serverRankList, requestId % availableInstanceCnt,
@@ -343,14 +349,10 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
         indexCache[instanceGroup.getId()] = selectedInstanceIdx;
       }
       String selectedInstance = instanceGroup.getInstance(selectedInstanceIdx, useCompleteReplicaGroup);
-      InstanceSegmentStates instanceSegmentStates = instanceGroup.getInstanceSegmentStates(selectedInstance);
-      if (instanceSegmentStates.isAvailableSegment(segment)) {
-        selectedServers.put(segment, selectedInstance);
-      }
+      checkSegmentState(segment, selectedInstance, instanceGroup, segmentToSelectedInstanceMap,
+          optionalSegmentToInstanceMap, unavailableSegments);
     }
-    collectUnavailableSegments(unavailableSegments, segmentGroupStates.getInstanceGroups(), indexCache,
-        useCompleteReplicaGroup);
-    return selectedServers;
+    return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
   private static int selectInstanceAdaptively(InstanceGroup instanceGroup, List<String> serverRankList,
@@ -376,37 +378,20 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
     return selectedInstanceIdx;
   }
 
-  /**
-   * Get all unavailable segments based on which instances are used for each segment group.
-   */
-  private static void collectUnavailableSegments(Set<String> unavailableSegments,
-      Collection<InstanceGroup> instanceGroups, int[] indexCache, boolean useCompleteReplicaGroup) {
-    for (InstanceGroup instanceGroup : instanceGroups) {
-      int instanceIdx = indexCache[instanceGroup.getId()];
-      if (instanceIdx == -1) {
-        unavailableSegments.addAll(instanceGroup._allOldSegments);
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Found no instances available for instanceGroup: {} so all oldSegments: {} are unavailable",
-              instanceGroup.getId(), instanceGroup._allOldSegments.size());
-        }
-      } else if (!useCompleteReplicaGroup) {
-        String instance = instanceGroup.getInstance(instanceIdx, false);
-        InstanceSegmentStates instanceSegmentStates = instanceGroup.getInstanceSegmentStates(instance);
-        unavailableSegments.addAll(instanceSegmentStates._unavailableSegments);
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Found instance: {} were available for instanceGroup: {} but with {} unavailable segments",
-              instance, instanceGroup.getId(), instanceSegmentStates._unavailableSegments.size());
-        }
-      } else {
-        // otherwise, all segments on the selected instance are completely available.
-        if (LOGGER.isDebugEnabled()) {
-          String instance = instanceGroup.getInstance(instanceIdx, true);
-          InstanceSegmentStates instanceSegmentStates = instanceGroup.getInstanceSegmentStates(instance);
-          LOGGER.debug(
-              "Found instance: {} were available for instanceGroup: {} and should have no unavailable segments: {}",
-              instance, instanceGroup.getId(), instanceSegmentStates._unavailableSegments.size());
-        }
-      }
+  private static void checkSegmentState(String segment, String selectedInstance, InstanceGroup instanceGroup,
+      Map<String, String> segmentToSelectedInstanceMap, Map<String, String> optionalSegmentToInstanceMap,
+      List<String> unavailableSegments) {
+    InstanceSegmentStates instanceSegmentStates = instanceGroup.getInstanceSegmentStates(selectedInstance);
+    if (instanceSegmentStates.isAvailableSegment(segment)) {
+      segmentToSelectedInstanceMap.put(segment, selectedInstance);
+    } else if (instanceSegmentStates.isOfflineNewSegments(segment)) {
+      optionalSegmentToInstanceMap.put(segment, selectedInstance);
+    } else if (instanceSegmentStates.isUnavailableSegments(segment)) {
+      unavailableSegments.add(segment);
+    } else if (LOGGER.isDebugEnabled()) {
+      // NOTE: the segments states tracked by the instance selector may not be updated yet. Like the other instance
+      // selectors, we just skip this segment and not report it as unavailable segment either.
+      LOGGER.debug("No segment states for segment: {} on instance: {}", segment, selectedInstance);
     }
   }
 
@@ -420,23 +405,43 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
   private static class InstanceGroup {
     private final int _id;
     private final Set<String> _instancesInIdealState;
-    private final Set<String> _allSegments = new HashSet<>();
-    private final Set<String> _allOldSegments = new HashSet<>();
-    private final Map<String, InstanceSegmentStates> _instanceSegmentStatesMap = new HashMap<>();
-    // The available instances and fully available instances can be updated separately based on enabled instances.
-    private final List<String> _availableInstances = new ArrayList<>();
-    private final List<String> _fullyAvailableInstances = new ArrayList<>();
+    private final Set<String> _allSegments;
+    private final Set<String> _newSegments;
+    private final Map<String, InstanceSegmentStates> _instanceSegmentStatesMap;
+    private final List<String> _availableInstances;
+    private final List<String> _completeInstances;
 
     public InstanceGroup(int id, Set<String> instancesInIdealState) {
       _id = id;
       _instancesInIdealState = instancesInIdealState;
+      _allSegments = new HashSet<>();
+      _newSegments = new HashSet<>();
+      _instanceSegmentStatesMap = new HashMap<>();
+      _availableInstances = new ArrayList<>();
+      _completeInstances = new ArrayList<>();
+    }
+
+    private InstanceGroup(int id, Set<String> instancesInIdealState, Set<String> allSegments, Set<String> newSegments,
+        Map<String, InstanceSegmentStates> instanceSegmentStatesMap, List<String> availableInstances,
+        List<String> fullyAvailableInstances) {
+      _id = id;
+      // Those collections are effectively immutable after InstanceGroup is created in updateSegmentMaps(), which
+      // always creates new InstanceGroups upon getting new external view or ideal states.
+      _instancesInIdealState = instancesInIdealState;
+      _allSegments = allSegments;
+      _newSegments = newSegments;
+      _instanceSegmentStatesMap = instanceSegmentStatesMap;
+      // Those collections can be updated after InstanceGroups are created when getting new set of enabled instances.
+      // And they are read concurrently when selecting servers to route queries so make a deep copy.
+      _availableInstances = new ArrayList<>(availableInstances);
+      _completeInstances = new ArrayList<>(fullyAvailableInstances);
     }
 
     public void addSegment(String segment, List<SegmentInstanceCandidate> candidates, boolean isNewSegment) {
       _allSegments.add(segment);
-      if (!isNewSegment) {
-        // In case no instances are enabled from this instance group, the unavailable segments are all old segments.
-        _allOldSegments.add(segment);
+      if (isNewSegment) {
+        // If no instances are available for the instance group, all segments are unavailable except the new segments.
+        _newSegments.add(segment);
       }
       Set<String> candidateInstances =
           candidates.stream().map(SegmentInstanceCandidate::getInstance).collect(Collectors.toSet());
@@ -451,7 +456,7 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
         } else if (candidateInstances.contains(instance)) {
           // New segments can have candidate instance that's offline, and those segments are not reported as
           // unavailable segments in query response.
-          Preconditions.checkState(isNewSegment, "Only NewSegment can be offline on candidate instance: " + instance);
+          Preconditions.checkState(isNewSegment, "Only newSegment can be offline on candidate instance: " + instance);
           instanceSegmentStates._offlineNewSegments.add(segment);
         } else {
           // Old segments always have same set of onlineInstances and candidateInstances, otherwise, it's unavailable
@@ -461,25 +466,9 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
       }
     }
 
-    public int getId() {
-      return _id;
-    }
-
-    public int getNumAvailableInstances(boolean useCompleteReplicaGroup) {
-      return useCompleteReplicaGroup ? _fullyAvailableInstances.size() : _availableInstances.size();
-    }
-
-    public String getInstance(int instanceIdx, boolean useCompleteReplicaGroup) {
-      return useCompleteReplicaGroup ? _fullyAvailableInstances.get(instanceIdx) : _availableInstances.get(instanceIdx);
-    }
-
-    public InstanceSegmentStates getInstanceSegmentStates(String instance) {
-      return _instanceSegmentStatesMap.get(instance);
-    }
-
     public void checkEnabledInstances(Set<String> enabledInstances) {
       _availableInstances.clear();
-      _fullyAvailableInstances.clear();
+      _completeInstances.clear();
       if (_instanceSegmentStatesMap.isEmpty()) {
         return;
       }
@@ -497,36 +486,52 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
       Collections.sort(_availableInstances);
       for (String instance : _availableInstances) {
         if (_instanceSegmentStatesMap.get(instance)._unavailableSegments.isEmpty()) {
-          _fullyAvailableInstances.add(instance);
+          _completeInstances.add(instance);
         }
       }
     }
 
-    public InstanceGroup copyForSelection() {
-      InstanceGroup ig = new InstanceGroup(_id, _instancesInIdealState);
-      ig._allOldSegments.addAll(_allOldSegments);
-      ig._availableInstances.addAll(_availableInstances);
-      ig._fullyAvailableInstances.addAll(_fullyAvailableInstances);
-      _instanceSegmentStatesMap.forEach((k, v) -> ig._instanceSegmentStatesMap.put(k, v.copyForSelection()));
-      return ig;
+    public int getId() {
+      return _id;
+    }
+
+    public boolean isNewSegment(String segment) {
+      return _newSegments.contains(segment);
+    }
+
+    public int getNumAvailableInstances(boolean useCompleteReplicaGroup) {
+      return useCompleteReplicaGroup ? _completeInstances.size() : _availableInstances.size();
+    }
+
+    public String getInstance(int instanceIdx, boolean useCompleteReplicaGroup) {
+      return useCompleteReplicaGroup ? _completeInstances.get(instanceIdx) : _availableInstances.get(instanceIdx);
+    }
+
+    public InstanceSegmentStates getInstanceSegmentStates(String instance) {
+      return _instanceSegmentStatesMap.get(instance);
+    }
+
+    public InstanceGroup copyForRead() {
+      return new InstanceGroup(_id, _instancesInIdealState, _allSegments, _newSegments, _instanceSegmentStatesMap,
+          _availableInstances, _completeInstances);
     }
 
     @Override
     public String toString() {
       return "InstanceGroup{" + "_id=" + _id + ", _instancesInIdealState=" + _instancesInIdealState + ", _allSegments="
-          + _allSegments + ", _allOldSegments=" + _allOldSegments + ", _instanceSegmentStatesMap="
-          + _instanceSegmentStatesMap + ", _availableInstances=" + _availableInstances + ", _fullyAvailableInstances="
-          + _fullyAvailableInstances + '}';
+          + _allSegments + ", _newSegments=" + _newSegments + ", _instanceSegmentStatesMap=" + _instanceSegmentStatesMap
+          + ", _availableInstances=" + _availableInstances + ", _completeInstances=" + _completeInstances + '}';
     }
   }
 
   private static class InstanceSegmentStates {
     private final Set<String> _availableSegments = new HashSet<>();
     private final Set<String> _unavailableSegments = new HashSet<>();
-    // TODO: treat offline NewSegments as optional segments according to PR#11978.
+    // Those offline NewSegments are treated as optional segments, so that broker or server can skip it upon any
+    // issue to process it.
     private final Set<String> _offlineNewSegments = new HashSet<>();
 
-    public InstanceSegmentStates copyForSelection() {
+    public InstanceSegmentStates copyForRead() {
       InstanceSegmentStates iss = new InstanceSegmentStates();
       iss._availableSegments.addAll(_availableSegments);
       iss._unavailableSegments.addAll(_unavailableSegments);
@@ -538,6 +543,14 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
       return _availableSegments.contains(segment);
     }
 
+    public boolean isOfflineNewSegments(String segment) {
+      return _offlineNewSegments.contains(segment);
+    }
+
+    public boolean isUnavailableSegments(String segment) {
+      return _unavailableSegments.contains(segment);
+    }
+
     @Override
     public String toString() {
       return "InstanceSegmentStates{" + "_availableSegments=" + _availableSegments + ", _unavailableSegments="
@@ -546,17 +559,17 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
   }
 
   private static class SegmentGroupStates {
-    private final List<InstanceGroup> _instanceGroups = new ArrayList<>();
     private final Set<String> _servingInstances;
+    private final List<InstanceGroup> _instanceGroups = new ArrayList<>();
     private final Map<String, InstanceGroup> _segmentInstanceGroupMap = new HashMap<>();
 
     public SegmentGroupStates(Map<Set<String>, InstanceGroup> instanceGroups, Set<String> servingInstances) {
-      for (InstanceGroup instanceGroup : instanceGroups.values()) {
-        InstanceGroup copy = instanceGroup.copyForSelection();
-        _instanceGroups.add(copy);
-        instanceGroup._allSegments.forEach(segment -> _segmentInstanceGroupMap.put(segment, copy));
-      }
       _servingInstances = servingInstances;
+      for (InstanceGroup instanceGroup : instanceGroups.values()) {
+        InstanceGroup copy = instanceGroup.copyForRead();
+        instanceGroup._allSegments.forEach(segment -> _segmentInstanceGroupMap.put(segment, copy));
+        _instanceGroups.add(copy);
+      }
     }
 
     public int getInstanceGroupCount() {
@@ -569,14 +582,6 @@ public class StrictReplicaGroupInstanceSelector implements InstanceSelector {
 
     public Map<String, InstanceGroup> getSegmentInstanceGroupMap() {
       return _segmentInstanceGroupMap;
-    }
-
-    public List<InstanceGroup> getInstanceGroups() {
-      return _instanceGroups;
-    }
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
-          _oldSegmentCandidatesMap.keySet());
     }
   }
 }
