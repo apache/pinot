@@ -204,16 +204,8 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
    */
   @Nullable
   private E readBlockOrNull() {
-    // in case _lastRead is _mailboxes.size() - 1, we just skip this loop.
-    for (int i = _lastRead + 1; i < _mailboxes.size(); i++) {
-      AsyncStream<E> mailbox = _mailboxes.get(i);
-      E block = mailbox.poll();
-      if (block != null) {
-        _lastRead = i;
-        return block;
-      }
-    }
-    for (int i = 0; i <= _lastRead; i++) {
+    int len = _mailboxes.size();
+    for (int count = len, i = (_lastRead + 1) % len; count > 0; count--, i = (i + 1) % len) {
       AsyncStream<E> mailbox = _mailboxes.get(i);
       E block = mailbox.poll();
       if (block != null) {
