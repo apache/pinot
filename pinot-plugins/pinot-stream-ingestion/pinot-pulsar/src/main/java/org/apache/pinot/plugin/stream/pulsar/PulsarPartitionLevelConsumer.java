@@ -73,10 +73,11 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
 
     final Collection<PulsarStreamMessage> messages = Collections.synchronizedList(new ArrayList<>());
 
-    CompletableFuture<PulsarMessageBatch> pulsarResultFuture = fetchMessagesAsync(startMessageId, endMessageId, messages)
+    CompletableFuture<PulsarMessageBatch> pulsarResultFuture = fetchMessagesAsync(startMessageId, endMessageId,
+        messages)
         .orTimeout(timeoutMillis, TimeUnit.MILLISECONDS)
         .handle((v, t) -> {
-          if (! (t instanceof TimeoutException)) {
+          if (!(t instanceof TimeoutException)) {
             LOGGER.warn("Error while fetching records from Pulsar", t);
           }
           return new PulsarMessageBatch(buildOffsetFilteringIterable(messages, startMessageId, endMessageId),
@@ -102,7 +103,7 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
       Collection<PulsarStreamMessage> messages) {
     CompletableFuture<Boolean> hasMessagesFut = _reader.hasMessageAvailableAsync();
     CompletableFuture<Message<byte[]>> messageFut = hasMessagesFut.thenCompose(msgAvailable ->
-        (msgAvailable)? _reader.readNextAsync() : CompletableFuture.completedFuture(null));
+        (msgAvailable) ? _reader.readNextAsync() : CompletableFuture.completedFuture(null));
     CompletableFuture<Void> handleMessageFut = messageFut.thenCompose(messageOrNull ->
         readMessageAndFetchNextOrComplete(endMessageId, messages, messageOrNull));
     return handleMessageFut;
@@ -120,7 +121,8 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     return fetchNextMessageAndAddToCollection(endMessageId, messages);
   }
 
-  private Iterable<PulsarStreamMessage> buildOffsetFilteringIterable(final Iterable<PulsarStreamMessage> messageAndOffsets,
+  private Iterable<PulsarStreamMessage> buildOffsetFilteringIterable(
+      final Iterable<PulsarStreamMessage> messageAndOffsets,
       final MessageId startOffset, final MessageId endOffset) {
     return Iterables.filter(messageAndOffsets, input -> {
       // Filter messages that are either null or have an offset ∉ [startOffset, endOffset]
@@ -128,12 +130,9 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
           (endOffset == null) || (input.getMessageId().compareTo(endOffset) < 0));
     });
   }
-
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _reader.close();
     super.close();
   }
-
 }
