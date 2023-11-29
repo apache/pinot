@@ -58,15 +58,22 @@ import org.slf4j.LoggerFactory;
 public class WorkerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerManager.class);
   private static final Random RANDOM = new Random();
+  private static final String DEFAULT_PARTITION_FUNCTION = "Hashcode";
 
   private final String _hostName;
   private final int _port;
   private final RoutingManager _routingManager;
+  private final String _defaultPartitionFunc;
 
   public WorkerManager(String hostName, int port, RoutingManager routingManager) {
+    this(hostName, port, routingManager, DEFAULT_PARTITION_FUNCTION);
+  }
+
+  public WorkerManager(String hostName, int port, RoutingManager routingManager, String defaultPartitionFunc) {
     _hostName = hostName;
     _port = port;
     _routingManager = routingManager;
+    _defaultPartitionFunc = defaultPartitionFunc;
   }
 
   public void assignWorkers(PlanFragment rootFragment, DispatchablePlanContext context) {
@@ -106,18 +113,7 @@ public class WorkerManager {
       // when partition key is not given, we do not partition assign workers for leaf-stage.
       assignWorkersToNonPartitionedLeafFragment(metadata, context);
     } else {
-      // when partition key exist, we assign workers for leaf-stage in partitioned fashion.
-      String numPartitionsStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
-      Preconditions.checkState(numPartitionsStr != null, "'%s' must be provided for partition key: %s",
-          PinotHintOptions.TableHintOptions.PARTITION_SIZE, partitionKey);
-      int numPartitions = Integer.parseInt(numPartitionsStr);
-      Preconditions.checkState(numPartitions > 0, "'%s' must be positive, got: %s",
-          PinotHintOptions.TableHintOptions.PARTITION_SIZE, numPartitions);
-      String partitionParallelismStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
-      int partitionParallelism = partitionParallelismStr != null ? Integer.parseInt(partitionParallelismStr) : 1;
-      Preconditions.checkState(partitionParallelism > 0, "'%s' must be positive: %s, got: %s",
-          PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM, partitionParallelism);
-      assignWorkersToPartitionedLeafFragment(metadata, context, partitionKey, numPartitions, partitionParallelism);
+      assignWorkersToPartitionedLeafFragment(metadata, context, partitionKey, tableOptions);
     }
   }
 
@@ -209,9 +205,28 @@ public class WorkerManager {
   }
 
   private void assignWorkersToPartitionedLeafFragment(DispatchablePlanMetadata metadata,
-      DispatchablePlanContext context, String partitionKey, int numPartitions, int partitionParallelism) {
+      DispatchablePlanContext context, String partitionKey, Map<String, String> tableOptions) {
+    // when partition key exist, we assign workers for leaf-stage in partitioned fashion.
+
+    String numPartitionsStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
+    Preconditions.checkState(numPartitionsStr != null, "'%s' must be provided for partition key: %s",
+        PinotHintOptions.TableHintOptions.PARTITION_SIZE, partitionKey);
+    int numPartitions = Integer.parseInt(numPartitionsStr);
+    Preconditions.checkState(numPartitions > 0, "'%s' must be positive, got: %s",
+        PinotHintOptions.TableHintOptions.PARTITION_SIZE, numPartitions);
+
+    // TODO: make enum of partition functions that are supported.
+    String partitionFunction = tableOptions.getOrDefault(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION,
+        _defaultPartitionFunc);
+
+    String partitionParallelismStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
+    int partitionParallelism = partitionParallelismStr != null ? Integer.parseInt(partitionParallelismStr) : 1;
+    Preconditions.checkState(partitionParallelism > 0, "'%s' must be positive: %s, got: %s",
+        PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM, partitionParallelism);
+
     String tableName = metadata.getScannedTables().get(0);
-    ColocatedTableInfo colocatedTableInfo = getColocatedTableInfo(tableName, partitionKey, numPartitions);
+    ColocatedTableInfo colocatedTableInfo =
+        getColocatedTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
 
     // Pick one server per partition
     // NOTE: Pick server based on the request id so that the same server is picked across different table scan when the
@@ -239,10 +254,7 @@ public class WorkerManager {
     metadata.setWorkerIdToServerInstanceMap(workedIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
     metadata.setTimeBoundaryInfo(colocatedTableInfo._timeBoundaryInfo);
-    // TODO: partition parallelism is actually referring to the next stage desired paralelism.
-    // At the current leaf stage, the partition parallelism is always 1 --> 1 partition, 1 opChain/worker
-    //     it is only when it exchanges against the next stage when it desires to fan out into 2 or more parallelism.
-    // Ideally, this config should be part of the next stage hint but unfortunately we cant support that as of now.
+    metadata.setPartitionFunction(partitionFunction);
     metadata.setPartitionParallelism(partitionParallelism);
   }
 
@@ -261,8 +273,9 @@ public class WorkerManager {
     // 1. create multiple intermediate stage workers on the same instance for each worker in the first child if the
     //    first child is a table scan. this is b/c we cannot pre-config parallelism on leaf stage thus needs fan-out.
     // 2. ignore partition parallelism when first child is NOT table scan b/c it would've done fan-out already.
-    if (isPartitionedIntermediateStage(metadata, children, context)) {
-      DispatchablePlanMetadata firstChildMetadata = metadataMap.get(children.get(0).getFragmentId());
+    DispatchablePlanMetadata firstChildMetadata = children.isEmpty() ? null
+        : metadataMap.get(children.get(0).getFragmentId());
+    if (firstChildMetadata != null && firstChildMetadata.isPrePartitioned()) {
       int partitionParallelism = firstChildMetadata.getPartitionParallelism();
       Map<Integer, QueryServerInstance> childWorkerIdToServerInstanceMap =
           firstChildMetadata.getWorkerIdToServerInstanceMap();
@@ -280,6 +293,7 @@ public class WorkerManager {
         }
         metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
       }
+      metadata.setPartitionFunction(firstChildMetadata.getPartitionFunction());
     } else {
       // If the query has more than one table, it is possible that the tables could be hosted on different tenants.
       // The intermediate stage will be processed on servers randomly picked from the tenants belonging to either or
@@ -302,22 +316,9 @@ public class WorkerManager {
           }
         }
         metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
+        metadata.setPartitionFunction(null);
       }
     }
-  }
-
-  private boolean isPartitionedIntermediateStage(DispatchablePlanMetadata parent, List<PlanFragment> children,
-      DispatchablePlanContext context) {
-    // Note:
-    // 1 Here inherent the first children's partition worker assignment if the mailbox send from the 1st-child is
-    //     already pre-partitioned: this guarantees no data shuffling if we reuse the worker assignment on 1st-child.
-    // 2. The current limitation is that this 1st-child rule only works b/c PinotRelDistributionTraitRule also attaches
-    //     partition trait from 1st-child.
-    if (children.isEmpty()) {
-      return false;
-    }
-    DispatchablePlanMetadata child = context.getDispatchablePlanMetadataMap().get(children.get(0).getFragmentId());
-    return child.isPrePartitioned();
   }
 
   private List<ServerInstance> assignServerInstances(DispatchablePlanContext context) {
@@ -374,7 +375,8 @@ public class WorkerManager {
     return serverInstances;
   }
 
-  private ColocatedTableInfo getColocatedTableInfo(String tableName, String partitionKey, int numPartitions) {
+  private ColocatedTableInfo getColocatedTableInfo(String tableName, String partitionKey, int numPartitions,
+      String partitionFunction) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
       String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
@@ -388,12 +390,12 @@ public class WorkerManager {
         TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
         // Ignore OFFLINE side when time boundary info is unavailable
         if (timeBoundaryInfo == null) {
-          return getRealtimeColocatedTableInfo(realtimeTableName, partitionKey, numPartitions);
+          return getRealtimeColocatedTableInfo(realtimeTableName, partitionKey, numPartitions, partitionFunction);
         }
-        PartitionInfo[] offlinePartitionInfoMap =
-            getTablePartitionInfo(offlineTableName, partitionKey, numPartitions).getPartitionInfoMap();
-        PartitionInfo[] realtimePartitionInfoMap =
-            getTablePartitionInfo(realtimeTableName, partitionKey, numPartitions).getPartitionInfoMap();
+        PartitionInfo[] offlinePartitionInfoMap = getTablePartitionInfo(offlineTableName, partitionKey, numPartitions,
+            partitionFunction).getPartitionInfoMap();
+        PartitionInfo[] realtimePartitionInfoMap = getTablePartitionInfo(realtimeTableName, partitionKey, numPartitions,
+            partitionFunction).getPartitionInfoMap();
         ColocatedPartitionInfo[] colocatedPartitionInfoMap = new ColocatedPartitionInfo[numPartitions];
         for (int i = 0; i < numPartitions; i++) {
           PartitionInfo offlinePartitionInfo = offlinePartitionInfoMap[i];
@@ -423,20 +425,21 @@ public class WorkerManager {
         }
         return new ColocatedTableInfo(colocatedPartitionInfoMap, timeBoundaryInfo);
       } else if (offlineRoutingExists) {
-        return getOfflineColocatedTableInfo(offlineTableName, partitionKey, numPartitions);
+        return getOfflineColocatedTableInfo(offlineTableName, partitionKey, numPartitions, partitionFunction);
       } else {
-        return getRealtimeColocatedTableInfo(realtimeTableName, partitionKey, numPartitions);
+        return getRealtimeColocatedTableInfo(realtimeTableName, partitionKey, numPartitions, partitionFunction);
       }
     } else {
       if (tableType == TableType.OFFLINE) {
-        return getOfflineColocatedTableInfo(tableName, partitionKey, numPartitions);
+        return getOfflineColocatedTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
       } else {
-        return getRealtimeColocatedTableInfo(tableName, partitionKey, numPartitions);
+        return getRealtimeColocatedTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
       }
     }
   }
 
-  private TablePartitionInfo getTablePartitionInfo(String tableNameWithType, String partitionKey, int numPartitions) {
+  private TablePartitionInfo getTablePartitionInfo(String tableNameWithType, String partitionKey, int numPartitions,
+      String partitionFunction) {
     TablePartitionInfo tablePartitionInfo = _routingManager.getTablePartitionInfo(tableNameWithType);
     Preconditions.checkState(tablePartitionInfo != null, "Failed to find table partition info for table: %s",
         tableNameWithType);
@@ -446,6 +449,9 @@ public class WorkerManager {
     Preconditions.checkState(tablePartitionInfo.getNumPartitions() == numPartitions,
         "Partition size mismatch (hint: %s, table: %s) for table: %s", numPartitions,
         tablePartitionInfo.getNumPartitions(), tableNameWithType);
+    Preconditions.checkState(tablePartitionInfo.getPartitionFunctionName().equals(partitionFunction),
+        "Partition function mismatch (hint: %s, table: %s) for table %s", partitionFunction,
+        tablePartitionInfo.getPartitionFunctionName(), tableNameWithType);
     Preconditions.checkState(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty(),
         "Find %s segments with invalid partition for table: %s",
         tablePartitionInfo.getSegmentsWithInvalidPartition().size(), tableNameWithType);
@@ -453,9 +459,9 @@ public class WorkerManager {
   }
 
   private ColocatedTableInfo getOfflineColocatedTableInfo(String offlineTableName, String partitionKey,
-      int numPartitions) {
+      int numPartitions, String partitionFunction) {
     PartitionInfo[] partitionInfoMap =
-        getTablePartitionInfo(offlineTableName, partitionKey, numPartitions).getPartitionInfoMap();
+        getTablePartitionInfo(offlineTableName, partitionKey, numPartitions, partitionFunction).getPartitionInfoMap();
     ColocatedPartitionInfo[] colocatedPartitionInfoMap = new ColocatedPartitionInfo[numPartitions];
     for (int i = 0; i < numPartitions; i++) {
       PartitionInfo partitionInfo = partitionInfoMap[i];
@@ -468,9 +474,9 @@ public class WorkerManager {
   }
 
   private ColocatedTableInfo getRealtimeColocatedTableInfo(String realtimeTableName, String partitionKey,
-      int numPartitions) {
+      int numPartitions, String partitionFunction) {
     PartitionInfo[] partitionInfoMap =
-        getTablePartitionInfo(realtimeTableName, partitionKey, numPartitions).getPartitionInfoMap();
+        getTablePartitionInfo(realtimeTableName, partitionKey, numPartitions, partitionFunction).getPartitionInfoMap();
     ColocatedPartitionInfo[] colocatedPartitionInfoMap = new ColocatedPartitionInfo[numPartitions];
     for (int i = 0; i < numPartitions; i++) {
       PartitionInfo partitionInfo = partitionInfoMap[i];
