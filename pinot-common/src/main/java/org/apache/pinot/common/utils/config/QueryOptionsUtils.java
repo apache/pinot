@@ -145,6 +145,10 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }
 
+  public static boolean isUseCompleteReplicaGroup(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_COMPLETE_REPLICA_GROUP, "true"));
+  }
+
   @Nullable
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
     String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);

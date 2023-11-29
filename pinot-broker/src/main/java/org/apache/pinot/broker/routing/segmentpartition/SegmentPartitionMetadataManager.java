@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.routing.instanceselector.InstanceSelector;
+import org.apache.pinot.broker.routing.instanceselector.InstanceSelectorUtils;
 import org.apache.pinot.broker.routing.segmentmetadata.SegmentZkMetadataFetchListener;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.SegmentUtils;
@@ -148,7 +148,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
         continue;
       }
       // Process new segments in the end
-      if (InstanceSelector.isNewSegment(segmentInfo._creationTimeMs, currentTimeMs)) {
+      if (InstanceSelectorUtils.isNewSegment(segmentInfo._creationTimeMs, currentTimeMs)) {
         newSegmentInfoEntries.add(entry);
         continue;
       }

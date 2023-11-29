@@ -105,7 +105,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       if (candidates == null) {
         continue;
       }
-      // Round robin selection.
       int numCandidates = candidates.size();
       int instanceIdx = (requestId + replicaOffset) % numCandidates;
       SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
@@ -119,6 +118,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       if (numReplicaGroups > numCandidates) {
         numReplicaGroups = numCandidates;
       }
+      // Round robin selection across segment groups.
       replicaOffset = (replicaOffset + 1) % numReplicaGroups;
     }
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
@@ -136,12 +136,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       if (candidates == null) {
         continue;
       }
-      // Round Robin.
+      // TODO: Support round robin and numReplicaGroupsToQuery with Adaptive Server Selection.
       int numCandidates = candidates.size();
       int instanceIdx = requestId % numCandidates;
       SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
       // Adaptive Server Selection
-      // TODO: Support numReplicaGroupsToQuery with Adaptive Server Selection.
       if (!serverRankList.isEmpty()) {
         int minIdx = Integer.MAX_VALUE;
         for (SegmentInstanceCandidate candidate : candidates) {

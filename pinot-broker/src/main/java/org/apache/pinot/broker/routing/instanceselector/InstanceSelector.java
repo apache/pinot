@@ -21,7 +21,6 @@ package org.apache.pinot.broker.routing.instanceselector;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -33,11 +32,8 @@ import org.apache.pinot.common.request.BrokerRequest;
  * The instance selector selects server instances to serve the query based on the selected segments.
  */
 public interface InstanceSelector {
-  long NEW_SEGMENT_EXPIRATION_MILLIS = TimeUnit.MINUTES.toMillis(5);
-
-  static boolean isNewSegment(long creationTimeMs, long currentTimeMs) {
-    return creationTimeMs > 0 && currentTimeMs - creationTimeMs <= NEW_SEGMENT_EXPIRATION_MILLIS;
-  }
+  // To prevent int overflow, reset the request id once it reaches this value
+  long MAX_REQUEST_ID = 1_000_000_000;
 
   /**
    * Initializes the instance selector with the enabled instances, ideal state, external view and online segments
