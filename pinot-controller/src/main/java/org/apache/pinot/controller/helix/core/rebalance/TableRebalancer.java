@@ -172,6 +172,7 @@ public class TableRebalancer {
     boolean bootstrap = rebalanceConfig.isBootstrap();
     boolean downtime = rebalanceConfig.isDowntime();
     int minReplicasToKeepUpForNoDowntime = rebalanceConfig.getMinAvailableReplicas();
+    boolean lowDiskMode = rebalanceConfig.isLowDiskMode();
     boolean bestEfforts = rebalanceConfig.isBestEfforts();
     long externalViewCheckIntervalInMs = rebalanceConfig.getExternalViewCheckIntervalInMs();
     long externalViewStabilizationTimeoutInMs = rebalanceConfig.getExternalViewStabilizationTimeoutInMs();
@@ -180,10 +181,11 @@ public class TableRebalancer {
         tableConfig.getRoutingConfig().getInstanceSelectorType());
     LOGGER.info(
         "Start rebalancing table: {} with dryRun: {}, reassignInstances: {}, includeConsuming: {}, bootstrap: {}, "
-            + "downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, bestEfforts: {}, "
-            + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}", tableNameWithType, dryRun,
-        reassignInstances, includeConsuming, bootstrap, downtime, minReplicasToKeepUpForNoDowntime,
-        enableStrictReplicaGroup, bestEfforts, externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs);
+            + "downtime: {}, minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, lowDiskMode: {}, "
+            + "bestEfforts: {}, externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}",
+        tableNameWithType, dryRun, reassignInstances, includeConsuming, bootstrap, downtime,
+        minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts,
+        externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs);
 
     // Fetch ideal state
     PropertyKey idealStatePropertyKey = _helixDataAccessor.keyBuilder().idealStates(tableNameWithType);
@@ -483,7 +485,8 @@ public class TableRebalancer {
             tierToInstancePartitionsMap, targetAssignment);
       }
       Map<String, Map<String, String>> nextAssignment =
-          getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup);
+          getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
+              lowDiskMode);
       LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be moved to "
               + "each instance: {}", rebalanceJobId, tableNameWithType,
           SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, nextAssignment));
@@ -847,15 +850,17 @@ public class TableRebalancer {
    */
   @VisibleForTesting
   static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
-      Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup) {
+      Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
+      boolean lowDiskMode) {
     return enableStrictReplicaGroup ? getNextStrictReplicaGroupAssignment(currentAssignment, targetAssignment,
-        minAvailableReplicas)
-        : getNextNonStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas);
+        minAvailableReplicas, lowDiskMode)
+        : getNextNonStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas,
+            lowDiskMode);
   }
 
   private static Map<String, Map<String, String>> getNextStrictReplicaGroupAssignment(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
-      int minAvailableReplicas) {
+      int minAvailableReplicas, boolean lowDiskMode) {
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
     Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
@@ -866,7 +871,7 @@ public class TableRebalancer {
       Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
       SingleSegmentAssignment assignment =
           getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
-              numSegmentsToOffloadMap, assignmentMap);
+              lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
       Set<String> assignedInstances = assignment._instanceStateMap.keySet();
       Set<String> availableInstances = assignment._availableInstances;
       availableInstancesMap.compute(assignedInstances, (k, currentAvailableInstances) -> {
@@ -897,7 +902,7 @@ public class TableRebalancer {
 
   private static Map<String, Map<String, String>> getNextNonStrictReplicaGroupAssignment(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
-      int minAvailableReplicas) {
+      int minAvailableReplicas, boolean lowDiskMode) {
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
     Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
@@ -907,7 +912,7 @@ public class TableRebalancer {
       Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
       Map<String, String> nextInstanceStateMap =
           getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
-              numSegmentsToOffloadMap, assignmentMap)._instanceStateMap;
+              lowDiskMode, numSegmentsToOffloadMap, assignmentMap)._instanceStateMap;
       nextAssignment.put(segmentName, nextInstanceStateMap);
       updateNumSegmentsToOffloadMap(numSegmentsToOffloadMap, currentInstanceStateMap.keySet(),
           nextInstanceStateMap.keySet());
@@ -954,7 +959,7 @@ public class TableRebalancer {
    */
   @VisibleForTesting
   static SingleSegmentAssignment getNextSingleSegmentAssignment(Map<String, String> currentInstanceStateMap,
-      Map<String, String> targetInstanceStateMap, int minAvailableReplicas,
+      Map<String, String> targetInstanceStateMap, int minAvailableReplicas, boolean lowDiskMode,
       Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap) {
     Map<String, String> nextInstanceStateMap = new TreeMap<>();
 
@@ -1005,16 +1010,23 @@ public class TableRebalancer {
     }
     Set<String> availableInstances = new TreeSet<>(nextInstanceStateMap.keySet());
 
-    // Add target instances until the number of instances matched
-    int numInstancesToAdd = targetInstanceStateMap.size() - nextInstanceStateMap.size();
-    if (numInstancesToAdd > 0) {
-      // Sort instances by number of segments to offload, and add the ones with the least segments to offload
-      List<Triple<String, String, Integer>> instancesInfo =
-          getSortedInstancesOnNumSegmentsToOffload(targetInstanceStateMap, nextInstanceStateMap,
-              numSegmentsToOffloadMap);
-      for (int i = 0; i < numInstancesToAdd; i++) {
-        Triple<String, String, Integer> instanceInfo = instancesInfo.get(i);
-        nextInstanceStateMap.put(instanceInfo.getLeft(), instanceInfo.getMiddle());
+    // After achieving the min available replicas, when low disk mode is enabled, only add new instances when all
+    // current instances exist in the next assignment.
+    // We want to first drop the extra instances as one step, then add the target instances as another step to avoid the
+    // case where segments are first added to the instance before other segments are dropped from the instance, which
+    // might cause server running out of disk. Note that even if segment addition and drop happen in the same step,
+    // there is no guarantee that server process the segment drop before the segment addition.
+    if (!lowDiskMode || currentInstanceStateMap.size() == nextInstanceStateMap.size()) {
+      int numInstancesToAdd = targetInstanceStateMap.size() - nextInstanceStateMap.size();
+      if (numInstancesToAdd > 0) {
+        // Sort instances by number of segments to offload, and add the ones with the least segments to offload
+        List<Triple<String, String, Integer>> instancesInfo =
+            getSortedInstancesOnNumSegmentsToOffload(targetInstanceStateMap, nextInstanceStateMap,
+                numSegmentsToOffloadMap);
+        for (int i = 0; i < numInstancesToAdd; i++) {
+          Triple<String, String, Integer> instanceInfo = instancesInfo.get(i);
+          nextInstanceStateMap.put(instanceInfo.getLeft(), instanceInfo.getMiddle());
+        }
       }
     }
 
