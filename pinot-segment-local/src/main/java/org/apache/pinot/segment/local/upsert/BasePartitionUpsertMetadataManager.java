@@ -694,7 +694,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   @Override
   public void removeExpiredPrimaryKeys() {
-    if (_metadataTTL <= 0) {
+    if (_metadataTTL <= 0 && _deletedKeysTTL <= 0) {
       return;
     }
     if (!startOperation()) {
@@ -707,27 +707,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       finishOperation();
     }
   }
-
-  @Override
-  public void removeExpiredDeletedKeys() {
-    if (_deletedKeysTTL <= 0) {
-      return;
-    }
-    if (!startOperation()) {
-      _logger.info("Skip removing expired deleted primary keys because metadata manager is already stopped");
-      return;
-    }
-    try {
-      doRemoveExpiredDeletedKeys();
-    } finally {
-      finishOperation();
-    }
-  }
-
-  /**
-   * Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL) and deleted.
-   */
-  protected abstract void doRemoveExpiredDeletedKeys();
 
   /**
    * Removes all primary keys that have comparison value smaller than (largestSeenComparisonValue - TTL).

@@ -1060,7 +1060,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(queryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{});
 
     // delete-key segment2: 2 -> {1, 120}
-    upsertMetadataManager.removeExpiredDeletedKeys();
+    upsertMetadataManager.removeExpiredPrimaryKeys();
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}
     // segment2: 3 -> {2, 150}
     checkRecordLocationForTTL(recordLocationMap, 0, segment1, 0, 100, hashFunction);
