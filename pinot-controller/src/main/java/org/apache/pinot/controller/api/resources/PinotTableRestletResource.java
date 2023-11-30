@@ -602,6 +602,7 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
       notes = "Rebalances a table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(
+      //@formatter:off
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun")
@@ -609,19 +610,24 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false")
       @QueryParam("reassignInstances") boolean reassignInstances,
       @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("false")
-      @QueryParam("includeConsuming") boolean includeConsuming, @ApiParam(
-      value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all "
-          + "segments in a round-robin fashion as if adding new segments to an empty table)") @DefaultValue("false")
-  @QueryParam("bootstrap") boolean bootstrap,
+      @QueryParam("includeConsuming") boolean includeConsuming,
+      @ApiParam(value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, "
+          + "reassign all segments in a round-robin fashion as if adding new segments to an empty table)")
+      @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
       boolean downtime,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or "
           + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
-  @QueryParam("minAvailableReplicas") int minAvailableReplicas, @ApiParam(
-      value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
-          + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts, @ApiParam(
-      value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
-  @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
+      @QueryParam("minAvailableReplicas") int minAvailableReplicas,
+      @ApiParam(value = "For no-downtime rebalance, whether to enable low disk mode during rebalance. When enabled, "
+          + "segments will first be offloaded from servers, then added to servers after offload is done while "
+          + "maintaining the min available replicas. It may increase the total time of the rebalance, but can be "
+          + "useful when servers are low on disk space, and we want to scale up the cluster and rebalance the table to "
+          + "more servers.") @DefaultValue("false") @QueryParam("lowDiskMode") boolean lowDiskMode,
+      @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime "
+          + "contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
+      @ApiParam(value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
+      @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
       @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
       @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs,
       @ApiParam(value = "How often to make a status update (i.e. heartbeat)") @DefaultValue("300000")
@@ -629,10 +635,13 @@ public class PinotTableRestletResource {
       @ApiParam(value = "How long to wait for next status update (i.e. heartbeat) before the job is considered failed")
       @DefaultValue("3600000") @QueryParam("heartbeatTimeoutInMs") long heartbeatTimeoutInMs,
       @ApiParam(value = "Max number of attempts to rebalance") @DefaultValue("3") @QueryParam("maxAttempts")
-      int maxAttempts, @ApiParam(value = "Initial delay to exponentially backoff retry") @DefaultValue("300000")
-  @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
+      int maxAttempts,
+      @ApiParam(value = "Initial delay to exponentially backoff retry") @DefaultValue("300000")
+      @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
-      @QueryParam("updateTargetTier") boolean updateTargetTier) {
+      @QueryParam("updateTargetTier") boolean updateTargetTier
+      //@formatter:on
+  ) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
@@ -641,6 +650,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setBootstrap(bootstrap);
     rebalanceConfig.setDowntime(downtime);
     rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
+    rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
     rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
