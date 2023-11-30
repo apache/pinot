@@ -159,6 +159,12 @@ rules:
   ## In case a metric does not fit the catch-all patterns, add them before this comment
   # This is a catch-all pattern for pinot table metrics with offline/realtime suffix without kafka topic
   # Patterns after this line may be skipped.
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
+  name: "pinot_$1_$4_$5"
+  cache: true
+  labels:
+    table: "$2"
+    tableType: "$3"
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$6"
   cache: true
