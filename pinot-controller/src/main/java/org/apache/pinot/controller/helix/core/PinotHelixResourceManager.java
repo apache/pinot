@@ -112,6 +112,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
@@ -2002,10 +2003,12 @@ public class PinotHelixResourceManager {
         } catch (HelixException e) {
           LOGGER.warn("Caught exception while resetting resource: {}", tableNameWithType, e);
         }
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED, 0);
         return PinotResourceManagerResponse.success(
             "Table: " + tableNameWithType + " enabled (reset success = " + resetSuccessful + ")");
       case DISABLE:
         _helixAdmin.enableResource(_helixClusterName, tableNameWithType, false);
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED, 1);
         return PinotResourceManagerResponse.success("Table: " + tableNameWithType + " disabled");
       case DROP:
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -3031,10 +3034,12 @@ public class PinotHelixResourceManager {
   }
 
   public PinotResourceManagerResponse enableInstance(String instanceName) {
+    _controllerMetrics.setValueOfInstanceGauge(instanceName, ControllerGauge.INSTANCE_DISABLED, 0);
     return enableInstance(instanceName, true, 10_000L);
   }
 
   public PinotResourceManagerResponse disableInstance(String instanceName) {
+    _controllerMetrics.setValueOfInstanceGauge(instanceName, ControllerGauge.INSTANCE_DISABLED, 1);
     return enableInstance(instanceName, false, 10_000L);
   }
 

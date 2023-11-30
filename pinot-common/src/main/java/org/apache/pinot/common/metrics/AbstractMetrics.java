@@ -390,6 +390,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
+   * Sets the value of an instance gauge.
+   * @param instanceName the instance name
+   * @param gauge the gauge to use
+   * @param value the value to set the gauge to
+   */
+  public void setValueOfInstanceGauge(final String instanceName, final G gauge, final long value) {
+    final String fullGaugeName = gauge.getGaugeName() + "." + instanceName;
+    setValueOfGauge(value, fullGaugeName);
+  }
+  /**
    * Sets the value of a table partition gauge.
    *
    * @param tableName The table name

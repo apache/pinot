@@ -147,7 +147,11 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   FAILED_TO_COPY_SCHEMA_COUNT("failedToCopySchemaCount", true),
 
   // Number of tables that we want to fix but failed to update table config
-  FAILED_TO_UPDATE_TABLE_CONFIG_COUNT("failedToUpdateTableConfigCount", true);
+  FAILED_TO_UPDATE_TABLE_CONFIG_COUNT("failedToUpdateTableConfigCount", true),
+  //indicates if a particular table is disabled
+  TABLE_DISABLED("tableDisabled", false),
+  //indicates if a particular instance is disabled
+  INSTANCE_DISABLED("instanceDisabled", false);
 
   private final String _gaugeName;
   private final String _unit;
