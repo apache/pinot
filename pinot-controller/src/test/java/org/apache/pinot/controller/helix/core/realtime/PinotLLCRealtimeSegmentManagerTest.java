@@ -31,7 +31,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -916,9 +915,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
   /**
    * Test cases for fixing LLC segment by uploading to segment store if missing
    */
-  @Test(timeOut = 30_000L)
+  @Test
   public void testUploadToSegmentStore()
-      throws HttpErrorStatusException, IOException, URISyntaxException, InterruptedException {
+      throws HttpErrorStatusException, IOException, URISyntaxException {
     // mock the behavior for PinotHelixResourceManager
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     HelixManager helixManager = mock(HelixManager.class);

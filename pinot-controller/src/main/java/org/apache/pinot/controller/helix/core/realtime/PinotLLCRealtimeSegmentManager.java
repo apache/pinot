@@ -1424,10 +1424,12 @@ public class PinotLLCRealtimeSegmentManager {
       }
 
       // Skip the fix if an upload is already queued for this segment
-      if (_deepStoreUploadExecutorPendingSegments.contains(segmentName)) {
+      if (!_deepStoreUploadExecutorPendingSegments.add(segmentName)) {
+        int queueSize = _deepStoreUploadExecutorPendingSegments.size();
+        _controllerMetrics.setOrUpdateGauge(
+            ControllerGauge.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE.getGaugeName(), queueSize);
         continue;
       }
-      _deepStoreUploadExecutorPendingSegments.add(segmentName);
 
       // create Runnable to perform the upload
       Runnable uploadRunnable = () -> {
