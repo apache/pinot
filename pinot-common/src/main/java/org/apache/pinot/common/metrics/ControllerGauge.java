@@ -149,7 +149,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Number of tables that we want to fix but failed to update table config
   FAILED_TO_UPDATE_TABLE_CONFIG_COUNT("failedToUpdateTableConfigCount", true),
 
-  TABLE_CONSUMPTION_PAUSED("tableConsumptionPaused", false);
+  TABLE_CONSUMPTION_PAUSED("tableConsumptionPaused", false),
+
+  TABLE_ENABLED("tableEnabled", false);
 
   private final String _gaugeName;
   private final String _unit;
