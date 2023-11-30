@@ -134,25 +134,25 @@
     <swagger.version>1.6.9</swagger.version>
     <hadoop.version>3.2.4</hadoop.version>
     <antlr.version>4.6</antlr.version>
-    <jsonpath.version>2.7.0</jsonpath.version>
+    <jsonpath.version>2.8.0</jsonpath.version>
     <jsonsmart.version>2.5.0</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.30.0</calcite.version>
-    <lucene.version>8.2.0</lucene.version>
+    <lucene.version>9.8.0</lucene.version>
     <reflections.version>0.9.11</reflections.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
     <!-- hadoop-common, spark-core use commons-net -->
-    <commons-net.version>3.1</commons-net.version>
+    <commons-net.version>3.10.0</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
+    <dropwizard-metrics.version>4.2.22</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.4</snappy-java.version>
     <zstd-jni.version>1.5.5-6</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <log4j.version>2.20.0</log4j.version>
     <slf4j.version>2.0.9</slf4j.version>
-    <netty.version>4.1.94.Final</netty.version>
-    <reactivestreams.version>1.0.3</reactivestreams.version>
+    <netty.version>4.1.100.Final</netty.version>
+    <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.26</jmh.version>
@@ -167,7 +167,7 @@
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
     <protobuf.version>3.24.3</protobuf.version>
-    <grpc.version>1.53.0</grpc.version>
+    <grpc.version>1.59.0</grpc.version>
     <confluent.version>7.2.6</confluent.version>
 
     <!-- Checkstyle violation prop.-->
@@ -1074,7 +1074,7 @@
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
         <artifactId>jsr305</artifactId>
-        <version>3.0.0</version>
+        <version>3.0.2</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.containers</groupId>
@@ -1185,7 +1185,7 @@
       <dependency>
         <groupId>org.apache.maven.surefire</groupId>
         <artifactId>surefire-testng</artifactId>
-        <version>${surefire.versino}</version>
+        <version>${surefire.version}</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -1239,7 +1239,7 @@
       <dependency>
         <groupId>com.google.code.gson</groupId>
         <artifactId>gson</artifactId>
-        <version>2.2.4</version>
+        <version>2.10.1</version>
       </dependency>
       <!-- kafka_2.10 & jmh-core use jopt-simple -->
       <dependency>
@@ -1312,7 +1312,7 @@
       <dependency>
         <groupId>com.mercateo</groupId>
         <artifactId>test-clock</artifactId>
-        <version>1.0.2</version>
+        <version>1.0.4</version>
         <scope>test</scope>
         <exclusions>
           <exclusion>
@@ -1403,6 +1403,30 @@
         <artifactId>woodstox-core</artifactId>
         <version>${woodstox.version}</version>
       </dependency>
+
+      <!-- Lucene dependencies -->
+      <dependency>
+        <groupId>org.apache.lucene</groupId>
+        <artifactId>lucene-backward-codecs</artifactId>
+        <version>${lucene.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.lucene</groupId>
+        <artifactId>lucene-core</artifactId>
+        <version>${lucene.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.lucene</groupId>
+        <artifactId>lucene-queryparser</artifactId>
+        <version>${lucene.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.lucene</groupId>
+        <artifactId>lucene-analysis-common</artifactId>
+        <version>${lucene.version}</version>
+      </dependency>
+      <!-- Lucene dependencies end -->
+
     </dependencies>
   </dependencyManagement>
   <build>
@@ -1444,7 +1468,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>appassembler-maven-plugin</artifactId>
-          <version>1.10</version>
+          <version>2.1.0</version>
           <configuration>
             <binFileExtensions>
               <unix>.sh</unix>
@@ -1805,7 +1829,7 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.9</version>
+        <version>0.8.11</version>
         <executions>
           <execution>
             <goals>
@@ -2004,6 +2028,7 @@
             <exclude>**/*.ser</exclude>
             <exclude>**/*.v1</exclude>
             <exclude>**/*.v2</exclude>
+            <exclude>**/Text.lucene.index/**</exclude>
             <exclude>**/appAssemblerScriptTemplate</exclude>
             <exclude>doap_Pinot.rdf</exclude>
 
@@ -2076,6 +2101,7 @@
             <filter>
               <artifact>*:*</artifact>
               <excludes>
+                <exclude>module-info.class</exclude>
                 <exclude>META-INF/*.SF</exclude>
                 <exclude>META-INF/*.DSA</exclude>
                 <exclude>META-INF/*.RSA</exclude>

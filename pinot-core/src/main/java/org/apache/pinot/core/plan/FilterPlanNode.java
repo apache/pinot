@@ -61,7 +61,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class FilterPlanNode implements PlanNode {
-
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
   private final FilterContext _filter;
@@ -76,7 +75,7 @@ public class FilterPlanNode implements PlanNode {
   public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext, @Nullable FilterContext filter) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
-    _filter = filter;
+    _filter = filter != null ? filter : _queryContext.getFilter();
   }
 
   @Override
@@ -96,9 +95,8 @@ public class FilterPlanNode implements PlanNode {
     }
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
 
-    FilterContext filter = _filter != null ? _filter : _queryContext.getFilter();
-    if (filter != null) {
-      BaseFilterOperator filterOperator = constructPhysicalOperator(filter, numDocs);
+    if (_filter != null) {
+      BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
       if (queryableDocIdSnapshot != null) {
         BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
@@ -312,6 +310,8 @@ public class FilterPlanNode implements PlanNode {
               return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
           }
         }
+      case CONSTANT:
+        return filter.isConstantTrue() ? new MatchAllFilterOperator(numDocs) : EmptyFilterOperator.getInstance();
       default:
         throw new IllegalStateException();
     }

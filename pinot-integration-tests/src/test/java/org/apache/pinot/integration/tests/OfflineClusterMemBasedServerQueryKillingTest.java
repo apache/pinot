@@ -80,6 +80,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
       "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest FROM mytable";
   private static final String COUNT_STAR_QUERY =
       "SELECT * FROM mytable LIMIT 5";
+  private static final String OOM_QUERY_SELECTION_ONLY = "SELECT * FROM mytable LIMIT 9000000";
 
   private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(20, r -> {
     Thread thread = new Thread(r);
@@ -217,6 +218,19 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY);
+    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("\"errorCode\":"
+        + QueryException.QUERY_CANCELLATION_ERROR_CODE));
+    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));
+    Assert.assertTrue(queryResponse.get("exceptions").toString().contains("got killed because"));
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testSelectionOnlyOOM(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    notSupportedInV2();
+    JsonNode queryResponse = postQuery(OOM_QUERY_SELECTION_ONLY);
+
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("\"errorCode\":"
         + QueryException.QUERY_CANCELLATION_ERROR_CODE));
     Assert.assertTrue(queryResponse.get("exceptions").toString().contains("QueryCancelledException"));

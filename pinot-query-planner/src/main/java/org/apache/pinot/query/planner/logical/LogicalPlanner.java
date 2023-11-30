@@ -35,8 +35,12 @@ public class LogicalPlanner extends HepPlanner {
   private List<RelTraitDef> _traitDefs;
 
   public LogicalPlanner(HepProgram program, Context context) {
+    this(program, context, new ArrayList<>());
+  }
+
+  public LogicalPlanner(HepProgram program, Context context, List<RelTraitDef> traitDefs) {
     super(program, context);
-    _traitDefs = new ArrayList();
+    _traitDefs = traitDefs;
   }
 
   @Override

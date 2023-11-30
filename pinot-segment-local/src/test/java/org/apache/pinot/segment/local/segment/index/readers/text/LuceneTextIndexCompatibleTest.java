@@ -16,13 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner;
+package org.apache.pinot.segment.local.segment.index.readers.text;
 
-/**
- * Metadata for a plan fragment. This class won't leave the query planner/broker side.
- */
-public class PlanFragmentMetadata {
+import com.google.common.collect.ImmutableMap;
+import java.io.File;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
-  public PlanFragmentMetadata() {
+
+public class LuceneTextIndexCompatibleTest {
+
+  @Test
+  public void testLucene80IndexReader() {
+    File indexPath =
+        new File(LuceneTextIndexCompatibleTest.class.getClassLoader().getResource("data/lucene_80_index").getPath());
+    LuceneTextIndexReader lucene80Index = new LuceneTextIndexReader("Text", indexPath, 1000, ImmutableMap.of());
+    Assert.assertNotNull(lucene80Index);
   }
 }

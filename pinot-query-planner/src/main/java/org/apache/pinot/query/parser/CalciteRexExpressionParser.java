@@ -56,10 +56,13 @@ public class CalciteRexExpressionParser {
 
   static {
     CANONICAL_NAME_TO_SPECIAL_KEY_MAP = new HashMap<>();
+    // adding filter kind special handling
     for (FilterKind filterKind : FilterKind.values()) {
       CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put(RequestUtils.canonicalizeFunctionName(filterKind.name()),
           filterKind.name());
     }
+    // adding SqlKind.OTHERS and SqlKind.OTHER_FUNCTIONS that have canonical names.
+    CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put("||", "concat");
   }
 
   private CalciteRexExpressionParser() {
@@ -223,12 +226,13 @@ public class CalciteRexExpressionParser {
         return compileAndExpression(rexCall, pinotQuery);
       case OR:
         return compileOrExpression(rexCall, pinotQuery);
+      case OTHER:
       case OTHER_FUNCTION:
-        functionName = rexCall.getFunctionName();
+        functionName = canonicalizeFunctionName(rexCall.getFunctionName());
         // Special handle for leaf stage multi-value columns, as the default behavior for filter and group by is not
         // sql standard, so need to use `array_to_mv` to convert the array to v1 multi-value column for behavior
         // consistency meanwhile not violating the sql standard.
-        if (ARRAY_TO_MV_FUNCTION_NAME.equals(canonicalizeFunctionName(functionName))) {
+        if (ARRAY_TO_MV_FUNCTION_NAME.equals(functionName)) {
           return toExpression(rexCall.getFunctionOperands().get(0), pinotQuery);
         }
         break;

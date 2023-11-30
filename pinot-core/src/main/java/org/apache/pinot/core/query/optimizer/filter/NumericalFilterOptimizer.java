@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
 
@@ -84,7 +85,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         Expression lhs = operands.get(0);
         Expression rhs = operands.get(1);
         if (isNumericLiteral(rhs)) {
-          FieldSpec.DataType dataType = getDataType(lhs, schema);
+          DataType dataType = getDataType(lhs, schema);
           if (dataType != null && dataType.isNumeric()) {
             switch (kind) {
               case EQUALS:
@@ -94,7 +95,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
               case GREATER_THAN_OR_EQUAL:
               case LESS_THAN:
               case LESS_THAN_OR_EQUAL:
-                return rewriteRangeExpression(filterExpression, kind, lhs, rhs, schema);
+                return rewriteRangeExpression(filterExpression, kind, dataType, rhs);
               default:
                 break;
             }
@@ -109,7 +110,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
    * Rewrite expressions of form "column = literal" or "column != literal" to ensure that RHS literal is the same
    * datatype as LHS column.
    */
-  private static Expression rewriteEqualsExpression(Expression equals, FilterKind kind, FieldSpec.DataType dataType,
+  private static Expression rewriteEqualsExpression(Expression equals, FilterKind kind, DataType dataType,
       Expression rhs) {
     // Get expression operator
     boolean result = kind == FilterKind.NOT_EQUALS;
@@ -201,11 +202,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
    * Rewrite expressions of form "column > literal", "column >= literal", "column < literal", and "column <= literal"
    * to ensure that RHS literal is the same datatype as LHS column.
    */
-  private static Expression rewriteRangeExpression(Expression range, FilterKind kind, Expression lhs, Expression rhs,
-      Schema schema) {
-    // Get column data type.
-    FieldSpec.DataType dataType = schema.getFieldSpecFor(lhs.getIdentifier().getName()).getDataType();
-
+  private static Expression rewriteRangeExpression(Expression range, FilterKind kind, DataType dataType,
+      Expression rhs) {
     switch (rhs.getLiteral().getSetField()) {
       case SHORT_VALUE:
       case INT_VALUE:
@@ -378,7 +376,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
   /** @return field data type extracted from the expression. null if we can't determine the type. */
   @Nullable
-  private static FieldSpec.DataType getDataType(Expression expression, Schema schema) {
+  private static DataType getDataType(Expression expression, Schema schema) {
     if (expression.getType() == ExpressionType.IDENTIFIER) {
       String column = expression.getIdentifier().getName();
       FieldSpec fieldSpec = schema.getFieldSpecFor(column);
@@ -390,13 +388,13 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
       // expression is not identifier but we can also determine the data type.
       String targetTypeLiteral =
           expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue().toUpperCase();
-      FieldSpec.DataType dataType;
+      DataType dataType;
       if ("INTEGER".equals(targetTypeLiteral)) {
-        dataType = FieldSpec.DataType.INT;
+        dataType = DataType.INT;
       } else if ("VARCHAR".equals(targetTypeLiteral)) {
-        dataType = FieldSpec.DataType.STRING;
+        dataType = DataType.STRING;
       } else {
-        dataType = FieldSpec.DataType.valueOf(targetTypeLiteral);
+        dataType = DataType.valueOf(targetTypeLiteral);
       }
       return dataType;
     }

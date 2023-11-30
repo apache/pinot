@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectIterators;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -93,6 +94,9 @@ public abstract class BaseArrayAggStringFunction<I extends AbstractObjectCollect
 
   @Override
   public ObjectArrayList<String> extractFinalResult(I stringArrayList) {
-    return new ObjectArrayList<>(stringArrayList);
+    // NOTE: Wrap a String[] to work around the bug of ObjectArrayList constructor creating Object[] internally.
+    String[] stringArray = new String[stringArrayList.size()];
+    ObjectIterators.unwrap(stringArrayList.iterator(), stringArray);
+    return ObjectArrayList.wrap(stringArray);
   }
 }

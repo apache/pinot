@@ -123,6 +123,8 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_KEY, JsonExtractKeyTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.TIME_CONVERT, TimeConversionTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT, DateTimeConversionTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT_WINDOW_HOP,
+        DateTimeConversionHopTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DATE_TRUNC, DateTruncTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_INDEX, JsonExtractIndexTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.YEAR, DateTimeTransformFunction.Year.class);

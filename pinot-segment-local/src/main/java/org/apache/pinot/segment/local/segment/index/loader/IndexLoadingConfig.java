@@ -35,7 +35,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.ColumnConfigDeserializer;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
@@ -49,6 +48,7 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
@@ -93,7 +93,7 @@ public class IndexLoadingConfig {
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
-  private Map<String, ChunkCompressionType> _compressionConfigs = new HashMap<>();
+  private Map<String, CompressionCodec> _compressionConfigs = new HashMap<>();
   private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
 
   private SegmentVersion _segmentVersion;
@@ -131,6 +131,10 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public IndexLoadingConfig(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig) {
     this(instanceDataManagerConfig, tableConfig, null);
+  }
+
+  public IndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema) {
+    extractFromTableConfigAndSchema(tableConfig, schema);
   }
 
   public IndexLoadingConfig() {
@@ -295,8 +299,8 @@ public class IndexLoadingConfig {
             + "indexLoadingConfig for indexType: {}", _schema == null, _tableConfig == null, indexType);
         deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig);
       } else if (_segmentTier == null) {
-        deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig)
-            .withFallbackAlternative(stdDeserializer);
+        deserializer =
+            IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig).withFallbackAlternative(stdDeserializer);
       } else {
         // No need to fall back to fromIndexLoadingConfig which contains index configs for default tier, when looking
         // for tier specific index configs.
@@ -348,8 +352,7 @@ public class IndexLoadingConfig {
     for (FieldConfig fieldConfig : fieldConfigList) {
       String column = fieldConfig.getName();
       if (fieldConfig.getCompressionCodec() != null) {
-        ChunkCompressionType compressionType = ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name());
-        _compressionConfigs.put(column, compressionType);
+        _compressionConfigs.put(column, fieldConfig.getCompressionCodec());
       }
     }
   }
@@ -609,7 +612,7 @@ public class IndexLoadingConfig {
    * Used by segmentPreProcessorTest to set compression configs.
    */
   @VisibleForTesting
-  public void setCompressionConfigs(Map<String, ChunkCompressionType> compressionConfigs) {
+  public void setCompressionConfigs(Map<String, CompressionCodec> compressionConfigs) {
     _compressionConfigs = new HashMap<>(compressionConfigs);
     _dirty = true;
   }
@@ -746,7 +749,7 @@ public class IndexLoadingConfig {
    *
    * @return a map containing column name as key and compressionType as value.
    */
-  public Map<String, ChunkCompressionType> getCompressionConfigs() {
+  public Map<String, CompressionCodec> getCompressionConfigs() {
     return unmodifiable(_compressionConfigs);
   }
 

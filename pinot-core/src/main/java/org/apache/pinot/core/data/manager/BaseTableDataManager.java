@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -206,10 +205,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
    * Releases and removes all segments tracked by the table data manager.
    */
   protected void releaseAndRemoveAllSegments() {
-    Iterator<SegmentDataManager> iterator = _segmentDataManagerMap.values().iterator();
-    while (iterator.hasNext()) {
-      SegmentDataManager segmentDataManager = iterator.next();
-      iterator.remove();
+    List<SegmentDataManager> segmentDataManagers;
+    synchronized (_segmentDataManagerMap) {
+      segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
+      _segmentDataManagerMap.clear();
+    }
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       releaseSegment(segmentDataManager);
     }
   }
@@ -310,6 +311,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
   @Override
   public List<SegmentDataManager> acquireSegments(List<String> segmentNames, List<String> missingSegments) {
+    return acquireSegments(segmentNames, null, missingSegments);
+  }
+
+  @Override
+  public List<SegmentDataManager> acquireSegments(List<String> segmentNames,
+      @Nullable List<String> optionalSegmentNames, List<String> missingSegments) {
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
     for (String segmentName : segmentNames) {
       SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
@@ -317,6 +324,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
         segmentDataManagers.add(segmentDataManager);
       } else {
         missingSegments.add(segmentName);
+      }
+    }
+    if (optionalSegmentNames != null) {
+      for (String segmentName : optionalSegmentNames) {
+        SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+        // Optional segments are not counted to missing segments that are reported back in query exception.
+        if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
+          segmentDataManagers.add(segmentDataManager);
+        }
       }
     }
     return segmentDataManagers;
@@ -522,7 +538,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
    */
   @Nullable
   protected SegmentDataManager registerSegment(String segmentName, SegmentDataManager segmentDataManager) {
-    SegmentDataManager oldSegmentDataManager = _segmentDataManagerMap.put(segmentName, segmentDataManager);
+    SegmentDataManager oldSegmentDataManager;
+    synchronized (_segmentDataManagerMap) {
+      oldSegmentDataManager = _segmentDataManagerMap.put(segmentName, segmentDataManager);
+    }
     _recentlyDeletedSegments.invalidate(segmentName);
     return oldSegmentDataManager;
   }
@@ -537,7 +556,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Nullable
   protected SegmentDataManager unregisterSegment(String segmentName) {
     _recentlyDeletedSegments.put(segmentName, segmentName);
-    return _segmentDataManagerMap.remove(segmentName);
+    synchronized (_segmentDataManagerMap) {
+      return _segmentDataManagerMap.remove(segmentName);
+    }
   }
 
   protected boolean allowDownload(String segmentName, SegmentZKMetadata zkMetadata) {

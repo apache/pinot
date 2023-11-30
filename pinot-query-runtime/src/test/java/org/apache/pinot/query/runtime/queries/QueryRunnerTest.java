@@ -62,7 +62,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     SCHEMA_BUILDER = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING, "")
         .addSingleValueDimension("col2", FieldSpec.DataType.STRING, "")
         .addDateTime("ts", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
-        .addMetric("col3", FieldSpec.DataType.INT, 0).setSchemaName("defaultSchemaName");
+        .addMetric("col3", FieldSpec.DataType.INT, 0).setSchemaName("defaultSchemaName")
+        .setEnableColumnBasedNullHandling(true);
   }
 
   public static List<GenericRow> buildRows(String tableName) {

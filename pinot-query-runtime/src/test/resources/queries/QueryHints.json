@@ -70,6 +70,10 @@
         "sql": "SELECT {tbl1}.num, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4', partition_parallelism='2') */ GROUP BY {tbl1}.num"
       },
       {
+        "description": "Skip leaf stage aggregation with GROUP BY hint",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), MIN({tbl1}.num) FROM {tbl1} WHERE {tbl1}.num >= 0 GROUP BY {tbl1}.name"
+      },
+      {
         "description": "Colocated JOIN with partition column",
         "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num"
       },
@@ -112,14 +116,11 @@
       {
         "description": "Colocated, Dynamic broadcast SEMI-JOIN with partially empty right table result for some servers",
         "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.name, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.val = 'z') GROUP BY {tbl1}.name"
-      },
-      {
-        "description": "Skip leaf stage aggregation with GROUP BY hint",
-        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), MIN({tbl1}.num) FROM {tbl1} WHERE {tbl1}.num >= 0 GROUP BY {tbl1}.name"
       }
     ]
   },
   "hint_option_queries_unmatched_partition": {
+    "comments": "this section specifically deal with unmatched partition tagging of table options",
     "tables": {
       "tbl1": {
         "schema": [
@@ -192,6 +193,346 @@
       {
         "description": "Colocated, Dynamic broadcast SEMI-JOIN with partially empty right table result for some servers",
         "sql": "SELECT /*+ joinOptions(join_strategy='dynamic_broadcast') */ {tbl1}.name, COUNT(*) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='2') */ WHERE {tbl1}.num IN (SELECT {tbl2}.num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.val = 'z') GROUP BY {tbl1}.name"
+      }
+    ]
+  },
+  "hint_option_join_queries": {
+    "comments": "this section specifically dealing with mixing INNER-JOIN/SEMI-JOIN coupled with SORT/AGG on top or partition table scan on bottom",
+    "tables": {
+      "tbl1": {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "name", "type": "STRING"},
+          {"name": "val", "type": "LONG"}
+        ],
+        "inputs": [
+          [1, "a", 23],
+          [2, "b", 34],
+          [3, "c", 45],
+          [3, "yyy", 56],
+          [4, "e", 12],
+          [4, "e", 23],
+          [6, "e", 34],
+          [7, "d", 45],
+          [7, "f", 56],
+          [8, "z", 67]
+        ],
+        "partitionColumns": [
+          "num"
+        ]
+      },
+      "tbl2": {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "id", "type": "STRING"},
+          {"name": "data", "type": "INT"}
+        ],
+        "inputs": [
+          [1, "xxx", 23],
+          [1, "xxx", 34],
+          [3, "yyy", 45],
+          [3, "zzz", 56],
+          [5, "zzz", 12],
+          [6, "e", 23],
+          [7, "d", 34],
+          [8, "z", 45]
+        ],
+        "partitionColumns": [
+          "num"
+        ]
+      },
+      "tbl3": {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "id", "type": "STRING"},
+          {"name": "data", "type": "INT"}
+        ],
+        "inputs": [
+          [1, "xxx", 12],
+          [2, "xxx", 23],
+          [3, "yyy", 34],
+          [4, "yyy", 45],
+          [5, "zzz", 12]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Inner join with group by",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.name, AVG({tbl2}.data) FROM {tbl1} JOIN {tbl2} ON {tbl1}.name = {tbl2}.id  WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' AND {tbl2}.data < 0 GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "semi-join with dynamic_broadcast join strategy",
+        "sql": "SELECT {tbl1}.name, {tbl1}.num FROM {tbl1} WHERE {tbl1}.name IN (SELECT id FROM {tbl2} WHERE {tbl2}.data > 0)"
+      },
+      {
+        "description": "semi-join with multi-ple dynamic_broadcast join strategy then group-by on same key",
+        "sql": "SELECT {tbl1}.name, {tbl1}.num FROM {tbl1} WHERE {tbl1}.name IN (SELECT id FROM {tbl2} WHERE {tbl2}.data > 0) AND {tbl1}.num IN (select num FROM {tbl3} WHERE {tbl3}.data > 0)"
+      },
+      {
+        "description": "semi-join with multi-ple dynamic_broadcast join strategy then group-by",
+        "sql": "SELECT {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} WHERE {tbl1}.name IN (SELECT id FROM {tbl2} WHERE {tbl2}.data > 0) AND {tbl1}.num IN (select num FROM {tbl3} WHERE {tbl3}.data > 0) GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "semi-join with dynamic_broadcast join strategy then group-by on same key",
+        "sql": "SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} WHERE {tbl1}.name IN (SELECT id FROM {tbl2} WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "semi-join with dynamic_broadcast join strategy then group-by on different key",
+        "sql": "SELECT {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} WHERE {tbl1}.name IN (SELECT id FROM {tbl2} WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "aggregate with skip leaf stage hint, group by aggregate",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ {tbl1}.num, {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' GROUP BY {tbl1}.name, {tbl1}.num"
+      },
+      {
+        "description": "aggregate with skip leaf stage hint, group by aggregate with having clause",
+        "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ {tbl1}.num, COUNT(*), SUM({tbl1}.val), SUM({tbl1}.num) FROM {tbl1} WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' GROUP BY {tbl1}.num HAVING COUNT(*) > 10 AND MAX({tbl1}.val) >= 0 AND MIN({tbl1}.val) < 20 AND SUM({tbl1}.val) <= 10 AND AVG({tbl1}.val) = 5"
+      },
+      {
+        "description": "aggregate with skip intermediate stage hint (via hinting the leaf stage group by as final stage_",
+        "sql": "SELECT /*+ aggOptionsInternal(agg_type='DIRECT') */ {tbl1}.num, COUNT(*), SUM({tbl1}.val), SUM({tbl1}.num) FROM {tbl1} WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' GROUP BY {tbl1}.num HAVING COUNT(*) > 10"
+      },
+      {
+        "description": "aggregate with skip leaf stage hint (via hint option is_partitioned_by_group_by_keys",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, COUNT(*), SUM({tbl1}.val), SUM({tbl1}.num) FROM {tbl1} WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "join with pre-partitioned left and right tables",
+        "sql": "SELECT {tbl1}.num, {tbl1}.val, {tbl2}.data FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0"
+      },
+      {
+        "description": "join with pre-partitioned left and right tables; colocated hint",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num, {tbl1}.val, {tbl2}.data FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0"
+      },
+      {
+        "description": "group by with pre-partitioned tables on partition column",
+        "sql": "SELECT {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "group by with pre-partitioned tables on non-partition column",
+        "sql": "SELECT {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "join with pre-partitioned left and right tables then group-by left join key column",
+        "sql": "SELECT {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "join with pre-partitioned left and right tables then group-by left join key column; colocated hint",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "join with pre-partitioned left and right tables then group-by left join key column and other columns",
+        "sql": "SELECT {tbl1}.num, {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl1}.num, {tbl2}.id"
+      },
+      {
+        "description": "join with pre-partitioned left and right tables then group-by left join key column and other columns; colocated hint",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num, {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl1}.num, {tbl2}.id"
+      },
+      {
+        "description": "join with pre-partitioned left and right tables then group-by left join key column and other columns",
+        "sql": "SELECT {tbl1}.num, {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl1}.num, {tbl2}.id"
+      },
+      {
+        "description": "join with pre-partitioned left and right tables then group-by left join key column and other columns; colocated hint",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num, {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl1}.num, {tbl2}.id"
+      },
+      {
+        "description": "join with pre-partitioned left and right tables then group-by other columns",
+        "sql": "SELECT {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl2}.id"
+      },
+      {
+        "description": "join with pre-partitioned left and right tables then group-by other columns; colocated hint",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl2}.id"
+      },
+      {
+        "description": "agg + semi-join on pre-partitioned main and side tables then group by on partition column",
+        "sql": "SELECT {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "agg + semi-join on pre-partitioned main and side tables then group by on partition column; colocated hint",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "agg + semi-join on pre-partitioned main tables then group by on partition column",
+        "sql": "SELECT {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "agg + semi-join on pre-partitioned main tables then group by on non-partitioned column",
+        "sql": "SELECT {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} WHERE {tbl2}.data > 0) GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "agg + semi-join on pre-partitioned main table with group by on partitioned column on pre-partitioned semi table",
+        "sql": "SELECT {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0 GROUP BY num HAVING COUNT(*) > 1) GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "agg + semi-join on pre-partitioned main table with group by on partitioned column on pre-partitioned semi table; colocated hint",
+        "ignored": true,
+        "comments": "although both table are partitioned, but the partition function for agg-having semi table is not the same as partition function of the main table, and thus cannot use colocated hint; This is not detected currently and thus will produce incorrect results",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0 GROUP BY num HAVING COUNT(*) > 1) GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "agg + semi-join on pre-partitioned main and side tables with group by on partitioned column with having filter on top of semi join",
+        "sql": "SELECT {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num HAVING COUNT(*) > 5"
+      },
+      {
+        "description": "agg + semi-join on pre-partitioned main and side tables with group by on partitioned column with having filter on top of semi join; colocated hint",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num HAVING COUNT(*) > 5"
+      },
+      {
+        "description": "agg + semi-join on pre-partitioned main and side tables with group by on partitioned column with sorting on top of semi join",
+        "sql": "SELECT {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.name ORDER BY SUM({tbl1}.val) DESC"
+      },
+      {
+        "description": "agg + semi-join on pre-partitioned main and side tables with group by on partitioned column with sorting on top of semi join; colocated hint",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.name ORDER BY SUM({tbl1}.val) DESC"
+      },
+      {
+        "description": "partition agg + semi-join with pre-partitioned main and side tables & agg hint",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "partition agg + semi-join with pre-partitioned main and side table & agg hint and colocated hint",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true'), joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "partition agg + semi-join with single table partition & agg hint",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "partition agg + semi-join on pre-partitioned main tables with group by on partitioned column with having filter on top of semi join",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num HAVING COUNT(*) > 5"
+      },
+      {
+        "description": "partition agg + semi-join on pre-partitioned main tables with group by on partitioned column with having filter on top of semi join; colocated hint",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true'), joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num HAVING COUNT(*) > 5"
+      },
+      {
+        "description": "partition agg + semi-join on pre-partitioned main tables with group by on partitioned column with sorting on top of semi join colocated on partition key",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num ORDER BY SUM({tbl1}.val) DESC"
+      },
+      {
+        "description": "partition agg + semi-join on pre-partitioned main tables with group by on partitioned column with sorting on top of semi join colocated on partition key; colocated hint",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true'), joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) GROUP BY {tbl1}.num ORDER BY SUM({tbl1}.val) DESC"
+      },
+      {
+        "description": "semi-join on pre-partitioned main and side tables with sorting on top of semi join on join key",
+        "sql": "SELECT {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) ORDER BY {tbl1}.num DESC"
+      },
+      {
+        "description": "semi-join on pre-partitioned main and side tables with sorting on top of semi join on join key; colocated hint",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.num FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) ORDER BY {tbl1}.num DESC"
+      },
+      {
+        "description": "semi-join on pre-partitioned main and side tables with sorting on top of semi join with non-join columns",
+        "sql": "SELECT {tbl1}.name, {tbl1}.val FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) ORDER BY {tbl1}.val DESC"
+      },
+      {
+        "description": "semi-join on pre-partitioned main and side tables with sorting on top of semi join with non-join columns; colocated hint",
+        "sql": "SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ {tbl1}.name, {tbl1}.val FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl1}.num IN (SELECT num FROM {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ WHERE {tbl2}.data > 0) ORDER BY {tbl1}.val DESC"
+      }
+    ]
+  },
+  "hint_option_rel_trait_partition": {
+    "comments": "this section specifically test behavior of relational trait / partition inferences and aggressively",
+    "tables": {
+      "tbl1": {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "name", "type": "STRING"},
+          {"name": "val", "type": "INT"}
+        ],
+        "inputs": [
+          [1, "a", 23],
+          [2, "b", 34],
+          [3, "c", 45],
+          [3, "yyy", 56],
+          [4, "e", 12],
+          [4, "e", 23],
+          [6, "e", 34],
+          [7, "d", 45],
+          [7, "f", 56],
+          [8, "z", 67]
+        ],
+        "partitionColumns": [
+          "num"
+        ]
+      },
+      "tbl2": {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "id", "type": "STRING"},
+          {"name": "data", "type": "INT"}
+        ],
+        "inputs": [
+          [1, "xxx", 2],
+          [1, "xxx", 4],
+          [3, "yyy", 5],
+          [3, "zzz", 6],
+          [5, "zzz", 12],
+          [6, "e", 23],
+          [7, "d", 34],
+          [8, "z", 45]
+        ],
+        "partitionColumns": [
+          "num"
+        ]
+      },
+      "tbl3": {
+        "schema": [
+          {"name": "num", "type": "INT"},
+          {"name": "id", "type": "STRING"},
+          {"name": "data", "type": "INT"}
+        ],
+        "inputs": [
+          [1, "xxx", 12],
+          [2, "xxx", 23],
+          [3, "yyy", 34],
+          [4, "yyy", 45],
+          [5, "zzz", 12]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "colocated join, with hint, not on partition key",
+        "sql": "SELECT {tbl1}.num, {tbl1}.val, {tbl2}.data FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.val = {tbl2}.data WHERE {tbl2}.data > 0"
+      },
+      {
+        "description": "colocated join, with hint, one-side on partition key",
+        "sql": "SELECT {tbl1}.num, {tbl1}.val, {tbl2}.data FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.data WHERE {tbl2}.data > 0"
+      },
+      {
+        "description": "colocated join, with hint, both-side on partition key",
+        "sql": "SELECT {tbl1}.num, {tbl1}.val, {tbl2}.data FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0"
+      },
+      {
+        "description": "colocated join then group by, not on partition key, group-by join key",
+        "sql": "SELECT {tbl1}.val, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.val = {tbl2}.data WHERE {tbl2}.data > 0 GROUP BY {tbl1}.val"
+      },
+      {
+        "description": "colocated join then group by, not on partition key, group-by non-join key",
+        "sql": "SELECT {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.val = {tbl2}.data WHERE {tbl2}.data > 0 GROUP BY {tbl2}.id"
+      },
+      {
+        "description": "colocated join then group by, one-side on partition key, group-by join key",
+        "sql": "SELECT {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.data WHERE {tbl2}.data > 0 GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "colocated join then group by, one-side on partition key, group-by non-join key",
+        "sql": "SELECT {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.data WHERE {tbl2}.data > 0 GROUP BY {tbl2}.id"
+      },
+      {
+        "description": "colocated join then group by, both-side on partition key, group-by left join key",
+        "sql": "SELECT {tbl1}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl1}.num"
+      },
+      {
+        "description": "colocated join then group by, both-side on partition key, group-by right join key",
+        "sql": "SELECT {tbl2}.num, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl2}.num"
+      },
+      {
+        "description": "colocated join then group by, both-side on partition key, group-by non-join key",
+        "sql": "SELECT {tbl2}.id, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num WHERE {tbl2}.data > 0 GROUP BY {tbl2}.id"
       }
     ]
   }

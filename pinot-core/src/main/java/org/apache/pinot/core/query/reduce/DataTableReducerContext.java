@@ -31,6 +31,7 @@ public class DataTableReducerContext {
   private final long _reduceTimeOutMs;
   // used for SQL GROUP BY
   private final int _groupByTrimThreshold;
+  private final int _minGroupTrimSize;
 
   /**
    * Constructor for the class.
@@ -41,11 +42,12 @@ public class DataTableReducerContext {
    * @param groupByTrimThreshold trim threshold for SQL group by
    */
   public DataTableReducerContext(ExecutorService executorService, int maxReduceThreadsPerQuery, long reduceTimeOutMs,
-      int groupByTrimThreshold) {
+      int groupByTrimThreshold, int minGroupTrimSize) {
     _executorService = executorService;
     _maxReduceThreadsPerQuery = maxReduceThreadsPerQuery;
     _reduceTimeOutMs = reduceTimeOutMs;
     _groupByTrimThreshold = groupByTrimThreshold;
+    _minGroupTrimSize = minGroupTrimSize;
   }
 
   public ExecutorService getExecutorService() {
@@ -62,5 +64,9 @@ public class DataTableReducerContext {
 
   public int getGroupByTrimThreshold() {
     return _groupByTrimThreshold;
+  }
+
+  public int getMinGroupTrimSize() {
+    return _minGroupTrimSize;
   }
 }

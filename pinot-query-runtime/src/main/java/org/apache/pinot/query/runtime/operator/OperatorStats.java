@@ -43,7 +43,6 @@ public class OperatorStats {
   private long _startTimeMs = -1;
   private long _endTimeMs = -1;
   private final Map<String, String> _executionStats;
-  private boolean _processingStarted = false;
 
   public OperatorStats(OpChainExecutionContext context) {
     this(context.getRequestId(), context.getStageId(), context.getServer());
@@ -69,7 +68,6 @@ public class OperatorStats {
       _executeStopwatch.stop();
       _endTimeMs = System.currentTimeMillis();
     }
-    _processingStarted = true;
   }
 
   public void recordRow(int numBlock, int numRows) {

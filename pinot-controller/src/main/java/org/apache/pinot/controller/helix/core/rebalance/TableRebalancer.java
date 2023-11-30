@@ -58,6 +58,7 @@ import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssign
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentFactory;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.controller.helix.core.assignment.segment.StrictRealtimeSegmentAssignment;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -326,14 +327,18 @@ public class TableRebalancer {
         targetAssignment);
 
     // Calculate the min available replicas for no-downtime rebalance
-    // NOTE: The calculation is based on the number of replicas of the target assignment. In case of increasing the
-    //       number of replicas for the current assignment, the current instance state map might not have enough
-    //       replicas to reach the minimum available replicas requirement. In this scenario we don't want to fail the
-    //       check, but keep all the current instances as this is the best we can do, and can help the table get out of
-    //       this state.
+    // NOTE:
+    // 1. The calculation is based on the number of replicas of the target assignment. In case of increasing the number
+    //    of replicas for the current assignment, the current instance state map might not have enough replicas to reach
+    //    the minimum available replicas requirement. In this scenario we don't want to fail the check, but keep all the
+    //    current instances as this is the best we can do, and can help the table get out of this state.
+    // 2. Only check the segments to be moved because we don't need to maintain available replicas for segments not
+    //    being moved, including segments with all replicas OFFLINE (error segments during consumption).
+    Set<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
+
     int numReplicas = Integer.MAX_VALUE;
-    for (Map<String, String> instanceStateMap : targetAssignment.values()) {
-      numReplicas = Math.min(instanceStateMap.size(), numReplicas);
+    for (String segment : segmentsToMove) {
+      numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
     }
     int minAvailableReplicas;
     if (minReplicasToKeepUpForNoDowntime >= 0) {
@@ -362,9 +367,17 @@ public class TableRebalancer {
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs);
     int expectedVersion = currentIdealState.getRecord().getVersion();
 
+    // We repeat the following steps until the target assignment is reached:
+    // 1. Wait for ExternalView to converge with the IdealState. Fail the rebalance if it doesn't converge within the
+    //    timeout.
+    // 2. When IdealState changes during step 1, re-calculate the target assignment based on the new IdealState (current
+    //    assignment).
+    // 3. Check if the target assignment is reached. Rebalance is done if it is reached.
+    // 4. Calculate the next assignment based on the current assignment, target assignment and min available replicas.
+    // 5. Update the IdealState to the next assignment. If the IdealState changes before the update, go back to step 1.
     while (true) {
       // Wait for ExternalView to converge before updating the next IdealState
-      Set<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
+      segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
       IdealState idealState;
       try {
         idealState =
@@ -399,16 +412,22 @@ public class TableRebalancer {
         // If all the segments to be moved remain unchanged (same instance state map) in the new ideal state, apply the
         // same target instance state map for these segments to the new ideal state as the target assignment
         boolean segmentsToMoveChanged = false;
-        for (String segment : segmentsToMove) {
-          Map<String, String> oldInstanceStateMap = oldAssignment.get(segment);
-          Map<String, String> currentInstanceStateMap = currentAssignment.get(segment);
-          if (!oldInstanceStateMap.equals(currentInstanceStateMap)) {
-            LOGGER.info(
-                "For rebalanceId: {}, segment state changed in IdealState from: {} to: {} for table: {}, segment: {}, "
-                    + "re-calculating the target assignment based on the new IdealState", rebalanceJobId,
-                oldInstanceStateMap, currentInstanceStateMap, tableNameWithType, segment);
-            segmentsToMoveChanged = true;
-            break;
+        if (segmentAssignment instanceof StrictRealtimeSegmentAssignment) {
+          // For StrictRealtimeSegmentAssignment, we need to recompute the target assignment because the assignment for
+          // new added segments is based on the existing assignment
+          segmentsToMoveChanged = true;
+        } else {
+          for (String segment : segmentsToMove) {
+            Map<String, String> oldInstanceStateMap = oldAssignment.get(segment);
+            Map<String, String> currentInstanceStateMap = currentAssignment.get(segment);
+            // TODO: Consider allowing segment state change from CONSUMING to ONLINE
+            if (!oldInstanceStateMap.equals(currentInstanceStateMap)) {
+              LOGGER.info("For rebalanceId: {}, segment state changed in IdealState from: {} to: {} for table: {}, "
+                      + "segment: {}, re-calculating the target assignment based on the new IdealState", rebalanceJobId,
+                  oldInstanceStateMap, currentInstanceStateMap, tableNameWithType, segment);
+              segmentsToMoveChanged = true;
+              break;
+            }
           }
         }
         if (segmentsToMoveChanged) {
@@ -417,8 +436,7 @@ public class TableRebalancer {
             instancePartitionsMap =
                 getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, false).getLeft();
             tierToInstancePartitionsMap =
-                getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap,
-                    dryRun).getLeft();
+                getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, false).getLeft();
             targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap, sortedTiers,
                 tierToInstancePartitionsMap, rebalanceConfig);
           } catch (Exception e) {

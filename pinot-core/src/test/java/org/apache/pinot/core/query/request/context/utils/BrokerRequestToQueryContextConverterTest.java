@@ -294,17 +294,17 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(filter.getType(), FilterContext.Type.AND);
       List<FilterContext> children = filter.getChildren();
       assertEquals(children.size(), 2);
-      assertEquals(children.get(0), new FilterContext(FilterContext.Type.PREDICATE, null,
+      assertEquals(children.get(0), FilterContext.forPredicate(
           new RangePredicate(ExpressionContext.forIdentifier("foo"), false, "15", false, "*")));
       FilterContext orFilter = children.get(1);
       assertEquals(orFilter.getType(), FilterContext.Type.OR);
       assertEquals(orFilter.getChildren().size(), 2);
-      assertEquals(orFilter.getChildren().get(0), new FilterContext(FilterContext.Type.PREDICATE, null,
-          new RangePredicate(ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "div",
+      assertEquals(orFilter.getChildren().get(0), FilterContext.forPredicate(new RangePredicate(
+          ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, "div",
               Arrays.asList(ExpressionContext.forIdentifier("bar"), ExpressionContext.forIdentifier("foo")))), true,
-              "10", true, "20")));
-      assertEquals(orFilter.getChildren().get(1), new FilterContext(FilterContext.Type.PREDICATE, null,
-          new TextMatchPredicate(ExpressionContext.forIdentifier("foobar"), "potato")));
+          "10", true, "20")));
+      assertEquals(orFilter.getChildren().get(1),
+          FilterContext.forPredicate(new TextMatchPredicate(ExpressionContext.forIdentifier("foobar"), "potato")));
       assertEquals(filter.toString(),
           "(foo > '15' AND (div(bar,foo) BETWEEN '10' AND '20' OR text_match(foobar,'potato')))");
       assertNull(queryContext.getGroupByExpressions());
@@ -340,7 +340,7 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(aliasList.get(1), "b");
       FilterContext filter = queryContext.getFilter();
       assertNotNull(filter);
-      assertEquals(filter, new FilterContext(FilterContext.Type.PREDICATE, null,
+      assertEquals(filter, FilterContext.forPredicate(
           new InPredicate(ExpressionContext.forIdentifier("bar"), Arrays.asList("5", "10", "15"))));
       assertEquals(filter.toString(), "bar IN ('5','10','15')");
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
@@ -388,8 +388,8 @@ public class BrokerRequestToQueryContextConverterTest {
       assertNull(queryContext.getOrderByExpressions());
       FilterContext havingFilter = queryContext.getHavingFilter();
       assertNotNull(havingFilter);
-      assertEquals(havingFilter, new FilterContext(FilterContext.Type.PREDICATE, null, new InPredicate(
-          ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
+      assertEquals(havingFilter, FilterContext.forPredicate(new InPredicate(ExpressionContext.forFunction(
+          new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
               Collections.singletonList(ExpressionContext.forIdentifier("foo")))), Arrays.asList("5", "10", "15"))));
       assertEquals(havingFilter.toString(), "sum(foo) IN ('5','10','15')");
       assertEquals(queryContext.getLimit(), 10);
@@ -658,7 +658,7 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testDeduplicateOrderByExpressions() {
+  public void testDeduplicateOrderByExpressions() {
     String query = "SELECT name FROM employees ORDER BY name DESC NULLS LAST, name ASC";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -668,7 +668,7 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testRemoveOrderByFunctions() {
+  public void testRemoveOrderByFunctions() {
     String query = "SELECT A FROM testTable ORDER BY datetrunc(A) DESC NULLS LAST";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -684,7 +684,7 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testOrderByDefault() {
+  public void testOrderByDefault() {
     String query = "SELECT A FROM testTable ORDER BY A";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -698,7 +698,7 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testOrderByNullsLast() {
+  public void testOrderByNullsLast() {
     String query = "SELECT A FROM testTable ORDER BY A NULLS LAST";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -712,7 +712,7 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testOrderByNullsFirst() {
+  public void testOrderByNullsFirst() {
     String query = "SELECT A FROM testTable ORDER BY A NULLS FIRST";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -726,7 +726,7 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testOrderByAscNullsFirst() {
+  public void testOrderByAscNullsFirst() {
     String query = "SELECT A FROM testTable ORDER BY A ASC NULLS FIRST";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -740,7 +740,7 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testOrderByAscNullsLast() {
+  public void testOrderByAscNullsLast() {
     String query = "SELECT A FROM testTable ORDER BY A ASC NULLS LAST";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -754,7 +754,7 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testOrderByDescNullsFirst() {
+  public void testOrderByDescNullsFirst() {
     String query = "SELECT A FROM testTable ORDER BY A DESC NULLS FIRST";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -768,7 +768,7 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testOrderByDescNullsLast() {
+  public void testOrderByDescNullsLast() {
     String query = "SELECT A FROM testTable ORDER BY A DESC NULLS LAST";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -782,7 +782,7 @@ public class BrokerRequestToQueryContextConverterTest {
   }
 
   @Test
-  void testDistinctOrderByNullsLast() {
+  public void testDistinctOrderByNullsLast() {
     String query = "SELECT DISTINCT A FROM testTable ORDER BY A NULLS LAST";
 
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
@@ -793,5 +793,56 @@ public class BrokerRequestToQueryContextConverterTest {
     OrderByExpressionContext orderByExpressionContext = orderByExpressionContexts.get(0);
     assertTrue(orderByExpressionContext.isAsc());
     assertTrue(orderByExpressionContext.isNullsLast());
+  }
+
+  @Test
+  public void testConstantFilter() {
+    String query = "SELECT * FROM testTable WHERE true";
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertNull(queryContext.getFilter());
+
+    query = "SELECT * FROM testTable WHERE false";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertSame(queryContext.getFilter(), FilterContext.CONSTANT_FALSE);
+
+    query = "SELECT * FROM testTable WHERE 'true'";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertNull(queryContext.getFilter());
+
+    query = "SELECT * FROM testTable WHERE 'false'";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertSame(queryContext.getFilter(), FilterContext.CONSTANT_FALSE);
+
+    query = "SELECT * FROM testTable WHERE 1 = 1";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertNull(queryContext.getFilter());
+
+    query = "SELECT * FROM testTable WHERE 1 = 0";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertSame(queryContext.getFilter(), FilterContext.CONSTANT_FALSE);
+
+    query = "SELECT * FROM testTable WHERE 1 = 1 AND 2 = 2";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertNull(queryContext.getFilter());
+
+    query = "SELECT * FROM testTable WHERE 1 = 1 AND 2 = 3";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertSame(queryContext.getFilter(), FilterContext.CONSTANT_FALSE);
+
+    query = "SELECT * FROM testTable WHERE 1 = 1 OR 2 = 3";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertNull(queryContext.getFilter());
+
+    query = "SELECT * FROM testTable WHERE 1 = 0 OR 2 = 3";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertSame(queryContext.getFilter(), FilterContext.CONSTANT_FALSE);
+
+    query = "SELECT * FROM testTable WHERE NOT 1 = 1";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertSame(queryContext.getFilter(), FilterContext.CONSTANT_FALSE);
+
+    query = "SELECT * FROM testTable WHERE NOT 1 = 0";
+    queryContext = QueryContextConverterUtils.getQueryContext(query);
+    assertNull(queryContext.getFilter());
   }
 }

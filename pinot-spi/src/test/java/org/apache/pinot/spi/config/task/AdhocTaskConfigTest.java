@@ -24,6 +24,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertThrows;
 
 
 public class AdhocTaskConfigTest {
@@ -39,5 +40,22 @@ public class AdhocTaskConfigTest {
     assertEquals(adhocTaskConfig.getTaskName(), "myTask-0");
     assertEquals(adhocTaskConfig.getTaskConfigs().size(), 1);
     assertEquals(adhocTaskConfig.getTaskConfigs().get("inputDirURI"), "s3://my-bucket/my-file.json");
+  }
+
+  @Test
+  public void testInvalidArgumentsForAdhocTaskConfig() {
+    // Test 1 : pass invalid taskType(null) to AdhocTaskConfig.
+    assertThrows(IllegalArgumentException.class, () -> new AdhocTaskConfig(null, "TestTable", "TestTaskName",
+        ImmutableMap.of("inputDirURI", "s3://my-bucket/my-file.json")));
+
+    // Test 2 : pass invalid tableName(null) to AdhocTaskConfig.
+    assertThrows(IllegalArgumentException.class,
+        () -> new AdhocTaskConfig("SegmentGenerationAndPushTask", null, "TestTaskName",
+            ImmutableMap.of("inputDirURI", "s3://my-bucket/my-file.json")));
+
+    //Test 3 : pass invalid taskName(String with path separator '/') to AdhocTaskConfig.
+    assertThrows(IllegalArgumentException.class,
+        () -> new AdhocTaskConfig("SegmentGenerationAndPushTask", "TestTable", "Invalid/TestTaskName",
+            ImmutableMap.of("inputDirURI", "s3://my-bucket/my-file.json")));
   }
 }

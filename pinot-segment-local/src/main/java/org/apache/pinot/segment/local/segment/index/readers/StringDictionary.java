@@ -88,7 +88,23 @@ public class StringDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public void readIntValues(int[] dictIds, int length, Integer[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = Integer.parseInt(getUnpaddedString(dictIds[i], buffer));
+    }
+  }
+
+  @Override
   public void readLongValues(int[] dictIds, int length, long[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = Long.parseLong(getUnpaddedString(dictIds[i], buffer));
+    }
+  }
+
+  @Override
+  public void readLongValues(int[] dictIds, int length, Long[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
       outValues[i] = Long.parseLong(getUnpaddedString(dictIds[i], buffer));
@@ -104,7 +120,23 @@ public class StringDictionary extends BaseImmutableDictionary {
   }
 
   @Override
+  public void readFloatValues(int[] dictIds, int length, Float[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = Float.parseFloat(getUnpaddedString(dictIds[i], buffer));
+    }
+  }
+
+  @Override
   public void readDoubleValues(int[] dictIds, int length, double[] outValues) {
+    byte[] buffer = getBuffer();
+    for (int i = 0; i < length; i++) {
+      outValues[i] = Double.parseDouble(getUnpaddedString(dictIds[i], buffer));
+    }
+  }
+
+  @Override
+  public void readDoubleValues(int[] dictIds, int length, Double[] outValues) {
     byte[] buffer = getBuffer();
     for (int i = 0; i < length; i++) {
       outValues[i] = Double.parseDouble(getUnpaddedString(dictIds[i], buffer));

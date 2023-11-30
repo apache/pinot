@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -94,7 +95,9 @@ public abstract class BaseDataTable implements DataTable {
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
     dataOutputStream.writeInt(_dictionaryMap.size());
+    int numEntriesAdded = 0;
     for (Map.Entry<String, Map<Integer, String>> dictionaryMapEntry : _dictionaryMap.entrySet()) {
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numEntriesAdded);
       String columnName = dictionaryMapEntry.getKey();
       Map<Integer, String> dictionary = dictionaryMapEntry.getValue();
       byte[] bytes = columnName.getBytes(UTF_8);
@@ -108,6 +111,7 @@ public abstract class BaseDataTable implements DataTable {
         dataOutputStream.writeInt(valueBytes.length);
         dataOutputStream.write(valueBytes);
       }
+      numEntriesAdded++;
     }
 
     return byteArrayOutputStream.toByteArray();

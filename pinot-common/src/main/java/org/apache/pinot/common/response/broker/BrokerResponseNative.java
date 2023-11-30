@@ -44,10 +44,12 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "resultTable", "requestId", "brokerId", "exceptions", "numServersQueried", "numServersResponded",
     "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
     "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter",
-    "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "offlineThreadCpuTimeNs",
-    "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
-    "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
-    "realtimeTotalCpuTimeNs", "brokerReduceTimeMs", "segmentStatistics", "traceInfo", "partialResult"})
+    "numEntriesScannedPostFilter", "numGroupsLimitReached", "maxRowsInJoinReached", "totalDocs", "timeUsedMs",
+    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
+    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs", "brokerReduceTimeMs",
+    "segmentStatistics", "traceInfo", "partialResult"
+})
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
@@ -76,6 +78,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
+  private boolean _maxRowsInJoinReached = false;
   private boolean _partialResult = false;
   private long _timeUsedMs = 0L;
   private long _offlineThreadCpuTimeNs = 0L;
@@ -492,6 +495,16 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("numGroupsLimitReached")
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @JsonProperty("maxRowsInJoinReached")
+  public boolean isMaxRowsInJoinReached() {
+    return _maxRowsInJoinReached;
+  }
+
+  @JsonProperty("maxRowsInJoinReached")
+  public void setMaxRowsInJoinReached(boolean maxRowsInJoinReached) {
+    _maxRowsInJoinReached = maxRowsInJoinReached;
   }
 
   @JsonProperty("partialResult")

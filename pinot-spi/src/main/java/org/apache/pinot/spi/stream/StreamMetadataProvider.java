@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
@@ -42,6 +43,13 @@ public interface StreamMetadataProvider extends Closeable {
    * @return number of partitions
    */
   int fetchPartitionCount(long timeoutMillis);
+
+  /**
+   * Fetches the partition ids for a topic given the stream configs.
+   */
+  default Set<Integer> fetchPartitionIds(long timeoutMillis) {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Fetches the offset for a given partition and offset criteria
@@ -98,5 +106,6 @@ public interface StreamMetadataProvider extends Closeable {
     return result;
   }
 
-  class UnknownLagState extends PartitionLagState { }
+  class UnknownLagState extends PartitionLagState {
+  }
 }
