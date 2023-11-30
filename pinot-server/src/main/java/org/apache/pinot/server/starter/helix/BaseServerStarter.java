@@ -178,7 +178,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         // NOTE: Need to add the instance id to the config because it is required in HelixInstanceDataManagerConfig
         _serverConf.addProperty(Server.CONFIG_OF_INSTANCE_ID, _instanceId);
       }
-      ServiceStartableUtils.overrideTenantConfigs(_instanceId, zkClient, _helixClusterName, _serverConf);
+      ServiceStartableUtils.applyTenantConfigs(_instanceId, zkClient, _helixClusterName, _serverConf);
     } finally {
       zkClient.close();
     }

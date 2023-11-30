@@ -103,7 +103,7 @@ public class ServiceStartableUtils {
   /**
    * Overrides the instance config with the tenant configs if the tenant is tagged on the instance.
    */
-  public static void overrideTenantConfigs(String instanceId, ZkClient zkClient, String clusterName,
+  public static void applyTenantConfigs(String instanceId, ZkClient zkClient, String clusterName,
       PinotConfiguration instanceConfig) {
     ZNRecord instanceConfigZNRecord =
         zkClient.readData(String.format(INSTANCE_CONFIG_ZK_PATH_TEMPLATE, clusterName, instanceId), true);
