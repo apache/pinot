@@ -210,6 +210,12 @@ rules:
   labels:
     tableName: "$1"
     tableType: "$2"
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.tableEnabled.([^\\.]*?)_(OFFLINE|REALTIME)\"><>(\\w+)"
+  name: "pinot_controller_tableEnabled_$3"
+  cache: true
+  labels:
+    tableName: "$1"
+    tableType: "$2"
 
   ## Metrics that fit the catch-all patterns above should not be added to this file.
   ## In case a metric does not fit the catch-all patterns, add them before this comment

@@ -129,8 +129,8 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
       exposeTableStates(tableNameWithType);
     }
     postprocess(context);
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, _taskName,
-        numTablesProcessed);
+    _controllerMetrics
+        .setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, _taskName, numTablesProcessed);
     LOGGER.info("Finish processing {}/{} tables in task: {}", numTablesProcessed, numTables, _taskName);
   }
 
