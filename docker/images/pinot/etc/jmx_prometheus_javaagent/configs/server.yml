@@ -165,6 +165,7 @@ rules:
   labels:
     table: "$2"
     tableType: "$3"
+#when there is partition but no topic in the metric
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$6"
   cache: true
@@ -172,15 +173,22 @@ rules:
     table: "$3"
     tableType: "$4"
     partition: "$5"
-#This is a catch-all pattern for pinot table metrics with offline/realtime suffix that also contains the topic
+#when there is partition and topic in the metric
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.(\\w+)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$2_$6"
+  name: "pinot_$1_$2_$7"
   cache: true
   labels:
     table: "$3"
     tableType: "$4"
     topic: "$5"
     partition: "$6"
+#when there is no partition in the metric
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
+  name: "pinot_$1_$2_$5"
+  cache: true
+  labels:
+    table: "$3"
+    tableType: "$4"
   # This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$3_$4"

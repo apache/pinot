@@ -172,9 +172,16 @@ rules:
     table: "$3"
     tableType: "$4"
     partition: "$5"
+  #when there is no partition in the metric
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
+  name: "pinot_$1_$2_$5"
+  cache: true
+  labels:
+    table: "$3"
+    tableType: "$4"
   #This is a catch-all pattern for pinot table metrics with offline/realtime suffix that also contain kafka topic
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.(\\w+)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$2_$6"
+  name: "pinot_$1_$2_$7"
   cache: true
   labels:
     table: "$3"
