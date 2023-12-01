@@ -88,8 +88,6 @@ public class WorkerManager {
     }
   }
 
-  // TODO: Find a better way to determine whether a stage is leaf stage or intermediary. We could have query plans that
-  //       process table data even in intermediary stages.
   private static boolean isLeafPlan(DispatchablePlanMetadata metadata) {
     return metadata.getScannedTables().size() == 1;
   }
@@ -105,8 +103,10 @@ public class WorkerManager {
     String partitionKey =
         tableOptions != null ? tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY) : null;
     if (partitionKey == null) {
+      // when partition key is not given, we do not partition assign workers for leaf-stage.
       assignWorkersToNonPartitionedLeafFragment(metadata, context);
     } else {
+      // when partition key exist, we assign workers for leaf-stage in partitioned fashion.
       String numPartitionsStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
       Preconditions.checkState(numPartitionsStr != null, "'%s' must be provided for partition key: %s",
           PinotHintOptions.TableHintOptions.PARTITION_SIZE, partitionKey);
@@ -239,7 +239,10 @@ public class WorkerManager {
     metadata.setWorkerIdToServerInstanceMap(workedIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
     metadata.setTimeBoundaryInfo(colocatedTableInfo._timeBoundaryInfo);
-    metadata.setPrePartitioned(metadata.isPrePartitioned());
+    // TODO: partition parallelism is actually referring to the next stage desired paralelism.
+    // At the current leaf stage, the partition parallelism is always 1 --> 1 partition, 1 opChain/worker
+    //     it is only when it exchanges against the next stage when it desires to fan out into 2 or more parallelism.
+    // Ideally, this config should be part of the next stage hint but unfortunately we cant support that as of now.
     metadata.setPartitionParallelism(partitionParallelism);
   }
 
@@ -252,37 +255,72 @@ public class WorkerManager {
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
 
-    // If the first child is partitioned table scan, use the same worker assignment to avoid shuffling data. When
-    // partition parallelism is configured, create multiple intermediate stage workers on the same instance for each
-    // worker in the first child.
-    if (!children.isEmpty()) {
+    // If the first child is partitioned and can be inherent from this intermediate stage, use the same worker
+    // assignment to avoid shuffling data.
+    // When partition parallelism is configured,
+    // 1. create multiple intermediate stage workers on the same instance for each worker in the first child if the
+    //    first child is a table scan. this is b/c we cannot pre-config parallelism on leaf stage thus needs fan-out.
+    // 2. ignore partition parallelism when first child is NOT table scan b/c it would've done fan-out already.
+    if (isPartitionedIntermediateStage(metadata, children, context)) {
       DispatchablePlanMetadata firstChildMetadata = metadataMap.get(children.get(0).getFragmentId());
-      if (firstChildMetadata.isPrePartitioned() && firstChildMetadata.getScannedTables().size() > 0) {
-        int partitionParallelism = firstChildMetadata.getPartitionParallelism();
-        Map<Integer, QueryServerInstance> childWorkerIdToServerInstanceMap =
-            firstChildMetadata.getWorkerIdToServerInstanceMap();
-        if (partitionParallelism == 1) {
-          metadata.setWorkerIdToServerInstanceMap(childWorkerIdToServerInstanceMap);
-        } else {
-          int numChildWorkers = childWorkerIdToServerInstanceMap.size();
-          Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
-          int workerId = 0;
-          for (int i = 0; i < numChildWorkers; i++) {
-            QueryServerInstance serverInstance = childWorkerIdToServerInstanceMap.get(i);
-            for (int j = 0; j < partitionParallelism; j++) {
-              workerIdToServerInstanceMap.put(workerId++, serverInstance);
-            }
+      int partitionParallelism = firstChildMetadata.getPartitionParallelism();
+      Map<Integer, QueryServerInstance> childWorkerIdToServerInstanceMap =
+          firstChildMetadata.getWorkerIdToServerInstanceMap();
+      if (partitionParallelism == 1 || firstChildMetadata.getScannedTables().size() == 0) {
+        metadata.setWorkerIdToServerInstanceMap(childWorkerIdToServerInstanceMap);
+      } else {
+        int numChildWorkers = childWorkerIdToServerInstanceMap.size();
+        Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
+        int workerId = 0;
+        for (int i = 0; i < numChildWorkers; i++) {
+          QueryServerInstance serverInstance = childWorkerIdToServerInstanceMap.get(i);
+          for (int j = 0; j < partitionParallelism; j++) {
+            workerIdToServerInstanceMap.put(workerId++, serverInstance);
           }
-          metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
         }
-        return;
+        metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
+      }
+    } else {
+      // If the query has more than one table, it is possible that the tables could be hosted on different tenants.
+      // The intermediate stage will be processed on servers randomly picked from the tenants belonging to either or
+      // all of the tables in the query.
+      // TODO: actually make assignment strategy decisions for intermediate stages
+      List<ServerInstance> serverInstances = assignServerInstances(context);
+      if (metadata.isRequiresSingletonInstance()) {
+        // require singleton should return a single global worker ID with 0;
+        metadata.setWorkerIdToServerInstanceMap(Collections.singletonMap(0,
+            new QueryServerInstance(serverInstances.get(RANDOM.nextInt(serverInstances.size())))));
+      } else {
+        Map<String, String> options = context.getPlannerContext().getOptions();
+        int stageParallelism = Integer.parseInt(options.getOrDefault(QueryOptionKey.STAGE_PARALLELISM, "1"));
+        Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
+        int workerId = 0;
+        for (ServerInstance serverInstance : serverInstances) {
+          QueryServerInstance queryServerInstance = new QueryServerInstance(serverInstance);
+          for (int i = 0; i < stageParallelism; i++) {
+            workerIdToServerInstanceMap.put(workerId++, queryServerInstance);
+          }
+        }
+        metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
       }
     }
+  }
 
-    // If the query has more than one table, it is possible that the tables could be hosted on different tenants.
-    // The intermediate stage will be processed on servers randomly picked from the tenants belonging to either or
-    // all of the tables in the query.
-    // TODO: actually make assignment strategy decisions for intermediate stages
+  private boolean isPartitionedIntermediateStage(DispatchablePlanMetadata parent, List<PlanFragment> children,
+      DispatchablePlanContext context) {
+    // Note:
+    // 1 Here inherent the first children's partition worker assignment if the mailbox send from the 1st-child is
+    //     already pre-partitioned: this guarantees no data shuffling if we reuse the worker assignment on 1st-child.
+    // 2. The current limitation is that this 1st-child rule only works b/c PinotRelDistributionTraitRule also attaches
+    //     partition trait from 1st-child.
+    if (children.isEmpty()) {
+      return false;
+    }
+    DispatchablePlanMetadata child = context.getDispatchablePlanMetadataMap().get(children.get(0).getFragmentId());
+    return child.isPrePartitioned();
+  }
+
+  private List<ServerInstance> assignServerInstances(DispatchablePlanContext context) {
     List<ServerInstance> serverInstances;
     Set<String> tableNames = context.getTableNames();
     Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
@@ -333,23 +371,7 @@ public class WorkerManager {
       throw new IllegalStateException(
           "No server instance found for intermediate stage for tables: " + Arrays.toString(tableNames.toArray()));
     }
-    if (metadata.isRequiresSingletonInstance()) {
-      // require singleton should return a single global worker ID with 0;
-      metadata.setWorkerIdToServerInstanceMap(Collections.singletonMap(0,
-          new QueryServerInstance(serverInstances.get(RANDOM.nextInt(serverInstances.size())))));
-    } else {
-      Map<String, String> options = context.getPlannerContext().getOptions();
-      int stageParallelism = Integer.parseInt(options.getOrDefault(QueryOptionKey.STAGE_PARALLELISM, "1"));
-      Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
-      int workerId = 0;
-      for (ServerInstance serverInstance : serverInstances) {
-        QueryServerInstance queryServerInstance = new QueryServerInstance(serverInstance);
-        for (int i = 0; i < stageParallelism; i++) {
-          workerIdToServerInstanceMap.put(workerId++, queryServerInstance);
-        }
-      }
-      metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
-    }
+    return serverInstances;
   }
 
   private ColocatedTableInfo getColocatedTableInfo(String tableName, String partitionKey, int numPartitions) {

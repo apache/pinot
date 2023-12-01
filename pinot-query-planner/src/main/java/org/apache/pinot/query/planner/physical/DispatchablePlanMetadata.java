@@ -68,8 +68,10 @@ public class DispatchablePlanMetadata implements Serializable {
   // whether a stage requires singleton instance to execute, e.g. stage contains global reduce (sort/agg) operator.
   private boolean _requiresSingletonInstance;
 
-  // whether a stage is partitioned by the same way the sending exchange is desired
+  // whether a stage is pre-partitioned by the same way the sending exchange is desired
   private boolean _isPrePartitioned;
+
+  // the partition info of this particular stage when data is received.
   private int _partitionParallelism;
 
   public DispatchablePlanMetadata() {

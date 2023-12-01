@@ -96,7 +96,7 @@ public class PinotLogicalQueryPlanner {
 
       // Sub plan root needs to send final results back to the Broker
       // TODO: Should be SINGLETON (currently SINGLETON has to be local, so use BROADCAST_DISTRIBUTED instead)
-      PlanNode subPlanRootSenderNode =
+      MailboxSendNode subPlanRootSenderNode =
           new MailboxSendNode(subPlanRoot.getPlanFragmentId(), subPlanRoot.getDataSchema(), 0,
               RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
               false, false);
