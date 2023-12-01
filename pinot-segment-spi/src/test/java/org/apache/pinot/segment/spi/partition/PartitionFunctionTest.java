@@ -163,9 +163,16 @@ public class PartitionFunctionTest {
       PartitionFunction partitionFunction3 =
           PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
 
+      // Create partition function with function config present with random seed value
+      // and with variant provided as "x64_32" in function config.
+      functionConfig.put("variant", "x64_32");
+      PartitionFunction partitionFunction4 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+
       testBasicProperties(partitionFunction1, functionName, numPartitions);
       testBasicProperties(partitionFunction2, functionName, numPartitions);
       testBasicProperties(partitionFunction3, functionName, numPartitions);
+      testBasicProperties(partitionFunction4, functionName, numPartitions);
 
       for (int j = 0; j < NUM_ROUNDS; j++) {
         int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
@@ -185,6 +192,12 @@ public class PartitionFunctionTest {
         // check for the partition function with non-null function config and with seed value.
         partition1 = partitionFunction3.getPartition(value);
         partition2 = partitionFunction3.getPartition(Integer.toString(value));
+        assertEquals(partition1, partition2);
+        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+
+        // check for the partition function with non-null function config and with seed value and variant.
+        partition1 = partitionFunction4.getPartition(value);
+        partition2 = partitionFunction4.getPartition(Integer.toString(value));
         assertEquals(partition1, partition2);
         assertTrue(partition1 >= 0 && partition1 < numPartitions);
       }
