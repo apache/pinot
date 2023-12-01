@@ -135,6 +135,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, context._realTimeTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, context._offlineTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTableCount);
+
     //emit a 0 for tables that are not paused/disabled. This makes alert expressions simpler as we don't have to deal
     // with missing metrics
     context._processedTables.forEach(tableNameWithType -> {
@@ -143,6 +144,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       } else {
         _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_CONSUMPTION_PAUSED, 0);
       }
+    });
+    context._processedTables.forEach(tableNameWithType -> {
       if (context._disabledTables.contains(tableNameWithType)) {
         _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED, 1);
       } else {
