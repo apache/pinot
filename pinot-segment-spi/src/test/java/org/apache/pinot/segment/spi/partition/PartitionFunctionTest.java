@@ -204,6 +204,90 @@ public class PartitionFunctionTest {
     }
   }
 
+  @Test
+  public void testMurmur3Equivalence() {
+    long seed = 100;
+    int numberOfPartitions = 5;
+    Random random = new Random(seed);
+
+    Murmur3PartitionFunction murmur3PartitionFunction = new Murmur3PartitionFunction(numberOfPartitions, null);
+
+    // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 0 to those values and stored in
+    // expectedMurmurValuesFor32BitX64WithZeroSeed.
+
+    int[] expectedMurmurValuesFor32BitX64WithZeroSeed = new int[]{
+        -1569442405, -921191038, 16439113, -881572510, 2111401876, 655879980, 1409856380, -1348364123, -1770645361,
+        1277101955
+    };
+
+    // Generate the same values as above - 10 random values of size 7, using {@link Random::nextBytes} with seed 100
+    // Apply {@link Murmur3PartitionFunction::murmurHash332bitsX64}. Here seed = 0.
+    // compare with stored results.
+    byte[] array = new byte[7];
+    for (int expectedMurmur3Value : expectedMurmurValuesFor32BitX64WithZeroSeed) {
+      random.nextBytes(array);
+      int actualMurmurValue = murmur3PartitionFunction.murmurHash332bitsX64(array, 0);
+      assertEquals(actualMurmurValue, expectedMurmur3Value);
+    }
+
+    // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 9001 to those values and
+    // stored in expectedMurmurValuesFor32BitX64WithNonZeroSeed.
+
+    int[] expectedMurmurValuesFor32BitX64WithNonZeroSeed = new int[]{
+        698083240, 174075836, -938825597, 155806634, -831733828, 319389887, -939822329, -1785781936, -1796939240,
+        757512622
+    };
+
+    // Generate the same values as above - 10 random values of size 7, using {@link Random::nextBytes} with seed 100
+    // Apply {@link Murmur3PartitionFunction::murmurHash332bitsX64}. Here seed = 9001.
+    // compare with stored results.
+    random = new Random(seed);
+    array = new byte[7];
+    for (int expectedMurmur3Value : expectedMurmurValuesFor32BitX64WithNonZeroSeed) {
+      random.nextBytes(array);
+      int actualMurmurValue = murmur3PartitionFunction.murmurHash332bitsX64(array, 9001);
+      assertEquals(actualMurmurValue, expectedMurmur3Value);
+    }
+
+    // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied com.google.common.hash.hashing::murmur3_32_fixed to those values with seed = 0 and stored in
+    // expectedMurmurValuesFor32BitX86WithZeroSeed.
+    int[] expectedMurmurValuesFor32BitX86WithZeroSeed = new int[]{
+        1255034832, -395463542, 659973067, 1070436837, -1193041642, -1412829846, -483463488, -1385092001, 568671606,
+        -807299446,
+    };
+
+    // Generate the same values as above - 10 random values of size 7, using {@link Random::nextBytes} with seed 100
+    // Apply {@link Murmur3PartitionFunction::murmurHash332bitsX86}. Here seed = 0.
+    // compare with stored results.
+    random = new Random(seed);
+    for (int expectedMurmur3Value : expectedMurmurValuesFor32BitX86WithZeroSeed) {
+      random.nextBytes(array);
+      int actualMurmurValue = murmur3PartitionFunction.murmurHash332bitsX86(array, 0);
+      assertEquals(actualMurmurValue, expectedMurmur3Value);
+    }
+
+    // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied com.google.common.hash.hashing::murmur3_32_fixed to those values with seed = 9001 and stored in
+    // expectedMurmurValuesFor32BitX86WithNonZeroSeed.
+    int[] expectedMurmurValuesFor32BitX86WithNonZeroSeed = new int[]{
+        -590969347, -315366997, 1642137565, -1732240651, -597560989, -1430018124, -448506674, 410998174, -1912106487,
+        -19253806,
+    };
+
+    // Generate the same values as above - 10 random values of size 7, using {@link Random::nextBytes} with seed 100
+    // Apply {@link Murmur3PartitionFunction::murmurHash332bitsX86}. Here seed = 9001.
+    // compare with stored results
+    random = new Random(seed);
+    for (int expectedMurmur3Value : expectedMurmurValuesFor32BitX86WithNonZeroSeed) {
+      random.nextBytes(array);
+      int actualMurmurValue = murmur3PartitionFunction.murmurHash332bitsX86(array, 9001);
+      assertEquals(actualMurmurValue, expectedMurmur3Value);
+    }
+  }
+
   /**
    * Unit test for {@link MurmurPartitionFunction}.
    * <ul>

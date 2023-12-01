@@ -58,9 +58,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   @Override
   public int getPartition(Object value) {
     if (_variant.equals("x86_32")) {
-      return
-          (Hashing.murmur3_32_fixed(_hashSeed).hashBytes(value.toString().getBytes(UTF_8)).asInt() & Integer.MAX_VALUE)
-              % _numPartitions;
+      return (murmurHash332bitsX86(value.toString().getBytes(UTF_8), _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
     }
     return (murmurHash332bitsX64(value.toString().getBytes(UTF_8), _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
   }
@@ -80,6 +78,10 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   public String toString() {
     return NAME;
   }
+  @VisibleForTesting
+  int murmurHash332bitsX86(byte[] data, int hashSeed) {
+    return Hashing.murmur3_32_fixed(hashSeed).hashBytes(data).asInt();
+  }
 
   /**
    * Taken from <a href=
@@ -92,10 +94,8 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    * >original in C</a>
    *
    * This is an implementation of MurmurHash3 to generate 32 bit hash for x64 architecture (not part of the original
-   * Murmur3
-   * implementations) used by Infinispan and Debezium, Removed the parts that we don't need and formatted the code to
-   * Apache
-   * Pinot's Checkstyle.
+   * Murmur3 implementations) used by Infinispan and Debezium, Removed the parts that we don't need and formatted
+   * the code to Apache Pinot's Checkstyle.
    *
    * @author Patrick McFarland
    * @see <a href="http://sites.google.com/site/murmurhash/">MurmurHash website</a>
@@ -170,56 +170,42 @@ public class Murmur3PartitionFunction implements PartitionFunction {
 
     int tail = (key.length >>> 4) << 4;
 
+    // CHECKSTYLE:OFF
     switch (key.length & 15) {
       case 15:
         state._k2 ^= (long) key[tail + 14] << 48;
-        break;
       case 14:
         state._k2 ^= (long) key[tail + 13] << 40;
-        break;
       case 13:
         state._k2 ^= (long) key[tail + 12] << 32;
-        break;
       case 12:
         state._k2 ^= (long) key[tail + 11] << 24;
-        break;
       case 11:
         state._k2 ^= (long) key[tail + 10] << 16;
-        break;
       case 10:
         state._k2 ^= (long) key[tail + 9] << 8;
-        break;
       case 9:
         state._k2 ^= key[tail + 8];
-        break;
       case 8:
         state._k1 ^= (long) key[tail + 7] << 56;
-        break;
       case 7:
         state._k1 ^= (long) key[tail + 6] << 48;
-        break;
       case 6:
         state._k1 ^= (long) key[tail + 5] << 40;
-        break;
       case 5:
         state._k1 ^= (long) key[tail + 4] << 32;
-        break;
       case 4:
         state._k1 ^= (long) key[tail + 3] << 24;
-        break;
       case 3:
         state._k1 ^= (long) key[tail + 2] << 16;
-        break;
       case 2:
         state._k1 ^= (long) key[tail + 1] << 8;
-        break;
       case 1:
         state._k1 ^= key[tail + 0];
         bmix(state);
-        break;
-      default:
     }
 
+    // CHECKSTYLE:ON
     state._h2 ^= key.length;
 
     state._h1 += state._h2;
@@ -242,7 +228,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    * @return 32 bit hashed key
    */
   @VisibleForTesting
-  private int murmurHash332bitsX64(final byte[] key, final int seed) {
+  int murmurHash332bitsX64(final byte[] key, final int seed) {
     return (int) (murmurHash364bitsX64(key, seed) >>> 32);
   }
 
