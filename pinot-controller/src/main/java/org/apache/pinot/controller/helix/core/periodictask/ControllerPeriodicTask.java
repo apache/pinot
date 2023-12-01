@@ -46,9 +46,6 @@ import org.slf4j.LoggerFactory;
 public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerPeriodicTask.class);
 
-  private static final String IS_TABLE_CONSUMPTION_PAUSED = "isTablePaused";
-  private static final String IS_TABLE_ENABLED = "HELIX_ENABLED";
-
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
   protected final LeadControllerManager _leadControllerManager;
   protected final ControllerMetrics _controllerMetrics;
