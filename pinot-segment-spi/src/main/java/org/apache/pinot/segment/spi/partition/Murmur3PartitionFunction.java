@@ -49,8 +49,12 @@ public class Murmur3PartitionFunction implements PartitionFunction {
                 "x64_32")),
         "Murmur3 variant must be either x86_32 or x64_32");
     _numPartitions = numPartitions;
+
+    // default value of the hash seed is 0.
     _hashSeed = (functionConfig == null || functionConfig.get(SEED_KEY) == null) ? 0
         : Integer.parseInt(functionConfig.get(SEED_KEY));
+
+    // default value of the murmur3 variant is x86_32.
     _variant = (functionConfig == null || functionConfig.get(MURMUR3_VARIANT) == null) ? "x86_32"
         : functionConfig.get(MURMUR3_VARIANT);
   }
@@ -149,7 +153,6 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    * @return 64 bit hashed key
    */
   private long murmurHash364bitsX64(final byte[] key, final int seed) {
-    // Exactly the same as MurmurHash3_x64_128, except it only returns state.h1
     State state = new State();
 
     state._h1 = 0x9368e53c2f6af274L ^ seed;

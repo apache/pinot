@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.hash.Hashing;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -446,6 +447,73 @@ public class PartitionFunctionTest {
     // generate the same 10 String values
     // Apply the partition function and compare with stored results
     testPartitionFunctionEquivalence(murmurPartitionFunction, expectedPartitions);
+  }
+
+  @Test
+  public void testMurmur3PartitionFunctionEquivalence() {
+
+    // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 0 to those values and stored in
+    // expectedMurmurValuesFor32BitX64WithZeroSeed.
+    // stored the results in expectedPartitions32BitsX64WithZeroSeed
+    int[] expectedPartitions32BitsX64WithZeroSeed = new int[]{
+        4, 1, 3, 2, 0, 3, 3, 2, 0, 1
+    };
+
+    // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 9001 to those values and
+    // stored in
+    // expectedMurmurValuesFor32BitX64WithZeroSeed.
+    // stored the results in expectedPartitions32BitsX64WithZeroSeed
+    int[] expectedPartitions32BitsX64WithNonZeroSeed = new int[]{
+        2, 1, 4, 2, 2, 2, 2, 1, 3, 3
+    };
+
+    // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied com.google.common.hash.hashing::murmur3_32_fixed with seed = 0 to those values and stored in
+    // expectedMurmurValuesFor32BitX64WithZeroSeed.
+    // stored the results in expectedPartitions32BitsX86WithZeroSeed
+    int[] expectedPartitions32BitsX86WithZeroSeed = new int[]{
+        4, 3, 3, 2, 3, 4, 0, 3, 1, 4
+    };
+
+    // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
+    // Applied com.google.common.hash.hashing::murmur3_32_fixed with seed = 9001 to those values and stored in
+    // expectedMurmurValuesFor32BitX64WithZeroSeed.
+    // stored the results in expectedPartitions32BitsX64WithZeroSeed
+    int[] expectedPartitions32BitsX86WithNonZeroSeed = new int[]{
+        2, 1, 3, 2, 2, 1, 1, 4, 4, 2
+    };
+
+    // initialized {@link Murmur3PartitionFunction} with 5 partitions
+    int numPartitions = 5;
+    Map<String, String> functionConfig = new HashMap<>();
+    functionConfig.put("variant", "x64_32");
+
+    // x64 32 bit variant with seed = 0.
+    Murmur3PartitionFunction murmur3PartitionFunction1 = new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+    // Put seed value in "seed" field in the function config.
+    functionConfig.put("seed", Integer.toString(9001));
+
+    // x64 32 bit variant with seed = 9001.
+    Murmur3PartitionFunction murmur3PartitionFunction2 = new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+    // x86 32 bit variant with seed = 0.
+    Murmur3PartitionFunction murmur3PartitionFunction3 = new Murmur3PartitionFunction(numPartitions, null);
+
+    // Remove the variant field.
+    functionConfig.remove("variant");
+
+    // x86 32 bit variant with seed = 9001.
+    Murmur3PartitionFunction murmur3PartitionFunction4 = new Murmur3PartitionFunction(numPartitions, functionConfig);
+
+    // generate the same 10 String values
+    // Apply the partition function and compare with stored results
+    testPartitionFunctionEquivalence(murmur3PartitionFunction1, expectedPartitions32BitsX64WithZeroSeed);
+    testPartitionFunctionEquivalence(murmur3PartitionFunction2, expectedPartitions32BitsX64WithNonZeroSeed);
+    testPartitionFunctionEquivalence(murmur3PartitionFunction3, expectedPartitions32BitsX86WithZeroSeed);
+    testPartitionFunctionEquivalence(murmur3PartitionFunction4, expectedPartitions32BitsX86WithNonZeroSeed);
   }
 
   /**
