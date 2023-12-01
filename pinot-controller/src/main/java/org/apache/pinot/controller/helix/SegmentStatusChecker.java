@@ -219,8 +219,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       } catch (NumberFormatException e) {
         // Ignore
       }
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS,
-          nReplicasFromIdealState);
+      _controllerMetrics
+          .setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, nReplicasFromIdealState);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, 100);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
       return;
@@ -232,8 +232,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(propertyStore, tableNameWithType);
     SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segmentsExcludeReplaced, segmentLineage);
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE,
-        idealState.toString().length());
+    _controllerMetrics
+        .setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_BYTE_SIZE,
         idealState.serialize(RECORD_SERIALIZER).length);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT,
@@ -279,9 +279,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           tableCompressedSize += sizeInBytes;
         }
       }
-      nReplicasIdealMax =
-          (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState.getInstanceStateMap(
-              partitionName).size() : nReplicasIdealMax;
+      nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState
+          .getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
       if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
         // No replicas for this segment
         nOffline++;
