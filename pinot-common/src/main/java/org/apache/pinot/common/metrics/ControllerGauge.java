@@ -151,7 +151,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   TABLE_CONSUMPTION_PAUSED("tableConsumptionPaused", false),
 
-  TABLE_ENABLED("tableEnabled", false);
+  TABLE_DISABLED("tableDisabled", false);
 
   private final String _gaugeName;
   private final String _unit;

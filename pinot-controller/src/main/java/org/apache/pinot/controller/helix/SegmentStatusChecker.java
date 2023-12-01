@@ -61,6 +61,7 @@ import org.slf4j.LoggerFactory;
 public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusChecker.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final int MAX_OFFLINE_SEGMENTS_TO_LOG = 5;
+  private static final String TABLE_CONSUMPTION_PAUSED = "isTablePaused";
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
   public static final String CONSUMING = "CONSUMING";
@@ -134,6 +135,20 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, context._realTimeTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, context._offlineTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTableCount);
+    //emit a 0 for tables that are not paused/disabled. This makes alert expressions simpler as we don't have to deal
+    // with missing metrics
+    context._processedTables.forEach(tableNameWithType -> {
+      if (context._pausedTables.contains(tableNameWithType)) {
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_CONSUMPTION_PAUSED, 1);
+      } else {
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_CONSUMPTION_PAUSED, 0);
+      }
+      if (context._disabledTables.contains(tableNameWithType)) {
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED, 1);
+      } else {
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED, 0);
+      }
+    });
 
     // Remove metrics for tables that are no longer in the cluster
     _cachedTableNamesWithType.removeAll(context._processedTables);
@@ -186,8 +201,15 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         LOGGER.warn("Table {} is disabled. Skipping segment status checks", tableNameWithType);
       }
       resetTableMetrics(tableNameWithType);
+      context._disabledTables.add(tableNameWithType);
       context._disabledTableCount++;
       return;
+    }
+
+    //check if table consumption is paused
+    boolean isTablePaused = Boolean.parseBoolean(idealState.getRecord().getSimpleField(TABLE_CONSUMPTION_PAUSED));
+    if (isTablePaused) {
+      context._pausedTables.add(tableNameWithType);
     }
 
     if (idealState.getPartitionSet().isEmpty()) {
@@ -197,8 +219,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       } catch (NumberFormatException e) {
         // Ignore
       }
-      _controllerMetrics
-          .setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, nReplicasFromIdealState);
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS,
+          nReplicasFromIdealState);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, 100);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
       return;
@@ -210,8 +232,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
     SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(propertyStore, tableNameWithType);
     SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segmentsExcludeReplaced, segmentLineage);
-    _controllerMetrics
-        .setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE,
+        idealState.toString().length());
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_BYTE_SIZE,
         idealState.serialize(RECORD_SERIALIZER).length);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT,
@@ -257,8 +279,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           tableCompressedSize += sizeInBytes;
         }
       }
-      nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState
-          .getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
+      nReplicasIdealMax =
+          (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState.getInstanceStateMap(
+              partitionName).size() : nReplicasIdealMax;
       if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
         // No replicas for this segment
         nOffline++;
@@ -335,6 +358,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE);
+    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED);
+    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_CONSUMPTION_PAUSED);
   }
 
   private void setStatusToDefault() {
@@ -369,5 +394,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     private int _offlineTableCount;
     private int _disabledTableCount;
     private Set<String> _processedTables = new HashSet<>();
+    private Set<String> _disabledTables = new HashSet<>();
+    private Set<String> _pausedTables = new HashSet<>();
   }
 }

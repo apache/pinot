@@ -126,7 +126,6 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
             ControllerMeter.PERIODIC_TASK_ERROR, 1L);
       }
       numTablesProcessed++;
-      exposeTableStates(tableNameWithType);
     }
     postprocess(context);
     _controllerMetrics
@@ -177,22 +176,5 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
    * @param tableNamesWithType the table names that the current controller isn't the leader for
    */
   protected void nonLeaderCleanup(List<String> tableNamesWithType) {
-  }
-
-  /*
-  We want to capture certain table states - Table enabled/disabled, consumption paused/resumed, etc
-   */
-  private void exposeTableStates(String tableNameWithType) {
-    IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
-    Optional.ofNullable(idealState).map(HelixProperty::getRecord).ifPresent(record -> {
-      boolean isTablePaused = Boolean.parseBoolean(record.getSimpleField(IS_TABLE_CONSUMPTION_PAUSED));
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_CONSUMPTION_PAUSED,
-          isTablePaused ? 1 : 0);
-      //is HELIX_ENALBED is not present in the map, Boolean.parseBoolean(null) will return false whereas we need a
-      // true (as the table is enabled in this case). Therefore, we do the explicit null check.
-      boolean isEnabled = Boolean.parseBoolean(
-          record.getSimpleField(IS_TABLE_ENABLED) != null ? record.getSimpleField(IS_TABLE_ENABLED) : "true");
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_ENABLED, isEnabled ? 1 : 0);
-    });
   }
 }
