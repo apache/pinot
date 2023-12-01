@@ -127,7 +127,7 @@ public final class RelToPlanNodeConverter {
       }
     }
     RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
-    boolean isPartitioned = inputDistributionTrait != null
+    boolean isPrePartitioned = inputDistributionTrait != null
         && inputDistributionTrait.getType() == RelDistribution.Type.HASH_DISTRIBUTED
         && inputDistributionTrait == node.getDistribution();
     List<RelFieldCollation> fieldCollations = (collation == null) ? null : collation.getFieldCollations();
@@ -136,7 +136,7 @@ public final class RelToPlanNodeConverter {
     Set<String> tableNames = getTableNamesFromRelRoot(node);
 
     return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), exchangeType, tableNames,
-        node.getDistribution(), fieldCollations, isSortOnSender, isSortOnReceiver, isPartitioned);
+        node.getDistribution(), fieldCollations, isSortOnSender, isSortOnReceiver, isPrePartitioned);
   }
 
   private static PlanNode convertLogicalSetOp(SetOp node, int currentStageId) {

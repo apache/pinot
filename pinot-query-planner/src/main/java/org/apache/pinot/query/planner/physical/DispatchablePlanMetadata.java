@@ -69,7 +69,7 @@ public class DispatchablePlanMetadata implements Serializable {
   private boolean _requiresSingletonInstance;
 
   // whether a stage is partitioned by the same way the sending exchange is desired
-  private boolean _isPartitioned;
+  private boolean _isPrePartitioned;
   private int _partitionParallelism;
 
   public DispatchablePlanMetadata() {
@@ -136,12 +136,12 @@ public class DispatchablePlanMetadata implements Serializable {
     _requiresSingletonInstance = _requiresSingletonInstance || newRequireInstance;
   }
 
-  public boolean isPartitioned() {
-    return _isPartitioned;
+  public boolean isPrePartitioned() {
+    return _isPrePartitioned;
   }
 
-  public void setPartitioned(boolean isPartitioned) {
-    _isPartitioned = isPartitioned;
+  public void setPrePartitioned(boolean isPartitioned) {
+    _isPrePartitioned = isPartitioned;
   }
 
   public int getPartitionParallelism() {

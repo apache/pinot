@@ -67,7 +67,7 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
           senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(receiverFragmentId, mailboxMetadata);
           receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderFragmentId, mailboxMetadata);
         }
-      } else if (senderMetadata.isPartitioned() && senderMetadata.getScannedTables().size() > 0
+      } else if (senderMetadata.isPrePartitioned() && senderMetadata.getScannedTables().size() > 0
           && (numReceivers / numSenders > 0)) {
         // For partitioned table scan, send the data to the worker with the same worker id (not necessary the same
         // instance). When partition parallelism is configured, send the data to the corresponding workers.
