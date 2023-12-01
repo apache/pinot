@@ -170,10 +170,25 @@ public class PartitionFunctionTest {
       PartitionFunction partitionFunction4 =
           PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
 
+      // Put variant value as "x86_32" in function config.
+      functionConfig.put("variant", "x86_32");
+
+      // Put seed value as 0 in function config.
+      functionConfig.put("seed", "0");
+
+      // Create partition function with function config present with variant provided as "x86_32" in function config.
+      PartitionFunction partitionFunction5 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+
+      // Partition number should be equal as partitionNumWithNullConfig and partitionNumWithNoSeedValue as this is
+      // default behavior.
+      assertEquals(partitionFunction5.getPartition(valueTobeHashed), partitionNumWithNullConfig);
+
       testBasicProperties(partitionFunction1, functionName, numPartitions);
-      testBasicProperties(partitionFunction2, functionName, numPartitions);
-      testBasicProperties(partitionFunction3, functionName, numPartitions);
-      testBasicProperties(partitionFunction4, functionName, numPartitions);
+      testBasicProperties(partitionFunction2, functionName, numPartitions, functionConfig);
+      testBasicProperties(partitionFunction3, functionName, numPartitions, functionConfig);
+      testBasicProperties(partitionFunction4, functionName, numPartitions, functionConfig);
+      testBasicProperties(partitionFunction5, functionName, numPartitions, functionConfig);
 
       for (int j = 0; j < NUM_ROUNDS; j++) {
         int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
@@ -199,6 +214,12 @@ public class PartitionFunctionTest {
         // check for the partition function with non-null function config and with seed value and variant.
         partition1 = partitionFunction4.getPartition(value);
         partition2 = partitionFunction4.getPartition(Integer.toString(value));
+        assertEquals(partition1, partition2);
+        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+
+        // check for the partition function with non-null function config and with seed value and variant.
+        partition1 = partitionFunction5.getPartition(value);
+        partition2 = partitionFunction5.getPartition(Integer.toString(value));
         assertEquals(partition1, partition2);
         assertTrue(partition1 >= 0 && partition1 < numPartitions);
       }
