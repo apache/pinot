@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.hash.Hashing;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
