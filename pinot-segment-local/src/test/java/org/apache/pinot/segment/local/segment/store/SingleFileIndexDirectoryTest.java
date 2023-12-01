@@ -39,6 +39,7 @@ import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndex
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.ColumnIndexDirectory;
@@ -233,11 +234,11 @@ public class SingleFileIndexDirectoryTest {
   @Test
   public void testRemoveTextIndices()
       throws IOException, ConfigurationException {
+    TextIndexConfig config =
+            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null);
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
-        LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true,
-            null, null, true, 500, null);
-        LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true,
-            null, null, true, 500, null)) {
+        LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, config);
+        LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true, config)) {
       PinotDataBuffer buf = sfd.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 1);
 
@@ -339,11 +340,11 @@ public class SingleFileIndexDirectoryTest {
   @Test
   public void testGetColumnIndices()
       throws Exception {
+    TextIndexConfig config =
+            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null);
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
-        LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true,
-            null, null, true, 500, null);
-        LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true,
-            null, null, true, 500, null)) {
+        LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, config);
+        LuceneTextIndexCreator barCreator = new LuceneTextIndexCreator("bar", TEMP_DIR, true, config)) {
       PinotDataBuffer buf = sfd.newBuffer("col1", StandardIndexes.forward(), 1024);
       buf.putInt(0, 111);
       buf = sfd.newBuffer("col2", StandardIndexes.dictionary(), 1024);

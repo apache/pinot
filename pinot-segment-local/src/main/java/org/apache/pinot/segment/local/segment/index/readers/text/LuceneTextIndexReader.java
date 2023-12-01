@@ -85,11 +85,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
-      String luceneAnalyzerFQCN = config.getLuceneAnalyzerFQCN();
-      _analyzer = luceneAnalyzerFQCN.equals(StandardAnalyzer.class.getName())
+      String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
+      _analyzer = luceneAnalyzerClass.equals(StandardAnalyzer.class.getName())
               ? TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
               config.getStopWordsInclude(), config.getStopWordsExclude())
-              : TextIndexUtils.getAnalyzerFromFQCN(luceneAnalyzerFQCN);
+              : TextIndexUtils.getAnalyzerFromFQCN(luceneAnalyzerClass);
       LOGGER.info("Successfully read lucene index for {} from {}", _column, indexDir);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,

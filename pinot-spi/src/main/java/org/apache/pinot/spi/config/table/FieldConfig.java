@@ -51,8 +51,8 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_STOP_WORD_EXCLUDE_KEY = "stopWordExclude";
   public static final String TEXT_INDEX_LUCENE_USE_COMPOUND_FILE = "luceneUseCompoundFile";
   public static final String TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB = "luceneMaxBufferSizeMB";
-  public static final String TEXT_INDEX_LUCENE_ANALYZER_FQCN = "luceneAnalyzerFQCN";
-  public static final String TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_FQCN
+  public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS = "luceneAnalyzerClass";
+  public static final String TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS
           = "org.apache.lucene.analysis.standard.StandardAnalyzer";
   public static final String TEXT_INDEX_STOP_WORD_SEPERATOR = ",";
   // "native" for native, default is Lucene

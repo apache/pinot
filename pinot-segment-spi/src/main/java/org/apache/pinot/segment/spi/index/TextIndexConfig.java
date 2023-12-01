@@ -47,7 +47,7 @@ public class TextIndexConfig extends IndexConfig {
   private final List<String> _stopWordsExclude;
   private final boolean _luceneUseCompoundFile;
   private final int _luceneMaxBufferSizeMB;
-  private final String _luceneAnalyzerFQCN;
+  private final String _luceneAnalyzerClass;
 
   @JsonCreator
   public TextIndexConfig(
@@ -60,7 +60,7 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("stopWordsExclude") List<String> stopWordsExclude,
       @JsonProperty("luceneUseCompoundFile") Boolean luceneUseCompoundFile,
       @JsonProperty("luceneMaxBufferSizeMB") Integer luceneMaxBufferSizeMB,
-      @JsonProperty("luceneAnalyzerFQCN") String luceneAnalyzerFQCN
+      @JsonProperty("luceneAnalyzerClass") String luceneAnalyzerClass
       ) {
     super(disabled);
     _fstType = fstType;
@@ -73,8 +73,8 @@ public class TextIndexConfig extends IndexConfig {
         luceneUseCompoundFile == null ? LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE : luceneUseCompoundFile;
     _luceneMaxBufferSizeMB =
         luceneMaxBufferSizeMB == null ? LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB : luceneMaxBufferSizeMB;
-    _luceneAnalyzerFQCN = (luceneAnalyzerFQCN == null || luceneAnalyzerFQCN.isEmpty())
-            ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_FQCN : luceneAnalyzerFQCN;
+    _luceneAnalyzerClass = (luceneAnalyzerClass == null || luceneAnalyzerClass.isEmpty())
+            ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS : luceneAnalyzerClass;
   }
 
   public FSTType getFstType() {
@@ -122,10 +122,10 @@ public class TextIndexConfig extends IndexConfig {
   }
 
   /**
-   * Lucene analyzer FQCN specifying which analyzer class to use for indexing
+   * Lucene analyzer fully qualified class name specifying which analyzer class to use for indexing
    */
-  public String getLuceneAnalyzerFQCN() {
-    return _luceneAnalyzerFQCN;
+  public String getLuceneAnalyzerClass() {
+    return _luceneAnalyzerClass;
   }
 
   public static abstract class AbstractBuilder {
@@ -139,7 +139,7 @@ public class TextIndexConfig extends IndexConfig {
     protected List<String> _stopWordsExclude = new ArrayList<>();
     protected boolean _luceneUseCompoundFile = LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE;
     protected int _luceneMaxBufferSizeMB = LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB;
-    protected String _luceneAnalyzerFQCN = FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_FQCN;
+    protected String _luceneAnalyzerClass = FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS;
 
     public AbstractBuilder(@Nullable FSTType fstType) {
       _fstType = fstType;
@@ -153,12 +153,12 @@ public class TextIndexConfig extends IndexConfig {
       _stopWordsExclude = new ArrayList<>(other._stopWordsExclude);
       _luceneUseCompoundFile = other._luceneUseCompoundFile;
       _luceneMaxBufferSizeMB = other._luceneMaxBufferSizeMB;
-      _luceneAnalyzerFQCN = other._luceneAnalyzerFQCN;
+      _luceneAnalyzerClass = other._luceneAnalyzerClass;
     }
 
     public TextIndexConfig build() {
       return new TextIndexConfig(false, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
-          _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile, _luceneMaxBufferSizeMB, _luceneAnalyzerFQCN);
+          _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile, _luceneMaxBufferSizeMB, _luceneAnalyzerClass);
     }
 
     public abstract AbstractBuilder withProperties(@Nullable Map<String, String> textIndexProperties);
@@ -189,7 +189,7 @@ public class TextIndexConfig extends IndexConfig {
     }
 
     public AbstractBuilder withLuceneAnalyzerFQCN(String luceneAnalyzerFQCN) {
-      _luceneAnalyzerFQCN = luceneAnalyzerFQCN;
+      _luceneAnalyzerClass = luceneAnalyzerFQCN;
       return this;
     }
   }
@@ -217,6 +217,6 @@ public class TextIndexConfig extends IndexConfig {
   public int hashCode() {
     return Objects.hash(super.hashCode(), _fstType, _rawValueForTextIndex, _enableQueryCache,
         _useANDForMultiTermQueries, _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile,
-        _luceneMaxBufferSizeMB, _luceneAnalyzerFQCN);
+        _luceneMaxBufferSizeMB, _luceneAnalyzerClass);
   }
 }
