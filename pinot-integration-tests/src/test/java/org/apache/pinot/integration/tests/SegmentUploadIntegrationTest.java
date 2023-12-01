@@ -48,8 +48,10 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
+import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 
@@ -59,6 +61,7 @@ import org.testng.annotations.Test;
  * todo: add test for URI push
  */
 public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
+  private String TABLE_NAME_WITH_TYPE = DEFAULT_TABLE_NAME + "_" + "OFFLINE";
 
   @Override
   protected Map<String, String> getStreamConfigs() {
@@ -136,8 +139,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(DEFAULT_TABLE_NAME);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
+    tableSpec.setTableName(TABLE_NAME_WITH_TYPE);
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(TABLE_NAME_WITH_TYPE));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
@@ -215,7 +218,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig offlineTableConfig = createOfflineTableConfigWithConsistentPush();
-    waitForEVToDisappear(offlineTableConfig.getTableName());
+    // waitForEVToDisappear(offlineTableConfig.getTableName());
     addTableConfig(offlineTableConfig);
 
     List<File> avroFiles = getAllAvroFiles();
@@ -237,8 +240,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(DEFAULT_TABLE_NAME);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
+    tableSpec.setTableName(TABLE_NAME_WITH_TYPE);
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(TABLE_NAME_WITH_TYPE));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());

@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
@@ -38,9 +41,12 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
+
 public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterIntegrationTest {
   private TableConfig _realtimeTableConfig;
   private static final String REALTIME_TABLE_NAME = "mytable";
+  private static final String REALTIME_TABLE_NAME_WITH_TYPE = "mytable_REALTIME";
+
   private static final String REALTIME_SCHEMA_NAME = "mytable";
 
   @BeforeTest
@@ -87,11 +93,11 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
   }
 
   /**
-   * This test validates if we are able to ingest segments into realtime table.
+   * Validates if we are able to ingest segments into realtime table, via adhoc mode.
    * @throws Exception
    */
   @Test
-  public void testIngestionIntoRealtimeTable()
+  public void testAdhocIngestionIntoRealtimeTable()
       throws Exception {
     Map<String, String> taskConfigs = new HashMap<>();
 
@@ -104,6 +110,41 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
     String url = getControllerBaseApiUrl() + "/tasks/execute";
     sendPostRequest(url, JsonUtils.objectToString(adhocTaskConfig),
         Collections.singletonMap("accept", "application/json"));
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        int totalDocs = getTotalDocs(REALTIME_TABLE_NAME);
+        return totalDocs == DEFAULT_COUNT_STAR_RESULT;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 5000L, 600_000L, "Failed to load " + DEFAULT_COUNT_STAR_RESULT + " documents", true);
+    JsonNode result = postQuery("SELECT COUNT(*) FROM " + REALTIME_TABLE_NAME);
+    assertEquals(result.get("numSegmentsQueried").asInt(), 14);
+  }
+
+  /**
+   * Validates ingestion to realtime table via scheduled mode
+   * @throws Exception
+   */
+  @Test
+  public void testScheduledIngestionIntoRealtimeTable()
+      throws Exception {
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put(BatchConfigProperties.INPUT_DIR_URI, _tempDir.getAbsolutePath());
+    taskConfigs.put(BatchConfigProperties.INPUT_FORMAT, "avro");
+
+    TableTaskConfig tableTaskConfig =
+        new TableTaskConfig(Collections.singletonMap("SegmentGenerationAndPushTask", taskConfigs));
+    BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(List.of(taskConfigs), "APPEND", "DAILY");
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(batchIngestionConfig);
+    _realtimeTableConfig.setIngestionConfig(ingestionConfig);
+    _realtimeTableConfig.setTaskConfig(tableTaskConfig);
+    updateTableConfig(_realtimeTableConfig);
+    String url = getControllerBaseApiUrl() + "/tasks/schedule?taskType=SegmentGenerationAndPushTask&tableName="
+        + REALTIME_TABLE_NAME_WITH_TYPE;
+
+    sendPostRequest(url, null, Collections.singletonMap("accept", "application/json"));
     TestUtils.waitForCondition(aVoid -> {
       try {
         int totalDocs = getTotalDocs(REALTIME_TABLE_NAME);
