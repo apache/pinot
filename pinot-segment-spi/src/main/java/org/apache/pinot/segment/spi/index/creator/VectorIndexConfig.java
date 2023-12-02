@@ -114,6 +114,12 @@ public class VectorIndexConfig extends IndexConfig {
     return this;
   }
 
+  public String toString() {
+    return "VectorIndexConfig{" + "_vectorIndexType='" + _vectorIndexType + "', _vectorDimension="
+        + _vectorDimension + ", _version=" + _version + ", _vectorDistanceFunction="
+        + _vectorDistanceFunction + ", _properties=" + _properties + '}';
+  }
+
   public enum VectorDistanceFunction {
     COSINE, INNER_PRODUCT, EUCLIDEAN, DOT_PRODUCT
   }

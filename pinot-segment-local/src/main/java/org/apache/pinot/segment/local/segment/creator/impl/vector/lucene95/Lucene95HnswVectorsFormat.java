@@ -132,7 +132,7 @@ public final class Lucene95HnswVectorsFormat extends KnnVectorsFormat {
    * underlying implementation of {@link HnswGraph} which uses a fixed size array to store the
    * vector values.
    */
-  private static final int DEFAULT_MAX_DIMENSIONS = 2048;
+  public static final int DEFAULT_MAX_DIMENSIONS = 2048;
 
   /**
    * Default number of the size of the queue maintained while searching during a graph construction.

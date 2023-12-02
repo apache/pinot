@@ -109,8 +109,7 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
     switch (IndexType.valueOf(indexConfig.getVectorIndexType())) {
       case HNSW:
-        return new HnswVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), true, true, 500,
-            indexConfig);
+        return new HnswVectorIndexCreator(context.getFieldSpec().getName(), context.getIndexDir(), indexConfig);
       // TODO: Support more vector index types.
       default:
         throw new UnsupportedOperationException("Unsupported vector index type: " + indexConfig.getVectorIndexType());

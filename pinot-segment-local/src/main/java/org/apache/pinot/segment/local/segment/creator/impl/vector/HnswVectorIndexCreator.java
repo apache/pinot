@@ -32,6 +32,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene95.Lucene95Codec;
+import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene95.Lucene95HnswVectorsFormat;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
@@ -56,8 +57,7 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
 
   private int _nextDocId = 0;
 
-  public HnswVectorIndexCreator(String column, File segmentIndexDir, boolean commit, boolean useCompoundFile,
-      int maxBufferSizeMB, VectorIndexConfig vectorIndexConfig) {
+  public HnswVectorIndexCreator(String column, File segmentIndexDir, VectorIndexConfig vectorIndexConfig) {
     _vectorColumn = column;
     _vectorDimension = vectorIndexConfig.getVectorDimension();
     VectorIndexConfig.VectorDistanceFunction vectorDistanceFunction = vectorIndexConfig.getVectorDistanceFunction();
@@ -82,19 +82,42 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       File indexFile = getV1VectorIndexFile(segmentIndexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
-      LOGGER.info("Creating HNSW index for column: " + column + " at path: " + indexFile.getAbsolutePath());
-
-      IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
-      indexWriterConfig.setRAMBufferSizeMB(maxBufferSizeMB);
-      indexWriterConfig.setCommitOnClose(commit);
-      indexWriterConfig.setUseCompoundFile(useCompoundFile);
-      indexWriterConfig.setCodec(new Lucene95Codec());
-
-      _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
+      LOGGER.info("Creating HNSW index for column: {} at path: {} with {} for segment: {}", column,
+          indexFile.getAbsolutePath(), vectorIndexConfig.getProperties(), segmentIndexDir.getAbsolutePath());
+      _indexWriter = new IndexWriter(_indexDirectory, getIndexWriterConfig(vectorIndexConfig));
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while instantiating the LuceneTextIndexCreator for column: " + column, e);
     }
+  }
+
+  private IndexWriterConfig getIndexWriterConfig(VectorIndexConfig vectorIndexConfig) {
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig();
+
+    double maxBufferSizeMB = Double.parseDouble(vectorIndexConfig.getProperties()
+        .getOrDefault("maxBufferSizeMB", String.valueOf(IndexWriterConfig.DEFAULT_RAM_BUFFER_SIZE_MB)));
+    boolean commit = Boolean.parseBoolean(vectorIndexConfig.getProperties()
+        .getOrDefault("commit", String.valueOf(IndexWriterConfig.DEFAULT_COMMIT_ON_CLOSE)));
+    boolean useCompoundFile = Boolean.parseBoolean(vectorIndexConfig.getProperties()
+        .getOrDefault("useCompoundFile", String.valueOf(IndexWriterConfig.DEFAULT_USE_COMPOUND_FILE_SYSTEM)));
+    indexWriterConfig.setRAMBufferSizeMB(maxBufferSizeMB);
+    indexWriterConfig.setCommitOnClose(commit);
+    indexWriterConfig.setUseCompoundFile(useCompoundFile);
+
+    int maxCon = Integer.parseInt(vectorIndexConfig.getProperties()
+        .getOrDefault("maxCon", String.valueOf(Lucene95HnswVectorsFormat.DEFAULT_MAX_CONN)));
+    int beamWidth = Integer.parseInt(vectorIndexConfig.getProperties()
+        .getOrDefault("beamWidth", String.valueOf(Lucene95HnswVectorsFormat.DEFAULT_BEAM_WIDTH)));
+    int maxDimensions = Integer.parseInt(vectorIndexConfig.getProperties()
+        .getOrDefault("maxDimensions", String.valueOf(Lucene95HnswVectorsFormat.DEFAULT_MAX_DIMENSIONS)));
+
+    Lucene95HnswVectorsFormat knnVectorsFormat =
+        new Lucene95HnswVectorsFormat(maxCon, beamWidth, maxDimensions);
+
+    Lucene95Codec.Mode mode = Lucene95Codec.Mode.valueOf(vectorIndexConfig.getProperties()
+        .getOrDefault("mode", Lucene95Codec.Mode.BEST_SPEED.name()));
+    indexWriterConfig.setCodec(new Lucene95Codec(mode, knnVectorsFormat));
+    return indexWriterConfig;
   }
 
   @Override
@@ -120,10 +143,6 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
         }
         add(floatValues);
       }
-    } else if (value0 instanceof float[]) {
-      for (Object value : values) {
-        add((float[]) value);
-      }
     } else {
       throw new UnsupportedOperationException(
           "Unsupported value class: " + value0.getClass() + " for column: " + _vectorColumn);
@@ -134,7 +153,9 @@ public class HnswVectorIndexCreator implements VectorIndexCreator {
   public void add(float[] document) {
     // text index on SV column
     Document docToIndex = new Document();
-    docToIndex.add(new XKnnFloatVectorField(_vectorColumn, document, _vectorSimilarityFunction));
+    XKnnFloatVectorField xKnnFloatVectorField =
+        new XKnnFloatVectorField(_vectorColumn, document, _vectorSimilarityFunction);
+    docToIndex.add(xKnnFloatVectorField);
     docToIndex.add(new StoredField(VECTOR_INDEX_DOC_ID_COLUMN_NAME, _nextDocId++));
     try {
       _indexWriter.addDocument(docToIndex);

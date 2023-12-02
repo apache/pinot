@@ -126,12 +126,21 @@ public class Lucene95Codec extends Codec {
    * @param mode stored fields compression mode to use for newly flushed/merged segments.
    */
   public Lucene95Codec(Mode mode) {
+    this(mode, new Lucene95HnswVectorsFormat());
+  }
+
+  /**
+   * Instantiates a new codec, specifying the stored fields compression mode to use.
+   *
+   * @param mode stored fields compression mode to use for newly flushed/merged segments.
+   */
+  public Lucene95Codec(Mode mode, KnnVectorsFormat defaultKnnVectorsFormat) {
     super("Lucene95");
     _storedFieldsFormat =
         new Lucene90StoredFieldsFormat(Objects.requireNonNull(mode)._storedMode);
     _defaultPostingsFormat = new Lucene90PostingsFormat();
     _defaultDVFormat = new Lucene90DocValuesFormat();
-    _defaultKnnVectorsFormat = new Lucene95HnswVectorsFormat();
+    _defaultKnnVectorsFormat = defaultKnnVectorsFormat;
   }
 
   @Override

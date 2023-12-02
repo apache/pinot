@@ -65,8 +65,4 @@ public class XKnnFloatVectorField extends KnnFloatVectorField {
   public XKnnFloatVectorField(String name, float[] vector, VectorSimilarityFunction similarityFunction) {
     super(name, vector, createType(vector, similarityFunction));
   }
-
-  public XKnnFloatVectorField(String name, float[] vector) {
-    this(name, vector, VectorSimilarityFunction.EUCLIDEAN);
-  }
 }
