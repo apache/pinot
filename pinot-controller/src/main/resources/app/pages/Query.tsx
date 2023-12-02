@@ -214,12 +214,14 @@ const QueryPage = () => {
   };
 
   const handleQueryInterfaceKeyDown = (editor, event) => {
-    // Map Cmd + Enter KeyPress to executing the query
-    if (event.metaKey == true && event.keyCode == 13) {
+    const modifiedEnabled = event.metaKey == true || event.ctrlKey == true;
+
+    // Map (Cmd/Ctrl) + Enter KeyPress to executing the query
+    if (modifiedEnabled && event.keyCode == 13) {
       handleRunNow(editor.getValue());
     }
-    // Map Cmd + / KeyPress to toggle commenting the query
-    if (event.metaKey == true && event.keyCode == 191) {
+    // Map (Cmd/Ctrl) + / KeyPress to toggle commenting the query
+    if (modifiedEnabled && event.keyCode == 191) {
       handleComment(editor);
     }
   }
