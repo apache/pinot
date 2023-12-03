@@ -56,8 +56,9 @@ public class Murmur3PartitionFunction implements PartitionFunction {
             : Integer.parseInt(functionConfig.get(SEED_KEY));
 
     // default value of the murmur3 variant is x86_32.
-    _variant = (functionConfig == null || functionConfig.get(MURMUR3_VARIANT) == null || functionConfig.get(MURMUR3_VARIANT).isEmpty()) ? "x86_32"
-        : functionConfig.get(MURMUR3_VARIANT);
+    _variant =
+        (functionConfig == null || functionConfig.get(MURMUR3_VARIANT) == null || functionConfig.get(MURMUR3_VARIANT)
+            .isEmpty()) ? "x86_32" : functionConfig.get(MURMUR3_VARIANT);
   }
 
   @Override
