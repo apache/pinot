@@ -44,18 +44,19 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    */
   public Murmur3PartitionFunction(int numPartitions, Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
-    Preconditions.checkArgument(functionConfig == null || functionConfig.get(MURMUR3_VARIANT) == null || (
-            functionConfig.get(MURMUR3_VARIANT).equals("x86_32") || functionConfig.get(MURMUR3_VARIANT).equals(
-                "x64_32")),
-        "Murmur3 variant must be either x86_32 or x64_32");
+    Preconditions.checkArgument(
+        functionConfig == null || functionConfig.get(MURMUR3_VARIANT) == null || functionConfig.get(MURMUR3_VARIANT)
+            .isEmpty() || functionConfig.get(MURMUR3_VARIANT).equals("x86_32") || functionConfig.get(MURMUR3_VARIANT)
+            .equals("x64_32"), "Murmur3 variant must be either x86_32 or x64_32");
     _numPartitions = numPartitions;
 
     // default value of the hash seed is 0.
-    _hashSeed = (functionConfig == null || functionConfig.get(SEED_KEY) == null) ? 0
-        : Integer.parseInt(functionConfig.get(SEED_KEY));
+    _hashSeed =
+        (functionConfig == null || functionConfig.get(SEED_KEY) == null || functionConfig.get(SEED_KEY).isEmpty()) ? 0
+            : Integer.parseInt(functionConfig.get(SEED_KEY));
 
     // default value of the murmur3 variant is x86_32.
-    _variant = (functionConfig == null || functionConfig.get(MURMUR3_VARIANT) == null) ? "x86_32"
+    _variant = (functionConfig == null || functionConfig.get(MURMUR3_VARIANT) == null || functionConfig.get(MURMUR3_VARIANT).isEmpty()) ? "x86_32"
         : functionConfig.get(MURMUR3_VARIANT);
   }
 

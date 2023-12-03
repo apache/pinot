@@ -120,8 +120,8 @@ public class PartitionFunctionTest {
    * <ul>
    *   <li> Tests that partition values are in expected range. </li>
    *   <li> Tests that toString returns expected string. </li>
-   *   <li> Tests that the partition numbers returned by partition function with null functionConfig and
-   *   functionConfig with empty seed value are equal</li>
+   *   <li> Tests the default behaviors when functionConfig is not provided or only one of the optional parameters of
+   *   functionConfig is provided.</li>
    * </ul>
    */
   @Test
@@ -183,44 +183,61 @@ public class PartitionFunctionTest {
       // default behavior.
       assertEquals(partitionFunction5.getPartition(valueTobeHashed), partitionNumWithNullConfig);
 
+      // Replace seed value as empty string in function config.
+      functionConfig.put("seed", "");
+
+      // Create partition function with function config present with variant provided as "x86_32" and empty seed
+      // value in functionConfig.
+      PartitionFunction partitionFunction6 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+
+      // Partition number should be equal as partitionNumWithNullConfig and partitionNumWithNoSeedValue as this is
+      // default behavior.
+      assertEquals(partitionFunction6.getPartition(valueTobeHashed), partitionNumWithNullConfig);
+
+      // Replace variant value as empty string in function config.
+      functionConfig.put("variant", "");
+
+      // Create partition function with function config present with empty variant and empty seed.
+      PartitionFunction partitionFunction7 =
+          PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions, functionConfig);
+
+      // Partition number should be equal as partitionNumWithNullConfig and partitionNumWithNoSeedValue as this is
+      // default behavior.
+      assertEquals(partitionFunction7.getPartition(valueTobeHashed), partitionNumWithNullConfig);
+
       testBasicProperties(partitionFunction1, functionName, numPartitions);
       testBasicProperties(partitionFunction2, functionName, numPartitions, functionConfig);
       testBasicProperties(partitionFunction3, functionName, numPartitions, functionConfig);
       testBasicProperties(partitionFunction4, functionName, numPartitions, functionConfig);
       testBasicProperties(partitionFunction5, functionName, numPartitions, functionConfig);
+      testBasicProperties(partitionFunction6, functionName, numPartitions, functionConfig);
+      testBasicProperties(partitionFunction7, functionName, numPartitions, functionConfig);
 
       for (int j = 0; j < NUM_ROUNDS; j++) {
         int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
 
-        // check for the partition function with function config as null.
-        int partition1 = partitionFunction1.getPartition(value);
-        int partition2 = partitionFunction1.getPartition(Integer.toString(value));
-        assertEquals(partition1, partition2);
-        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+        // check for the partition function with functionConfig as null.
+        testToStringAndPartitionNumber(partitionFunction1, value, numPartitions);
 
-        // check for the partition function with non-null function config but without seed value.
-        partition1 = partitionFunction2.getPartition(value);
-        partition2 = partitionFunction2.getPartition(Integer.toString(value));
-        assertEquals(partition1, partition2);
-        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+        // check for the partition function with non-null functionConfig but without seed value.
+        testToStringAndPartitionNumber(partitionFunction2, value, numPartitions);
 
-        // check for the partition function with non-null function config and with seed value.
-        partition1 = partitionFunction3.getPartition(value);
-        partition2 = partitionFunction3.getPartition(Integer.toString(value));
-        assertEquals(partition1, partition2);
-        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+        // check for the partition function with non-null functionConfig and with seed value.
+        testToStringAndPartitionNumber(partitionFunction3, value, numPartitions);
 
-        // check for the partition function with non-null function config and with seed value and variant.
-        partition1 = partitionFunction4.getPartition(value);
-        partition2 = partitionFunction4.getPartition(Integer.toString(value));
-        assertEquals(partition1, partition2);
-        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+        // check for the partition function with non-null functionConfig and with seed value and variant.
+        testToStringAndPartitionNumber(partitionFunction4, value, numPartitions);
 
-        // check for the partition function with non-null function config and with seed value and variant.
-        partition1 = partitionFunction5.getPartition(value);
-        partition2 = partitionFunction5.getPartition(Integer.toString(value));
-        assertEquals(partition1, partition2);
-        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+        // check for the partition function with non-null functionConfig and with explicitly provided default seed
+        // value and variant.
+        testToStringAndPartitionNumber(partitionFunction5, value, numPartitions);
+
+        // check for the partition function with non-null functionConfig and with empty seed value and default variant.
+        testToStringAndPartitionNumber(partitionFunction6, value, numPartitions);
+
+        // check for the partition function with non-null functionConfig and with empty seed value and empty variant.
+        testToStringAndPartitionNumber(partitionFunction7, value, numPartitions);
       }
     }
   }
@@ -475,16 +492,15 @@ public class PartitionFunctionTest {
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 0 to those values and stored in
     // expectedMurmurValuesFor32BitX64WithZeroSeed.
-    // stored the results in expectedPartitions32BitsX64WithZeroSeed
+    // stored the results in expectedPartitions32BitsX64WithZeroSeed.
     int[] expectedPartitions32BitsX64WithZeroSeed = new int[]{
         4, 1, 3, 2, 0, 3, 3, 2, 0, 1
     };
 
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 9001 to those values and
-    // stored in
-    // expectedMurmurValuesFor32BitX64WithZeroSeed.
-    // stored the results in expectedPartitions32BitsX64WithZeroSeed
+    // stored in expectedMurmurValuesFor32BitX64WithZeroSeed.
+    // stored the results in expectedPartitions32BitsX64WithZeroSeed.
     int[] expectedPartitions32BitsX64WithNonZeroSeed = new int[]{
         2, 1, 4, 2, 2, 2, 2, 1, 3, 3
     };
@@ -492,7 +508,7 @@ public class PartitionFunctionTest {
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied com.google.common.hash.hashing::murmur3_32_fixed with seed = 0 to those values and stored in
     // expectedMurmurValuesFor32BitX64WithZeroSeed.
-    // stored the results in expectedPartitions32BitsX86WithZeroSeed
+    // stored the results in expectedPartitions32BitsX86WithZeroSeed.
     int[] expectedPartitions32BitsX86WithZeroSeed = new int[]{
         4, 3, 3, 2, 3, 4, 0, 3, 1, 4
     };
@@ -500,36 +516,36 @@ public class PartitionFunctionTest {
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied com.google.common.hash.hashing::murmur3_32_fixed with seed = 9001 to those values and stored in
     // expectedMurmurValuesFor32BitX64WithZeroSeed.
-    // stored the results in expectedPartitions32BitsX64WithZeroSeed
+    // stored the results in expectedPartitions32BitsX64WithZeroSeed.
     int[] expectedPartitions32BitsX86WithNonZeroSeed = new int[]{
         2, 1, 3, 2, 2, 1, 1, 4, 4, 2
     };
 
-    // initialized {@link Murmur3PartitionFunction} with 5 partitions
+    // initialized {@link Murmur3PartitionFunction} with 5 partitions and variant as "x64_32".
     int numPartitions = 5;
     Map<String, String> functionConfig = new HashMap<>();
     functionConfig.put("variant", "x64_32");
 
-    // x64 32 bit variant with seed = 0.
+    // x64_32 variant with seed = 0.
     Murmur3PartitionFunction murmur3PartitionFunction1 = new Murmur3PartitionFunction(numPartitions, functionConfig);
 
     // Put seed value in "seed" field in the function config.
     functionConfig.put("seed", Integer.toString(9001));
 
-    // x64 32 bit variant with seed = 9001.
+    // x64_32 variant with seed = 9001.
     Murmur3PartitionFunction murmur3PartitionFunction2 = new Murmur3PartitionFunction(numPartitions, functionConfig);
 
-    // x86 32 bit variant with seed = 0.
+    // x86_32 variant with seed = 0.
     Murmur3PartitionFunction murmur3PartitionFunction3 = new Murmur3PartitionFunction(numPartitions, null);
 
     // Remove the variant field.
     functionConfig.remove("variant");
 
-    // x86 32 bit variant with seed = 9001.
+    // x86_32 bit variant with seed = 9001.
     Murmur3PartitionFunction murmur3PartitionFunction4 = new Murmur3PartitionFunction(numPartitions, functionConfig);
 
-    // generate the same 10 String values
-    // Apply the partition function and compare with stored results
+    // generate the same 10 String values.
+    // Apply the partition function and compare with stored results.
     testPartitionFunctionEquivalence(murmur3PartitionFunction1, expectedPartitions32BitsX64WithZeroSeed);
     testPartitionFunctionEquivalence(murmur3PartitionFunction2, expectedPartitions32BitsX64WithNonZeroSeed);
     testPartitionFunctionEquivalence(murmur3PartitionFunction3, expectedPartitions32BitsX86WithZeroSeed);
@@ -569,5 +585,13 @@ public class PartitionFunctionTest {
       int actualPartition = partitionFunction.getPartition(nextString);
       assertEquals(actualPartition, expectedPartition);
     }
+  }
+
+  private void testToStringAndPartitionNumber(PartitionFunction partitionFunction, int testValueForGetPartition,
+      int numPartitions) {
+    int partition1 = partitionFunction.getPartition(testValueForGetPartition);
+    int partition2 = partitionFunction.getPartition(Integer.toString(testValueForGetPartition));
+    assertEquals(partition1, partition2);
+    assertTrue(partition1 >= 0 && partition1 < numPartitions);
   }
 }
