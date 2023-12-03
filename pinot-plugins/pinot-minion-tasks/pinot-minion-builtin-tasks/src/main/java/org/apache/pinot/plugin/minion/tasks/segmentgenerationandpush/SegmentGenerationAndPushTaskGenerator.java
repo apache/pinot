@@ -104,12 +104,12 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
     for (TableConfig tableConfig : tableConfigs) {
-      String tableName = tableConfig.getTableName();
+      String tableNameWithType = tableConfig.getTableName();
       TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
       Preconditions.checkNotNull(tableTaskConfig);
       Map<String, String> taskConfigs =
           tableTaskConfig.getConfigsForTaskType(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE);
-      Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", tableName);
+      Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", tableNameWithType);
 
       // Get max number of tasks for this table
       int tableMaxNumTasks;
@@ -141,10 +141,10 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
           List<SegmentZKMetadata> segmentsZKMetadata = Collections.emptyList();
           // For append mode, we don't create segments for input file URIs already created.
           if (BatchConfigProperties.SegmentIngestionType.APPEND.name().equalsIgnoreCase(batchSegmentIngestionType)) {
-            segmentsZKMetadata = getSegmentsZKMetadataForTable(tableName);
+            segmentsZKMetadata = getSegmentsZKMetadataForTable(tableNameWithType);
           }
           Set<String> existingSegmentInputFiles = getExistingSegmentInputFiles(segmentsZKMetadata);
-          Set<String> inputFilesFromRunningTasks = getInputFilesFromRunningTasks(tableName);
+          Set<String> inputFilesFromRunningTasks = getInputFilesFromRunningTasks(tableNameWithType);
           existingSegmentInputFiles.addAll(inputFilesFromRunningTasks);
           LOGGER.info("Trying to extract input files from path: {}, "
                   + "and exclude input files from existing segments metadata: {}, "
@@ -158,7 +158,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
           }
           for (URI inputFileURI : inputFileURIs) {
             Map<String, String> singleFileGenerationTaskConfig =
-                getSingleFileGenerationTaskConfig(tableName, tableNumTasks, batchConfigMap, inputFileURI, null);
+                getSingleFileGenerationTaskConfig(tableNameWithType, tableNumTasks, batchConfigMap, inputFileURI, null);
             pinotTaskConfigs.add(new PinotTaskConfig(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
                 singleFileGenerationTaskConfig));
             tableNumTasks++;
@@ -181,7 +181,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
   public List<PinotTaskConfig> generateTasks(TableConfig tableConfig, Map<String, String> taskConfigs)
       throws Exception {
     String taskUUID = UUID.randomUUID().toString();
-    String tableName = tableConfig.getTableName();
+    String tableNameWithType = tableConfig.getTableName();
 
     // Override task configs from table with adhoc task configs.
     Map<String, String> batchConfigMap = new HashMap<>();
@@ -211,8 +211,8 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
       LOGGER.info("Final input files for task config generation: {}", inputFileURIs);
       for (URI inputFileURI : inputFileURIs) {
         Map<String, String> singleFileGenerationTaskConfig =
-            getSingleFileGenerationTaskConfig(tableName, tableNumTasks, batchConfigMap, inputFileURI,
-                generateFixedSegmentName(tableName, taskUUID, tableNumTasks));
+            getSingleFileGenerationTaskConfig(tableNameWithType, tableNumTasks, batchConfigMap, inputFileURI,
+                generateFixedSegmentName(tableNameWithType, taskUUID, tableNumTasks));
         pinotTaskConfigs.add(new PinotTaskConfig(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
             singleFileGenerationTaskConfig));
         tableNumTasks++;
