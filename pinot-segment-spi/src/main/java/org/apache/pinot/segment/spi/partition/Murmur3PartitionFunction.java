@@ -30,6 +30,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Implementation of {@link PartitionFunction} which partitions based on 32 bit murmur3 hash
  */
 public class Murmur3PartitionFunction implements PartitionFunction {
+  public static final byte INVALID_CHAR = (byte) '?';
   private static final String NAME = "Murmur3";
   private static final String SEED_KEY = "seed";
   private static final String MURMUR3_VARIANT = "variant";
@@ -64,9 +65,9 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   @Override
   public int getPartition(Object value) {
     if (_variant.equals("x86_32")) {
-      return (murmurHash332bitsX86(value.toString().getBytes(UTF_8), _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
+      return (murmurHash332BitsX86(value.toString().getBytes(UTF_8), _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
     }
-    return (murmurHash332bitsX64(value.toString().getBytes(UTF_8), _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
+    return (murmurHash332BitsX64(value, _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
   }
 
   @Override
@@ -84,8 +85,9 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   public String toString() {
     return NAME;
   }
+
   @VisibleForTesting
-  int murmurHash332bitsX86(byte[] data, int hashSeed) {
+  int murmurHash332BitsX86(byte[] data, int hashSeed) {
     return Hashing.murmur3_32_fixed(hashSeed).hashBytes(data).asInt();
   }
 
@@ -154,7 +156,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    * @param seed random value
    * @return 64 bit hashed key
    */
-  private long murmurHash364bitsX64(final byte[] key, final int seed) {
+  private long murmurHash364BitsX64(final byte[] key, final int seed) {
     State state = new State();
 
     state._h1 = 0x9368e53c2f6af274L ^ seed;
@@ -232,9 +234,209 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    * @param seed random value
    * @return 32 bit hashed key
    */
+  private int murmurHash332BitsX64(final byte[] key, final int seed) {
+    return (int) (murmurHash364BitsX64(key, seed) >>> 32);
+  }
+
+  private long murmurHash364BitsX64(final long[] key, final int seed) {
+    // Exactly the same as MurmurHash3_x64_128, except it only returns state.h1
+    State state = new State();
+
+    state._h1 = 0x9368e53c2f6af274L ^ seed;
+    state._h2 = 0x586dcd208f7cd3fdL ^ seed;
+
+    state._c1 = 0x87c37b91114253d5L;
+    state._c2 = 0x4cf5ad432745937fL;
+
+    for (int i = 0; i < key.length / 2; i++) {
+      state._k1 = key[i * 2];
+      state._k2 = key[i * 2 + 1];
+
+      bmix(state);
+    }
+
+    long tail = key[key.length - 1];
+
+    if (key.length % 2 != 0) {
+      state._k1 ^= tail;
+      bmix(state);
+    }
+
+    state._h2 ^= key.length * 8;
+
+    state._h1 += state._h2;
+    state._h2 += state._h1;
+
+    state._h1 = fmix(state._h1);
+    state._h2 = fmix(state._h2);
+
+    state._h1 += state._h2;
+    state._h2 += state._h1;
+
+    return state._h1;
+  }
+
+  /**
+   * Hash a value using the x64 32 bit variant of MurmurHash3
+   *
+   * @param key value to hash
+   * @param seed random value
+   * @return 32 bit hashed key
+   */
+  private int murmurHash332BitsX64(final long[] key, final int seed) {
+    return (int) (murmurHash364BitsX64(key, seed) >>> 32);
+  }
+
   @VisibleForTesting
-  int murmurHash332bitsX64(final byte[] key, final int seed) {
-    return (int) (murmurHash364bitsX64(key, seed) >>> 32);
+  int murmurHash332BitsX64(Object o, int seed) {
+    if (o instanceof byte[]) {
+      return murmurHash332BitsX64((byte[]) o, seed);
+    } else if (o instanceof long[]) {
+      return murmurHash332BitsX64((long[]) o, seed);
+    } else if (o instanceof String) {
+      return murmurHash332BitsX64((String) o, seed);
+    } else {
+      // Differing from the source implementation here. The default case in the source implementation is to apply the
+      // hash on the hashcode of the object. The hashcode of an object is not guaranteed to be consistent across JVMs
+      // (except for String values), so we cannot guarantee the same value as the data source. Instead, we will apply
+      // the hash on the string representation of the object, which aligns with rest of our codebase.
+      return murmurHash332BitsX64(o.toString().getBytes(UTF_8), seed);
+    }
+  }
+
+  private int murmurHash332BitsX64(String s, int seed) {
+    return (int) (murmurHash364BitsX64String(s, seed) >> 32);
+  }
+
+  private long murmurHash364BitsX64String(String s, long seed) {
+    // Exactly the same as MurmurHash3_x64_64, except it works directly on a String's chars
+    State state = new State();
+
+    state._h1 = 0x9368e53c2f6af274L ^ seed;
+    state._h2 = 0x586dcd208f7cd3fdL ^ seed;
+
+    state._c1 = 0x87c37b91114253d5L;
+    state._c2 = 0x4cf5ad432745937fL;
+
+    int byteLen = 0;
+    int stringLen = s.length();
+
+    // CHECKSTYLE:OFF
+    for (int i = 0; i < stringLen; i++) {
+      char c1 = s.charAt(i);
+      int cp;
+      if (!Character.isSurrogate(c1)) {
+        cp = c1;
+      } else if (Character.isHighSurrogate(c1)) {
+        if (i + 1 < stringLen) {
+          char c2 = s.charAt(i + 1);
+          if (Character.isLowSurrogate(c2)) {
+            i++;
+            cp = Character.toCodePoint(c1, c2);
+          } else {
+            cp = INVALID_CHAR;
+          }
+        } else {
+          cp = INVALID_CHAR;
+        }
+      } else {
+        cp = INVALID_CHAR;
+      }
+
+      if (cp <= 0x7f) {
+        addByte(state, (byte) cp, byteLen++);
+      } else if (cp <= 0x07ff) {
+        byte b1 = (byte) (0xc0 | (0x1f & (cp >> 6)));
+        byte b2 = (byte) (0x80 | (0x3f & cp));
+        addByte(state, b1, byteLen++);
+        addByte(state, b2, byteLen++);
+      } else if (cp <= 0xffff) {
+        byte b1 = (byte) (0xe0 | (0x0f & (cp >> 12)));
+        byte b2 = (byte) (0x80 | (0x3f & (cp >> 6)));
+        byte b3 = (byte) (0x80 | (0x3f & cp));
+        addByte(state, b1, byteLen++);
+        addByte(state, b2, byteLen++);
+        addByte(state, b3, byteLen++);
+      } else {
+        byte b1 = (byte) (0xf0 | (0x07 & (cp >> 18)));
+        byte b2 = (byte) (0x80 | (0x3f & (cp >> 12)));
+        byte b3 = (byte) (0x80 | (0x3f & (cp >> 6)));
+        byte b4 = (byte) (0x80 | (0x3f & cp));
+        addByte(state, b1, byteLen++);
+        addByte(state, b2, byteLen++);
+        addByte(state, b3, byteLen++);
+        addByte(state, b4, byteLen++);
+      }
+    }
+
+    // CHECKSTYLE:ON
+    long savedK1 = state._k1;
+    long savedK2 = state._k2;
+    state._k1 = 0;
+    state._k2 = 0;
+
+    // CHECKSTYLE:OFF
+    switch (byteLen & 15) {
+      case 15:
+        state._k2 ^= (long) ((byte) (savedK2 >> 48)) << 48;
+      case 14:
+        state._k2 ^= (long) ((byte) (savedK2 >> 40)) << 40;
+      case 13:
+        state._k2 ^= (long) ((byte) (savedK2 >> 32)) << 32;
+      case 12:
+        state._k2 ^= (long) ((byte) (savedK2 >> 24)) << 24;
+      case 11:
+        state._k2 ^= (long) ((byte) (savedK2 >> 16)) << 16;
+      case 10:
+        state._k2 ^= (long) ((byte) (savedK2 >> 8)) << 8;
+      case 9:
+        state._k2 ^= ((byte) savedK2);
+      case 8:
+        state._k1 ^= (long) ((byte) (savedK1 >> 56)) << 56;
+      case 7:
+        state._k1 ^= (long) ((byte) (savedK1 >> 48)) << 48;
+      case 6:
+        state._k1 ^= (long) ((byte) (savedK1 >> 40)) << 40;
+      case 5:
+        state._k1 ^= (long) ((byte) (savedK1 >> 32)) << 32;
+      case 4:
+        state._k1 ^= (long) ((byte) (savedK1 >> 24)) << 24;
+      case 3:
+        state._k1 ^= (long) ((byte) (savedK1 >> 16)) << 16;
+      case 2:
+        state._k1 ^= (long) ((byte) (savedK1 >> 8)) << 8;
+      case 1:
+        state._k1 ^= ((byte) savedK1);
+        bmix(state);
+    }
+    // CHECKSTYLE:ON
+    state._h2 ^= byteLen;
+
+    state._h1 += state._h2;
+    state._h2 += state._h1;
+
+    state._h1 = fmix(state._h1);
+    state._h2 = fmix(state._h2);
+
+    state._h1 += state._h2;
+    state._h2 += state._h1;
+
+    return state._h1;
+  }
+
+  private void addByte(State state, byte b, int len) {
+    int shift = (len & 0x7) * 8;
+    long bb = (b & 0xffL) << shift;
+    if ((len & 0x8) == 0) {
+      state._k1 |= bb;
+    } else {
+      state._k2 |= bb;
+      if ((len & 0xf) == 0xf) {
+        bmix(state);
+        state._k1 = 0;
+        state._k2 = 0;
+      }
+    }
   }
 
   static class State {
