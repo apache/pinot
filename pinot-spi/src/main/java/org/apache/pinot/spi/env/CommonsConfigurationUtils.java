@@ -20,6 +20,7 @@ package org.apache.pinot.spi.env;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -239,6 +240,33 @@ public class CommonsConfigurationUtils {
       value = value.substring(0, value.length() - 1);
     }
     return value.replace("\0\0", ",");
+  }
+
+  /**
+   * Get string list from properties.
+   * <p>
+   * NOTE: When the property associated with the key is empty, {@link PropertiesConfiguration#getList(String)} will
+   * return an empty string singleton list. Using this method will return an empty list instead.
+   *
+   * @param key property key.
+   * @return string list value for the property.
+   */
+  public static List<String> getStringList(String key, PropertiesConfiguration segmentProperties) {
+    List<String> stringList = new ArrayList<>();
+    List propertyList = segmentProperties.getList(key);
+    if (propertyList != null) {
+      for (Object value : propertyList) {
+        String stringValue = value.toString();
+        if (!stringValue.isEmpty()) {
+          if (stringValue.contains(",")) {
+            stringList.addAll(List.of(stringValue.split(",")));
+          } else {
+            stringList.add(stringValue);
+          }
+        }
+      }
+    }
+    return stringList;
   }
 
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,

@@ -213,10 +213,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // - If key does not exist, it will return an empty list
     // - If key exists but value is missing, it will return a singleton list with an empty string
     Set<String> physicalColumns = new HashSet<>();
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.DIMENSIONS), physicalColumns);
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.METRICS), physicalColumns);
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.TIME_COLUMN_NAME), physicalColumns);
-    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.DATETIME_COLUMNS), physicalColumns);
+    addPhysicalColumns(
+        CommonsConfigurationUtils.getStringList(Segment.DIMENSIONS, segmentMetadataPropertiesConfiguration),
+        physicalColumns);
+    addPhysicalColumns(
+        CommonsConfigurationUtils.getStringList(Segment.METRICS, segmentMetadataPropertiesConfiguration),
+        physicalColumns);
+    addPhysicalColumns(
+        CommonsConfigurationUtils.getStringList(Segment.TIME_COLUMN_NAME, segmentMetadataPropertiesConfiguration),
+        physicalColumns);
+    addPhysicalColumns(
+        CommonsConfigurationUtils.getStringList(Segment.DATETIME_COLUMNS, segmentMetadataPropertiesConfiguration),
+        physicalColumns);
 
     // Set the table name (for backward compatibility)
     String tableName = segmentMetadataPropertiesConfiguration.getString(Segment.TABLE_NAME);

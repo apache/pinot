@@ -325,7 +325,8 @@ public class ColumnMetadataImpl implements ColumnMetadata {
               partitionFunctionConfigMap);
       builder.setPartitionFunction(partitionFunction);
       builder.setPartitions(
-          ColumnPartitionMetadata.extractPartitions(config.getList(Column.getKeyFor(column, Column.PARTITION_VALUES))));
+          ColumnPartitionMetadata.extractPartitions(CommonsConfigurationUtils.getStringList(
+              Column.getKeyFor(column, Column.PARTITION_VALUES), config)));
     }
 
     return builder.build();

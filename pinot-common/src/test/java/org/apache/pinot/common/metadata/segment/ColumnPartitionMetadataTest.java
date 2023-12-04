@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.convert.DefaultListDelimiterHandler;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
@@ -59,7 +60,8 @@ public class ColumnPartitionMetadataTest {
   public void testPartitionsConfig() {
     PropertiesConfiguration config = new PropertiesConfiguration();
     config.setProperty("partitions", PARTITIONS);
-    Set<Integer> actual = ColumnPartitionMetadata.extractPartitions(config.getList("partitions"));
+    Set<Integer> actual = ColumnPartitionMetadata.extractPartitions(
+        CommonsConfigurationUtils.getStringList("partitions", config));
     assertEquals(actual, PARTITIONS);
   }
 
@@ -68,7 +70,8 @@ public class ColumnPartitionMetadataTest {
     PropertiesConfiguration config = new PropertiesConfiguration();
     config.setListDelimiterHandler(new DefaultListDelimiterHandler(','));
     config.setProperty("partitionRanges", LEGACY_PARTITION_RANGES_STRING);
-    Set<Integer> actual = ColumnPartitionMetadata.extractPartitions(config.getList("partitionRanges"));
+    Set<Integer> actual = ColumnPartitionMetadata.extractPartitions(
+        CommonsConfigurationUtils.getStringList("partitionRanges", config));
     assertEquals(actual, PARTITIONS);
   }
 }
