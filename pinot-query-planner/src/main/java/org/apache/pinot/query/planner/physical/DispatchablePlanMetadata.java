@@ -49,8 +49,8 @@ public class DispatchablePlanMetadata implements Serializable {
   // info from TableNode
   private final List<String> _scannedTables;
   private Map<String, String> _tableOptions;
-  // info from MailboxSendNode
-  private boolean _isPartitioned;
+  // info from MailboxSendNode - whether a stage is pre-partitioned by the same way the sending exchange desires
+  private boolean _isPrePartitioned;
   // info from PlanNode that requires singleton (e.g. SortNode/AggregateNode)
   private boolean _requiresSingletonInstance;
 
@@ -74,9 +74,6 @@ public class DispatchablePlanMetadata implements Serializable {
 
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
-
-  // whether a stage is pre-partitioned by the same way the sending exchange is desired
-  private boolean _isPrePartitioned;
 
   // physical partition info
   private String _partitionFunction;
@@ -150,8 +147,8 @@ public class DispatchablePlanMetadata implements Serializable {
     return _isPrePartitioned;
   }
 
-  public void setPrePartitioned(boolean isPartitioned) {
-    _isPrePartitioned = isPartitioned;
+  public void setPrePartitioned(boolean isPrePartitioned) {
+    _isPrePartitioned = isPrePartitioned;
   }
 
   public String getPartitionFunction() {

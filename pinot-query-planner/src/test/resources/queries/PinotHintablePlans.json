@@ -2,6 +2,26 @@
   "pinot_hint_option_tests": {
     "queries": [
       {
+        "description": "hint table without partitioning should throw exception",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d /*+ tableOptions(partition_key='col1', partition_size='4') */ LIMIT 10",
+        "expectedException": "Error composing query plan for:.*"
+      },
+      {
+        "description": "hint table with partition on wrong key should throw exception",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col1', partition_size='4') */ LIMIT 10",
+        "expectedException": "Error composing query plan for:.*"
+      },
+      {
+        "description": "hint table with partition on wrong size should throw exception",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col2', partition_size='2') */ LIMIT 10",
+        "expectedException": "Error composing query plan for:.*"
+      },
+      {
+        "description": "hint table with partition on wrong function should throw exception",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col2', partition_size='4', partition_function='murmur') */ LIMIT 10",
+        "expectedException": "Error composing query plan for:.*"
+      },
+      {
         "description": "Inner join with group by",
         "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col1, AVG(b.col3) FROM a JOIN b ON a.col1 = b.col2  WHERE a.col3 >= 0 AND a.col2 = 'a' AND b.col3 < 0 GROUP BY a.col1",
         "output": [

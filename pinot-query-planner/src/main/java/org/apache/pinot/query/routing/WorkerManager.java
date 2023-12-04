@@ -316,7 +316,6 @@ public class WorkerManager {
           }
         }
         metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
-        metadata.setPartitionFunction(null);
       }
     }
   }
