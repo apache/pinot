@@ -572,8 +572,9 @@ public class PartitionFunctionTest {
     // x86_32 bit variant with seed = 9001.
     Murmur3PartitionFunction murmur3PartitionFunction4 = new Murmur3PartitionFunction(numPartitions, functionConfig);
 
-    // Generate the same 10 String values. Test if the calculated values are equal for both String and byte[] and if the
-    // values are equal to the expected values for the x64_32 variant with seed = 0 and x64_32 variant with seed = 9001.
+    // Generate the same 10 String values. Test if the calculated values are equal for both String and byte[] (they
+    // should be equal when String is converted to byte[]) and if the values are equal to the expected values for the
+    // x64_32 variant with seed = 0 and x64_32 variant with seed = 9001.
     testPartitionFunctionEquivalenceWithStringAndByteArray(murmur3PartitionFunction1,
         expectedPartitions32BitsX64WithZeroSeedForByteArrayAndString);
     testPartitionFunctionEquivalenceWithStringAndByteArray(murmur3PartitionFunction2,

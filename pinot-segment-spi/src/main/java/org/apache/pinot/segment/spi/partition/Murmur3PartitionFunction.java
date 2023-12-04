@@ -298,9 +298,10 @@ public class Murmur3PartitionFunction implements PartitionFunction {
     } else {
       // Differing from the source implementation here. The default case in the source implementation is to apply the
       // hash on the hashcode of the object. The hashcode of an object is not guaranteed to be consistent across JVMs
-      // (except for String values), so we cannot guarantee the same value as the data source. Instead, we will apply
-      // the hash on the string representation of the object, which aligns with rest of our codebase.
-      return murmurHash332BitsX64(o.toString().getBytes(UTF_8), seed);
+      // (except for String values), so we cannot guarantee the same value as the data source. Since we cannot
+      // guarantee similar values, we will instead apply the hash on the string representation of the object, which
+      // aligns with the rest of our code base.
+      return murmurHash332BitsX64(o.toString(), seed);
     }
   }
 
