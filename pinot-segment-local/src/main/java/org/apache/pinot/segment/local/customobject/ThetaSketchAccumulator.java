@@ -121,7 +121,15 @@ public class ThetaSketchAccumulator {
       return _accumulator.get(0);
     }
 
-    // Performance optimisation: ensure that the minimum Theta is used for "early-stop".
+    // Performance optimization: ensure that the minimum Theta is used for "early stop".
+    // The "early stop" optimization is implemented in the Apache Datasketches Union operation for
+    // ordered and compact Theta sketches. Internally, a compact and ordered Theta sketch can be
+    // compared to a sorted array of K items.  When performing a union, only those items from
+    // the input sketch less than Theta need to be processed.  The loop terminates as soon as a hash
+    // is seen that is > Theta.
+    // The following "sort" improves on this further by selecting the minimal Theta value up-front,
+    // which results in fewer redundant entries being retained and subsequently discarded during the
+    // union operation.
     _accumulator.sort(Comparator.comparingDouble(Sketch::getTheta));
     for (Sketch accumulatedSketch : _accumulator) {
       _union.union(accumulatedSketch);
