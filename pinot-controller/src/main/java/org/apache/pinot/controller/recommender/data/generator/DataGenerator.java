@@ -18,19 +18,22 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.controller.recommender.data.writer.AvroWriter;
+import org.apache.pinot.controller.recommender.data.writer.AvroWriterSpec;
+import org.apache.pinot.controller.recommender.data.writer.CsvWriter;
+import org.apache.pinot.controller.recommender.data.writer.FileWriterSpec;
+import org.apache.pinot.controller.recommender.data.writer.JsonWriter;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -100,58 +103,37 @@ public class DataGenerator {
   }
 
   public void generateAvro(long totalDocs, int numFiles)
-      throws IOException {
-    final int numPerFiles = (int) (totalDocs / numFiles);
-    for (int i = 0; i < numFiles; i++) {
-      try (AvroWriter writer = new AvroWriter(_outDir, i, _generators, fetchSchema())) {
-        for (int j = 0; j < numPerFiles; j++) {
-          writer.writeNext();
-        }
-      }
-    }
+      throws Exception {
+    AvroWriter avroWriter = new AvroWriter();
+    avroWriter.init(new AvroWriterSpec(this, _outDir, totalDocs, numFiles));
+    avroWriter.write();
   }
 
   public void generateCsv(long totalDocs, int numFiles)
-      throws IOException {
-    final int numPerFiles = (int) (totalDocs / numFiles);
-    for (int i = 0; i < numFiles; i++) {
-      try (FileWriter writer = new FileWriter(new File(_outDir, String.format("output_%d.csv", i)))) {
-        writer.append(StringUtils.join(_genSpec.getColumns(), ",")).append('\n');
-        for (int j = 0; j < numPerFiles; j++) {
-          Object[] values = new Object[_genSpec.getColumns().size()];
-          for (int k = 0; k < _genSpec.getColumns().size(); k++) {
-            Object next = _generators.get(_genSpec.getColumns().get(k)).next();
-            values[k] = serializeIfMultiValue(next);
-          }
-          writer.append(StringUtils.join(values, ",")).append('\n');
-        }
-      }
-    }
+      throws Exception {
+    CsvWriter csvWriter = new CsvWriter();
+    csvWriter.init(new FileWriterSpec(this, _outDir, totalDocs, numFiles));
+    csvWriter.write();
   }
 
   public void generateJson(long totalDocs, int numFiles)
-      throws IOException {
-    final int numPerFiles = (int) (totalDocs / numFiles);
-    final ObjectMapper mapper = new ObjectMapper();
-    for (int i = 0; i < numFiles; i++) {
-      try (FileWriter writer = new FileWriter(new File(_outDir, String.format("output_%d.json", i)))) {
-        for (int j = 0; j < numPerFiles; j++) {
-          Map<String, Object> row = new HashMap<>();
-          for (int k = 0; k < _genSpec.getColumns().size(); k++) {
-            String key = _genSpec.getColumns().get(k);
-            row.put(key, _generators.get(key).next());
-          }
-          writer.append(mapper.writeValueAsString(row)).append('\n');
-        }
-      }
-    }
+      throws Exception {
+    JsonWriter jsonWriter = new JsonWriter();
+    jsonWriter.init(new FileWriterSpec(this, _outDir, totalDocs, numFiles));
+    jsonWriter.write();
   }
 
-  private Object serializeIfMultiValue(Object obj) {
-    if (obj instanceof List) {
-      return StringUtils.join((List) obj, ";");
+  /*
+   * Returns a LinkedHashMap of columns and their respective generated values.
+   * This ensures that the entries are ordered as per the column list
+   *
+   * */
+  public Map<String, Object> nextRow() {
+    Map<String, Object> row = new LinkedHashMap<>();
+    for (String key : _genSpec.getColumns()) {
+      row.put(key, _generators.get(key).next());
     }
-    return obj;
+    return row;
   }
 
   public Schema fetchSchema() {
@@ -193,7 +175,7 @@ public class DataGenerator {
   }
 
   public static void main(String[] args)
-      throws IOException {
+      throws Exception {
 
     final Map<String, DataType> dataTypes = new HashMap<>();
     final Map<String, FieldType> fieldTypes = new HashMap<>();
