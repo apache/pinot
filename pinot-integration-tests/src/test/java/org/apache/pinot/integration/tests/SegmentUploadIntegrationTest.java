@@ -59,7 +59,6 @@ import org.testng.annotations.Test;
  * todo: add test for URI push
  */
 public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
-  private static final String TABLE_NAME_WITH_TYPE = DEFAULT_TABLE_NAME + "_" + "OFFLINE";
 
   @Override
   protected Map<String, String> getStreamConfigs() {
@@ -137,8 +136,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(TABLE_NAME_WITH_TYPE);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(TABLE_NAME_WITH_TYPE));
+    tableSpec.setTableName(DEFAULT_TABLE_NAME);
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
@@ -238,8 +237,8 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(TABLE_NAME_WITH_TYPE);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(TABLE_NAME_WITH_TYPE));
+    tableSpec.setTableName(DEFAULT_TABLE_NAME);
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
