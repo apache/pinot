@@ -1228,9 +1228,13 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * @return param list
    */
   public static List<NameValuePair> makeTableParam(String tableName) {
-    return List.of(new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName),
-        new BasicNameValuePair(QueryParameters.TABLE_TYPE,
-            TableNameBuilder.getTableTypeFromTableName(tableName).name()));
+    List<NameValuePair> tableParams = new ArrayList<>();
+    tableParams.add(new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName));
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType != null) {
+      tableParams.add(new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name()));
+    }
+    return tableParams;
   }
 
   @Override
