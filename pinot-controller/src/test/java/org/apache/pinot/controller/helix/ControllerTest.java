@@ -302,37 +302,32 @@ public class ControllerTest {
       controllerScheme = controllerConfig.getControllerVipProtocol();
     }
 
-    String controllerBaseApiURL = controllerScheme + "://localhost:" + controllerPort;
-    _controllerBaseApiUrls.put(controllerPort, controllerBaseApiURL);
-    _controllerRequestURLBuilders.put(controllerPort, ControllerRequestURLBuilder.baseUrl(controllerBaseApiURL));
-    _controllerDataDirs.put(controllerPort, controllerConfig.getDataDir());
-    _controllerStarters.put(controllerPort, getControllerStarter());
-    controllerStarter = _controllerStarters.get(controllerPort);
-    controllerStarter.init(new PinotConfiguration(properties));
-    controllerStarter.start();
-    PinotHelixResourceManager helixResourceManager = controllerStarter.getHelixResourceManager();
-    _helixResourceManagers.put(controllerPort, helixResourceManager);
-    HelixManager helixManager = controllerStarter.getHelixControllerManager();
-    _helixManagers.put(controllerPort, helixManager);
-    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
-    _helixDataAccessors.put(controllerPort, helixDataAccessor);
-    ConfigAccessor configAccessor = helixManager.getConfigAccessor();
+    _controllerBaseApiUrl = controllerScheme + "://localhost:" + controllerPort;
+    _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
+    _controllerDataDir = controllerConfig.getDataDir();
+    _controllerStarter = getControllerStarter();
+    _controllerStarter.init(new PinotConfiguration(properties));
+    _controllerStarter.start();
+    _helixResourceManager = _controllerStarter.getHelixResourceManager();
+    _helixManager = _controllerStarter.getHelixControllerManager();
+    _helixDataAccessor = _helixManager.getHelixDataAccessor();
+    ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
     // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
     HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
         controllerConfig.getHelixClusterName()).build();
-    switch (controllerStarter.getControllerMode()) {
+    switch (_controllerStarter.getControllerMode()) {
       case DUAL:
       case PINOT_ONLY:
-        _helixAdmins.put(controllerPort, helixResourceManager.getHelixAdmin());
-        _propertyStores.put(controllerPort, helixResourceManager.getPropertyStore());
+        _helixAdmin = _helixResourceManager.getHelixAdmin();
+        _propertyStore = _helixResourceManager.getPropertyStore();
         // TODO: Enable periodic rebalance per 10 seconds as a temporary work-around for the Helix issue:
         //       https://github.com/apache/helix/issues/331 and https://github.com/apache/helix/issues/2309.
         //       Remove this after Helix fixing the issue.
         configAccessor.set(scope, ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000");
         break;
       case HELIX_ONLY:
-        _helixAdmins.put(controllerPort, helixManager.getClusterManagmentTool());
-        _propertyStores.put(controllerPort, helixManager.getHelixPropertyStore());
+        _helixAdmin = _helixManager.getClusterManagmentTool();
+        _propertyStore = _helixManager.getHelixPropertyStore();
         break;
       default:
         break;
@@ -361,9 +356,9 @@ public class ControllerTest {
       controllerScheme = controllerConfig.getControllerVipProtocol();
     }
 
-    _controllerBaseApiUrl = controllerScheme + "://localhost:" + controllerPort;
-    _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _controllerDataDir = controllerConfig.getDataDir();
+    _controllerBaseApiUrls.put(controllerPort, controllerScheme + "://localhost:" + controllerPort);
+    _controllerRequestURLBuilders.put(controllerPort, ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl));
+    _controllerDataDirs.put(controllerPort, controllerConfig.getDataDir());
 
     controllerStarter = getControllerStarter();
     _controllerStarters.put(controllerPort, controllerStarter);
