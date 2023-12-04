@@ -141,8 +141,8 @@ public class PinotRealtimeTableResource {
           + "only those partitions or consuming segments will be force committed.")
   public Map<String, String> forceCommit(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Comma separated list of partitions to be committed") @QueryParam("partitions")
-      String partitions,
+      @ApiParam(value = "Comma separated list of partition group IDs to be committed") @QueryParam("partitions")
+      String partitionGroupIds,
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
       String consumingSegments) {
     long startTimeMs = System.currentTimeMillis();
@@ -151,7 +151,7 @@ public class PinotRealtimeTableResource {
     Map<String, String> response = new HashMap<>();
     try {
       Set<String> consumingSegmentsForceCommitted =
-          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitions, consumingSegments);
+          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments);
       response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();

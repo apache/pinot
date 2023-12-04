@@ -1563,15 +1563,15 @@ public class PinotLLCRealtimeSegmentManager {
    * Commit all partitions unless either partitionsToCommit or segmentsToCommit are provided.
    *
    * @param tableNameWithType  table name with type
-   * @param partitionsToCommit  comma separated list of partitions to commit
+   * @param partitionGroupIdsToCommit  comma separated list of partition group IDs to commit
    * @param segmentsToCommit  comma separated list of consuming segments to commit
-   * @return the set of consuming segments that were committed
+   * @return the set of consuming segments for which commit was initiated
    */
-  public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionsToCommit,
+  public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
       @Nullable String segmentsToCommit) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
-    Set<String> targetConsumingSegments = filterSegmentsToCommit(allConsumingSegments, partitionsToCommit,
+    Set<String> targetConsumingSegments = filterSegmentsToCommit(allConsumingSegments, partitionGroupIdsToCommit,
         segmentsToCommit);
     sendForceCommitMessageToServers(tableNameWithType, targetConsumingSegments);
     return targetConsumingSegments;
@@ -1580,12 +1580,12 @@ public class PinotLLCRealtimeSegmentManager {
   /**
    * Among all consuming segments, filter the ones that are in the given partitions or segments.
    */
-  private Set<String> filterSegmentsToCommit(Set<String> allConsumingSegments, @Nullable String partitionsToCommitStr,
-      @Nullable String segmentsToCommitStr) {
-    if (partitionsToCommitStr == null && segmentsToCommitStr == null) {
+  private Set<String> filterSegmentsToCommit(Set<String> allConsumingSegments,
+      @Nullable String partitionGroupIdsToCommitStr, @Nullable String segmentsToCommitStr) {
+    if (partitionGroupIdsToCommitStr == null && segmentsToCommitStr == null) {
       return allConsumingSegments;
     }
-    Preconditions.checkState(partitionsToCommitStr == null || segmentsToCommitStr == null,
+    Preconditions.checkState(partitionGroupIdsToCommitStr == null || segmentsToCommitStr == null,
         "Cannot specify both partitions and segments to commit");
 
     if (segmentsToCommitStr != null) {
@@ -1597,8 +1597,8 @@ public class PinotLLCRealtimeSegmentManager {
       return segmentsToCommit;
     }
 
-    // partitionsToCommitStr != null
-    Set<Integer> partitionsToCommit = Arrays.stream(partitionsToCommitStr.split(","))
+    // partitionGroupIdsToCommitStr != null
+    Set<Integer> partitionsToCommit = Arrays.stream(partitionGroupIdsToCommitStr.split(","))
         .map(String::trim)
         .map(Integer::parseInt)
         .collect(Collectors.toSet());
@@ -1606,7 +1606,7 @@ public class PinotLLCRealtimeSegmentManager {
         .filter(segmentName -> partitionsToCommit.contains(new LLCSegmentName(segmentName).getPartitionGroupId()))
         .collect(Collectors.toSet());
     Preconditions.checkState(!targetSegments.isEmpty(), "Cannot find segments to commit for partitions: %s",
-        partitionsToCommitStr);
+        partitionGroupIdsToCommitStr);
     return targetSegments;
   }
 
