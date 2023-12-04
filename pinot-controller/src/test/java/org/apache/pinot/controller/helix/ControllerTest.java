@@ -337,7 +337,7 @@ public class ControllerTest {
     configAccessor.set(scope, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
   }
 
-  public void startController(Map<String, Object> properties, int controllerPort)
+  public void startController(Map<String, Object> properties, String clusterName, int controllerPort)
       throws Exception {
     BaseControllerStarter controllerStarter = _controllerStarters.get(controllerPort);
     Preconditions.checkState(controllerStarter == null);
@@ -356,7 +356,8 @@ public class ControllerTest {
     }
 
     _controllerBaseApiUrls.put(controllerPort, controllerScheme + "://localhost:" + controllerPort);
-    _controllerRequestURLBuilders.put(controllerPort, ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl));
+    _controllerRequestURLBuilders.put(controllerPort,
+        ControllerRequestURLBuilder.baseUrl(controllerScheme + "://localhost:" + controllerPort));
     _controllerDataDirs.put(controllerPort, controllerConfig.getDataDir());
 
     controllerStarter = getControllerStarter();
@@ -368,8 +369,7 @@ public class ControllerTest {
     ConfigAccessor configAccessor = helixManager.getConfigAccessor();
     // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
     HelixConfigScope scope =
-        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
-            .build();
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(clusterName).build();
     switch (controllerStarter.getControllerMode()) {
       case DUAL:
       case PINOT_ONLY:
