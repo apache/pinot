@@ -283,28 +283,26 @@ public class ControllerTest {
 
   public void startController(Map<String, Object> properties)
       throws Exception {
+    Preconditions.checkState(_controllerStarter == null);
 
-    ControllerConf controllerConfig = new ControllerConf(properties);
-
-    int controllerPort = DEFAULT_CONTROLLER_PORT;
-    if (StringUtils.isNotBlank(controllerConfig.getControllerPort())) {
-      controllerPort = Integer.parseInt(controllerConfig.getControllerPort());
-    } else if (StringUtils.isNotBlank(controllerConfig.getControllerVipPort())) {
-      controllerPort = Integer.parseInt(controllerConfig.getControllerVipPort());
-    }
-
-    BaseControllerStarter controllerStarter = _controllerStarters.get(controllerPort);
-
-    Preconditions.checkState(controllerStarter == null);
+    _controllerConfig = new ControllerConf(properties);
 
     String controllerScheme = "http";
-    if (StringUtils.isNotBlank(controllerConfig.getControllerVipProtocol())) {
-      controllerScheme = controllerConfig.getControllerVipProtocol();
+    if (StringUtils.isNotBlank(_controllerConfig.getControllerVipProtocol())) {
+      controllerScheme = _controllerConfig.getControllerVipProtocol();
     }
 
-    _controllerBaseApiUrl = controllerScheme + "://localhost:" + controllerPort;
+    _controllerPort = DEFAULT_CONTROLLER_PORT;
+    if (StringUtils.isNotBlank(_controllerConfig.getControllerPort())) {
+      _controllerPort = Integer.parseInt(_controllerConfig.getControllerPort());
+    } else if (StringUtils.isNotBlank(_controllerConfig.getControllerVipPort())) {
+      _controllerPort = Integer.parseInt(_controllerConfig.getControllerVipPort());
+    }
+
+    _controllerBaseApiUrl = controllerScheme + "://localhost:" + _controllerPort;
     _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
-    _controllerDataDir = controllerConfig.getDataDir();
+    _controllerDataDir = _controllerConfig.getDataDir();
+
     _controllerStarter = getControllerStarter();
     _controllerStarter.init(new PinotConfiguration(properties));
     _controllerStarter.start();
@@ -313,8 +311,9 @@ public class ControllerTest {
     _helixDataAccessor = _helixManager.getHelixDataAccessor();
     ConfigAccessor configAccessor = _helixManager.getConfigAccessor();
     // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
-    HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
-        controllerConfig.getHelixClusterName()).build();
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
     switch (_controllerStarter.getControllerMode()) {
       case DUAL:
       case PINOT_ONLY:
