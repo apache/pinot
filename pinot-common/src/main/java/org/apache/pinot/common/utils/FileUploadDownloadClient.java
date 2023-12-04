@@ -65,6 +65,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1227,8 +1228,13 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * @return param list
    */
   public static List<NameValuePair> makeTableParam(String tableName) {
-    return Collections.singletonList(
-        new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName));
+    List<NameValuePair> tableParams = new ArrayList<>();
+    tableParams.add(new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName));
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType != null) {
+      tableParams.add(new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name()));
+    }
+    return tableParams;
   }
 
   @Override
