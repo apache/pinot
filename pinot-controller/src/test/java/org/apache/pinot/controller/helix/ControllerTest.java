@@ -371,27 +371,24 @@ public class ControllerTest {
     controllerStarter.start();
     PinotHelixResourceManager helixResourceManager = controllerStarter.getHelixResourceManager();
     HelixManager helixManager = controllerStarter.getHelixControllerManager();
-    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
     ConfigAccessor configAccessor = helixManager.getConfigAccessor();
     // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
     HelixConfigScope scope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
             .build();
-    HelixAdmin helixAdmin = null;
-    ZkHelixPropertyStore<ZNRecord> propertyStore = null;
     switch (controllerStarter.getControllerMode()) {
       case DUAL:
       case PINOT_ONLY:
-        helixAdmin = helixResourceManager.getHelixAdmin();
-        propertyStore = helixResourceManager.getPropertyStore();
+        _helixAdmins.put(controllerPort, helixResourceManager.getHelixAdmin());
+        _propertyStores.put(controllerPort, helixResourceManager.getPropertyStore());
         // TODO: Enable periodic rebalance per 10 seconds as a temporary work-around for the Helix issue:
         //       https://github.com/apache/helix/issues/331 and https://github.com/apache/helix/issues/2309.
         //       Remove this after Helix fixing the issue.
         configAccessor.set(scope, ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000");
         break;
       case HELIX_ONLY:
-        helixAdmin = helixManager.getClusterManagmentTool();
-        propertyStore = helixManager.getHelixPropertyStore();
+        _helixAdmins.put(controllerPort, helixManager.getClusterManagmentTool());
+        _propertyStores.put(controllerPort, helixManager.getHelixPropertyStore());
         break;
       default:
         break;
