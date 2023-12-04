@@ -656,14 +656,17 @@ public abstract class ClusterTest extends ControllerTest {
   @DataProvider(name = "systemColumns")
   public Object[][] systemColumns() {
     return new Object[][]{
-        {"$docId"}, {"$hostName"}, {"$segmentName"}
+        {"$docId"},
+        {"$hostName"},
+        {"$segmentName"}
     };
   }
 
   @DataProvider(name = "useBothQueryEngines")
   public Object[][] useBothQueryEngines() {
     return new Object[][]{
-        {false}, {true}
+        {false},
+        {true}
     };
   }
 
