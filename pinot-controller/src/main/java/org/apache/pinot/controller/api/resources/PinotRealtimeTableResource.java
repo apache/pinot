@@ -141,8 +141,10 @@ public class PinotRealtimeTableResource {
           + "only those partitions or consuming segments will be force committed.")
   public Map<String, String> forceCommit(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Comma separated list of partitions to be committed") @QueryParam("partitions") String partitions,
-      @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments") String consumingSegments) {
+      @ApiParam(value = "Comma separated list of partitions to be committed") @QueryParam("partitions")
+      String partitions,
+      @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
+      String consumingSegments) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validate(tableNameWithType);
