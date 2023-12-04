@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
@@ -41,7 +40,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -255,15 +253,14 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   @VisibleForTesting
   void preloadSegmentWithSnapshot(String segmentName, IndexLoadingConfig indexLoadingConfig,
       SegmentZKMetadata zkMetadata) {
-    // This method might modify the file on disk. Use segment lock to prevent race condition
-    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
-    try {
-      segmentLock.lock();
-      // This method checks segment crc and if it has changed, the segment is not loaded.
-      _tableDataManager.tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata);
-    } finally {
-      segmentLock.unlock();
-    }
+    // This method checks segment crc and if it has changed, the segment is not loaded. It might modify the file on
+    // disk, but we don't need to take the segmentLock, because every segment from the current table is processed by
+    // at most one thread from the preloading thread pool. HelixTaskExecutor task threads about to process segments
+    // from the same table are blocked on ConcurrentHashMap lock as in HelixInstanceDataManager.addRealtimeSegment().
+    // In fact, taking segmentLock during segment preloading phase could cause deadlock when HelixTaskExecutor
+    // threads processing other tables have taken the same segmentLock as decided by the hash of table name and
+    // segment name, i.e. due to hash collision.
+    _tableDataManager.tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata);
   }
 
   private File getValidDocIdsSnapshotFile(String segmentName, String segmentTier) {

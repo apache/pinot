@@ -62,13 +62,13 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.planner.DispatchableSubPlan;
-import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.SubPlan;
+import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
@@ -122,7 +122,8 @@ public class QueryEnvironment {
             // SUB-QUERY Threshold is useless as we are encoding all IN clause in-line anyway
             .withInSubQueryThreshold(Integer.MAX_VALUE)
             .addRelBuilderConfigTransform(c -> c.withPushJoinCondition(true))
-            .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true)))
+            .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true))
+            .addRelBuilderConfigTransform(c -> c.withPruneInputOfAggregate(false)))
         .build();
     _optProgram = getOptProgram();
     _traitProgram = getTraitProgram();

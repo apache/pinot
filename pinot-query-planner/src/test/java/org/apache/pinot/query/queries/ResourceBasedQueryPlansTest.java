@@ -33,7 +33,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
-import org.apache.pinot.query.planner.DispatchableSubPlan;
+import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;

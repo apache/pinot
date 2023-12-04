@@ -32,7 +32,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
-import org.apache.pinot.query.planner.PlanFragmentMetadata;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.QueryPlanMetadata;
 import org.apache.pinot.query.planner.SubPlan;
@@ -102,8 +101,7 @@ public class PinotLogicalQueryPlanner {
               RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
               false, false);
       subPlanRootSenderNode.addInput(subPlanRoot);
-      PlanFragment planFragment1 =
-          new PlanFragment(1, subPlanRootSenderNode, new PlanFragmentMetadata(), new ArrayList<>());
+      PlanFragment planFragment1 = new PlanFragment(1, subPlanRootSenderNode, new ArrayList<>());
       planFragmentMap.put(1, planFragment1);
       for (Int2ObjectMap.Entry<IntList> entry : childPlanFragmentIdsMap.int2ObjectEntrySet()) {
         PlanFragment planFragment = planFragmentMap.get(entry.getIntKey());
@@ -117,8 +115,7 @@ public class PinotLogicalQueryPlanner {
           new MailboxReceiveNode(0, subPlanRoot.getDataSchema(), subPlanRoot.getPlanFragmentId(),
               RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
               false, false, subPlanRootSenderNode);
-      PlanFragment rootPlanFragment =
-          new PlanFragment(0, rootReceiveNode, new PlanFragmentMetadata(), Collections.singletonList(planFragment1));
+      PlanFragment rootPlanFragment = new PlanFragment(0, rootReceiveNode, Collections.singletonList(planFragment1));
       SubPlan subPlan = new SubPlan(rootPlanFragment, subPlanContext._subPlanIdToMetadataMap.get(0), new ArrayList<>());
       subPlanMap.put(subPlanId, subPlan);
     }

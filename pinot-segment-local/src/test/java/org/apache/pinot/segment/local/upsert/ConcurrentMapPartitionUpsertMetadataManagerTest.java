@@ -834,7 +834,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ImmutableSegmentImpl segment1 =
         mockImmutableSegment(1, validDocIds1, null, getPrimaryKeyList(numRecords, primaryKeys));
     // Preloading segment adds the segment without checking for upsert.
-    upsertMetadataManager.addSegment(segment1, validDocIds1, null,
+    upsertMetadataManager.addSegmentUnsafe(segment1, validDocIds1, null,
         getRecordInfoList(numRecords, primaryKeys, timestamps, null).iterator(), true);
 
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
@@ -851,7 +851,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl segment2 =
         mockImmutableSegment(2, validDocIds2, null, getPrimaryKeyList(numRecords, primaryKeys));
-    upsertMetadataManager.addSegment(segment2, validDocIds2, null,
+    upsertMetadataManager.addSegmentUnsafe(segment2, validDocIds2, null,
         getRecordInfoList(numRecords, primaryKeys, timestamps, null).iterator(), true);
 
     // segment1: 0 -> {0, 100}, 1 -> {1, 120}, 2 -> {2, 100}
