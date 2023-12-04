@@ -19,10 +19,7 @@
 package org.apache.pinot.controller.recommender.data.writer;
 
 import java.io.File;
-import java.util.List;
-import java.util.Map;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
-import org.apache.pinot.controller.recommender.data.generator.Generator;
 
 
 public class FileWriterSpec extends WriterSpec {

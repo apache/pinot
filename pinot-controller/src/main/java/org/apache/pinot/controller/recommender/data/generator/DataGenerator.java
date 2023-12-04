@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -27,13 +26,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.math.IntRange;
-import org.apache.pinot.controller.recommender.data.writer.AvroWriter;
-import org.apache.pinot.controller.recommender.data.writer.AvroWriterSpec;
-import org.apache.pinot.controller.recommender.data.writer.CsvWriter;
-import org.apache.pinot.controller.recommender.data.writer.FileWriterSpec;
-import org.apache.pinot.controller.recommender.data.writer.JsonWriter;
+import org.apache.pinot.controller.recommender.data.DataGenerationHelpers;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -42,7 +36,6 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.data.readers.FileFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,7 +46,6 @@ import org.slf4j.LoggerFactory;
 // TODO: add DATE_TIME to the data generator
 public class DataGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataGenerator.class);
-  private File _outDir;
 
   DataGeneratorSpec _genSpec;
 
@@ -66,17 +58,6 @@ public class DataGenerator {
   public void init(DataGeneratorSpec spec)
       throws IOException {
     _genSpec = spec;
-    _outDir = new File(_genSpec.getOutputDir());
-    if (_outDir.exists() && !_genSpec.isOverrideOutDir()) {
-      LOGGER.error("output directory already exists, and override is set to false");
-      throw new RuntimeException("output directory exists");
-    }
-
-    if (_outDir.exists()) {
-      FileUtils.deleteDirectory(_outDir);
-    }
-
-    _outDir.mkdir();
 
     for (final String column : _genSpec.getColumns()) {
       DataType dataType = _genSpec.getDataTypeMap().get(column);
@@ -100,27 +81,6 @@ public class DataGenerator {
       generator.init();
       _generators.put(column, generator);
     }
-  }
-
-  public void generateAvro(long totalDocs, int numFiles)
-      throws Exception {
-    AvroWriter avroWriter = new AvroWriter();
-    avroWriter.init(new AvroWriterSpec(this, _outDir, totalDocs, numFiles));
-    avroWriter.write();
-  }
-
-  public void generateCsv(long totalDocs, int numFiles)
-      throws Exception {
-    CsvWriter csvWriter = new CsvWriter();
-    csvWriter.init(new FileWriterSpec(this, _outDir, totalDocs, numFiles));
-    csvWriter.write();
-  }
-
-  public void generateJson(long totalDocs, int numFiles)
-      throws Exception {
-    JsonWriter jsonWriter = new JsonWriter();
-    jsonWriter.init(new FileWriterSpec(this, _outDir, totalDocs, numFiles));
-    jsonWriter.write();
   }
 
   /*
@@ -239,11 +199,11 @@ public class DataGenerator {
     String outputDir = Paths.get(System.getProperty("java.io.tmpdir"), "csv-data").toString();
     final DataGeneratorSpec spec =
         new DataGeneratorSpec(columnNames, cardinality, range, template, mvCountMap, lengthMap, dataTypes, fieldTypes,
-            timeUnits, FileFormat.CSV, outputDir, true);
+            timeUnits);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
-    gen.generateCsv(100, 1);
+    DataGenerationHelpers.generateCsv(gen, 100, 1, outputDir, true);
     System.out.println("CSV data is generated under: " + outputDir);
   }
 }

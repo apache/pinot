@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.controller.recommender.data.DataGenerationHelpers;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
 import org.apache.pinot.controller.recommender.data.generator.SchemaAnnotation;
@@ -36,7 +37,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.Schema.SchemaBuilder;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
 import org.slf4j.Logger;
@@ -148,11 +148,11 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     gen.init(spec);
 
     if (FORMAT_AVRO.equalsIgnoreCase(_format)) {
-      gen.generateAvro(_numRecords, _numFiles);
+      DataGenerationHelpers.generateAvro(gen, _numRecords, _numFiles, _outDir, _overwrite);
     } else if (FORMAT_CSV.equalsIgnoreCase(_format)) {
-      gen.generateCsv(_numRecords, _numFiles);
+      DataGenerationHelpers.generateCsv(gen, _numRecords, _numFiles, _outDir, _overwrite);
     } else if (FORMAT_JSON.equalsIgnoreCase(_format)) {
-      gen.generateJson(_numRecords, _numFiles);
+      DataGenerationHelpers.generateJson(gen, _numRecords, _numFiles, _outDir, _overwrite);
     } else {
       throw new IllegalArgumentException(String.format("Invalid output format '%s'", _format));
     }
@@ -225,7 +225,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     }
 
     return new DataGeneratorSpec(columns, cardinality, range, pattern, mvCountMap, lengthMap, dataTypes, fieldTypes,
-        timeUnits, FileFormat.AVRO, _outDir, _overwrite);
+        timeUnits);
   }
 
   public static void main(String[] args)
