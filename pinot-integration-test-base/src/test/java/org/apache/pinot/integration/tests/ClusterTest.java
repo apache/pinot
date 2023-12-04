@@ -169,6 +169,11 @@ public abstract class ClusterTest extends ControllerTest {
     startBrokers(1);
   }
 
+  protected void startBroker(String clusterName)
+      throws Exception {
+    startBrokers(1, clusterName);
+  }
+
   protected void startBrokers(int numBrokers)
       throws Exception {
     _brokerStarters = new ArrayList<>(numBrokers);
@@ -181,10 +186,33 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerBaseApiUrl = "http://localhost:" + _brokerPorts.get(0);
   }
 
+  protected void startBrokers(int numBrokers, String clusterName)
+      throws Exception {
+    _brokerStarters = new ArrayList<>(numBrokers);
+    _brokerPorts = new ArrayList<>();
+    for (int i = 0; i < numBrokers; i++) {
+      BaseBrokerStarter brokerStarter = startOneBroker(i, clusterName);
+      _brokerStarters.add(brokerStarter);
+      _brokerPorts.add(brokerStarter.getPort());
+    }
+    _brokerBaseApiUrl = "http://localhost:" + _brokerPorts.get(0);
+  }
+
   protected BaseBrokerStarter startOneBroker(int brokerId)
       throws Exception {
     HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
     brokerStarter.init(getBrokerConf(brokerId));
+    brokerStarter.start();
+    return brokerStarter;
+  }
+
+  protected BaseBrokerStarter startOneBroker(int brokerId, String clusterName)
+      throws Exception {
+    HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
+    PinotConfiguration brokerConf = getBrokerConf(brokerId);
+    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl(clusterName));
+    brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    brokerStarter.init(brokerConf);
     brokerStarter.start();
     return brokerStarter;
   }
@@ -271,10 +299,30 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
+  protected void startServers(int numServers, String clusterName)
+      throws Exception {
+    FileUtils.deleteQuietly(new File(_baseInstanceDataDir + File.separator + "PinotServer"));
+    _serverStarters = new ArrayList<>(numServers);
+    for (int i = 0; i < numServers; i++) {
+      _serverStarters.add(startOneServer(i, clusterName));
+    }
+  }
+
   protected BaseServerStarter startOneServer(int serverId)
       throws Exception {
     HelixServerStarter serverStarter = new HelixServerStarter();
     serverStarter.init(getServerConf(serverId));
+    serverStarter.start();
+    return serverStarter;
+  }
+
+  protected BaseServerStarter startOneServer(int serverId, String clusterName)
+      throws Exception {
+    HelixServerStarter serverStarter = new HelixServerStarter();
+    PinotConfiguration serverConf = getServerConf(serverId);
+    serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl(clusterName));
+    serverStarter.init(serverConf);
     serverStarter.start();
     return serverStarter;
   }
@@ -608,17 +656,14 @@ public abstract class ClusterTest extends ControllerTest {
   @DataProvider(name = "systemColumns")
   public Object[][] systemColumns() {
     return new Object[][]{
-        {"$docId"},
-        {"$hostName"},
-        {"$segmentName"}
+        {"$docId"}, {"$hostName"}, {"$segmentName"}
     };
   }
 
   @DataProvider(name = "useBothQueryEngines")
   public Object[][] useBothQueryEngines() {
     return new Object[][]{
-        {false},
-        {true}
+        {false}, {true}
     };
   }
 
