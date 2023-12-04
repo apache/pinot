@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -1559,12 +1560,54 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * Force commit the current segments in consuming state and restart consumption
+   * Commit all partitions unless either partitionsToCommit or segmentsToCommit are provided.
+   *
+   * @param tableNameWithType  table name with type
+   * @param partitionsToCommit  comma separated list of partitions to commit
+   * @param segmentsToCommit  comma separated list of consuming segments to commit
+   * @return the set of consuming segments that were committed
    */
-  public Set<String> forceCommit(String tableNameWithType) {
+  public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionsToCommit,
+      @Nullable String segmentsToCommit) {
     IdealState idealState = getIdealState(tableNameWithType);
-    Set<String> consumingSegments = findConsumingSegments(idealState);
-    sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
-    return consumingSegments;
+    Set<String> allConsumingSegments = findConsumingSegments(idealState);
+    Set<String> targetConsumingSegments = filterSegmentsToCommit(allConsumingSegments, partitionsToCommit,
+        segmentsToCommit);
+    sendForceCommitMessageToServers(tableNameWithType, targetConsumingSegments);
+    return targetConsumingSegments;
+  }
+
+  /**
+   * Among all consuming segments, filter the ones that are in the given partitions or segments.
+   */
+  private Set<String> filterSegmentsToCommit(Set<String> allConsumingSegments, @Nullable String partitionsToCommitStr,
+      @Nullable String segmentsToCommitStr) {
+    if (partitionsToCommitStr == null && segmentsToCommitStr == null) {
+      return allConsumingSegments;
+    }
+    Preconditions.checkState(partitionsToCommitStr == null || segmentsToCommitStr == null,
+        "Cannot specify both partitions and segments to commit");
+
+    if (segmentsToCommitStr != null) {
+      Set<String> segmentsToCommit = Arrays.stream(segmentsToCommitStr.split(","))
+          .map(String::trim)
+          .collect(Collectors.toSet());
+      Preconditions.checkState(allConsumingSegments.containsAll(segmentsToCommit),
+          "Cannot commit segments that are not in CONSUMING state");
+      return segmentsToCommit;
+    }
+
+    // partitionsToCommitStr != null
+    Set<Integer> partitionsToCommit = Arrays.stream(partitionsToCommitStr.split(","))
+        .map(String::trim)
+        .map(Integer::parseInt)
+        .collect(Collectors.toSet());
+    Set<String> targetSegments = allConsumingSegments.stream()
+        .filter(segmentName -> partitionsToCommit.contains(new LLCSegmentName(segmentName).getPartitionGroupId()))
+        .collect(Collectors.toSet());
+    Preconditions.checkState(!targetSegments.isEmpty(), "Cannot find segments to commit for partitions: %s",
+        partitionsToCommitStr);
+    return targetSegments;
   }
 
   /**

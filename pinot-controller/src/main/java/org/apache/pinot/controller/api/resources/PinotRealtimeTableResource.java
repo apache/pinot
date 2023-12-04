@@ -136,15 +136,20 @@ public class PinotRealtimeTableResource {
       notes = "Force commit the current segments in consuming state and restart consumption. "
           + "This should be used after schema/table config changes. "
           + "Please note that this is an asynchronous operation, "
-          + "and 200 response does not mean it has actually been done already")
+          + "and 200 response does not mean it has actually been done already."
+          + "If specific partitions or consuming segments are provided, "
+          + "only those partitions or consuming segments will be force committed.")
   public Map<String, String> forceCommit(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Comma separated list of partitions to be committed") @QueryParam("partitions") String partitions,
+      @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments") String consumingSegments) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validate(tableNameWithType);
     Map<String, String> response = new HashMap<>();
     try {
-      Set<String> consumingSegmentsForceCommitted = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType);
+      Set<String> consumingSegmentsForceCommitted =
+          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitions, consumingSegments);
       response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();
