@@ -61,7 +61,7 @@ import org.slf4j.LoggerFactory;
 public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusChecker.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final int MAX_OFFLINE_SEGMENTS_TO_LOG = 5;
-  private static final String TABLE_CONSUMPTION_PAUSED = "isTablePaused";
+  private static final String IS_TABLE_CONSUMPTION_PAUSED = "isTablePaused";
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
   public static final String CONSUMING = "CONSUMING";
@@ -210,7 +210,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     //check if table consumption is paused
-    boolean isTablePaused = Boolean.parseBoolean(idealState.getRecord().getSimpleField(TABLE_CONSUMPTION_PAUSED));
+    boolean isTablePaused = Boolean.parseBoolean(idealState.getRecord().getSimpleField(IS_TABLE_CONSUMPTION_PAUSED));
     if (isTablePaused) {
       context._pausedTables.add(tableNameWithType);
     }
