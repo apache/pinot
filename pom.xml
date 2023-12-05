@@ -1753,7 +1753,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>8.45.1</version>
+            <version>10.12.5</version>
           </dependency>
         </dependencies>
         <executions>
