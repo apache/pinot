@@ -40,6 +40,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -71,6 +72,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
   protected final double _metadataTTL;
+  protected final double _deletedKeysTTL;
   protected final File _tableIndexDir;
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
@@ -98,7 +100,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      double metadataTTL, double deletedKeysTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
     _primaryKeyColumns = primaryKeyColumns;
@@ -108,6 +110,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _partialUpsertHandler = partialUpsertHandler;
     _enableSnapshot = enableSnapshot;
     _metadataTTL = metadataTTL;
+    _deletedKeysTTL = deletedKeysTTL;
     _tableIndexDir = tableIndexDir;
     _snapshotLock = enableSnapshot ? new ReentrantReadWriteLock() : null;
     _serverMetrics = serverMetrics;
@@ -115,6 +118,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (metadataTTL > 0) {
       _largestSeenComparisonValue = loadWatermark();
     } else {
+      _largestSeenComparisonValue = Double.MIN_VALUE;
       deleteWatermark();
     }
   }
@@ -158,8 +162,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _tableNameWithType);
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
 
+    if (_deletedKeysTTL > 0) {
+      double maxComparisonValue =
+          ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
+              .getMaxValue()).doubleValue();
+      _largestSeenComparisonValue = Math.max(_largestSeenComparisonValue, maxComparisonValue);
+    }
+
     // Skip adding segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
-    if (_largestSeenComparisonValue > 0) {
+    if (_metadataTTL > 0 && _largestSeenComparisonValue > 0) {
       Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");
@@ -489,7 +500,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     // Skip removing segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
-    if (_largestSeenComparisonValue > 0) {
+    if (_metadataTTL > 0 && _largestSeenComparisonValue > 0) {
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
       if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
@@ -686,7 +697,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   @Override
   public void removeExpiredPrimaryKeys() {
-    if (_metadataTTL <= 0) {
+    if (_metadataTTL <= 0 && _deletedKeysTTL <= 0) {
       return;
     }
     if (!startOperation()) {
@@ -694,7 +705,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     try {
+      long startTime = System.currentTimeMillis();
       doRemoveExpiredPrimaryKeys();
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS,
+          duration, TimeUnit.MILLISECONDS);
     } finally {
       finishOperation();
     }

@@ -61,9 +61,9 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
       List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
       HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+      double metadataTTL, double deletedKeysTTL, File tableIndexDir, ServerMetrics serverMetrics) {
     super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn,
-        hashFunction, partialUpsertHandler, enableSnapshot, metadataTTL, tableIndexDir, serverMetrics);
+        hashFunction, partialUpsertHandler, enableSnapshot, metadataTTL, deletedKeysTTL, tableIndexDir, serverMetrics);
   }
 
   @Override
@@ -231,13 +231,55 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   @Override
   public void doRemoveExpiredPrimaryKeys() {
-    double threshold = _largestSeenComparisonValue - _metadataTTL;
+    AtomicInteger numDeletedTTLKeysRemoved = new AtomicInteger();
+    AtomicInteger numMetadataTTLKeysRemoved = new AtomicInteger();
+    double metadataTTLKeysThreshold;
+    if (_metadataTTL > 0) {
+      metadataTTLKeysThreshold = _largestSeenComparisonValue - _metadataTTL;
+    } else {
+      metadataTTLKeysThreshold = Double.MIN_VALUE;
+    }
+
+    double deletedKeysThreshold;
+
+    if (_deletedKeysTTL > 0) {
+      deletedKeysThreshold = _largestSeenComparisonValue - _deletedKeysTTL;
+    } else {
+      deletedKeysThreshold = Double.MIN_VALUE;
+    }
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
-      if (((Number) recordLocation.getComparisonValue()).doubleValue() < threshold) {
+      double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
+      if (_metadataTTL > 0 && comparisonValue < metadataTTLKeysThreshold) {
         _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
+        numMetadataTTLKeysRemoved.getAndIncrement();
+      } else if (_deletedKeysTTL > 0 && comparisonValue < deletedKeysThreshold) {
+        ThreadSafeMutableRoaringBitmap currentQueryableDocIds = recordLocation.getSegment().getQueryableDocIds();
+        // if key not part of queryable doc id, it means it is deleted
+        if (currentQueryableDocIds != null && !currentQueryableDocIds.contains(recordLocation.getDocId())) {
+          _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
+          removeDocId(recordLocation.getSegment(), recordLocation.getDocId());
+          numDeletedTTLKeysRemoved.getAndIncrement();
+        }
       }
     });
-    persistWatermark(_largestSeenComparisonValue);
+    if (_metadataTTL > 0) {
+      persistWatermark(_largestSeenComparisonValue);
+    }
+
+    int numDeletedTTLKeys = numDeletedTTLKeysRemoved.get();
+    if (numDeletedTTLKeys > 0) {
+      _logger.info("Deleted {} primary keys based on deletedKeysTTL in the table {}",
+          numDeletedTTLKeys, _tableNameWithType);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED,
+          numDeletedTTLKeys);
+    }
+    int numMetadataTTLKeys = numMetadataTTLKeysRemoved.get();
+    if (numMetadataTTLKeys > 0) {
+      _logger.info("Deleted {} primary keys based on metadataTTL in the table {}",
+          numMetadataTTLKeys, _tableNameWithType);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.METADATA_TTL_PRIMARY_KEYS_REMOVED,
+          numMetadataTTLKeys);
+    }
   }
 
   /**
@@ -253,7 +295,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     Comparable newComparisonValue = recordInfo.getComparisonValue();
 
     // When TTL is enabled, update largestSeenComparisonValue when adding new record
-    if (_metadataTTL > 0) {
+    if (_metadataTTL > 0 || _deletedKeysTTL > 0) {
       double comparisonValue = ((Number) newComparisonValue).doubleValue();
       _largestSeenComparisonValue = Math.max(_largestSeenComparisonValue, comparisonValue);
     }

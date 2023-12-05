@@ -67,6 +67,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected PartialUpsertHandler _partialUpsertHandler;
   protected boolean _enableSnapshot;
   protected double _metadataTTL;
+  protected double _deletedKeysTTL;
   protected File _tableIndexDir;
   protected ServerMetrics _serverMetrics;
   protected HelixManager _helixManager;
@@ -109,6 +110,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     _enableSnapshot = upsertConfig.isEnableSnapshot();
     _metadataTTL = upsertConfig.getMetadataTTL();
+    _deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
     _tableIndexDir = tableDataManager.getTableDataDir();
     _serverMetrics = serverMetrics;
     _helixManager = helixManager;
@@ -118,10 +120,10 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     LOGGER.info(
         "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
-            + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {}, table "
-            + "index dir: {}", getClass().getSimpleName(), _tableNameWithType, _primaryKeyColumns, _comparisonColumns,
-        _deleteRecordColumn, _hashFunction, upsertConfig.getMode(), _enableSnapshot, upsertConfig.isEnablePreload(),
-        _metadataTTL, _tableIndexDir);
+            + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
+            + " deleted Keys TTL: {}, table index dir: {}", getClass().getSimpleName(), _tableNameWithType,
+        _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn, _hashFunction, upsertConfig.getMode(),
+        _enableSnapshot, upsertConfig.isEnablePreload(), _metadataTTL, _deletedKeysTTL, _tableIndexDir);
 
     if (_enableSnapshot && segmentPreloadExecutor != null && upsertConfig.isEnablePreload()) {
       // Preloading the segments with snapshots for fast upsert metadata recovery.
