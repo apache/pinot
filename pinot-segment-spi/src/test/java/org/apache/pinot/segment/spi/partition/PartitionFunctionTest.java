@@ -687,7 +687,7 @@ public class PartitionFunctionTest {
         for (int expectedHashValue : expectedHashValues) {
           random.nextBytes(array1);
           String nextString = new String(array1, UTF_8);
-          int actualHashValueFromString = murmur3PartitionFunction.murmurHash332BitsX64(nextString, hashSeed);
+          int actualHashValueFromString = murmur3PartitionFunction.murmur3Hash32BitsX64(nextString, hashSeed);
           assertEquals(actualHashValueFromString, expectedHashValue);
         }
         break;
@@ -701,9 +701,9 @@ public class PartitionFunctionTest {
         for (int expectedHashValue : expectedHashValues) {
           random.nextBytes(array2);
           if (variant.equals("x64_32")) {
-            actualHashValueFromByteArray = murmur3PartitionFunction.murmurHash332BitsX64(array2, hashSeed);
+            actualHashValueFromByteArray = murmur3PartitionFunction.murmur3Hash32BitsX64(array2, hashSeed);
           } else {
-            actualHashValueFromByteArray = murmur3PartitionFunction.murmurHash332BitsX86(array2, hashSeed);
+            actualHashValueFromByteArray = murmur3PartitionFunction.murmur3Hash32BitsX86(array2, hashSeed);
           }
           assertEquals(actualHashValueFromByteArray, expectedHashValue);
         }
@@ -723,7 +723,7 @@ public class PartitionFunctionTest {
 
         // Apply the partition function and compare with expected values.
         for (int i = 0; i < 10; i++) {
-          int actualHashValueFromLongArray = murmur3PartitionFunction.murmurHash332BitsX64(longList.get(i), hashSeed);
+          int actualHashValueFromLongArray = murmur3PartitionFunction.murmur3Hash32BitsX64(longList.get(i), hashSeed);
           assertEquals(actualHashValueFromLongArray, expectedHashValues[i]);
         }
         break;

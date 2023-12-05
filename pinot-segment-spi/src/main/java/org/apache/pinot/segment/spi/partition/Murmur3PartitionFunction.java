@@ -65,9 +65,9 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   @Override
   public int getPartition(Object value) {
     if (_variant.equals("x86_32")) {
-      return (murmurHash332BitsX86(value.toString().getBytes(UTF_8), _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
+      return (murmur3Hash32BitsX86(value.toString().getBytes(UTF_8), _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
     }
-    return (murmurHash332BitsX64(value, _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
+    return (murmur3Hash32BitsX64(value, _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
   }
 
   @Override
@@ -87,7 +87,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   }
 
   @VisibleForTesting
-  int murmurHash332BitsX86(byte[] data, int hashSeed) {
+  int murmur3Hash32BitsX86(byte[] data, int hashSeed) {
     return Hashing.murmur3_32_fixed(hashSeed).hashBytes(data).asInt();
   }
 
@@ -156,7 +156,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    * @param seed random value
    * @return 64 bit hashed key
    */
-  private long murmurHash364BitsX64(final byte[] key, final int seed) {
+  private long murmur3Hash64BitsX64(final byte[] key, final int seed) {
     State state = new State();
 
     state._h1 = 0x9368e53c2f6af274L ^ seed;
@@ -234,11 +234,11 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    * @param seed random value
    * @return 32 bit hashed key
    */
-  private int murmurHash332BitsX64(final byte[] key, final int seed) {
-    return (int) (murmurHash364BitsX64(key, seed) >>> 32);
+  private int murmur3Hash32BitsX64(final byte[] key, final int seed) {
+    return (int) (murmur3Hash64BitsX64(key, seed) >>> 32);
   }
 
-  private long murmurHash364BitsX64(final long[] key, final int seed) {
+  private long murmur3Hash64BitsX64(final long[] key, final int seed) {
     // Exactly the same as MurmurHash3_x64_128, except it only returns state.h1
     State state = new State();
 
@@ -283,33 +283,33 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    * @param seed random value
    * @return 32 bit hashed key
    */
-  private int murmurHash332BitsX64(final long[] key, final int seed) {
-    return (int) (murmurHash364BitsX64(key, seed) >>> 32);
+  private int murmur3Hash32BitsX64(final long[] key, final int seed) {
+    return (int) (murmur3Hash64BitsX64(key, seed) >>> 32);
   }
 
   @VisibleForTesting
-  int murmurHash332BitsX64(Object o, int seed) {
+  int murmur3Hash32BitsX64(Object o, int seed) {
     if (o instanceof byte[]) {
-      return murmurHash332BitsX64((byte[]) o, seed);
+      return murmur3Hash32BitsX64((byte[]) o, seed);
     } else if (o instanceof long[]) {
-      return murmurHash332BitsX64((long[]) o, seed);
+      return murmur3Hash32BitsX64((long[]) o, seed);
     } else if (o instanceof String) {
-      return murmurHash332BitsX64((String) o, seed);
+      return murmur3Hash32BitsX64((String) o, seed);
     } else {
       // Differing from the source implementation here. The default case in the source implementation is to apply the
       // hash on the hashcode of the object. The hashcode of an object is not guaranteed to be consistent across JVMs
       // (except for String values), so we cannot guarantee the same value as the data source. Since we cannot
       // guarantee similar values, we will instead apply the hash on the string representation of the object, which
       // aligns with the rest of our code base.
-      return murmurHash332BitsX64(o.toString(), seed);
+      return murmur3Hash32BitsX64(o.toString(), seed);
     }
   }
 
-  private int murmurHash332BitsX64(String s, int seed) {
-    return (int) (murmurHash364BitsX64String(s, seed) >> 32);
+  private int murmur3Hash32BitsX64(String s, int seed) {
+    return (int) (murmur3Hash32BitsX64String(s, seed) >> 32);
   }
 
-  private long murmurHash364BitsX64String(String s, long seed) {
+  private long murmur3Hash32BitsX64String(String s, long seed) {
     // Exactly the same as MurmurHash3_x64_64, except it works directly on a String's chars
     State state = new State();
 
