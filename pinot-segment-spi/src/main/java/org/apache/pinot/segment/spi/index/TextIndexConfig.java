@@ -188,7 +188,7 @@ public class TextIndexConfig extends IndexConfig {
       return this;
     }
 
-    public AbstractBuilder withLuceneAnalyzerFQCN(String luceneAnalyzerFQCN) {
+    public AbstractBuilder withLuceneAnalyzerClass(String luceneAnalyzerClass) {
       _luceneAnalyzerClass = luceneAnalyzerFQCN;
       return this;
     }
