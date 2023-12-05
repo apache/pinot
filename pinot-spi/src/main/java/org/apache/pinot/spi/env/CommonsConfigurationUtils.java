@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.env;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -46,27 +47,42 @@ public class CommonsConfigurationUtils {
   private CommonsConfigurationUtils() {
   }
 
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
+   * @param file containing properties
+   * @return a {@link PropertiesConfiguration} instance. Empty if file does not exist.
+   */
   public static PropertiesConfiguration fromFile(File file) {
     try {
-      return loadFromFile(file, false, false);
+      return fromFile(file, false, false);
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
   }
 
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
+   * @param stream containing properties
+   * @return a {@link PropertiesConfiguration} instance.
+   */
   public static PropertiesConfiguration fromInputStream(InputStream stream) {
     try {
-      return loadFromInputStream(stream, false, false);
+      return fromInputStream(stream, false, false);
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
   }
 
-  public static PropertiesConfiguration loadFromPath(String path) throws ConfigurationException {
-    return loadFromPath(path, false, false);
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
+   * @param path representing the path of file
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromPath(String path) throws ConfigurationException {
+    return fromPath(path, false, false);
   }
 
-  public static PropertiesConfiguration loadFromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
+  public static PropertiesConfiguration fromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     FileHandler fileHandler = new FileHandler(config);
@@ -74,21 +90,15 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
-
-  public static PropertiesConfiguration loadFromInputStream(InputStream stream) throws ConfigurationException {
-    return loadFromInputStream(stream, false, false);
-  }
-
-  public static PropertiesConfiguration loadFromInputStream(InputStream stream, boolean setIOFactory,
+  public static PropertiesConfiguration fromInputStream(InputStream stream, boolean setIOFactory,
       boolean setDefaultDelimiter) throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
-    config.setThrowExceptionOnMissing(false);
     FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(stream);
     return config;
   }
 
-  public static PropertiesConfiguration loadFromFile(File file, boolean setIOFactory,
+  public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
       boolean setDefaultDelimiter) throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     FileHandler fileHandler = new FileHandler(config);
@@ -101,20 +111,11 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
-  public static void saveToExistingFile(PropertiesConfiguration propertiesConfiguration, File file) {
-    try {
-      FileHandler fileHandler = new FileHandler(propertiesConfiguration);
-      fileHandler.setFile(file);
-      fileHandler.save();
-    } catch (ConfigurationException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   public static void saveToFile(PropertiesConfiguration propertiesConfiguration, File file) {
+    Preconditions.checkNotNull(file, "File object can not be null for saving configurations");
+    FileHandler fileHandler = new FileHandler(propertiesConfiguration);
+    fileHandler.setFile(file);
     try {
-      FileHandler fileHandler = new FileHandler(propertiesConfiguration);
-      fileHandler.setFile(file);
       fileHandler.save();
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);
@@ -128,7 +129,6 @@ public class CommonsConfigurationUtils {
   public static Stream<String> getKeysStream(Configuration configuration) {
     return StreamSupport.stream(getIterable(configuration.getKeys()).spliterator(), false);
   }
-
 
   public static List<String> getKeys(Configuration configuration) {
     return getKeysStream(configuration).collect(Collectors.toList());
@@ -239,7 +239,7 @@ public class CommonsConfigurationUtils {
    * <p>
    * NOTE: When the property associated with the key is empty, {@link PropertiesConfiguration#getList(String)} will
    * return an empty string singleton list. Using this method will return an empty list instead.
-   *
+   * also, for backward compatibility, split the string with COMMA and return the string list.
    * @param key property key.
    * @return string list value for the property.
    */
@@ -278,11 +278,7 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
-  private static void setListDelimiterHandler(PropertiesConfiguration configuration, Character delimiter) {
-    configuration.setListDelimiterHandler(new DefaultListDelimiterHandler(delimiter));
-  }
-
   private static void setDefaultListDelimiterHandler(PropertiesConfiguration configuration) {
-    setListDelimiterHandler(configuration, DEFAULT_LIST_DELIMITER);
+    configuration.setListDelimiterHandler(new DefaultListDelimiterHandler(DEFAULT_LIST_DELIMITER));
   }
 }

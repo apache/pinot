@@ -71,7 +71,7 @@ public class SegmentColumnarIndexCreatorTest {
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "a", "foo");
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "b", "bar");
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "c", "foobar");
-    CommonsConfigurationUtils.saveToExistingFile(configuration, CONFIG_FILE);
+    CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
 
     configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
     assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
@@ -81,7 +81,7 @@ public class SegmentColumnarIndexCreatorTest {
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
-    CommonsConfigurationUtils.saveToExistingFile(configuration, CONFIG_FILE);
+    CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
 
     configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));

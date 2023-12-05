@@ -554,7 +554,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       properties.setProperty(Realtime.END_OFFSET, segmentZKPropsConfig.getEndOffset());
     }
 
-    //builder.save();
     CommonsConfigurationUtils.saveToFile(properties, metadataFile);
   }
 

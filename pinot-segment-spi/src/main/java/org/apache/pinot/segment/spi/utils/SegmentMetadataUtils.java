@@ -48,7 +48,7 @@ public class SegmentMetadataUtils {
   public static void savePropertiesConfiguration(PropertiesConfiguration propertiesConfiguration, File indexDir) {
     File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
     Preconditions.checkNotNull(metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
-    CommonsConfigurationUtils.saveToExistingFile(propertiesConfiguration, metadataFile);
+    CommonsConfigurationUtils.saveToFile(propertiesConfiguration, metadataFile);
   }
 
   public static SegmentMetadata updateMetadataProperties(SegmentDirectory segmentDirectory,
