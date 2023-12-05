@@ -24,7 +24,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
@@ -32,7 +31,6 @@ import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
@@ -233,8 +231,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
   @Override
   public void doRemoveExpiredPrimaryKeys() {
-    AtomicInteger numDeletedKeys = new AtomicInteger();
-    long startTime = System.currentTimeMillis();
+    AtomicInteger numDeletedTTLKeysRemoved = new AtomicInteger();
+    AtomicInteger numMetadataTTLKeysRemoved = new AtomicInteger();
     double metadataTTLKeysThreshold;
     if (_metadataTTL > 0) {
       metadataTTLKeysThreshold = _largestSeenComparisonValue - _metadataTTL;
@@ -250,32 +248,38 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       deletedKeysThreshold = Double.MIN_VALUE;
     }
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
-      if (_metadataTTL > 0 && ((Number) recordLocation.getComparisonValue()).doubleValue() < metadataTTLKeysThreshold) {
+      double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
+      if (_metadataTTL > 0 && comparisonValue < metadataTTLKeysThreshold) {
         _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
-        numDeletedKeys.getAndIncrement();
-      } else if (_deletedKeysTTL > 0
-          && ((Number) recordLocation.getComparisonValue()).doubleValue() < deletedKeysThreshold) {
+        numMetadataTTLKeysRemoved.getAndIncrement();
+      } else if (_deletedKeysTTL > 0 && comparisonValue < deletedKeysThreshold) {
         ThreadSafeMutableRoaringBitmap currentQueryableDocIds = recordLocation.getSegment().getQueryableDocIds();
         // if key not part of queryable doc id, it means it is deleted
         if (currentQueryableDocIds != null && !currentQueryableDocIds.contains(recordLocation.getDocId())) {
           _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
           removeDocId(recordLocation.getSegment(), recordLocation.getDocId());
-          numDeletedKeys.getAndIncrement();
+          numDeletedTTLKeysRemoved.getAndIncrement();
         }
       }
     });
     if (_metadataTTL > 0) {
       persistWatermark(_largestSeenComparisonValue);
     }
-    long duration = System.currentTimeMillis() - startTime;
-    int numDeletedTTLKeys = numDeletedKeys.get();
+
+    int numDeletedTTLKeys = numDeletedTTLKeysRemoved.get();
     if (numDeletedTTLKeys > 0) {
-      _logger.info("Deleted {} primary deleted keys in the table {}", numDeletedTTLKeys, _tableNameWithType);
-      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_TTL_PRIMARY_KEY_REMOVED,
+      _logger.info("Deleted {} primary keys based on deletedKeysTTL in the table {}",
+          numDeletedTTLKeys, _tableNameWithType);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED,
           numDeletedTTLKeys);
     }
-    _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.EXPIRED_PRIMARY_KEYS_DELETION_TIME_MS, duration,
-        TimeUnit.MILLISECONDS);
+    int numMetadataTTLKeys = numMetadataTTLKeysRemoved.get();
+    if (numMetadataTTLKeys > 0) {
+      _logger.info("Deleted {} primary keys based on metadataTTL in the table {}",
+          numMetadataTTLKeys, _tableNameWithType);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.METADATA_TTL_PRIMARY_KEYS_REMOVED,
+          numMetadataTTLKeys);
+    }
   }
 
   /**

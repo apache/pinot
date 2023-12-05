@@ -49,8 +49,8 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   TOTAL_CPU_TIME_NS("nanoseconds", false, "Total query cost (thread cpu time + system "
       + "activities cpu time + response serialization cpu time) for query processing on server."),
 
-  EXPIRED_PRIMARY_KEYS_DELETION_TIME_MS("milliseconds", false, "Total time taken to delete expired primary keys based "
-      + "on metadataTTL or deletedKeysTTL");
+  UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS("milliseconds", false,
+      "Total time taken to delete expired primary keys based on metadataTTL or deletedKeysTTL");
 
   private final String _timerName;
   private final boolean _global;

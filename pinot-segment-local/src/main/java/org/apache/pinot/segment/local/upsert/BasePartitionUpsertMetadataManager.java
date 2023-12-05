@@ -40,6 +40,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -160,12 +161,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         "Got unsupported segment implementation: {} for segment: {}, table: {}", segment.getClass(), segmentName,
         _tableNameWithType);
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-    double maxComparisonValue =
-        ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
-            .getMaxValue()).doubleValue();
 
-    if (_deletedKeysTTL > 0 && maxComparisonValue > _largestSeenComparisonValue) {
-      _largestSeenComparisonValue = maxComparisonValue;
+    if (_deletedKeysTTL > 0) {
+      double maxComparisonValue =
+          ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
+              .getMaxValue()).doubleValue();
+      _largestSeenComparisonValue = Math.max(_largestSeenComparisonValue, maxComparisonValue);
     }
 
     // Skip adding segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
@@ -173,7 +174,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");
-      if (maxComparisonValue < _largestSeenComparisonValue - _metadataTTL) {
+      Number maxComparisonValue =
+          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
+      if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
         _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
         MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
         if (validDocIdsSnapshot != null) {
@@ -702,7 +705,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     try {
+      long startTime = System.currentTimeMillis();
       doRemoveExpiredPrimaryKeys();
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS,
+          duration, TimeUnit.MILLISECONDS);
     } finally {
       finishOperation();
     }

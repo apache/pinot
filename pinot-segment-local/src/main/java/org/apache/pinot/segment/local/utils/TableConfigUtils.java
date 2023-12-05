@@ -731,21 +731,6 @@ public final class TableConfigUtils {
             "The delete record column must be a single-valued BOOLEAN column");
       }
 
-      double deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
-      if (deletedKeysTTL > 0) {
-        Preconditions.checkState(deleteRecordColumn != null,
-            "Deleted Keys TTL can only be enabled with deleteRecordColumn set.");
-        if (CollectionUtils.isNotEmpty(comparisonColumns)) {
-          Preconditions.checkState(comparisonColumns.size() == 1,
-                  "Deleted Keys TTL does not work with multiple comparison columns.");
-          String comparisonColumn = comparisonColumns.get(0);
-          DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
-          Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-                  "Deleted Keys TTL must have comparison column: %s in numeric type, found: %s.",
-                  comparisonColumn, comparisonColumnDataType);
-        }
-      }
-
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
       Preconditions.checkState(
           outOfOrderRecordColumn == null || !upsertConfig.isDropOutOfOrderRecord(),
@@ -773,22 +758,29 @@ public final class TableConfigUtils {
   @VisibleForTesting
   static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    if (upsertConfig == null || upsertConfig.getMetadataTTL() == 0) {
+    if (upsertConfig == null || (upsertConfig.getMetadataTTL() == 0 && upsertConfig.getDeletedKeysTTL() == 0)) {
       return;
     }
 
     List<String> comparisonColumns = upsertConfig.getComparisonColumns();
     if (CollectionUtils.isNotEmpty(comparisonColumns)) {
       Preconditions.checkState(comparisonColumns.size() == 1,
-          "Upsert TTL does not work with multiple comparison columns");
+          "MetadataTTL / DeletedKeysTTL does not work with multiple comparison columns");
       String comparisonColumn = comparisonColumns.get(0);
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
       Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "Upsert TTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s",
+          comparisonColumn, comparisonColumnDataType);
     }
 
-    Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
+    if (upsertConfig.getMetadataTTL() > 0) {
+      Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
+    }
+
+    if (upsertConfig.getDeletedKeysTTL() > 0) {
+      Preconditions.checkState(upsertConfig.getDeleteRecordColumn() != null,
+          "Deleted Keys TTL can only be enabled with deleteRecordColumn set.");
+    }
   }
 
   /**

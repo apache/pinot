@@ -1774,7 +1774,8 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "Deleted Keys TTL does not work with multiple comparison columns.");
+      Assert.assertEquals(e.getMessage(),
+          "MetadataTTL / DeletedKeysTTL does not work with multiple comparison columns");
     }
 
     // comparison column with non-numeric type
@@ -1787,7 +1788,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-              "Deleted Keys TTL must have comparison column: myCol in numeric type, found: STRING.");
+          "MetadataTTL / DeletedKeysTTL must have comparison column: myCol in numeric type, found: STRING");
     }
 
     // time column as comparison column
