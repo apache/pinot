@@ -87,9 +87,8 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
       String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
       _analyzer = luceneAnalyzerClass.equals(StandardAnalyzer.class.getName())
-              ? TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
-              config.getStopWordsInclude(), config.getStopWordsExclude())
-              : TextIndexUtils.getAnalyzerFromFQCN(luceneAnalyzerClass);
+          ? TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(config.getStopWordsInclude(),
+          config.getStopWordsExclude()) : TextIndexUtils.getAnalyzerFromClassName(luceneAnalyzerClass);
       LOGGER.info("Successfully read lucene index for {} from {}", _column, indexDir);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,

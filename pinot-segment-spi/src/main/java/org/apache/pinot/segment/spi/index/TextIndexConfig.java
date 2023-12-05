@@ -50,9 +50,7 @@ public class TextIndexConfig extends IndexConfig {
   private final String _luceneAnalyzerClass;
 
   @JsonCreator
-  public TextIndexConfig(
-      @JsonProperty("disabled") Boolean disabled,
-      @JsonProperty("fst") FSTType fstType,
+  public TextIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("fst") FSTType fstType,
       @JsonProperty("rawValue") @Nullable Object rawValueForTextIndex,
       @JsonProperty("queryCache") boolean enableQueryCache,
       @JsonProperty("useANDForMultiTermQueries") boolean useANDForMultiTermQueries,
@@ -60,8 +58,7 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("stopWordsExclude") List<String> stopWordsExclude,
       @JsonProperty("luceneUseCompoundFile") Boolean luceneUseCompoundFile,
       @JsonProperty("luceneMaxBufferSizeMB") Integer luceneMaxBufferSizeMB,
-      @JsonProperty("luceneAnalyzerClass") String luceneAnalyzerClass
-      ) {
+      @JsonProperty("luceneAnalyzerClass") String luceneAnalyzerClass) {
     super(disabled);
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
@@ -74,7 +71,7 @@ public class TextIndexConfig extends IndexConfig {
     _luceneMaxBufferSizeMB =
         luceneMaxBufferSizeMB == null ? LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB : luceneMaxBufferSizeMB;
     _luceneAnalyzerClass = (luceneAnalyzerClass == null || luceneAnalyzerClass.isEmpty())
-            ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS : luceneAnalyzerClass;
+        ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS : luceneAnalyzerClass;
   }
 
   public FSTType getFstType() {
@@ -189,7 +186,7 @@ public class TextIndexConfig extends IndexConfig {
     }
 
     public AbstractBuilder withLuceneAnalyzerClass(String luceneAnalyzerClass) {
-      _luceneAnalyzerClass = luceneAnalyzerFQCN;
+      _luceneAnalyzerClass = luceneAnalyzerClass;
       return this;
     }
   }
