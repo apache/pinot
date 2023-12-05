@@ -245,10 +245,8 @@ public class CustomSerDeUtils {
     public byte[] serialize(Sketch value) {
       // The serializer should respect existing ordering to enable "early stop"
       // optimisations on unions.
-      boolean shouldCompact = !value.isCompact();
-      boolean shouldOrder = value.isOrdered();
-      if (shouldCompact) {
-        return value.compact(shouldOrder, null).toByteArray();
+      if (!value.isCompact()) {
+        return value.compact(value.isOrdered(), null).toByteArray();
       }
       return value.toByteArray();
     }
