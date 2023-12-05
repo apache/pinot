@@ -113,7 +113,7 @@ public class TextIndexUtils {
         .map(String::trim).collect(Collectors.toList());
   }
 
-  public static Analyzer getAnalyzerFromFQCN(@Nonnull String luceneAnalyzerFQCN) throws
+  public static Analyzer getAnalyzerFromClassName(String luceneAnalyzerClass) throws
       ReflectiveOperationException {
     // Support instantiation with default constructor for now unless customized
     return (Analyzer) Class.forName(luceneAnalyzerFQCN).getConstructor().newInstance();
