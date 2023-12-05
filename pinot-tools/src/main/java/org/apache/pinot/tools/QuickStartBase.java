@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
@@ -48,6 +49,8 @@ import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.tools.utils.PinotConfigUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.tools.utils.KafkaStarterUtils.PORT;
 
 
 /**
@@ -358,12 +361,40 @@ public abstract class QuickStartBase {
     }
   }
 
+  protected int startKafka(int zkPort) {
+    printStatus(Quickstart.Color.CYAN, "***** Starting Kafka *****");
+    System.out.println("zookeeper port: " + zkPort);
+    _zookeeperInstance = ZkStarter.startLocalZkServer(zkPort);
+    try {
+      Properties defaultKafkaConfiguration = KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance);
+      _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
+          defaultKafkaConfiguration);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
+    }
+    _kafkaStarter.start();
+
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      try {
+        printStatus(Quickstart.Color.GREEN, "***** Shutting down kafka and zookeeper *****");
+        _kafkaStarter.stop();
+        ZkStarter.stopLocalZkServer(_zookeeperInstance);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }));
+
+    printStatus(Quickstart.Color.CYAN, "***** Kafka Started *****");
+    return zkPort;
+  }
+
   protected void startKafka() {
     printStatus(Quickstart.Color.CYAN, "***** Starting Kafka *****");
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     try {
+      Properties defaultKafkaConfiguration = KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance);
       _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
+          defaultKafkaConfiguration);
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }
