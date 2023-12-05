@@ -67,13 +67,13 @@ public class SegmentColumnarIndexCreatorTest {
   @Test
   public void testRemoveColumnMetadataInfo()
       throws Exception {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.loadFromFile(CONFIG_FILE);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "a", "foo");
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "b", "bar");
     configuration.setProperty(COLUMN_PROPERTY_KEY_PREFIX + "c", "foobar");
     CommonsConfigurationUtils.saveToExistingFile(configuration, CONFIG_FILE);
 
-    configuration = CommonsConfigurationUtils.loadFromFile(CONFIG_FILE);
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
     assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
     assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
     assertTrue(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
@@ -83,7 +83,7 @@ public class SegmentColumnarIndexCreatorTest {
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));
     CommonsConfigurationUtils.saveToExistingFile(configuration, CONFIG_FILE);
 
-    configuration = CommonsConfigurationUtils.loadFromFile(CONFIG_FILE);
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "a"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "b"));
     assertFalse(configuration.containsKey(COLUMN_PROPERTY_KEY_PREFIX + "c"));

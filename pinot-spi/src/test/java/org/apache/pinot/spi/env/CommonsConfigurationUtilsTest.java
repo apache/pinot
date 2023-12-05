@@ -95,15 +95,13 @@ public class CommonsConfigurationUtilsTest {
       throws ConfigurationException {
     String replacedValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(value);
 
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true);
-    configuration.setIOFactory(new PropertiesConfiguration.JupIOFactory(false));
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
     configuration.setProperty(PROPERTY_KEY, replacedValue);
     String recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true);
-    configuration.setIOFactory(new PropertiesConfiguration.JupIOFactory(false));
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
 
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));

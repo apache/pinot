@@ -217,7 +217,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       throws ConfigurationException {
     File mapFile = new File(_segmentDirectory, V1Constants.INDEX_MAP_FILE_NAME);
 
-    PropertiesConfiguration mapConfig = CommonsConfigurationUtils.loadFromFile(mapFile);
+    PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(mapFile);
 
     for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
       String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _segmentDirectory.getPath());

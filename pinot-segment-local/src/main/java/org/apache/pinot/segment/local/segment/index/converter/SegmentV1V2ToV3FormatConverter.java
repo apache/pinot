@@ -208,7 +208,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     File v2MetadataFile = new File(currentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     File v3MetadataFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
 
-    final PropertiesConfiguration properties = CommonsConfigurationUtils.loadFromFile(v2MetadataFile);
+    final PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(v2MetadataFile);
     // update the segment version
     properties.setProperty(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, SegmentVersion.v3.toString());
     CommonsConfigurationUtils.saveToExistingFile(properties, v3MetadataFile);

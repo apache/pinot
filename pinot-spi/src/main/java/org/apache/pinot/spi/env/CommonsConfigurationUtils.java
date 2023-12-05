@@ -34,6 +34,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.convert.DefaultListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.io.FileHandler;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -45,16 +46,9 @@ public class CommonsConfigurationUtils {
   private CommonsConfigurationUtils() {
   }
 
-  public static PropertiesConfiguration fromFile(File file, boolean setJupIOFactory) {
-    try {
-      return loadFromFile(file, false, false, setJupIOFactory);
-    } catch (ConfigurationException e) {
-      throw new RuntimeException(e);
-    }
-  }
   public static PropertiesConfiguration fromFile(File file) {
     try {
-      return loadFromFile(file, false, false, false);
+      return loadFromFile(file, false, false);
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
@@ -74,7 +68,7 @@ public class CommonsConfigurationUtils {
 
   public static PropertiesConfiguration loadFromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
       throws ConfigurationException {
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, false);
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(path);
     return config;
@@ -87,22 +81,18 @@ public class CommonsConfigurationUtils {
 
   public static PropertiesConfiguration loadFromInputStream(InputStream stream, boolean setIOFactory,
       boolean setDefaultDelimiter) throws ConfigurationException {
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, false);
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     config.setThrowExceptionOnMissing(false);
     FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(stream);
     return config;
   }
 
-  public static PropertiesConfiguration loadFromFile(File file) throws ConfigurationException {
-    return loadFromFile(file, false, false, false);
-  }
-
   public static PropertiesConfiguration loadFromFile(File file, boolean setIOFactory,
-      boolean setDefaultDelimiter, boolean setJupIOFactory) throws ConfigurationException {
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, setJupIOFactory);
+      boolean setDefaultDelimiter) throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     FileHandler fileHandler = new FileHandler(config);
-    // check if file exits, load the properties otherwise set the file.
+    // check if file exists, load the properties otherwise set the file.
     if (file.exists()) {
       fileHandler.load(file);
     } else {
@@ -213,6 +203,7 @@ public class CommonsConfigurationUtils {
    * - Escaping comma with backslash doesn't work when comma is preceded by a backslash
    */
   public static String replaceSpecialCharacterInPropertyValue(String value) {
+    value = StringEscapeUtils.escapeJava(value);
     if (value.isEmpty()) {
       return value;
     }
@@ -230,6 +221,7 @@ public class CommonsConfigurationUtils {
    * {@link #replaceSpecialCharacterInPropertyValue(String)}.
    */
   public static String recoverSpecialCharacterInPropertyValue(String value) {
+    value = StringEscapeUtils.unescapeJava(value);
     if (value.isEmpty()) {
       return value;
     }
@@ -270,21 +262,19 @@ public class CommonsConfigurationUtils {
   }
 
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
-      boolean setDefaultDelimiter, boolean setJupIOFactory) {
+      boolean setDefaultDelimiter) {
     PropertiesConfiguration config = new PropertiesConfiguration();
 
     // setting IO Reader Factory
     if (setIOFactory) {
       config.setIOFactory(new ConfigFilePropertyReaderFactory());
-    } else if (setJupIOFactory) {
-      config.setIOFactory(new PropertiesConfiguration.JupIOFactory(true));
     }
 
     // setting DEFAULT_LIST_DELIMITER
     if (setDefaultDelimiter) {
       CommonsConfigurationUtils.setDefaultListDelimiterHandler(config);
     }
-    config.setThrowExceptionOnMissing(false);
+
     return config;
   }
 
