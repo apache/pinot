@@ -47,7 +47,7 @@
     <grpc-context.version>1.59.0</grpc-context.version>
     <bouncycastle.version>1.75</bouncycastle.version>
     <caffeine.version>2.6.2</caffeine.version>
-    <codehaus-annotations.version>1.17</codehaus-annotations.version>
+    <codehaus-annotations.version>1.23</codehaus-annotations.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
     <commons-collections.version>4.1</commons-collections.version>
     <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
