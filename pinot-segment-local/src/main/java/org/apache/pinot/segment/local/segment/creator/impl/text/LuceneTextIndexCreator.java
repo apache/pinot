@@ -41,8 +41,6 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -51,7 +49,6 @@ import org.slf4j.LoggerFactory;
  * and realtime from {@link RealtimeLuceneTextIndex}
  */
 public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCreator.class);
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
 
   private final String _textColumn;
@@ -104,10 +101,10 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
       Analyzer luceneAnalyzer;
       if (luceneAnalyzerClass.isEmpty() || luceneAnalyzerClass.equals(StandardAnalyzer.class.getName())) {
-        luceneAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(
-            config.getStopWordsInclude(), config.getStopWordsExclude());
+        luceneAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(config.getStopWordsInclude(),
+            config.getStopWordsExclude());
       } else {
-        luceneAnalyzer = TextIndexUtils.getAnalyzerFromFQCN(luceneAnalyzerClass);
+        luceneAnalyzer = TextIndexUtils.getAnalyzerFromClassName(luceneAnalyzerClass);
       }
 
       IndexWriterConfig indexWriterConfig = new IndexWriterConfig(luceneAnalyzer);
