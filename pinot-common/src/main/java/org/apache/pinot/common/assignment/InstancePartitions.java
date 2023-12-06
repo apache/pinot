@@ -71,7 +71,7 @@ public class InstancePartitions {
   }
 
   @JsonCreator
-  private InstancePartitions(
+  public InstancePartitions(
       @JsonProperty(value = "instancePartitionsName", required = true) String instancePartitionsName,
       @JsonProperty(value = "partitionToInstancesMap", required = true)
           Map<String, List<String>> partitionToInstancesMap) {
