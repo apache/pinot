@@ -82,9 +82,7 @@
         "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4', partition_parallelism='2') */ ON {tbl1}.num = {tbl2}.num"
       },
       {
-        "description": "Colocated JOIN with partition column with partition parallelism in first table",
-        "ignored": true,
-        "comment": "partition parallelism mismatched in hint, this query shouldn't work at all",
+        "description": "Colocated JOIN with partition column with partition parallelism in first table; this result in a mismatch in parallelism and thus fallback to normal join.",
         "sql": "SELECT {tbl1}.num, {tbl1}.name, {tbl2}.num, {tbl2}.val FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4', partition_parallelism='2') */ JOIN {tbl2} /*+ tableOptions(partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num"
       },
       {

@@ -4,22 +4,22 @@
       {
         "description": "hint table without partitioning should throw exception",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM d /*+ tableOptions(partition_key='col1', partition_size='4') */ LIMIT 10",
-        "expectedException": "Error composing query plan for:.*"
+        "expectedException": ".*Failed to find table partition info.*"
       },
       {
         "description": "hint table with partition on wrong key should throw exception",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col1', partition_size='4') */ LIMIT 10",
-        "expectedException": "Error composing query plan for:.*"
+        "expectedException": ".*Partition key: col1 does not match partition column: col2.*"
       },
       {
         "description": "hint table with partition on wrong size should throw exception",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col2', partition_size='2') */ LIMIT 10",
-        "expectedException": "Error composing query plan for:.*"
+        "expectedException": ".*Partition size mismatch (hint: 2, table: 4).*"
       },
       {
         "description": "hint table with partition on wrong function should throw exception",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col2', partition_size='4', partition_function='murmur') */ LIMIT 10",
-        "expectedException": "Error composing query plan for:.*"
+        "expectedException": ".*Partition function mismatch (hint: murmur, table: Hashcode).*"
       },
       {
         "description": "Inner join with group by",

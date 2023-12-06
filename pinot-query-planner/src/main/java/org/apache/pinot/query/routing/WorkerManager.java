@@ -58,22 +58,17 @@ import org.slf4j.LoggerFactory;
 public class WorkerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerManager.class);
   private static final Random RANDOM = new Random();
-  private static final String DEFAULT_PARTITION_FUNCTION = "Hashcode";
+  private static final String DEFAULT_SHUFFLE_PARTITION_FUNCTION = "AbsHashCodeSum";
+  private static final String DEFAULT_TABLE_PARTITION_FUNCTION = "Hashcode";
 
   private final String _hostName;
   private final int _port;
   private final RoutingManager _routingManager;
-  private final String _defaultPartitionFunc;
 
   public WorkerManager(String hostName, int port, RoutingManager routingManager) {
-    this(hostName, port, routingManager, DEFAULT_PARTITION_FUNCTION);
-  }
-
-  public WorkerManager(String hostName, int port, RoutingManager routingManager, String defaultPartitionFunc) {
     _hostName = hostName;
     _port = port;
     _routingManager = routingManager;
-    _defaultPartitionFunc = defaultPartitionFunc;
   }
 
   public void assignWorkers(PlanFragment rootFragment, DispatchablePlanContext context) {
@@ -115,10 +110,8 @@ public class WorkerManager {
     // 1. create multiple intermediate stage workers on the same instance for each worker in the first child if the
     //    first child is a table scan. this is b/c we cannot pre-config parallelism on leaf stage thus needs fan-out.
     // 2. ignore partition parallelism when first child is NOT table scan b/c it would've done fan-out already.
-    List<PlanFragment> children = fragment.getChildren();
-    DispatchablePlanMetadata firstChildMetadata = children.isEmpty() ? null
-        : metadataMap.get(children.get(0).getFragmentId());
-    if (firstChildMetadata != null && firstChildMetadata.isPrePartitioned()) {
+    if (isPrePartitionAssignment(fragment, metadataMap)) {
+      DispatchablePlanMetadata firstChildMetadata = metadataMap.get(fragment.getChildren().get(0).getFragmentId());
       int partitionParallelism = firstChildMetadata.getPartitionParallelism();
       Map<Integer, QueryServerInstance> childWorkerIdToServerInstanceMap =
           firstChildMetadata.getWorkerIdToServerInstanceMap();
@@ -159,8 +152,40 @@ public class WorkerManager {
           }
         }
         metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
+        metadata.setPartitionFunction(DEFAULT_SHUFFLE_PARTITION_FUNCTION);
       }
     }
+  }
+
+  private boolean isPrePartitionAssignment(PlanFragment fragment, Map<Integer, DispatchablePlanMetadata> metadataMap) {
+    List<PlanFragment> children = fragment.getChildren();
+    if (children.isEmpty()) {
+      return false;
+    }
+    // Now, is all children needs to be pre-partitioned by the same function and size to allow pre-partition assignment
+    // TODO1: when partition function is allowed to be configured in exchange we can relax this condition
+    // TODO2: pick the most colocate assignment instead of picking the first children
+    String partitionFunction = null;
+    int partitionCount = 0;
+    for (PlanFragment child : fragment.getChildren()) {
+      DispatchablePlanMetadata childMetadata = metadataMap.get(child.getFragmentId());
+      if (!childMetadata.isPrePartitioned()) {
+        return false;
+      }
+      if (partitionFunction == null) {
+        partitionFunction = childMetadata.getPartitionFunction();
+      } else if (!partitionFunction.equals(childMetadata.getPartitionFunction())) {
+        return false;
+      }
+      int childComputedPartitionCount = childMetadata.getWorkerIdToServerInstanceMap().size()
+          * (isLeafPlan(childMetadata) ? childMetadata.getPartitionParallelism() : 1);
+      if (partitionCount == 0) {
+        partitionCount = childComputedPartitionCount;
+      } else if (childComputedPartitionCount != partitionCount) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private List<ServerInstance> assignServerInstances(DispatchablePlanContext context) {
@@ -282,6 +307,7 @@ public class WorkerManager {
     }
     metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+    metadata.setPartitionFunction(DEFAULT_SHUFFLE_PARTITION_FUNCTION);
   }
 
   /**
@@ -334,9 +360,8 @@ public class WorkerManager {
     Preconditions.checkState(numPartitions > 0, "'%s' must be positive, got: %s",
         PinotHintOptions.TableHintOptions.PARTITION_SIZE, numPartitions);
 
-    // TODO: make enum of partition functions that are supported.
     String partitionFunction = tableOptions.getOrDefault(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION,
-        _defaultPartitionFunc);
+        DEFAULT_TABLE_PARTITION_FUNCTION);
 
     String partitionParallelismStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
     int partitionParallelism = partitionParallelismStr != null ? Integer.parseInt(partitionParallelismStr) : 1;
