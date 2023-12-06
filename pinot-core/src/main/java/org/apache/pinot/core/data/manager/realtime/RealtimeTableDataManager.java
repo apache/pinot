@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
@@ -61,6 +62,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -528,22 +530,36 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     // Register the new segment after it is fully initialized by partitionUpsertMetadataManager, e.g. to fill up its
     // validDocId bitmap. Otherwise, the query can return wrong results, if accessing the premature segment.
-    SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
-    if (oldSegmentManager == null) {
-      if (_tableUpsertMetadataManager.isPreloading()) {
-        partitionUpsertMetadataManager.preloadSegment(immutableSegment);
-      } else {
+    if (_tableUpsertMetadataManager.isPreloading()) {
+      // Preloading segment happens when creating table manager when server restarts, and segment is ensured to be
+      // preloaded by a single thread, so no need for segmentLock.
+      partitionUpsertMetadataManager.preloadSegment(immutableSegment);
+      registerSegment(segmentName, newSegmentManager);
+      _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
+      return;
+    }
+    // Replacing segment may happen in two threads, i.e. the consuming thread that's committing the mutable segment
+    // and a HelixTaskExecutor thread that's bringing segment from ONLINE to CONSUMING when the server finds
+    // consuming thread can't commit the segment in time. Adding segment should be done by a single HelixTaskExecutor
+    // thread but do it with segmentLock as well for simplicity.
+    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    segmentLock.lock();
+    try {
+      SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
+      if (oldSegmentManager == null) {
         partitionUpsertMetadataManager.addSegment(immutableSegment);
+        registerSegment(segmentName, newSegmentManager);
+        _logger.info("Added new immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
+      } else {
+        IndexSegment oldSegment = oldSegmentManager.getSegment();
+        partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+        registerSegment(segmentName, newSegmentManager);
+        _logger.info("Replaced {} segment: {} of upsert-enabled table: {}",
+            oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, _tableNameWithType);
+        releaseSegment(oldSegmentManager);
       }
-      registerSegment(segmentName, newSegmentManager);
-      _logger.info("Added new immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
-    } else {
-      IndexSegment oldSegment = oldSegmentManager.getSegment();
-      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
-      registerSegment(segmentName, newSegmentManager);
-      _logger.info("Replaced {} segment: {} of upsert-enabled table: {}",
-          oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, _tableNameWithType);
-      releaseSegment(oldSegmentManager);
+    } finally {
+      segmentLock.unlock();
     }
   }
 
