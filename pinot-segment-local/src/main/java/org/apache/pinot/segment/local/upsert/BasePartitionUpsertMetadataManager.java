@@ -292,7 +292,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
-      addSegmentUnsafe(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds), true);
+      doPreloadSegment(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while preloading segment: %s, table: %s", segmentName, _tableNameWithType),
@@ -308,6 +308,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   /**
+   * NOTE: no need to get segmentLock to preload segment as callers ensure the segment is processed by a single thread.
+   * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
+   *       tests. The passed in bitmaps should always be empty.
+   */
+  @VisibleForTesting
+  void doPreloadSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
+    if (validDocIds == null) {
+      validDocIds = new ThreadSafeMutableRoaringBitmap();
+    }
+    if (queryableDocIds == null && _deleteRecordColumn != null) {
+      queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+    }
+    addSegmentWithoutUpsert(segment, validDocIds, queryableDocIds, recordInfoIterator);
+  }
+
+  /**
    * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
    *       tests. The passed in bitmaps should always be empty.
    */
@@ -318,26 +335,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
     segmentLock.lock();
     try {
-      addSegmentUnsafe(segment, validDocIds, queryableDocIds, recordInfoIterator, false);
+      if (validDocIds == null) {
+        validDocIds = new ThreadSafeMutableRoaringBitmap();
+      }
+      if (queryableDocIds == null && _deleteRecordColumn != null) {
+        queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+      }
+      addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
     } finally {
       segmentLock.unlock();
-    }
-  }
-
-  @VisibleForTesting
-  void addSegmentUnsafe(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
-      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
-      boolean isPreloading) {
-    if (validDocIds == null) {
-      validDocIds = new ThreadSafeMutableRoaringBitmap();
-    }
-    if (queryableDocIds == null && _deleteRecordColumn != null) {
-      queryableDocIds = new ThreadSafeMutableRoaringBitmap();
-    }
-    if (isPreloading) {
-      addSegmentWithoutUpsert(segment, validDocIds, queryableDocIds, recordInfoIterator);
-    } else {
-      addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
     }
   }
 
