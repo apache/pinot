@@ -543,6 +543,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // consuming thread can't commit the segment in time. Adding segment should be done by a single HelixTaskExecutor
     // thread but do it with segmentLock as well for simplicity.
     Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    segmentLock.lock();
     try {
       SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
       if (oldSegmentManager == null) {
