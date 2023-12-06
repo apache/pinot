@@ -88,6 +88,9 @@ public class WorkerManager {
   }
 
   private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context) {
+    for (PlanFragment child : fragment.getChildren()) {
+      assignWorkersToNonRootFragment(child, context);
+    }
     if (isLeafPlan(context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId()))) {
       assignWorkersToLeafFragment(fragment, context);
     } else {
@@ -99,171 +102,10 @@ public class WorkerManager {
     return metadata.getScannedTables().size() == 1;
   }
 
-  private void assignWorkersToLeafFragment(PlanFragment fragment, DispatchablePlanContext context) {
-    // NOTE: For pipeline breaker, leaf fragment can also have children
-    for (PlanFragment child : fragment.getChildren()) {
-      assignWorkersToNonRootFragment(child, context);
-    }
-
-    DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId());
-    Map<String, String> tableOptions = metadata.getTableOptions();
-    String partitionKey =
-        tableOptions != null ? tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY) : null;
-    if (partitionKey == null) {
-      // when partition key is not given, we do not partition assign workers for leaf-stage.
-      assignWorkersToNonPartitionedLeafFragment(metadata, context);
-    } else {
-      assignWorkersToPartitionedLeafFragment(metadata, context, partitionKey, tableOptions);
-    }
-  }
-
-  private void assignWorkersToNonPartitionedLeafFragment(DispatchablePlanMetadata metadata,
-      DispatchablePlanContext context) {
-    String tableName = metadata.getScannedTables().get(0);
-    Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, context.getRequestId());
-    Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
-
-    // acquire time boundary info if it is a hybrid table.
-    if (routingTableMap.size() > 1) {
-      TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(
-          TableNameBuilder.forType(TableType.OFFLINE)
-              .tableNameWithType(TableNameBuilder.extractRawTableName(tableName)));
-      if (timeBoundaryInfo != null) {
-        metadata.setTimeBoundaryInfo(timeBoundaryInfo);
-      } else {
-        // remove offline table routing if no time boundary info is acquired.
-        routingTableMap.remove(TableType.OFFLINE.name());
-      }
-    }
-
-    // extract all the instances associated to each table type
-    Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
-    for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
-      String tableType = routingEntry.getKey();
-      RoutingTable routingTable = routingEntry.getValue();
-      // for each server instance, attach all table types and their associated segment list.
-      Map<ServerInstance, Pair<List<String>, List<String>>> segmentsMap = routingTable.getServerInstanceToSegmentsMap();
-      for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> serverEntry : segmentsMap.entrySet()) {
-        Map<String, List<String>> tableTypeToSegmentListMap =
-            serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
-        // TODO: support optional segments for multi-stage engine.
-        Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getLeft()) == null,
-            "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
-      }
-
-      // attach unavailable segments to metadata
-      if (!routingTable.getUnavailableSegments().isEmpty()) {
-        metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
-      }
-    }
-    int workerId = 0;
-    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
-    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
-    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : serverInstanceToSegmentsMap.entrySet()) {
-      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
-      workerIdToSegmentsMap.put(workerId, entry.getValue());
-      workerId++;
-    }
-    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
-    metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
-  }
-
-  /**
-   * Acquire routing table for items listed in {@link TableScanNode}.
-   *
-   * @param tableName table name with or without type suffix.
-   * @return keyed-map from table type(s) to routing table(s).
-   */
-  private Map<String, RoutingTable> getRoutingTable(String tableName, long requestId) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    Map<String, RoutingTable> routingTableMap = new HashMap<>();
-    RoutingTable routingTable;
-    if (tableType == null) {
-      routingTable = getRoutingTable(rawTableName, TableType.OFFLINE, requestId);
-      if (routingTable != null) {
-        routingTableMap.put(TableType.OFFLINE.name(), routingTable);
-      }
-      routingTable = getRoutingTable(rawTableName, TableType.REALTIME, requestId);
-      if (routingTable != null) {
-        routingTableMap.put(TableType.REALTIME.name(), routingTable);
-      }
-    } else {
-      routingTable = getRoutingTable(tableName, tableType, requestId);
-      if (routingTable != null) {
-        routingTableMap.put(tableType.name(), routingTable);
-      }
-    }
-    return routingTableMap;
-  }
-
-  private RoutingTable getRoutingTable(String tableName, TableType tableType, long requestId) {
-    String tableNameWithType =
-        TableNameBuilder.forType(tableType).tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
-    return _routingManager.getRoutingTable(
-        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + tableNameWithType), requestId);
-  }
-
-  private void assignWorkersToPartitionedLeafFragment(DispatchablePlanMetadata metadata,
-      DispatchablePlanContext context, String partitionKey, Map<String, String> tableOptions) {
-    // when partition key exist, we assign workers for leaf-stage in partitioned fashion.
-
-    String numPartitionsStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
-    Preconditions.checkState(numPartitionsStr != null, "'%s' must be provided for partition key: %s",
-        PinotHintOptions.TableHintOptions.PARTITION_SIZE, partitionKey);
-    int numPartitions = Integer.parseInt(numPartitionsStr);
-    Preconditions.checkState(numPartitions > 0, "'%s' must be positive, got: %s",
-        PinotHintOptions.TableHintOptions.PARTITION_SIZE, numPartitions);
-
-    // TODO: make enum of partition functions that are supported.
-    String partitionFunction = tableOptions.getOrDefault(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION,
-        _defaultPartitionFunc);
-
-    String partitionParallelismStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
-    int partitionParallelism = partitionParallelismStr != null ? Integer.parseInt(partitionParallelismStr) : 1;
-    Preconditions.checkState(partitionParallelism > 0, "'%s' must be positive: %s, got: %s",
-        PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM, partitionParallelism);
-
-    String tableName = metadata.getScannedTables().get(0);
-    ColocatedTableInfo colocatedTableInfo =
-        getColocatedTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
-
-    // Pick one server per partition
-    // NOTE: Pick server based on the request id so that the same server is picked across different table scan when the
-    //       segments for the same partition is colocated
-    long indexToPick = context.getRequestId();
-    ColocatedPartitionInfo[] partitionInfoMap = colocatedTableInfo._partitionInfoMap;
-    int workerId = 0;
-    Map<Integer, QueryServerInstance> workedIdToServerInstanceMap = new HashMap<>();
-    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
-    Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
-    for (int i = 0; i < numPartitions; i++) {
-      ColocatedPartitionInfo partitionInfo = partitionInfoMap[i];
-      // TODO: Currently we don't support the case when a partition doesn't contain any segment. The reason is that the
-      //       leaf stage won't be able to directly return empty response.
-      Preconditions.checkState(partitionInfo != null, "Failed to find any segment for table: %s, partition: %s",
-          tableName, i);
-      ServerInstance serverInstance =
-          pickEnabledServer(partitionInfo._fullyReplicatedServers, enabledServerInstanceMap, indexToPick++);
-      Preconditions.checkState(serverInstance != null,
-          "Failed to find enabled fully replicated server for table: %s, partition: %s", tableName, i);
-      workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
-      workerIdToSegmentsMap.put(workerId, getSegmentsMap(partitionInfo));
-      workerId++;
-    }
-    metadata.setWorkerIdToServerInstanceMap(workedIdToServerInstanceMap);
-    metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
-    metadata.setTimeBoundaryInfo(colocatedTableInfo._timeBoundaryInfo);
-    metadata.setPartitionFunction(partitionFunction);
-    metadata.setPartitionParallelism(partitionParallelism);
-  }
-
+  // --------------------------------------------------------------------------
+  // Intermediate stage assign logic
+  // --------------------------------------------------------------------------
   private void assignWorkersToIntermediateFragment(PlanFragment fragment, DispatchablePlanContext context) {
-    List<PlanFragment> children = fragment.getChildren();
-    for (PlanFragment child : children) {
-      assignWorkersToNonRootFragment(child, context);
-    }
-
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
 
@@ -273,6 +115,7 @@ public class WorkerManager {
     // 1. create multiple intermediate stage workers on the same instance for each worker in the first child if the
     //    first child is a table scan. this is b/c we cannot pre-config parallelism on leaf stage thus needs fan-out.
     // 2. ignore partition parallelism when first child is NOT table scan b/c it would've done fan-out already.
+    List<PlanFragment> children = fragment.getChildren();
     DispatchablePlanMetadata firstChildMetadata = children.isEmpty() ? null
         : metadataMap.get(children.get(0).getFragmentId());
     if (firstChildMetadata != null && firstChildMetadata.isPrePartitioned()) {
@@ -372,6 +215,166 @@ public class WorkerManager {
           "No server instance found for intermediate stage for tables: " + Arrays.toString(tableNames.toArray()));
     }
     return serverInstances;
+  }
+
+  private void assignWorkersToLeafFragment(PlanFragment fragment, DispatchablePlanContext context) {
+    DispatchablePlanMetadata metadata = context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId());
+    Map<String, String> tableOptions = metadata.getTableOptions();
+    String partitionKey =
+        tableOptions != null ? tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY) : null;
+    if (partitionKey == null) {
+      // when partition key is not given, we do not partition assign workers for leaf-stage.
+      assignWorkersToNonPartitionedLeafFragment(metadata, context);
+    } else {
+      assignWorkersToPartitionedLeafFragment(metadata, context, partitionKey, tableOptions);
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Non-partitioned leaf stage assignment
+  // --------------------------------------------------------------------------
+  private void assignWorkersToNonPartitionedLeafFragment(DispatchablePlanMetadata metadata,
+      DispatchablePlanContext context) {
+    String tableName = metadata.getScannedTables().get(0);
+    Map<String, RoutingTable> routingTableMap = getRoutingTable(tableName, context.getRequestId());
+    Preconditions.checkState(!routingTableMap.isEmpty(), "Unable to find routing entries for table: %s", tableName);
+
+    // acquire time boundary info if it is a hybrid table.
+    if (routingTableMap.size() > 1) {
+      TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(
+          TableNameBuilder.forType(TableType.OFFLINE)
+              .tableNameWithType(TableNameBuilder.extractRawTableName(tableName)));
+      if (timeBoundaryInfo != null) {
+        metadata.setTimeBoundaryInfo(timeBoundaryInfo);
+      } else {
+        // remove offline table routing if no time boundary info is acquired.
+        routingTableMap.remove(TableType.OFFLINE.name());
+      }
+    }
+
+    // extract all the instances associated to each table type
+    Map<ServerInstance, Map<String, List<String>>> serverInstanceToSegmentsMap = new HashMap<>();
+    for (Map.Entry<String, RoutingTable> routingEntry : routingTableMap.entrySet()) {
+      String tableType = routingEntry.getKey();
+      RoutingTable routingTable = routingEntry.getValue();
+      // for each server instance, attach all table types and their associated segment list.
+      Map<ServerInstance, Pair<List<String>, List<String>>> segmentsMap = routingTable.getServerInstanceToSegmentsMap();
+      for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> serverEntry : segmentsMap.entrySet()) {
+        Map<String, List<String>> tableTypeToSegmentListMap =
+            serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
+        // TODO: support optional segments for multi-stage engine.
+        Preconditions.checkState(tableTypeToSegmentListMap.put(tableType, serverEntry.getValue().getLeft()) == null,
+            "Entry for server {} and table type: {} already exist!", serverEntry.getKey(), tableType);
+      }
+
+      // attach unavailable segments to metadata
+      if (!routingTable.getUnavailableSegments().isEmpty()) {
+        metadata.addUnavailableSegments(tableName, routingTable.getUnavailableSegments());
+      }
+    }
+    int workerId = 0;
+    Map<Integer, QueryServerInstance> workerIdToServerInstanceMap = new HashMap<>();
+    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
+    for (Map.Entry<ServerInstance, Map<String, List<String>>> entry : serverInstanceToSegmentsMap.entrySet()) {
+      workerIdToServerInstanceMap.put(workerId, new QueryServerInstance(entry.getKey()));
+      workerIdToSegmentsMap.put(workerId, entry.getValue());
+      workerId++;
+    }
+    metadata.setWorkerIdToServerInstanceMap(workerIdToServerInstanceMap);
+    metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+  }
+
+  /**
+   * Acquire routing table for items listed in {@link TableScanNode}.
+   *
+   * @param tableName table name with or without type suffix.
+   * @return keyed-map from table type(s) to routing table(s).
+   */
+  private Map<String, RoutingTable> getRoutingTable(String tableName, long requestId) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    Map<String, RoutingTable> routingTableMap = new HashMap<>();
+    RoutingTable routingTable;
+    if (tableType == null) {
+      routingTable = getRoutingTable(rawTableName, TableType.OFFLINE, requestId);
+      if (routingTable != null) {
+        routingTableMap.put(TableType.OFFLINE.name(), routingTable);
+      }
+      routingTable = getRoutingTable(rawTableName, TableType.REALTIME, requestId);
+      if (routingTable != null) {
+        routingTableMap.put(TableType.REALTIME.name(), routingTable);
+      }
+    } else {
+      routingTable = getRoutingTable(tableName, tableType, requestId);
+      if (routingTable != null) {
+        routingTableMap.put(tableType.name(), routingTable);
+      }
+    }
+    return routingTableMap;
+  }
+
+  private RoutingTable getRoutingTable(String tableName, TableType tableType, long requestId) {
+    String tableNameWithType =
+        TableNameBuilder.forType(tableType).tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
+    return _routingManager.getRoutingTable(
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM " + tableNameWithType), requestId);
+  }
+
+  // --------------------------------------------------------------------------
+  // Partitioned leaf stage assignment
+  // --------------------------------------------------------------------------
+  private void assignWorkersToPartitionedLeafFragment(DispatchablePlanMetadata metadata,
+      DispatchablePlanContext context, String partitionKey, Map<String, String> tableOptions) {
+    // when partition key exist, we assign workers for leaf-stage in partitioned fashion.
+
+    String numPartitionsStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
+    Preconditions.checkState(numPartitionsStr != null, "'%s' must be provided for partition key: %s",
+        PinotHintOptions.TableHintOptions.PARTITION_SIZE, partitionKey);
+    int numPartitions = Integer.parseInt(numPartitionsStr);
+    Preconditions.checkState(numPartitions > 0, "'%s' must be positive, got: %s",
+        PinotHintOptions.TableHintOptions.PARTITION_SIZE, numPartitions);
+
+    // TODO: make enum of partition functions that are supported.
+    String partitionFunction = tableOptions.getOrDefault(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION,
+        _defaultPartitionFunc);
+
+    String partitionParallelismStr = tableOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
+    int partitionParallelism = partitionParallelismStr != null ? Integer.parseInt(partitionParallelismStr) : 1;
+    Preconditions.checkState(partitionParallelism > 0, "'%s' must be positive: %s, got: %s",
+        PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM, partitionParallelism);
+
+    String tableName = metadata.getScannedTables().get(0);
+    ColocatedTableInfo colocatedTableInfo =
+        getColocatedTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
+
+    // Pick one server per partition
+    // NOTE: Pick server based on the request id so that the same server is picked across different table scan when the
+    //       segments for the same partition is colocated
+    long indexToPick = context.getRequestId();
+    ColocatedPartitionInfo[] partitionInfoMap = colocatedTableInfo._partitionInfoMap;
+    int workerId = 0;
+    Map<Integer, QueryServerInstance> workedIdToServerInstanceMap = new HashMap<>();
+    Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
+    Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
+    for (int i = 0; i < numPartitions; i++) {
+      ColocatedPartitionInfo partitionInfo = partitionInfoMap[i];
+      // TODO: Currently we don't support the case when a partition doesn't contain any segment. The reason is that the
+      //       leaf stage won't be able to directly return empty response.
+      Preconditions.checkState(partitionInfo != null, "Failed to find any segment for table: %s, partition: %s",
+          tableName, i);
+      ServerInstance serverInstance =
+          pickEnabledServer(partitionInfo._fullyReplicatedServers, enabledServerInstanceMap, indexToPick++);
+      Preconditions.checkState(serverInstance != null,
+          "Failed to find enabled fully replicated server for table: %s, partition: %s", tableName, i);
+      workedIdToServerInstanceMap.put(workerId, new QueryServerInstance(serverInstance));
+      workerIdToSegmentsMap.put(workerId, getSegmentsMap(partitionInfo));
+      workerId++;
+    }
+    metadata.setWorkerIdToServerInstanceMap(workedIdToServerInstanceMap);
+    metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+    metadata.setTimeBoundaryInfo(colocatedTableInfo._timeBoundaryInfo);
+    metadata.setPartitionFunction(partitionFunction);
+    metadata.setPartitionParallelism(partitionParallelism);
   }
 
   private ColocatedTableInfo getColocatedTableInfo(String tableName, String partitionKey, int numPartitions,
@@ -502,7 +505,7 @@ public class WorkerManager {
     final List<String> _offlineSegments;
     final List<String> _realtimeSegments;
 
-    public ColocatedPartitionInfo(Set<String> fullyReplicatedServers, @Nullable List<String> offlineSegments,
+    ColocatedPartitionInfo(Set<String> fullyReplicatedServers, @Nullable List<String> offlineSegments,
         @Nullable List<String> realtimeSegments) {
       _fullyReplicatedServers = fullyReplicatedServers;
       _offlineSegments = offlineSegments;
