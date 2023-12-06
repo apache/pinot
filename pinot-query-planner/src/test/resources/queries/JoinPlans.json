@@ -524,7 +524,7 @@
       {
         "description": "Incorrect table",
         "sql": "EXPLAIN PLAN FOR SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3",
-        "expectedException": "Error explain query plan for.*"
+        "expectedException": ".*Table 'b' not found.*"
       }
     ]
   }

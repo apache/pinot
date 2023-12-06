@@ -154,7 +154,7 @@
       {
         "description": "select non-exist literal function",
         "sql": "EXPLAIN PLAN FOR Select nonExistFun(1,2) FROM a",
-        "expectedException": "Error explain query plan for.*"
+        "expectedException": ".*No match found for function signature nonExistFun.*"
       }
     ]
   }
