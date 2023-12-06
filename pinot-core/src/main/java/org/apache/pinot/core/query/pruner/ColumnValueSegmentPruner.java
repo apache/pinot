@@ -117,7 +117,7 @@ public class ColumnValueSegmentPruner extends ValueBasedSegmentPruner {
     if (partitionFunction != null) {
       Set<Integer> partitions = dataSourceMetadata.getPartitions();
       assert partitions != null;
-      if (!partitions.contains(partitionFunction.getPartition(value))) {
+      if (!partitions.contains(partitionFunction.getValueToPartition(value))) {
         return true;
       }
     }

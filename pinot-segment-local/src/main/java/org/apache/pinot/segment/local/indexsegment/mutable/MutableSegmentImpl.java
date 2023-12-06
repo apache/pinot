@@ -680,13 +680,12 @@ public class MutableSegmentImpl implements MutableSegment {
       if (fieldSpec.isSingleValueField()) {
         // Check partitions
         if (column.equals(_partitionColumn)) {
-          Object valueToPartition = (dataType == BYTES) ? new ByteArray((byte[]) value) : value;
-          int partition = _partitionFunction.getPartition(valueToPartition);
+          int partition = _partitionFunction.getValueToPartition(value);
           if (partition != _mainPartitionId) {
             if (indexContainer._partitions.add(partition)) {
               // for every partition other than mainPartitionId, log a warning once
               _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column,
-                  valueToPartition);
+                  value);
             }
             // always emit a metric when a partition other than mainPartitionId is detected
             if (_serverMetrics != null) {

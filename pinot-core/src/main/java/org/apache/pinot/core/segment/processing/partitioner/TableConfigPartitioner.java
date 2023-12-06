@@ -41,6 +41,6 @@ public class TableConfigPartitioner implements Partitioner {
 
   @Override
   public String getPartition(GenericRow genericRow) {
-    return String.valueOf(_partitionFunction.getPartition(genericRow.getValue(_column)));
+    return String.valueOf(_partitionFunction.getValueToPartition(genericRow.getValue(_column)));
   }
 }
