@@ -61,8 +61,10 @@ public class PulsarConfig {
   private final String _tlsTrustCertsFilePath;
 
   private final String _issuerUrl; // OAUTH2 issuer URL example: "https://auth.streamnative.cloud"
-  private final String _credentialsFilePath; // Absolute path of your downloaded key file on the local file system.
-                                             // example: file:///path/to/private_creds_file
+
+  // Absolute path of your downloaded key file on the local file system.
+  // example: file:///path/to/private_creds_file
+  private final String _credentialsFilePath;
   private final String _audience; // Audience for your OAUTH2 client: urn:sn:pulsar:test:test-cluster
 
   // Deprecated since pulsar supports record key extraction
