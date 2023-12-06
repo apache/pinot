@@ -19,6 +19,9 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -61,7 +64,7 @@ public class PulsarConfig {
   private final String _credentialsFilePath; // Absolute path of your downloaded key file on the local file system.
                                              // example: file:///path/to/private_creds_file
   private final String _audience; // Audience for your OAUTH2 client: urn:sn:pulsar:test:test-cluster
-  
+
   // Deprecated since pulsar supports record key extraction
   @Deprecated
   private final boolean _enableKeyValueStitch;
@@ -93,7 +96,27 @@ public class PulsarConfig {
     }
     _issuerUrl = getConfigValue(streamConfigMap, OAUTH_ISSUER_URL);
     _credentialsFilePath = getConfigValue(streamConfigMap, OAUTH_CREDS_FILE_PATH);
+    if (StringUtils.isNotBlank(_credentialsFilePath)) {
+      validateOAuthCredFile();
+    }
     _audience = getConfigValue(streamConfigMap, OAUTH_AUDIENCE);
+  }
+
+  protected void validateOAuthCredFile() {
+    try {
+      URL credFilePathUrl = new URL(_credentialsFilePath);
+      if (!"file".equals(credFilePathUrl.getProtocol())) {
+        throw new IllegalArgumentException("Invalid credentials file path: " + _credentialsFilePath
+            + ". URL protocol must be file://");
+      }
+      File credFile = new File(credFilePathUrl.getPath());
+      if (!credFile.exists()) {
+        throw new IllegalArgumentException("Invalid credentials file path: " + _credentialsFilePath
+            + ". File does not exist.");
+      }
+    } catch (MalformedURLException mue) {
+      throw new IllegalArgumentException("Invalid credentials file path: " + _credentialsFilePath, mue);
+    }
   }
 
   private String getConfigValue(Map<String, String> streamConfigMap, String key) {
