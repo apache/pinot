@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.tenant.TenantRole;
@@ -43,7 +44,7 @@ import org.slf4j.LoggerFactory;
 public class QuickstartRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickstartRunner.class.getName());
   private static final Random RANDOM = new Random();
-  private static final String CLUSTER_NAME = "QuickStartCluster";
+  private final String _clusterName;
 
   private static final int ZK_PORT = 2123;
   private static final String ZK_ADDRESS = "localhost:" + ZK_PORT;
@@ -89,6 +90,8 @@ public class QuickstartRunner {
       int numServers, int numMinions, File tempDir, boolean enableIsolation, AuthProvider authProvider,
       Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData)
       throws Exception {
+    _clusterName = "QuickStartCluster" + UUID.randomUUID().toString().substring(0, 4);
+    System.out.println("Cluster name: " + _clusterName);
     _tableRequests = tableRequests;
     _numControllers = numControllers;
     _numBrokers = numBrokers;
@@ -118,19 +121,47 @@ public class QuickstartRunner {
     zkStarter.execute();
   }
 
+  private void startZookeeper(int zkPort)
+      throws IOException {
+    StartZookeeperCommand zkStarter = new StartZookeeperCommand();
+    zkStarter.setPort(zkPort);
+    zkStarter.setDataDir(new File(_tempDir, DEFAULT_ZK_DIR).getAbsolutePath());
+    zkStarter.execute();
+  }
+
   private void startControllers()
       throws Exception {
     for (int i = 0; i < _numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
-      controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i))
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+      int controllerPort = new Random().nextInt(50_000);
+      System.out.println("controller port: " + controllerPort);
+      controllerStarter.setControllerPort(String.valueOf(controllerPort))
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(_clusterName)
           .setTenantIsolation(_enableTenantIsolation)
           .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
       if (!controllerStarter.execute()) {
         throw new RuntimeException("Failed to start Controller");
       }
-      _controllerPorts.add(DEFAULT_CONTROLLER_PORT + i);
+      _controllerPorts.add(Integer.parseInt(controllerStarter.getControllerPort()));
+    }
+  }
+
+  private void startControllers(int zkPort)
+      throws Exception {
+    for (int i = 0; i < _numControllers; i++) {
+      StartControllerCommand controllerStarter = new StartControllerCommand();
+      int controllerPort = new Random().nextInt(50_000);
+      System.out.println("controller port: " + controllerPort);
+      controllerStarter.setControllerPort(String.valueOf(controllerPort))
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : "localhost:" + zkPort)
+          .setClusterName(_clusterName).setTenantIsolation(_enableTenantIsolation)
+          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
+          .setConfigOverrides(_configOverrides);
+      if (!controllerStarter.execute()) {
+        throw new RuntimeException("Failed to start Controller");
+      }
+      _controllerPorts.add(Integer.parseInt(controllerStarter.getControllerPort()));
     }
   }
 
@@ -138,13 +169,30 @@ public class QuickstartRunner {
       throws Exception {
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
-      brokerStarter.setPort(DEFAULT_BROKER_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
-          .setConfigOverrides(_configOverrides);
+      int brokerPort = new Random().nextInt(50_000);
+      System.out.println("broker port: " + brokerPort);
+      brokerStarter.setPort(brokerPort).setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS)
+          .setClusterName(_clusterName).setConfigOverrides(_configOverrides);
       if (!brokerStarter.execute()) {
         throw new RuntimeException("Failed to start Broker");
       }
-      _brokerPorts.add(DEFAULT_BROKER_PORT + i);
+      _brokerPorts.add(brokerPort + i);
+    }
+  }
+
+  private void startBrokers(int zkPort)
+      throws Exception {
+    for (int i = 0; i < _numBrokers; i++) {
+      StartBrokerCommand brokerStarter = new StartBrokerCommand();
+      int brokerPort = new Random().nextInt(50_000);
+      System.out.println("broker port: " + brokerPort);
+      brokerStarter.setPort(brokerPort)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : "localhost:" + zkPort)
+          .setClusterName(_clusterName).setConfigOverrides(_configOverrides);
+      if (!brokerStarter.execute()) {
+        throw new RuntimeException("Failed to start Broker");
+      }
+      _brokerPorts.add(brokerPort + i);
     }
   }
 
@@ -152,10 +200,30 @@ public class QuickstartRunner {
       throws Exception {
     for (int i = 0; i < _numServers; i++) {
       StartServerCommand serverStarter = new StartServerCommand();
+      int serverPort = new Random().nextInt(50_000);
+      System.out.println("server port: " + serverPort);
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
           .setGrpcPort(DEFAULT_SERVER_GRPC_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(_clusterName)
           .setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
+          .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
+          .setConfigOverrides(_configOverrides);
+      if (!serverStarter.execute()) {
+        throw new RuntimeException("Failed to start Server");
+      }
+    }
+  }
+
+  private void startServers(int zkPort)
+      throws Exception {
+    for (int i = 0; i < _numServers; i++) {
+      StartServerCommand serverStarter = new StartServerCommand();
+      int serverPort = new Random().nextInt(50_000);
+      System.out.println("server port: " + serverPort);
+      serverStarter.setPort(serverPort + i++).setAdminPort(serverPort + i++)
+          .setGrpcPort(serverPort + i++)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : "localhost:" + zkPort)
+          .setClusterName(_clusterName).setDataDir(new File(_tempDir, DEFAULT_SERVER_DATA_DIR + i).getAbsolutePath())
           .setSegmentDir(new File(_tempDir, DEFAULT_SERVER_SEGMENT_DIR + i).getAbsolutePath())
           .setConfigOverrides(_configOverrides);
       if (!serverStarter.execute()) {
@@ -169,7 +237,7 @@ public class QuickstartRunner {
     for (int i = 0; i < _numMinions; i++) {
       StartMinionCommand minionStarter = new StartMinionCommand();
       minionStarter.setMinionPort(DEFAULT_MINION_PORT + i)
-          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(CLUSTER_NAME)
+          .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : ZK_ADDRESS).setClusterName(_clusterName)
           .setConfigOverrides(_configOverrides);
       if (!minionStarter.execute()) {
         throw new RuntimeException("Failed to start Minion");
@@ -192,6 +260,18 @@ public class QuickstartRunner {
     startBrokers();
     startServers();
     startMinions();
+  }
+
+  public void startAll(int zkPort)
+      throws Exception {
+    registerDefaultPinotFS();
+    if (_zkExternalAddress == null) {
+      startZookeeper(zkPort);
+    }
+    startControllers(zkPort);
+    startBrokers(zkPort);
+    startServers(zkPort);
+//    startMinions();
   }
 
   public void stop()
@@ -228,8 +308,8 @@ public class QuickstartRunner {
   public void bootstrapTable()
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
-      if (!new BootstrapTableTool("http", "localhost", _controllerPorts.get(0),
-          request.getBootstrapTableDir(), _authProvider).execute()) {
+      if (!new BootstrapTableTool("http", "localhost", _controllerPorts.get(0), request.getBootstrapTableDir(),
+          _authProvider).execute()) {
         throw new RuntimeException("Failed to bootstrap table with request - " + request);
       }
     }

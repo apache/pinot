@@ -123,22 +123,41 @@ public class ControllerTest {
 
   private int _controllerPort;
   private String _controllerBaseApiUrl;
+  private final Map<Integer, String> _controllerBaseApiUrls = new HashMap<>();
   protected ControllerConf _controllerConfig;
+  protected Map<Integer, ControllerConf> _controllerConfigs = new HashMap<>();
   protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
-
+  protected Map<Integer, ControllerRequestURLBuilder> _controllerRequestURLBuilders = new HashMap<>();
   protected ControllerRequestClient _controllerRequestClient = null;
+
+  protected Map<Integer, ControllerRequestClient> _controllerRequestClients = new HashMap<>();
 
   protected final List<HelixManager> _fakeInstanceHelixManagers = new ArrayList<>();
   protected String _controllerDataDir;
+  protected Map<Integer, String> _controllerDataDirs = new HashMap<>();
+
+  protected Map<Integer, BaseControllerStarter> _controllerStarters = new HashMap<>();
 
   protected BaseControllerStarter _controllerStarter;
+
   protected PinotHelixResourceManager _helixResourceManager;
+  protected Map<Integer, PinotHelixResourceManager> _helixResourceManagers = new HashMap<>();
+
   protected HelixManager _helixManager;
+  protected Map<Integer, HelixManager> _helixManagers = new HashMap<>();
+
   protected HelixAdmin _helixAdmin;
+  protected Map<Integer, HelixAdmin> _helixAdmins = new HashMap<>();
+
   protected HelixDataAccessor _helixDataAccessor;
+  protected Map<Integer, HelixDataAccessor> _helixDataAccessors = new HashMap<>();
+
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected Map<Integer, ZkHelixPropertyStore<ZNRecord>> _propertyStores = new HashMap<>();
 
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
+  private Map<String, ZkStarter.ZookeeperInstance> _zookeeperInstances = new HashMap<>();
+  private String _zkURl;
 
   /**
    * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
@@ -181,15 +200,31 @@ public class ControllerTest {
     return _controllerRequestClient;
   }
 
+  public ControllerRequestClient getControllerRequestClient(int controllerPort) {
+    if (_controllerRequestClients.get(controllerPort) == null) {
+      _controllerRequestClients.put(controllerPort,
+          new ControllerRequestClient(_controllerRequestURLBuilders.get(controllerPort), getHttpClient()));
+    }
+    return _controllerRequestClients.get(controllerPort);
+  }
+
   public void startZk() {
     if (_zookeeperInstance == null) {
       _zookeeperInstance = ZkStarter.startLocalZkServer();
+      _zkURl = _zookeeperInstance.getZkUrl();
     }
   }
 
   public void startZk(int port) {
     if (_zookeeperInstance == null) {
       _zookeeperInstance = ZkStarter.startLocalZkServer(port);
+      _zkURl = _zookeeperInstance.getZkUrl();
+    }
+  }
+
+  public void startZk(String clusterName) {
+    if (_zookeeperInstances.get(clusterName) == null) {
+      _zookeeperInstances.put(clusterName, ZkStarter.startLocalZkServer());
     }
   }
 
@@ -198,6 +233,7 @@ public class ControllerTest {
       if (_zookeeperInstance != null) {
         ZkStarter.stopLocalZkServer(_zookeeperInstance);
         _zookeeperInstance = null;
+        _zkURl = null;
       }
     } catch (Exception e) {
       // Swallow exceptions
@@ -205,7 +241,11 @@ public class ControllerTest {
   }
 
   public String getZkUrl() {
-    return _zookeeperInstance.getZkUrl();
+    return _zkURl;
+  }
+
+  public String getZkUrl(String clusterName) {
+    return _zookeeperInstances.get(clusterName).getZkUrl();
   }
 
   public Map<String, Object> getDefaultControllerConfiguration() {
@@ -226,6 +266,14 @@ public class ControllerTest {
 
   protected void overrideControllerConf(Map<String, Object> properties) {
     // do nothing, to be overridden by tests if they need something specific
+  }
+
+  /**
+   * //overrides controller props with the given overrides, replacing existing (k,v)
+   * @param controllerProps the original controller props
+   * @param overrides the key,val pairs as overrides
+   */
+  protected void overrideControllerConf(Map<String, Object> controllerProps, Map<String, Object> overrides) {
   }
 
   public void startController()
@@ -289,11 +337,76 @@ public class ControllerTest {
     configAccessor.set(scope, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
   }
 
+  public void startController(Map<String, Object> properties, String clusterName, int controllerPort)
+      throws Exception {
+    BaseControllerStarter controllerStarter = _controllerStarters.get(controllerPort);
+    Preconditions.checkState(controllerStarter == null);
+    ControllerConf controllerConfig = new ControllerConf(properties);
+    _controllerConfigs.put(controllerPort, controllerConfig);
+
+    if (StringUtils.isNotBlank(controllerConfig.getControllerPort())) {
+      controllerPort = Integer.parseInt(controllerConfig.getControllerPort());
+    } else if (StringUtils.isNotBlank(controllerConfig.getControllerVipPort())) {
+      controllerPort = Integer.parseInt(controllerConfig.getControllerVipPort());
+    }
+
+    String controllerScheme = "http";
+    if (StringUtils.isNotBlank(controllerConfig.getControllerVipProtocol())) {
+      controllerScheme = controllerConfig.getControllerVipProtocol();
+    }
+
+    _controllerBaseApiUrls.put(controllerPort, controllerScheme + "://localhost:" + controllerPort);
+    _controllerRequestURLBuilders.put(controllerPort,
+        ControllerRequestURLBuilder.baseUrl(controllerScheme + "://localhost:" + controllerPort));
+    _controllerDataDirs.put(controllerPort, controllerConfig.getDataDir());
+
+    controllerStarter = getControllerStarter();
+    _controllerStarters.put(controllerPort, controllerStarter);
+    controllerStarter.init(new PinotConfiguration(properties));
+    controllerStarter.start();
+    PinotHelixResourceManager helixResourceManager = controllerStarter.getHelixResourceManager();
+    HelixManager helixManager = controllerStarter.getHelixControllerManager();
+    ConfigAccessor configAccessor = helixManager.getConfigAccessor();
+    // HelixResourceManager is null in Helix only mode, while HelixManager is null in Pinot only mode.
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(clusterName).build();
+    switch (controllerStarter.getControllerMode()) {
+      case DUAL:
+      case PINOT_ONLY:
+        _helixAdmins.put(controllerPort, helixResourceManager.getHelixAdmin());
+        _propertyStores.put(controllerPort, helixResourceManager.getPropertyStore());
+        // TODO: Enable periodic rebalance per 10 seconds as a temporary work-around for the Helix issue:
+        //       https://github.com/apache/helix/issues/331 and https://github.com/apache/helix/issues/2309.
+        //       Remove this after Helix fixing the issue.
+        configAccessor.set(scope, ClusterConfig.ClusterConfigProperty.REBALANCE_TIMER_PERIOD.name(), "10000");
+        break;
+      case HELIX_ONLY:
+        _helixAdmins.put(controllerPort, helixManager.getClusterManagmentTool());
+        _propertyStores.put(controllerPort, helixManager.getHelixPropertyStore());
+        break;
+      default:
+        break;
+    }
+    // Enable case-insensitive for test cases.
+    configAccessor.set(scope, Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
+    // Set hyperloglog log2m value to 12.
+    configAccessor.set(scope, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
+  }
+
   public void stopController() {
     Preconditions.checkState(_controllerStarter != null);
     _controllerStarter.stop();
     _controllerStarter = null;
     _controllerRequestClient = null;
+    FileUtils.deleteQuietly(new File(_controllerDataDir));
+  }
+
+  public void stopController(int controllerPort) {
+    BaseControllerStarter controllerStarter = _controllerStarters.get(controllerPort);
+    Preconditions.checkState(_controllerStarter != null);
+    controllerStarter.stop();
+    _controllerStarters.remove(controllerPort);
+    _controllerRequestClients.remove(controllerPort);
     FileUtils.deleteQuietly(new File(_controllerDataDir));
   }
 
@@ -642,6 +755,11 @@ public class ControllerTest {
     getControllerRequestClient().addSchema(schema);
   }
 
+  public void addSchema(Schema schema, int controllerPort)
+      throws IOException {
+    getControllerRequestClient(controllerPort).addSchema(schema);
+  }
+
   public void updateSchema(Schema schema)
       throws IOException {
     getControllerRequestClient().updateSchema(schema);
@@ -661,6 +779,11 @@ public class ControllerTest {
   public void addTableConfig(TableConfig tableConfig)
       throws IOException {
     getControllerRequestClient().addTableConfig(tableConfig);
+  }
+
+  public void addTableConfig(TableConfig tableConfig, int controllerPort)
+      throws IOException {
+    getControllerRequestClient(controllerPort).addTableConfig(tableConfig);
   }
 
   public void updateTableConfig(TableConfig tableConfig)

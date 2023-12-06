@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.PinotAdministrator;
@@ -84,16 +85,18 @@ public class RealtimeQuickStart extends QuickStartBase {
     File quickstartTmpDir =
         _setCustomDataDir ? _dataDir : new File(_dataDir, String.valueOf(System.currentTimeMillis()));
     File quickstartRunnerDir = new File(quickstartTmpDir, "quickstart");
+    System.out.println("Datadir: " + quickstartRunnerDir);
     Preconditions.checkState(quickstartRunnerDir.mkdirs());
     List<QuickstartTableRequest> quickstartTableRequests = bootstrapStreamTableDirectories(quickstartTmpDir);
     final QuickstartRunner runner =
-        new QuickstartRunner(quickstartTableRequests, 1, 1, 1, 1, quickstartRunnerDir, getConfigOverrides());
+        new QuickstartRunner(quickstartTableRequests, 1, 1, 3, 0, quickstartRunnerDir, getConfigOverrides());
 
-    startKafka();
-    startAllDataStreams(_kafkaStarter, quickstartTmpDir);
+    int zkPort = new Random().nextInt(50_000);
+//    startKafka(zkPort);
+//    startAllDataStreams(_kafkaStarter, quickstartTmpDir);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker, server and minion *****");
-    runner.startAll();
+    runner.startAll(zkPort);
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
         printStatus(Color.GREEN, "***** Shutting down realtime quick start *****");
@@ -104,15 +107,15 @@ public class RealtimeQuickStart extends QuickStartBase {
       }
     }));
 
-    printStatus(Color.CYAN, "***** Bootstrap all tables *****");
-    runner.bootstrapTable();
-
-    printStatus(Color.CYAN, "***** Waiting for 5 seconds for a few events to get populated *****");
-    Thread.sleep(5000);
-
-    printStatus(Color.YELLOW, "***** Realtime quickstart setup complete *****");
-    runSampleQueries(runner);
-
+//    printStatus(Color.CYAN, "***** Bootstrap all tables *****");
+//    runner.bootstrapTable();
+//
+//    printStatus(Color.CYAN, "***** Waiting for 5 seconds for a few events to get populated *****");
+//    Thread.sleep(5000);
+//
+//    printStatus(Color.YELLOW, "***** Realtime quickstart setup complete *****");
+//    runSampleQueries(runner);
+//
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
   }
 }
