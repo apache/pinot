@@ -88,7 +88,7 @@ spec:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
           periodSeconds: {{ .Values.probes.periodSeconds }}
           httpGet:
-            {{- if .Values.server.probes.livenessProbe.endpoint }}
+            {{- if and .Values.server.probes.livenessProbe .Values.server.probes.livenessProbe.endpoint}}
             path: {{ .Values.server.probes.livenessProbe.endpoint }}
             {{- else }}
             path: {{ .Values.server.probes.endpoint }}
@@ -100,7 +100,7 @@ spec:
           initialDelaySeconds: {{ .Values.probes.initialDelaySeconds }}
           periodSeconds: {{ .Values.probes.periodSeconds }}
           httpGet:
-            {{- if .Values.server.probes.readinessProbe.endpoint }}
+            {{- if and .Values.server.probes.readinessProbe .Values.server.probes.readinessProbe.endpoint}}
             path: {{ .Values.server.probes.readinessProbe.endpoint }}
             {{- else }}
             path: {{ .Values.server.probes.endpoint }}
