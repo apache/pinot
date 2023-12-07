@@ -27,7 +27,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.lucene.search.IndexSearcher;
@@ -59,13 +58,13 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
   private final int _vectorDimension;
   private final VectorSimilarityFunction _vectorSimilarityFunction;
   private final IndexWriter _indexWriter;
-  private final IndexReader _indexReader;
   private final String _vectorColumn;
   private final String _segmentName;
   private final long _commitIntervalMs;
   private final long _commitDocs;
   private final File _indexDir;
 
+  private final FSDirectory _indexDirectory;
   private int _nextDocId;
 
   private long _lastCommitTime;
@@ -83,13 +82,12 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       _indexDir = new File(FileUtils.getTempDirectory(), segmentName);
-      FSDirectory indexDirectory = FSDirectory.open(
+      _indexDirectory = FSDirectory.open(
           new File(_indexDir, _vectorColumn + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION).toPath());
       LOGGER.info("Creating mutable HNSW index for segment: {}, column: {} at path: {} with {}", segmentName,
           vectorColumn, _indexDir.getAbsolutePath(), vectorIndexConfig.getProperties());
-      _indexWriter = new IndexWriter(indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
+      _indexWriter = new IndexWriter(_indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));
       _indexWriter.commit();
-      _indexReader = DirectoryReader.open(indexDirectory);
       _lastCommitTime = System.currentTimeMillis();
     } catch (Exception e) {
       throw new RuntimeException(
@@ -108,7 +106,6 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
     for (int i = 0; i < values.length; i++) {
       floatValues[i] = (Float) values[i];
     }
-
     Document docToIndex = new Document();
     XKnnFloatVectorField xKnnFloatVectorField =
         new XKnnFloatVectorField(_vectorColumn, floatValues, _vectorSimilarityFunction);
@@ -129,10 +126,11 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
 
   @Override
   public MutableRoaringBitmap getDocIds(float[] vector, int topK) {
-    IndexSearcher indexSearcher = new IndexSearcher(_indexReader);
-    Query query = new KnnFloatVectorQuery(_vectorColumn, vector, topK);
-    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    MutableRoaringBitmap docIds;
     try {
+      IndexSearcher indexSearcher = new IndexSearcher(DirectoryReader.open(_indexDirectory));
+      Query query = new KnnFloatVectorQuery(_vectorColumn, vector, topK);
+      docIds = new MutableRoaringBitmap();
       TopDocs search = indexSearcher.search(query, topK);
       Arrays.stream(search.scoreDocs).map(scoreDoc -> scoreDoc.doc).forEach(docIds::add);
     } catch (IOException e) {
@@ -146,7 +144,6 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
     try {
       _indexWriter.commit();
       _indexWriter.close();
-      _indexReader.close();
     } catch (IOException e) {
       throw new RuntimeException(e);
     } finally {

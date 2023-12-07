@@ -23,6 +23,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.zip.GZIPInputStream;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
@@ -337,7 +340,7 @@ public abstract class QuickStartBase {
         break;
       case "fineFoodReviews":
         publishLineSplitFileToKafka("fineFoodReviews",
-            new File(dataDir, "/rawdata/fine_food_reviews_with_embeddings_1k.json"));
+            new File(dataDir, "/rawdata/fine_food_reviews_with_embeddings_1k.json.gz"));
         break;
       default:
         break;
@@ -353,6 +356,14 @@ public abstract class QuickStartBase {
     StreamDataProducer producer =
         StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
     try {
+      if (dataFile.getName().endsWith(".gz")) {
+        File unzippedFile = new File(dataFile.getParentFile(), dataFile.getName().replace(".gz", ""));
+        if (unzippedFile.exists()) {
+          FileUtils.deleteQuietly(unzippedFile);
+        }
+        unGzipFile(dataFile.getAbsolutePath(), unzippedFile.getAbsolutePath());
+        dataFile = unzippedFile;
+      }
       LineIterator dataStream = FileUtils.lineIterator(dataFile);
 
       while (dataStream.hasNext()) {
@@ -360,6 +371,19 @@ public abstract class QuickStartBase {
       }
     } finally {
       producer.close();
+    }
+  }
+
+  public static void unGzipFile(String gzipFile, String outputFile) {
+    byte[] buffer = new byte[1024];
+    try (GZIPInputStream gzis = new GZIPInputStream(new FileInputStream(gzipFile));
+        FileOutputStream out = new FileOutputStream(outputFile)) {
+      int len;
+      while ((len = gzis.read(buffer)) > 0) {
+        out.write(buffer, 0, len);
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
     }
   }
 
@@ -918,7 +942,8 @@ public abstract class QuickStartBase {
         "select ProductId, UserId, l2_distance(embedding, " + vectorArrayLiteral + ") as l2_dist, n_tokens, combined "
             + "from fineFoodReviews "
             + "where VECTOR_SIMILARITY(embedding," + vectorArrayLiteral + ", 5) "
-            + "order by l2_dist ASC ";
+            + "order by l2_dist ASC "
+            + "limit 5";
     printStatus(Quickstart.Color.YELLOW,
         "Search the top 5 most relevant review with the embedding of tomato soup using HNSW index");
     printStatus(Quickstart.Color.CYAN, "Query : " + q7);
