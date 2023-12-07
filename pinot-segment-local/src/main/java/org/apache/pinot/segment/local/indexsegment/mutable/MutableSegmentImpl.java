@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.ints.IntArrays;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -103,6 +104,7 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.FixedIntArray;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.BatchIterator;
@@ -111,6 +113,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.BIG_DECIMAL;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
 
@@ -680,13 +683,20 @@ public class MutableSegmentImpl implements MutableSegment {
       if (fieldSpec.isSingleValueField()) {
         // Check partitions
         if (column.equals(_partitionColumn)) {
-          Object valueToPartition = (dataType == BYTES) ? new ByteArray((byte[]) value) : value;
-          int partition = _partitionFunction.getPartition(valueToPartition);
+          String stringValue;
+          if (dataType == BIG_DECIMAL) {
+            stringValue = ((BigDecimal) value).toPlainString();
+          } else if (dataType == BYTES) {
+            stringValue = BytesUtils.toHexString((byte[]) value);
+          } else {
+            stringValue = value.toString();
+          }
+          int partition = _partitionFunction.getPartition(stringValue);
           if (partition != _mainPartitionId) {
             if (indexContainer._partitions.add(partition)) {
               // for every partition other than mainPartitionId, log a warning once
               _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column,
-                  valueToPartition);
+                  stringValue);
             }
             // always emit a metric when a partition other than mainPartitionId is detected
             if (_serverMetrics != null) {

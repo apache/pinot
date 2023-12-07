@@ -19,9 +19,7 @@
 package org.apache.pinot.segment.spi.partition;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -68,8 +66,6 @@ public class PartitionFunctionTest {
         if (expectedPartition < 0) {
           expectedPartition += numPartitions;
         }
-        assertEquals(partitionFunction.getPartition(value), expectedPartition);
-        assertEquals(partitionFunction.getPartition((long) value), expectedPartition);
         assertEquals(partitionFunction.getPartition(Integer.toString(value)), expectedPartition);
       }
 
@@ -80,7 +76,6 @@ public class PartitionFunctionTest {
         if (expectedPartition < 0) {
           expectedPartition += numPartitions;
         }
-        assertEquals(partitionFunction.getPartition(value), expectedPartition);
         assertEquals(partitionFunction.getPartition(Long.toString(value)), expectedPartition);
       }
     }
@@ -90,7 +85,6 @@ public class PartitionFunctionTest {
    * Unit test for {@link MurmurPartitionFunction}.
    * <ul>
    *   <li> Tests that partition values are in expected range. </li>
-   *   <li> Tests that toString returns expected string. </li>
    * </ul>
    */
   @Test
@@ -109,10 +103,7 @@ public class PartitionFunctionTest {
 
       for (int j = 0; j < NUM_ROUNDS; j++) {
         int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
-        int partition1 = partitionFunction.getPartition(value);
-        int partition2 = partitionFunction.getPartition(Integer.toString(value));
-        assertEquals(partition1, partition2);
-        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+        testPartitionInExpectedRange(partitionFunction, value, numPartitions);
       }
     }
   }
@@ -220,26 +211,26 @@ public class PartitionFunctionTest {
         int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
 
         // check for the partition function with functionConfig as null.
-        testToStringAndPartitionNumber(partitionFunction1, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction1, value, numPartitions);
 
         // check for the partition function with non-null functionConfig but without seed value.
-        testToStringAndPartitionNumber(partitionFunction2, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction2, value, numPartitions);
 
         // check for the partition function with non-null functionConfig and with seed value.
-        testToStringAndPartitionNumber(partitionFunction3, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction3, value, numPartitions);
 
         // check for the partition function with non-null functionConfig and with seed value and variant.
-        testToStringAndPartitionNumber(partitionFunction4, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction4, value, numPartitions);
 
         // check for the partition function with non-null functionConfig and with explicitly provided default seed
         // value and variant.
-        testToStringAndPartitionNumber(partitionFunction5, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction5, value, numPartitions);
 
         // check for the partition function with non-null functionConfig and with empty seed value and default variant.
-        testToStringAndPartitionNumber(partitionFunction6, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction6, value, numPartitions);
 
         // check for the partition function with non-null functionConfig and with empty seed value and empty variant.
-        testToStringAndPartitionNumber(partitionFunction7, value, numPartitions);
+        testPartitionInExpectedRange(partitionFunction7, value, numPartitions);
       }
     }
   }
@@ -247,50 +238,18 @@ public class PartitionFunctionTest {
   @Test
   public void testMurmur3Equivalence() {
 
-    // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
-    // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 0 to those values and stored in
-    // expectedMurmurValuesFor32BitX64WithZeroSeedForByteArray.
-    int[] expectedMurmurValuesFor32BitX64WithZeroSeedForByteArray = new int[]{
-        -1569442405, -921191038, 16439113, -881572510, 2111401876, 655879980, 1409856380, -1348364123, -1770645361,
-        1277101955
-    };
-
-    // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
-    // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 9001 to those values and
-    // stored in expectedMurmurValuesFor32BitX64WithNonZeroSeedForByteArray.
-    int[] expectedMurmurValuesFor32BitX64WithNonZeroSeedForByteArray = new int[]{
-        698083240, 174075836, -938825597, 155806634, -831733828, 319389887, -939822329, -1785781936, -1796939240,
-        757512622
-    };
-
-    // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
-    // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 0 to those values and stored in
-    // expectedMurmurValuesFor32BitX64WithZeroSeedForLongArray.
-    int[] expectedMurmurValuesFor32BitX64WithZeroSeedForLongArray = new int[]{
-        -621156783, -1341356662, 1615513844, 1608247599, -1339558745, -1782606270, 1204009437, 8939246, -42073819,
-        1268621125
-    };
-
-    // 10 values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
-    // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 9001 to those values and
-    // stored in expectedMurmurValuesFor32BitX64WithNonZeroSeedForLongArray.
-    int[] expectedMurmurValuesFor32BitX64WithNonZeroSeedForLongArray = new int[]{
-        -159780599, 1266925141, -2039451704, 237323842, -1373894107, -1718192521, 314068498, 1377198162, 1239340429,
-        -1643307044
-    };
-
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_64_String with seed = 0, applied right shift
-    // on 32 bits to those values and stored in expectedMurmurValuesFor32BitX64WithZeroSeedForString.
-    int[] expectedMurmurValuesFor32BitX64WithZeroSeedForString = new int[]{
+    // on 32 bits to those values and stored in expectedMurmurValuesFor32BitX64WithZeroSeed.
+    int[] expectedMurmurValuesFor32BitX64WithZeroSeed = new int[]{
         -930531654, 1010637996, -1251084035, -1551293561, 1591443335, 181872103, 1308755538, -432310401, -701537488,
         674867586
     };
 
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_64_String with seed = 0, applied right shift
-    // on 32 bits those values and stored in expectedMurmurValuesFor32BitX64WithNonZeroSeedForString.
-    int[] expectedMurmurValuesFor32BitX64WithNonZeroSeedForString = new int[]{
+    // on 32 bits those values and stored in expectedMurmurValuesFor32BitX64WithNonZeroSeed.
+    int[] expectedMurmurValuesFor32BitX64WithNonZeroSeed = new int[]{
         1558697417, 933581816, 1071120824, 1964512897, 1629803052, 2037246152, -1867319466, -1003065762, -275998120,
         1386652858
     };
@@ -311,44 +270,23 @@ public class PartitionFunctionTest {
         -19253806
     };
 
-    // Test for 32 bit murmur3 hash with x64_64 variant and seed = 0 for byte array.
-    testMurmur3HashEquivalenceForDifferentDataTypes(0, expectedMurmurValuesFor32BitX64WithZeroSeedForByteArray,
-        "byteArray", "x64_32");
-
-    // Test for 32 bit murmur3 hash with x64_64 variant and seed = 9001 for byte array.
-    testMurmur3HashEquivalenceForDifferentDataTypes(9001, expectedMurmurValuesFor32BitX64WithNonZeroSeedForByteArray,
-        "byteArray", "x64_32");
-
-    // Test for 32 bit murmur3 hash with x64_64 variant and seed = 0 for long array.
-    testMurmur3HashEquivalenceForDifferentDataTypes(0, expectedMurmurValuesFor32BitX64WithZeroSeedForLongArray,
-        "longArray", "x64_32");
-
-    // Test for 32 bit murmur3 hash with x64_64 variant and seed = 9001 for long array.
-    testMurmur3HashEquivalenceForDifferentDataTypes(9001, expectedMurmurValuesFor32BitX64WithNonZeroSeedForLongArray,
-        "longArray", "x64_32");
-
     // Test for 64 bit murmur3 hash with x64_64 variant and seed = 0 for String.
-    testMurmur3HashEquivalenceForDifferentDataTypes(0, expectedMurmurValuesFor32BitX64WithZeroSeedForString, "String",
-        "x64_32");
+    testMurmur3Hash(0, expectedMurmurValuesFor32BitX64WithZeroSeed, true);
 
     // Test for 64 bit murmur3 hash with x64_64 variant and seed = 9001 for String.
-    testMurmur3HashEquivalenceForDifferentDataTypes(9001, expectedMurmurValuesFor32BitX64WithNonZeroSeedForString,
-        "String", "x64_32");
+    testMurmur3Hash(9001, expectedMurmurValuesFor32BitX64WithNonZeroSeed, true);
 
     // Test for 32 bit murmur3 hash with x86_32 variant and seed = 0 for byte array.
-    testMurmur3HashEquivalenceForDifferentDataTypes(0, expectedMurmurValuesFor32BitX86WithZeroSeed, "byteArray",
-        "x86_32");
+    testMurmur3Hash(0, expectedMurmurValuesFor32BitX86WithZeroSeed, false);
 
     // Test for 32 bit murmur3 hash with x86_32 variant and seed = 9001 for byte array.
-    testMurmur3HashEquivalenceForDifferentDataTypes(9001, expectedMurmurValuesFor32BitX86WithNonZeroSeed, "byteArray",
-        "x86_32");
+    testMurmur3Hash(9001, expectedMurmurValuesFor32BitX86WithNonZeroSeed, false);
   }
 
   /**
    * Unit test for {@link MurmurPartitionFunction}.
    * <ul>
    *   <li> Tests that partition values are in expected range. </li>
-   *   <li> Tests that toString returns expected string. </li>
    * </ul>
    */
   @Test
@@ -367,10 +305,7 @@ public class PartitionFunctionTest {
 
       for (int j = 0; j < NUM_ROUNDS; j++) {
         int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
-        int partition1 = partitionFunction.getPartition(value);
-        int partition2 = partitionFunction.getPartition(Integer.toString(value));
-        assertEquals(partition1, partition2);
-        assertTrue(partition1 >= 0 && partition1 < numPartitions);
+        testPartitionInExpectedRange(partitionFunction, value, numPartitions);
       }
     }
   }
@@ -394,7 +329,6 @@ public class PartitionFunctionTest {
         int value = j == 0 ? Integer.MIN_VALUE : random.nextInt();
         int hashCode = Integer.toString(value).hashCode();
         int expectedPartition = ((hashCode == Integer.MIN_VALUE) ? 0 : Math.abs(hashCode)) % numPartitions;
-        assertEquals(partitionFunction.getPartition(value), expectedPartition);
         assertEquals(partitionFunction.getPartition(Integer.toString(value)), expectedPartition);
       }
 
@@ -403,7 +337,6 @@ public class PartitionFunctionTest {
         double value = j == 0 ? Double.NEGATIVE_INFINITY : random.nextDouble();
         int hashCode = Double.toString(value).hashCode();
         int expectedPartition = ((hashCode == Integer.MIN_VALUE) ? 0 : Math.abs(hashCode)) % numPartitions;
-        assertEquals(partitionFunction.getPartition(value), expectedPartition);
         assertEquals(partitionFunction.getPartition(Double.toString(value)), expectedPartition);
       }
     }
@@ -467,17 +400,13 @@ public class PartitionFunctionTest {
     long seed = 100;
     Random random = new Random(seed);
 
-    int numPartitions = 5;
-    MurmurPartitionFunction murmurPartitionFunction = new MurmurPartitionFunction(numPartitions);
-
     // Generate the same values as above - 10 random values of size 7, using {@link Random::nextBytes} with seed 100
     // Apply {@link MurmurPartitionFunction::murmur2
     // compare with stored results
-    byte[] array = new byte[7];
+    byte[] bytes = new byte[7];
     for (int expectedMurmurValue : expectedMurmurValues) {
-      random.nextBytes(array);
-      int actualMurmurValue = murmurPartitionFunction.murmur2(array);
-      assertEquals(actualMurmurValue, expectedMurmurValue);
+      random.nextBytes(bytes);
+      assertEquals(MurmurPartitionFunction.murmur2(bytes), expectedMurmurValue);
     }
   }
 
@@ -501,7 +430,7 @@ public class PartitionFunctionTest {
 
     // generate the same 10 String values
     // Apply the partition function and compare with stored results
-    testPartitionFunctionEquivalence(murmurPartitionFunction, expectedPartitions);
+    testPartitionFunction(murmurPartitionFunction, expectedPartitions);
   }
 
   @Test
@@ -510,29 +439,15 @@ public class PartitionFunctionTest {
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 0 to those values and stored in
     // expectedMurmurValuesFor32BitX64WithZeroSeed.
-    int[] expectedPartitions32BitsX64WithZeroSeedForByteArrayAndString = new int[]{
+    int[] expectedPartitions32BitsX64WithZeroSeed = new int[]{
         4, 1, 3, 2, 0, 3, 3, 2, 0, 1
     };
 
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
     // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 9001 to those values and
     // stored in expectedMurmurValuesFor32BitX64WithZeroSeed.
-    int[] expectedPartitions32BitsX64WithNonZeroSeedForByteArrayAndString = new int[]{
+    int[] expectedPartitions32BitsX64WithNonZeroSeed = new int[]{
         2, 1, 4, 2, 2, 2, 2, 1, 3, 3
-    };
-
-    // 10 long[] values of size 10, were randomly generated, using {@link Random::nextLong} with seed 100
-    // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 0 to those values and stored in
-    // expectedPartitions32BitsX64WithZeroSeedForLongArray.
-    int[] expectedPartitions32BitsX64WithZeroSeedForLongArray = new int[]{
-        0, 1, 4, 4, 3, 3, 2, 1, 4, 0
-    };
-
-    // 10 long[] values of size 10, were randomly generated, using {@link Random::nextLong} with seed 100
-    // Applied org.infinispan.commons.hash.MurmurHash3::MurmurHash3_x64_32 with seed = 0 to those values and stored in
-    // expectedPartitions32BitsX64WithNonZeroSeedForLongArray.
-    int[] expectedPartitions32BitsX64WithNonZeroSeedForLongArray = new int[]{
-        4, 1, 4, 2, 1, 2, 3, 2, 4, 4
     };
 
     // 10 String values of size 7, were randomly generated, using {@link Random::nextBytes} with seed 100
@@ -575,22 +490,13 @@ public class PartitionFunctionTest {
     // Generate the same 10 String values. Test if the calculated values are equal for both String and byte[] (they
     // should be equal when String is converted to byte[]) and if the values are equal to the expected values for the
     // x64_32 variant with seed = 0 and x64_32 variant with seed = 9001.
-    testPartitionFunctionEquivalenceWithStringAndByteArray(murmur3PartitionFunction1,
-        expectedPartitions32BitsX64WithZeroSeedForByteArrayAndString);
-    testPartitionFunctionEquivalenceWithStringAndByteArray(murmur3PartitionFunction2,
-        expectedPartitions32BitsX64WithNonZeroSeedForByteArrayAndString);
-
-    // Generate the same 10 long[] values. Test if the calculated values are equal to the expected values for the x64_32
-    // variant with seed = 0 and x64_32 variant with seed = 9001.
-    testPartitionFunctionEquivalenceWithLongArray(murmur3PartitionFunction1,
-        expectedPartitions32BitsX64WithZeroSeedForLongArray);
-    testPartitionFunctionEquivalenceWithLongArray(murmur3PartitionFunction2,
-        expectedPartitions32BitsX64WithNonZeroSeedForLongArray);
+    testPartitionFunction(murmur3PartitionFunction1, expectedPartitions32BitsX64WithZeroSeed);
+    testPartitionFunction(murmur3PartitionFunction2, expectedPartitions32BitsX64WithNonZeroSeed);
 
     // Generate the same 10 String values. Test if the calculated values are equal to the expected values for the x86_32
     // variant with seed = 0 and x86_32 variant with seed = 9001.
-    testPartitionFunctionEquivalence(murmur3PartitionFunction3, expectedPartitions32BitsX86WithZeroSeed);
-    testPartitionFunctionEquivalence(murmur3PartitionFunction4, expectedPartitions32BitsX86WithNonZeroSeed);
+    testPartitionFunction(murmur3PartitionFunction3, expectedPartitions32BitsX86WithZeroSeed);
+    testPartitionFunction(murmur3PartitionFunction4, expectedPartitions32BitsX86WithNonZeroSeed);
   }
 
   /**
@@ -609,132 +515,43 @@ public class PartitionFunctionTest {
 
     // generate the same 10 String values
     // Apply the partition function and compare with stored results
-    testPartitionFunctionEquivalence(byteArrayPartitionFunction, expectedPartitions);
+    testPartitionFunction(byteArrayPartitionFunction, expectedPartitions);
   }
 
-  private void testPartitionFunctionEquivalence(PartitionFunction partitionFunction, int[] expectedPartitions) {
+  private void testPartitionInExpectedRange(PartitionFunction partitionFunction, Object value, int numPartitions) {
+    int partition = partitionFunction.getPartition(value.toString());
+    assertTrue(partition >= 0 && partition < numPartitions);
+  }
+
+  private void testPartitionFunction(PartitionFunction partitionFunction, int[] expectedPartitions) {
     long seed = 100;
     Random random = new Random(seed);
 
     // Generate 10 random String values of size 7, using {@link Random::nextBytes} with seed 100
     // Apply given partition function
     // compare with expectedPartitions
-    byte[] array = new byte[7];
-    for (int expectedPartition : expectedPartitions) {
-      random.nextBytes(array);
-      String nextString = new String(array, UTF_8);
-      int actualPartition = partitionFunction.getPartition(nextString);
-      assertEquals(actualPartition, expectedPartition);
-    }
-  }
-
-  private void testPartitionFunctionEquivalenceWithStringAndByteArray(PartitionFunction partitionFunction,
-      int[] expectedPartitions) {
-    long seed = 100;
-    Random random = new Random(seed);
-
-    // Generate 10 random String values of size 7, using {@link Random::nextBytes} with seed 100
-    // Apply given partition function
-    // compare with expectedPartitions
-    byte[] array = new byte[7];
+    byte[] bytes = new byte[7];
     for (int expectedPartitionNumber : expectedPartitions) {
-      random.nextBytes(array);
-      String nextString = new String(array, UTF_8);
-      int actualPartitionNumberFromString = partitionFunction.getPartition(nextString);
-      int actualPartitionNumberFromByteArray = partitionFunction.getPartition(nextString.getBytes(UTF_8));
-      assertEquals(actualPartitionNumberFromString, actualPartitionNumberFromByteArray);
-      assertEquals(actualPartitionNumberFromString, expectedPartitionNumber);
+      random.nextBytes(bytes);
+      String nextString = new String(bytes, UTF_8);
+      assertEquals(partitionFunction.getPartition(nextString), expectedPartitionNumber);
     }
   }
 
-  private void testPartitionFunctionEquivalenceWithLongArray(PartitionFunction partitionFunction,
-      int[] expectedPartitions) {
-    int seed = 100;
+  private void testMurmur3Hash(int hashSeed, int[] expectedHashValues, boolean useX64) {
+    long seed = 100;
     Random random = new Random(seed);
 
-    // Create a list of 10 long[] values using ArrayList, each of size 10.
-    List<long[]> longList = new ArrayList<>();
-
-    for (int i = 0; i < 10; i++) {
-      long[] longArray = new long[10];
-      for (int j = 0; j < 10; j++) {
-        longArray[j] = random.nextLong();
-      }
-      longList.add(longArray);
+    // Generate 10 random String values of size 7, using {@link Random::nextBytes} with seed 100
+    // Apply given partition function
+    // compare with expectedPartitions
+    byte[] bytes = new byte[7];
+    for (int expectedHashValue : expectedHashValues) {
+      random.nextBytes(bytes);
+      String nextString = new String(bytes, UTF_8);
+      int actualHashValue = useX64 ? Murmur3PartitionFunction.murmur3Hash32BitsX64(nextString, hashSeed)
+          : Murmur3PartitionFunction.murmur3Hash32BitsX86(bytes, hashSeed);
+      assertEquals(actualHashValue, expectedHashValue);
     }
-
-    // Apply the partition function and compare with expected values.
-    for (int i = 0; i < 10; i++) {
-      int actualPartitionNumberFromLongArray = partitionFunction.getPartition(longList.get(i));
-      assertEquals(actualPartitionNumberFromLongArray, expectedPartitions[i]);
-    }
-  }
-
-  private void testMurmur3HashEquivalenceForDifferentDataTypes(int hashSeed, int[] expectedHashValues, String dataType,
-      String variant) {
-    long seed = 100;
-    Random random;
-    int numPartitions = 5;
-    Murmur3PartitionFunction murmur3PartitionFunction = new Murmur3PartitionFunction(numPartitions, null);
-
-    switch (dataType.toLowerCase()) {
-      case "string":
-        // Generate 10 random String values of size 7, using {@link Random::nextBytes} with seed 100
-        // Apply given partition function
-        // compare with expectedPartitions
-        random = new Random(seed);
-        byte[] array1 = new byte[7];
-        for (int expectedHashValue : expectedHashValues) {
-          random.nextBytes(array1);
-          String nextString = new String(array1, UTF_8);
-          int actualHashValueFromString = murmur3PartitionFunction.murmur3Hash32BitsX64(nextString, hashSeed);
-          assertEquals(actualHashValueFromString, expectedHashValue);
-        }
-        break;
-      case "bytearray":
-        // Generate 10 random String values of size 7, using {@link Random::nextBytes} with seed 100
-        // Apply given partition function
-        // compare with expectedPartitions
-        random = new Random(seed);
-        int actualHashValueFromByteArray;
-        byte[] array2 = new byte[7];
-        for (int expectedHashValue : expectedHashValues) {
-          random.nextBytes(array2);
-          if (variant.equals("x64_32")) {
-            actualHashValueFromByteArray = murmur3PartitionFunction.murmur3Hash32BitsX64(array2, hashSeed);
-          } else {
-            actualHashValueFromByteArray = murmur3PartitionFunction.murmur3Hash32BitsX86(array2, hashSeed);
-          }
-          assertEquals(actualHashValueFromByteArray, expectedHashValue);
-        }
-        break;
-      case "longarray":
-        random = new Random(seed);
-        // Create a list of 10 long[] values using ArrayList, each of size 10.
-        List<long[]> longList = new ArrayList<>();
-
-        for (int i = 0; i < 10; i++) {
-          long[] longArray = new long[10];
-          for (int j = 0; j < 10; j++) {
-            longArray[j] = random.nextLong();
-          }
-          longList.add(longArray);
-        }
-
-        // Apply the partition function and compare with expected values.
-        for (int i = 0; i < 10; i++) {
-          int actualHashValueFromLongArray = murmur3PartitionFunction.murmur3Hash32BitsX64(longList.get(i), hashSeed);
-          assertEquals(actualHashValueFromLongArray, expectedHashValues[i]);
-        }
-        break;
-        default:
-    }
-  }
-  private void testToStringAndPartitionNumber(PartitionFunction partitionFunction, int testValueForGetPartition,
-      int numPartitions) {
-    int partition1 = partitionFunction.getPartition(testValueForGetPartition);
-    int partition2 = partitionFunction.getPartition(Integer.toString(testValueForGetPartition));
-    assertEquals(partition1, partition2);
-    assertTrue(partition1 >= 0 && partition1 < numPartitions);
   }
 }
