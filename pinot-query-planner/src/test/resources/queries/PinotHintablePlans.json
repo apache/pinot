@@ -3,22 +3,22 @@
     "queries": [
       {
         "description": "hint table without partitioning should throw exception",
-        "sql": "EXPLAIN PLAN FOR SELECT * FROM d /*+ tableOptions(partition_key='col1', partition_size='4') */ LIMIT 10",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ LIMIT 10",
         "expectedException": ".*Failed to find table partition info.*"
       },
       {
         "description": "hint table with partition on wrong key should throw exception",
-        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col1', partition_size='4') */ LIMIT 10",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ LIMIT 10",
         "expectedException": ".*Partition key: col1 does not match partition column: col2.*"
       },
       {
         "description": "hint table with partition on wrong size should throw exception",
-        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col2', partition_size='2') */ LIMIT 10",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='2') */ LIMIT 10",
         "expectedException": ".*Partition size mismatch \\(hint: 2, table: 4\\).*"
       },
       {
         "description": "hint table with partition on wrong function should throw exception",
-        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_key='col2', partition_size='4', partition_function='murmur') */ LIMIT 10",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a /*+ tableOptions(partition_function='murmur', partition_key='col2', partition_size='4') */ LIMIT 10",
         "expectedException": ".*Partition function mismatch \\(hint: murmur, table: Hashcode\\).*"
       },
       {
@@ -192,7 +192,7 @@
     "queries": [
       {
         "description": "join with colocated tables",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col2, a.col3, b.col3 FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */ ON a.col2 = b.col1 WHERE b.col3 > 0",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, a.col3, b.col3 FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ ON a.col2 = b.col1 WHERE b.col3 > 0",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col2=[$0], col3=[$1], col30=[$3])",
@@ -209,7 +209,7 @@
       },
       {
         "description": "group by with pre-partitioned tables on partition column",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ GROUP BY 1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -221,7 +221,7 @@
       },
       {
         "description": "group by with pre-partitioned tables on non-partition column",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ GROUP BY 1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -233,7 +233,7 @@
       },
       {
         "description": "join with colocated tables then group-by left join key column",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */ ON a.col2 = b.col1 WHERE b.col3 > 0 GROUP BY 1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ ON a.col2 = b.col1 WHERE b.col3 > 0 GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -252,7 +252,7 @@
       },
       {
         "description": "join with colocated tables then group-by left join key column and other columns",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col2, b.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */ ON a.col2 = b.col1 WHERE b.col3 > 0 GROUP BY 1, 2",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, b.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ ON a.col2 = b.col1 WHERE b.col3 > 0 GROUP BY 1, 2",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
@@ -271,7 +271,7 @@
       },
       {
         "description": "join with colocated tables then group-by other columns",
-        "sql": "EXPLAIN PLAN FOR SELECT b.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */ ON a.col2 = b.col1 WHERE b.col3 > 0 GROUP BY 1",
+        "sql": "EXPLAIN PLAN FOR SELECT b.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ ON a.col2 = b.col1 WHERE b.col3 > 0 GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -290,7 +290,7 @@
       },
       {
         "description": "agg + semi-join on colocated tables then group by on partition column",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -308,7 +308,7 @@
       },
       {
         "description": "agg + semi-join on pre-partitioned main tables then group by on partition column",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b WHERE b.col3 > 0) GROUP BY 1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b WHERE b.col3 > 0) GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -326,7 +326,7 @@
       },
       {
         "description": "agg + semi-join on pre-partitioned main tables then group by on non-partitioned column",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b WHERE b.col3 > 0) GROUP BY 1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b WHERE b.col3 > 0) GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -344,7 +344,7 @@
       },
       {
         "description": "agg + semi-join on pre-partitioned main tables with group by on partitioned column on semi table",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */ WHERE b.col3 > 0 GROUP BY 1 HAVING COUNT(*) > 1) GROUP BY 1",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0 GROUP BY 1 HAVING COUNT(*) > 1) GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
@@ -366,7 +366,7 @@
       },
       {
         "description": "agg + semi-join on pre-partitioned main tables with group by on partitioned column with having filter on top of semi join",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1 HAVING COUNT(*) > 5",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1 HAVING COUNT(*) > 5",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[$1])",
@@ -386,7 +386,7 @@
       },
       {
         "description": "agg + semi-join on pre-partitioned main tables with group by on partitioned column with sorting on top of semi join",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1 ORDER BY 2 DESC",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1 ORDER BY 2 DESC",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$1], dir0=[DESC], offset=[0])",
@@ -407,7 +407,7 @@
       },
       {
         "description": "co-partition agg + semi-join with colocated tables & agg hint",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
@@ -423,7 +423,7 @@
       },
       {
         "description": "co-partition agg + semi-join with single table partition & agg hint",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b WHERE b.col3 > 0) GROUP BY 1",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b WHERE b.col3 > 0) GROUP BY 1",
         "output": [
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
@@ -439,7 +439,7 @@
       },
       {
         "description": "co-partition agg + semi-join on pre-partitioned main tables with group by on partitioned column with having filter on top of semi join",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1 HAVING COUNT(*) > 5",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1 HAVING COUNT(*) > 5",
         "output": [
           "Execution Plan",
           "\nLogicalProject(col2=[$0], EXPR$1=[$1])",
@@ -457,7 +457,7 @@
       },
       {
         "description": "co-partition agg + semi-join on pre-partitioned main tables with group by on partitioned column with sorting on top of semi join colocated on partition key",
-        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1 ORDER BY 2 DESC",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1 ORDER BY 2 DESC",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$1], dir0=[DESC], offset=[0])",
@@ -476,7 +476,7 @@
       },
       {
         "description": "semi-join on pre-partitioned main tables with sorting on top of semi join on join key",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col2 FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) ORDER BY 1 DESC",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2 FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) ORDER BY 1 DESC",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$0], dir0=[DESC], offset=[0])",
@@ -494,7 +494,7 @@
       },
       {
         "description": "semi-join on pre-partitioned main tables with sorting on top of semi join with non-join columns",
-        "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col3 FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) ORDER BY 2 DESC",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col3 FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) ORDER BY 2 DESC",
         "output": [
           "Execution Plan",
           "\nLogicalSort(sort0=[$1], dir0=[DESC], offset=[0])",

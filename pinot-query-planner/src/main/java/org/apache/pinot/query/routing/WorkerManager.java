@@ -479,7 +479,7 @@ public class WorkerManager {
     Preconditions.checkState(tablePartitionInfo.getNumPartitions() == numPartitions,
         "Partition size mismatch (hint: %s, table: %s) for table: %s", numPartitions,
         tablePartitionInfo.getNumPartitions(), tableNameWithType);
-    Preconditions.checkState(tablePartitionInfo.getPartitionFunctionName().equals(partitionFunction),
+    Preconditions.checkState(tablePartitionInfo.getPartitionFunctionName().equalsIgnoreCase(partitionFunction),
         "Partition function mismatch (hint: %s, table: %s) for table %s", partitionFunction,
         tablePartitionInfo.getPartitionFunctionName(), tableNameWithType);
     Preconditions.checkState(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty(),
