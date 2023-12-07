@@ -175,7 +175,7 @@ public class WorkerManager {
       }
       if (partitionFunction == null) {
         partitionFunction = childMetadata.getPartitionFunction();
-      } else if (!partitionFunction.equals(childMetadata.getPartitionFunction())) {
+      } else if (!partitionFunction.equalsIgnoreCase(childMetadata.getPartitionFunction())) {
         return false;
       }
       int childComputedPartitionCount = childMetadata.getWorkerIdToServerInstanceMap().size()

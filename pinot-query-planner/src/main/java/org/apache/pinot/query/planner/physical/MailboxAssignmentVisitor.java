@@ -156,12 +156,12 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       // leaf-to-intermediate condition
       return numSenders * sender.getPartitionParallelism() == numReceivers
           && sender.getPartitionFunction() != null
-          && sender.getPartitionFunction().equals(receiver.getPartitionFunction());
+          && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
     } else {
       // dynamic-broadcast condition || intermediate-to-intermediate
       return numSenders == numReceivers
           && sender.getPartitionFunction() != null
-          && sender.getPartitionFunction().equals(receiver.getPartitionFunction());
+          && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
     }
   }
 }
