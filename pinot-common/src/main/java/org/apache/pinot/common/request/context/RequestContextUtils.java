@@ -242,10 +242,6 @@ public class RequestContextUtils {
       case JSON_MATCH:
         return FilterContext.forPredicate(
             new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
-      case IS_NULL:
-        return FilterContext.forPredicate(new IsNullPredicate(getExpression(operands.get(0))));
-      case IS_NOT_NULL:
-        return FilterContext.forPredicate(new IsNotNullPredicate(getExpression(operands.get(0))));
       case VECTOR_SIMILARITY:
         ExpressionContext lhs = getExpression(operands.get(0));
         float[] vectorValue = getVectorValue(operands.get(1));
@@ -254,6 +250,10 @@ public class RequestContextUtils {
           topK = (int) operands.get(2).getLiteral().getLongValue();
         }
         return FilterContext.forPredicate(new VectorSimilarityPredicate(lhs, vectorValue, topK));
+      case IS_NULL:
+        return FilterContext.forPredicate(new IsNullPredicate(getExpression(operands.get(0))));
+      case IS_NOT_NULL:
+        return FilterContext.forPredicate(new IsNotNullPredicate(getExpression(operands.get(0))));
       default:
         throw new IllegalStateException();
     }
@@ -404,10 +404,6 @@ public class RequestContextUtils {
         return FilterContext.forPredicate(new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
       case JSON_MATCH:
         return FilterContext.forPredicate(new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
-      case IS_NULL:
-        return FilterContext.forPredicate(new IsNullPredicate(operands.get(0)));
-      case IS_NOT_NULL:
-        return FilterContext.forPredicate(new IsNotNullPredicate(operands.get(0)));
       case VECTOR_SIMILARITY:
         int topK = VectorSimilarityPredicate.DEFAULT_TOP_K;
         if (operands.size() == 3) {
@@ -415,6 +411,10 @@ public class RequestContextUtils {
         }
         return FilterContext.forPredicate(
             new VectorSimilarityPredicate(operands.get(0), getVectorValue(operands.get(1)), topK));
+      case IS_NULL:
+        return FilterContext.forPredicate(new IsNullPredicate(operands.get(0)));
+      case IS_NOT_NULL:
+        return FilterContext.forPredicate(new IsNotNullPredicate(operands.get(0)));
       default:
         throw new IllegalStateException();
     }

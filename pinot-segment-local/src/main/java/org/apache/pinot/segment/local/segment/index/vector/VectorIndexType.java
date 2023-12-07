@@ -164,7 +164,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
         .isSingleValueField()) {
       return null;
     }
-    return new MutableVectorIndex(config);
+
+    return new MutableVectorIndex(context.getSegmentName(), context.getFieldSpec().getName(), config);
   }
 
   public enum IndexType {

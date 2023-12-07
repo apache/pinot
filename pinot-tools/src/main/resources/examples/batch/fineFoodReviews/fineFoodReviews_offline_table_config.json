@@ -1,15 +1,4 @@
 {
-  "fieldConfigList": [
-    {
-      "encodingType": "RAW",
-      "indexType": "TEXT",
-      "name": "Text",
-      "properties": {
-        "deriveNumDocsPerChunkForRawIndex": "true",
-        "rawIndexWriterVersion": "3"
-      }
-    }
-  ],
   "tableName": "fineFoodReviews",
   "tableType": "OFFLINE",
   "segmentsConfig": {
@@ -40,6 +29,15 @@
         "vectorDimension": 1536,
         "vectorDistanceFunction": "COSINE",
         "version": 1
+      }
+    },
+    {
+      "encodingType": "RAW",
+      "indexType": "TEXT",
+      "name": "Text",
+      "properties": {
+        "deriveNumDocsPerChunkForRawIndex": "true",
+        "rawIndexWriterVersion": "3"
       }
     }
   ]

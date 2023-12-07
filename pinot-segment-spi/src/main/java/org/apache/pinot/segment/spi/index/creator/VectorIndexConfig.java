@@ -121,6 +121,6 @@ public class VectorIndexConfig extends IndexConfig {
   }
 
   public enum VectorDistanceFunction {
-    COSINE, INNER_PRODUCT, EUCLIDEAN, DOT_PRODUCT
+    COSINE, INNER_PRODUCT, EUCLIDEAN, DOT_PRODUCT;
   }
 }

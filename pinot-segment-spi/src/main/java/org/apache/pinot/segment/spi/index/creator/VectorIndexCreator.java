@@ -28,7 +28,7 @@ public interface VectorIndexCreator extends IndexCreator {
   @Override
   default void add(@Nonnull Object value, int dictId)
       throws IOException {
-    add((float[]) value);
+    throw new UnsupportedOperationException("Mutable Vector indexes are not supported for single-valued columns");
   }
 
   @Override
