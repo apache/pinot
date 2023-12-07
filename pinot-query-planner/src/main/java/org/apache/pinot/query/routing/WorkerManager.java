@@ -34,7 +34,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TablePartitionInfo;
-import org.apache.pinot.core.routing.TablePartitionInfo.PartitionInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.PlanFragment;
@@ -58,8 +57,10 @@ import org.slf4j.LoggerFactory;
 public class WorkerManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerManager.class);
   private static final Random RANDOM = new Random();
+  // default shuffle method in v2
   private static final String DEFAULT_SHUFFLE_PARTITION_FUNCTION = "AbsHashCodeSum";
-  private static final String DEFAULT_TABLE_PARTITION_FUNCTION = "Hashcode";
+  // default table partition function if not specified in hint
+  private static final String DEFAULT_TABLE_PARTITION_FUNCTION = "Murmur";
 
   private final String _hostName;
   private final int _port;
@@ -369,20 +370,20 @@ public class WorkerManager {
         PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM, partitionParallelism);
 
     String tableName = metadata.getScannedTables().get(0);
-    ColocatedTableInfo colocatedTableInfo =
-        getColocatedTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
+    PartitionTableInfo partitionTableInfo =
+        getPartitionTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
 
     // Pick one server per partition
     // NOTE: Pick server based on the request id so that the same server is picked across different table scan when the
     //       segments for the same partition is colocated
     long indexToPick = context.getRequestId();
-    ColocatedPartitionInfo[] partitionInfoMap = colocatedTableInfo._partitionInfoMap;
+    PartitionInfo[] partitionInfoMap = partitionTableInfo._partitionInfoMap;
     int workerId = 0;
     Map<Integer, QueryServerInstance> workedIdToServerInstanceMap = new HashMap<>();
     Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap = new HashMap<>();
     Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
     for (int i = 0; i < numPartitions; i++) {
-      ColocatedPartitionInfo partitionInfo = partitionInfoMap[i];
+      PartitionInfo partitionInfo = partitionInfoMap[i];
       // TODO: Currently we don't support the case when a partition doesn't contain any segment. The reason is that the
       //       leaf stage won't be able to directly return empty response.
       Preconditions.checkState(partitionInfo != null, "Failed to find any segment for table: %s, partition: %s",
@@ -397,12 +398,12 @@ public class WorkerManager {
     }
     metadata.setWorkerIdToServerInstanceMap(workedIdToServerInstanceMap);
     metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
-    metadata.setTimeBoundaryInfo(colocatedTableInfo._timeBoundaryInfo);
+    metadata.setTimeBoundaryInfo(partitionTableInfo._timeBoundaryInfo);
     metadata.setPartitionFunction(partitionFunction);
     metadata.setPartitionParallelism(partitionParallelism);
   }
 
-  private ColocatedTableInfo getColocatedTableInfo(String tableName, String partitionKey, int numPartitions,
+  private PartitionTableInfo getPartitionTableInfo(String tableName, String partitionKey, int numPartitions,
       String partitionFunction) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
@@ -417,28 +418,30 @@ public class WorkerManager {
         TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
         // Ignore OFFLINE side when time boundary info is unavailable
         if (timeBoundaryInfo == null) {
-          return getRealtimeColocatedTableInfo(realtimeTableName, partitionKey, numPartitions, partitionFunction);
+          return getRealtimePartitionTableInfo(realtimeTableName, partitionKey, numPartitions, partitionFunction);
         }
-        PartitionInfo[] offlinePartitionInfoMap = getTablePartitionInfo(offlineTableName, partitionKey, numPartitions,
-            partitionFunction).getPartitionInfoMap();
-        PartitionInfo[] realtimePartitionInfoMap = getTablePartitionInfo(realtimeTableName, partitionKey, numPartitions,
-            partitionFunction).getPartitionInfoMap();
-        ColocatedPartitionInfo[] colocatedPartitionInfoMap = new ColocatedPartitionInfo[numPartitions];
+        TablePartitionInfo.PartitionInfo[] offlinePartitionInfoMap =
+            getTablePartitionInfo(offlineTableName, partitionKey, numPartitions,
+                partitionFunction).getPartitionInfoMap();
+        TablePartitionInfo.PartitionInfo[] realtimePartitionInfoMap =
+            getTablePartitionInfo(realtimeTableName, partitionKey, numPartitions,
+                partitionFunction).getPartitionInfoMap();
+        PartitionInfo[] partitionInfoMap = new PartitionInfo[numPartitions];
         for (int i = 0; i < numPartitions; i++) {
-          PartitionInfo offlinePartitionInfo = offlinePartitionInfoMap[i];
-          PartitionInfo realtimePartitionInfo = realtimePartitionInfoMap[i];
+          TablePartitionInfo.PartitionInfo offlinePartitionInfo = offlinePartitionInfoMap[i];
+          TablePartitionInfo.PartitionInfo realtimePartitionInfo = realtimePartitionInfoMap[i];
           if (offlinePartitionInfo == null && realtimePartitionInfo == null) {
             continue;
           }
           if (offlinePartitionInfo == null) {
-            colocatedPartitionInfoMap[i] =
-                new ColocatedPartitionInfo(realtimePartitionInfo._fullyReplicatedServers, null,
+            partitionInfoMap[i] =
+                new PartitionInfo(realtimePartitionInfo._fullyReplicatedServers, null,
                     realtimePartitionInfo._segments);
             continue;
           }
           if (realtimePartitionInfo == null) {
-            colocatedPartitionInfoMap[i] =
-                new ColocatedPartitionInfo(offlinePartitionInfo._fullyReplicatedServers, offlinePartitionInfo._segments,
+            partitionInfoMap[i] =
+                new PartitionInfo(offlinePartitionInfo._fullyReplicatedServers, offlinePartitionInfo._segments,
                     null);
             continue;
           }
@@ -446,21 +449,21 @@ public class WorkerManager {
           fullyReplicatedServers.retainAll(realtimePartitionInfo._fullyReplicatedServers);
           Preconditions.checkState(!fullyReplicatedServers.isEmpty(),
               "Failed to find fully replicated server for partition: %s in hybrid table: %s", i, tableName);
-          colocatedPartitionInfoMap[i] =
-              new ColocatedPartitionInfo(fullyReplicatedServers, offlinePartitionInfo._segments,
+          partitionInfoMap[i] =
+              new PartitionInfo(fullyReplicatedServers, offlinePartitionInfo._segments,
                   realtimePartitionInfo._segments);
         }
-        return new ColocatedTableInfo(colocatedPartitionInfoMap, timeBoundaryInfo);
+        return new PartitionTableInfo(partitionInfoMap, timeBoundaryInfo);
       } else if (offlineRoutingExists) {
-        return getOfflineColocatedTableInfo(offlineTableName, partitionKey, numPartitions, partitionFunction);
+        return getOfflinePartitionTableInfo(offlineTableName, partitionKey, numPartitions, partitionFunction);
       } else {
-        return getRealtimeColocatedTableInfo(realtimeTableName, partitionKey, numPartitions, partitionFunction);
+        return getRealtimePartitionTableInfo(realtimeTableName, partitionKey, numPartitions, partitionFunction);
       }
     } else {
       if (tableType == TableType.OFFLINE) {
-        return getOfflineColocatedTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
+        return getOfflinePartitionTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
       } else {
-        return getRealtimeColocatedTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
+        return getRealtimePartitionTableInfo(tableName, partitionKey, numPartitions, partitionFunction);
       }
     }
   }
@@ -485,52 +488,52 @@ public class WorkerManager {
     return tablePartitionInfo;
   }
 
-  private ColocatedTableInfo getOfflineColocatedTableInfo(String offlineTableName, String partitionKey,
+  private PartitionTableInfo getOfflinePartitionTableInfo(String offlineTableName, String partitionKey,
       int numPartitions, String partitionFunction) {
-    PartitionInfo[] partitionInfoMap =
+    TablePartitionInfo.PartitionInfo[] tablePartitionInfoArr =
         getTablePartitionInfo(offlineTableName, partitionKey, numPartitions, partitionFunction).getPartitionInfoMap();
-    ColocatedPartitionInfo[] colocatedPartitionInfoMap = new ColocatedPartitionInfo[numPartitions];
+    PartitionInfo[] partitionInfoMap = new PartitionInfo[numPartitions];
     for (int i = 0; i < numPartitions; i++) {
-      PartitionInfo partitionInfo = partitionInfoMap[i];
+      TablePartitionInfo.PartitionInfo partitionInfo = tablePartitionInfoArr[i];
       if (partitionInfo != null) {
-        colocatedPartitionInfoMap[i] =
-            new ColocatedPartitionInfo(partitionInfo._fullyReplicatedServers, partitionInfo._segments, null);
+        partitionInfoMap[i] =
+            new PartitionInfo(partitionInfo._fullyReplicatedServers, partitionInfo._segments, null);
       }
     }
-    return new ColocatedTableInfo(colocatedPartitionInfoMap, null);
+    return new PartitionTableInfo(partitionInfoMap, null);
   }
 
-  private ColocatedTableInfo getRealtimeColocatedTableInfo(String realtimeTableName, String partitionKey,
+  private PartitionTableInfo getRealtimePartitionTableInfo(String realtimeTableName, String partitionKey,
       int numPartitions, String partitionFunction) {
-    PartitionInfo[] partitionInfoMap =
+    TablePartitionInfo.PartitionInfo[] tablePartitionInfoArr =
         getTablePartitionInfo(realtimeTableName, partitionKey, numPartitions, partitionFunction).getPartitionInfoMap();
-    ColocatedPartitionInfo[] colocatedPartitionInfoMap = new ColocatedPartitionInfo[numPartitions];
+    PartitionInfo[] partitionInfoMap = new PartitionInfo[numPartitions];
     for (int i = 0; i < numPartitions; i++) {
-      PartitionInfo partitionInfo = partitionInfoMap[i];
+      TablePartitionInfo.PartitionInfo partitionInfo = tablePartitionInfoArr[i];
       if (partitionInfo != null) {
-        colocatedPartitionInfoMap[i] =
-            new ColocatedPartitionInfo(partitionInfo._fullyReplicatedServers, null, partitionInfo._segments);
+        partitionInfoMap[i] =
+            new PartitionInfo(partitionInfo._fullyReplicatedServers, null, partitionInfo._segments);
       }
     }
-    return new ColocatedTableInfo(colocatedPartitionInfoMap, null);
+    return new PartitionTableInfo(partitionInfoMap, null);
   }
 
-  private static class ColocatedTableInfo {
-    final ColocatedPartitionInfo[] _partitionInfoMap;
+  private static class PartitionTableInfo {
+    final PartitionInfo[] _partitionInfoMap;
     final TimeBoundaryInfo _timeBoundaryInfo;
 
-    ColocatedTableInfo(ColocatedPartitionInfo[] partitionInfoMap, @Nullable TimeBoundaryInfo timeBoundaryInfo) {
+    PartitionTableInfo(PartitionInfo[] partitionInfoMap, @Nullable TimeBoundaryInfo timeBoundaryInfo) {
       _partitionInfoMap = partitionInfoMap;
       _timeBoundaryInfo = timeBoundaryInfo;
     }
   }
 
-  private static class ColocatedPartitionInfo {
+  private static class PartitionInfo {
     final Set<String> _fullyReplicatedServers;
     final List<String> _offlineSegments;
     final List<String> _realtimeSegments;
 
-    ColocatedPartitionInfo(Set<String> fullyReplicatedServers, @Nullable List<String> offlineSegments,
+    PartitionInfo(Set<String> fullyReplicatedServers, @Nullable List<String> offlineSegments,
         @Nullable List<String> realtimeSegments) {
       _fullyReplicatedServers = fullyReplicatedServers;
       _offlineSegments = offlineSegments;
@@ -564,7 +567,7 @@ public class WorkerManager {
     return null;
   }
 
-  private static Map<String, List<String>> getSegmentsMap(ColocatedPartitionInfo partitionInfo) {
+  private static Map<String, List<String>> getSegmentsMap(PartitionInfo partitionInfo) {
     Map<String, List<String>> segmentsMap = new HashMap<>();
     if (partitionInfo._offlineSegments != null) {
       segmentsMap.put(TableType.OFFLINE.name(), partitionInfo._offlineSegments);
