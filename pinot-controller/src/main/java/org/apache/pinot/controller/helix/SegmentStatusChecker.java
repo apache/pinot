@@ -44,6 +44,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.MissingConsumingSegmentFinder;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -61,7 +62,6 @@ import org.slf4j.LoggerFactory;
 public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusChecker.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final int MAX_OFFLINE_SEGMENTS_TO_LOG = 5;
-  private static final String IS_TABLE_CONSUMPTION_PAUSED = "isTablePaused";
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
   public static final String CONSUMING = "CONSUMING";
@@ -134,7 +134,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   protected void postprocess(Context context) {
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, context._realTimeTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, context._offlineTableCount);
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTableCount);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTables.size());
 
     //emit a 0 for tables that are not paused/disabled. This makes alert expressions simpler as we don't have to deal
     // with missing metrics
@@ -205,12 +205,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       resetTableMetrics(tableNameWithType);
       context._disabledTables.add(tableNameWithType);
-      context._disabledTableCount++;
       return;
     }
 
     //check if table consumption is paused
-    boolean isTablePaused = Boolean.parseBoolean(idealState.getRecord().getSimpleField(IS_TABLE_CONSUMPTION_PAUSED));
+    boolean isTablePaused =
+        Boolean.parseBoolean(idealState.getRecord().getSimpleField(PinotLLCRealtimeSegmentManager.IS_TABLE_PAUSED));
     if (isTablePaused) {
       context._pausedTables.add(tableNameWithType);
     }
@@ -394,7 +394,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     private boolean _logDisabledTables;
     private int _realTimeTableCount;
     private int _offlineTableCount;
-    private int _disabledTableCount;
     private Set<String> _processedTables = new HashSet<>();
     private Set<String> _disabledTables = new HashSet<>();
     private Set<String> _pausedTables = new HashSet<>();

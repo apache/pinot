@@ -129,13 +129,13 @@ import org.slf4j.LoggerFactory;
  * TODO: migrate code in this class to other places for better readability
  */
 public class PinotLLCRealtimeSegmentManager {
+
+  // simple field in Ideal State representing pause status for the table
+  public static final String IS_TABLE_PAUSED = "isTablePaused";
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
 
   private static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
-
-  // simple field in Ideal State representing pause status for the table
-  private static final String IS_TABLE_PAUSED = "isTablePaused";
 
   // Max time to wait for all LLC segments to complete committing their metadata while stopping the controller.
   private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
