@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests.plugin.minion.tasks;
 
 import java.util.Map;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.integration.tests.SimpleMinionClusterIntegrationTest;
 import org.apache.pinot.minion.MinionConf;
@@ -63,8 +64,8 @@ public class TestTaskExecutorFactory implements PinotTaskExecutorFactory {
       @Override
       public Boolean executeTask(PinotTaskConfig pinotTaskConfig) {
         assertTrue(MINION_CONTEXT.getDataDir().exists());
-        assertNotNull(MINION_CONTEXT.getMinionMetrics());
         assertNotNull(MINION_CONTEXT.getHelixPropertyStore());
+        assertNotNull(MinionMetrics.get());
 
         assertEquals(pinotTaskConfig.getTaskType(), SimpleMinionClusterIntegrationTest.TASK_TYPE);
         Map<String, String> configs = pinotTaskConfig.getConfigs();

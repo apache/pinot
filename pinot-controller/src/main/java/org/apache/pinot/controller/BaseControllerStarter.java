@@ -691,6 +691,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
     _controllerMetrics.initializeGlobalMeters();
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    ControllerMetrics.register(_controllerMetrics);
     _validationMetrics = new ValidationMetrics(_metricsRegistry);
   }
 
