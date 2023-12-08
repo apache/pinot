@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class LuceneFSTIndexCreator implements FSTIndexCreator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexCreator.class);
   private final File _fstIndexFile;
   private final FSTBuilder _fstBuilder;
   Integer _dictId;

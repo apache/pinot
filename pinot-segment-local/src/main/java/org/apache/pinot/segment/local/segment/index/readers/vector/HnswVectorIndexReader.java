@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 
 public class HnswVectorIndexReader implements VectorIndexReader {
 
-  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexReader.class);
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(HnswVectorIndexReader.class);
 
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;

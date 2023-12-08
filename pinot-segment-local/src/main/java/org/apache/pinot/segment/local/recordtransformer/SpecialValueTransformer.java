@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SpecialValueTransformer implements RecordTransformer {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(NullValueTransformer.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SpecialValueTransformer.class);
   private final HashSet<String> _specialValuesKeySet = new HashSet<>();
 
   public SpecialValueTransformer(Schema schema) {
