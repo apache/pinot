@@ -110,7 +110,9 @@ public class SpecialValueTransformer implements RecordTransformer {
         }
       }
     }
-    LOGGER.info("Converted {} -0.0s to 0.0 and {} NaNs to null", _negativeZeroConversionCount, _nanConversionCount);
+    if (_negativeZeroConversionCount > 0 || _nanConversionCount > 0) {
+      LOGGER.info("Converted {} -0.0s to 0.0 and {} NaNs to null", _negativeZeroConversionCount, _nanConversionCount);
+    }
     return record;
   }
 
