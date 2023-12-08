@@ -42,7 +42,6 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
@@ -61,10 +60,11 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleSegmentConversionExecutor.class);
 
+  protected final MinionMetrics _minionMetrics = MinionMetrics.get();
+
   // Tracking finer grained progress status.
   protected PinotTaskConfig _pinotTaskConfig;
   protected MinionEventObserver _eventObserver;
-  protected final MinionMetrics _minionMetrics = MinionContext.getInstance().getMinionMetrics();
 
   /**
    * Converts the segment based on the given task config and returns the conversion result.

@@ -62,10 +62,12 @@ public class MinionContext {
     _dataDir = dataDir;
   }
 
+  @Deprecated
   public MinionMetrics getMinionMetrics() {
     return _minionMetrics;
   }
 
+  @Deprecated
   public void setMinionMetrics(MinionMetrics minionMetrics) {
     _minionMetrics = minionMetrics;
   }
