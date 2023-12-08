@@ -290,11 +290,9 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvDoubleNegativeZero"), new Double[]{0.0d, 1.0d, 0.0d, 3.0d});
       assertNull(record.getValue("svFloatNaN"));
       assertNull(record.getValue("svDoubleNaN"));
-      assertEquals(record.getValue("mvFloatNaN"),
-          new Float[]{0.0f, 2.0f});
-      assertEquals(record.getValue("mvDoubleNaN"),
-          new Double[]{0.0d, 2.0d});
-      assertEquals(transformer.getNegativeZeroConversionCount(),6);
+      assertEquals(record.getValue("mvFloatNaN"), new Float[]{0.0f, 2.0f});
+      assertEquals(record.getValue("mvDoubleNaN"), new Double[]{0.0d, 2.0d});
+      assertEquals(transformer.getNegativeZeroConversionCount(), 6);
       assertEquals(transformer.getNanConversionCount(), 4);
     }
   }

@@ -113,10 +113,12 @@ public class SpecialValueTransformer implements RecordTransformer {
     LOGGER.info("Converted {} -0.0s to 0.0 and {} NaNs to null", _negativeZeroConversionCount, _nanConversionCount);
     return record;
   }
+
   @VisibleForTesting
   int getNegativeZeroConversionCount() {
     return _negativeZeroConversionCount;
   }
+
   @VisibleForTesting
   int getNanConversionCount() {
     return _nanConversionCount;
