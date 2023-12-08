@@ -57,6 +57,4 @@ public @interface ScalarFunction {
    *
    */
   boolean nullableParameters() default false;
-
-  boolean isPlaceholder() default false;
 }

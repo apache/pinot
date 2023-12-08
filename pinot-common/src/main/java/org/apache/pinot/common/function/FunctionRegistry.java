@@ -71,10 +71,10 @@ public class FunctionRegistry {
         boolean nullableParameters = scalarFunction.nullableParameters();
         if (scalarFunctionNames.length > 0) {
           for (String name : scalarFunctionNames) {
-            FunctionRegistry.registerFunction(name, method, nullableParameters, scalarFunction.isPlaceholder());
+            FunctionRegistry.registerFunction(name, method, nullableParameters);
           }
         } else {
-          FunctionRegistry.registerFunction(method, nullableParameters, scalarFunction.isPlaceholder());
+          FunctionRegistry.registerFunction(method, nullableParameters);
         }
       }
     }
@@ -93,18 +93,15 @@ public class FunctionRegistry {
   /**
    * Registers a method with the name of the method.
    */
-  public static void registerFunction(Method method, boolean nullableParameters, boolean isPlaceholder) {
-    registerFunction(method.getName(), method, nullableParameters, isPlaceholder);
+  public static void registerFunction(Method method, boolean nullableParameters) {
+    registerFunction(method.getName(), method, nullableParameters);
   }
 
   /**
    * Registers a method with the given function name.
    */
-  public static void registerFunction(String functionName, Method method, boolean nullableParameters,
-      boolean isPlaceholder) {
-    if (!isPlaceholder) {
-      registerFunctionInfoMap(functionName, method, nullableParameters);
-    }
+  public static void registerFunction(String functionName, Method method, boolean nullableParameters) {
+    registerFunctionInfoMap(functionName, method, nullableParameters);
     registerCalciteNamedFunctionMap(functionName, method, nullableParameters);
   }
 
@@ -151,32 +148,5 @@ public class FunctionRegistry {
 
   private static String canonicalize(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
-  }
-
-  /**
-   * Placeholders for scalar function, they register and represents the signature for transform and filter predicate
-   * so that v2 engine can understand and plan them correctly.
-   */
-  private static class PlaceholderScalarFunctions {
-
-    @ScalarFunction(names = {"textContains", "text_contains"}, isPlaceholder = true)
-    public static boolean textContains(String text, String pattern) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
-    @ScalarFunction(names = {"textMatch", "text_match"}, isPlaceholder = true)
-    public static boolean textMatch(String text, String pattern) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
-    @ScalarFunction(names = {"jsonMatch", "json_match"}, isPlaceholder = true)
-    public static boolean jsonMatch(String text, String pattern) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
-
-    @ScalarFunction(names = {"vectorSimilarity", "vector_similarity"}, isPlaceholder = true)
-    public static double vectorSimilarity(float[] vector1, float[] vector2) {
-      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
-    }
   }
 }
