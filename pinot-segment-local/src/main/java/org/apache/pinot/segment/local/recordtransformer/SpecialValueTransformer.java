@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -43,6 +44,8 @@ public class SpecialValueTransformer implements RecordTransformer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(NullValueTransformer.class);
   private final HashSet<String> _specialValuesKeySet = new HashSet<>();
+  private int _negativeZeroConversionCount = 0;
+  private int _nanConversionCount = 0;
 
   public SpecialValueTransformer(Schema schema) {
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -55,22 +58,22 @@ public class SpecialValueTransformer implements RecordTransformer {
 
   private Object transformNegativeZero(Object value) {
     if ((value instanceof Float) && (Float.floatToRawIntBits((float) value) == Float.floatToRawIntBits(-0.0f))) {
-      LOGGER.info("-0.0f value detected, converting to 0.0.");
       value = 0.0f;
+      _negativeZeroConversionCount++;
     } else if ((value instanceof Double) && (Double.doubleToLongBits((double) value) == Double.doubleToLongBits(
         -0.0d))) {
-      LOGGER.info("-0.0d value detected, converting to 0.0.");
       value = 0.0d;
+      _negativeZeroConversionCount++;
     }
     return value;
   }
 
   private Object transformNaN(Object value) {
     if ((value instanceof Float) && ((Float) value).isNaN()) {
-      LOGGER.info("Float.NaN detected, converting to default null.");
       value = null;
+      _nanConversionCount++;
     } else if ((value instanceof Double) && ((Double) value).isNaN()) {
-      LOGGER.info("Double.NaN detected, converting to default null.");
+      _nanConversionCount++;
       value = null;
     }
     return value;
@@ -90,7 +93,6 @@ public class SpecialValueTransformer implements RecordTransformer {
         Object[] values = (Object[]) value;
         int numValues = values.length;
         List<Object> negativeZeroNanSanitizedValues = new ArrayList<>(numValues);
-        int numberOfElements = values.length;
         for (Object o : values) {
           Object zeroTransformedValue = transformNegativeZero(o);
           Object nanTransformedValue = transformNaN(zeroTransformedValue);
@@ -108,6 +110,15 @@ public class SpecialValueTransformer implements RecordTransformer {
         }
       }
     }
+    LOGGER.info("Converted {} -0.0s to 0.0 and {} NaNs to null", _negativeZeroConversionCount, _nanConversionCount);
     return record;
+  }
+  @VisibleForTesting
+  int getNegativeZeroConversionCount() {
+    return _negativeZeroConversionCount;
+  }
+  @VisibleForTesting
+  int getNanConversionCount() {
+    return _nanConversionCount;
   }
 }

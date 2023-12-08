@@ -277,7 +277,7 @@ public class RecordTransformerTest {
 
   @Test
   public void testSpecialValueTransformer() {
-    RecordTransformer transformer = new SpecialValueTransformer(SCHEMA);
+    SpecialValueTransformer transformer = new SpecialValueTransformer(SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
@@ -294,6 +294,8 @@ public class RecordTransformerTest {
           new Float[]{0.0f, 2.0f});
       assertEquals(record.getValue("mvDoubleNaN"),
           new Double[]{0.0d, 2.0d});
+      assertEquals(transformer.getNegativeZeroConversionCount(),6);
+      assertEquals(transformer.getNanConversionCount(), 4);
     }
   }
 
