@@ -19,9 +19,7 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,7 +28,6 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
@@ -38,7 +35,6 @@ import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.roaringbitmap.PeekableIntIterator;
@@ -58,12 +54,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   @VisibleForTesting
   final ConcurrentHashMap<Object, RecordLocation> _primaryKeyToRecordLocationMap = new ConcurrentHashMap<>();
 
-  public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
-      List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
-      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, double deletedKeysTTL, File tableIndexDir, ServerMetrics serverMetrics) {
-    super(tableNameWithType, partitionId, primaryKeyColumns, comparisonColumns, deleteRecordColumn,
-        hashFunction, partialUpsertHandler, enableSnapshot, metadataTTL, deletedKeysTTL, tableIndexDir, serverMetrics);
+  public ConcurrentMapPartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
+    super(tableNameWithType, partitionId, context);
   }
 
   @Override
@@ -268,15 +260,15 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
     int numDeletedTTLKeys = numDeletedTTLKeysRemoved.get();
     if (numDeletedTTLKeys > 0) {
-      _logger.info("Deleted {} primary keys based on deletedKeysTTL in the table {}",
-          numDeletedTTLKeys, _tableNameWithType);
+      _logger.info("Deleted {} primary keys based on deletedKeysTTL in the table {}", numDeletedTTLKeys,
+          _tableNameWithType);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED,
           numDeletedTTLKeys);
     }
     int numMetadataTTLKeys = numMetadataTTLKeysRemoved.get();
     if (numMetadataTTLKeys > 0) {
-      _logger.info("Deleted {} primary keys based on metadataTTL in the table {}",
-          numMetadataTTLKeys, _tableNameWithType);
+      _logger.info("Deleted {} primary keys based on metadataTTL in the table {}", numMetadataTTLKeys,
+          _tableNameWithType);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.METADATA_TTL_PRIMARY_KEYS_REMOVED,
           numMetadataTTLKeys);
     }

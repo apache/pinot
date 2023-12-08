@@ -36,7 +36,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -56,76 +55,67 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetadataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableUpsertMetadataManager.class);
 
-  protected TableConfig _tableConfig;
-  protected Schema _schema;
-  protected TableDataManager _tableDataManager;
   protected String _tableNameWithType;
-  protected List<String> _primaryKeyColumns;
-  protected List<String> _comparisonColumns;
-  protected String _deleteRecordColumn;
-  protected HashFunction _hashFunction;
-  protected PartialUpsertHandler _partialUpsertHandler;
-  protected boolean _enableSnapshot;
-  protected double _metadataTTL;
-  protected double _deletedKeysTTL;
-  protected File _tableIndexDir;
-  protected ServerMetrics _serverMetrics;
+  protected TableDataManager _tableDataManager;
   protected HelixManager _helixManager;
   protected ExecutorService _segmentPreloadExecutor;
+  protected UpsertContext _context;
 
   private volatile boolean _isPreloading = false;
 
   @Override
-  public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
-      ServerMetrics serverMetrics, HelixManager helixManager, @Nullable ExecutorService segmentPreloadExecutor) {
-    _tableConfig = tableConfig;
-    _schema = schema;
-    _tableDataManager = tableDataManager;
+  public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, HelixManager helixManager,
+      @Nullable ExecutorService segmentPreloadExecutor) {
     _tableNameWithType = tableConfig.getTableName();
+    _tableDataManager = tableDataManager;
+    _helixManager = helixManager;
+    _segmentPreloadExecutor = segmentPreloadExecutor;
 
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     Preconditions.checkArgument(upsertConfig != null && upsertConfig.getMode() != UpsertConfig.Mode.NONE,
         "Upsert must be enabled for table: %s", _tableNameWithType);
 
-    _primaryKeyColumns = schema.getPrimaryKeyColumns();
-    Preconditions.checkArgument(!CollectionUtils.isEmpty(_primaryKeyColumns),
+    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+    Preconditions.checkArgument(!CollectionUtils.isEmpty(primaryKeyColumns),
         "Primary key columns must be configured for upsert enabled table: %s", _tableNameWithType);
 
-    _comparisonColumns = upsertConfig.getComparisonColumns();
-    if (_comparisonColumns == null) {
-      _comparisonColumns = Collections.singletonList(tableConfig.getValidationConfig().getTimeColumnName());
+    List<String> comparisonColumns = upsertConfig.getComparisonColumns();
+    if (comparisonColumns == null) {
+      comparisonColumns = Collections.singletonList(tableConfig.getValidationConfig().getTimeColumnName());
     }
 
-    _deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
-    _hashFunction = upsertConfig.getHashFunction();
-
+    PartialUpsertHandler partialUpsertHandler = null;
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
       Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
       Preconditions.checkArgument(partialUpsertStrategies != null,
           "Partial-upsert strategies must be configured for partial-upsert enabled table: %s", _tableNameWithType);
-      _partialUpsertHandler =
+      partialUpsertHandler =
           new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig.getDefaultPartialUpsertStrategy(),
-              _comparisonColumns);
+              comparisonColumns);
     }
 
-    _enableSnapshot = upsertConfig.isEnableSnapshot();
-    _metadataTTL = upsertConfig.getMetadataTTL();
-    _deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
-    _tableIndexDir = tableDataManager.getTableDataDir();
-    _serverMetrics = serverMetrics;
-    _helixManager = helixManager;
-    _segmentPreloadExecutor = segmentPreloadExecutor;
-
-    initCustomVariables();
-
+    String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
+    HashFunction hashFunction = upsertConfig.getHashFunction();
+    boolean enableSnapshot = upsertConfig.isEnableSnapshot();
+    boolean enablePreload = upsertConfig.isEnablePreload();
+    double metadataTTL = upsertConfig.getMetadataTTL();
+    double deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
+    File tableIndexDir = tableDataManager.getTableDataDir();
+    _context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setPrimaryKeyColumns(primaryKeyColumns).setComparisonColumns(comparisonColumns)
+        .setDeleteRecordColumn(deleteRecordColumn).setHashFunction(hashFunction)
+        .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot).setEnablePreload(enablePreload)
+        .setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL).setTableIndexDir(tableIndexDir).build();
     LOGGER.info(
         "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
             + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
             + " deleted Keys TTL: {}, table index dir: {}", getClass().getSimpleName(), _tableNameWithType,
-        _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn, _hashFunction, upsertConfig.getMode(),
-        _enableSnapshot, upsertConfig.isEnablePreload(), _metadataTTL, _deletedKeysTTL, _tableIndexDir);
+        primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction, upsertConfig.getMode(), enableSnapshot,
+        enablePreload, metadataTTL, deletedKeysTTL, tableIndexDir);
 
-    if (_enableSnapshot && segmentPreloadExecutor != null && upsertConfig.isEnablePreload()) {
+    initCustomVariables();
+
+    if (enableSnapshot && enablePreload && segmentPreloadExecutor != null) {
       // Preloading the segments with snapshots for fast upsert metadata recovery.
       // Note that there is an implicit waiting logic between the thread doing the segment preloading here and the
       // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).
@@ -226,7 +216,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   @VisibleForTesting
   IndexLoadingConfig createIndexLoadingConfig() {
     return new IndexLoadingConfig(_tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig(),
-        _tableConfig, _schema);
+        _context.getTableConfig(), _context.getSchema());
   }
 
   @VisibleForTesting
@@ -266,7 +256,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   }
 
   private File getValidDocIdsSnapshotFile(String segmentName, String segmentTier) {
-    File indexDir = _tableDataManager.getSegmentDataDir(segmentName, segmentTier, _tableConfig);
+    File indexDir = _tableDataManager.getSegmentDataDir(segmentName, segmentTier, _context.getTableConfig());
     return new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
   }
 
@@ -277,6 +267,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
   @Override
   public UpsertConfig.Mode getUpsertMode() {
-    return _partialUpsertHandler == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
+    return _context.getPartialUpsertHandler() == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
   }
 }
