@@ -150,7 +150,7 @@ public class S3PinotFS extends BasePinotFS {
       if (s3Config.getHttpClientBuilder() != null) {
         s3ClientBuilder.httpClientBuilder(s3Config.getHttpClientBuilder());
       }
-      _s3Client = s3ClientBuilder.build();
+      _s3Client = s3ClientBuilder.forcePathStyle(true).build();
       setMultiPartUploadConfigs(s3Config);
     } catch (S3Exception e) {
       throw new RuntimeException("Could not initialize S3PinotFS", e);

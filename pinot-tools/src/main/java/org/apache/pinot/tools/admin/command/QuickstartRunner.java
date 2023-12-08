@@ -147,16 +147,18 @@ public class QuickstartRunner {
     }
   }
 
-  private void startControllers(int zkPort)
+  private void startControllers(int zkPort, String clusterName)
       throws Exception {
     for (int i = 0; i < _numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       int controllerPort = new Random().nextInt(50_000);
       System.out.println("controller port: " + controllerPort);
+      String dataDir = "s3://localhost:50000" + "/" + clusterName + "/" + "segments";
+      System.out.println("Datadir is: " + dataDir);
       controllerStarter.setControllerPort(String.valueOf(controllerPort))
           .setZkAddress(_zkExternalAddress != null ? _zkExternalAddress : "localhost:" + zkPort)
-          .setClusterName(_clusterName).setTenantIsolation(_enableTenantIsolation)
-          .setDataDir(new File(_tempDir, DEFAULT_CONTROLLER_DIR + i).getAbsolutePath())
+          .setClusterName(clusterName).setTenantIsolation(_enableTenantIsolation)
+          .setDataDir(dataDir)
           .setConfigOverrides(_configOverrides);
       if (!controllerStarter.execute()) {
         throw new RuntimeException("Failed to start Controller");
@@ -262,13 +264,13 @@ public class QuickstartRunner {
     startMinions();
   }
 
-  public void startAll(int zkPort)
+  public void startAll(int zkPort, String clusterName)
       throws Exception {
     registerDefaultPinotFS();
     if (_zkExternalAddress == null) {
       startZookeeper(zkPort);
     }
-    startControllers(zkPort);
+    startControllers(zkPort, clusterName);
     startBrokers(zkPort);
     startServers(zkPort);
 //    startMinions();
@@ -330,7 +332,8 @@ public class QuickstartRunner {
 
   public static void registerDefaultPinotFS() {
     registerPinotFS("s3", "org.apache.pinot.plugin.filesystem.S3PinotFS",
-        ImmutableMap.of("region", System.getProperty("AWS_REGION", "us-west-2")));
+        ImmutableMap.of("region", System.getProperty("AWS_REGION", "us-west-2"), "accessKey", "accesskey", "secretKey",
+            "secretKey"));
   }
 
   public static void registerPinotFS(String scheme, String fsClassName, Map<String, Object> configs) {

@@ -18,16 +18,27 @@
  */
 package org.apache.pinot.tools;
 
+import com.github.dockerjava.api.model.ExposedPort;
+import com.github.dockerjava.api.model.PortBinding;
+import com.github.dockerjava.api.model.Ports;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
+import org.testcontainers.containers.GenericContainer;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 
 
 public class RealtimeQuickStart extends QuickStartBase {
@@ -85,18 +96,23 @@ public class RealtimeQuickStart extends QuickStartBase {
     File quickstartTmpDir =
         _setCustomDataDir ? _dataDir : new File(_dataDir, String.valueOf(System.currentTimeMillis()));
     File quickstartRunnerDir = new File(quickstartTmpDir, "quickstart");
-    System.out.println("Datadir: " + quickstartRunnerDir);
+
+    String clusterName = "srcds";
+    setupTestContainers(clusterName);
+
     Preconditions.checkState(quickstartRunnerDir.mkdirs());
     List<QuickstartTableRequest> quickstartTableRequests = bootstrapStreamTableDirectories(quickstartTmpDir);
     final QuickstartRunner runner =
         new QuickstartRunner(quickstartTableRequests, 1, 1, 3, 0, quickstartRunnerDir, getConfigOverrides());
 
     int zkPort = new Random().nextInt(50_000);
-//    startKafka(zkPort);
-//    startAllDataStreams(_kafkaStarter, quickstartTmpDir);
+    startKafka(zkPort);
+    startAllDataStreams(_kafkaStarter, quickstartTmpDir);
 
     printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker, server and minion *****");
-    runner.startAll(zkPort);
+
+    runner.startAll(zkPort, clusterName);
+
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
         printStatus(Color.GREEN, "***** Shutting down realtime quick start *****");
@@ -107,15 +123,47 @@ public class RealtimeQuickStart extends QuickStartBase {
       }
     }));
 
-//    printStatus(Color.CYAN, "***** Bootstrap all tables *****");
-//    runner.bootstrapTable();
-//
-//    printStatus(Color.CYAN, "***** Waiting for 5 seconds for a few events to get populated *****");
-//    Thread.sleep(5000);
-//
-//    printStatus(Color.YELLOW, "***** Realtime quickstart setup complete *****");
-//    runSampleQueries(runner);
+    printStatus(Color.CYAN, "***** Bootstrap all tables *****");
+    runner.bootstrapTable();
+
+    printStatus(Color.CYAN, "***** Waiting for 5 seconds for a few events to get populated *****");
+    Thread.sleep(5000);
+
+    printStatus(Color.YELLOW, "***** Realtime quickstart setup complete *****");
+    runSampleQueries(runner);
 //
     printStatus(Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
+  }
+
+  private void setupTestContainers(String bucketName) {
+    try (GenericContainer<?> s3Container = new GenericContainer<>("adobe/s3mock:2.1.14").withEnv(
+        Map.of("AWS_REGION", "us-west-2", "ACCESS_KEY", "accessKey", "SECRET_KEY", "secretKey"))) {
+
+      s3Container.withCreateContainerCmdModifier(cmd -> {
+        cmd.getHostConfig().withPortBindings(new PortBinding(Ports.Binding.bindPort(50_000), new ExposedPort(9090)));
+      });
+
+      s3Container.start();
+
+      // Get S3 endpoint URL
+      String s3Endpoint = "http://" + s3Container.getHost() + ":" + s3Container.getMappedPort(9090);
+
+      // Use Testcontainers S3 endpoint in your S3 client configuration
+      S3Client s3Client =
+          S3Client.builder().forcePathStyle(true).region(Region.US_WEST_2).endpointOverride(URI.create(s3Endpoint))
+              .credentialsProvider(
+                  StaticCredentialsProvider.create(AwsBasicCredentials.create("accessKey", "secretKey"))).build();
+
+      while (true) {
+        try {
+          s3Client.createBucket(CreateBucketRequest.builder().bucket(bucketName).build());
+          break;
+        } catch (Exception e) {
+          continue;
+        }
+      }
+
+      System.out.println("Created bucket");
+    }
   }
 }
