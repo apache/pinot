@@ -52,12 +52,8 @@ public class CommonsConfigurationUtils {
    * @param file containing properties
    * @return a {@link PropertiesConfiguration} instance. Empty if file does not exist.
    */
-  public static PropertiesConfiguration fromFile(File file) {
-    try {
-      return fromFile(file, false, false);
-    } catch (ConfigurationException e) {
-      throw new RuntimeException(e);
-    }
+  public static PropertiesConfiguration fromFile(File file) throws ConfigurationException {
+    return fromFile(file, false, false);
   }
 
   /**
@@ -65,12 +61,8 @@ public class CommonsConfigurationUtils {
    * @param stream containing properties
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromInputStream(InputStream stream) {
-    try {
-      return fromInputStream(stream, false, false);
-    } catch (ConfigurationException e) {
-      throw new RuntimeException(e);
-    }
+  public static PropertiesConfiguration fromInputStream(InputStream stream) throws ConfigurationException {
+    return fromInputStream(stream, false, false);
   }
 
   /**
@@ -245,10 +237,9 @@ public class CommonsConfigurationUtils {
    */
   public static List<String> getStringList(String key, PropertiesConfiguration segmentProperties) {
     List<String> stringList = new ArrayList<>();
-    List propertyList = segmentProperties.getList(key);
+    List<String> propertyList = segmentProperties.getList(String.class, key);
     if (propertyList != null) {
-      for (Object value : propertyList) {
-        String stringValue = value.toString();
+      for (String stringValue : propertyList) {
         if (!stringValue.isEmpty()) {
           if (stringValue.contains(",")) {
             stringList.addAll(List.of(stringValue.split(",")));

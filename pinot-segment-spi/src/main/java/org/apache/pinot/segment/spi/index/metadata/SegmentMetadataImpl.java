@@ -44,6 +44,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -102,7 +103,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    * For segments that can only provide the inputstream to the metadata
    */
   public SegmentMetadataImpl(InputStream metadataPropertiesInputStream, InputStream creationMetaInputStream)
-      throws IOException {
+      throws IOException, ConfigurationException {
     _indexDir = null;
     _columnMetadataMap = new TreeMap<>();
     _schema = new Schema();
@@ -122,7 +123,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    * <p>If segment metadata file exists in multiple segment version, load the one in highest segment version.
    */
   public SegmentMetadataImpl(File indexDir)
-      throws IOException {
+      throws IOException, ConfigurationException {
     _indexDir = indexDir;
     _columnMetadataMap = new TreeMap<>();
     _schema = new Schema();
@@ -199,7 +200,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  private void init(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
+  private void init(PropertiesConfiguration segmentMetadataPropertiesConfiguration)
+      throws ConfigurationException {
     if (segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_CREATOR_VERSION)) {
       _creatorName = segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_CREATOR_VERSION);
     }

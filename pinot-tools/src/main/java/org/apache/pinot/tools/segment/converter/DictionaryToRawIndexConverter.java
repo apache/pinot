@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -249,7 +250,8 @@ public class DictionaryToRawIndexConverter {
    * @param columns Converted columns
    * @param tableName New table name to be written in the meta-data. Skipped if null.
    */
-  private void updateMetadata(File segmentDir, String[] columns, String tableName) {
+  private void updateMetadata(File segmentDir, String[] columns, String tableName)
+      throws ConfigurationException {
     File metadataFile = new File(segmentDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(metadataFile);
 

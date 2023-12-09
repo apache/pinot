@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -32,13 +33,15 @@ public class SegmentMetadataUtils {
   private SegmentMetadataUtils() {
   }
 
-  public static PropertiesConfiguration getPropertiesConfiguration(File indexDir) {
+  public static PropertiesConfiguration getPropertiesConfiguration(File indexDir)
+      throws ConfigurationException {
     File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
     Preconditions.checkNotNull(metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
     return CommonsConfigurationUtils.fromFile(metadataFile);
   }
 
-  public static PropertiesConfiguration getPropertiesConfiguration(SegmentMetadata segmentMetadata) {
+  public static PropertiesConfiguration getPropertiesConfiguration(SegmentMetadata segmentMetadata)
+      throws ConfigurationException {
     File indexDir = segmentMetadata.getIndexDir();
     Preconditions.checkState(indexDir != null, "Cannot get PropertiesConfiguration from in-memory segment: %s",
         segmentMetadata.getName());

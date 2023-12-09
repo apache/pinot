@@ -77,7 +77,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   public SegmentLocalFSDirectory(File directory, ReadMode readMode)
-      throws IOException {
+      throws IOException, ConfigurationException {
     this(directory, new SegmentMetadataImpl(directory), readMode);
   }
 
@@ -269,7 +269,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         break;
     }
     if (CollectionUtils.isNotEmpty(_segmentMetadata.getStarTreeV2MetadataList())) {
-      _starTreeIndexReader = new StarTreeIndexReader(_segmentDirectory, _segmentMetadata, _readMode);
+      try {
+        _starTreeIndexReader = new StarTreeIndexReader(_segmentDirectory, _segmentMetadata, _readMode);
+      } catch (ConfigurationException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 

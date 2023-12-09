@@ -103,7 +103,8 @@ public class CommonsConfigurationUtilsTest {
     testGetStringList(orgStringList); // test for random NUM_ROUNDS strings in list
   }
 
-  private void testGetStringList(List<String> stringList) {
+  private void testGetStringList(List<String> stringList)
+      throws ConfigurationException {
     PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
 
     // test for commons-configuration2
@@ -132,7 +133,8 @@ public class CommonsConfigurationUtilsTest {
     assertEquals(stringList.size(), recoveredStringList.size());
   }
 
-  private void testPropertyValueWithSpecialCharacters(String value) {
+  private void testPropertyValueWithSpecialCharacters(String value)
+      throws ConfigurationException {
     String replacedValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(value);
 
     PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
