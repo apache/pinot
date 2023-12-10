@@ -188,7 +188,7 @@ public class PluginManager {
 
     for (String pluginsDirectory : directories) {
       if (!new File(pluginsDirectory).exists()) {
-        throw new IllegalArgumentException(String.format("Plugins dir [{}] doesn't exist.", pluginsDirectory));
+        throw new IllegalArgumentException(String.format("Plugins dir [%s] doesn't exist.", pluginsDirectory));
       }
 
       Collection<File> jarFiles = FileUtils.listFiles(
