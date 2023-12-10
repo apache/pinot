@@ -154,7 +154,7 @@ public class SegmentDeletionManager {
         }
       }
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while checking helix states for table {} " + tableName, e);
+      LOGGER.warn(String.format("Caught exception while checking helix states for table [%s]", tableName), e);
       segmentsToDelete.clear();
       segmentsToDelete.addAll(segmentIds);
       segmentsToRetryLater.clear();
