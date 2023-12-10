@@ -19,12 +19,14 @@
 package org.apache.pinot.core.util;
 
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public final class OsCheck {
 
   // cached result of OS detection
-  protected static final OSType _detectedOS;
+  private static final OSType _detectedOS;
 
   private OsCheck() {
   }
@@ -46,9 +48,11 @@ public final class OsCheck {
     Windows, MacOS, Linux, Other
   }
 
+  private static final Logger log = LoggerFactory.getLogger(OsCheck.class);
+
   static {
     String os = System.getProperty("os.name", "generic").toLowerCase(Locale.ENGLISH);
-    System.out.println(os);
+    log.info("System property \"os.name\" is [{}]", os);
     if ((os.contains("mac")) || (os.contains("darwin"))) {
       _detectedOS = OSType.MacOS;
     } else if (os.contains("win")) {
