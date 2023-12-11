@@ -264,9 +264,6 @@ public enum TransformFunctionType {
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY)), "vector_dims"),
   VECTOR_NORM("vectorNorm", ReturnTypes.explicit(SqlTypeName.DOUBLE),
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY)), "vector_norm"),
-  VECTOR_SIMILARITY("vectorSimilarity", ReturnTypes.explicit(SqlTypeName.DOUBLE),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.ARRAY, SqlTypeFamily.CHARACTER),
-          ordinal -> ordinal > 1 && ordinal < 4), "vector_similarity"),
 
   ARRAY_VALUE_CONSTRUCTOR("arrayValueConstructor", "array_value_constructor"),
 
