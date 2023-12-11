@@ -29,8 +29,6 @@ import org.apache.lucene.util.automaton.RegExp;
 import org.apache.lucene.util.automaton.Transition;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.Util;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -42,7 +40,6 @@ import org.slf4j.LoggerFactory;
  *   match(input) Function builds the automaton and matches given input.
  */
 public class RegexpMatcher {
-  public static final Logger LOGGER = LoggerFactory.getLogger(FSTBuilder.class);
 
   private final String _regexQuery;
   private final FST<Long> _fst;

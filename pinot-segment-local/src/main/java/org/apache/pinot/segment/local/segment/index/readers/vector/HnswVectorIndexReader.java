@@ -33,7 +33,6 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.HnswVectorIndexCreator;
-import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
@@ -45,7 +44,7 @@ import org.slf4j.LoggerFactory;
 
 public class HnswVectorIndexReader implements VectorIndexReader {
 
-  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexReader.class);
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(HnswVectorIndexReader.class);
 
   private final IndexReader _indexReader;
   private final Directory _indexDirectory;

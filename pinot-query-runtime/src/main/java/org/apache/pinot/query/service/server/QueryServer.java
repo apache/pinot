@@ -33,7 +33,6 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
-import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
@@ -47,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * {@link QueryServer} is the GRPC server that accepts query plan requests sent from {@link QueryDispatcher}.
  */
 public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
-  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryServer.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryServer.class);
   // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
   // See https://github.com/apache/pinot/issues/10331
   private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;

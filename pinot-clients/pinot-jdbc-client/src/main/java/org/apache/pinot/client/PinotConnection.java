@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -33,13 +32,10 @@ import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class PinotConnection extends AbstractBaseConnection {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(Connection.class);
   protected static final String[] POSSIBLE_QUERY_OPTIONS = {
     QueryOptionKey.ENABLE_NULL_HANDLING,
     QueryOptionKey.USE_MULTISTAGE_ENGINE
