@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.search.SearcherManager;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
@@ -57,8 +58,10 @@ public class LuceneMutableTextIndexTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    TextIndexConfig config =
+            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null);
     _realtimeLuceneTextIndex =
-        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", null, null, true, 500);
+        new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", config);
     String[][] documents = getTextData();
     String[][] repeatedDocuments = getRepeatedData();
 

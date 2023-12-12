@@ -31,6 +31,7 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -706,9 +707,8 @@ public class TableConfigUtilsTest {
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE, "100m");
     streamConfigs.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS);
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigs)));
-    tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-            .setIngestionConfig(ingestionConfig).build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+        .setIngestionConfig(ingestionConfig).build();
 
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -720,9 +720,8 @@ public class TableConfigUtilsTest {
     // When size based threshold is specified, rows has to be set to 0.
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "1000");
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigs)));
-    tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfig).build();
 
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -734,9 +733,8 @@ public class TableConfigUtilsTest {
     // When size based threshold is specified, rows has to be set to 0.
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "0");
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigs)));
-    tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfig).build();
 
     try {
       TableConfigUtils.validate(tableConfig, schema);
@@ -1030,7 +1028,9 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since FST index is enabled on RAW encoding type");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "FST Index is only enabled on dictionary encoded columns");
+      Assert.assertEquals(e.getMessage(),
+          "Cannot create FST index on column: myCol1, it can only be applied to dictionary encoded single value "
+              + "string columns");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
@@ -1041,7 +1041,9 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since FST index is enabled on multi value column");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "FST Index is only supported for single value string columns");
+      Assert.assertEquals(e.getMessage(),
+          "Cannot create FST index on column: myCol2, it can only be applied to dictionary encoded single value "
+              + "string columns");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
@@ -1052,7 +1054,9 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since FST index is enabled on non String column");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "FST Index is only supported for single value string columns");
+      Assert.assertEquals(e.getMessage(),
+          "Cannot create FST index on column: intCol, it can only be applied to dictionary encoded single value "
+              + "string columns");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1064,7 +1068,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should fail since TEXT index is enabled on non String column");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "TEXT Index is only supported for string columns");
+      Assert.assertEquals(e.getMessage(),
+          "Cannot create text index on column: intCol, it can only be applied to string columns");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1077,29 +1082,29 @@ public class TableConfigUtilsTest {
       Assert.fail("Should fail since field name is not present in schema");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(),
-          "Column Name myCol21 defined in field config list must be a valid column defined in the schema");
+          "Column: myCol21 defined in field config list must be a valid column defined in the schema");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
       FieldConfig fieldConfig = new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
-          FieldConfig.CompressionCodec.SNAPPY, null);
+          CompressionCodec.SNAPPY, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail since dictionary encoding does not support compression codec snappy");
+      Assert.fail("Should fail since dictionary encoding does not support compression codec SNAPPY");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Set compression codec to null for dictionary encoding type");
+      Assert.assertEquals(e.getMessage(), "Compression codec: SNAPPY is not applicable to dictionary encoded index");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
-      FieldConfig fieldConfig = new FieldConfig("intCol", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
-          FieldConfig.CompressionCodec.ZSTANDARD, null);
+      FieldConfig fieldConfig = new FieldConfig("intCol", FieldConfig.EncodingType.RAW, Collections.emptyList(),
+          CompressionCodec.MV_ENTRY_DICT, null);
       tableConfig.setFieldConfigList(Arrays.asList(fieldConfig));
       TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail since dictionary encoding does not support compression codec zstandard");
+      Assert.fail("Should fail since raw encoding does not support compression codec MV_ENTRY_DICT");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "Set compression codec to null for dictionary encoding type");
+      Assert.assertEquals(e.getMessage(), "Compression codec: MV_ENTRY_DICT is not applicable to raw index");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1227,7 +1232,7 @@ public class TableConfigUtilsTest {
       Assert.fail("Should not be able to disable dictionary but keep inverted index");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(),
-          "Cannot create an Inverted index on column myCol2 specified in the " + "noDictionaryColumns config");
+          "Cannot create an Inverted index on column myCol2 specified in the noDictionaryColumns config");
     }
 
     // Tests the case when the field-config list marks a column as raw (non-dictionary) and enables
@@ -1242,7 +1247,7 @@ public class TableConfigUtilsTest {
       Assert.fail("Should not be able to disable dictionary but keep inverted index");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(),
-          "Cannot create an Inverted Index on column: myCol2, specified as a non dictionary column");
+          "Cannot create inverted index on column: myCol2, it can only be applied to dictionary encoded columns");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1258,7 +1263,9 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validate(tableConfig, schema);
       Assert.fail("Should not be able to disable dictionary but keep inverted index");
     } catch (Exception e) {
-      Assert.assertEquals(e.getMessage(), "FST Index is only enabled on dictionary encoded columns");
+      Assert.assertEquals(e.getMessage(),
+          "Cannot create FST index on column: myCol2, it can only be applied to dictionary encoded single value "
+              + "string columns");
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1433,7 +1440,7 @@ public class TableConfigUtilsTest {
     }
 
     starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol"), null, null,
-        Arrays.asList(new StarTreeAggregationConfig("myCol2", "SUM", FieldConfig.CompressionCodec.LZ4)), 1);
+        Arrays.asList(new StarTreeAggregationConfig("myCol2", "SUM", CompressionCodec.LZ4)), 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
     try {
@@ -1759,6 +1766,61 @@ public class TableConfigUtilsTest {
       Assert.fail("Shouldn't fail table creation when delete column type is boolean.");
     }
 
+    // upsert deleted-keys-ttl configs with no deleted column
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+            .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN).build();
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeletedKeysTTL(3600);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+            .setUpsertConfig(upsertConfig)
+            .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+            .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Deleted Keys TTL can only be enabled with deleteRecordColumn set.");
+    }
+
+    upsertConfig.setDeleteRecordColumn(delCol);
+    // multiple comparison columns set for deleted-keys-ttl
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
+            .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+            .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN).build();
+    upsertConfig.setComparisonColumns(Lists.newArrayList(TIME_COLUMN, "myCol"));
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+            .setUpsertConfig(upsertConfig)
+            .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+            .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "MetadataTTL / DeletedKeysTTL does not work with multiple comparison columns");
+    }
+
+    // comparison column with non-numeric type
+    upsertConfig.setComparisonColumns(Lists.newArrayList("myCol"));
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+            .setUpsertConfig(upsertConfig)
+            .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+            .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "MetadataTTL / DeletedKeysTTL must have comparison column: myCol in numeric type, found: STRING");
+    }
+
+    // time column as comparison column
+    upsertConfig.setComparisonColumns(Lists.newArrayList(TIME_COLUMN));
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+            .setUpsertConfig(upsertConfig)
+            .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+            .build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
     // upsert out-of-order configs
     String outOfOrderRecordColumn = "outOfOrderRecordColumn";
     boolean dropOutOfOrderRecord = true;
@@ -1798,8 +1860,7 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(),
-          "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
+      Assert.assertEquals(e.getMessage(), "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
     }
   }
 

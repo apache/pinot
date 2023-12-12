@@ -20,7 +20,6 @@ package org.apache.pinot.spi.env;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -107,11 +106,12 @@ public class CommonsConfigurationUtils {
       // Explicitly providing the input stream on load bypasses the problem.
       propertiesConfiguration.setFile(file);
       if (file.exists()) {
-        propertiesConfiguration.load(new FileInputStream(file));
+        try (InputStream in = new FileInputStream(file)) {
+          propertiesConfiguration.load(in);
+        }
       }
-
       return propertiesConfiguration;
-    } catch (org.apache.commons.configuration.ConfigurationException | FileNotFoundException e) {
+    } catch (org.apache.commons.configuration.ConfigurationException | IOException e) {
       throw new RuntimeException(e);
     }
   }

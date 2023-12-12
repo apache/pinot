@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
@@ -88,9 +89,10 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
   @Override
   protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
-      RequestContext requestContext)
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+      ServerStats serverStats, RequestContext requestContext)
       throws Exception {
     // TODO: Support failure detection
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
@@ -106,8 +108,8 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
           requestContext.isSampledRequest());
     }
     final long startReduceTimeNanos = System.nanoTime();
-    BrokerResponseNative brokerResponse = _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest,
-        responseMap, timeoutMs, _brokerMetrics);
+    BrokerResponseNative brokerResponse =
+        _streamingReduceService.reduceOnStreamResponse(originalBrokerRequest, responseMap, timeoutMs, _brokerMetrics);
     requestContext.setReduceTimeNanos(System.nanoTime() - startReduceTimeNanos);
     return brokerResponse;
   }
@@ -116,11 +118,12 @@ public class GrpcBrokerRequestHandler extends BaseBrokerRequestHandler {
    * Query pinot server for data table.
    */
   private void sendRequest(long requestId, TableType tableType, BrokerRequest brokerRequest,
-      Map<ServerInstance, List<String>> routingTable,
+      Map<ServerInstance, Pair<List<String>, List<String>>> routingTable,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, boolean trace) {
-    for (Map.Entry<ServerInstance, List<String>> routingEntry : routingTable.entrySet()) {
+    for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> routingEntry : routingTable.entrySet()) {
       ServerInstance serverInstance = routingEntry.getKey();
-      List<String> segments = routingEntry.getValue();
+      // TODO: support optional segments for GrpcQueryServer.
+      List<String> segments = routingEntry.getValue().getLeft();
       String serverHost = serverInstance.getHostname();
       int port = serverInstance.getGrpcPort();
       // TODO: enable throttling on per host bases.

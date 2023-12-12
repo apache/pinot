@@ -74,8 +74,14 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
     // Initialize the query generator
     setUpQueryGenerator(avroFiles);
 
+    runValidationJob(600_000);
+
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+  }
+
+  protected void runValidationJob(long timeoutMs)
+      throws Exception {
   }
 
   protected void createSegmentsAndUpload(List<File> avroFile, Schema schema, TableConfig tableConfig)

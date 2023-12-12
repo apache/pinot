@@ -36,6 +36,7 @@ import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueEntryDictForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
@@ -48,6 +49,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreInd
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -55,8 +57,11 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
@@ -780,8 +785,18 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             }
           }
         } else {
-          try (ForwardIndexCreator forwardIndexCreator = new MultiValueUnsortedForwardIndexCreator(_indexDir, column,
-              cardinality, numDocs, indexCreationInfo.getTotalNumberOfEntries())) {
+          DictIdCompressionType dictIdCompressionType = null;
+          FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
+          if (fieldIndexConfig != null) {
+            ForwardIndexConfig forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
+            if (forwardIndexConfig != null) {
+              dictIdCompressionType = forwardIndexConfig.getDictIdCompressionType();
+            }
+          }
+          try (ForwardIndexCreator forwardIndexCreator = dictIdCompressionType == DictIdCompressionType.MV_ENTRY_DICT
+              ? new MultiValueEntryDictForwardIndexCreator(_indexDir, column, cardinality, numDocs)
+              : new MultiValueUnsortedForwardIndexCreator(_indexDir, column, cardinality, numDocs,
+                  indexCreationInfo.getTotalNumberOfEntries())) {
             for (int i = 0; i < numDocs; i++) {
               forwardIndexCreator.putDictIdMV(dictionaryCreator.indexOfMV(outputValues[i]));
             }

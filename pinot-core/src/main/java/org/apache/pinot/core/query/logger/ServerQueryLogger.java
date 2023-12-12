@@ -82,7 +82,7 @@ public class ServerQueryLogger {
         getLongValue(responseMetadata, MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER.getName(), -1);
     addToTableMeter(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
 
-    int numSegmentsQueried = request.getSegmentsToQuery().size();
+    long numSegmentsQueried = getLongValue(responseMetadata, MetadataKey.NUM_SEGMENTS_QUERIED.getName(), -1);
     addToTableMeter(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
 
     long numSegmentsProcessed = getLongValue(responseMetadata, MetadataKey.NUM_SEGMENTS_PROCESSED.getName(), -1);

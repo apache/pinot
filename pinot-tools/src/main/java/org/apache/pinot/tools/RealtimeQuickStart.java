@@ -77,6 +77,8 @@ public class RealtimeQuickStart extends QuickStartBase {
     printStatus(Color.CYAN, "Query : " + q5);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
     printStatus(Color.GREEN, "***************************************************");
+
+    runVectorQueryExamples(runner);
   }
 
   public void execute()

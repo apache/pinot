@@ -113,6 +113,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION)) {
         FileUtils.deleteDirectory(file);
       }
+      if (file.isDirectory() && file.getName().endsWith(V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION)) {
+        FileUtils.deleteDirectory(file);
+      }
     }
   }
 
@@ -154,7 +157,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         for (String column : v2Metadata.getAllColumns()) {
           for (IndexType<?, ?, ?> indexType : sortedIndexTypes()) {
             // NOTE: Text index is copied separately
-            if (indexType != StandardIndexes.text()) {
+            if (indexType != StandardIndexes.text() && indexType != StandardIndexes.vector()) {
               copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
             }
           }
@@ -163,6 +166,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       }
     }
     copyLuceneTextIndexIfExists(v2Directory, v3Directory);
+    copyVectorIndexIfExists(v2Directory, v3Directory);
     copyStarTreeV2(v2Directory, v3Directory);
   }
 
@@ -253,6 +257,27 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     for (File docIdMappingFile : textIndexDocIdMappingFiles) {
       File v3DocIdMappingFile = new File(v3Dir, docIdMappingFile.getName());
       Files.copy(docIdMappingFile.toPath(), v3DocIdMappingFile.toPath());
+    }
+  }
+
+  private void copyVectorIndexIfExists(File segmentDirectory, File v3Dir)
+      throws IOException {
+    // TODO: see if this can be done by reusing some existing methods
+    String suffix = V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
+    File[] vectorIndexFiles = segmentDirectory.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith(suffix);
+      }
+    });
+    for (File vectorIndexFile : vectorIndexFiles) {
+      File[] indexFiles = vectorIndexFile.listFiles();
+      File v3VectorIndexDir = new File(v3Dir, vectorIndexFile.getName());
+      v3VectorIndexDir.mkdir();
+      for (File indexFile : indexFiles) {
+        File v3VectorIndexFile = new File(v3VectorIndexDir, indexFile.getName());
+        Files.copy(indexFile.toPath(), v3VectorIndexFile.toPath());
+      }
     }
   }
 

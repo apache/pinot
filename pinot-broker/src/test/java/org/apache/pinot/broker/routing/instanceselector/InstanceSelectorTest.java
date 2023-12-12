@@ -151,7 +151,7 @@ public class InstanceSelectorTest {
   }
 
   private static boolean isReplicaGroupType(String selectorType) {
-    return selectorType.equals(RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) || selectorType.equals(
+    return selectorType.equals(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) || selectorType.equals(
         STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
   }
 
@@ -165,7 +165,7 @@ public class InstanceSelectorTest {
   @DataProvider(name = "selectorType")
   public Object[] getSelectorType() {
     return new Object[]{
-        RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
+        REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
         BALANCED_INSTANCE_SELECTOR
     };
   }
@@ -203,7 +203,7 @@ public class InstanceSelectorTest {
         brokerMetrics) instanceof BalancedInstanceSelector);
 
     // Replica-group instance selector should be returned
-    when(routingConfig.getInstanceSelectorType()).thenReturn(RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
+    when(routingConfig.getInstanceSelectorType()).thenReturn(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
     assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
         brokerMetrics) instanceof ReplicaGroupInstanceSelector);
 
@@ -1414,15 +1414,15 @@ public class InstanceSelectorTest {
       // First selection, we select instance0 for oldSeg and instance1 for newSeg in balance selector
       // For replica group, we select instance0 for oldSeg and newSeg. Because newSeg is not online in instance0, so
       // we exclude it from selection result.
-      Map<String, String> expectedSelectionResult;
-      if (isReplicaGroupType(selectorType)) {
-        expectedSelectionResult = ImmutableMap.of(oldSeg, instance0);
-      } else {
-        expectedSelectionResult = ImmutableMap.of(oldSeg, instance0, newSeg, instance1);
-      }
       InstanceSelector.SelectionResult selectionResult =
           selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-      assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectionResult);
+      if (isReplicaGroupType(selectorType)) {
+        assertEquals(selectionResult.getSegmentToInstanceMap(), ImmutableMap.of(oldSeg, instance0));
+        assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), ImmutableMap.of(newSeg, instance0));
+      } else {
+        assertEquals(selectionResult.getSegmentToInstanceMap(), ImmutableMap.of(oldSeg, instance0, newSeg, instance1));
+        assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
+      }
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     }
     {
@@ -1430,21 +1430,22 @@ public class InstanceSelectorTest {
       // Second selection, we select instance1 for oldSeg and instance0 for newSeg in balance selector
       // Because newSeg is not online in instance0, so we exclude it from selection result.
       // For replica group, we select instance1 for oldSeg and newSeg.
-      Map<String, String> expectedSelectionResult;
+      InstanceSelector.SelectionResult selectionResult =
+          selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
       switch (selectorType) {
         case BALANCED_INSTANCE_SELECTOR:
-          expectedSelectionResult = ImmutableMap.of(oldSeg, instance1);
+          assertEquals(selectionResult.getSegmentToInstanceMap(), ImmutableMap.of(oldSeg, instance1));
+          assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), ImmutableMap.of(newSeg, instance0));
           break;
         case STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE: // fall through
-        case RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
-          expectedSelectionResult = ImmutableMap.of(oldSeg, instance1, newSeg, instance1);
+        case REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
+          assertEquals(selectionResult.getSegmentToInstanceMap(),
+              ImmutableMap.of(oldSeg, instance1, newSeg, instance1));
+          assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
           break;
         default:
           throw new RuntimeException("unsupported selector type:" + selectorType);
       }
-      InstanceSelector.SelectionResult selectionResult =
-          selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-      assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectionResult);
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     }
     // Advance the clock to make newSeg to old segment.
@@ -1453,21 +1454,22 @@ public class InstanceSelectorTest {
     selector.init(enabledInstances, idealState, externalView, onlineSegments);
     {
       int requestId = 0;
-      Map<String, String> expectedSelectionResult;
+      InstanceSelector.SelectionResult selectionResult =
+          selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
       switch (selectorType) {
         case BALANCED_INSTANCE_SELECTOR: // fall through
-        case RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
-          expectedSelectionResult = ImmutableMap.of(oldSeg, instance0, newSeg, instance1);
+        case REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
+          assertEquals(selectionResult.getSegmentToInstanceMap(),
+              ImmutableMap.of(oldSeg, instance0, newSeg, instance1));
           break;
         case STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE:
-          expectedSelectionResult = ImmutableMap.of(oldSeg, instance1, newSeg, instance1);
+          assertEquals(selectionResult.getSegmentToInstanceMap(),
+              ImmutableMap.of(oldSeg, instance1, newSeg, instance1));
           break;
         default:
           throw new RuntimeException("unsupported selector type:" + selectorType);
       }
-      InstanceSelector.SelectionResult selectionResult =
-          selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-      assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectionResult);
+      assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     }
     {
@@ -1476,6 +1478,7 @@ public class InstanceSelectorTest {
       InstanceSelector.SelectionResult selectionResult =
           selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
       assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectionResult);
+      assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
       assertTrue(selectionResult.getUnavailableSegments().isEmpty());
     }
   }
@@ -1523,19 +1526,21 @@ public class InstanceSelectorTest {
     InstanceSelector.SelectionResult selectionResult =
         selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
+    assertEquals(selectionResult.getOptionalSegmentToInstanceMap(), ImmutableMap.of(newSeg, instance0));
     assertTrue(selectionResult.getUnavailableSegments().isEmpty());
 
     // Advance the clock to make newSeg to old segment and we see newSeg is reported as unavailable segment.
     _mutableClock.fastForward(Duration.ofMillis(NEW_SEGMENT_EXPIRATION_MILLIS + 10));
     selector.init(enabledInstances, idealState, externalView, onlineSegments);
     selectionResult = selector.select(_brokerRequest, Lists.newArrayList(onlineSegments), requestId);
-    if (selectorType == STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE) {
+    if (STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equals(selectorType)) {
       expectedResult = ImmutableMap.of();
       assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg, oldSeg));
     } else {
       assertEquals(selectionResult.getUnavailableSegments(), ImmutableList.of(newSeg));
     }
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedResult);
+    assertTrue(selectionResult.getOptionalSegmentToInstanceMap().isEmpty());
   }
 
   @Test(dataProvider = "selectorType")

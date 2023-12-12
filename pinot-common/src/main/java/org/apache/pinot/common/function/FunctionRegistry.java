@@ -173,5 +173,10 @@ public class FunctionRegistry {
     public static boolean jsonMatch(String text, String pattern) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
+
+    @ScalarFunction(names = {"vectorSimilarity", "vector_similarity"}, isPlaceholder = true)
+    public static double vectorSimilarity(float[] vector1, float[] vector2) {
+      throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
   }
 }

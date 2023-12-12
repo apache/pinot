@@ -261,6 +261,11 @@ public class SketchFunctions {
     return diff.getResult(false, null, false);
   }
 
+  @ScalarFunction(names = {"thetaSketchToString", "theta_sketch_to_string"})
+  public static String thetaSketchToString(Object sketchObject) {
+    return asThetaSketch(sketchObject).toString();
+  }
+
   private static Sketch thetaSketchUnionVar(Object... sketchObjects) {
     Union union = SET_OPERATION_BUILDER.buildUnion();
     for (Object sketchObj : sketchObjects) {
@@ -415,6 +420,11 @@ public class SketchFunctions {
   @ScalarFunction(names = {"cpcSketchUnion", "cpc_sketch_union"})
   public static byte[] cpcSketchUnion(Object o1, Object o2, Object o3, Object o4, Object o5) {
     return cpcSketchUnionVar(o1, o2, o3, o4, o5);
+  }
+
+  @ScalarFunction(names = {"cpcSketchToString", "cpc_sketch_to_string"})
+  public static String cpcSketchToString(Object sketchObject) {
+    return asCpcSketch(sketchObject).toString();
   }
 
   /**

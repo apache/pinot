@@ -118,6 +118,27 @@
         ]
       },
       {
+        "description": "multi 'with' table and semi-joins on same column multiple conditions and other column condition",
+        "sql": "WITH t1 AS ( SELECT * FROM {tbl1} WHERE intCol > 1 ) SELECT boolCol, strCol1, strCol2, intCol FROM {tbl2} WHERE strCol1 IN (SELECT strCol FROM t1) AND strCol2 IN (SELECT strCol2 FROM {tbl2} WHERE intCol > 1000) AND strCol1 IN (SELECT strCol1 FROM {tbl2} WHERE boolCol)",
+        "outputs": [
+          [true, "b", "bob", 196883]
+        ]
+      },
+      {
+        "description": "multi 'with' table and semi-joins and group-by with having",
+        "sql": "WITH t1 AS ( SELECT * FROM {tbl1} WHERE intCol > 1 ) SELECT strCol1, SUM(doubleCol) FROM {tbl2} WHERE strCol1 IN (SELECT strCol FROM t1) AND intCol IN (SELECT intCol FROM {tbl1} WHERE intCol < 100) GROUP BY strCol1 HAVING COUNT(*) < 10",
+        "outputs": [
+          ["a", 275.12]
+        ]
+      },
+      {
+        "description": "multi 'with' table and semi-joins and agg",
+        "sql": "WITH t1 AS ( SELECT * FROM {tbl1} WHERE intCol > 1 ) SELECT COUNT(*) FROM {tbl2} WHERE strCol1 IN (SELECT strCol FROM t1) AND intCol IN (SELECT intCol FROM {tbl1} WHERE intCol < 100)",
+        "outputs": [
+          [2]
+        ]
+      },
+      {
         "description": "nested 'with' on agg table: (with a as ( ... ), select ... ",
         "sql": "WITH agg1 AS (SELECT strCol1, strCol2, sum(intCol) AS sumVal FROM {tbl2} GROUP BY strCol1, strCol2) SELECT strCol1, avg(sumVal) AS avgVal FROM agg1 GROUP BY strCol1",
         "outputs": [

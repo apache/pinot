@@ -23,7 +23,6 @@ import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -35,8 +34,9 @@ import org.apache.pinot.spi.data.Schema;
  */
 @ThreadSafe
 public interface TableUpsertMetadataManager extends Closeable {
-  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, ServerMetrics serverMetrics,
-      HelixManager helixManager, @Nullable ExecutorService segmentPreloadExecutor);
+
+  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, HelixManager helixManager,
+      @Nullable ExecutorService segmentPreloadExecutor);
 
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 

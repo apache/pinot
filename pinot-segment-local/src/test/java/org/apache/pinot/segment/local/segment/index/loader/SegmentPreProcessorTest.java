@@ -62,6 +62,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -656,9 +657,8 @@ public class SegmentPreProcessorTest {
   @Test
   public void testForwardIndexHandlerChangeCompression()
       throws Exception {
-    Map<String, ChunkCompressionType> compressionConfigs = new HashMap<>();
-    ChunkCompressionType newCompressionType = ChunkCompressionType.ZSTANDARD;
-    compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    Map<String, CompressionCodec> compressionConfigs = new HashMap<>();
+    compressionConfigs.put(EXISTING_STRING_COL_RAW, CompressionCodec.ZSTANDARD);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     _indexLoadingConfig.addNoDictionaryColumns(EXISTING_STRING_COL_RAW);
 
@@ -672,12 +672,11 @@ public class SegmentPreProcessorTest {
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
 
     // Test2: Now forward index will be rewritten with ZSTANDARD compressionType.
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, newCompressionType, true,
-        0, DataType.STRING, 100000);
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0,
+        ChunkCompressionType.ZSTANDARD, true, 0, DataType.STRING, 100000);
 
     // Test3: Change compression on existing raw index column. Also add text index on same column. Check correctness.
-    newCompressionType = ChunkCompressionType.SNAPPY;
-    compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    compressionConfigs.put(EXISTING_STRING_COL_RAW, CompressionCodec.SNAPPY);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     Set<String> textIndexColumns = new HashSet<>();
     textIndexColumns.add(EXISTING_STRING_COL_RAW);
@@ -688,12 +687,11 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
     assertNotNull(columnMetadata);
     checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0);
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
-        0, newCompressionType, false, DataType.STRING, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true, 0,
+        ChunkCompressionType.SNAPPY, false, DataType.STRING, 100000);
 
     // Test4: Change compression on RAW index column. Change another index on another column. Check correctness.
-    newCompressionType = ChunkCompressionType.ZSTANDARD;
-    compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    compressionConfigs.put(EXISTING_STRING_COL_RAW, CompressionCodec.ZSTANDARD);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     Set<String> fstColumns = new HashSet<>();
     fstColumns.add(EXISTING_STRING_COL_DICT);
@@ -706,12 +704,11 @@ public class SegmentPreProcessorTest {
     // Check FST index
     checkFSTIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _newColumnsSchemaWithFST, false, false, 26);
     // Check forward index.
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
-        0, newCompressionType, false, DataType.STRING, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true, 0,
+        ChunkCompressionType.ZSTANDARD, false, DataType.STRING, 100000);
 
     // Test5: Change compressionType for an MV column
-    newCompressionType = ChunkCompressionType.ZSTANDARD;
-    compressionConfigs.put(EXISTING_INT_COL_RAW_MV, newCompressionType);
+    compressionConfigs.put(EXISTING_INT_COL_RAW_MV, CompressionCodec.ZSTANDARD);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     _indexLoadingConfig.addNoDictionaryColumns(EXISTING_INT_COL_RAW_MV);
 

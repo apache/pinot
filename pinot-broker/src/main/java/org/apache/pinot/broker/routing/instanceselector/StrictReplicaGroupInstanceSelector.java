@@ -172,5 +172,9 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
       }
       _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMap.get(segment), candidates));
     }
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
+          _oldSegmentCandidatesMap.keySet());
+    }
   }
 }

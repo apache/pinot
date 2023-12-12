@@ -325,6 +325,16 @@ public class ControllerRequestClient {
     }
   }
 
+  public void runPeriodicTask(String taskName)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(
+          _controllerRequestURLBuilder.forPeriodTaskRun(taskName)).toURI()));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
   protected String getBrokerTenantRequestPayload(String tenantName, int numBrokers) {
     return new Tenant(TenantRole.BROKER, tenantName, numBrokers, 0, 0).toJsonString();
   }
