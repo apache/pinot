@@ -65,6 +65,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected final String _tableNameWithType;
   protected final int _partitionId;
+  protected final UpsertContext _context;
   protected final List<String> _primaryKeyColumns;
   protected final List<String> _comparisonColumns;
   protected final String _deleteRecordColumn;
@@ -97,25 +98,23 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private int _numPendingOperations = 1;
   private boolean _closed;
 
-  protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
-      List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
-      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, double deletedKeysTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+  protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
-    _primaryKeyColumns = primaryKeyColumns;
-    _comparisonColumns = comparisonColumns;
-    _deleteRecordColumn = deleteRecordColumn;
-    _hashFunction = hashFunction;
-    _partialUpsertHandler = partialUpsertHandler;
-    _enableSnapshot = enableSnapshot;
-    _metadataTTL = metadataTTL;
-    _deletedKeysTTL = deletedKeysTTL;
-    _tableIndexDir = tableIndexDir;
-    _snapshotLock = enableSnapshot ? new ReentrantReadWriteLock() : null;
-    _serverMetrics = serverMetrics;
+    _context = context;
+    _primaryKeyColumns = context.getPrimaryKeyColumns();
+    _comparisonColumns = context.getComparisonColumns();
+    _deleteRecordColumn = context.getDeleteRecordColumn();
+    _hashFunction = context.getHashFunction();
+    _partialUpsertHandler = context.getPartialUpsertHandler();
+    _enableSnapshot = context.isSnapshotEnabled();
+    _snapshotLock = _enableSnapshot ? new ReentrantReadWriteLock() : null;
+    _metadataTTL = context.getMetadataTTL();
+    _deletedKeysTTL = context.getDeletedKeysTTL();
+    _tableIndexDir = context.getTableIndexDir();
+    _serverMetrics = ServerMetrics.get();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
-    if (metadataTTL > 0) {
+    if (_metadataTTL > 0) {
       _largestSeenComparisonValue = loadWatermark();
     } else {
       _largestSeenComparisonValue = Double.MIN_VALUE;

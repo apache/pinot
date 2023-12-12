@@ -48,7 +48,9 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -58,6 +60,7 @@ import org.mockito.MockedConstruction;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -72,13 +75,25 @@ import static org.testng.Assert.*;
 public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
+  private static final List<String> PRIMARY_KEY_COLUMNS = Collections.singletonList("pk");
+  private static final List<String> COMPARISON_COLUMNS = Collections.singletonList("timeCol");
+  private static final String DELETE_RECORD_COLUMN = "deleteCol";
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), "ConcurrentMapPartitionUpsertMetadataManagerTest");
+
+  private UpsertContext.Builder _contextBuilder;
 
   @BeforeClass
   public void setUp()
       throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
+    ServerMetrics.register(mock(ServerMetrics.class));
+  }
+
+  @BeforeMethod
+  public void setUpContextBuilder() {
+    _contextBuilder = new UpsertContext.Builder().setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
+        .setPrimaryKeyColumns(PRIMARY_KEY_COLUMNS).setComparisonColumns(COMPARISON_COLUMNS).setTableIndexDir(INDEX_DIR);
   }
 
   @AfterClass
@@ -90,9 +105,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   @Test
   public void testStartFinishOperation() {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 0, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
 
     // Start 2 operations
     assertTrue(upsertMetadataManager.startOperation());
@@ -150,6 +163,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   @Test
   public void testUpsertMetadataCleanupWithTTLConfig()
       throws IOException {
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
     verifyRemoveExpiredPrimaryKeys(new Integer(80), new Integer(120));
     verifyRemoveExpiredPrimaryKeys(new Float(80), new Float(120));
     verifyRemoveExpiredPrimaryKeys(new Double(80), new Double(120));
@@ -165,6 +179,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   @Test
   public void testGetQueryableDocIds() {
+    _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN);
+
     boolean[] deleteFlags1 = new boolean[]{false, false, false, true, true, false};
     int[] docIds1 = new int[]{2, 4, 5};
     MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
@@ -202,11 +218,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   private void verifyAddReplaceRemoveSegment(HashFunction hashFunction, boolean enableSnapshot)
       throws IOException {
-    String comparisonColumn = "timeCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(hashFunction).build());
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
 
@@ -354,6 +368,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   @Test
   public void testAddReplaceRemoveSegmentWithRecordDelete()
       throws IOException {
+    _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN);
     verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.NONE, false);
     verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.MD5, false);
     verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.MURMUR3, false);
@@ -364,12 +379,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   private void verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction hashFunction, boolean enableSnapshot)
       throws IOException {
-    String comparisonColumn = "timeCol";
-    String deleteRecordColumn = "deleteCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), deleteRecordColumn, hashFunction, null, false, 0,
-            0, INDEX_DIR, mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(hashFunction).setEnableSnapshot(enableSnapshot).build());
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
 
@@ -548,11 +560,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   private List<RecordInfo> getRecordInfoListForTTL(int numRecords, int[] primaryKeys, int[] timestamps,
-                                             @Nullable boolean[] deleteRecordFlags) {
+      @Nullable boolean[] deleteRecordFlags) {
     List<RecordInfo> recordInfoList = new ArrayList<>();
     for (int i = 0; i < numRecords; i++) {
       recordInfoList.add(new RecordInfo(makePrimaryKey(primaryKeys[i]), i, new Integer(timestamps[i]),
-              deleteRecordFlags != null && deleteRecordFlags[i]));
+          deleteRecordFlags != null && deleteRecordFlags[i]));
     }
     return recordInfoList;
   }
@@ -667,11 +679,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   private void verifyAddRecord(HashFunction hashFunction)
       throws IOException {
-    String comparisonColumn = "timeCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(hashFunction).build());
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -760,11 +770,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   private void verifyAddOutOfOrderRecord(HashFunction hashFunction)
       throws IOException {
-    String comparisonColumn = "timeCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(hashFunction).build());
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -828,11 +836,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   private void verifyPreloadSegment(HashFunction hashFunction) {
-    String comparisonColumn = "timeCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), null, hashFunction, null, false, 0, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(hashFunction).build());
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -876,6 +882,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   @Test
   public void testAddRecordWithDeleteColumn()
       throws IOException {
+    _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN);
     verifyAddRecordWithDeleteColumn(HashFunction.NONE);
     verifyAddRecordWithDeleteColumn(HashFunction.MD5);
     verifyAddRecordWithDeleteColumn(HashFunction.MURMUR3);
@@ -883,12 +890,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   private void verifyAddRecordWithDeleteColumn(HashFunction hashFunction)
       throws IOException {
-    String comparisonColumn = "timeCol";
-    String deleteColumn = "deleteCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), deleteColumn, hashFunction, null,
-            false, 0, 0, INDEX_DIR, mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(hashFunction).build());
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // queryableDocIds is same as validDocIds in the absence of delete markers
@@ -985,21 +989,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   @Test
   public void testRemoveExpiredDeletedKeys()
-          throws IOException {
+      throws IOException {
+    _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN).setDeletedKeysTTL(20);
     verifyRemoveExpiredDeletedKeys(HashFunction.NONE);
     verifyRemoveExpiredDeletedKeys(HashFunction.MD5);
     verifyRemoveExpiredDeletedKeys(HashFunction.MURMUR3);
   }
 
   private void verifyRemoveExpiredDeletedKeys(HashFunction hashFunction)
-          throws IOException {
-
-    String comparisonColumn = "timeCol";
-    String deleteColumn = "deleteCol";
+      throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-            new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-                    Collections.singletonList(comparisonColumn), deleteColumn, hashFunction, null,
-                    false, 0, 20, INDEX_DIR, mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(hashFunction).build());
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
@@ -1010,9 +1011,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     ThreadSafeMutableRoaringBitmap queryableDocIds1 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl segment1 =
-            mockImmutableSegment(1, validDocIds1, queryableDocIds1, getPrimaryKeyList(numRecords, primaryKeys));
+        mockImmutableSegment(1, validDocIds1, queryableDocIds1, getPrimaryKeyList(numRecords, primaryKeys));
     upsertMetadataManager.addSegment(segment1, validDocIds1, queryableDocIds1,
-            getRecordInfoListForTTL(numRecords, primaryKeys, timestamps, null).iterator());
+        getRecordInfoListForTTL(numRecords, primaryKeys, timestamps, null).iterator());
 
     // Update records from the second segment
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
@@ -1069,16 +1070,18 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertEquals(validDocIds2.getMutableRoaringBitmap().toArray(), new int[]{2});
     assertEquals(queryableDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1});
     assertEquals(queryableDocIds2.getMutableRoaringBitmap().toArray(), new int[]{});
+
+    // Stop the metadata manager
+    upsertMetadataManager.stop();
+
+    // Close the metadata manager
+    upsertMetadataManager.close();
   }
 
   private void verifyRemoveExpiredPrimaryKeys(Comparable earlierComparisonValue, Comparable largerComparisonValue)
       throws IOException {
-    File tableDir = new File(INDEX_DIR, REALTIME_TABLE_NAME);
-
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, false, 30, 0, tableDir,
-            mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -1095,8 +1098,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
     ImmutableSegmentImpl segment1 =
-        mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, Collections.singletonList("timeCol"),
-            earlierComparisonValue, null);
+        mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, COMPARISON_COLUMNS, earlierComparisonValue,
+            null);
 
     int[] docIds1 = new int[]{0, 1, 2, 3};
     MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
@@ -1141,12 +1144,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   private void verifyAddOutOfTTLSegment()
       throws IOException {
-    File tableDir = new File(INDEX_DIR, REALTIME_TABLE_NAME);
-
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 30, 0, tableDir,
-            mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -1163,8 +1162,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
     ImmutableSegmentImpl segment1 =
-        mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, Collections.singletonList("timeCol"),
-            new Double(80), null);
+        mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, COMPARISON_COLUMNS, new Double(80), null);
 
     int[] docIds1 = new int[]{0, 1, 2, 3};
     MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
@@ -1199,8 +1197,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     validDocIdsSnapshot2.add(docIds2);
     ThreadSafeMutableRoaringBitmap validDocIds2 = new ThreadSafeMutableRoaringBitmap();
     ImmutableSegmentImpl segment2 =
-        mockImmutableSegmentWithEndTime(1, validDocIds2, null, primaryKeys2, Collections.singletonList("timeCol"),
-            new Double(80), validDocIdsSnapshot2);
+        mockImmutableSegmentWithEndTime(1, validDocIds2, null, primaryKeys2, COMPARISON_COLUMNS, new Double(80),
+            validDocIdsSnapshot2);
     upsertMetadataManager.addSegment(segment2);
     // out of ttl segment should not be added to recordLocationMap
     assertEquals(recordLocationMap.size(), 5);
@@ -1214,12 +1212,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   private void verifyAddOutOfTTLSegmentWithRecordDelete()
       throws IOException {
-    String comparisonColumn = "timeCol";
-    String deleteRecordColumn = "deleteCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), deleteRecordColumn, HashFunction.NONE, null, true, 30,
-            0, INDEX_DIR, mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
     Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
 
@@ -1235,8 +1229,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     int[] docIds1 = new int[]{2, 4, 5};
     MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
     validDocIdsSnapshot1.add(docIds1);
-    ImmutableSegmentImpl segment1 = mockImmutableSegmentWithEndTime(1, validDocIds1, queryableDocIds1, primaryKeys1,
-        Collections.singletonList(comparisonColumn), new Double(120), validDocIdsSnapshot1);
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegmentWithEndTime(1, validDocIds1, queryableDocIds1, primaryKeys1, COMPARISON_COLUMNS,
+            new Double(120), validDocIdsSnapshot1);
 
     // get recordInfo from validDocIdSnapshot.
     // segment1 snapshot: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
@@ -1266,7 +1261,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     validDocIdsSnapshot2.add(docIds2);
     ImmutableSegmentImpl segment2 =
         mockImmutableSegmentWithEndTime(2, validDocIds2, queryableDocIds2, getPrimaryKeyList(numRecords, primaryKeys),
-            Collections.singletonList(comparisonColumn), new Double(40), validDocIdsSnapshot2);
+            COMPARISON_COLUMNS, new Double(40), validDocIdsSnapshot2);
 
     // get recordInfo from validDocIdSnapshot.
     // segment2 snapshot: 3 -> {3, 40}, 4 -> {4, 40}
@@ -1299,12 +1294,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   public void verifyGetQueryableDocIds(boolean isDeleteColumnNull, boolean[] deleteFlags,
       MutableRoaringBitmap validDocIdsSnapshot, MutableRoaringBitmap queryableDocIds) {
-    String comparisonColumn = "timeCol";
-    String deleteRecordColumn = "deleteCol";
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList(comparisonColumn), deleteRecordColumn, HashFunction.NONE, null, true, 30,
-            0, INDEX_DIR, mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
 
     try (MockedConstruction<PinotSegmentColumnReader> deleteColReader = mockConstruction(PinotSegmentColumnReader.class,
         (mockReader, context) -> {
@@ -1318,9 +1309,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
       when(segmentMetadata.getTotalDocs()).thenReturn(deleteFlags.length);
       when(segmentMetadata.getColumnMetadataMap()).thenReturn(new TreeMap() {{
-        this.put(comparisonColumn, columnMetadata);
+        this.put(COMPARISON_COLUMNS.get(0), columnMetadata);
       }});
-      when(columnMetadata.getMaxValue()).thenReturn(null);
 
       ImmutableSegmentImpl segment =
           mockImmutableSegmentWithSegmentMetadata(1, new ThreadSafeMutableRoaringBitmap(), null, null, segmentMetadata,
@@ -1331,12 +1321,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
 
   private void verifyAddSegmentForTTL(Comparable comparisonValue)
       throws IOException {
-    File tableDir = new File(INDEX_DIR, REALTIME_TABLE_NAME);
-
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 30, 0, tableDir,
-            mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
     Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
         upsertMetadataManager._primaryKeyToRecordLocationMap;
 
@@ -1352,8 +1338,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
     List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
     ImmutableSegmentImpl segment1 =
-        mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, Collections.singletonList("timeCol"), -1,
-            null);
+        mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, COMPARISON_COLUMNS, -1, null);
 
     int[] docIds1 = new int[]{0, 1, 2, 3};
     MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
@@ -1395,9 +1380,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   private void verifyPersistAndLoadWatermark()
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, Collections.singletonList("pk"),
-            Collections.singletonList("timeCol"), null, HashFunction.NONE, null, true, 10, 0, INDEX_DIR,
-            mock(ServerMetrics.class));
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
 
     double currentTimeMs = System.currentTimeMillis();
     upsertMetadataManager.persistWatermark(currentTimeMs);
