@@ -18,16 +18,20 @@
  */
 package org.apache.pinot.common.function;
 
-import com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.calcite.schema.Function;
-import org.apache.calcite.schema.impl.ScalarFunctionImpl;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.schema.impl.ReflectiveFunctionBase;
 import org.apache.calcite.util.NameMultimap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -46,11 +50,7 @@ public class FunctionRegistry {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
 
-  // TODO: consolidate the following 2
-  // This FUNCTION_INFO_MAP is used by Pinot server to look up function by # of arguments
-  private static final Map<String, Map<Integer, FunctionInfo>> FUNCTION_INFO_MAP = new HashMap<>();
-  // This FUNCTION_MAP is used by Calcite function catalog to look up function by function signature.
-  private static final NameMultimap<Function> FUNCTION_MAP = new NameMultimap<>();
+  private static final NameMultimap<PinotScalarFunction> FUNCTION_MAP = new NameMultimap<>();
 
   /**
    * Registers the scalar functions via reflection.
@@ -66,20 +66,15 @@ public class FunctionRegistry {
       }
       ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
       if (scalarFunction.enabled()) {
-        // Annotated function names
-        String[] scalarFunctionNames = scalarFunction.names();
+        // Parse annotated function names and alias
+        Set<String> scalarFunctionNames = Arrays.stream(scalarFunction.names()).collect(Collectors.toSet());
+        scalarFunctionNames.add(method.getName());
         boolean nullableParameters = scalarFunction.nullableParameters();
-        if (scalarFunctionNames.length > 0) {
-          for (String name : scalarFunctionNames) {
-            FunctionRegistry.registerFunction(name, method, nullableParameters, scalarFunction.isPlaceholder());
-          }
-        } else {
-          FunctionRegistry.registerFunction(method, nullableParameters, scalarFunction.isPlaceholder());
-        }
+        FunctionRegistry.registerFunction(method, scalarFunctionNames, nullableParameters);
       }
     }
-    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_INFO_MAP.size(),
-        FUNCTION_INFO_MAP.keySet(), System.currentTimeMillis() - startTimeMs);
+    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_MAP.map().size(),
+        FUNCTION_MAP.map().keySet(), System.currentTimeMillis() - startTimeMs);
   }
 
   /**
@@ -93,37 +88,21 @@ public class FunctionRegistry {
   /**
    * Registers a method with the name of the method.
    */
-  public static void registerFunction(Method method, boolean nullableParameters, boolean isPlaceholder) {
-    registerFunction(method.getName(), method, nullableParameters, isPlaceholder);
+  @VisibleForTesting
+  public static void registerFunction(Method method, boolean nullableParameters) {
+    registerFunction(method, Collections.singleton(method.getName()), nullableParameters);
   }
 
-  /**
-   * Registers a method with the given function name.
-   */
-  public static void registerFunction(String functionName, Method method, boolean nullableParameters,
-      boolean isPlaceholder) {
-    if (!isPlaceholder) {
-      registerFunctionInfoMap(functionName, method, nullableParameters);
-    }
-    registerCalciteNamedFunctionMap(functionName, method, nullableParameters);
-  }
-
-  private static void registerFunctionInfoMap(String functionName, Method method, boolean nullableParameters) {
-    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
-    String canonicalName = canonicalize(functionName);
-    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
-    FunctionInfo existFunctionInfo = functionInfoMap.put(method.getParameterCount(), functionInfo);
-    Preconditions.checkState(existFunctionInfo == null || existFunctionInfo.getMethod() == functionInfo.getMethod(),
-        "Function: %s with %s parameters is already registered", functionName, method.getParameterCount());
-  }
-
-  private static void registerCalciteNamedFunctionMap(String functionName, Method method, boolean nullableParameters) {
+  private static void registerFunction(Method method, Set<String> alias, boolean nullableParameters) {
     if (method.getAnnotation(Deprecated.class) == null) {
-      FUNCTION_MAP.put(functionName, ScalarFunctionImpl.create(method));
+//      String name = canonicalize(method.getName());
+      for (String name : alias) {
+        FUNCTION_MAP.put(name, new PinotScalarFunction(name, alias, method, nullableParameters));
+      }
     }
   }
 
-  public static Map<String, List<Function>> getRegisteredCalciteFunctionMap() {
+  public static Map<String, List<PinotScalarFunction>> getRegisteredCalciteFunctionMap() {
     return FUNCTION_MAP.map();
   }
 
@@ -135,7 +114,7 @@ public class FunctionRegistry {
    * Returns {@code true} if the given function name is registered, {@code false} otherwise.
    */
   public static boolean containsFunction(String functionName) {
-    return FUNCTION_INFO_MAP.containsKey(canonicalize(functionName));
+    return FUNCTION_MAP.containsKey(canonicalize(functionName), false);
   }
 
   /**
@@ -145,8 +124,21 @@ public class FunctionRegistry {
    */
   @Nullable
   public static FunctionInfo getFunctionInfo(String functionName, int numParameters) {
-    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.get(canonicalize(functionName));
-    return functionInfoMap != null ? functionInfoMap.get(numParameters) : null;
+    List<PinotScalarFunction> candidates = findByNumParameters(FUNCTION_MAP.range(functionName, false), numParameters);
+    if (candidates.size() <= 1) {
+      return candidates.size() == 1 ? candidates.get(0).getFunctionInfo() : null;
+    } else {
+      throw new IllegalArgumentException(
+          "Unable to lookup function: " + functionName + " by parameter count: " + numParameters
+              + " Found multiple candidates. Try to use argument types to resolve the correct one!");
+    }
+  }
+
+  private static List<PinotScalarFunction> findByNumParameters(
+      Collection<Map.Entry<String, PinotScalarFunction>> scalarFunctionList, int numParameters) {
+    return scalarFunctionList == null ? Collections.emptyList()
+        : scalarFunctionList.stream().filter(e -> e.getValue().getParameters().size() == numParameters)
+            .map(Map.Entry::getValue).collect(Collectors.toList());
   }
 
   private static String canonicalize(String functionName) {
@@ -177,6 +169,48 @@ public class FunctionRegistry {
     @ScalarFunction(names = {"vectorSimilarity", "vector_similarity"}, isPlaceholder = true)
     public static double vectorSimilarity(float[] vector1, float[] vector2) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
+    }
+  }
+
+  /**
+   * Pinot specific implementation of the {@link org.apache.calcite.schema.ScalarFunction}.
+   *
+   * @see "{@link org.apache.calcite.schema.impl.ScalarFunctionImpl}"
+   */
+  public static class PinotScalarFunction extends ReflectiveFunctionBase
+      implements org.apache.calcite.schema.ScalarFunction {
+    private final FunctionInfo _functionInfo;
+    private final String _name;
+    private final Set<String> _alias;
+    private final Method _method;
+
+    public PinotScalarFunction(String name, Set<String> alias, Method method, boolean isNullableParameter) {
+      super(method);
+      _name = name;
+      _alias = alias;
+      _method = method;
+      _functionInfo = new FunctionInfo(method, method.getClass(), isNullableParameter);
+    }
+
+    @Override
+    public RelDataType getReturnType(RelDataTypeFactory typeFactory) {
+      return typeFactory.createJavaType(method.getReturnType());
+    }
+
+    public String getName() {
+      return _name;
+    }
+
+    public Set<String> getAlias() {
+      return _alias;
+    }
+
+    public Method getMethod() {
+      return _method;
+    }
+
+    public FunctionInfo getFunctionInfo() {
+      return _functionInfo;
     }
   }
 }
