@@ -168,7 +168,7 @@
     <argLine>-Xms4g -Xmx4g</argLine>
     <protobuf.version>3.24.3</protobuf.version>
     <grpc.version>1.59.0</grpc.version>
-    <confluent.version>7.2.6</confluent.version>
+    <confluent.version>7.5.2</confluent.version>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
