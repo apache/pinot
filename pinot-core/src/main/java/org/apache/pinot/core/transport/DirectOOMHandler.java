@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * no one will reach channelRead0.
  */
 public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DataTableHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(DirectOOMHandler.class);
   private static final AtomicBoolean DIRECT_OOM_SHUTTING_DOWN = new AtomicBoolean(false);
   private final QueryRouter _queryRouter;
   private final ServerRoutingInstance _serverRoutingInstance;

@@ -43,7 +43,7 @@ public class ExprMinMaxRewriterTest {
         "SELECT CHILD_EXPR_MIN(0,col5,col5,col1,col2), "
             + "CHILD_EXPR_MIN(0,col6,col6,col1,col2), "
             + "CHILD_EXPR_MAX(0,col6,col6,col1,col2),"
-            + "PARENT_EXPR_MIN(0,2,col1,col2,col6,col5),"
+            + "PARENT_EXPR_MIN(0,2,col1,col2,col5,col6),"
             + "PARENT_EXPR_MAX(0,2,col1,col2,col6) FROM myTable");
   }
 

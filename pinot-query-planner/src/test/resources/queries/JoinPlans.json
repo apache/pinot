@@ -424,7 +424,81 @@
         ]
       },
       {
-        "description": "nexted reused tmp table SEMI JOINs",
+        "description": "multiple SEMI JOINs on same column multiple conditions and multiple columns",
+        "sql": "EXPLAIN PLAN FOR WITH tmp1 AS ( SELECT * FROM a WHERE col2 NOT IN ('foo', 'bar') ) SELECT * FROM a WHERE col2 IN (SELECT col1 FROM tmp1) AND col2 IN (SELECT col1 FROM b WHERE col3 > 100) AND col3 IN (SELECT col3 from b WHERE col3 < 100)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalJoin(condition=[=($2, $7)], joinType=[semi])",
+          "\n  LogicalJoin(condition=[=($1, $7)], joinType=[semi])",
+          "\n    LogicalJoin(condition=[=($1, $7)], joinType=[semi])",
+          "\n      LogicalTableScan(table=[[a]])",
+          "\n      PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          LogicalFilter(condition=[AND(<>($1, 'bar'), <>($1, 'foo'))])",
+          "\n            LogicalTableScan(table=[[a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        LogicalFilter(condition=[>($2, 100)])",
+          "\n          LogicalTableScan(table=[[b]])",
+          "\n  PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n    LogicalProject(col3=[$2])",
+          "\n      LogicalFilter(condition=[<($2, 100)])",
+          "\n        LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple SEMI JOINs with Agg",
+        "sql": "EXPLAIN PLAN FOR WITH tmp1 AS ( SELECT * FROM a WHERE col2 NOT IN ('foo', 'bar') ) SELECT COUNT(*) FROM a WHERE col2 IN (SELECT col1 FROM tmp1) AND col3 IN (SELECT col3 from b WHERE col3 < 100)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalAggregate(group=[{}], agg#0=[COUNT($0)])",
+          "\n  PinotLogicalExchange(distribution=[hash])",
+          "\n    LogicalAggregate(group=[{}], agg#0=[COUNT()])",
+          "\n      LogicalJoin(condition=[=($0, $1)], joinType=[semi])",
+          "\n        LogicalProject(col3=[$1])",
+          "\n          LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
+          "\n            LogicalProject(col2=[$1], col3=[$2])",
+          "\n              LogicalTableScan(table=[[a]])",
+          "\n            PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n              LogicalProject(col1=[$0])",
+          "\n                LogicalFilter(condition=[AND(<>($1, 'bar'), <>($1, 'foo'))])",
+          "\n                  LogicalTableScan(table=[[a]])",
+          "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n          LogicalProject(col3=[$2])",
+          "\n            LogicalFilter(condition=[<($2, 100)])",
+          "\n              LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "multiple SEMI JOINs with group-by and having clause",
+        "sql": "EXPLAIN PLAN FOR WITH tmp1 AS ( SELECT * FROM a WHERE col2 NOT IN ('foo', 'bar') ) SELECT col1, SUM(col3) FROM a WHERE col2 IN (SELECT col1 FROM tmp1) AND col3 IN (SELECT col3 from b WHERE col3 < 100) GROUP BY col1 HAVING COUNT(*) > 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], EXPR$1=[$1])",
+          "\n  LogicalFilter(condition=[>($2, 10)])",
+          "\n    LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n          LogicalJoin(condition=[=($1, $2)], joinType=[semi])",
+          "\n            LogicalProject(col1=[$0], col3=[$2])",
+          "\n              LogicalJoin(condition=[=($1, $3)], joinType=[semi])",
+          "\n                LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n                  LogicalTableScan(table=[[a]])",
+          "\n                PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n                  LogicalProject(col1=[$0])",
+          "\n                    LogicalFilter(condition=[AND(<>($1, 'bar'), <>($1, 'foo'))])",
+          "\n                      LogicalTableScan(table=[[a]])",
+          "\n            PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n              LogicalProject(col3=[$2])",
+          "\n                LogicalFilter(condition=[<($2, 100)])",
+          "\n                  LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "reused tmp table in SEMI JOINs",
         "sql": "EXPLAIN PLAN FOR WITH tmp1 AS ( SELECT * FROM a WHERE col2 NOT IN ('foo', 'bar') ), tmp2 AS ( SELECT * FROM b WHERE col1 IN (SELECT col1 FROM tmp1) AND col3 < 100 ) SELECT * FROM tmp2 WHERE col3 IN (SELECT col3 from tmp1)",
         "output": [
           "Execution Plan",
@@ -450,7 +524,7 @@
       {
         "description": "Incorrect table",
         "sql": "EXPLAIN PLAN FOR SELECT b.col1 - a.col3 FROM a JOIN c ON a.col1 = c.col3",
-        "expectedException": "Error explain query plan for.*"
+        "expectedException": ".*Table 'b' not found.*"
       }
     ]
   }
