@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.core.segment.processing.partitioner;
 
-import java.math.BigDecimal;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.utils.BytesUtils;
 
 
 /**
@@ -43,16 +42,6 @@ public class TableConfigPartitioner implements Partitioner {
 
   @Override
   public String getPartition(GenericRow genericRow) {
-    return String.valueOf(_partitionFunction.getPartition(convertToString(genericRow.getValue(_column))));
-  }
-
-  private static String convertToString(Object value) {
-    if (value instanceof BigDecimal) {
-      return ((BigDecimal) value).toPlainString();
-    }
-    if (value instanceof byte[]) {
-      return BytesUtils.toHexString((byte[]) value);
-    }
-    return value.toString();
+    return String.valueOf(_partitionFunction.getPartition(FieldSpec.getStringValue(genericRow.getValue(_column))));
   }
 }
