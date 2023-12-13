@@ -48,7 +48,7 @@ public final class OsCheck {
     Windows, MacOS, Linux, Other
   }
 
-  private static final Logger log = LoggerFactory.getLogger(OsCheck.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(OsCheck.class);
 
   static {
     String os = System.getProperty("os.name", "generic").toLowerCase(Locale.ENGLISH);
