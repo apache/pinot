@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.datasketches.common.ResizeFactor;
 import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.theta.AnotB;
 import org.apache.datasketches.theta.Intersection;
@@ -70,13 +69,11 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
  *     'dimName=''course'' AND dimValue=''math''', 'SET_INTERSECT($1,$2)')
  *   </li>
  * </ul>
- * Currently, there are 5 parameters to the function:
+ * Currently, there are 3 parameters to the function:
  * <ul>
  *   <li>
  *     nominalEntries: The nominal entries used to create the sketch. (Default 4096)
- *     resizeFactor: Controls the size multiple that affects how fast the internal cache grows (Default 2^3=8)
  *     samplingProbability: Sets the upfront uniform sampling probability, p. (Default 1.0)
- *     intermediateOrdering: Whether compacted sketches should be ordered. (Default false)
  *     accumulatorThreshold: How many sketches should be kept in memory before merging. (Default 2)
  *   </li>
  * </ul>
@@ -98,7 +95,6 @@ public class DistinctCountThetaSketchAggregationFunction
   private final ExpressionContext _postAggregationExpression;
   private final UpdateSketchBuilder _updateSketchBuilder = new UpdateSketchBuilder();
   protected final SetOperationBuilder _setOperationBuilder = new SetOperationBuilder();
-  protected boolean _intermediateOrdering = DEFAULT_INTERMEDIATE_ORDERING;
   protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
 
   public DistinctCountThetaSketchAggregationFunction(List<ExpressionContext> arguments) {
@@ -113,8 +109,6 @@ public class DistinctCountThetaSketchAggregationFunction
       Parameters parameters = new Parameters(paramsExpression.getLiteral().getStringValue());
       // Allows the user to trade-off memory usage for merge CPU; higher values use more memory
       _accumulatorThreshold = parameters.getAccumulatorThreshold();
-      // Ordering controls whether intermediate compact sketches are ordered in set operations
-      _intermediateOrdering = parameters.getIntermediateOrdering();
       // Nominal entries controls sketch accuracy and size
       int nominalEntries = parameters.getNominalEntries();
       _updateSketchBuilder.setNominalEntries(nominalEntries);
@@ -123,10 +117,6 @@ public class DistinctCountThetaSketchAggregationFunction
       float p = parameters.getSamplingProbability();
       _setOperationBuilder.setP(p);
       _updateSketchBuilder.setP(p);
-      // Resize factor controls the size multiple that affects how fast the internal cache grows
-      ResizeFactor rf = parameters.getResizeFactor();
-      _setOperationBuilder.setResizeFactor(rf);
-      _updateSketchBuilder.setResizeFactor(rf);
     }
 
     if (numArguments < 4) {
@@ -953,7 +943,7 @@ public class DistinctCountThetaSketchAggregationFunction
       int numSketches = _filterEvaluators.size() + 1;
       List<ThetaSketchAccumulator> sketches = new ArrayList<>(numSketches);
       for (int i = 0; i < numSketches; i++) {
-        sketches.add(new ThetaSketchAccumulator(_setOperationBuilder, _intermediateOrdering, _accumulatorThreshold));
+        sketches.add(new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold));
       }
       return sketches;
     }
@@ -963,7 +953,7 @@ public class DistinctCountThetaSketchAggregationFunction
       ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(numSketches);
       for (Object o : result) {
         ThetaSketchAccumulator thetaSketchAccumulator =
-            new ThetaSketchAccumulator(_setOperationBuilder, _intermediateOrdering, _accumulatorThreshold);
+            new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold);
         thetaSketchAccumulator.apply((Sketch) o);
         thetaSketchAccumulators.add(thetaSketchAccumulator);
       }
@@ -982,7 +972,7 @@ public class DistinctCountThetaSketchAggregationFunction
       ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(numSketches);
       for (Object o : result) {
         ThetaSketchAccumulator thetaSketchAccumulator =
-            new ThetaSketchAccumulator(_setOperationBuilder, _intermediateOrdering, _accumulatorThreshold);
+            new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold);
         thetaSketchAccumulator.apply((Sketch) o);
         thetaSketchAccumulators.add(thetaSketchAccumulator);
       }
@@ -1029,7 +1019,6 @@ public class DistinctCountThetaSketchAggregationFunction
     List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
 
     for (ThetaSketchAccumulator accumulator : accumulators) {
-      accumulator.setOrdered(_intermediateOrdering);
       accumulator.setThreshold(_accumulatorThreshold);
       accumulator.setSetOperationBuilder(_setOperationBuilder);
       mergedSketches.add(accumulator.getResult());
@@ -1270,7 +1259,7 @@ public class DistinctCountThetaSketchAggregationFunction
     List<ThetaSketchAccumulator> unions = new ArrayList<>(numUnions);
     for (int i = 0; i < numUnions; i++) {
       ThetaSketchAccumulator thetaSketchAccumulator =
-          new ThetaSketchAccumulator(_setOperationBuilder, _intermediateOrdering, _accumulatorThreshold);
+          new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold);
       unions.add(thetaSketchAccumulator);
     }
     return unions;
@@ -1311,18 +1300,18 @@ public class DistinctCountThetaSketchAggregationFunction
         for (ExpressionContext argument : arguments) {
           union.union(evaluatePostAggregationExpression(argument, sketches));
         }
-        return union.getResult(_intermediateOrdering, null);
+        return union.getResult(false, null);
       case SET_INTERSECT:
         Intersection intersection = _setOperationBuilder.buildIntersection();
         for (ExpressionContext argument : arguments) {
           intersection.intersect(evaluatePostAggregationExpression(argument, sketches));
         }
-        return intersection.getResult(_intermediateOrdering, null);
+        return intersection.getResult(false, null);
       case SET_DIFF:
         AnotB diff = _setOperationBuilder.buildANotB();
         diff.setA(evaluatePostAggregationExpression(arguments.get(0), sketches));
         diff.notB(evaluatePostAggregationExpression(arguments.get(1), sketches));
-        return diff.getResult(_intermediateOrdering, null, false);
+        return diff.getResult(false, null, false);
       default:
         throw new IllegalStateException();
     }
@@ -1336,15 +1325,11 @@ public class DistinctCountThetaSketchAggregationFunction
     private static final char PARAMETER_DELIMITER = ';';
     private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
     private static final String NOMINAL_ENTRIES_KEY = "nominalEntries";
-    private static final String RESIZE_FACTOR_KEY = "resizeFactor";
     private static final String SAMPLING_PROBABILITY_KEY = "samplingProbability";
-    private static final String INTERMEDIATE_ORDERING_KEY = "intermediateOrdering";
     private static final String ACCUMULATOR_THRESHOLD_KEY = "accumulatorThreshold";
 
-    private int _resizeFactor = ResizeFactor.X8.getValue();
     private int _nominalEntries = ThetaUtil.DEFAULT_NOMINAL_ENTRIES;
     private int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
-    private boolean _intermediateOrdering = DEFAULT_INTERMEDIATE_ORDERING;
     private float _samplingProbability = 1.0F;
 
     Parameters(String parametersString) {
@@ -1359,10 +1344,6 @@ public class DistinctCountThetaSketchAggregationFunction
           _nominalEntries = Integer.parseInt(value);
         } else if (key.equalsIgnoreCase(SAMPLING_PROBABILITY_KEY)) {
           _samplingProbability = Float.parseFloat(value);
-        } else if (key.equalsIgnoreCase(RESIZE_FACTOR_KEY)) {
-          _resizeFactor = Integer.parseInt(value);
-        } else if (key.equalsIgnoreCase(INTERMEDIATE_ORDERING_KEY)) {
-          _intermediateOrdering = Boolean.parseBoolean(value);
         } else if (key.equalsIgnoreCase(ACCUMULATOR_THRESHOLD_KEY)) {
           _accumulatorThreshold = Integer.parseInt(value);
         } else {
@@ -1379,16 +1360,8 @@ public class DistinctCountThetaSketchAggregationFunction
       return _samplingProbability;
     }
 
-    boolean getIntermediateOrdering() {
-      return _intermediateOrdering;
-    }
-
     int getAccumulatorThreshold() {
       return _accumulatorThreshold;
-    }
-
-    ResizeFactor getResizeFactor() {
-      return ResizeFactor.getRF(_resizeFactor);
     }
   }
 
