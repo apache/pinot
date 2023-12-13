@@ -462,16 +462,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           // TODO: only LongMsgOffset supplies long offset value.
           _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
               ((LongMsgOffset) _currentOffset).getOffset());
-          final long expectedRowsConsumed = ((LongMsgOffset) _currentOffset).getOffset() -
-                  ((LongMsgOffset) lastUpdatedOffset).getOffset();
-          final long rowsConsumed = _numRowsConsumed - _lastConsumedCount;
-
-          if (expectedRowsConsumed != rowsConsumed) {
-            _segmentLogger.error("Message offsets and rows consumed do not match.\n" +
-                    "currentOffset={}\n" +
-                    "lastUpdatedOffset={}\n" +
-                    "rowsConsumed={}", _currentOffset, lastUpdatedOffset, rowsConsumed);
-          }
         }
         _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
@@ -1673,6 +1663,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+    _partitionGroupConsumer.validateStreamState(_currentOffset);
     _partitionGroupConsumer.start(_currentOffset);
   }
 
@@ -1686,6 +1677,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closePartitionGroupConsumer();
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+    _partitionGroupConsumer.validateStreamState(_currentOffset);
     _partitionGroupConsumer.start(_currentOffset);
   }
 

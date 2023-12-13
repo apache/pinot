@@ -74,4 +74,8 @@ public interface PartitionGroupConsumer extends Closeable {
   default StreamPartitionMsgOffset checkpoint(StreamPartitionMsgOffset lastOffset) {
     return lastOffset;
   }
+
+  default boolean validateStreamState(StreamPartitionMsgOffset startOffset) {
+    return true;
+  }
 }
