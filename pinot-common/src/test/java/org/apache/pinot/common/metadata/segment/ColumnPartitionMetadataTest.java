@@ -22,9 +22,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.convert.DefaultListDelimiterHandler;
+import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
-import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
@@ -60,18 +59,16 @@ public class ColumnPartitionMetadataTest {
   public void testPartitionsConfig() {
     PropertiesConfiguration config = new PropertiesConfiguration();
     config.setProperty("partitions", PARTITIONS);
-    Set<Integer> actual = ColumnPartitionMetadata.extractPartitions(
-        CommonsConfigurationUtils.getStringList("partitions", config));
+    Set<Integer> actual = ColumnPartitionMetadata.extractPartitions(config.getList("partitions"));
     assertEquals(actual, PARTITIONS);
   }
 
   @Test
   public void testLegacyPartitionRangesConfig() {
     PropertiesConfiguration config = new PropertiesConfiguration();
-    config.setListDelimiterHandler(new DefaultListDelimiterHandler(','));
+    config.setListDelimiterHandler(new LegacyListDelimiterHandler(','));
     config.setProperty("partitionRanges", LEGACY_PARTITION_RANGES_STRING);
-    Set<Integer> actual = ColumnPartitionMetadata.extractPartitions(
-        CommonsConfigurationUtils.getStringList("partitionRanges", config));
+    Set<Integer> actual = ColumnPartitionMetadata.extractPartitions(config.getList("partitionRanges"));
     assertEquals(actual, PARTITIONS);
   }
 }

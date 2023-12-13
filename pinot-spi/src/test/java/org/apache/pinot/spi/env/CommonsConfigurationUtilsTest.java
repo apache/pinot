@@ -20,9 +20,6 @@ package org.apache.pinot.spi.env;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.IntStream;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -40,7 +37,7 @@ public class CommonsConfigurationUtilsTest {
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
   private static final String PROPERTY_KEY = "testKey";
   private static final String LIST_PROPERTY_KEY = "listTestKey";
-  private static final int NUM_ROUNDS = 1000;
+  private static final int NUM_ROUNDS = 10000;
 
   @BeforeClass
   public void setUp()
@@ -93,57 +90,19 @@ public class CommonsConfigurationUtilsTest {
       testPropertyValueWithSpecialCharacters(RandomStringUtils.randomAscii(5));
       testPropertyValueWithSpecialCharacters(StringUtils.remove(RandomStringUtils.random(5), '\0'));
     }
-
-
-    List<String> orgStringList = new ArrayList<>();
-    testGetStringList(orgStringList); // test for empty list
-    IntStream.range(0, NUM_ROUNDS).forEachOrdered(n -> {
-      orgStringList.add(StringUtils.remove(RandomStringUtils.random(5), ','));
-    });
-    testGetStringList(orgStringList); // test for random NUM_ROUNDS strings in list
-  }
-
-  private void testGetStringList(List<String> stringList)
-      throws ConfigurationException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
-
-    // test for commons-configuration2
-    configuration.setProperty(LIST_PROPERTY_KEY, stringList);
-    List<String> recoveredStringList = CommonsConfigurationUtils.getStringList(LIST_PROPERTY_KEY, configuration);
-    assertEquals(stringList.size(), recoveredStringList.size());
-    assertEquals(stringList.size(), recoveredStringList.size());
-    CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE); // saving the config
-
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE); // loading the saved config
-    recoveredStringList = CommonsConfigurationUtils.getStringList(LIST_PROPERTY_KEY, configuration);
-    assertEquals(stringList.size(), recoveredStringList.size());
-    assertEquals(stringList.size(), recoveredStringList.size());
-
-    // test for commons-configuration1
-    configuration.setProperty(LIST_PROPERTY_KEY, stringList.toString()
-        .replace(", ", ",").replace("[", "").replace("]", ""));
-    recoveredStringList = CommonsConfigurationUtils.getStringList(LIST_PROPERTY_KEY, configuration);
-    assertEquals(stringList.size(), recoveredStringList.size());
-    assertEquals(stringList.size(), recoveredStringList.size());
-    CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE); // saving the config
-
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE); // loading the saved config
-    recoveredStringList = CommonsConfigurationUtils.getStringList(LIST_PROPERTY_KEY, configuration);
-    assertEquals(stringList.size(), recoveredStringList.size());
-    assertEquals(stringList.size(), recoveredStringList.size());
   }
 
   private void testPropertyValueWithSpecialCharacters(String value)
       throws ConfigurationException {
     String replacedValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(value);
 
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true);
     configuration.setProperty(PROPERTY_KEY, replacedValue);
     String recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE);
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true);
 
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));

@@ -30,7 +30,7 @@ import org.apache.commons.configuration2.CompositeConfiguration;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.convert.DefaultListDelimiterHandler;
+import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
@@ -165,7 +165,7 @@ public class PinotConfiguration {
 
     return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(e -> {
       MapConfiguration mapConfiguration = new MapConfiguration(e);
-      mapConfiguration.setListDelimiterHandler(new DefaultListDelimiterHandler(','));
+      mapConfiguration.setListDelimiterHandler(new LegacyListDelimiterHandler(','));
       return mapConfiguration;
     }), propertiesFromConfigPaths).collect(Collectors.toList());
   }

@@ -21,7 +21,6 @@ package org.apache.pinot.spi.env;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -32,7 +31,7 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.convert.DefaultListDelimiterHandler;
+import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.io.FileHandler;
 import org.apache.commons.lang.StringEscapeUtils;
@@ -53,7 +52,7 @@ public class CommonsConfigurationUtils {
    * @return a {@link PropertiesConfiguration} instance. Empty if file does not exist.
    */
   public static PropertiesConfiguration fromFile(File file) throws ConfigurationException {
-    return fromFile(file, false, false);
+    return fromFile(file, false, true);
   }
 
   /**
@@ -62,7 +61,7 @@ public class CommonsConfigurationUtils {
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromInputStream(InputStream stream) throws ConfigurationException {
-    return fromInputStream(stream, false, false);
+    return fromInputStream(stream, false, true);
   }
 
   /**
@@ -71,7 +70,7 @@ public class CommonsConfigurationUtils {
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromPath(String path) throws ConfigurationException {
-    return fromPath(path, false, false);
+    return fromPath(path, false, true);
   }
 
   public static PropertiesConfiguration fromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
@@ -226,32 +225,6 @@ public class CommonsConfigurationUtils {
     return value.replace("\0\0", ",");
   }
 
-  /**
-   * Get string list from properties.
-   * <p>
-   * NOTE: When the property associated with the key is empty, {@link PropertiesConfiguration#getList(String)} will
-   * return an empty string singleton list. Using this method will return an empty list instead.
-   * also, for backward compatibility, split the string with COMMA and return the string list.
-   * @param key property key.
-   * @return string list value for the property.
-   */
-  public static List<String> getStringList(String key, PropertiesConfiguration segmentProperties) {
-    List<String> stringList = new ArrayList<>();
-    List<String> propertyList = segmentProperties.getList(String.class, key);
-    if (propertyList != null) {
-      for (String stringValue : propertyList) {
-        if (!stringValue.isEmpty()) {
-          if (stringValue.contains(",")) {
-            stringList.addAll(List.of(stringValue.split(",")));
-          } else {
-            stringList.add(stringValue);
-          }
-        }
-      }
-    }
-    return stringList;
-  }
-
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
       boolean setDefaultDelimiter) {
     PropertiesConfiguration config = new PropertiesConfiguration();
@@ -263,13 +236,13 @@ public class CommonsConfigurationUtils {
 
     // setting DEFAULT_LIST_DELIMITER
     if (setDefaultDelimiter) {
-      CommonsConfigurationUtils.setDefaultListDelimiterHandler(config);
+      CommonsConfigurationUtils.setListDelimiterHandler(config);
     }
 
     return config;
   }
 
-  private static void setDefaultListDelimiterHandler(PropertiesConfiguration configuration) {
-    configuration.setListDelimiterHandler(new DefaultListDelimiterHandler(DEFAULT_LIST_DELIMITER));
+  private static void setListDelimiterHandler(PropertiesConfiguration configuration) {
+    configuration.setListDelimiterHandler(new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER));
   }
 }

@@ -21,6 +21,9 @@ package org.apache.pinot.segment.local.segment.index.loader;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -53,6 +56,29 @@ public class LoaderUtils {
     PinotDataBuffer buffer = segmentWriter.newIndexFor(column, indexType, fileLength);
     buffer.readFrom(0, indexFile, 0, fileLength);
     FileUtils.forceDelete(indexFile);
+  }
+
+  /**
+   * Get string list from segment properties.
+   * <p>
+   * NOTE: When the property associated with the key is empty, {@link PropertiesConfiguration#getList(String)} will
+   * return an empty string singleton list. Using this method will return an empty list instead.
+   *
+   * @param key property key.
+   * @return string list value for the property.
+   */
+  public static List<String> getStringListFromSegmentProperties(String key, PropertiesConfiguration segmentProperties) {
+    List<String> stringList = new ArrayList<>();
+    List propertyList = segmentProperties.getList(key);
+    if (propertyList != null) {
+      for (Object value : propertyList) {
+        String stringValue = value.toString();
+        if (!stringValue.isEmpty()) {
+          stringList.add(stringValue);
+        }
+      }
+    }
+    return stringList;
   }
 
   /**
