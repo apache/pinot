@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 public final class OsCheck {
 
   // cached result of OS detection
-  private static final OSType _detectedOS;
+  private static final OSType DETECTED_OS;
 
   private OsCheck() {
   }
@@ -38,7 +38,7 @@ public final class OsCheck {
    * @return - the operating system detected
    */
   public static OSType getOperatingSystemType() {
-    return _detectedOS;
+    return DETECTED_OS;
   }
 
   /**
@@ -52,15 +52,15 @@ public final class OsCheck {
 
   static {
     String os = System.getProperty("os.name", "generic").toLowerCase(Locale.ENGLISH);
-    log.info("System property \"os.name\" is: {}", os);
+    LOGGER.info("System property \"os.name\" is: {}", os);
     if ((os.contains("mac")) || (os.contains("darwin"))) {
-      _detectedOS = OSType.MacOS;
+      DETECTED_OS = OSType.MacOS;
     } else if (os.contains("win")) {
-      _detectedOS = OSType.Windows;
+      DETECTED_OS = OSType.Windows;
     } else if (os.contains("linux")) {
-      _detectedOS = OSType.Linux;
+      DETECTED_OS = OSType.Linux;
     } else {
-      _detectedOS = OSType.Other;
+      DETECTED_OS = OSType.Other;
     }
   }
 }
