@@ -52,7 +52,7 @@ public final class OsCheck {
 
   static {
     String os = System.getProperty("os.name", "generic").toLowerCase(Locale.ENGLISH);
-    log.info("System property \"os.name\" is [{}]", os);
+    log.info("System property \"os.name\" is: {}", os);
     if ((os.contains("mac")) || (os.contains("darwin"))) {
       _detectedOS = OSType.MacOS;
     } else if (os.contains("win")) {
