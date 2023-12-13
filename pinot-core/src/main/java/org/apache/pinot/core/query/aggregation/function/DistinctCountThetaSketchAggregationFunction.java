@@ -87,8 +87,6 @@ public class DistinctCountThetaSketchAggregationFunction
   private static final String SET_DIFF = "setdiff";
   private static final String DEFAULT_SKETCH_IDENTIFIER = "$0";
   private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
-  private static final boolean DEFAULT_INTERMEDIATE_ORDERING = false;
-
   private final List<ExpressionContext> _inputExpressions;
   private final boolean _includeDefaultSketch;
   private final List<FilterEvaluator> _filterEvaluators;
