@@ -140,7 +140,7 @@ public class StringFunctions {
    * @param seperator
    * @return The two input strings joined by the seperator
    */
-  @ScalarFunction(names = "concat_ws")
+  @ScalarFunction(names = {"concatWS", "concat_ws"})
   public static String concatws(String seperator, String input1, String input2) {
     return concat(input1, input2, seperator);
   }
