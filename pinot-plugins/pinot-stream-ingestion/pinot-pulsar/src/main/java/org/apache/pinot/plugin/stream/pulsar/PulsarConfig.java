@@ -64,6 +64,7 @@ public class PulsarConfig {
 
   // Absolute path of your downloaded key file on the local file system.
   // example: file:///path/to/private_creds_file
+  //TODO: find a good way to support pushing this secret to all servers.
   private final String _credentialsFilePath;
   private final String _audience; // Audience for your OAUTH2 client: urn:sn:pulsar:test:test-cluster
 
