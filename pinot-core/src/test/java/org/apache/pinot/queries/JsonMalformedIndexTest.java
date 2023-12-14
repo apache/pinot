@@ -1,17 +1,15 @@
 package org.apache.pinot.queries;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.creator.impl.ColumnJsonParserException;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -20,7 +18,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.io.File;
@@ -29,7 +26,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 
-public class JsonMalformedTest extends BaseQueriesTest {
+public class JsonMalformedIndexTest extends BaseQueriesTest {
 
 
     static final String RAW_TABLE_NAME = "testTable";
@@ -51,8 +48,7 @@ public class JsonMalformedTest extends BaseQueriesTest {
     List<GenericRow> records = new ArrayList<>();
 
     @BeforeClass
-    public void setUp()
-            throws Exception {
+    public void setUp() throws Exception {
         records.add(createRecord("ludwik von drake",
                 "{\"name\": {\"first\": \"ludwik\", \"last\": \"von drake\"}, \"id\": 181, \"data\": [\"l\", \"b\", \"c\", "
                         + "\"d\"]"));
@@ -74,7 +70,10 @@ public class JsonMalformedTest extends BaseQueriesTest {
         return record;
     }
 
-    @Test
+    @Test(
+            expectedExceptions = ColumnJsonParserException.class,
+            expectedExceptionsMessageRegExp = "Column: jsonColumn.*"
+    )
     public void testJsonIndexBuild() throws Exception {
         File indexDir = indexDir();
         FileUtils.deleteDirectory(indexDir);

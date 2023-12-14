@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl;
 
+import com.fasterxml.jackson.core.JsonParseException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -315,11 +316,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-
-      if (fieldSpec.isSingleValueField()) {
-        indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
-      } else {
-        indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+      try {
+        if (fieldSpec.isSingleValueField()) {
+          indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+        } else {
+          indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+        }
+      } catch (JsonParseException jpe) {
+        throw new ColumnJsonParserException(columnName, jpe.getOriginalMessage(), jpe.getLocation(), jpe.getCause());
       }
     }
 
