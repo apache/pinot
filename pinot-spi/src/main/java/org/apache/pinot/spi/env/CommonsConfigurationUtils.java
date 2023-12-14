@@ -51,7 +51,8 @@ public class CommonsConfigurationUtils {
    * @param file containing properties
    * @return a {@link PropertiesConfiguration} instance. Empty if file does not exist.
    */
-  public static PropertiesConfiguration fromFile(File file) throws ConfigurationException {
+  public static PropertiesConfiguration fromFile(File file)
+      throws ConfigurationException {
     return fromFile(file, false, true);
   }
 
@@ -60,7 +61,8 @@ public class CommonsConfigurationUtils {
    * @param stream containing properties
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromInputStream(InputStream stream) throws ConfigurationException {
+  public static PropertiesConfiguration fromInputStream(InputStream stream)
+      throws ConfigurationException {
     return fromInputStream(stream, false, true);
   }
 
@@ -69,10 +71,18 @@ public class CommonsConfigurationUtils {
    * @param path representing the path of file
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromPath(String path) throws ConfigurationException {
+  public static PropertiesConfiguration fromPath(String path)
+      throws ConfigurationException {
     return fromPath(path, false, true);
   }
 
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
+   * @param path representing the path of file
+   * @param setIOFactory representing to set the IOFactory or not
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
   public static PropertiesConfiguration fromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
@@ -81,6 +91,13 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
+   * @param stream containing properties
+   * @param setIOFactory representing to set the IOFactory or not
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
   public static PropertiesConfiguration fromInputStream(InputStream stream, boolean setIOFactory,
       boolean setDefaultDelimiter) throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
@@ -89,6 +106,13 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
+   * @param file containing properties
+   * @param setIOFactory representing to set the IOFactory or not
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
   public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
       boolean setDefaultDelimiter) throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
@@ -102,6 +126,11 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
+  /**
+   * Save the propertiesConfiguration content into the provided file.
+   * @param propertiesConfiguration a {@link PropertiesConfiguration} instance.
+   * @param file a {@link File} instance.
+   */
   public static void saveToFile(PropertiesConfiguration propertiesConfiguration, File file) {
     Preconditions.checkNotNull(file, "File object can not be null for saving configurations");
     FileHandler fileHandler = new FileHandler(propertiesConfiguration);
