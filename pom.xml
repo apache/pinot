@@ -473,19 +473,6 @@
         <artifactId>commons-collections</artifactId>
         <version>3.2.2</version>
       </dependency>
-
-      <!-- commons-configuration1.10, will be deleted after the upgrade. -->
-      <dependency>
-        <groupId>commons-configuration</groupId>
-        <artifactId>commons-configuration</artifactId>
-        <version>1.10</version>
-        <exclusions>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-configuration2</artifactId>
