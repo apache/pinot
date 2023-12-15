@@ -504,15 +504,14 @@ public class ObjectSerDeUtilsTest {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
       UpdateSketch input = Sketches.updateSketchBuilder().build();
       int size = RANDOM.nextInt(100) + 10;
-      boolean shouldOrder = RANDOM.nextBoolean();
 
       for (int j = 0; j < size; j++) {
         input.update(j);
       }
 
       SetOperationBuilder setOperationBuilder = new SetOperationBuilder();
-      ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(setOperationBuilder, shouldOrder, 2);
-      Sketch sketch = input.compact(shouldOrder, null);
+      ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(setOperationBuilder, 2);
+      Sketch sketch = input.compact(false, null);
       accumulator.apply(sketch);
 
       byte[] bytes = ObjectSerDeUtils.serialize(accumulator);
@@ -521,7 +520,6 @@ public class ObjectSerDeUtilsTest {
 
       assertEquals(actual.getResult().getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
       assertEquals(actual.getResult().toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
-      assertEquals(actual.getResult().isOrdered(), shouldOrder, ERROR_MESSAGE);
     }
   }
 }
