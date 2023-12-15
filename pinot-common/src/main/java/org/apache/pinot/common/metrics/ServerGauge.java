@@ -32,6 +32,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   SEGMENT_COUNT("segments", false),
   LLC_PARTITION_CONSUMING("state", false),
   HIGHEST_STREAM_OFFSET_CONSUMED("messages", false),
+  INVALID_REALTIME_STREAM_STATE_EXCEPTION("state", false),
   LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS("seconds", false),
   LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS("seconds", false),
   LAST_REALTIME_SEGMENT_INITIAL_CONSUMPTION_DURATION_SECONDS("seconds", false),

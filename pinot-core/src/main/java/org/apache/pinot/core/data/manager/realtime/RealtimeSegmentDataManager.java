@@ -1663,7 +1663,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-    _partitionGroupConsumer.validateStreamState(_currentOffset);
+    try {
+      _partitionGroupConsumer.validateStreamState(_currentOffset);
+      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, 0,
+              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 0);
+    } catch (PermanentConsumerException pce) {
+      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, 0,
+              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 1);
+      _segmentLogger.error(pce.getMessage());
+    }
     _partitionGroupConsumer.start(_currentOffset);
   }
 
@@ -1677,7 +1685,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closePartitionGroupConsumer();
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-    _partitionGroupConsumer.validateStreamState(_currentOffset);
+    try {
+      _partitionGroupConsumer.validateStreamState(_currentOffset);
+      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionGroupId,
+              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 0);
+    } catch (PermanentConsumerException pce) {
+      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionGroupId,
+              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 1);
+      _segmentLogger.error(pce.getMessage());
+    }
     _partitionGroupConsumer.start(_currentOffset);
   }
 
