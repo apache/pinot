@@ -265,7 +265,7 @@ public class CommonsConfigurationUtils {
 
     // setting DEFAULT_LIST_DELIMITER
     if (setDefaultDelimiter) {
-      CommonsConfigurationUtils.setListDelimiterHandler(config);
+      setListDelimiterHandler(config);
     }
 
     return config;

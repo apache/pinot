@@ -50,7 +50,7 @@ public class SegmentMetadataUtils {
 
   public static void savePropertiesConfiguration(PropertiesConfiguration propertiesConfiguration, File indexDir) {
     File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
-    Preconditions.checkNotNull(metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
+    Preconditions.checkState(metadataFile != null, "Cannot find segment metadata file under directory: %s", indexDir);
     CommonsConfigurationUtils.saveToFile(propertiesConfiguration, metadataFile);
   }
 
