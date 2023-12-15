@@ -43,7 +43,7 @@
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
     <jersey-container-grizzly2-http.version>2.39</jersey-container-grizzly2-http.version>
     <simpleclient_common.version>0.16.0</simpleclient_common.version>
-    <grpc-proto.version>1.12.0</grpc-proto.version>
+    <grpc-proto.version>2.29.0</grpc-proto.version>
     <grpc-context.version>1.59.0</grpc-context.version>
     <bouncycastle.version>1.75</bouncycastle.version>
     <caffeine.version>2.6.2</caffeine.version>
