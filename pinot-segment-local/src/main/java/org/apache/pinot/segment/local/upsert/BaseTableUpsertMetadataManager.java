@@ -233,9 +233,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         ZKMetadataProvider.getSegmentZKMetadata(propertyStore, _tableNameWithType, segmentName);
     Preconditions.checkState(zkMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s", segmentName,
         _tableNameWithType);
-    File snapshotFile = getValidDocIdsSnapshotFile(segmentName, zkMetadata.getTier());
-    if (!snapshotFile.exists()) {
-      LOGGER.info("Skip segment: {} as no validDocIds snapshot at: {}", segmentName, snapshotFile);
+    if (!hasValidDocIdsSnapshot(segmentName, zkMetadata.getTier())) {
+      LOGGER.info("Skip segment: {} as no validDocIds snapshot exists", segmentName);
       return;
     }
     preloadSegmentWithSnapshot(segmentName, indexLoadingConfig, zkMetadata);
@@ -255,9 +254,15 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     _tableDataManager.tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata);
   }
 
-  private File getValidDocIdsSnapshotFile(String segmentName, String segmentTier) {
-    File indexDir = _tableDataManager.getSegmentDataDir(segmentName, segmentTier, _context.getTableConfig());
-    return new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+  private boolean hasValidDocIdsSnapshot(String segmentName, String segmentTier) {
+    try {
+      File indexDir = _tableDataManager.getSegmentDataDir(segmentName, segmentTier, _context.getTableConfig());
+      File snapshotFile =
+          new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+      return snapshotFile.exists();
+    } catch (Exception e) {
+      return false;
+    }
   }
 
   @Override
