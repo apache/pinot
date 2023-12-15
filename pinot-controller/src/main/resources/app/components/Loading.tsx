@@ -18,26 +18,8 @@
  */
 
 import React from 'react';
-import { Grid, makeStyles } from '@material-ui/core';
-import TenantsTable from '../components/Homepage/TenantsListing';
+import Skeleton from "@material-ui/lab/Skeleton";
 
-const useStyles = makeStyles(() => ({
-  gridContainer: {
-    padding: 20,
-    backgroundColor: 'white',
-    maxHeight: 'calc(100vh - 70px)',
-    overflowY: 'auto',
-  },
-}));
+const Loading: { customRenderer: JSX.Element } = { customRenderer: <Skeleton animation={'wave'} /> };
 
-const TenantsListingPage = () => {
-  const classes = useStyles();
-
-  return (
-    <Grid item xs className={classes.gridContainer}>
-      <TenantsTable />
-    </Grid>
-  );
-};
-
-export default TenantsListingPage;
+export default Loading;
