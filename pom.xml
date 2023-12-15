@@ -130,7 +130,7 @@
     <async-http-client.version>2.12.3</async-http-client.version>
     <jersey.version>2.39</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
-    <hk2.version>2.6.1</hk2.version>
+    <hk2.version>3.0.5</hk2.version>
     <swagger.version>1.6.9</swagger.version>
     <hadoop.version>3.2.4</hadoop.version>
     <antlr.version>4.6</antlr.version>
