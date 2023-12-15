@@ -323,7 +323,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
         }
       } catch (JsonParseException jpe) {
-        throw new ColumnJsonParserException(columnName, jpe.getOriginalMessage(), jpe.getLocation(), jpe.getCause());
+        throw new ColumnJsonParserException(columnName, jpe);
       }
     }
 

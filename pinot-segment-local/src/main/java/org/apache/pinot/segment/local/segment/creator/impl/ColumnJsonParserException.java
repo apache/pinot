@@ -27,20 +27,16 @@ public class ColumnJsonParserException extends JsonParseException {
      * processing JSON content in a column
      * Sub-class of {@link com.fasterxml.jackson.core.JsonParseException}.
      */
-    final static long serialVersionUID = 123; // Stupid eclipse...
 
     final String _columnName;
 
-    protected ColumnJsonParserException(String columnName, String msg, JsonLocation loc, Throwable rootCause) {
-        /* Argh. IOException(Throwable,String) is only available starting
-         * with JDK 1.6...
-         */
-        super(msg, loc, rootCause);
+    protected ColumnJsonParserException(String columnName, JsonParseException jpe) {
+        super(jpe.getProcessor(), jpe.getOriginalMessage(), jpe.getCause());
         _columnName = columnName;
     }
 
     /**
-     * Default method overridden so that we can add location information
+     * Default method overridden so that we can add column and location information
      */
     @Override
     public String getMessage() {
