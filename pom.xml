@@ -1214,7 +1214,7 @@
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
         <artifactId>tyrus-standalone-client</artifactId>
-        <version>1.15</version>
+        <version>2.1.4</version>
       </dependency>
       <!-- hadoop-common & jmh-core use common-math3 -->
       <dependency>
