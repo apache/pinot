@@ -31,6 +31,7 @@ import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
+import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -50,17 +51,17 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
-  public boolean validateStreamState(StreamPartitionMsgOffset startMsgOffset) {
+  public void validateStreamState(StreamPartitionMsgOffset startMsgOffset) throws PermanentConsumerException {
     final long startOffset = ((LongMsgOffset) startMsgOffset).getOffset();
     Map<TopicPartition, Long> beginningOffsets =
             _consumer.beginningOffsets(Collections.singletonList(_topicPartition));
 
     final long beginningOffset = beginningOffsets.getOrDefault(_topicPartition, 0L);
     if (startOffset < beginningOffset) {
-      LOGGER.warn("startOffset({}) is older than topic's beginning offset({}) ", startOffset, beginningOffset);
+      throw new PermanentConsumerException(new Throwable(String.format(
+              "startOffset(%s) is older than topic's beginning offset(%s) ",
+              startOffset, beginningOffset)));
     }
-
-    return true;
   }
 
   @Override
