@@ -191,7 +191,7 @@
     <flink.version>1.12.0</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
 
-    <proto.google.common.protos.version>2.9.6</proto.google.common.protos.version>
+    <proto.google.common.protos.version>2.29.0</proto.google.common.protos.version>
 
     <kotlin.stdlib.version>1.7.22</kotlin.stdlib.version>
   </properties>
