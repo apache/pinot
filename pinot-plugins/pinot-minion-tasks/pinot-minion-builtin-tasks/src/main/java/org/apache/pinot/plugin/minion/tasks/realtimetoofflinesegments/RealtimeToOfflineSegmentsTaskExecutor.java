@@ -18,15 +18,31 @@
  */
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.IOException;
+import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import javax.annotation.Nullable;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.core.Response;
+
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
+import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -41,8 +57,13 @@ import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.roaringbitmap.PeekableIntIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +94,11 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   private final MinionTaskZkMetadataManager _minionTaskZkMetadataManager;
   private int _expectedVersion = Integer.MIN_VALUE;
 
+  private static HelixManager _helixManager = MINION_CONTEXT.getHelixManager();
+  private static HelixAdmin _clusterManagementTool = _helixManager.getClusterManagmentTool();
+  private static String _clusterName = _helixManager.getClusterName();
+
+  
   public RealtimeToOfflineSegmentsTaskExecutor(MinionTaskZkMetadataManager minionTaskZkMetadataManager,
       MinionConf minionConf) {
     super(minionConf);
@@ -159,13 +185,24 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
     List<RecordReader> recordReaders = new ArrayList<>(numInputSegments);
     int count = 1;
+  
+    ImmutableRoaringBitmap validDocIds = null;
+    if (configs.get("shouldUseCompactReader").equals("true")) {
+      validDocIds = getValidDocIds(realtimeTableName, configs);
+    }
+
     for (File segmentDir : segmentDirs) {
       _eventObserver.notifyProgress(_pinotTaskConfig,
-          String.format("Creating RecordReader for: %s (%d out of %d)", segmentDir, count++, numInputSegments));
+          String.format("Creating RecordReader for: %s (%d out of %d)", segmentDir, count++, numInputSegments));   
+      if (validDocIds != null) {
+        CompactedRecordReader recordReader = new CompactedRecordReader(segmentDir, validDocIds);
+        recordReaders.add(recordReader);
+      } else {
       PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader();
       // NOTE: Do not fill null field with default value to be consistent with other record readers
       recordReader.init(segmentDir, null, null, true);
       recordReaders.add(recordReader);
+      }
     }
     List<File> outputSegmentDirs;
     try {
@@ -210,5 +247,113 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
         Collections.emptyMap());
+  }
+
+   // TODO: Consider moving this method to a more appropriate class (eg ServerSegmentMetadataReader)
+  private static ImmutableRoaringBitmap getValidDocIds(String tableNameWithType, Map<String, String> configs)
+      throws URISyntaxException {
+    String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
+    String server = getServer(segmentName, tableNameWithType);
+
+    // get the url for the validDocIds for the server
+    InstanceConfig instanceConfig = _clusterManagementTool.getInstanceConfig(_clusterName, server);
+    String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
+    String url =
+        new URIBuilder(endpoint).setPath(String.format("/segments/%s/%s/validDocIds", tableNameWithType, segmentName))
+            .toString();
+
+    // get the validDocIds from that server
+    Response response = ClientBuilder.newClient().target(url).request().get(Response.class);
+    Preconditions.checkState(response.getStatus() == Response.Status.OK.getStatusCode(),
+        "Unable to retrieve validDocIds from %s", url);
+    byte[] snapshot = response.readEntity(byte[].class);
+    ImmutableRoaringBitmap validDocIds = new ImmutableRoaringBitmap(ByteBuffer.wrap(snapshot));
+    return validDocIds;
+  }
+
+  @VisibleForTesting
+  public static String getServer(String segmentName, String tableNameWithType) {
+    ExternalView externalView = _clusterManagementTool.getResourceExternalView(_clusterName, tableNameWithType);
+    if (externalView == null) {
+      throw new IllegalStateException("External view does not exist for table: " + tableNameWithType);
+    }
+    Map<String, String> instanceStateMap = externalView.getStateMap(segmentName);
+    if (instanceStateMap == null) {
+      throw new IllegalStateException("Failed to find segment: " + segmentName);
+    }
+    for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
+      if (entry.getValue().equals(SegmentStateModel.ONLINE)) {
+        return entry.getKey();
+      }
+    }
+    throw new IllegalStateException("Failed to find ONLINE server for segment: " + segmentName);
+  }
+
+  private class CompactedRecordReader implements RecordReader {
+    private final PinotSegmentRecordReader _pinotSegmentRecordReader;
+    private final PeekableIntIterator _validDocIdsIterator;
+    // Reusable generic row to store the next row to return
+    GenericRow _nextRow = new GenericRow();
+    // Flag to mark whether we need to fetch another row
+    boolean _nextRowReturned = true;
+
+    CompactedRecordReader(File indexDir, ImmutableRoaringBitmap validDocIds) {
+      _pinotSegmentRecordReader = new PinotSegmentRecordReader();
+      _pinotSegmentRecordReader.init(indexDir, null, null);
+      _validDocIdsIterator = validDocIds.getIntIterator();
+    }
+
+    @Override
+    public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
+    }
+
+    @Override
+    public boolean hasNext() {
+      if (!_validDocIdsIterator.hasNext() && _nextRowReturned) {
+        return false;
+      }
+
+      // If next row has not been returned, return true
+      if (!_nextRowReturned) {
+        return true;
+      }
+
+      // Try to get the next row to return
+      if (_validDocIdsIterator.hasNext()) {
+        int docId = _validDocIdsIterator.next();
+        _nextRow.clear();
+        _pinotSegmentRecordReader.getRecord(docId, _nextRow);
+        _nextRowReturned = false;
+        return true;
+      }
+
+      // Cannot find next row to return, return false
+      return false;
+    }
+
+    @Override
+    public GenericRow next() {
+      return next(new GenericRow());
+    }
+
+    @Override
+    public GenericRow next(GenericRow reuse) {
+      Preconditions.checkState(!_nextRowReturned);
+      reuse.init(_nextRow);
+      _nextRowReturned = true;
+      return reuse;
+    }
+
+    @Override
+    public void rewind() {
+      _pinotSegmentRecordReader.rewind();
+      _nextRowReturned = true;
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      _pinotSegmentRecordReader.close();
+    }
   }
 }
