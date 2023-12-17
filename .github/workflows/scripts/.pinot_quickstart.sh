@@ -41,8 +41,7 @@ netstat -i
 # Java version
 java -version
 jdk_version() {
-  IFS='
-'
+  IFS=$'\n'
   # remove \r for Cygwin
   lines=$(java -Xms32M -Xmx32M -version 2>&1 | tr '\r' '\n')
   for line in $lines; do
