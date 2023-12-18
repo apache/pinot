@@ -19,8 +19,12 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.collect.ImmutableList;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -112,5 +116,55 @@ public class PulsarConfigTest {
         pulsarConfig.getMetadataFields();
     Assert.assertFalse(pulsarConfig.isPopulateMetadata());
     Assert.assertEquals(metadataFieldsToExtract.size(), 0);
+  }
+
+  @Test
+  public void testParsingConfigForOAuth() throws Exception {
+    Path testFile = null;
+    try {
+      testFile = Files.createTempFile("test_cred_file", ".json");
+      Map<String, String> streamConfigMap = getCommonStreamConfigMap();
+      streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_ISSUER_URL),
+          "http://auth.test.com");
+      streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
+              PulsarConfig.OAUTH_CREDS_FILE_PATH), "file://" + testFile.toFile().getAbsolutePath());
+      streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_AUDIENCE),
+          "urn:test:test");
+      StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
+
+      PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
+      Assert.assertEquals(pulsarConfig.getIssuerUrl(), "http://auth.test.com");
+      Assert.assertEquals(pulsarConfig.getCredentialsFilePath(),
+          "file://" + testFile.toFile().getAbsolutePath());
+      Assert.assertEquals(pulsarConfig.getAudience(), "urn:test:test");
+    } catch (Exception e) {
+      Assert.fail("Should not throw exception", e);
+    } finally {
+      Optional.ofNullable(testFile).map(Path::toFile).ifPresent(File::delete);
+    }
+  }
+
+  @Test
+  public void testParsingConfigFailFileValidationForOAuth() throws Exception {
+    String testFilePath = "file://path/to/file.json";
+
+    try {
+      Map<String, String> streamConfigMap = getCommonStreamConfigMap();
+      streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_ISSUER_URL),
+          "http://auth.test.com");
+      streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
+              PulsarConfig.OAUTH_CREDS_FILE_PATH),
+          testFilePath);
+      streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_AUDIENCE),
+          "urn:test:test");
+      StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
+      PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId"); //will throw exception
+    } catch (IllegalArgumentException mue) {
+      //expected case.
+      String errorMessage = String.format("Invalid credentials file path: %s. File does not exist.", testFilePath);
+      Assert.assertEquals(errorMessage, mue.getMessage());
+    } catch (Exception e) {
+      Assert.fail("Should not throw other exception", e);
+    }
   }
 }

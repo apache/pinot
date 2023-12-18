@@ -19,6 +19,9 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -42,6 +45,10 @@ public class PulsarConfig {
   public static final String BOOTSTRAP_SERVERS = "bootstrap.servers";
   public static final String AUTHENTICATION_TOKEN = "authenticationToken";
   public static final String TLS_TRUST_CERTS_FILE_PATH = "tlsTrustCertsFilePath";
+
+  public static final String OAUTH_ISSUER_URL = "issuerUrl";
+  public static final String OAUTH_CREDS_FILE_PATH = "credsFilePath";
+  public static final String OAUTH_AUDIENCE = "audience";
   public static final String ENABLE_KEY_VALUE_STITCH = "enableKeyValueStitch";
   public static final String METADATA_FIELDS = "metadata.fields"; //list of the metadata fields comma separated
 
@@ -52,6 +59,15 @@ public class PulsarConfig {
   private final SubscriptionInitialPosition _subscriptionInitialPosition;
   private final String _authenticationToken;
   private final String _tlsTrustCertsFilePath;
+
+  private final String _issuerUrl; // OAUTH2 issuer URL example: "https://auth.streamnative.cloud"
+
+  // Absolute path of your downloaded key file on the local file system.
+  // example: file:///path/to/private_creds_file
+  //TODO: find a good way to support pushing this secret to all servers.
+  private final String _credentialsFilePath;
+  private final String _audience; // Audience for your OAUTH2 client: urn:sn:pulsar:test:test-cluster
+
   // Deprecated since pulsar supports record key extraction
   @Deprecated
   private final boolean _enableKeyValueStitch;
@@ -59,38 +75,59 @@ public class PulsarConfig {
   private final Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> _metadataFields;
   public PulsarConfig(StreamConfig streamConfig, String subscriberId) {
     Map<String, String> streamConfigMap = streamConfig.getStreamConfigsMap();
-    _pulsarTopicName = streamConfig.getTopicName();
-    _bootstrapServers =
-        streamConfigMap.get(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, BOOTSTRAP_SERVERS));
     _subscriberId = subscriberId;
 
-    String authenticationTokenKey = StreamConfigProperties.constructStreamProperty(STREAM_TYPE, AUTHENTICATION_TOKEN);
-    _authenticationToken = streamConfigMap.get(authenticationTokenKey);
-
-    String tlsTrustCertsFilePathKey = StreamConfigProperties.
-        constructStreamProperty(STREAM_TYPE, TLS_TRUST_CERTS_FILE_PATH);
-    _tlsTrustCertsFilePath = streamConfigMap.get(tlsTrustCertsFilePathKey);
-
-    String enableKeyValueStitchKey = StreamConfigProperties.
-        constructStreamProperty(STREAM_TYPE, ENABLE_KEY_VALUE_STITCH);
-    _enableKeyValueStitch = Boolean.parseBoolean(streamConfigMap.get(enableKeyValueStitchKey));
-
+    _pulsarTopicName = streamConfig.getTopicName();
+    _bootstrapServers = getConfigValue(streamConfigMap, BOOTSTRAP_SERVERS);
     Preconditions.checkNotNull(_bootstrapServers, "No brokers provided in the config");
+
+    _authenticationToken = getConfigValue(streamConfigMap, AUTHENTICATION_TOKEN);
+    _tlsTrustCertsFilePath = getConfigValue(streamConfigMap, TLS_TRUST_CERTS_FILE_PATH);
+    _enableKeyValueStitch = Boolean.parseBoolean(getConfigValue(streamConfigMap, ENABLE_KEY_VALUE_STITCH));
 
     OffsetCriteria offsetCriteria = streamConfig.getOffsetCriteria();
 
     _subscriptionInitialPosition = PulsarUtils.offsetCriteriaToSubscription(offsetCriteria);
     _initialMessageId = PulsarUtils.offsetCriteriaToMessageId(offsetCriteria);
-    _populateMetadata = Boolean.parseBoolean(streamConfig.getStreamConfigsMap().getOrDefault(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE),
-        "false"));
-    String metadataFieldsToExtractCSV = streamConfig.getStreamConfigsMap().getOrDefault(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, METADATA_FIELDS), "");
+    _populateMetadata = Boolean.parseBoolean(getConfigValueOrDefault(streamConfigMap,
+        StreamConfigProperties.METADATA_POPULATE, "false"));
+    String metadataFieldsToExtractCSV = getConfigValueOrDefault(streamConfigMap, METADATA_FIELDS, "");
     if (StringUtils.isBlank(metadataFieldsToExtractCSV) || !_populateMetadata) {
       _metadataFields = Collections.emptySet();
     } else {
       _metadataFields = parseConfigStringToEnumSet(metadataFieldsToExtractCSV);
     }
+    _issuerUrl = getConfigValue(streamConfigMap, OAUTH_ISSUER_URL);
+    _credentialsFilePath = getConfigValue(streamConfigMap, OAUTH_CREDS_FILE_PATH);
+    if (StringUtils.isNotBlank(_credentialsFilePath)) {
+      validateOAuthCredFile();
+    }
+    _audience = getConfigValue(streamConfigMap, OAUTH_AUDIENCE);
+  }
+
+  protected void validateOAuthCredFile() {
+    try {
+      URL credFilePathUrl = new URL(_credentialsFilePath);
+      if (!"file".equals(credFilePathUrl.getProtocol())) {
+        throw new IllegalArgumentException("Invalid credentials file path: " + _credentialsFilePath
+            + ". URL protocol must be file://");
+      }
+      File credFile = new File(credFilePathUrl.getPath());
+      if (!credFile.exists()) {
+        throw new IllegalArgumentException("Invalid credentials file path: " + _credentialsFilePath
+            + ". File does not exist.");
+      }
+    } catch (MalformedURLException mue) {
+      throw new IllegalArgumentException("Invalid credentials file path: " + _credentialsFilePath, mue);
+    }
+  }
+
+  private String getConfigValue(Map<String, String> streamConfigMap, String key) {
+    return streamConfigMap.get(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, key));
+  }
+
+  private String getConfigValueOrDefault(Map<String, String> streamConfigMap, String key, String defaultValue) {
+    return streamConfigMap.getOrDefault(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, key), defaultValue);
   }
 
   private Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> parseConfigStringToEnumSet(
@@ -143,5 +180,17 @@ public class PulsarConfig {
 
   public Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> getMetadataFields() {
     return _metadataFields;
+  }
+
+  public String getIssuerUrl() {
+    return _issuerUrl;
+  }
+
+  public String getCredentialsFilePath() {
+    return _credentialsFilePath;
+  }
+
+  public String getAudience() {
+    return _audience;
   }
 }
