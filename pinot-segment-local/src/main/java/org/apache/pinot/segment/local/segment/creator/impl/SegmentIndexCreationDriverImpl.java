@@ -188,6 +188,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Use the same transform pipeline if the data source is backed by a record reader
     if (dataSource instanceof RecordReaderSegmentCreationDataSource) {
       ((RecordReaderSegmentCreationDataSource) dataSource).setTransformPipeline(transformPipeline);
+      ((RecordReaderSegmentCreationDataSource) dataSource).setRecordEnricherPipeline(enricherPipeline);
     }
 
     // Initialize stats collection
