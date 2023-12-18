@@ -21,13 +21,22 @@ package org.apache.pinot.controller.recommender.data;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
+import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
 import org.apache.pinot.controller.recommender.data.writer.AvroWriter;
 import org.apache.pinot.controller.recommender.data.writer.AvroWriterSpec;
 import org.apache.pinot.controller.recommender.data.writer.CsvWriter;
 import org.apache.pinot.controller.recommender.data.writer.FileWriterSpec;
 import org.apache.pinot.controller.recommender.data.writer.JsonWriter;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,5 +80,40 @@ public final class DataGenerationHelpers {
     }
     dir.mkdir();
     return dir;
+  }
+
+  public static DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String> columns,
+      HashMap<String, FieldSpec.DataType> dataTypes, HashMap<String, FieldSpec.FieldType> fieldTypes,
+      HashMap<String, TimeUnit> timeUnits, HashMap<String, Integer> cardinality, HashMap<String, IntRange> range,
+      HashMap<String, Map<String, Object>> pattern, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap) {
+    for (final FieldSpec fs : schema.getAllFieldSpecs()) {
+      String col = fs.getName();
+      columns.add(col);
+      dataTypes.put(col, fs.getDataType());
+      fieldTypes.put(col, fs.getFieldType());
+
+      switch (fs.getFieldType()) {
+        case DIMENSION:
+          cardinality.putIfAbsent(col, 1000);
+          break;
+        case METRIC:
+          range.putIfAbsent(col, new IntRange(1, 1000));
+          break;
+        case TIME:
+          range.putIfAbsent(col, new IntRange(1, 1000));
+          TimeFieldSpec tfs = (TimeFieldSpec) fs;
+          timeUnits.put(col, tfs.getIncomingGranularitySpec().getTimeType());
+          break;
+
+        // forward compatibility with pattern generator
+        case DATE_TIME:
+        case COMPLEX:
+          break;
+        default:
+          throw new RuntimeException("Invalid field type.");
+      }
+    }
+    return new DataGeneratorSpec(columns, cardinality, range, pattern, mvCountMap, lengthMap, dataTypes, fieldTypes,
+        timeUnits);
   }
 }

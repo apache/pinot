@@ -30,6 +30,7 @@ import org.apache.pinot.controller.recommender.data.DataGenerationHelpers;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
 import org.apache.pinot.controller.recommender.data.generator.SchemaAnnotation;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -141,8 +142,8 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     buildCardinalityRangeMaps(_schemaAnnFile, cardinality, range, pattern);
 
     final DataGeneratorSpec spec =
-        buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits, cardinality, range, pattern,
-            mvCountMap, lengthMap);
+        DataGenerationHelpers.buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits, cardinality,
+            range, pattern, mvCountMap, lengthMap);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
@@ -180,52 +181,6 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
         cardinality.put(column, sa.getCardinality());
       }
     }
-  }
-
-  private DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String> columns,
-      HashMap<String, DataType> dataTypes, HashMap<String, FieldType> fieldTypes, HashMap<String, TimeUnit> timeUnits,
-      HashMap<String, Integer> cardinality, HashMap<String, IntRange> range,
-      HashMap<String, Map<String, Object>> pattern, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap) {
-    for (final FieldSpec fs : schema.getAllFieldSpecs()) {
-      String col = fs.getName();
-
-      columns.add(col);
-      dataTypes.put(col, fs.getDataType());
-      fieldTypes.put(col, fs.getFieldType());
-
-      switch (fs.getFieldType()) {
-        case DIMENSION:
-          if (cardinality.get(col) == null) {
-            cardinality.put(col, 1000);
-          }
-          break;
-
-        case METRIC:
-          if (!range.containsKey(col)) {
-            range.put(col, new IntRange(1, 1000));
-          }
-          break;
-
-        case TIME:
-          if (!range.containsKey(col)) {
-            range.put(col, new IntRange(1, 1000));
-          }
-          TimeFieldSpec tfs = (TimeFieldSpec) fs;
-          timeUnits.put(col, tfs.getIncomingGranularitySpec().getTimeType());
-          break;
-
-        // forward compatibility with pattern generator
-        case DATE_TIME:
-        case COMPLEX:
-          break;
-
-        default:
-          throw new RuntimeException("Invalid field type.");
-      }
-    }
-
-    return new DataGeneratorSpec(columns, cardinality, range, pattern, mvCountMap, lengthMap, dataTypes, fieldTypes,
-        timeUnits);
   }
 
   public static void main(String[] args)
