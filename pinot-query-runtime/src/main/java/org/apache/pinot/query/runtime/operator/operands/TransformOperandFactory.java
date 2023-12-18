@@ -20,12 +20,28 @@ package org.apache.pinot.query.runtime.operator.operands;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import org.apache.calcite.config.CalciteConnectionConfig;
+import org.apache.calcite.jdbc.CalciteSchema;
+import org.apache.calcite.jdbc.CalciteSchemaBuilder;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.pinot.common.function.sql.PinotCalciteCatalogReader;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.query.type.TypeSystem;
 
 
 public class TransformOperandFactory {
+  private static final RelDataTypeFactory FUNCTION_CATALOGREL_DATA_TYPE_FACTORY = new TypeFactory(new TypeSystem());
+  private static final CalciteSchema FUNCTION_CATALOG_ROOT_SCHEMA =
+      CalciteSchemaBuilder.asRootSchema(new PinotCatalog(null));
+  private static final CalciteConnectionConfig FUNCTION_CATALOG_CONFIG = CalciteConnectionConfig.DEFAULT;
+  private static final PinotCalciteCatalogReader FUNCTION_CATALOG_OPERATOR_TABLE =
+      new PinotCalciteCatalogReader(FUNCTION_CATALOG_ROOT_SCHEMA, FUNCTION_CATALOG_ROOT_SCHEMA.path(null),
+          FUNCTION_CATALOGREL_DATA_TYPE_FACTORY, FUNCTION_CATALOG_CONFIG);
+
   private TransformOperandFactory() {
   }
 
@@ -74,7 +90,8 @@ public class TransformOperandFactory {
       case "lessThanOrEqual":
         return new FilterOperand.Predicate(operands, dataSchema, v -> v <= 0);
       default:
-        return new FunctionOperand(functionCall, canonicalName, dataSchema);
+        return new FunctionOperand(FUNCTION_CATALOG_OPERATOR_TABLE, FUNCTION_CATALOGREL_DATA_TYPE_FACTORY,
+            functionCall, canonicalName, dataSchema);
     }
   }
 }

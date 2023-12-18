@@ -21,7 +21,10 @@ package org.apache.pinot.query.runtime.operator.operands;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -43,11 +46,20 @@ public class FunctionOperand implements TransformOperand {
   private final List<TransformOperand> _operands;
   private final Object[] _reusableOperandHolder;
 
-  public FunctionOperand(RexExpression.FunctionCall functionCall, String canonicalName, DataSchema dataSchema) {
+  public FunctionOperand(SqlOperatorTable sqlOperatorTable, RelDataTypeFactory relDataTypeFactory,
+      RexExpression.FunctionCall functionCall, String canonicalName, DataSchema dataSchema) {
     _resultType = functionCall.getDataType();
     List<RexExpression> operands = functionCall.getFunctionOperands();
     int numOperands = operands.size();
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(canonicalName, numOperands);
+    List<ColumnDataType> operandTypes = operands.stream().map(e -> {
+      if (e instanceof RexExpression.InputRef) {
+        return dataSchema.getColumnDataType(((RexExpression.InputRef) e).getIndex());
+      } else {
+        return e.getDataType();
+      }
+    }).collect(Collectors.toList());
+    FunctionInfo functionInfo =
+        FunctionRegistry.getFunctionInfo(sqlOperatorTable, relDataTypeFactory, canonicalName, operandTypes);
     Preconditions.checkState(functionInfo != null, "Cannot find function with name: %s", canonicalName);
     _functionInvoker = new FunctionInvoker(functionInfo);
     if (!_functionInvoker.getMethod().isVarArgs()) {

@@ -19,23 +19,16 @@
 package org.apache.pinot.common.function;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.function.registry.PinotFunction;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.pinot.common.function.registry.PinotScalarFunction;
 import org.apache.pinot.common.function.sql.PinotFunctionRegistry;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.annotations.ScalarFunction;
-import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,36 +39,8 @@ import org.slf4j.LoggerFactory;
 public class FunctionRegistry {
   public static final boolean CASE_SENSITIVITY = false;
   private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
-  private static final Map<String, Map<Integer, FunctionInfo>> FUNCTION_INFO_MAP = new HashMap<>();
 
   private FunctionRegistry() {
-  }
-
-  /**
-   * Registers the scalar functions via reflection.
-   * NOTE: In order to plugin methods using reflection, the methods should be inside a class that includes ".function."
-   *       in its class path. This convention can significantly reduce the time of class scanning.
-   */
-  static {
-    long startTimeMs = System.currentTimeMillis();
-    Set<Method> methods = PinotReflectionUtils.getMethodsThroughReflection(".*\\.function\\..*", ScalarFunction.class);
-    for (Method method : methods) {
-      if (!Modifier.isPublic(method.getModifiers())) {
-        continue;
-      }
-      ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
-      if (scalarFunction.enabled()) {
-        // Parse annotated function names and alias
-        Set<String> scalarFunctionNames = Arrays.stream(scalarFunction.names()).collect(Collectors.toSet());
-        if (scalarFunctionNames.size() == 0) {
-          scalarFunctionNames.add(method.getName());
-        }
-        boolean nullableParameters = scalarFunction.nullableParameters();
-        FunctionRegistry.registerFunction(method, scalarFunctionNames, nullableParameters);
-      }
-    }
-    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_INFO_MAP.size(),
-        FUNCTION_INFO_MAP.keySet(), System.currentTimeMillis() - startTimeMs);
   }
 
   /**
@@ -87,29 +52,15 @@ public class FunctionRegistry {
   }
 
   @VisibleForTesting
-  public static void registerFunction(Method method, boolean nullableParameters) {
-    registerFunction(method, Collections.singleton(method.getName()), nullableParameters);
-  }
-
-  @VisibleForTesting
   public static Set<String> getRegisteredCalciteFunctionNames() {
     return PinotFunctionRegistry.getFunctionMap().map().keySet();
-  }
-
-  /**
-   * Returns the full list of all registered ScalarFunction to Calcite.
-   */
-  public static Map<String, List<PinotFunction>> getRegisteredCalciteFunctionMap() {
-    return PinotFunctionRegistry.getFunctionMap().map();
   }
 
   /**
    * Returns {@code true} if the given function name is registered, {@code false} otherwise.
    */
   public static boolean containsFunction(String functionName) {
-    // TODO: remove deprecated FUNCTION_INFO_MAP
-    return PinotFunctionRegistry.getFunctionMap().containsKey(functionName, CASE_SENSITIVITY)
-        || FUNCTION_INFO_MAP.containsKey(canonicalize(functionName));
+    return PinotFunctionRegistry.getFunctionMap().containsKey(functionName, CASE_SENSITIVITY);
   }
 
   /**
@@ -119,36 +70,25 @@ public class FunctionRegistry {
    */
   @Nullable
   public static FunctionInfo getFunctionInfo(String functionName, int numParams) {
-    try {
-      return getFunctionInfoFromCalciteNamedMap(functionName, numParams);
-    } catch (IllegalArgumentException iae) {
-      // TODO: remove deprecated FUNCTION_INFO_MAP
-      return getFunctionInfoFromFunctionInfoMap(functionName, numParams);
-    }
+    return getFunctionInfoFromCalciteNamedMap(functionName, numParams);
   }
 
-  // TODO: remove deprecated FUNCTION_INFO_MAP
-  private static void registerFunction(Method method, Set<String> alias, boolean nullableParameters) {
-    if (method.getAnnotation(Deprecated.class) == null) {
-      for (String name : alias) {
-        registerFunctionInfoMap(name, method, nullableParameters);
-      }
-    }
-  }
-
-  private static void registerFunctionInfoMap(String functionName, Method method, boolean nullableParameters) {
-    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
-    String canonicalName = canonicalize(functionName);
-    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
-    FunctionInfo existFunctionInfo = functionInfoMap.put(method.getParameterCount(), functionInfo);
-    Preconditions.checkState(existFunctionInfo == null || existFunctionInfo.getMethod() == functionInfo.getMethod(),
-        "Function: %s with %s parameters is already registered", functionName, method.getParameterCount());
-  }
-
+  /**
+   * Returns the {@link FunctionInfo} associated with the given function name and number of parameters, or {@code null}
+   * if there is no matching method. This method should be called after the FunctionRegistry is initialized and all
+   * methods are already registered.
+   */
   @Nullable
-  private static FunctionInfo getFunctionInfoFromFunctionInfoMap(String functionName, int numParams) {
-    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.get(canonicalize(functionName));
-    return functionInfoMap != null ? functionInfoMap.get(numParams) : null;
+  public static FunctionInfo getFunctionInfo(SqlOperatorTable operatorTable, RelDataTypeFactory typeFactory,
+      String functionName, List<DataSchema.ColumnDataType> argTypes) {
+    PinotScalarFunction scalarFunction =
+        PinotFunctionRegistry.getScalarFunction(operatorTable, typeFactory, functionName, argTypes);
+    if (scalarFunction != null) {
+      return scalarFunction.getFunctionInfo();
+    } else {
+      // TODO: convert this to throw IAE when all operator has scalar equivalent.
+      return null;
+    }
   }
 
   @Nullable
@@ -160,14 +100,9 @@ public class FunctionRegistry {
     if (candidates.size() == 1) {
       return candidates.get(0).getFunctionInfo();
     } else {
-      throw new IllegalArgumentException(
-          "Unable to lookup function: " + functionName + " by parameter count: " + numParams + " Found "
-              + candidates.size() + " candidates. Try to use argument types to resolve the correct one!");
+      // TODO: convert this to throw IAE when all operator has scalar equivalent.
+      return null;
     }
-  }
-
-  private static String canonicalize(String functionName) {
-    return StringUtils.remove(functionName, '_').toLowerCase();
   }
 
   /**
