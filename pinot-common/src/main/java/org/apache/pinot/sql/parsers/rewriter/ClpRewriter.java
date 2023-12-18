@@ -54,7 +54,7 @@ import org.apache.pinot.sql.parsers.SqlCompilationException;
  * See {@link org.apache.pinot.core.operator.transform.function.CLPDecodeTransformFunction} for details about the
  * underlying clpDecode transformer.
  */
-public class CLPDecodeRewriter implements QueryRewriter {
+public class ClpRewriter implements QueryRewriter {
   public static final String LOGTYPE_COLUMN_SUFFIX = "_logtype";
   public static final String DICTIONARY_VARS_COLUMN_SUFFIX = "_dictionaryVars";
   public static final String ENCODED_VARS_COLUMN_SUFFIX = "_encodedVars";

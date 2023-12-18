@@ -26,8 +26,8 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertThrows;
 
 
-public class CLPDecodeRewriterTest {
-  private static final QueryRewriter _QUERY_REWRITER = new CLPDecodeRewriter();
+public class ClpRewriterTest {
+  private static final QueryRewriter _QUERY_REWRITER = new ClpRewriter();
 
   @Test
   public void testCLPDecodeRewrite() {
