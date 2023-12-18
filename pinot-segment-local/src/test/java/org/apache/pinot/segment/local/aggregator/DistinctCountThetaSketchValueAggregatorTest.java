@@ -27,7 +27,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 public class DistinctCountThetaSketchValueAggregatorTest {
@@ -161,5 +163,16 @@ public class DistinctCountThetaSketchValueAggregatorTest {
     assertThrows(() -> agg.getInitialAggregatedValue(objects));
     byte[][] zeroSketches = {};
     assertEquals(agg.getInitialAggregatedValue(zeroSketches).getEstimate(), 0.0);
+  }
+
+  @Test
+  public void shouldRetainSketchOrdering() {
+    UpdateSketch input = Sketches.updateSketchBuilder().build();
+    IntStream.range(0, 10).forEach(input::update);
+    Sketch unordered = input.compact(false, null);
+    Sketch ordered = input.compact(true, null);
+    DistinctCountThetaSketchValueAggregator agg = new DistinctCountThetaSketchValueAggregator();
+    assertTrue(agg.cloneAggregatedValue(ordered).isOrdered());
+    assertFalse(agg.cloneAggregatedValue(unordered).isOrdered());
   }
 }

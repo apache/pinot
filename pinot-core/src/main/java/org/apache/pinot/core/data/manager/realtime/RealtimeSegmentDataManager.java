@@ -381,7 +381,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
         return false;
       default:
-        _segmentLogger.error("Illegal state {}" + _state.toString());
+        _segmentLogger.error("Illegal state: {}", _state);
         throw new RuntimeException("Illegal state to consume");
     }
   }

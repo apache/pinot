@@ -36,6 +36,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -458,7 +459,7 @@ public class LLCSegmentCompletionHandlers {
    * temporarily.
    */
   private static SegmentMetadataImpl extractSegmentMetadataFromForm(FormDataMultiPart form, String segmentName)
-      throws IOException {
+      throws IOException, ConfigurationException {
     File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
         ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), getTempSegmentFileName(segmentName),
         "Invalid segment name: %s", segmentName);

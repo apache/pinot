@@ -51,6 +51,9 @@ public class FieldConfig extends BaseJsonConfig {
   public static final String TEXT_INDEX_STOP_WORD_EXCLUDE_KEY = "stopWordExclude";
   public static final String TEXT_INDEX_LUCENE_USE_COMPOUND_FILE = "luceneUseCompoundFile";
   public static final String TEXT_INDEX_LUCENE_MAX_BUFFER_SIZE_MB = "luceneMaxBufferSizeMB";
+  public static final String TEXT_INDEX_LUCENE_ANALYZER_CLASS = "luceneAnalyzerClass";
+  public static final String TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS
+          = "org.apache.lucene.analysis.standard.StandardAnalyzer";
   public static final String TEXT_INDEX_STOP_WORD_SEPERATOR = ",";
   // "native" for native, default is Lucene
   public static final String TEXT_FST_TYPE = "fstType";
@@ -115,7 +118,7 @@ public class FieldConfig extends BaseJsonConfig {
 
   // If null, there won't be any index
   public enum IndexType {
-    INVERTED, SORTED, TEXT, FST, H3, JSON, TIMESTAMP, RANGE
+    INVERTED, SORTED, TEXT, FST, H3, JSON, TIMESTAMP, VECTOR, RANGE
   }
 
   public enum CompressionCodec {

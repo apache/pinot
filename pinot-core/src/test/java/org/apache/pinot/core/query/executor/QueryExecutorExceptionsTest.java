@@ -156,7 +156,7 @@ public class QueryExecutorExceptionsTest {
     resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
     assertNotNull(resourceUrl);
     PropertiesConfiguration queryExecutorConfig =
-        CommonsConfigurationUtils.loadFromFile(new File(resourceUrl.getFile()));
+        CommonsConfigurationUtils.fromFile(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, _serverMetrics);
   }

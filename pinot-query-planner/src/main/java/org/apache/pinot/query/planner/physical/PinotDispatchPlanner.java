@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
-import org.apache.pinot.query.planner.DispatchableSubPlan;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.physical.colocated.GreedyShuffleRewriteVisitor;
@@ -66,14 +65,12 @@ public class PinotDispatchPlanner {
     // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
     context.getWorkerManager().assignWorkers(rootFragment, context);
     // 4. compute the mailbox assignment for each stage.
-    // TODO: refactor this to be a pluggable interface.
     rootNode.visit(MailboxAssignmentVisitor.INSTANCE, context);
     // 5. Run physical optimizations
     runPhysicalOptimizers(rootNode, context, _tableCache);
     // 6. Run validations
     runValidations(rootFragment, context);
     // 7. convert it into query plan.
-    // TODO: refactor this to be a pluggable interface.
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
 

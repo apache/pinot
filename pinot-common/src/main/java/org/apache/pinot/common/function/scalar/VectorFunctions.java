@@ -117,6 +117,38 @@ public class VectorFunctions {
   }
 
   /**
+   * Returns the Euclidean distance between two vectors
+   * @param vector1 vector1
+   * @param vector2 vector2
+   * @return Euclidean distance
+   */
+  @ScalarFunction(names = {"euclideandistance", "euclidean_distance"})
+  public static double euclideanDistance(float[] vector1, float[] vector2) {
+    validateVectors(vector1, vector2);
+    double distance = 0;
+    for (int i = 0; i < vector1.length; i++) {
+      distance += Math.pow(vector1[i] - vector2[i], 2);
+    }
+    return distance;
+  }
+
+  /**
+   * Returns the dot product between two vectors
+   * @param vector1 vector1
+   * @param vector2 vector2
+   * @return dot product
+   */
+  @ScalarFunction(names = {"dotproduct", "dot_product"})
+  public static double dotProduct(float[] vector1, float[] vector2) {
+    validateVectors(vector1, vector2);
+    double dotProduct = 0.0;
+    for (int i = 0; i < vector1.length; i++) {
+      dotProduct += vector1[i] * vector2[i];
+    }
+    return dotProduct;
+  }
+
+  /**
    * Returns the number of dimensions in a vector
    * @param vector input vector
    * @return number of dimensions

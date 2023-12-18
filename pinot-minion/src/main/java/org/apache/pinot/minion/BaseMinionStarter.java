@@ -191,6 +191,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     MinionMetrics minionMetrics = new MinionMetrics(_config.getMetricsPrefix(), metricsRegistry);
     minionMetrics.initializeGlobalMeters();
     minionMetrics.setValueOfGlobalGauge(MinionGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    MinionMetrics.register(minionMetrics);
     minionContext.setMinionMetrics(minionMetrics);
 
     // Install default SSL context if necessary (even if not force-enabled everywhere)

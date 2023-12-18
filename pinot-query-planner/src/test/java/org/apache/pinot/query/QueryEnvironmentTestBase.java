@@ -264,7 +264,7 @@ public class QueryEnvironmentTestBase {
           partitionIdToInfoMap[i] = new PartitionInfo(Collections.singleton(hostname), partitionIdToSegmentsMap.get(i));
         }
         TablePartitionInfo tablePartitionInfo =
-            new TablePartitionInfo(tableNameWithType, partitionColumn, "hashCode", numPartitions, partitionIdToInfoMap,
+            new TablePartitionInfo(tableNameWithType, partitionColumn, "Hashcode", numPartitions, partitionIdToInfoMap,
                 Collections.emptyList());
         partitionInfoMap.put(tableNameWithType, tablePartitionInfo);
       }
