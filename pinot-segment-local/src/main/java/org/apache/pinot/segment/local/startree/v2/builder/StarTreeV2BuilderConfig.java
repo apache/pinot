@@ -243,10 +243,6 @@ public class StarTreeV2BuilderConfig {
       metadataProperties.setProperty(prefix + MetadataKey.COLUMN_NAME, functionColumnPair.getColumn());
       metadataProperties.setProperty(prefix + MetadataKey.COMPRESSION_CODEC, aggregationSpec.getCompressionType());
       String valueFunctionType = aggregationSpec.getValueAggregationFunctionTypeName();
-      if (valueFunctionType == null) {
-        valueFunctionType =
-            AggregationFunctionType.getValueAggregationType(functionColumnPair.getFunctionType()).getName();
-      }
       metadataProperties.setProperty(prefix + MetadataKey.VALUE_FUNCTION_TYPE, valueFunctionType);
       index++;
     }
