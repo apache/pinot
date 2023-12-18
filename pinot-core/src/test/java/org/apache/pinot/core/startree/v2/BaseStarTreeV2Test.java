@@ -168,10 +168,11 @@ abstract class BaseStarTreeV2Test<R, A> {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords));
     driver.build();
 
+    String aggregationTypeName = _valueAggregator.getAggregationType().getName();
     StarTreeIndexConfig starTreeIndexConfig =
         new StarTreeIndexConfig(Arrays.asList(DIMENSION_D1, DIMENSION_D2), null, null, Collections.singletonList(
-            new StarTreeAggregationConfig(METRIC, _valueAggregator.getAggregationType().getName(),
-                getCompressionCodec())), MAX_LEAF_RECORDS);
+            new StarTreeAggregationConfig(METRIC, aggregationTypeName, getCompressionCodec(), aggregationTypeName)),
+            MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
     MultipleTreesBuilder.BuildMode buildMode =

@@ -22,15 +22,20 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -92,9 +97,8 @@ public class StarTreeBuilderUtils {
     long totalSizeInBytes = headerSizeInBytes + (long) numNodes * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
 
     // Backward-compatible: star-tree file is always little-endian
-    try (PinotDataBuffer buffer = PinotDataBuffer
-        .mapFile(starTreeFile, false, 0, totalSizeInBytes, ByteOrder.LITTLE_ENDIAN,
-            "StarTreeBuilderUtils#serializeTree: star-tree buffer")) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(starTreeFile, false, 0, totalSizeInBytes,
+        ByteOrder.LITTLE_ENDIAN, "StarTreeBuilderUtils#serializeTree: star-tree buffer")) {
       long offset = writeHeader(buffer, headerSizeInBytes, dimensions, numNodes);
       writeNodes(buffer, offset, rootNode);
     }
@@ -268,5 +272,31 @@ public class StarTreeBuilderUtils {
     File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME));
     FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
+  }
+
+  public static TreeMap<AggregationFunctionColumnPair, AggregationSpec> deduplicateAggregationSpecs(
+      TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs) {
+    HashSet<AggregationFunctionColumnPair> uniqueColumnPairs = new HashSet<>();
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> filteredMap = new TreeMap<>();
+    for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
+      AggregationFunctionColumnPair originalColumnPair = entry.getKey();
+      AggregationSpec spec = entry.getValue();
+
+      AggregationFunctionColumnPair resolvedColumnPair;
+      String valueAggregationFunctionTypeName = spec.getValueAggregationFunctionTypeName();
+      if (valueAggregationFunctionTypeName == null) {
+        resolvedColumnPair = AggregationFunctionColumnPair.resolveToValueType(originalColumnPair);
+      } else {
+        resolvedColumnPair = new AggregationFunctionColumnPair(
+            AggregationFunctionType.getAggregationFunctionType(valueAggregationFunctionTypeName),
+            originalColumnPair.getColumn());
+      }
+
+      if (!uniqueColumnPairs.contains(resolvedColumnPair)) {
+        filteredMap.put(resolvedColumnPair, spec);
+        uniqueColumnPairs.add(resolvedColumnPair);
+      }
+    }
+    return filteredMap;
   }
 }

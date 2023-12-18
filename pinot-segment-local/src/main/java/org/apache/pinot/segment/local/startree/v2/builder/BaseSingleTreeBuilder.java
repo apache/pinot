@@ -133,7 +133,9 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
           "Dimension: " + dimension + " does not have dictionary");
     }
 
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = builderConfig.getAggregationSpecs();
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs =
+        StarTreeBuilderUtils.deduplicateAggregationSpecs(builderConfig.getAggregationSpecs());
+
     _numMetrics = aggregationSpecs.size();
     _metrics = new String[_numMetrics];
     _valueAggregators = new ValueAggregator[_numMetrics];

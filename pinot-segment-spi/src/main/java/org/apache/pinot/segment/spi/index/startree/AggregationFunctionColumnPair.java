@@ -66,6 +66,18 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     return fromFunctionAndColumnName(aggregationConfig.getAggregationFunction(), aggregationConfig.getColumnName());
   }
 
+  /**
+   * Return a new {@code AggregationFunctionColumnPair} from an existing functionColumnPair where the new object
+   * has the {@link AggregationFunctionType} set to that of the underlying StarTree value aggregator.
+   * @param functionColumnPair the existing functionColumnPair
+   * @return the new functionColumnPair
+   */
+  public static AggregationFunctionColumnPair resolveToValueType(AggregationFunctionColumnPair functionColumnPair) {
+     AggregationFunctionType valueAggregationFunctionType =
+         AggregationFunctionType.getValueAggregationType(functionColumnPair.getFunctionType());
+     return new AggregationFunctionColumnPair(valueAggregationFunctionType, functionColumnPair.getColumn());
+  }
+
   private static AggregationFunctionColumnPair fromFunctionAndColumnName(String functionName, String columnName) {
     AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
     if (functionType == AggregationFunctionType.COUNT) {

@@ -26,10 +26,13 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 
 import static org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils.IndexKey;
@@ -69,7 +72,9 @@ public class StarTreeIndexCombiner implements Closeable {
     }
 
     // Write metric (function-column pair) indexes
-    for (AggregationFunctionColumnPair functionColumnPair : builderConfig.getFunctionColumnPairs()) {
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs =
+        StarTreeBuilderUtils.deduplicateAggregationSpecs(builderConfig.getAggregationSpecs());
+    for (AggregationFunctionColumnPair functionColumnPair : aggregationSpecs.keySet()) {
       String metric = functionColumnPair.toColumnName();
       File metricIndexFile =
           new File(starTreeIndexDir, metric + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);

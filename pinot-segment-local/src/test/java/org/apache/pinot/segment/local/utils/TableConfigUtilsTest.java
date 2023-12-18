@@ -1440,7 +1440,7 @@ public class TableConfigUtilsTest {
     }
 
     starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol"), null, null,
-        Arrays.asList(new StarTreeAggregationConfig("myCol2", "SUM", CompressionCodec.LZ4)), 1);
+        Arrays.asList(new StarTreeAggregationConfig("myCol2", "SUM", CompressionCodec.LZ4, "SUM")), 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
     try {

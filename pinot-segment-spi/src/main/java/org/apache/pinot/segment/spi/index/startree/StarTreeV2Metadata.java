@@ -54,8 +54,12 @@ public class StarTreeV2Metadata {
         String columnName = aggregationConfig.getString(MetadataKey.COLUMN_NAME);
         ChunkCompressionType compressionType =
             ChunkCompressionType.valueOf(aggregationConfig.getString(MetadataKey.COMPRESSION_CODEC));
+        String valueAggregationFunctionTypeName = aggregationConfig.getString(MetadataKey.VALUE_FUNCTION_TYPE);
+        if (valueAggregationFunctionTypeName == null) {
+          valueAggregationFunctionTypeName = AggregationFunctionType.getValueAggregationType(functionType).getName();
+        }
         _aggregationSpecs.put(new AggregationFunctionColumnPair(functionType, columnName),
-            new AggregationSpec(compressionType));
+            new AggregationSpec(compressionType, valueAggregationFunctionTypeName));
       }
     } else {
       // Backward compatibility with columnName format
@@ -87,7 +91,12 @@ public class StarTreeV2Metadata {
   }
 
   public boolean containsFunctionColumnPair(AggregationFunctionColumnPair functionColumnPair) {
-    return _aggregationSpecs.containsKey(functionColumnPair);
+    boolean containsColumnPair = _aggregationSpecs.containsKey(functionColumnPair);
+    if (!containsColumnPair) {
+      AggregationFunctionColumnPair valuePair = AggregationFunctionColumnPair.resolveToValueType(functionColumnPair);
+      containsColumnPair = _aggregationSpecs.containsKey(valuePair);
+    }
+    return containsColumnPair;
   }
 
   public int getMaxLeafRecords() {
