@@ -1,19 +1,3 @@
-package org.apache.pinot.segment.local.recordenricher.clp;
-
-import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
-import java.io.IOException;
-import java.util.Map;
-import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.segment.local.recordenricher.RecordEnricher;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import com.yscope.clp.compressorfrontend.EncodedMessage;
-import com.yscope.clp.compressorfrontend.MessageEncoder;
-import org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,6 +16,21 @@ import org.slf4j.LoggerFactory;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.segment.local.recordenricher.clp;
+
+import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
+import com.yscope.clp.compressorfrontend.EncodedMessage;
+import com.yscope.clp.compressorfrontend.MessageEncoder;
+import java.io.IOException;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.local.recordenricher.RecordEnricher;
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class CLPEncodingEnricher extends RecordEnricher {
   public static final String FIELDS_FOR_CLP_ENCODING_CONFIG_KEY = "fieldsForClpEncoding";
   public static final String FIELDS_FOR_CLP_ENCODING_SEPARATOR = ",";
