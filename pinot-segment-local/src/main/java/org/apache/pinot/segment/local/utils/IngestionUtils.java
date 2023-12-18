@@ -309,7 +309,8 @@ public final class IngestionUtils {
   public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
 
-    if (null != ingestionConfig && null != ingestionConfig.getSchemaConformingTransformerConfig()) {
+    if (null != ingestionConfig && (null != ingestionConfig.getSchemaConformingTransformerConfig()
+        || null != ingestionConfig.getEnrichmentConfigs())) {
       // The SchemaConformingTransformer requires that all fields are extracted, indicated by returning an empty set
       // here. Compared to extracting the fields specified below, extracting all fields should be a superset.
       return fieldsForRecordExtractor;

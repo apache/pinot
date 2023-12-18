@@ -30,10 +30,13 @@ public class RecordEnricherPipeline {
 
   public static RecordEnricherPipeline fromTableConfig(TableConfig tableConfig) {
     RecordEnricherPipeline pipeline = new RecordEnricherPipeline();
+    if (null == tableConfig.getIngestionConfig() || null == tableConfig.getIngestionConfig().getEnrichmentConfigs()) {
+      return pipeline;
+    }
+
     for (EnrichmentConfig enrichmentConfig : tableConfig.getIngestionConfig().getEnrichmentConfigs()) {
       try {
-        RecordEnricher enricher =
-            (RecordEnricher) Class.forName(enrichmentConfig.getEnricherClassName()).newInstance();
+        RecordEnricher enricher = (RecordEnricher) Class.forName(enrichmentConfig.getEnricherClassName()).newInstance();
         enricher.init(enrichmentConfig.getEnricherProps());
         pipeline.add(enricher);
       } catch (Exception e) {
