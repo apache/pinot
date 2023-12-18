@@ -16,20 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.calcite.sql.fun;
+package org.apache.pinot.common.function.registry;
 
-import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.validate.SqlValidator;
+import org.apache.calcite.schema.Function;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
+import org.apache.calcite.sql.type.SqlReturnTypeInference;
 
 
-/**
- * Pinot supports native COALESCE function, thus no need to create CASE WHEN conversion.
- */
-public class PinotSqlCoalesceFunction extends SqlCoalesceFunction {
-
-  @Override
-  public SqlNode rewriteCall(SqlValidator validator, SqlCall call) {
-    return call;
-  }
+public interface PinotFunction extends Function {
+  SqlOperandTypeChecker getOperandTypeChecker();
+  SqlReturnTypeInference getReturnTypeInference();
 }
