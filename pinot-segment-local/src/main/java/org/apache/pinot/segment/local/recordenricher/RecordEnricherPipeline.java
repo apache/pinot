@@ -28,6 +28,10 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class RecordEnricherPipeline {
   private final List<RecordEnricher> _enrichers = new ArrayList<>();
 
+  public static RecordEnricherPipeline getPassThroughPipeline() {
+    return new RecordEnricherPipeline();
+  }
+
   public static RecordEnricherPipeline fromTableConfig(TableConfig tableConfig) {
     RecordEnricherPipeline pipeline = new RecordEnricherPipeline();
     if (null == tableConfig.getIngestionConfig() || null == tableConfig.getIngestionConfig().getEnrichmentConfigs()) {
@@ -37,7 +41,7 @@ public class RecordEnricherPipeline {
     for (EnrichmentConfig enrichmentConfig : tableConfig.getIngestionConfig().getEnrichmentConfigs()) {
       try {
         RecordEnricher enricher = (RecordEnricher) Class.forName(enrichmentConfig.getEnricherClassName()).newInstance();
-        enricher.init(enrichmentConfig.getEnricherProps());
+        enricher.init(enrichmentConfig.getProperties());
         pipeline.add(enricher);
       } catch (Exception e) {
         throw new RuntimeException("Failed to instantiate record enricher: " + enrichmentConfig.getEnricherClassName(),

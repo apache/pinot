@@ -30,20 +30,20 @@ public class EnrichmentConfig extends BaseJsonConfig {
   private final String _enricherClassName;
 
   @JsonPropertyDescription("Enricher properties")
-  private final Map<String, String> _enricherProps;
+  private final Map<String, String> _properties;
 
   @JsonCreator
   public EnrichmentConfig(@JsonProperty("enricherClassName") String className,
-      @JsonProperty("transformFunction") Map<String, String> enricherProps) {
+      @JsonProperty("properties") Map<String, String> properties) {
     _enricherClassName = className;
-    _enricherProps = enricherProps;
+    _properties = properties;
   }
 
   public String getEnricherClassName() {
     return _enricherClassName;
   }
 
-  public Map<String, String> getEnricherProps() {
-    return _enricherProps;
+  public Map<String, String> getProperties() {
+    return _properties;
   }
 }
