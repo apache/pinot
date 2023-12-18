@@ -41,7 +41,7 @@ import java.lang.annotation.Target;
  *     - byte[]
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD, ElementType.TYPE})
 public @interface ScalarFunction {
 
   boolean enabled() default true;

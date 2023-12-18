@@ -38,6 +38,8 @@ import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
+import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
 import org.apache.calcite.sql.validate.SqlUserDefinedFunction;
@@ -88,6 +90,22 @@ public class FunctionRegistry {
         }
         boolean nullableParameters = scalarFunction.nullableParameters();
         registerFunction(method, scalarFunctionNames, nullableParameters);
+      }
+    }
+    Set<Class<?>> classes = PinotReflectionUtils.getClassesThroughReflection(".*\\.function\\..*", ScalarFunction.class);
+    for (Class<?> clazz : classes) {
+      if (!Modifier.isPublic(clazz.getModifiers())) {
+        continue;
+      }
+      ScalarFunction scalarFunction = clazz.getAnnotation(ScalarFunction.class);
+      if (scalarFunction.enabled()) {
+        // Parse annotated function names and alias
+        Set<String> scalarFunctionNames = Arrays.stream(scalarFunction.names()).collect(Collectors.toSet());
+        if (scalarFunctionNames.size() == 0) {
+          scalarFunctionNames.add(clazz.getName());
+        }
+        boolean nullableParameters = scalarFunction.nullableParameters();
+        registerFunction(clazz, scalarFunctionNames, nullableParameters);
       }
     }
     LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_MAP.map().size(),
@@ -223,8 +241,30 @@ public class FunctionRegistry {
     }
   }
 
+  private static void registerFunction(Class<?> clazz, Set<String> alias, boolean nullableParameters) {
+    if (clazz.getAnnotation(Deprecated.class) == null) {
+      for (String name : alias) {
+        registerCalciteNamedFunctionMap(name, clazz, nullableParameters);
+      }
+    }
+  }
+
   private static void registerCalciteNamedFunctionMap(String name, Method method, boolean nullableParameters) {
     FUNCTION_MAP.put(name, new PinotScalarFunction(name, method, nullableParameters));
+  }
+
+  private static void registerCalciteNamedFunctionMap(String name, Class<?> clazz, boolean nullableParameters) {
+    try {
+      SqlReturnTypeInference returnTypeInference = (SqlReturnTypeInference) clazz.getField("RETURN_TYPE_INFERENCE").get(null);
+      SqlOperandTypeChecker operandTypeChecker = (SqlOperandTypeChecker) clazz.getField("OPERAND_TYPE_CHECKER").get(null);
+      for (Method method : clazz.getMethods()) {
+        if (method.getName().equals("eval")) {
+          FUNCTION_MAP.put(name, new PinotScalarFunction(name, method, nullableParameters, operandTypeChecker, returnTypeInference));
+        }
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static void registerAggregateFunction(String functionName, AggregationFunctionType functionType) {
