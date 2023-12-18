@@ -40,12 +40,10 @@ public class ColumnJsonParserException extends JsonParseException {
      */
     @Override
     public String getMessage() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Column: ");
-        sb.append(_columnName);
-        sb.append("\n");
-        sb.append(super.getMessage());
-        return sb.toString();
+        return "Column: " +
+                _columnName +
+                "\n" +
+                super.getMessage();
     }
 
     @Override
