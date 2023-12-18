@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.calcite.prepare;
+package org.apache.pinot.common.function.sql;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -35,6 +35,8 @@ import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.linq4j.function.Hints;
 import org.apache.calcite.model.ModelHandler;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.prepare.Prepare;
+import org.apache.calcite.prepare.RelOptTableImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeFactoryImpl;
@@ -310,7 +312,7 @@ public class PinotCalciteCatalogReader implements Prepare.CatalogReader {
   }
 
   /** Converts a function to a {@link org.apache.calcite.sql.SqlOperator}. */
-  private static SqlOperator toOp(SqlIdentifier name,
+  public static SqlOperator toOp(SqlIdentifier name,
       final org.apache.calcite.schema.Function function) {
     final Function<RelDataTypeFactory, List<RelDataType>> argTypesFactory =
         typeFactory -> function.getParameters()

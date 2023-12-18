@@ -35,7 +35,6 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.hep.HepMatchOrder;
 import org.apache.calcite.plan.hep.HepProgram;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
-import org.apache.calcite.prepare.PinotCalciteCatalogReader;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
@@ -52,8 +51,8 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.fun.PinotOperatorTable;
 import org.apache.calcite.sql.util.PinotChainedSqlOperatorTable;
+import org.apache.calcite.sql.util.PinotSqlStdOperatorTable;
 import org.apache.calcite.sql2rel.PinotConvertletTable;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
@@ -61,6 +60,8 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.function.sql.PinotCalciteCatalogReader;
+import org.apache.pinot.common.function.sql.PinotOperatorTable;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.QueryPlan;
@@ -113,6 +114,7 @@ public class QueryEnvironment {
 
     _config = Frameworks.newConfigBuilder().traitDefs()
         .operatorTable(new PinotChainedSqlOperatorTable(Arrays.asList(
+            PinotSqlStdOperatorTable.instance(),
             PinotOperatorTable.instance(),
             _catalogReader)))
         .defaultSchema(_rootSchema.plus())

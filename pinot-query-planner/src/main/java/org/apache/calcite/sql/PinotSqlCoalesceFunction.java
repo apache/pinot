@@ -18,20 +18,17 @@
  */
 package org.apache.calcite.sql;
 
-import org.apache.calcite.sql.type.SqlOperandTypeChecker;
-import org.apache.calcite.sql.type.SqlOperandTypeInference;
-import org.apache.calcite.sql.type.SqlReturnTypeInference;
-import org.checkerframework.checker.nullness.qual.Nullable;
+import org.apache.calcite.sql.fun.SqlCoalesceFunction;
+import org.apache.calcite.sql.validate.SqlValidator;
 
 
 /**
- * Pinot SqlAggFunction class to register the Pinot aggregation functions with the Calcite operator table.
+ * Pinot supports native COALESCE function, thus no need to create CASE WHEN conversion.
  */
-public class PinotSqlTransformFunction extends SqlFunction {
+public class PinotSqlCoalesceFunction extends SqlCoalesceFunction {
 
-  public PinotSqlTransformFunction(String name, SqlKind kind, @Nullable SqlReturnTypeInference returnTypeInference,
-      @Nullable SqlOperandTypeInference operandTypeInference, @Nullable SqlOperandTypeChecker operandTypeChecker,
-      SqlFunctionCategory category) {
-    super(name, kind, returnTypeInference, operandTypeInference, operandTypeChecker, category);
+  @Override
+  public SqlNode rewriteCall(SqlValidator validator, SqlCall call) {
+    return call;
   }
 }
