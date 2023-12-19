@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -336,7 +337,7 @@ public class TableRebalancer {
     //    current instances as this is the best we can do, and can help the table get out of this state.
     // 2. Only check the segments to be moved because we don't need to maintain available replicas for segments not
     //    being moved, including segments with all replicas OFFLINE (error segments during consumption).
-    Set<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
+    List<String> segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
 
     int numReplicas = Integer.MAX_VALUE;
     for (String segment : segmentsToMove) {
@@ -379,12 +380,15 @@ public class TableRebalancer {
     // 5. Update the IdealState to the next assignment. If the IdealState changes before the update, go back to step 1.
     while (true) {
       // Wait for ExternalView to converge before updating the next IdealState
+      // NOTE: Monitor the segments to be moved from both the previous round and this round to ensure the moved segments
+      //       in the previous round are also converged.
+      Set<String> segmentsToMonitor = new HashSet<>(segmentsToMove);
       segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
+      segmentsToMonitor.addAll(segmentsToMove);
       IdealState idealState;
       try {
-        idealState =
-            waitForExternalViewToConverge(tableNameWithType, bestEfforts, segmentsToMove, externalViewCheckIntervalInMs,
-                externalViewStabilizationTimeoutInMs);
+        idealState = waitForExternalViewToConverge(tableNameWithType, bestEfforts, segmentsToMonitor,
+            externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs);
       } catch (Exception e) {
         String errorMsg = String.format(
             "For rebalanceId: %s, caught exception while waiting for ExternalView to converge for table: %s, "
