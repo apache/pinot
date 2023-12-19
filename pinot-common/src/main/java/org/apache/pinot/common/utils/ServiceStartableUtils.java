@@ -26,7 +26,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
-import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -42,7 +41,7 @@ public class ServiceStartableUtils {
   private static final String CLUSTER_CONFIG_ZK_PATH_TEMPLATE = "/%s/CONFIGS/CLUSTER/%s";
   private static final String INSTANCE_CONFIG_ZK_PATH_TEMPLATE = "/%s/CONFIGS/PARTICIPANT/%s";
   private static final String PINOT_ALL_CONFIG_KEY_PREFIX = "pinot.all.";
-  private static final String PINOT_TENANT_LEVEL_CONFIG_KEY_PREFIX = "pinot.tenant.";
+  private static final String PINOT_TAG_LEVEL_CONFIG_KEY_PREFIX = "pinot.tag.";
   private static final String PINOT_INSTANCE_CONFIG_KEY_PREFIX_TEMPLATE = "pinot.%s.";
 
   public static void applyClusterConfig(PinotConfiguration instanceConfig, String zkAddress, String clusterName,
@@ -112,17 +111,17 @@ public class ServiceStartableUtils {
       return;
     }
     InstanceConfig instanceZKConfig = new InstanceConfig(instanceConfigZNRecord);
-    Set<String> tenantsRelaxedNames = instanceZKConfig.getTags().stream()
-        .map(tag -> PinotConfiguration.relaxPropertyName(TagNameUtils.getTenantFromTag(tag)))
+    Set<String> instanceTags = instanceZKConfig.getTags().stream()
+        .map(PinotConfiguration::relaxPropertyName)
         .collect(Collectors.toSet());
 
     for (String key : instanceConfig.getKeys()) {
-      if (key.startsWith(PINOT_TENANT_LEVEL_CONFIG_KEY_PREFIX)) {
-        String instanceConfigKey = key.substring(PINOT_TENANT_LEVEL_CONFIG_KEY_PREFIX.length());
-        String tenant = instanceConfigKey.substring(0, instanceConfigKey.indexOf('.'));
-        String tenantKey = instanceConfigKey.substring(tenant.length() + 1);
-        if (tenantsRelaxedNames.contains(tenant)) {
-          instanceConfig.setProperty(tenantKey, instanceConfig.getProperty(key));
+      if (key.startsWith(PINOT_TAG_LEVEL_CONFIG_KEY_PREFIX)) {
+        String instanceConfigKey = key.substring(PINOT_TAG_LEVEL_CONFIG_KEY_PREFIX.length());
+        String tag = instanceConfigKey.substring(0, instanceConfigKey.indexOf('.'));
+        String tagKey = instanceConfigKey.substring(tag.length() + 1);
+        if (instanceTags.contains(tag)) {
+          instanceConfig.setProperty(tagKey, instanceConfig.getProperty(key));
         }
       }
     }
