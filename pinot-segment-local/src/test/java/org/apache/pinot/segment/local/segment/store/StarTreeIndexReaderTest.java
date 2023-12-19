@@ -175,7 +175,7 @@ public class StarTreeIndexReaderTest {
   }
 
   @Test
-  public void TestDuplicateValueAggregation()
+  public void testDuplicateValueAggregation()
       throws IOException, ConfigurationException {
     StarTreeV2Metadata stMeta = mock(StarTreeV2Metadata.class);
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> specs = new TreeMap<>();
