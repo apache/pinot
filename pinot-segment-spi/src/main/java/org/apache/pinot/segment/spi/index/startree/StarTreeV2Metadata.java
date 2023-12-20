@@ -54,9 +54,8 @@ public class StarTreeV2Metadata {
         String columnName = aggregationConfig.getString(MetadataKey.COLUMN_NAME);
         ChunkCompressionType compressionType =
             ChunkCompressionType.valueOf(aggregationConfig.getString(MetadataKey.COMPRESSION_CODEC));
-        String valueAggregationFunctionTypeName = aggregationConfig.getString(MetadataKey.VALUE_FUNCTION_TYPE);
         _aggregationSpecs.put(new AggregationFunctionColumnPair(functionType, columnName),
-            new AggregationSpec(compressionType, valueAggregationFunctionTypeName));
+            new AggregationSpec(compressionType));
       }
     } else {
       // Backward compatibility with columnName format

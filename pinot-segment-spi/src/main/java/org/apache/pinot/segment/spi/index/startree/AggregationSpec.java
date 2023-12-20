@@ -22,22 +22,16 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
 
 public class AggregationSpec {
-  public static final AggregationSpec DEFAULT = new AggregationSpec(ChunkCompressionType.PASS_THROUGH, null);
+  public static final AggregationSpec DEFAULT = new AggregationSpec(ChunkCompressionType.PASS_THROUGH);
 
   private final ChunkCompressionType _compressionType;
-  private final String _valueAggregationFunctionTypeName;
 
-  public AggregationSpec(ChunkCompressionType compressionType, String valueAggregationFunctionTypeName) {
+  public AggregationSpec(ChunkCompressionType compressionType) {
     _compressionType = compressionType;
-    _valueAggregationFunctionTypeName = valueAggregationFunctionTypeName;
   }
 
   public ChunkCompressionType getCompressionType() {
     return _compressionType;
-  }
-
-  public String getValueAggregationFunctionTypeName() {
-    return _valueAggregationFunctionTypeName;
   }
 
   @Override
@@ -49,16 +43,11 @@ public class AggregationSpec {
       return false;
     }
     AggregationSpec that = (AggregationSpec) o;
-    return _compressionType == that._compressionType && (_valueAggregationFunctionTypeName == null
-        ? that._valueAggregationFunctionTypeName == null
-        : _valueAggregationFunctionTypeName.equalsIgnoreCase(that._valueAggregationFunctionTypeName));
+    return _compressionType == that._compressionType;
   }
 
   @Override
   public int hashCode() {
-    int result = _compressionType.hashCode();
-    result =
-        31 * result + (_valueAggregationFunctionTypeName == null ? 0 : _valueAggregationFunctionTypeName.hashCode());
-    return result;
+    return _compressionType.hashCode();
   }
 }

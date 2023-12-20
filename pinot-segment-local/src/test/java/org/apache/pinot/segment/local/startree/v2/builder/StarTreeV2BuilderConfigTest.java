@@ -100,7 +100,7 @@ public class StarTreeV2BuilderConfigTest {
   @Test
   public void testBuildFromIndexConfig() {
     List<StarTreeAggregationConfig> aggregationConfigs =
-        List.of(new StarTreeAggregationConfig("m1", "SUM", CompressionCodec.LZ4, "SUM"));
+        List.of(new StarTreeAggregationConfig("m1", "SUM", CompressionCodec.LZ4));
     StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("d1"), null, null, aggregationConfigs, 1);
     StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig);
     assertEquals(builderConfig.getMaxLeafRecords(), 1);
@@ -109,7 +109,7 @@ public class StarTreeV2BuilderConfigTest {
         Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1")));
     assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
     assertEquals(builderConfig.getAggregationSpecs().values(),
-        Collections.singleton(new AggregationSpec(ChunkCompressionType.LZ4, "SUM")));
+        Collections.singleton(new AggregationSpec(ChunkCompressionType.LZ4)));
   }
 
   private ColumnMetadata getColumnMetadata(String column, boolean hasDictionary, int cardinality) {

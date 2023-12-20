@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +31,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
@@ -276,25 +274,16 @@ public class StarTreeBuilderUtils {
 
   public static TreeMap<AggregationFunctionColumnPair, AggregationSpec> deduplicateAggregationSpecs(
       TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs) {
-    HashSet<AggregationFunctionColumnPair> uniqueColumnPairs = new HashSet<>();
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> filteredMap = new TreeMap<>();
     for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
       AggregationFunctionColumnPair originalColumnPair = entry.getKey();
       AggregationSpec spec = entry.getValue();
 
-      AggregationFunctionColumnPair resolvedColumnPair;
-      String valueAggregationFunctionTypeName = spec.getValueAggregationFunctionTypeName();
-      if (valueAggregationFunctionTypeName == null) {
-        resolvedColumnPair = AggregationFunctionColumnPair.resolveToValueType(originalColumnPair);
-      } else {
-        resolvedColumnPair = new AggregationFunctionColumnPair(
-            AggregationFunctionType.getAggregationFunctionType(valueAggregationFunctionTypeName),
-            originalColumnPair.getColumn());
-      }
+      AggregationFunctionColumnPair valueAggregationType =
+          AggregationFunctionColumnPair.resolveToValueType(originalColumnPair);
 
-      if (!uniqueColumnPairs.contains(resolvedColumnPair)) {
-        filteredMap.put(resolvedColumnPair, spec);
-        uniqueColumnPairs.add(resolvedColumnPair);
+      if (!filteredMap.containsKey(valueAggregationType)) {
+        filteredMap.put(valueAggregationType, spec);
       }
     }
     return filteredMap;

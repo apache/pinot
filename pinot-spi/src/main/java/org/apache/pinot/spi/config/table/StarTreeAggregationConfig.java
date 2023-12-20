@@ -29,18 +29,14 @@ public class StarTreeAggregationConfig extends BaseJsonConfig {
   private final String _columnName;
   private final String _aggregationFunction;
   private final CompressionCodec _compressionCodec;
-  private final String _valueAggregationFunction;
 
   @JsonCreator
   public StarTreeAggregationConfig(@JsonProperty(value = "columnName", required = true) String columnName,
       @JsonProperty(value = "aggregationFunction", required = true) String aggregationFunction,
-      @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec,
-      @JsonProperty(value = "valueAggregationFunction") @Nullable String valueAggregationFunction
-      ) {
+      @JsonProperty(value = "compressionCodec") @Nullable CompressionCodec compressionCodec) {
     _columnName = columnName;
     _aggregationFunction = aggregationFunction;
     _compressionCodec = compressionCodec != null ? compressionCodec : CompressionCodec.PASS_THROUGH;
-    _valueAggregationFunction = valueAggregationFunction;
   }
 
   public String getColumnName() {
@@ -53,9 +49,5 @@ public class StarTreeAggregationConfig extends BaseJsonConfig {
 
   public CompressionCodec getCompressionCodec() {
     return _compressionCodec;
-  }
-
-  public String getValueAggregationFunction() {
-    return _valueAggregationFunction;
   }
 }

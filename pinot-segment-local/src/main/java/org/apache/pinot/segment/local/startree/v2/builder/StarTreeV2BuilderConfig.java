@@ -83,25 +83,16 @@ public class StarTreeV2BuilderConfig {
       for (StarTreeAggregationConfig aggregationConfig : indexConfig.getAggregationConfigs()) {
         AggregationFunctionColumnPair aggregationFunctionColumnPair =
             AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
-
-        AggregationFunctionColumnPair valueColumnPair;
-        if (aggregationConfig.getValueAggregationFunction() == null) {
-          valueColumnPair = AggregationFunctionColumnPair.resolveToValueType(aggregationFunctionColumnPair);
-        } else {
-          valueColumnPair = new AggregationFunctionColumnPair(
-              AggregationFunctionType.getAggregationFunctionType(aggregationConfig.getAggregationFunction()),
-              aggregationFunctionColumnPair.getColumn());
-        }
+        AggregationFunctionColumnPair valueAggregationColumnPair =
+            AggregationFunctionColumnPair.resolveToValueType(aggregationFunctionColumnPair);
         // If there is already an equivalent functionColumnPair in the map, do not load another.
         // This prevents the duplication of the aggregation when the StarTree is constructed.
-        if (aggregationSpecs.containsKey(valueColumnPair)) {
+        if (aggregationSpecs.containsKey(valueAggregationColumnPair)) {
           continue;
         }
         ChunkCompressionType compressionType =
             ChunkCompressionType.valueOf(aggregationConfig.getCompressionCodec().name());
-        String valueAggregationFunction = aggregationConfig.getValueAggregationFunction();
-        aggregationSpecs.put(aggregationFunctionColumnPair,
-            new AggregationSpec(compressionType, valueAggregationFunction));
+        aggregationSpecs.put(aggregationFunctionColumnPair, new AggregationSpec(compressionType));
       }
     }
 
@@ -242,8 +233,6 @@ public class StarTreeV2BuilderConfig {
           functionColumnPair.getFunctionType().getName());
       metadataProperties.setProperty(prefix + MetadataKey.COLUMN_NAME, functionColumnPair.getColumn());
       metadataProperties.setProperty(prefix + MetadataKey.COMPRESSION_CODEC, aggregationSpec.getCompressionType());
-      String valueFunctionType = aggregationSpec.getValueAggregationFunctionTypeName();
-      metadataProperties.setProperty(prefix + MetadataKey.VALUE_FUNCTION_TYPE, valueFunctionType);
       index++;
     }
     metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);

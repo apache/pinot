@@ -49,11 +49,11 @@ public class StarTreeBuilderUtilsTest {
   public void testDuplicateAggregationSpecs() {
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> specs = new TreeMap<>();
     specs.put(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "dimX"),
-        new AggregationSpec(ChunkCompressionType.LZ4, null));
+        new AggregationSpec(ChunkCompressionType.LZ4));
     specs.put(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "dimY"),
-        new AggregationSpec(ChunkCompressionType.LZ4, "distinctCountThetaSketch"));
+        new AggregationSpec(ChunkCompressionType.LZ4));
     specs.put(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH, "dimY"),
-        new AggregationSpec(ChunkCompressionType.LZ4, "distinctCountThetaSketch"));
+        new AggregationSpec(ChunkCompressionType.LZ4));
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> result =
         StarTreeBuilderUtils.deduplicateAggregationSpecs(specs);
     assertEquals(result.size(), 2);
