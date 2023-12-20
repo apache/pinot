@@ -23,13 +23,17 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AvroWriter implements Writer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AvroWriter.class);
   private AvroWriterSpec _spec;
 
   public static org.apache.avro.Schema getAvroSchema(Schema schema) {
@@ -63,6 +67,19 @@ public class AvroWriter implements Writer {
           appender.append(_spec.getGenerator().nextRow());
         }
       }
+    }
+  }
+
+  @Override
+  public void cleanup() {
+    File baseDir = new File(_spec.getBaseDir().toURI());
+    for (File file : Objects.requireNonNull(baseDir.listFiles())) {
+      if (!file.delete()) {
+        LOGGER.error("Unable to delete file {}", file.getAbsolutePath());
+      }
+    }
+    if (!baseDir.delete()) {
+      LOGGER.error("Unable to delete directory {}", baseDir.getAbsolutePath());
     }
   }
 }

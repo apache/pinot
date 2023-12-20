@@ -19,11 +19,16 @@
 package org.apache.pinot.controller.recommender.data.writer;
 
 import java.io.File;
+import java.util.Objects;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public abstract class FileWriter implements Writer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FileWriter.class);
+
   private FileWriterSpec _spec;
   @Override
   public void init(WriterSpec spec) {
@@ -44,6 +49,19 @@ public abstract class FileWriter implements Writer {
           writer.append(appendString).append('\n');
         }
       }
+    }
+  }
+
+  @Override
+  public void cleanup() {
+    File baseDir = new File(_spec.getBaseDir().toURI());
+    for (File file : Objects.requireNonNull(baseDir.listFiles())) {
+      if (!file.delete()) {
+        LOGGER.error("Unable to delete file {}", file.getAbsolutePath());
+      }
+    }
+    if (!baseDir.delete()) {
+      LOGGER.error("Unable to delete directory {}", baseDir.getAbsolutePath());
     }
   }
 

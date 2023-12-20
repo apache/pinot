@@ -25,4 +25,6 @@ public interface Writer {
 
   void write()
       throws Exception;
+
+  void cleanup();
 }
