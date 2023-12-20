@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.spi.index.startree;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
 
@@ -49,5 +51,11 @@ public class AggregationSpec {
   @Override
   public int hashCode() {
     return _compressionType.hashCode();
+  }
+
+  @Override
+  public String toString() {
+    return new ToStringBuilder(this, ToStringStyle.SHORT_PREFIX_STYLE).append("compressionType", _compressionType)
+        .toString();
   }
 }
