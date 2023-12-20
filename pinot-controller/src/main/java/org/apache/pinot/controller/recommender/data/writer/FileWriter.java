@@ -23,7 +23,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 
 
-public class FileWriter implements Writer {
+public abstract class FileWriter implements Writer {
   private FileWriterSpec _spec;
   @Override
   public void init(WriterSpec spec) {
@@ -47,7 +47,5 @@ public class FileWriter implements Writer {
     }
   }
 
-  protected String generateRow(DataGenerator generator) {
-    throw new UnsupportedOperationException();
-  }
+  protected abstract String generateRow(DataGenerator generator);
 }
