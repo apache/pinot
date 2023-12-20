@@ -40,9 +40,10 @@ public abstract class FileWriter implements Writer {
       throws Exception {
     final int numPerFiles = (int) (_spec.getTotalDocs() / _spec.getNumFiles());
     final String headers = StringUtils.join(_spec.getGenerator().nextRow().keySet(), ",");
+    final String extension = getExtension() == null ? "" : String.format(".%s", getExtension());
     for (int i = 0; i < _spec.getNumFiles(); i++) {
       try (java.io.FileWriter writer =
-          new java.io.FileWriter(new File(_spec.getBaseDir(), String.format("output_%d.csv", i)))) {
+          new java.io.FileWriter(new File(_spec.getBaseDir(), String.format("output_%d%s", i, extension)))) {
         writer.append(headers).append('\n');
         for (int j = 0; j < numPerFiles; j++) {
           String appendString = generateRow(_spec.getGenerator());
@@ -50,6 +51,10 @@ public abstract class FileWriter implements Writer {
         }
       }
     }
+  }
+
+  protected String getExtension() {
+    return null;
   }
 
   @Override

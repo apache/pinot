@@ -44,4 +44,9 @@ public class CsvWriter extends FileWriter {
     }
     return obj;
   }
+
+  @Override
+  protected String getExtension() {
+    return "csv";
+  }
 }

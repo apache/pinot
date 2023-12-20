@@ -35,4 +35,9 @@ public class JsonWriter extends FileWriter {
       throw new RuntimeException("Issue while processing the json entry.", e);
     }
   }
+
+  @Override
+  protected String getExtension() {
+    return "json";
+  }
 }
