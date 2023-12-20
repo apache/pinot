@@ -75,8 +75,8 @@ public class PulsarPartitionLevelConnectionHandler {
 
   private Optional<Authentication> getAuthenticationFactory(PulsarConfig pulsarConfig) {
     if (StringUtils.isNotBlank(pulsarConfig.getIssuerUrl())
-        && StringUtils.isBlank(pulsarConfig.getAudience())
-        && StringUtils.isBlank(pulsarConfig.getCredentialsFilePath())) {
+        && StringUtils.isNotBlank(pulsarConfig.getAudience())
+        && StringUtils.isNotBlank(pulsarConfig.getCredentialsFilePath())) {
       try {
         return Optional.of(AuthenticationFactoryOAuth2.clientCredentials(
             new URL(pulsarConfig.getIssuerUrl()),
