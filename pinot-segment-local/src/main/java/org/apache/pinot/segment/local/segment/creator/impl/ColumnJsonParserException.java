@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl;
 
-import com.fasterxml.jackson.core.JsonLocation;
 import com.fasterxml.jackson.core.JsonParseException;
 
 public class ColumnJsonParserException extends JsonParseException {
@@ -40,10 +39,10 @@ public class ColumnJsonParserException extends JsonParseException {
      */
     @Override
     public String getMessage() {
-        return "Column: " +
-                _columnName +
-                "\n" +
-                super.getMessage();
+        return "Column: "
+                + _columnName
+                + "\n"
+                + super.getMessage();
     }
 
     @Override
