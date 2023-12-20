@@ -26,6 +26,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class PercentileTDigestValueAggregator implements ValueAggregator<Object, TDigest> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
+  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.PERCENTILETDIGEST;
 
   // TODO: This is copied from PercentileTDigestAggregationFunction.
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
@@ -34,7 +35,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.PERCENTILETDIGEST;
+    return AGGREGATION_FUNCTION_TYPE;
   }
 
   @Override

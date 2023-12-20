@@ -24,10 +24,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class MinValueAggregator implements ValueAggregator<Number, Double> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.DOUBLE;
+  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.MIN;
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.MIN;
+    return AGGREGATION_FUNCTION_TYPE;
   }
 
   @Override

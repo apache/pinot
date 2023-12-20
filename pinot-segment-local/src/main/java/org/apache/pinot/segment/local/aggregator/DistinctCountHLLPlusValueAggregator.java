@@ -31,6 +31,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Object, HyperLogLogPlus> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
+  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.DISTINCTCOUNTHLL;
 
   private final int _p;
   private final int _sp;
@@ -54,7 +55,7 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.DISTINCTCOUNTHLL;
+    return AGGREGATION_FUNCTION_TYPE;
   }
 
   @Override

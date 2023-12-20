@@ -24,10 +24,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class CountValueAggregator implements ValueAggregator<Object, Long> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.LONG;
+  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.COUNT;
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.COUNT;
+    return AGGREGATION_FUNCTION_TYPE;
   }
 
   @Override

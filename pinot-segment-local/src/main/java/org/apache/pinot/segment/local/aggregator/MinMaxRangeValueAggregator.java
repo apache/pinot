@@ -26,10 +26,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMaxRangePair> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
+  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.MINMAXRANGE;
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.MINMAXRANGE;
+    return AGGREGATION_FUNCTION_TYPE;
   }
 
   @Override

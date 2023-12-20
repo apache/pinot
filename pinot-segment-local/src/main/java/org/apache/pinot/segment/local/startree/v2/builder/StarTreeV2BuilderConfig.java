@@ -30,6 +30,7 @@ import java.util.TreeSet;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -83,16 +84,16 @@ public class StarTreeV2BuilderConfig {
       for (StarTreeAggregationConfig aggregationConfig : indexConfig.getAggregationConfigs()) {
         AggregationFunctionColumnPair aggregationFunctionColumnPair =
             AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
-        AggregationFunctionColumnPair valueAggregationColumnPair =
-            AggregationFunctionColumnPair.resolveToValueType(aggregationFunctionColumnPair);
+        AggregationFunctionColumnPair aggregatedColumnPair =
+            StarTreeBuilderUtils.resolveToAggregatedType(aggregationFunctionColumnPair);
         // If there is already an equivalent functionColumnPair in the map, do not load another.
         // This prevents the duplication of the aggregation when the StarTree is constructed.
-        if (aggregationSpecs.containsKey(valueAggregationColumnPair)) {
+        if (aggregationSpecs.containsKey(aggregatedColumnPair)) {
           continue;
         }
         ChunkCompressionType compressionType =
             ChunkCompressionType.valueOf(aggregationConfig.getCompressionCodec().name());
-        aggregationSpecs.put(aggregationFunctionColumnPair, new AggregationSpec(compressionType));
+        aggregationSpecs.put(aggregatedColumnPair, new AggregationSpec(compressionType));
       }
     }
 

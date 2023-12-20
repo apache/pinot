@@ -26,12 +26,13 @@ import org.roaringbitmap.RoaringBitmap;
 
 public class DistinctCountBitmapValueAggregator implements ValueAggregator<Object, RoaringBitmap> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
+  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.DISTINCTCOUNTBITMAP;
 
   private int _maxByteSize;
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.DISTINCTCOUNTBITMAP;
+    return AGGREGATION_FUNCTION_TYPE;
   }
 
   @Override

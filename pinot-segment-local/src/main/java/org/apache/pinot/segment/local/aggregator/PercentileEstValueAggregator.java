@@ -26,6 +26,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class PercentileEstValueAggregator implements ValueAggregator<Object, QuantileDigest> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
+  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.PERCENTILEEST;
 
   // TODO: This is copied from PercentileEstAggregationFunction.
   public static final double DEFAULT_MAX_ERROR = 0.05;
@@ -34,7 +35,7 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.PERCENTILEEST;
+    return AGGREGATION_FUNCTION_TYPE;
   }
 
   @Override

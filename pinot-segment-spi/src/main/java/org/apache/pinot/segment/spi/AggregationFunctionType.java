@@ -497,40 +497,4 @@ public enum AggregationFunctionType {
       }
     }
   }
-
-  /**
-   * Returns the underlying value aggregation type that is used to resolve the query aggregation function type.  This
-   * prevents duplicating the same value aggregation type for different query aggregation types in the StarTree index.
-   * @param queryAggregationFunctionType the aggregation type used in a query
-   * @return the underlying value aggregation type used in storage e.g. StarTree index
-   */
-  public static AggregationFunctionType getValueAggregationType(AggregationFunctionType queryAggregationFunctionType) {
-    switch (queryAggregationFunctionType) {
-      case DISTINCTCOUNTHLL:
-      case DISTINCTCOUNTRAWHLL:
-        return DISTINCTCOUNTHLL;
-      case PERCENTILETDIGEST:
-      case PERCENTILERAWTDIGEST:
-        return PERCENTILETDIGEST;
-      case DISTINCTCOUNTTHETASKETCH:
-      case DISTINCTCOUNTRAWTHETASKETCH:
-        return DISTINCTCOUNTTHETASKETCH;
-      case DISTINCTCOUNTHLLPLUS:
-      case DISTINCTCOUNTRAWHLLPLUS:
-        return DISTINCTCOUNTHLLPLUS;
-      case DISTINCTCOUNTTUPLESKETCH:
-      case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
-      case AVGVALUEINTEGERSUMTUPLESKETCH:
-      case SUMVALUESINTEGERSUMTUPLESKETCH:
-        return DISTINCTCOUNTTUPLESKETCH;
-      case DISTINCTCOUNTCPCSKETCH:
-      case DISTINCTCOUNTRAWCPCSKETCH:
-        return DISTINCTCOUNTCPCSKETCH;
-      case DISTINCTCOUNTULL:
-      case DISTINCTCOUNTRAWULL:
-        return DISTINCTCOUNTULL;
-      default:
-        return queryAggregationFunctionType;
-    }
-  }
 }

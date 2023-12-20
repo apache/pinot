@@ -24,10 +24,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class SumValueAggregator implements ValueAggregator<Number, Double> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.DOUBLE;
+  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.SUM;
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.SUM;
+    return AGGREGATION_FUNCTION_TYPE;
   }
 
   @Override

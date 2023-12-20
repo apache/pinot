@@ -26,10 +26,11 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
+  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.AVG;
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.AVG;
+    return AGGREGATION_FUNCTION_TYPE;
   }
 
   @Override

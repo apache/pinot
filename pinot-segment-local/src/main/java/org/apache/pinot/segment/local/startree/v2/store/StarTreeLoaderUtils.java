@@ -110,9 +110,9 @@ public class StarTreeLoaderUtils {
           if (result == null) {
             AggregationFunctionColumnPair originalColumnPair =
                 AggregationFunctionColumnPair.fromColumnName(columnName);
-            AggregationFunctionColumnPair valueColumnPair =
-                AggregationFunctionColumnPair.resolveToValueType(originalColumnPair);
-            return dataSourceMap.get(valueColumnPair.toColumnName());
+            AggregationFunctionColumnPair aggregatedTypePair =
+                StarTreeBuilderUtils.resolveToAggregatedType(originalColumnPair);
+            return dataSourceMap.get(aggregatedTypePair.toColumnName());
           }
           return result;
         }

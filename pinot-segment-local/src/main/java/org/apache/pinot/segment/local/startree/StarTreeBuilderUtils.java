@@ -30,7 +30,9 @@ import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
@@ -272,20 +274,35 @@ public class StarTreeBuilderUtils {
     FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
   }
 
+  /**
+   * Removes duplicate {@link AggregationFunctionColumnPair}s from the input where the same aggregated function type
+   * is used.  The compression type used in the {@link AggregationSpec} might differ and these differences are
+   * ignored for simplicity.
+   * @param aggregationSpecs the input map of aggregation function column pairs to aggregation spec.
+   * @return a new map of aggregation function column pairs to aggregation spec where duplicates are removed.
+   */
   public static TreeMap<AggregationFunctionColumnPair, AggregationSpec> deduplicateAggregationSpecs(
       TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs) {
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> filteredMap = new TreeMap<>();
     for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
-      AggregationFunctionColumnPair originalColumnPair = entry.getKey();
-      AggregationSpec spec = entry.getValue();
-
-      AggregationFunctionColumnPair valueAggregationType =
-          AggregationFunctionColumnPair.resolveToValueType(originalColumnPair);
-
+      AggregationFunctionColumnPair valueAggregationType = resolveToAggregatedType(entry.getKey());
       if (!filteredMap.containsKey(valueAggregationType)) {
-        filteredMap.put(valueAggregationType, spec);
+        filteredMap.put(valueAggregationType, entry.getValue());
       }
     }
     return filteredMap;
+  }
+
+  /**
+   * Return a new {@link AggregationFunctionColumnPair} from an existing functionColumnPair where the new pair
+   * has the {@link AggregationFunctionType} set to the aggregated function type used in the segment or indexes.
+   * @param functionColumnPair the existing functionColumnPair
+   * @return the new functionColumnPair
+   */
+  public static AggregationFunctionColumnPair resolveToAggregatedType(
+      AggregationFunctionColumnPair functionColumnPair) {
+     AggregationFunctionType valueAggregationFunctionType =
+         ValueAggregatorFactory.getAggregatedFunctionType(functionColumnPair.getFunctionType());
+     return new AggregationFunctionColumnPair(valueAggregationFunctionType, functionColumnPair.getColumn());
   }
 }

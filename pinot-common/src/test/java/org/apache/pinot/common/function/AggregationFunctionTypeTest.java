@@ -93,25 +93,4 @@ public class AggregationFunctionTypeTest {
   public void testInvalidGetAggregationFunctionType() {
     AggregationFunctionType.getAggregationFunctionType("PERCENTILEFOO");
   }
-
-  @Test
-  public void testGetValueAggregationType() {
-    Assert.assertEquals(AggregationFunctionType.DISTINCTCOUNTHLL,
-        AggregationFunctionType.getValueAggregationType(AggregationFunctionType.DISTINCTCOUNTRAWHLL));
-    Assert.assertEquals(AggregationFunctionType.PERCENTILETDIGEST,
-        AggregationFunctionType.getValueAggregationType(AggregationFunctionType.PERCENTILERAWTDIGEST));
-    Assert.assertEquals(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
-        AggregationFunctionType.getValueAggregationType(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH));
-    Assert.assertEquals(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
-        AggregationFunctionType.getValueAggregationType(AggregationFunctionType.DISTINCTCOUNTHLLPLUS));
-    Assert.assertEquals(AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
-        AggregationFunctionType.getValueAggregationType(AggregationFunctionType.DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH));
-    Assert.assertEquals(AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
-        AggregationFunctionType.getValueAggregationType(AggregationFunctionType.SUMVALUESINTEGERSUMTUPLESKETCH));
-    Assert.assertEquals(AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
-        AggregationFunctionType.getValueAggregationType(AggregationFunctionType.AVGVALUEINTEGERSUMTUPLESKETCH));
-    // Default case
-    Assert.assertEquals(AggregationFunctionType.COUNT,
-        AggregationFunctionType.getValueAggregationType(AggregationFunctionType.COUNT));
-  }
 }
