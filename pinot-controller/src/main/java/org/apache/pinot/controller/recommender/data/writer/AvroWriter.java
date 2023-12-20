@@ -21,9 +21,14 @@ package org.apache.pinot.controller.recommender.data.writer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Objects;
+import org.apache.avro.file.DataFileWriter;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -81,5 +86,32 @@ public class AvroWriter implements Writer {
     if (!baseDir.delete()) {
       LOGGER.error("Unable to delete directory {}", baseDir.getAbsolutePath());
     }
+  }
+}
+
+class AvroRecordAppender implements Closeable {
+  private final DataFileWriter<GenericData.Record> _recordWriter;
+  private final org.apache.avro.Schema _avroSchema;
+
+  public AvroRecordAppender(File file, org.apache.avro.Schema avroSchema)
+      throws IOException {
+    _avroSchema = avroSchema;
+    _recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(_avroSchema));
+    _recordWriter.create(_avroSchema, file);
+  }
+
+  public void append(Map<String, Object> record)
+      throws IOException {
+    GenericData.Record nextRecord = new GenericData.Record(_avroSchema);
+    record.forEach((column, value) -> {
+      nextRecord.put(column, record.get(column));
+    });
+    _recordWriter.append(nextRecord);
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    _recordWriter.close();
   }
 }
