@@ -27,9 +27,9 @@ public class ColumnJsonParserException extends JsonParseException {
      * Sub-class of {@link com.fasterxml.jackson.core.JsonParseException}.
      */
 
-    final String _columnName;
+    private final String _columnName;
 
-    protected ColumnJsonParserException(String columnName, JsonParseException jpe) {
+    public ColumnJsonParserException(String columnName, JsonParseException jpe) {
         super(jpe.getProcessor(), jpe.getOriginalMessage(), jpe.getCause());
         _columnName = columnName;
     }
