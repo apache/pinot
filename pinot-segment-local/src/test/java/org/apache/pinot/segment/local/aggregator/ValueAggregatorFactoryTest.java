@@ -25,6 +25,7 @@ import static org.testng.Assert.assertEquals;
 
 
 public class ValueAggregatorFactoryTest {
+  
   @Test
   public void testGetValueAggregationType() {
     assertEquals(AggregationFunctionType.DISTINCTCOUNTHLL,
