@@ -45,28 +45,22 @@ import java.util.HashSet;
 import java.util.List;
 
 public class JsonMalformedIndexTest extends BaseQueriesTest {
-
-
-    static final String RAW_TABLE_NAME = "testTable";
-    static final String SEGMENT_NAME = "testSegment";
-
-    static final String STRING_COLUMN = "stringColumn";
-    static final String JSON_COLUMN = "jsonColumn";
-
+    private static final String RAW_TABLE_NAME = "testTable";
+    private static final String SEGMENT_NAME = "testSegment";
+    private static final String STRING_COLUMN = "stringColumn";
+    private static final String JSON_COLUMN = "jsonColumn";
     private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
             .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
             .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.STRING).build();
-
     private static final TableConfig TABLE_CONFIG =
-            new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-                    .build();
-
-    protected IndexSegment _indexSegment;
-    protected List<IndexSegment> _indexSegments;
-    List<GenericRow> _records = new ArrayList<>();
+            new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    private IndexSegment _indexSegment;
+    private List<IndexSegment> _indexSegments;
+    private final List<GenericRow> _records = new ArrayList<>();
 
     @BeforeClass
-    public void setUp() throws Exception {
+    public void setUp()
+            throws Exception {
         _records.add(createRecord("ludwik von drake",
                 "{\"name\": {\"first\": \"ludwik\", \"last\": \"von drake\"}, \"id\": 181, "
                         + "\"data\": [\"l\", \"b\", \"c\", \"d\"]"));
@@ -88,11 +82,10 @@ public class JsonMalformedIndexTest extends BaseQueriesTest {
         return record;
     }
 
-    @Test(
-            expectedExceptions = ColumnJsonParserException.class,
-            expectedExceptionsMessageRegExp = "Column: jsonColumn.*"
-    )
-    public void testJsonIndexBuild() throws Exception {
+    @Test(expectedExceptions = ColumnJsonParserException.class,
+          expectedExceptionsMessageRegExp = "Column: jsonColumn.*")
+    public void testJsonIndexBuild()
+            throws Exception {
         File indexDir = indexDir();
         FileUtils.deleteDirectory(indexDir);
 
