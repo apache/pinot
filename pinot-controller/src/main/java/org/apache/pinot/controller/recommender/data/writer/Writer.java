@@ -18,13 +18,32 @@
  */
 package org.apache.pinot.controller.recommender.data.writer;
 
+import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 
+
+/**
+ * Interface to write data to a datasource.
+ * Implementations of this interface should use {@link DataGenerator} to generate new rows
+ * and write those to the respective datasource.
+ */
 public interface Writer {
 
+  /**
+   * Initialise the Writer
+   * @param spec {@link WriterSpec} object which contains {@link DataGenerator} object
+   *             used to generate rows to write to the data source
+   */
   void init(WriterSpec spec);
 
+  /**
+   * Writes the generated rows to the specified datasource
+   * @throws Exception
+   */
   void write()
       throws Exception;
 
+  /**
+   * Cleanup the data written to the datasource
+   */
   void cleanup();
 }
