@@ -63,4 +63,15 @@ public class StarTreeBuilderUtilsTest {
     assertTrue(metrics.contains("distinctCountThetaSketch__dimY"));
     assertFalse(metrics.contains("distinctCountRawThetaSketch__dimY"));
   }
+
+  @Test
+  public void testResolveToAggregatedType() {
+    assertEquals(AggregationFunctionColumnPair.fromColumnName("distinctCountThetaSketch__dimX"),
+        StarTreeBuilderUtils.resolveToAggregatedType(
+            AggregationFunctionColumnPair.fromColumnName("distinctCountRawThetaSketch__dimX")));
+    assertEquals(AggregationFunctionColumnPair.fromColumnName("count__*"),
+        StarTreeBuilderUtils.resolveToAggregatedType(AggregationFunctionColumnPair.fromColumnName("count__*")));
+    assertEquals(AggregationFunctionColumnPair.fromColumnName("sum__dimY"),
+        StarTreeBuilderUtils.resolveToAggregatedType(AggregationFunctionColumnPair.fromColumnName("sum__dimY")));
+  }
 }
