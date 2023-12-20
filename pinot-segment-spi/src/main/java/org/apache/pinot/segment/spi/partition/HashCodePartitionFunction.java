@@ -37,8 +37,8 @@ public class HashCodePartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object value) {
-    return abs(value.toString().hashCode()) % _numPartitions;
+  public int getPartition(String value) {
+    return abs(value.hashCode()) % _numPartitions;
   }
 
   @Override
