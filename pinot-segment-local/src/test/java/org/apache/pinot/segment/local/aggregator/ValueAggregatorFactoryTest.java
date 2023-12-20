@@ -25,25 +25,28 @@ import static org.testng.Assert.assertEquals;
 
 
 public class ValueAggregatorFactoryTest {
-  
+
   @Test
   public void testGetValueAggregationType() {
-    assertEquals(AggregationFunctionType.DISTINCTCOUNTHLL,
-        ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.DISTINCTCOUNTRAWHLL));
-    assertEquals(AggregationFunctionType.PERCENTILETDIGEST,
-        ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.PERCENTILERAWTDIGEST));
-    assertEquals(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
-        ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH));
-    assertEquals(AggregationFunctionType.DISTINCTCOUNTHLLPLUS,
-        ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.DISTINCTCOUNTHLLPLUS));
-    assertEquals(AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH, ValueAggregatorFactory.getAggregatedFunctionType(
-        AggregationFunctionType.DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH));
-    assertEquals(AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
-        ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.SUMVALUESINTEGERSUMTUPLESKETCH));
-    assertEquals(AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
-        ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.AVGVALUEINTEGERSUMTUPLESKETCH));
+    assertEquals(ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.DISTINCTCOUNTRAWHLL),
+        AggregationFunctionType.DISTINCTCOUNTHLL);
+    assertEquals(ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.PERCENTILERAWTDIGEST),
+        AggregationFunctionType.PERCENTILETDIGEST);
+    assertEquals(ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH),
+        AggregationFunctionType.DISTINCTCOUNTTHETASKETCH);
+    assertEquals(
+        ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH),
+        AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH);
+    assertEquals(
+        ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.SUMVALUESINTEGERSUMTUPLESKETCH),
+        AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH);
+    assertEquals(
+        ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.AVGVALUEINTEGERSUMTUPLESKETCH),
+        AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH);
+    assertEquals(ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.DISTINCTCOUNTHLLPLUS),
+        AggregationFunctionType.DISTINCTCOUNTHLLPLUS);
     // Default case
-    assertEquals(AggregationFunctionType.COUNT,
-        ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.COUNT));
+    assertEquals(ValueAggregatorFactory.getAggregatedFunctionType(AggregationFunctionType.COUNT),
+        AggregationFunctionType.COUNT);
   }
 }
