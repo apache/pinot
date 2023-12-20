@@ -150,7 +150,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    */
   protected void updatePartition(Object value) {
     if (_partitionFunction != null) {
-      _partitions.add(_partitionFunction.getPartition(value));
+      _partitions.add(_partitionFunction.getValueToPartition(value));
     }
   }
 

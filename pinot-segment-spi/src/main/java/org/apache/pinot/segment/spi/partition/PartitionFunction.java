@@ -21,6 +21,7 @@ package org.apache.pinot.segment.spi.partition;
 import java.io.Serializable;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.utils.ByteArray;
 
 
 /**
@@ -32,6 +33,18 @@ import javax.annotation.Nullable;
  */
 public interface PartitionFunction extends Serializable {
 
+  /**
+   * Translates value to the correct instance type before invoking partitioning function
+   * @param value
+   * @return
+   */
+  default int getValueToPartition(Object value) {
+    Object valueForType = value;
+    if (value instanceof byte[]) {
+      valueForType = new ByteArray((byte[]) value);
+    }
+    return getPartition(valueForType);
+  }
   /**
    * Method to compute and return partition id for the given value.
    *

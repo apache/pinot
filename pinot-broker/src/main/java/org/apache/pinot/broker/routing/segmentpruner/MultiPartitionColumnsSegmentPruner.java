@@ -140,7 +140,7 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
         if (identifier != null) {
           SegmentPartitionInfo partitionInfo = columnPartitionInfoMap.get(identifier.getName());
           return partitionInfo == null || partitionInfo.getPartitions().contains(
-              partitionInfo.getPartitionFunction().getPartition(operands.get(1).getLiteral().getFieldValue()));
+              partitionInfo.getPartitionFunction().getValueToPartition(operands.get(1).getLiteral().getFieldValue()));
         } else {
           return true;
         }
@@ -155,7 +155,7 @@ public class MultiPartitionColumnsSegmentPruner implements SegmentPruner {
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
             if (partitionInfo.getPartitions().contains(partitionInfo.getPartitionFunction()
-                .getPartition(operands.get(i).getLiteral().getFieldValue().toString()))) {
+                .getValueToPartition(operands.get(i).getLiteral().getFieldValue().toString()))) {
               return true;
             }
           }

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -84,6 +85,17 @@ public class PartitionFunctionTest {
         assertEquals(partitionFunction.getPartition(Long.toString(value)), expectedPartition);
       }
     }
+  }
+
+  @Test
+  public void testPartioningOnByteArray() {
+    byte[] arr1 = new byte[] {5, 1, 9, 2, 6};
+    byte[] arr2 = new byte[] {5, 1, 9, 2, 6};
+    byte[] arr3 = new byte[] {10, 1, 9, 2, 6};
+    String functionName = "mUrmur";
+    PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(functionName, 5, null);
+    Assert.assertTrue(partitionFunction.getValueToPartition(arr1) == partitionFunction.getValueToPartition(arr2));
+    Assert.assertTrue(partitionFunction.getValueToPartition(arr1) != partitionFunction.getValueToPartition(arr3));
   }
 
   /**
