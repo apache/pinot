@@ -98,7 +98,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   private static HelixAdmin _clusterManagementTool = _helixManager.getClusterManagmentTool();
   private static String _clusterName = _helixManager.getClusterName();
 
-  
   public RealtimeToOfflineSegmentsTaskExecutor(MinionTaskZkMetadataManager minionTaskZkMetadataManager,
       MinionConf minionConf) {
     super(minionConf);
@@ -185,7 +184,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
     List<RecordReader> recordReaders = new ArrayList<>(numInputSegments);
     int count = 1;
-  
     ImmutableRoaringBitmap validDocIds = null;
     if (configs.get("shouldUseCompactReader").equals("true")) {
       validDocIds = getValidDocIds(realtimeTableName, configs);
@@ -193,7 +191,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
     for (File segmentDir : segmentDirs) {
       _eventObserver.notifyProgress(_pinotTaskConfig,
-          String.format("Creating RecordReader for: %s (%d out of %d)", segmentDir, count++, numInputSegments));   
+          String.format("Creating RecordReader for: %s (%d out of %d)", segmentDir, count++, numInputSegments));
       if (validDocIds != null) {
         CompactedRecordReader recordReader = new CompactedRecordReader(segmentDir, validDocIds);
         recordReaders.add(recordReader);
