@@ -33,8 +33,8 @@ public class AggregationFunctionTypeTest {
         AggregationFunctionType.PERCENTILETDIGEST);
     assertEquals(AggregationFunctionType.getAggregatedFunctionType(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH),
         AggregationFunctionType.DISTINCTCOUNTTHETASKETCH);
-    assertEquals(
-        AggregationFunctionType.getAggregatedFunctionType(AggregationFunctionType.DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH),
+    assertEquals(AggregationFunctionType.getAggregatedFunctionType(
+            AggregationFunctionType.DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH),
         AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH);
     assertEquals(
         AggregationFunctionType.getAggregatedFunctionType(AggregationFunctionType.SUMVALUESINTEGERSUMTUPLESKETCH),
