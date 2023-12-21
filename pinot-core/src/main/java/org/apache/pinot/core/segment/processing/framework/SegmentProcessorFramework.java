@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -177,7 +176,7 @@ public class SegmentProcessorFramework {
   }
 
   private Consumer<Object> doReduce(Map<String, GenericRowFileManager> partitionToFileManagerMap)
-      throws Exception{
+      throws Exception {
     LOGGER.info("Beginning reduce phase on partitions: {}", partitionToFileManagerMap.keySet());
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
     int totalCount = partitionToFileManagerMap.keySet().size();
