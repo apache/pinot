@@ -112,6 +112,36 @@ public class StarTreeV2BuilderConfigTest {
         Collections.singleton(new AggregationSpec(ChunkCompressionType.LZ4)));
   }
 
+  @Test
+  public void testAggregationSpecUniqueness() {
+    List<StarTreeAggregationConfig> aggregationConfigs =
+        List.of(new StarTreeAggregationConfig("m1", "distinctCountThetaSketch", CompressionCodec.LZ4),
+            new StarTreeAggregationConfig("m1", "distinctCountRawThetaSketch", CompressionCodec.LZ4));
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("d1"), null, null, aggregationConfigs, 1);
+    StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig);
+    assertEquals(builderConfig.getMaxLeafRecords(), 1);
+    assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
+    assertEquals(builderConfig.getFunctionColumnPairs(),
+        Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1")));
+    assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
+    assertEquals(builderConfig.getAggregationSpecs().values(),
+        Collections.singleton(new AggregationSpec(ChunkCompressionType.LZ4)));
+  }
+
+  @Test
+  public void testFunctionColumnPairUniqueness() {
+    List<String> functionColumnPairs = List.of("distinctCountThetaSketch__m1", "distinctCountRawThetaSketch__m1");
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("d1"), null, functionColumnPairs, null, 1);
+    StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig);
+    assertEquals(builderConfig.getMaxLeafRecords(), 1);
+    assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
+    assertEquals(builderConfig.getFunctionColumnPairs(),
+        Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1")));
+    assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
+    assertEquals(builderConfig.getAggregationSpecs().values(), Collections.singleton(AggregationSpec.DEFAULT));
+  }
+
   private ColumnMetadata getColumnMetadata(String column, boolean hasDictionary, int cardinality) {
     ColumnMetadata columnMetadata = mock(ColumnMetadata.class);
     when(columnMetadata.getColumnName()).thenReturn(column);
