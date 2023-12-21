@@ -31,6 +31,8 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.junit.Assert.assertTrue;
+
 
 public class PulsarConfigTest {
   public static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
@@ -137,6 +139,9 @@ public class PulsarConfigTest {
       Assert.assertEquals(pulsarConfig.getCredentialsFilePath(),
           "file://" + testFile.toFile().getAbsolutePath());
       Assert.assertEquals(pulsarConfig.getAudience(), "urn:test:test");
+      PulsarPartitionLevelConnectionHandler pulsarPartitionLevelConnectionHandler =
+          new PulsarPartitionLevelConnectionHandler("testId", streamConfig);
+      assertTrue(pulsarPartitionLevelConnectionHandler.getAuthenticationFactory(pulsarConfig).isPresent());
     } catch (Exception e) {
       Assert.fail("Should not throw exception", e);
     } finally {
@@ -147,7 +152,6 @@ public class PulsarConfigTest {
   @Test
   public void testParsingConfigFailFileValidationForOAuth() throws Exception {
     String testFilePath = "file://path/to/file.json";
-
     try {
       Map<String, String> streamConfigMap = getCommonStreamConfigMap();
       streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_ISSUER_URL),

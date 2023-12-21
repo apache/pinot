@@ -73,7 +73,7 @@ public class PulsarPartitionLevelConnectionHandler {
     }
   }
 
-  private Optional<Authentication> getAuthenticationFactory(PulsarConfig pulsarConfig) {
+  protected Optional<Authentication> getAuthenticationFactory(PulsarConfig pulsarConfig) {
     if (StringUtils.isNotBlank(pulsarConfig.getIssuerUrl())
         && StringUtils.isNotBlank(pulsarConfig.getAudience())
         && StringUtils.isNotBlank(pulsarConfig.getCredentialsFilePath())) {
