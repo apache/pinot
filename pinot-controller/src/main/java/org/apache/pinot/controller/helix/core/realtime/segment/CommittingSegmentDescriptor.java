@@ -31,6 +31,7 @@ public class CommittingSegmentDescriptor {
   private String _segmentLocation;
   private String _nextOffset;
   private SegmentMetadataImpl _segmentMetadata;
+  private String _stopReason;
 
   public static CommittingSegmentDescriptor fromSegmentCompletionReqParams(
       SegmentCompletionProtocol.Request.Params reqParams) {
@@ -38,6 +39,7 @@ public class CommittingSegmentDescriptor {
         new CommittingSegmentDescriptor(reqParams.getSegmentName(), reqParams.getStreamPartitionMsgOffset(),
             reqParams.getSegmentSizeBytes());
     committingSegmentDescriptor.setSegmentLocation(reqParams.getSegmentLocation());
+    committingSegmentDescriptor.setStopReason(reqParams.getReason());
     return committingSegmentDescriptor;
   }
 
@@ -94,5 +96,13 @@ public class CommittingSegmentDescriptor {
 
   public void setSegmentMetadata(SegmentMetadataImpl segmentMetadata) {
     _segmentMetadata = segmentMetadata;
+  }
+
+  public String getStopReason() {
+    return _stopReason;
+  }
+
+  public void setStopReason(String stopReason) {
+    _stopReason = stopReason;
   }
 }
