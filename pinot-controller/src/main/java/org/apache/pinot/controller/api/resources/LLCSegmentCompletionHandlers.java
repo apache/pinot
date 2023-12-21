@@ -363,6 +363,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
       FormDataMultiPart metadataFiles) {
     if (instanceId == null || segmentName == null || segmentLocation == null || metadataFiles == null || (offset == -1
         && streamPartitionMsgOffset == null)) {
@@ -376,7 +377,7 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withSegmentLocation(segmentLocation)
         .withSegmentSizeBytes(segmentSizeBytes).withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis)
-        .withNumRows(numRows).withMemoryUsedBytes(memoryUsedBytes);
+        .withNumRows(numRows).withMemoryUsedBytes(memoryUsedBytes).withReason(stopReason);
     extractOffsetFromParams(requestParams, streamPartitionMsgOffset, offset);
     LOGGER.info("Processing segmentCommitEndWithMetadata:{}", requestParams.toString());
 

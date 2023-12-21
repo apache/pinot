@@ -25,6 +25,9 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
+import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
+
+
 class SegmentFlushThresholdComputer {
   public static final int MINIMUM_NUM_ROWS_THRESHOLD = 10_000;
   static final double CURRENT_SEGMENT_RATIO_WEIGHT = 0.1;
@@ -78,11 +81,14 @@ class SegmentFlushThresholdComputer {
     }
 
     final long committingSegmentSizeBytes = committingSegmentDescriptor.getSegmentSizeBytes();
-    if (committingSegmentSizeBytes <= 0) { // repair segment case
+    if (committingSegmentSizeBytes <= 0 // repair segment case
+        || REASON_FORCE_COMMIT_MESSAGE_RECEIVED.equals(committingSegmentDescriptor.getStopReason())) {
+      String reason = committingSegmentSizeBytes <= 0 //
+          ? "Committing segment size is not available" //
+          : "Committing segment is due to force-commit";
       final int targetNumRows = committingSegmentZKMetadata.getSizeThresholdToFlushSegment();
-      SegmentSizeBasedFlushThresholdUpdater.LOGGER.info(
-          "Committing segment size is not available, setting thresholds from previous segment for {} as {}",
-          newSegmentName, targetNumRows);
+      SegmentSizeBasedFlushThresholdUpdater.LOGGER.info("{}, setting thresholds from previous segment for {} as {}",
+          reason, newSegmentName, targetNumRows);
       return targetNumRows;
     }
 
