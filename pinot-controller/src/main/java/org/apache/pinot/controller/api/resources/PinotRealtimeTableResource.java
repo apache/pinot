@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -95,7 +96,7 @@ public class PinotRealtimeTableResource {
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType)).build();
     } catch (Exception e) {
@@ -116,7 +117,7 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "smallest | largest") @QueryParam("consumeFrom") String consumeFrom) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
     if (consumeFrom != null && !consumeFrom.equalsIgnoreCase("smallest") && !consumeFrom.equalsIgnoreCase("largest")) {
       throw new ControllerApplicationException(LOGGER,
           String.format("consumeFrom param '%s' is not valid.", consumeFrom), Response.Status.BAD_REQUEST);
@@ -145,9 +146,13 @@ public class PinotRealtimeTableResource {
       String partitionGroupIds,
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
       String consumingSegments) {
+    if (partitionGroupIds != null && consumingSegments != null) {
+      throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
+          Response.Status.BAD_REQUEST);
+    }
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
     Map<String, String> response = new HashMap<>();
     try {
       Set<String> consumingSegmentsForceCommitted =
@@ -216,7 +221,7 @@ public class PinotRealtimeTableResource {
   public Response getPauseStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
     try {
       return Response.ok().entity(_pinotLLCRealtimeSegmentManager.getPauseStatus(tableNameWithType)).build();
     } catch (Exception e) {
@@ -256,7 +261,7 @@ public class PinotRealtimeTableResource {
     }
   }
 
-  private void validate(String tableNameWithType) {
+  private void validateTable(String tableNameWithType) {
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
     if (idealState == null) {
       throw new ControllerApplicationException(LOGGER, String.format("Table %s not found!", tableNameWithType),

@@ -1569,8 +1569,6 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
       @Nullable String segmentsToCommit) {
-    Preconditions.checkArgument(partitionGroupIdsToCommit == null || segmentsToCommit == null,
-        "Cannot specify both partitions and segments to commit");
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments = filterSegmentsToCommit(allConsumingSegments, partitionGroupIdsToCommit,
