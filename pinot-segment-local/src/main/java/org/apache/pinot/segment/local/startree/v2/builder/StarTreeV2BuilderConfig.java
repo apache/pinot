@@ -85,7 +85,7 @@ public class StarTreeV2BuilderConfig {
         AggregationFunctionColumnPair aggregationFunctionColumnPair =
             AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
         AggregationFunctionColumnPair aggregatedColumnPair =
-            StarTreeBuilderUtils.resolveToAggregatedType(aggregationFunctionColumnPair);
+            AggregationFunctionColumnPair.resolveToAggregatedType(aggregationFunctionColumnPair);
         // If there is already an equivalent functionColumnPair in the map, do not load another.
         // This prevents the duplication of the aggregation when the StarTree is constructed.
         if (aggregationSpecs.containsKey(aggregatedColumnPair)) {

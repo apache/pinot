@@ -66,6 +66,19 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     return fromFunctionAndColumnName(aggregationConfig.getAggregationFunction(), aggregationConfig.getColumnName());
   }
 
+  /**
+   * Return a new {@code AggregationFunctionColumnPair} from an existing functionColumnPair where the new pair
+   * has the {@link AggregationFunctionType} set to the aggregated function type used in the segment or indexes.
+   * @param functionColumnPair the existing functionColumnPair
+   * @return the new functionColumnPair
+   */
+  public static AggregationFunctionColumnPair resolveToAggregatedType(
+      AggregationFunctionColumnPair functionColumnPair) {
+    AggregationFunctionType valueAggregationFunctionType =
+        AggregationFunctionType.getAggregatedFunctionType(functionColumnPair.getFunctionType());
+    return new AggregationFunctionColumnPair(valueAggregationFunctionType, functionColumnPair.getColumn());
+  }
+
   private static AggregationFunctionColumnPair fromFunctionAndColumnName(String functionName, String columnName) {
     AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
     if (functionType == AggregationFunctionType.COUNT) {

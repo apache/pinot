@@ -16,26 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.startree.v2;
+package org.apache.pinot.segment.spi.index.startree;
 
-import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.testng.annotations.Test;
 
 import static org.testng.AssertJUnit.assertEquals;
 
 
-public class StarTreeBuilderUtilsTest {
+public class AggregationFunctionColumnPairTest {
 
   @Test
   public void testResolveToAggregatedType() {
     assertEquals(AggregationFunctionColumnPair.fromColumnName("distinctCountThetaSketch__dimX"),
-        StarTreeBuilderUtils.resolveToAggregatedType(
+        AggregationFunctionColumnPair.resolveToAggregatedType(
             AggregationFunctionColumnPair.fromColumnName("distinctCountRawThetaSketch__dimX")));
     assertEquals(AggregationFunctionColumnPair.fromColumnName("count__*"),
-        StarTreeBuilderUtils.resolveToAggregatedType(AggregationFunctionColumnPair.fromColumnName("count__*")));
+        AggregationFunctionColumnPair.resolveToAggregatedType(
+            AggregationFunctionColumnPair.fromColumnName("count__*")));
     assertEquals(AggregationFunctionColumnPair.fromColumnName("sum__dimY"),
-        StarTreeBuilderUtils.resolveToAggregatedType(AggregationFunctionColumnPair.fromColumnName("sum__dimY")));
+        AggregationFunctionColumnPair.resolveToAggregatedType(
+            AggregationFunctionColumnPair.fromColumnName("sum__dimY")));
   }
-
 }

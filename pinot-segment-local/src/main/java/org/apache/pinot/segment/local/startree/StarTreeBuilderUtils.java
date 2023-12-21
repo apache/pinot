@@ -29,11 +29,8 @@ import java.util.Queue;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -95,8 +92,9 @@ public class StarTreeBuilderUtils {
     long totalSizeInBytes = headerSizeInBytes + (long) numNodes * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
 
     // Backward-compatible: star-tree file is always little-endian
-    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(starTreeFile, false, 0, totalSizeInBytes,
-        ByteOrder.LITTLE_ENDIAN, "StarTreeBuilderUtils#serializeTree: star-tree buffer")) {
+    try (PinotDataBuffer buffer = PinotDataBuffer
+        .mapFile(starTreeFile, false, 0, totalSizeInBytes, ByteOrder.LITTLE_ENDIAN,
+            "StarTreeBuilderUtils#serializeTree: star-tree buffer")) {
       long offset = writeHeader(buffer, headerSizeInBytes, dimensions, numNodes);
       writeNodes(buffer, offset, rootNode);
     }
@@ -270,18 +268,5 @@ public class StarTreeBuilderUtils {
     File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME));
     FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
-  }
-
-  /**
-   * Return a new {@link AggregationFunctionColumnPair} from an existing functionColumnPair where the new pair
-   * has the {@link AggregationFunctionType} set to the aggregated function type used in the segment or indexes.
-   * @param functionColumnPair the existing functionColumnPair
-   * @return the new functionColumnPair
-   */
-  public static AggregationFunctionColumnPair resolveToAggregatedType(
-      AggregationFunctionColumnPair functionColumnPair) {
-     AggregationFunctionType valueAggregationFunctionType =
-         ValueAggregatorFactory.getAggregatedFunctionType(functionColumnPair.getFunctionType());
-     return new AggregationFunctionColumnPair(valueAggregationFunctionType, functionColumnPair.getColumn());
   }
 }
