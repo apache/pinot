@@ -22,10 +22,9 @@ import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
-
-import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
 
 
 class SegmentFlushThresholdComputer {
@@ -82,7 +81,8 @@ class SegmentFlushThresholdComputer {
 
     final long committingSegmentSizeBytes = committingSegmentDescriptor.getSegmentSizeBytes();
     if (committingSegmentSizeBytes <= 0 // repair segment case
-        || REASON_FORCE_COMMIT_MESSAGE_RECEIVED.equals(committingSegmentDescriptor.getStopReason())) {
+        || SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED.equals(
+        committingSegmentDescriptor.getStopReason())) {
       String reason = committingSegmentSizeBytes <= 0 //
           ? "Committing segment size is not available" //
           : "Committing segment is due to force-commit";

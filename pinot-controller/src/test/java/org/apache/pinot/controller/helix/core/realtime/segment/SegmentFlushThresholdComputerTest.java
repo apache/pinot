@@ -120,7 +120,7 @@ public class SegmentFlushThresholdComputerTest {
     when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(committingSegmentSizeThreshold);
 
     StreamConfig streamConfig = mock(StreamConfig.class);
-    
+
     int newSegmentSizeThreshold =
         computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
             "newSegmentName");
