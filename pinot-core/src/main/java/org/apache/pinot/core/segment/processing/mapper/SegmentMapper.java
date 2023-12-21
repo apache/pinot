@@ -37,6 +37,7 @@ import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
+import org.apache.pinot.segment.local.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -72,6 +73,7 @@ public class SegmentMapper {
   private final boolean _includeNullFields;
   private final int _numSortFields;
 
+  private final RecordEnricherPipeline _recordEnricherPipeline;
   private final CompositeTransformer _recordTransformer;
   private final TimeHandler _timeHandler;
   private final Partitioner[] _partitioners;
@@ -93,6 +95,7 @@ public class SegmentMapper {
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();
     _includeNullFields = tableConfig.getIndexingConfig().isNullHandlingEnabled();
+    _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
     _recordTransformer = CompositeTransformer.composeAllTransformers(_customRecordTransformers, tableConfig, schema);
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
     List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
@@ -164,6 +167,7 @@ public class SegmentMapper {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
     while (recordReader.hasNext()) {
       reuse = recordReader.next(reuse);
+      _recordEnricherPipeline.run(reuse);
 
       // TODO: Add ComplexTypeTransformer here. Currently it is not idempotent so cannot add it
 
