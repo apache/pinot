@@ -28,15 +28,12 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import org.apache.commons.configuration2.ex.ConfigurationException;
-import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -124,9 +121,7 @@ public class StarTreeIndexReader implements Closeable {
           _dataBuffer, ByteOrder.BIG_ENDIAN));
     }
     // Load metric (function-column pair) forward indexes
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> deduplicatedAggregationSpecs =
-        StarTreeBuilderUtils.deduplicateAggregationSpecs(starTreeMetadata.getAggregationSpecs());
-    for (AggregationFunctionColumnPair functionColumnPair : deduplicatedAggregationSpecs.keySet()) {
+    for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
       String metric = functionColumnPair.toColumnName();
       IndexKey indexKey = new IndexKey(metric, StandardIndexes.forward());
       columnEntries.computeIfAbsent(indexKey, k -> new StarTreeIndexEntry(

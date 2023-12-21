@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
@@ -36,7 +35,6 @@ import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTree;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
@@ -80,9 +78,7 @@ public class StarTreeLoaderUtils {
       }
 
       // Load metric (function-column pair) forward indexes
-      TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs =
-          StarTreeBuilderUtils.deduplicateAggregationSpecs(starTreeMetadata.getAggregationSpecs());
-      for (AggregationFunctionColumnPair functionColumnPair : aggregationSpecs.keySet()) {
+      for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
         String metric = functionColumnPair.toColumnName();
         PinotDataBuffer forwardIndexDataBuffer = indexReader.getIndexFor(metric, StandardIndexes.forward());
         DataType dataType = ValueAggregatorFactory.getAggregatedValueType(functionColumnPair.getFunctionType());

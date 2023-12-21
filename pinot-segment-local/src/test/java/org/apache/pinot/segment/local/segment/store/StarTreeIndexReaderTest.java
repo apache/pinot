@@ -23,8 +23,8 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.TreeMap;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -34,7 +34,6 @@ import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
-import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -47,7 +46,6 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -80,16 +78,14 @@ public class StarTreeIndexReaderTest {
   public void testLoadStarTreeIndexBuffers()
       throws IOException, ConfigurationException {
     // Test with 2 index trees.
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> m1specs = new TreeMap<>();
-    m1specs.put(new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "*"), AggregationSpec.DEFAULT);
     StarTreeV2Metadata stMeta1 = mock(StarTreeV2Metadata.class);
     when(stMeta1.getDimensionsSplitOrder()).thenReturn(Arrays.asList("dim0", "dim1"));
-    when(stMeta1.getAggregationSpecs()).thenReturn(m1specs);
+    when(stMeta1.getFunctionColumnPairs()).thenReturn(
+        Collections.singleton(new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "*")));
     StarTreeV2Metadata stMeta2 = mock(StarTreeV2Metadata.class);
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> m2specs = new TreeMap<>();
-    m2specs.put(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "dimX"), AggregationSpec.DEFAULT);
     when(stMeta2.getDimensionsSplitOrder()).thenReturn(Arrays.asList("dimX", "dimY"));
-    when(stMeta2.getAggregationSpecs()).thenReturn(m2specs);
+    when(stMeta2.getFunctionColumnPairs()).thenReturn(
+        Collections.singleton(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "dimX")));
     when(_segmentMetadata.getStarTreeV2MetadataList()).thenReturn(Arrays.asList(stMeta1, stMeta2));
     // Mock the offset/sizes for the index buffers.
     List<List<Pair<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>>> indexMaps = new ArrayList<>();
@@ -171,82 +167,6 @@ public class StarTreeIndexReaderTest {
       buf = reader.getBuffer(1, "sum__dimX", StandardIndexes.forward());
       assertEquals(buf.size(), 3);
       assertEquals(buf.getByte(2), 21);
-    }
-  }
-
-  @Test
-  public void testDuplicateValueAggregation()
-      throws IOException, ConfigurationException {
-    StarTreeV2Metadata stMeta = mock(StarTreeV2Metadata.class);
-    TreeMap<AggregationFunctionColumnPair, AggregationSpec> specs = new TreeMap<>();
-    specs.put(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "dimX"),
-        AggregationSpec.DEFAULT);
-    specs.put(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH, "dimX"),
-        AggregationSpec.DEFAULT);
-    specs.put(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "dimY"),
-        AggregationSpec.DEFAULT);
-    specs.put(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH, "dimY"),
-        AggregationSpec.DEFAULT);
-    when(stMeta.getDimensionsSplitOrder()).thenReturn(Arrays.asList("dimX", "dimY"));
-    when(stMeta.getAggregationSpecs()).thenReturn(specs);
-    when(_segmentMetadata.getStarTreeV2MetadataList()).thenReturn(List.of(stMeta));
-    // Mock the offset/sizes for the index buffers.
-    List<List<Pair<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>>> indexMaps = new ArrayList<>();
-    List<Pair<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> indexMap = new ArrayList<>();
-    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.STAR_TREE, null),
-        new StarTreeIndexMapUtils.IndexValue(0, 1)));
-    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "dimX"),
-        new StarTreeIndexMapUtils.IndexValue(1, 1)));
-    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, "dimY"),
-        new StarTreeIndexMapUtils.IndexValue(2, 1)));
-    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX,
-        "distinctCountThetaSketch__dimX"), new StarTreeIndexMapUtils.IndexValue(3, 1)));
-    indexMap.add(Pair.of(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX,
-        "distinctCountThetaSketch__dimY"), new StarTreeIndexMapUtils.IndexValue(4, 1)));
-    indexMaps.add(indexMap);
-    File indexMapFile = new File(TEMP_DIR, StarTreeV2Constants.INDEX_MAP_FILE_NAME);
-    StarTreeIndexMapUtils.storeToFile(indexMaps, indexMapFile);
-
-    File indexFile = new File(TEMP_DIR, StarTreeV2Constants.INDEX_FILE_NAME);
-    if (!indexFile.exists()) {
-      indexFile.createNewFile();
-    }
-    byte[] data = new byte[32];
-    for (int i = 0; i < data.length; i++) {
-      data[i] = (byte) i;
-    }
-    try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapFile(indexFile, false, 0, data.length, ByteOrder.LITTLE_ENDIAN,
-        "StarTree V2 data buffer from: " + indexFile)) {
-      dataBuffer.readFrom(0, data);
-    }
-
-    try (StarTreeIndexReader reader = new StarTreeIndexReader(TEMP_DIR, _segmentMetadata, ReadMode.mmap)) {
-      assertTrue(reader.hasIndexFor(0, "0", StandardIndexes.inverted()));
-      PinotDataBuffer buf = reader.getBuffer(0, "0", StandardIndexes.inverted());
-      assertEquals(buf.size(), 1);
-      assertEquals(buf.getByte(0), 0);
-
-      assertTrue(reader.hasIndexFor(0, "dimX", StandardIndexes.forward()));
-      buf = reader.getBuffer(0, "dimX", StandardIndexes.forward());
-      assertEquals(buf.size(), 1);
-      assertEquals(buf.getByte(0), 1);
-
-      assertTrue(reader.hasIndexFor(0, "dimY", StandardIndexes.forward()));
-      buf = reader.getBuffer(0, "dimY", StandardIndexes.forward());
-      assertEquals(buf.size(), 1);
-      assertEquals(buf.getByte(0), 2);
-
-      assertTrue(reader.hasIndexFor(0, "distinctCountThetaSketch__dimX", StandardIndexes.forward()));
-      buf = reader.getBuffer(0, "distinctCountThetaSketch__dimX", StandardIndexes.forward());
-      assertEquals(buf.size(), 1);
-      assertEquals(buf.getByte(0), 3);
-      assertFalse(reader.hasIndexFor(0, "distinctCountRawThetaSketch__dimX", StandardIndexes.forward()));
-
-      assertTrue(reader.hasIndexFor(0, "distinctCountThetaSketch__dimY", StandardIndexes.forward()));
-      buf = reader.getBuffer(0, "distinctCountThetaSketch__dimY", StandardIndexes.forward());
-      assertEquals(buf.size(), 1);
-      assertEquals(buf.getByte(0), 4);
-      assertFalse(reader.hasIndexFor(0, "distinctCountRawThetaSketch__dimY", StandardIndexes.forward()));
     }
   }
 }

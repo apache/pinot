@@ -38,6 +38,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
+import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -150,7 +151,12 @@ public class StarTreeUtils {
       Set<String> predicateColumns) {
     // Check aggregations
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
-      if (!starTreeV2Metadata.containsFunctionColumnPair(aggregationFunctionColumnPair)) {
+      // Check both query and stored aggregate types
+      boolean containsFunctionColumnPair = starTreeV2Metadata.containsFunctionColumnPair(aggregationFunctionColumnPair)
+          || starTreeV2Metadata.containsFunctionColumnPair(
+          StarTreeBuilderUtils.resolveToAggregatedType(aggregationFunctionColumnPair));
+
+      if (!containsFunctionColumnPair) {
         return false;
       }
     }
