@@ -76,7 +76,11 @@ public class StarTreeV2BuilderConfig {
       for (String functionColumnPair : indexConfig.getFunctionColumnPairs()) {
         AggregationFunctionColumnPair aggregationFunctionColumnPair =
             AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
-        aggregationSpecs.put(aggregationFunctionColumnPair, AggregationSpec.DEFAULT);
+        AggregationFunctionColumnPair aggregatedColumnPair =
+            AggregationFunctionColumnPair.resolveToAggregatedType(aggregationFunctionColumnPair);
+        // If there is already an equivalent functionColumnPair in the map, do not load another.
+        // This prevents the duplication of the aggregation when the StarTree is constructed.
+        aggregationSpecs.putIfAbsent(aggregatedColumnPair, AggregationSpec.DEFAULT);
       }
     }
     if (indexConfig.getAggregationConfigs() != null) {
@@ -85,14 +89,11 @@ public class StarTreeV2BuilderConfig {
             AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
         AggregationFunctionColumnPair aggregatedColumnPair =
             AggregationFunctionColumnPair.resolveToAggregatedType(aggregationFunctionColumnPair);
-        // If there is already an equivalent functionColumnPair in the map, do not load another.
-        // This prevents the duplication of the aggregation when the StarTree is constructed.
-        if (aggregationSpecs.containsKey(aggregatedColumnPair)) {
-          continue;
-        }
         ChunkCompressionType compressionType =
             ChunkCompressionType.valueOf(aggregationConfig.getCompressionCodec().name());
-        aggregationSpecs.put(aggregatedColumnPair, new AggregationSpec(compressionType));
+        // If there is already an equivalent functionColumnPair in the map, do not load another.
+        // This prevents the duplication of the aggregation when the StarTree is constructed.
+        aggregationSpecs.putIfAbsent(aggregatedColumnPair, new AggregationSpec(compressionType));
       }
     }
 
