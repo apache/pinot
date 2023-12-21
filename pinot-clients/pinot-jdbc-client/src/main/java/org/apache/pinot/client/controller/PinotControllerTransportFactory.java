@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.client.controller;
 
+import io.netty.handler.ssl.SslContext;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.ConnectionTimeouts;
 import org.apache.pinot.client.TlsProtocols;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -35,7 +35,7 @@ public class PinotControllerTransportFactory {
 
   private Map<String, String> _headers = new HashMap<>();
   private String _scheme = CommonConstants.HTTP_PROTOCOL;
-  private SSLContext _sslContext = null;
+  private SslContext _sslContext = null;
 
   private boolean _tlsV10Enabled = false;
   private int _readTimeoutMs = Integer.parseInt(DEFAULT_CONTROLLER_READ_TIMEOUT_MS);
@@ -66,11 +66,11 @@ public class PinotControllerTransportFactory {
     _scheme = scheme;
   }
 
-  public SSLContext getSslContext() {
+  public SslContext getSslContext() {
     return _sslContext;
   }
 
-  public void setSslContext(SSLContext sslContext) {
+  public void setSslContext(SslContext sslContext) {
     _sslContext = sslContext;
   }
 

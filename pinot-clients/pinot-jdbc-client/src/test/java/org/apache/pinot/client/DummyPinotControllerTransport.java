@@ -19,9 +19,9 @@
 package org.apache.pinot.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.netty.handler.ssl.SslContext;
 import java.util.Map;
 import javax.annotation.Nullable;
-import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -29,7 +29,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 public class DummyPinotControllerTransport extends PinotControllerTransport {
 
-  public DummyPinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
+  public DummyPinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SslContext sslContext,
       @Nullable String appId) {
     super(headers, scheme, sslContext, ConnectionTimeouts.create(1000, 1000, 1000), TlsProtocols.defaultProtocols(true),
         appId);

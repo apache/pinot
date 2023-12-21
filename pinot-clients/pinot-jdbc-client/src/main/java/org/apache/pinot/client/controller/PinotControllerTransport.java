@@ -18,15 +18,13 @@
  */
 package org.apache.pinot.client.controller;
 
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.JdkSslContext;
+import io.netty.handler.ssl.SslContext;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import javax.annotation.Nullable;
-import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.client.ConnectionTimeouts;
 import org.apache.pinot.client.PinotClientException;
@@ -51,14 +49,14 @@ public class PinotControllerTransport {
   private final String _scheme;
   private final AsyncHttpClient _httpClient;
 
-  public PinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SSLContext sslContext,
+  public PinotControllerTransport(Map<String, String> headers, String scheme, @Nullable SslContext sslContext,
       ConnectionTimeouts connectionTimeouts, TlsProtocols tlsProtocols, @Nullable String appId) {
     _headers = headers;
     _scheme = scheme;
 
     DefaultAsyncHttpClientConfig.Builder builder = Dsl.config();
     if (sslContext != null) {
-      builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
+      builder.setSslContext(sslContext);
     }
 
     builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())

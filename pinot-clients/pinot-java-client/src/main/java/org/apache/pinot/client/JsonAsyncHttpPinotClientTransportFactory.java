@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.client;
 
+import io.netty.handler.ssl.SslContext;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -38,7 +38,7 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
 
   private Map<String, String> _headers = new HashMap<>();
   private String _scheme = CommonConstants.HTTP_PROTOCOL;
-  private SSLContext _sslContext = null;
+  private SslContext _sslContext = null;
   private boolean _tlsV10Enabled = false;
   private int _readTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
   private int _connectTimeoutMs = Integer.parseInt(DEFAULT_BROKER_READ_TIMEOUT_MS);
@@ -72,11 +72,11 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
     _scheme = scheme;
   }
 
-  public SSLContext getSslContext() {
+  public SslContext getSslContext() {
     return _sslContext;
   }
 
-  public void setSslContext(SSLContext sslContext) {
+  public void setSslContext(SslContext sslContext) {
     _sslContext = sslContext;
   }
 
@@ -90,7 +90,7 @@ public class JsonAsyncHttpPinotClientTransportFactory implements PinotClientTran
     }
 
     if (_sslContext == null && _scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
-      _sslContext = ConnectionUtils.getSSLContextFromProperties(properties);
+      _sslContext = ConnectionUtils.getSslContextFromProperties(properties);
     }
 
     _readTimeoutMs = Integer.parseInt(properties.getProperty("brokerReadTimeoutMs", DEFAULT_BROKER_READ_TIMEOUT_MS));
