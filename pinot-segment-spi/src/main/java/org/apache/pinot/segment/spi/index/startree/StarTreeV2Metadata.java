@@ -52,17 +52,25 @@ public class StarTreeV2Metadata {
         AggregationFunctionType functionType =
             AggregationFunctionType.getAggregationFunctionType(aggregationConfig.getString(MetadataKey.FUNCTION_TYPE));
         String columnName = aggregationConfig.getString(MetadataKey.COLUMN_NAME);
+        AggregationFunctionColumnPair functionColumnPair = new AggregationFunctionColumnPair(functionType, columnName);
+        // Lookup the stored aggregation type
+        AggregationFunctionColumnPair aggregatedFunctionColumnPair =
+            AggregationFunctionColumnPair.resolveToAggregatedType(functionColumnPair);
         ChunkCompressionType compressionType =
             ChunkCompressionType.valueOf(aggregationConfig.getString(MetadataKey.COMPRESSION_CODEC));
-        _aggregationSpecs.put(new AggregationFunctionColumnPair(functionType, columnName),
-            new AggregationSpec(compressionType));
+        // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
+        _aggregationSpecs.putIfAbsent(aggregatedFunctionColumnPair, new AggregationSpec(compressionType));
       }
     } else {
       // Backward compatibility with columnName format
       for (String functionColumnPairName : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
         AggregationFunctionColumnPair functionColumnPair =
             AggregationFunctionColumnPair.fromColumnName(functionColumnPairName);
-        _aggregationSpecs.put(functionColumnPair, AggregationSpec.DEFAULT);
+        // Lookup the stored aggregation type
+        AggregationFunctionColumnPair aggregatedFunctionColumnPair =
+            AggregationFunctionColumnPair.resolveToAggregatedType(functionColumnPair);
+        // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
+        _aggregationSpecs.putIfAbsent(aggregatedFunctionColumnPair, AggregationSpec.DEFAULT);
       }
     }
     _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
@@ -87,7 +95,13 @@ public class StarTreeV2Metadata {
   }
 
   public boolean containsFunctionColumnPair(AggregationFunctionColumnPair functionColumnPair) {
-    return _aggregationSpecs.containsKey(functionColumnPair);
+    boolean containsKey = _aggregationSpecs.containsKey(functionColumnPair);
+    if (!containsKey) {
+      AggregationFunctionColumnPair aggregatedFunctionColumnPair =
+          AggregationFunctionColumnPair.resolveToAggregatedType(functionColumnPair);
+      containsKey = _aggregationSpecs.containsKey(aggregatedFunctionColumnPair);
+    }
+    return containsKey;
   }
 
   public int getMaxLeafRecords() {

@@ -150,12 +150,7 @@ public class StarTreeUtils {
       Set<String> predicateColumns) {
     // Check aggregations
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
-      // Check both query and stored aggregate types
-      boolean containsFunctionColumnPair = starTreeV2Metadata.containsFunctionColumnPair(aggregationFunctionColumnPair)
-          || starTreeV2Metadata.containsFunctionColumnPair(
-          AggregationFunctionColumnPair.resolveToAggregatedType(aggregationFunctionColumnPair));
-
-      if (!containsFunctionColumnPair) {
+      if (!starTreeV2Metadata.containsFunctionColumnPair(aggregationFunctionColumnPair)) {
         return false;
       }
     }
