@@ -106,10 +106,10 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
         "1");
     serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-        HelixInstanceDataManagerConfig.PREFIX_OF_CONFIG_OF_UPSERT,
+        HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
         TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_ENABLE_SNAPSHOT), "true");
     serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-        HelixInstanceDataManagerConfig.PREFIX_OF_CONFIG_OF_UPSERT,
+        HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
         TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_ENABLE_PRELOAD), "true");
   }
 
