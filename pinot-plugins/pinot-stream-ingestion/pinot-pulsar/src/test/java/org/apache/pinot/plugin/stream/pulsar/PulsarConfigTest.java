@@ -33,7 +33,6 @@ import org.testng.annotations.Test;
 
 import static org.junit.Assert.assertTrue;
 
-
 public class PulsarConfigTest {
   public static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
 
@@ -152,6 +151,7 @@ public class PulsarConfigTest {
   @Test
   public void testParsingConfigFailFileValidationForOAuth() throws Exception {
     String testFilePath = "file://path/to/file.json";
+
     try {
       Map<String, String> streamConfigMap = getCommonStreamConfigMap();
       streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_ISSUER_URL),
