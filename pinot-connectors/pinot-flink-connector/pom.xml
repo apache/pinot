@@ -51,7 +51,15 @@
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
+      <artifactId>flink-streaming-java</artifactId>
+      <version>${flink.version}</version>
+      <exclusions>
+        <exclusion>
+          <!-- Causes unnecessary dependency convergence errors -->
+          <groupId>com.twitter</groupId>
+          <artifactId>chill-java</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -82,7 +90,8 @@
     </dependency>
     <dependency>
       <groupId>org.apache.flink</groupId>
-      <artifactId>flink-clients_${scala.compat.version}</artifactId>
+      <artifactId>flink-clients</artifactId>
+      <version>${flink.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
