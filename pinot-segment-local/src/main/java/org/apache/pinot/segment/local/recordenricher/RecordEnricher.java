@@ -19,10 +19,12 @@
 package org.apache.pinot.segment.local.recordenricher;
 
 import java.util.Map;
+import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 public abstract class RecordEnricher {
   abstract public void init(Map<String, String> enricherProps);
+  abstract public Set<String> getInputColumns();
   abstract public void enrich(GenericRow record);
 }
