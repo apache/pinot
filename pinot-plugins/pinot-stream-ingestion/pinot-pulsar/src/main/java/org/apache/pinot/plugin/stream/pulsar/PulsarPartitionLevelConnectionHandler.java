@@ -19,7 +19,11 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.List;
+import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pulsar.client.api.Authentication;
 import org.apache.pulsar.client.api.AuthenticationFactory;
@@ -27,6 +31,7 @@ import org.apache.pulsar.client.api.ClientBuilder;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Reader;
+import org.apache.pulsar.client.impl.auth.oauth2.AuthenticationFactoryOAuth2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,6 +65,7 @@ public class PulsarPartitionLevelConnectionHandler {
         pulsarClientBuilder.authentication(authentication);
       }
 
+      getAuthenticationFactory(_config).ifPresent(pulsarClientBuilder::authentication);
       _pulsarClient = pulsarClientBuilder.build();
       LOGGER.info("Created pulsar client {}", _pulsarClient);
     } catch (Exception e) {
@@ -67,6 +73,26 @@ public class PulsarPartitionLevelConnectionHandler {
     }
   }
 
+  private Optional<Authentication> getAuthenticationFactory(PulsarConfig pulsarConfig) {
+    if (StringUtils.isNotBlank(pulsarConfig.getIssuerUrl())
+        && StringUtils.isBlank(pulsarConfig.getAudience())
+        && StringUtils.isBlank(pulsarConfig.getCredentialsFilePath())) {
+      try {
+        return Optional.of(AuthenticationFactoryOAuth2.clientCredentials(
+            new URL(pulsarConfig.getIssuerUrl()),
+            new URL(pulsarConfig.getCredentialsFilePath()),
+            pulsarConfig.getAudience()));
+      } catch (MalformedURLException mue) {
+        LOGGER.error("Failed to create authentication factory for pulsar client with config: "
+                + "issuer: {}, credential file path: {}, audience: {}",
+            pulsarConfig.getIssuerUrl(),
+            pulsarConfig.getCredentialsFilePath(),
+            pulsarConfig.getAudience(),
+            mue);
+      }
+    }
+    return Optional.empty();
+  }
   protected Reader<byte[]> createReaderForPartition(String topic, int partition, MessageId initialMessageId) {
     if (_pulsarClient == null) {
       throw new RuntimeException("Failed to create reader as no pulsar client found for topic " + topic);

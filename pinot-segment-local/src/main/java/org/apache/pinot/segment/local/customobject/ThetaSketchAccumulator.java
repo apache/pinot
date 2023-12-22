@@ -38,7 +38,6 @@ import org.apache.datasketches.theta.Union;
  */
 public class ThetaSketchAccumulator {
   private ArrayList<Sketch> _accumulator;
-  private boolean _ordered = false;
   private SetOperationBuilder _setOperationBuilder = new SetOperationBuilder();
   private Union _union;
   private int _threshold;
@@ -51,14 +50,9 @@ public class ThetaSketchAccumulator {
   // happens on serialization. Therefore, when deserialized, the values may be null and will
   // require re-initialisation. Since the primary use case is at query time for the Broker
   // and Server, these properties are already in memory and are re-set.
-  public ThetaSketchAccumulator(SetOperationBuilder setOperationBuilder, boolean ordered, int threshold) {
+  public ThetaSketchAccumulator(SetOperationBuilder setOperationBuilder, int threshold) {
     _setOperationBuilder = setOperationBuilder;
-    _ordered = ordered;
     _threshold = threshold;
-  }
-
-  public void setOrdered(boolean ordered) {
-    _ordered = ordered;
   }
 
   public void setSetOperationBuilder(SetOperationBuilder setOperationBuilder) {
@@ -111,12 +105,12 @@ public class ThetaSketchAccumulator {
     }
     // Return the default update "gadget" sketch as a compact sketch
     if (isEmpty()) {
-      return _union.getResult(_ordered, null);
+      return _union.getResult(false, null);
     }
     // Corner-case: the parameters are not strictly respected when there is a single sketch.
     // This single sketch might have been the result of a previously accumulated union and
     // would already have the parameters set.  The sketch is returned as-is without adjusting
-    // ordering and nominal entries which requires an additional union operation.
+    // nominal entries which requires an additional union operation.
     if (_numInputs == 1) {
       return _accumulator.get(0);
     }
@@ -136,6 +130,6 @@ public class ThetaSketchAccumulator {
     }
     _accumulator.clear();
 
-    return _union.getResult(_ordered, null);
+    return _union.getResult(false, null);
   }
 }

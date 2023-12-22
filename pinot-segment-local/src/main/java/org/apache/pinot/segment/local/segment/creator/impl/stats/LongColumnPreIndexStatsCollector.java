@@ -51,7 +51,9 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
       long value = (long) entry;
       addressSorted(value);
       if (_values.add(value)) {
-        updatePartition(value);
+        if (isPartitionEnabled()) {
+          updatePartition(Long.toString(value));
+        }
       }
 
       _totalNumberOfEntries++;

@@ -176,6 +176,11 @@ public enum TransformFunctionType {
 
   EXTRACT("extract"),
 
+  // string functions
+  SPLIT("split", ReturnTypes.TO_ARRAY, OperandTypes.family(
+      ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER),
+      ordinal -> ordinal > 1), "split"),
+
   // array functions
   // The only column accepted by "cardinality" function is multi-value array, thus putting "cardinality" as alias.
   // TODO: once we support other types of multiset, we should make CARDINALITY its own function

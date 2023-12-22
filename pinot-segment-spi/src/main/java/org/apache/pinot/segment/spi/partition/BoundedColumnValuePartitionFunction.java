@@ -62,9 +62,9 @@ public class BoundedColumnValuePartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object value) {
+  public int getPartition(String value) {
     for (int i = 0; i < _numPartitions - 1; i++) {
-      if (_values[i].equalsIgnoreCase(value.toString())) {
+      if (_values[i].equalsIgnoreCase(value)) {
         return i + 1;
       }
     }

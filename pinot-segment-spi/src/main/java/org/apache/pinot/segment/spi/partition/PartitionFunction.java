@@ -34,11 +34,12 @@ public interface PartitionFunction extends Serializable {
 
   /**
    * Method to compute and return partition id for the given value.
+   * NOTE: The value is expected to be a string representation of the actual value.
    *
    * @param value Value for which to determine the partition id.
    * @return partition id for the value.
    */
-  int getPartition(Object value);
+  int getPartition(String value);
 
   /**
    * Returns the name of the partition function.

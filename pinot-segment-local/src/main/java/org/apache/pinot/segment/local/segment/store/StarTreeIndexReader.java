@@ -28,6 +28,7 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -64,7 +65,7 @@ public class StarTreeIndexReader implements Closeable {
    * @param readMode         mmap vs heap mode
    */
   public StarTreeIndexReader(File segmentDirectory, SegmentMetadataImpl segmentMetadata, ReadMode readMode)
-      throws IOException {
+      throws IOException, ConfigurationException {
     Preconditions.checkNotNull(segmentDirectory);
     Preconditions.checkArgument(segmentDirectory.exists(), "SegmentDirectory: " + segmentDirectory + " does not exist");
     Preconditions.checkArgument(segmentDirectory.isDirectory(),
@@ -82,7 +83,7 @@ public class StarTreeIndexReader implements Closeable {
   }
 
   private void load()
-      throws IOException {
+      throws IOException, ConfigurationException {
     List<Map<StarTreeIndexMapUtils.IndexKey, StarTreeIndexMapUtils.IndexValue>> indexMapList;
     try (InputStream inputStream = new FileInputStream(
         new File(_segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME))) {

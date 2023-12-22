@@ -51,7 +51,9 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       int value = (int) entry;
       addressSorted(value);
       if (_values.add(value)) {
-        updatePartition(value);
+        if (isPartitionEnabled()) {
+          updatePartition(Integer.toString(value));
+        }
       }
 
       _totalNumberOfEntries++;

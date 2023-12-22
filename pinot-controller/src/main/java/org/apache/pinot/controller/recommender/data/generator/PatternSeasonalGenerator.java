@@ -21,7 +21,7 @@ package org.apache.pinot.controller.recommender.data.generator;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.PropertyConverter;
+import org.apache.commons.configuration2.convert.PropertyConverter;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.apache.commons.math3.random.Well19937c;
 

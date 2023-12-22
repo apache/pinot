@@ -772,6 +772,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
     doClose();
+    // We don't remove the segment from the metadata manager when
+    // it's closed. This was done to make table deletion faster. Since we don't remove the segment, we never decrease
+    // the primary key count. So, we set the primary key count to 0 here.
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        0L);
     _logger.info("Closed the metadata manager");
   }
 
