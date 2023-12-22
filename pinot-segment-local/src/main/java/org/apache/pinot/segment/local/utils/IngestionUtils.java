@@ -34,6 +34,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.segment.local.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -309,8 +310,7 @@ public final class IngestionUtils {
   public static Set<String> getFieldsForRecordExtractor(@Nullable IngestionConfig ingestionConfig, Schema schema) {
     Set<String> fieldsForRecordExtractor = new HashSet<>();
 
-    if (null != ingestionConfig && (null != ingestionConfig.getSchemaConformingTransformerConfig()
-        || null != ingestionConfig.getEnrichmentConfigs())) {
+    if (null != ingestionConfig && null != ingestionConfig.getSchemaConformingTransformerConfig()) {
       // The SchemaConformingTransformer requires that all fields are extracted, indicated by returning an empty set
       // here. Compared to extracting the fields specified below, extracting all fields should be a superset.
       return fieldsForRecordExtractor;
@@ -380,14 +380,18 @@ public final class IngestionUtils {
           expressionContext.getColumns(fields);
         }
       }
+
+      fields.addAll(RecordEnricherPipeline.fromIngestionConfig(ingestionConfig).getColumnsToExtract());
+
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
         for (TransformConfig transformConfig : transformConfigs) {
           FunctionEvaluator expressionEvaluator =
               FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
           fields.addAll(expressionEvaluator.getArguments());
-          fields.add(transformConfig
-              .getColumnName()); // add the column itself too, so that if it is already transformed, we won't
+          fields.add(
+              transformConfig.getColumnName()); // add the column itself too, so that if it is already transformed,
+          // we won't
           // transform again
         }
       }

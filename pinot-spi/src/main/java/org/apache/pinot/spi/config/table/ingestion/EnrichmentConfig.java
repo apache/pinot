@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table.ingestion;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -34,6 +35,7 @@ public class EnrichmentConfig extends BaseJsonConfig {
 
   @JsonCreator
   public EnrichmentConfig(@JsonProperty("enricherClassName") String className,
+      @JsonProperty("columnsToExtract") List<String> columnsToExtract,
       @JsonProperty("properties") Map<String, String> properties) {
     _enricherClassName = className;
     _properties = properties;

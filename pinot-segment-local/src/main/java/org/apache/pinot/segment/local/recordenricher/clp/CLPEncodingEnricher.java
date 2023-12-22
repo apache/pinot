@@ -54,6 +54,10 @@ public class CLPEncodingEnricher extends RecordEnricher {
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
   }
 
+  @Override
+  public Set<String> getInputColumns() {
+    return _fields;
+  }
 
   @Override
   public void enrich(GenericRow record) {
