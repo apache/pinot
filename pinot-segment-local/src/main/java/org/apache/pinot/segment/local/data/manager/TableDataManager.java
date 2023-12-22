@@ -33,6 +33,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -242,4 +243,9 @@ public interface TableDataManager {
    */
   default void onConsumingToOnline(String segmentNameStr) {
   };
+
+
+  default TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return null;
+  }
 }

@@ -40,6 +40,8 @@ public interface TableUpsertMetadataManager extends Closeable {
 
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
+  PartitionUpsertMetadataManager get(int partitionId);
+
   UpsertConfig.Mode getUpsertMode();
 
   /**

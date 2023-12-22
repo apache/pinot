@@ -730,4 +730,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
     return isValid;
   }
+
+  @Override
+  public TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return _tableUpsertMetadataManager;
+  }
 }

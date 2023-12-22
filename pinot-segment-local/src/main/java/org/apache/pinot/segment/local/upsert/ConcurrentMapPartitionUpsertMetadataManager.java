@@ -352,6 +352,23 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     return record;
   }
 
+  @Override
+  public GenericRow getRecordLocation(PrimaryKey primaryKey) {
+    RecordLocation recordLocation =
+        _primaryKeyToRecordLocationMap.get(HashUtils.hashPrimaryKey(primaryKey, _hashFunction));
+    if (recordLocation == null) {
+      return null;
+    } else {
+      GenericRow genericRow = new GenericRow();
+      IndexSegment segment = recordLocation.getSegment();
+      int docId = recordLocation.getDocId();
+      genericRow.putValue("segmentName", segment.getSegmentName());
+      genericRow.putValue("docId", docId);
+      genericRow.putValue("comparisonValue", recordLocation.getComparisonValue());
+      return genericRow;
+    }
+  }
+
   @VisibleForTesting
   static class RecordLocation {
     private final IndexSegment _segment;

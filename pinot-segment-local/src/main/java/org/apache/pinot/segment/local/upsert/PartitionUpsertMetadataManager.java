@@ -25,6 +25,7 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
 /**
@@ -101,6 +102,11 @@ public interface PartitionUpsertMetadataManager extends Closeable {
    * Remove the expired primary keys from the metadata when TTL is enabled.
    */
   void removeExpiredPrimaryKeys();
+
+  /**
+   * Returns the record location for the given primary key.
+   */
+  GenericRow getRecordLocation(PrimaryKey primaryKey);
 
   /**
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.

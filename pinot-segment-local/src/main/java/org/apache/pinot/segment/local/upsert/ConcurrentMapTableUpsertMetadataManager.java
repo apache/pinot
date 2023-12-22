@@ -39,6 +39,11 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   }
 
   @Override
+  public ConcurrentMapPartitionUpsertMetadataManager get(int partitionId) {
+    return _partitionMetadataManagerMap.get(partitionId);
+  }
+
+  @Override
   public void stop() {
     for (ConcurrentMapPartitionUpsertMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
       metadataManager.stop();
