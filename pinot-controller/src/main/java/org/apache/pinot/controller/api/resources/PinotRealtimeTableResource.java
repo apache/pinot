@@ -109,17 +109,26 @@ public class PinotRealtimeTableResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Resume consumption of a realtime table", notes =
       "Resume the consumption for a realtime table. ConsumeFrom parameter indicates from which offsets "
-          + "consumption should resume. If consumeFrom parameter is not provided, consumption continues based on the "
-          + "offsets in segment ZK metadata, and in case the offsets are already gone, the first available offsets are "
-          + "picked to minimize the data loss.")
+          + "consumption should resume. Recommended value is 'lastUsed', which indicates consumption should continue "
+          + "based on the offsets in segment ZK metadata, and in case the offsets are already gone, the first "
+          + "available offsets are picked to minimize the data loss.")
   public Response resumeConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "smallest | largest") @QueryParam("consumeFrom") String consumeFrom) {
+      @ApiParam(
+          value = "lastUsed (safer) | smallest (repeat rows) | largest (miss rows)",
+          allowableValues = "lastUsed, smallest, largest",
+          defaultValue = "lastUsed"
+      )
+      @QueryParam("consumeFrom") String consumeFrom) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
+    if ("lastUsed".equalsIgnoreCase(consumeFrom)) {
+      consumeFrom = null;
+    }
     if (consumeFrom != null && !consumeFrom.equalsIgnoreCase("smallest") && !consumeFrom.equalsIgnoreCase("largest")) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("consumeFrom param '%s' is not valid.", consumeFrom), Response.Status.BAD_REQUEST);
+          String.format("consumeFrom param '%s' is not valid. Valid values are 'lastUsed', 'smallest' and 'largest'.",
+              consumeFrom), Response.Status.BAD_REQUEST);
     }
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom)).build();
