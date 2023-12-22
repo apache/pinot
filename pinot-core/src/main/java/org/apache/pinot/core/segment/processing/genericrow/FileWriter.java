@@ -5,5 +5,5 @@ import java.io.IOException;
 
 public interface FileWriter<T> {
   void close() throws IOException;
-  long write(T dataUnit) throws IOException;
+  long writeData(T dataUnit) throws IOException;
 }

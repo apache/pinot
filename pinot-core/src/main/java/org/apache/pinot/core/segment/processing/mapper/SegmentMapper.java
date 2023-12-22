@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
+import org.apache.pinot.core.segment.processing.framework.StatefulRecordReaderFileConfig;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
@@ -63,7 +64,7 @@ import org.slf4j.LoggerFactory;
 public class SegmentMapper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMapper.class);
 
-  private List<RecordReaderFileConfig> _recordReaderFileConfigs;
+  private List<StatefulRecordReaderFileConfig> _recordReaderFileConfigs;
   private List<RecordTransformer> _customRecordTransformers;
   private final SegmentProcessorConfig _processorConfig;
   private final File _mapperOutputDir;
@@ -79,7 +80,7 @@ public class SegmentMapper {
   // NOTE: Use TreeMap so that the order is deterministic
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
 
-  public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
+  public SegmentMapper(List<StatefulRecordReaderFileConfig> recordReaderFileConfigs,
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
     _recordReaderFileConfigs = recordReaderFileConfigs;
     _customRecordTransformers = customRecordTransformers;
@@ -132,8 +133,9 @@ public class SegmentMapper {
     int totalCount = _recordReaderFileConfigs.size();
     int count = 1;
     GenericRow reuse = new GenericRow();
-    for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
-      RecordReader recordReader = recordReaderFileConfig._recordReader;
+    for (StatefulRecordReaderFileConfig statefulRecordReaderFileConfig : _recordReaderFileConfigs) {
+      RecordReader recordReader = statefulRecordReaderFileConfig.getRecordReader();
+      RecordReaderFileConfig recordReaderFileConfig = statefulRecordReaderFileConfig.getRecordReaderFileConfig();
       if (recordReader == null) {
         // We create and use the recordReader here.
         try {

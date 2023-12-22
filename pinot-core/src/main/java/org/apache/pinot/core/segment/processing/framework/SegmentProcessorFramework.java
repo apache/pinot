@@ -142,21 +142,30 @@ public class SegmentProcessorFramework {
 
   private List<File> doProcess()
       throws Exception {
-    SegmentMapper mapper = new SegmentMapper(_recordReaderFileConfigs, _customRecordTransformers,
-        _segmentProcessorConfig, _mapperOutputDir);
-
-    // Map phase.
-    _partitionToFileManagerMap = doMap(mapper);
-
-    if (_partitionToFileManagerMap == null) {
-      return Collections.emptyList();
+    List<StatefulRecordReaderFileConfig> statefulRecordReaderFileConfigs = new ArrayList<>();
+    List<File> outputSegmentDirs = new ArrayList<>();
+    for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
+      statefulRecordReaderFileConfigs.add(new StatefulRecordReaderFileConfig(recordReaderFileConfig));
     }
+    while (!allRecordsAreProcessed(statefulRecordReaderFileConfigs)) {
+      SegmentMapper mapper =
+          new SegmentMapper(statefulRecordReaderFileConfigs, _customRecordTransformers, _segmentProcessorConfig,
+              _mapperOutputDir);
 
-    // Reduce phase.
-    Consumer<Object> observer = doReduce(_partitionToFileManagerMap);
+      // Map phase.
+      _partitionToFileManagerMap = doMap(mapper);
 
-    // Segment creation phase.
-    return generateSegment(_partitionToFileManagerMap, observer);
+      if (_partitionToFileManagerMap == null) {
+        return Collections.emptyList();
+      }
+
+      // Reduce phase.
+      Consumer<Object> observer = doReduce(_partitionToFileManagerMap);
+
+      // Segment creation phase.
+      outputSegmentDirs.addAll(generateSegment(_partitionToFileManagerMap, observer));
+    }
+    return outputSegmentDirs;
   }
 
   private Map<String, GenericRowFileManager> doMap(SegmentMapper mapper)
@@ -252,5 +261,14 @@ public class SegmentProcessorFramework {
     }
     LOGGER.info("Successfully created segments: {}", outputSegmentDirs);
     return outputSegmentDirs;
+  }
+  private boolean allRecordsAreProcessed(List<StatefulRecordReaderFileConfig> statefulRecordReaderFileConfigs) {
+    for (StatefulRecordReaderFileConfig statefulRecordReaderFileConfig : statefulRecordReaderFileConfigs) {
+      RecordReader recordReader = statefulRecordReaderFileConfig.getRecordReader();
+      if (recordReader == null || recordReader.hasNext()) {
+        return false;
+      }
+    }
+    return true;
   }
 }
