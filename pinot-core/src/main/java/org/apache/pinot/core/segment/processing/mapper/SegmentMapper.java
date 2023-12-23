@@ -20,8 +20,11 @@ package org.apache.pinot.core.segment.processing.mapper;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -29,6 +32,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.core.segment.processing.framework.AdaptiveSizeBasedConstraintsChecker;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.framework.StatefulRecordReaderFileConfig;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
@@ -64,7 +68,9 @@ import org.slf4j.LoggerFactory;
 public class SegmentMapper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMapper.class);
 
-  private List<StatefulRecordReaderFileConfig> _recordReaderFileConfigs;
+  private List<RecordReaderFileConfig> _recordReaderFileConfigs;
+  private List<StatefulRecordReaderFileConfig> _statefulRecordReaderFileConfigs;
+  private AdaptiveSizeBasedConstraintsChecker _constraintsChecker;
   private List<RecordTransformer> _customRecordTransformers;
   private final SegmentProcessorConfig _processorConfig;
   private final File _mapperOutputDir;
@@ -80,9 +86,15 @@ public class SegmentMapper {
   // NOTE: Use TreeMap so that the order is deterministic
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
 
-  public SegmentMapper(List<StatefulRecordReaderFileConfig> recordReaderFileConfigs,
-      List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
+  public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
+      List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir,
+      AdaptiveSizeBasedConstraintsChecker constraintsChecker) {
     _recordReaderFileConfigs = recordReaderFileConfigs;
+    _statefulRecordReaderFileConfigs = new ArrayList<>();
+    for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
+      _statefulRecordReaderFileConfigs.add(new StatefulRecordReaderFileConfig(recordReaderFileConfig));
+    }
+    _constraintsChecker = constraintsChecker;
     _customRecordTransformers = customRecordTransformers;
     _processorConfig = processorConfig;
     _mapperOutputDir = mapperOutputDir;
@@ -114,10 +126,10 @@ public class SegmentMapper {
    * Reads the input records and generates partitioned generic row files into the mapper output directory.
    * Records for each partition are put into a directory of the partition name within the mapper output directory.
    */
-  public Map<String, GenericRowFileManager> map()
+  public Map<Integer, Map<String, GenericRowFileManager>> map(int recordReaderIndex)
       throws Exception {
     try {
-      return doMap();
+      return doMap(recordReaderIndex);
     } catch (Exception e) {
       // Cleaning up resources created by the mapper, leaving others to the caller like the input _recordReaders.
       for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
@@ -127,29 +139,38 @@ public class SegmentMapper {
     }
   }
 
-  private Map<String, GenericRowFileManager> doMap()
+  private Map<Integer, Map<String, GenericRowFileManager>> doMap(int recordReaderIndex)
       throws Exception {
     Consumer<Object> observer = _processorConfig.getProgressObserver();
     int totalCount = _recordReaderFileConfigs.size();
     int count = 1;
+    int i;
     GenericRow reuse = new GenericRow();
-    for (StatefulRecordReaderFileConfig statefulRecordReaderFileConfig : _recordReaderFileConfigs) {
-      RecordReader recordReader = statefulRecordReaderFileConfig.getRecordReader();
-      RecordReaderFileConfig recordReaderFileConfig = statefulRecordReaderFileConfig.getRecordReaderFileConfig();
+    for (i = recordReaderIndex; i < totalCount; i++) {
+      RecordReaderFileConfig recordReaderFileConfig = _statefulRecordReaderFileConfigs.get(i).getRecordReaderFileConfig();
+      RecordReader recordReader = _statefulRecordReaderFileConfigs.get(i).getRecordReader();
       if (recordReader == null) {
         // We create and use the recordReader here.
         try {
           recordReader =
               RecordReaderFactory.getRecordReader(recordReaderFileConfig._fileFormat, recordReaderFileConfig._dataFile,
                   recordReaderFileConfig._fieldsToRead, recordReaderFileConfig._recordReaderConfig);
-          mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
+          mapAndTransformRow(recordReader, reuse, observer, count, totalCount, i);
+          if (!_constraintsChecker.canWrite()) {
+            // Constraints are met, pause the mapper
+            break;
+          }
         } finally {
           if (recordReader != null) {
             recordReader.close();
           }
         }
       } else {
-        mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
+        mapAndTransformRow(recordReader, reuse, observer, count, totalCount, i);
+        if (!_constraintsChecker.canWrite()) {
+          // Constraints are met, pause the mapper
+          break;
+        }
       }
       count++;
     }
@@ -157,14 +178,16 @@ public class SegmentMapper {
     for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
       fileManager.closeFileWriter();
     }
-
-    return _partitionToFileManagerMap;
+    Map<Integer, Map<String, GenericRowFileManager>> resultMap = new HashMap<>();
+    resultMap.put(i, _partitionToFileManagerMap);
+    return resultMap;
   }
 
-  private void mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
-      Consumer<Object> observer, int count, int totalCount) throws Exception {
+  private void mapAndTransformRow(RecordReader recordReader, GenericRow reuse, Consumer<Object> observer, int count,
+      int totalCount, int recordReaderIndex)
+      throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
-    while (recordReader.hasNext()) {
+    while (recordReader.hasNext() && _constraintsChecker.canWrite()) {
       reuse = recordReader.next(reuse);
 
       // TODO: Add ComplexTypeTransformer here. Currently it is not idempotent so cannot add it
@@ -174,25 +197,31 @@ public class SegmentMapper {
         for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
           GenericRow transformedRow = _recordTransformer.transform(row);
           if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            writeRecord(transformedRow);
+            long bytesWritten = writeRecord(transformedRow);
+            _constraintsChecker.updateNumBytesWritten(bytesWritten);
           }
         }
       } else {
         GenericRow transformedRow = _recordTransformer.transform(reuse);
         if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-          writeRecord(transformedRow);
+          long bytesWritten = writeRecord(transformedRow);
+          _constraintsChecker.updateNumBytesWritten(bytesWritten);
         }
       }
       reuse.clear();
     }
+    if (recordReader.hasNext()) {
+      _statefulRecordReaderFileConfigs.get(recordReaderIndex).setRecordReader(recordReader);
+      LOGGER.info("Pausing mapper because constraints are met");
+    }
   }
 
-  private void writeRecord(GenericRow row)
+  private long writeRecord(GenericRow row)
       throws IOException {
     String timePartition = _timeHandler.handleTime(row);
     if (timePartition == null) {
       // Record not in the valid time range
-      return;
+      return -1;
     }
     _partitionsBuffer[0] = timePartition;
 
@@ -212,6 +241,6 @@ public class SegmentMapper {
       _partitionToFileManagerMap.put(partition, fileManager);
     }
 
-    fileManager.getFileWriter().write(row);
+    return fileManager.getFileWriter().writeData(row);
   }
 }

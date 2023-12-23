@@ -16,4 +16,7 @@ public class AdaptiveSizeBasedConstraintsChecker implements AdaptiveConstrainsCh
   public void updateNumBytesWritten(long numBytesWritten) {
     _numBytesWritten += numBytesWritten;
   }
+  public void reset() {
+    _numBytesWritten = 0;
+  }
 }
