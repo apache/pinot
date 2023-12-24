@@ -145,6 +145,7 @@ public class PinotTableInstances {
     return ret.toString();
   }
 
+  @Deprecated
   @GET
   @Path("/tables/{tableName}/livebrokers")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_BROKER)
@@ -175,9 +176,11 @@ public class PinotTableInstances {
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<String, List<InstanceInfo>> getLiveBrokers(@Context HttpHeaders headers) {
+  public Map<String, List<InstanceInfo>> getLiveBrokers(@Context HttpHeaders headers,
+          @ApiParam(value = "Table name list(with or without type)", allowMultiple = true)
+          @QueryParam("tables") List<String> tables) {
     try {
-      return _pinotHelixResourceManager.getTableToLiveBrokersMapping(headers.getHeaderString(DATABASE));
+      return _pinotHelixResourceManager.getTableToLiveBrokersMapping(headers.getHeaderString(DATABASE), tables);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }

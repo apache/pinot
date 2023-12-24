@@ -3983,16 +3983,38 @@ public class PinotHelixResourceManager {
    * Returns map of tableName in default database to list of live brokers
    * @return Map of tableName to list of ONLINE brokers serving the table
    */
-  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping() {
-    return getTableToLiveBrokersMapping(null);
+  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping() throws TableNotFoundException {
+    return getTableToLiveBrokersMapping(null, new ArrayList<>());
+  }
+
+  /**
+   * Returns map of tableName in default database to list of live brokers
+   * @param databaseName database to get the tables from
+   * @return Map of tableName to list of ONLINE brokers serving the table
+   */
+  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping(@Nullable String databaseName)
+          throws TableNotFoundException {
+    return getTableToLiveBrokersMapping(databaseName, new ArrayList<>());
+  }
+
+  /**
+   * Returns map of tableName in default database to list of live brokers
+   * @param tableNameList table list to get the tables from
+   * @return Map of tableName to list of ONLINE brokers serving the table
+   */
+  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping(List<String> tables)
+          throws TableNotFoundException {
+    return getTableToLiveBrokersMapping(null, tables);
   }
 
   /**
    * Returns map of tableName to list of live brokers
    * @param databaseName database to get the tables from
+   * @param tables table list to get the tables from
    * @return Map of tableName to list of ONLINE brokers serving the table
    */
-  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping(@Nullable String databaseName) {
+  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping(@Nullable String databaseName,
+    List<String> tables) throws TableNotFoundException {
     ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
     if (ev == null) {
       throw new IllegalStateException("Failed to find external view for " + Helix.BROKER_RESOURCE_INSTANCE);
@@ -4004,25 +4026,49 @@ public class PinotHelixResourceManager {
 
     Map<String, List<InstanceInfo>> result = new HashMap<>();
     ZNRecord znRecord = ev.getRecord();
+
+    if (!tables.isEmpty()) {
+      for (String tableNameInList: tables) {
+        List<String> tableNameWithType = getExistingTableNamesWithType(tableNameInList, null);
+        if (tableNameWithType.isEmpty()) {
+          throw new ControllerApplicationException(LOGGER, String.format("Table=%s not found", tableNameInList),
+                  Response.Status.NOT_FOUND);
+        }
+        tableNameWithType.forEach(tableName -> {
+          Map<String, String> brokersToState = znRecord.getMapField(tableName);
+          List<InstanceInfo> hosts = getTableToLiveBrokerMapping(brokersToState, instanceConfigMap);
+          result.put(tableName, hosts);
+        });
+      }
+      return result;
+    }
+
     for (Map.Entry<String, Map<String, String>> tableToBrokersEntry : znRecord.getMapFields().entrySet()) {
       String tableName = tableToBrokersEntry.getKey();
       if (!DatabaseUtils.isPartOfDatabase(tableName, databaseName)) {
         continue;
       }
       Map<String, String> brokersToState = tableToBrokersEntry.getValue();
-      List<InstanceInfo> hosts = new ArrayList<>();
-      for (Map.Entry<String, String> brokerEntry : brokersToState.entrySet()) {
-        if ("ONLINE".equalsIgnoreCase(brokerEntry.getValue()) && instanceConfigMap.containsKey(brokerEntry.getKey())) {
-          InstanceConfig instanceConfig = instanceConfigMap.get(brokerEntry.getKey());
-          hosts.add(new InstanceInfo(instanceConfig.getInstanceName(), instanceConfig.getHostName(),
-              Integer.parseInt(instanceConfig.getPort())));
-        }
-      }
+      List<InstanceInfo> hosts = getTableToLiveBrokerMapping(brokersToState, instanceConfigMap);
       if (!hosts.isEmpty()) {
         result.put(tableName, hosts);
       }
     }
     return result;
+  }
+
+  private List<InstanceInfo> getTableToLiveBrokerMapping(Map<String, String> brokersToState,
+                                                         Map<String, InstanceConfig> instanceConfigMap) {
+    List<InstanceInfo> hosts = new ArrayList<>();
+
+    for (Map.Entry<String, String> brokerEntry : brokersToState.entrySet()) {
+      if ("ONLINE".equalsIgnoreCase(brokerEntry.getValue()) && instanceConfigMap.containsKey(brokerEntry.getKey())) {
+        InstanceConfig instanceConfig = instanceConfigMap.get(brokerEntry.getKey());
+        hosts.add(new InstanceInfo(instanceConfig.getInstanceName(), instanceConfig.getHostName(),
+                Integer.parseInt(instanceConfig.getPort())));
+      }
+    }
+    return hosts;
   }
 
   /**
