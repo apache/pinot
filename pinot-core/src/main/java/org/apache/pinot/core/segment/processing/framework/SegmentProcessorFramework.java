@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -142,29 +143,19 @@ public class SegmentProcessorFramework {
 
   private List<File> doProcess()
       throws Exception {
-    List<StatefulRecordReaderFileConfig> statefulRecordReaderFileConfigs = new ArrayList<>();
     List<File> outputSegmentDirs = new ArrayList<>();
-    int recordReaderIndex = 0;
     int numRecordReaders = _recordReaderFileConfigs.size();
-    long numBytesLimit = Long.MAX_VALUE;
-    AdaptiveSizeBasedConstraintsChecker constraintsChecker =
-        new AdaptiveSizeBasedConstraintsChecker(numBytesLimit);
     SegmentMapper mapper =
         new SegmentMapper(_recordReaderFileConfigs, _customRecordTransformers, _segmentProcessorConfig,
-            _mapperOutputDir, constraintsChecker);
-    while (recordReaderIndex < numRecordReaders) {
-      constraintsChecker.reset();
+            _mapperOutputDir);
 
+    while (mapper.getCurrentRecordReaderIndex() < numRecordReaders) {
+      mapper.resetConstraintsChecker();
       // Map phase.
-      Map<Integer, Map<String, GenericRowFileManager>> mapperResult = doMap(mapper, recordReaderIndex);
-      for (Map.Entry<Integer, Map<String, GenericRowFileManager>> entry : mapperResult.entrySet()) {
-        recordReaderIndex = entry.getKey();
-        _partitionToFileManagerMap = entry.getValue();
-      }
+      _partitionToFileManagerMap = doMap(mapper);
 
       if (_partitionToFileManagerMap == null) {
-        LOGGER.info("No partition generated from mapper phase, skipping the reducer phase");
-        continue;
+        return Collections.emptyList();
       }
 
       // Reduce phase.
@@ -176,18 +167,24 @@ public class SegmentProcessorFramework {
     return outputSegmentDirs;
   }
 
-  private Map<Integer, Map<String, GenericRowFileManager>> doMap(SegmentMapper mapper, int recordReaderIndex)
+  private Map<String, GenericRowFileManager> doMap(SegmentMapper mapper)
       throws Exception {
     Map<String, GenericRowFileManager> partitionToFileManagerMap;
     // Map phase
 
     LOGGER.info("Beginning map phase on {} record readers", _recordReaderFileConfigs.size());
+    partitionToFileManagerMap = mapper.map();
 
-    return mapper.map(recordReaderIndex);
+    // Check for mapper output files
+    if (partitionToFileManagerMap.isEmpty()) {
+      LOGGER.info("No partition generated from mapper phase, skipping the reducer phase");
+      return null;
+    }
+    return partitionToFileManagerMap;
   }
 
   private Consumer<Object> doReduce(Map<String, GenericRowFileManager> partitionToFileManagerMap)
-      throws Exception {
+      throws Exception{
     LOGGER.info("Beginning reduce phase on partitions: {}", partitionToFileManagerMap.keySet());
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
     int totalCount = partitionToFileManagerMap.keySet().size();
@@ -263,14 +260,5 @@ public class SegmentProcessorFramework {
     }
     LOGGER.info("Successfully created segments: {}", outputSegmentDirs);
     return outputSegmentDirs;
-  }
-  private boolean allRecordsAreProcessed(List<StatefulRecordReaderFileConfig> statefulRecordReaderFileConfigs) {
-    for (StatefulRecordReaderFileConfig statefulRecordReaderFileConfig : statefulRecordReaderFileConfigs) {
-      RecordReader recordReader = statefulRecordReaderFileConfig.getRecordReader();
-      if (recordReader == null || recordReader.hasNext()) {
-        return false;
-      }
-    }
-    return true;
   }
 }

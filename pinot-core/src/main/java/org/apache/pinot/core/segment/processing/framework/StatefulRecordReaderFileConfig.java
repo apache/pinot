@@ -7,6 +7,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 public class StatefulRecordReaderFileConfig {
   private final RecordReaderFileConfig _recordReaderFileConfig;
   private RecordReader _recordReader;
+  private boolean _isFirstTime = true;
 
   // Pass in the info needed to initialize the reader
   public StatefulRecordReaderFileConfig(RecordReaderFileConfig recordReaderFileConfig) {
@@ -18,6 +19,10 @@ public class StatefulRecordReaderFileConfig {
     _recordReader = recordReader;
   }
   public RecordReader getRecordReader() {
+    if(_recordReaderFileConfig._recordReader != null && _isFirstTime) {
+      _isFirstTime = false;
+      return _recordReaderFileConfig._recordReader;
+    }
     return _recordReader;
   }
   public RecordReaderFileConfig getRecordReaderFileConfig() {
