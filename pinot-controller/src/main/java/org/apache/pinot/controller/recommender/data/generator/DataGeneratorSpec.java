@@ -42,15 +42,20 @@ public class DataGeneratorSpec {
   private final Map<String, FieldType> _fieldTypeMap;
   private final Map<String, TimeUnit> _timeUnitMap;
 
-  private final FileFormat _outputFileFormat;
-  private final String _outputDir;
-  private final boolean _overrideOutDir;
+  @Deprecated
+  private FileFormat _outputFileFormat;
+  @Deprecated
+  private String _outputDir;
+  @Deprecated
+  private boolean _overrideOutDir;
 
+  @Deprecated
   public DataGeneratorSpec() {
     this(new ArrayList<String>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(),
         new HashMap<>(), new HashMap<>(), new HashMap<>(), FileFormat.AVRO, "/tmp/dataGen", true);
   }
 
+  @Deprecated
   public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
       Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap,
       Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
@@ -65,6 +70,21 @@ public class DataGeneratorSpec {
     _outputFileFormat = format;
     _outputDir = outputDir;
     _overrideOutDir = override;
+
+    _dataTypeMap = dataTypesMap;
+    _fieldTypeMap = fieldTypesMap;
+    _timeUnitMap = timeUnitMap;
+  }
+
+  public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
+      Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap,
+      Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap) {
+    _columns = columns;
+    _cardinalityMap = cardinalityMap;
+    _rangeMap = rangeMap;
+    _patternMap = patternMap;
+    _mvCountMap = mvCountMap;
+    _lengthMap = lengthMap;
 
     _dataTypeMap = dataTypesMap;
     _fieldTypeMap = fieldTypesMap;
