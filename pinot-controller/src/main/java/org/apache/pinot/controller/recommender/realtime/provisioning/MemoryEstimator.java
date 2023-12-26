@@ -526,9 +526,15 @@ public class MemoryEstimator {
 
       // generate data
       String outputDir = new File(_workingDir, "csv").getAbsolutePath();
-      DataGeneratorSpec spec =
-          new DataGeneratorSpec(colNames, cardinalities, new HashMap<>(), new HashMap<>(), mvCounts, lengths, dataTypes,
-              fieldTypes, timeUnits);
+      DataGeneratorSpec spec = new DataGeneratorSpec.Builder()
+          .setColumns(colNames)
+          .setCardinalityMap(cardinalities)
+          .setMvCountMap(mvCounts)
+          .setLengthMap(lengths)
+          .setDataTypeMap(dataTypes)
+          .setFieldTypeMap(fieldTypes)
+          .setTimeUnitMap(timeUnits)
+          .build();
       DataGenerator dataGenerator = new DataGenerator();
       try {
         dataGenerator.init(spec);

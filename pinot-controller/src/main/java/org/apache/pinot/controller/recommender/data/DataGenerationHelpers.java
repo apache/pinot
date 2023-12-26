@@ -22,8 +22,8 @@ package org.apache.pinot.controller.recommender.data;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.math.IntRange;
@@ -34,6 +34,7 @@ import org.apache.pinot.controller.recommender.data.writer.AvroWriterSpec;
 import org.apache.pinot.controller.recommender.data.writer.CsvWriter;
 import org.apache.pinot.controller.recommender.data.writer.FileWriterSpec;
 import org.apache.pinot.controller.recommender.data.writer.JsonWriter;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
@@ -82,10 +83,16 @@ public final class DataGenerationHelpers {
     return dir;
   }
 
-  public static DataGeneratorSpec buildDataGeneratorSpec(Schema schema, List<String> columns,
-      HashMap<String, FieldSpec.DataType> dataTypes, HashMap<String, FieldSpec.FieldType> fieldTypes,
-      HashMap<String, TimeUnit> timeUnits, HashMap<String, Integer> cardinality, HashMap<String, IntRange> range,
-      HashMap<String, Map<String, Object>> pattern, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap) {
+  public static DataGeneratorSpec buildDataGeneratorSpec(Schema schema) {
+    final List<String> columns = new LinkedList<>();
+    final HashMap<String, FieldSpec.DataType> dataTypes = new HashMap<>();
+    final HashMap<String, FieldSpec.FieldType> fieldTypes = new HashMap<>();
+    final HashMap<String, TimeUnit> timeUnits = new HashMap<>();
+
+    final HashMap<String, Integer> cardinality = new HashMap<>();
+    final HashMap<String, IntRange> range = new HashMap<>();
+    final HashMap<String, String> granularityMap = new HashMap<>();
+    final HashMap<String, String> formatMap = new HashMap<>();
     for (final FieldSpec fs : schema.getAllFieldSpecs()) {
       String col = fs.getName();
       columns.add(col);
@@ -104,16 +111,28 @@ public final class DataGenerationHelpers {
           TimeFieldSpec tfs = (TimeFieldSpec) fs;
           timeUnits.put(col, tfs.getIncomingGranularitySpec().getTimeType());
           break;
+        case DATE_TIME:
+          DateTimeFieldSpec dtfs = (DateTimeFieldSpec) fs;
+          granularityMap.put(col, dtfs.getGranularity());
+          formatMap.put(col, dtfs.getFormat());
+          break;
 
         // forward compatibility with pattern generator
-        case DATE_TIME:
         case COMPLEX:
           break;
         default:
           throw new RuntimeException("Invalid field type.");
       }
     }
-    return new DataGeneratorSpec(columns, cardinality, range, pattern, mvCountMap, lengthMap, dataTypes, fieldTypes,
-        timeUnits);
+    return new DataGeneratorSpec.Builder()
+        .setColumns(columns)
+        .setDataTypeMap(dataTypes)
+        .setFieldTypeMap(fieldTypes)
+        .setTimeUnitMap(timeUnits)
+        .setCardinalityMap(cardinality)
+        .setRangeMap(range)
+        .setDateTimeGranularityMap(granularityMap)
+        .setDateTimeFormatMap(formatMap)
+        .build();
   }
 }

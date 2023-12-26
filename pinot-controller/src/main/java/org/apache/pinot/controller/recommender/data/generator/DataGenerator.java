@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.controller.recommender.data.DataGenerationHelpers;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -63,7 +64,11 @@ public class DataGenerator {
       DataType dataType = _genSpec.getDataTypeMap().get(column);
 
       Generator generator;
-      if (_genSpec.getPatternMap().containsKey(column)) {
+      if (_genSpec.getDateTimeFormatMap().containsKey(column)
+          && _genSpec.getDateTimeGranularityMap().containsKey(column)) {
+        generator = new DateTimeGenerator(_genSpec.getDateTimeFormatMap().get(column),
+            _genSpec.getDateTimeGranularityMap().get(column));
+      } else if (_genSpec.getPatternMap().containsKey(column)) {
         generator = GeneratorFactory
             .getGeneratorFor(PatternType.valueOf(_genSpec.getPatternMap().get(column).get("type").toString()),
                 _genSpec.getPatternMap().get(column));
@@ -123,6 +128,12 @@ public class DataGenerator {
         spec = new TimeFieldSpec(new TimeGranularitySpec(dataType, genSpec.getTimeUnitMap().get(column), column));
         break;
 
+      case DATE_TIME:
+        String format = genSpec.getDateTimeFormatMap().get(column);
+        String granularity = genSpec.getDateTimeGranularityMap().get(column);
+        spec = new DateTimeFieldSpec(column, dataType, format, granularity);
+        break;
+
       default:
         throw new RuntimeException("Invalid Field type.");
     }
@@ -147,6 +158,9 @@ public class DataGenerator {
     Map<String, Double> mvCountMap = new HashMap<>();
     Map<String, Integer> lengthMap = new HashMap<>();
     List<String> columnNames = new ArrayList<>();
+
+    final Map<String, String> dateTimeFormatMap = new HashMap<>();
+    final Map<String, String> dateTimeGranularityMap = new HashMap<>();
 
     int cardinalityValue = 5;
     int strLength = 5;
@@ -199,7 +213,7 @@ public class DataGenerator {
     String outputDir = Paths.get(System.getProperty("java.io.tmpdir"), "csv-data").toString();
     final DataGeneratorSpec spec =
         new DataGeneratorSpec(columnNames, cardinality, range, template, mvCountMap, lengthMap, dataTypes, fieldTypes,
-            timeUnits);
+            timeUnits, dateTimeFormatMap, dateTimeGranularityMap);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);

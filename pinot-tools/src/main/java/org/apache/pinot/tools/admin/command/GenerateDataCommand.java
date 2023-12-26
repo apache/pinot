@@ -20,10 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.pinot.controller.recommender.data.DataGenerationHelpers;
@@ -31,7 +28,6 @@ import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
 import org.apache.pinot.controller.recommender.data.generator.SchemaAnnotation;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.Schema.SchemaBuilder;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -124,23 +120,10 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     }
 
     Schema schema = Schema.fromFile(new File(_schemaFile));
-
-    List<String> columns = new LinkedList<>();
-    final HashMap<String, DataType> dataTypes = new HashMap<>();
-    final HashMap<String, FieldType> fieldTypes = new HashMap<>();
-    final HashMap<String, TimeUnit> timeUnits = new HashMap<>();
-
-    final HashMap<String, Integer> cardinality = new HashMap<>();
-    final HashMap<String, IntRange> range = new HashMap<>();
-    final HashMap<String, Map<String, Object>> pattern = new HashMap<>();
-    final HashMap<String, Double> mvCountMap = new HashMap<>();
-    final HashMap<String, Integer> lengthMap = new HashMap<>();
-
-    buildCardinalityRangeMaps(_schemaAnnFile, cardinality, range, pattern);
-
     final DataGeneratorSpec spec =
-        DataGenerationHelpers.buildDataGeneratorSpec(schema, columns, dataTypes, fieldTypes, timeUnits, cardinality,
-            range, pattern, mvCountMap, lengthMap);
+        DataGenerationHelpers.buildDataGeneratorSpec(schema);
+    buildCardinalityRangeMaps(_schemaAnnFile, spec);
+
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
@@ -158,8 +141,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     return true;
   }
 
-  private void buildCardinalityRangeMaps(String file, HashMap<String, Integer> cardinality,
-      HashMap<String, IntRange> range, Map<String, Map<String, Object>> pattern)
+  private void buildCardinalityRangeMaps(String file, DataGeneratorSpec spec)
       throws IOException {
     if (file == null) {
       return; // Nothing to do here.
@@ -171,11 +153,11 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       String column = sa.getColumn();
 
       if (sa.isRange()) {
-        range.put(column, new IntRange(sa.getRangeStart(), sa.getRangeEnd()));
+        spec.getRangeMap().put(column, new IntRange(sa.getRangeStart(), sa.getRangeEnd()));
       } else if (sa.getPattern() != null) {
-        pattern.put(column, sa.getPattern());
+        spec.getPatternMap().put(column, sa.getPattern());
       } else {
-        cardinality.put(column, sa.getCardinality());
+        spec.getCardinalityMap().put(column, sa.getCardinality());
       }
     }
   }
