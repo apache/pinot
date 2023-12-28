@@ -37,16 +37,21 @@ public abstract class FileWriter implements Writer {
   @Override
   public void write()
       throws Exception {
-    final int numPerFiles = (int) (_spec.getTotalDocs() / _spec.getNumFiles());
+    long totalDocs = _spec.getTotalDocs();
+    final long docsPerFile = (long) Math.ceil((double) totalDocs / _spec.getNumFiles());
     final String extension = getExtension() == null ? "" : String.format(".%s", getExtension());
-    for (int i = 0; i < _spec.getNumFiles(); i++) {
+    long ingestedDocs = 0;
+    int fileIndex = 0;
+    while (ingestedDocs < totalDocs) {
       try (java.io.FileWriter writer =
-          new java.io.FileWriter(new File(_spec.getBaseDir(), String.format("output_%d%s", i, extension)))) {
-        for (int j = 0; j < numPerFiles; j++) {
+          new java.io.FileWriter(new File(_spec.getBaseDir(), String.format("output_%d%s", fileIndex, extension)))) {
+        for (int j = 0; j < docsPerFile && ingestedDocs < totalDocs; j++) {
           String appendString = generateRow(_spec.getGenerator());
           writer.append(appendString).append('\n');
+          ingestedDocs++;
         }
       }
+      fileIndex++;
     }
   }
 
