@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.controller.recommender.data.writer;
 
+import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.FileReader;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 
@@ -36,6 +40,24 @@ public class CsvWriter extends FileWriter {
       index++;
     }
     return StringUtils.join(values, ",");
+  }
+
+  @Override
+  public void write()
+      throws Exception {
+    super.write();
+    final String headers = StringUtils.join(_spec.getGenerator().nextRow().keySet(), ",");
+    for (File file : Objects.requireNonNull(_spec.getBaseDir().listFiles())) {
+      File tempFile = new File(_spec.getBaseDir(), String.format("temp_%s", file.getName()));
+      try (java.io.FileWriter writer = new java.io.FileWriter(tempFile)) {
+        writer.append(headers).append('\n');
+        try (FileReader reader = new FileReader(file)) {
+          reader.transferTo(writer);
+        }
+      }
+      Preconditions.checkState(file.delete());
+      Preconditions.checkState(tempFile.renameTo(file));
+    }
   }
 
   private Object serializeIfMultiValue(Object obj) {
