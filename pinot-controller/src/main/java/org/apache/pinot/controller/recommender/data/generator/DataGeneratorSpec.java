@@ -41,6 +41,8 @@ public class DataGeneratorSpec {
   private final Map<String, DataType> _dataTypeMap;
   private final Map<String, FieldType> _fieldTypeMap;
   private final Map<String, TimeUnit> _timeUnitMap;
+  private final Map<String, String> _dateTimeFormatMap;
+  private final Map<String, String> _dateTimeGranularityMap;
 
   @Deprecated
   private FileFormat _outputFileFormat;
@@ -74,11 +76,15 @@ public class DataGeneratorSpec {
     _dataTypeMap = dataTypesMap;
     _fieldTypeMap = fieldTypesMap;
     _timeUnitMap = timeUnitMap;
+
+    _dateTimeFormatMap = new HashMap<>();
+    _dateTimeGranularityMap = new HashMap<>();
   }
 
   public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
       Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap,
-      Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap) {
+      Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
+      Map<String, String> dateTimeFormatMap, Map<String, String> dateTimeGranularityMap) {
     _columns = columns;
     _cardinalityMap = cardinalityMap;
     _rangeMap = rangeMap;
@@ -89,6 +95,8 @@ public class DataGeneratorSpec {
     _dataTypeMap = dataTypesMap;
     _fieldTypeMap = fieldTypesMap;
     _timeUnitMap = timeUnitMap;
+    _dateTimeGranularityMap = dateTimeGranularityMap;
+    _dateTimeFormatMap = dateTimeFormatMap;
   }
 
   public Map<String, DataType> getDataTypeMap() {
@@ -139,6 +147,14 @@ public class DataGeneratorSpec {
     return _outputDir;
   }
 
+  public Map<String, String> getDateTimeFormatMap() {
+    return _dateTimeFormatMap;
+  }
+
+  public Map<String, String> getDateTimeGranularityMap() {
+    return _dateTimeGranularityMap;
+  }
+
   @Override
   public String toString() {
     final StringBuilder builder = new StringBuilder();
@@ -155,5 +171,79 @@ public class DataGeneratorSpec {
     builder.append("output file format : " + _outputFileFormat);
     builder.append(", output dir : " + _outputDir);
     return builder.toString();
+  }
+
+  public static class Builder {
+    private List<String> _columns = new ArrayList<>();
+    private Map<String, Integer> _cardinalityMap = new HashMap<>();
+    private Map<String, IntRange> _rangeMap = new HashMap<>();
+    private Map<String, Map<String, Object>> _patternMap = new HashMap<>();
+    private Map<String, Double> _mvCountMap = new HashMap<>();
+    private Map<String, Integer> _lengthMap = new HashMap<>();
+    private Map<String, DataType> _dataTypeMap = new HashMap<>();
+    private Map<String, FieldType> _fieldTypeMap = new HashMap<>();
+    private Map<String, TimeUnit> _timeUnitMap = new HashMap<>();
+    private Map<String, String> _dateTimeFormatMap = new HashMap<>();
+    private Map<String, String> _dateTimeGranularityMap = new HashMap<>();
+
+    public DataGeneratorSpec build() {
+      return new DataGeneratorSpec(_columns, _cardinalityMap, _rangeMap, _patternMap, _mvCountMap, _lengthMap,
+          _dataTypeMap, _fieldTypeMap, _timeUnitMap, _dateTimeFormatMap, _dateTimeGranularityMap);
+    }
+
+    public Builder setColumns(List<String> columns) {
+      _columns = columns;
+      return this;
+    }
+
+    public Builder setCardinalityMap(Map<String, Integer> cardinalityMap) {
+      _cardinalityMap = cardinalityMap;
+      return this;
+    }
+
+    public Builder setRangeMap(Map<String, IntRange> rangeMap) {
+      _rangeMap = rangeMap;
+      return this;
+    }
+
+    public Builder setPatternMap(Map<String, Map<String, Object>> patternMap) {
+      _patternMap = patternMap;
+      return this;
+    }
+
+    public Builder setMvCountMap(Map<String, Double> mvCountMap) {
+      _mvCountMap = mvCountMap;
+      return this;
+    }
+
+    public Builder setLengthMap(Map<String, Integer> lengthMap) {
+      _lengthMap = lengthMap;
+      return this;
+    }
+
+    public Builder setDataTypeMap(Map<String, DataType> dataTypeMap) {
+      _dataTypeMap = dataTypeMap;
+      return this;
+    }
+
+    public Builder setFieldTypeMap(Map<String, FieldType> fieldTypeMap) {
+      _fieldTypeMap = fieldTypeMap;
+      return this;
+    }
+
+    public Builder setTimeUnitMap(Map<String, TimeUnit> timeUnitMap) {
+      _timeUnitMap = timeUnitMap;
+      return this;
+    }
+
+    public Builder setDateTimeFormatMap(Map<String, String> dateTimeFormatMap) {
+      _dateTimeFormatMap = dateTimeFormatMap;
+      return this;
+    }
+
+    public Builder setDateTimeGranularityMap(Map<String, String> dateTimeGranularityMap) {
+      _dateTimeGranularityMap = dateTimeGranularityMap;
+      return this;
+    }
   }
 }
