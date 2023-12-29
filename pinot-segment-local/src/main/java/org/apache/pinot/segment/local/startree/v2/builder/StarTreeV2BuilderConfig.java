@@ -255,7 +255,7 @@ public class StarTreeV2BuilderConfig {
 
   public static Map<String, JsonNode> convertJsonNodeToMap(JsonNode columnsMetadata) {
     Map<String, JsonNode> map = new HashMap<>();
-    for (JsonNode columnMetadata : columnsMetadata.get("columns")) {
+    for (JsonNode columnMetadata : columnsMetadata) {
       String columnName = columnMetadata.get("columnName").asText();
       map.put(columnName, columnMetadata);
     }
