@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -59,6 +60,8 @@ public final class TlsUtils {
   private static final String TRUSTSTORE_PATH = "truststore.path";
   private static final String TRUSTSTORE_PASSWORD = "truststore.password";
   private static final String SSL_PROVIDER = "ssl.provider";
+  private static final String TLS_REF = "ref";
+  private static final String SHARED_TLS_PREFIX = "pinot.shared.tls";
 
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
 
@@ -89,6 +92,13 @@ public final class TlsUtils {
    */
   public static TlsConfig extractTlsConfig(PinotConfiguration pinotConfig, String namespace, TlsConfig defaultConfig) {
     TlsConfig tlsConfig = new TlsConfig(defaultConfig);
+    String tlsRefName = pinotConfig.getProperty(key(namespace, TLS_REF));
+    if (!Strings.isNullOrEmpty(tlsRefName)) {
+      if (key(SHARED_TLS_PREFIX, tlsRefName).equals(namespace)) {
+        throw new RuntimeException("Tls shared config " + namespace + " has circular dependency");
+      }
+      return extractTlsConfig(pinotConfig, key(SHARED_TLS_PREFIX, tlsRefName), defaultConfig);
+    }
     tlsConfig.setClientAuthEnabled(
         pinotConfig.getProperty(key(namespace, CLIENT_AUTH_ENABLED), defaultConfig.isClientAuthEnabled()));
     tlsConfig.setKeyStoreType(
