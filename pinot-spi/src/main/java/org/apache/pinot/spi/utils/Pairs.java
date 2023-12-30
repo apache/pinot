@@ -30,7 +30,11 @@ public class Pairs {
   }
 
   public static Comparator<IntPair> intPairComparator() {
-    return new AscendingIntPairComparator();
+    return new AscendingIntPairComparator(true);
+  }
+
+  public static Comparator<IntPair> intPairComparator(boolean ascending) {
+    return new AscendingIntPairComparator(ascending);
   }
 
   public static class IntPair {
@@ -79,13 +83,26 @@ public class Pairs {
   }
 
   public static class AscendingIntPairComparator implements Comparator<IntPair> {
+    private boolean _ascending;
+
+    public AscendingIntPairComparator(boolean ascending) {
+      _ascending = ascending;
+    }
 
     @Override
     public int compare(IntPair pair1, IntPair pair2) {
       if (pair1._left != pair2._left) {
-        return Integer.compare(pair1._left, pair2._left);
+        if (_ascending) {
+          return Integer.compare(pair1._left, pair2._left);
+        } else {
+          return Integer.compare(pair2._left, pair1._left);
+        }
       } else {
-        return Integer.compare(pair1._right, pair2._right);
+        if (_ascending) {
+          return Integer.compare(pair1._right, pair2._right);
+        } else {
+          return Integer.compare(pair2._right, pair1._right);
+        }
       }
     }
   }

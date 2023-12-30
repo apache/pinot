@@ -22,16 +22,18 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.utils.Pairs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -123,36 +125,38 @@ public class InstanceTagPoolSelector {
 
         poolsToSelect = new ArrayList<>(numPoolsToSelect);
         if (_minimizeDataMovement && _existingInstancePartitions != null) {
-          Set<Integer> existingPools = new TreeSet<>();
+          Map<Integer, Set<String>> existingPoolsToExistingInstancesMap = new TreeMap<>();
           // Keep the same pool if it's already been used for the table.
           int existingNumPartitions = _existingInstancePartitions.getNumPartitions();
           int existingNumReplicaGroups = _existingInstancePartitions.getNumReplicaGroups();
           for (int replicaGroupId = 0; replicaGroupId < existingNumReplicaGroups; replicaGroupId++) {
-            boolean foundExistingPoolForReplicaGroup = false;
-            for (int partitionId = 0; partitionId < existingNumPartitions & !foundExistingPoolForReplicaGroup;
-                partitionId++) {
+            for (int partitionId = 0; partitionId < existingNumPartitions; partitionId++) {
               List<String> existingInstances = _existingInstancePartitions.getInstances(partitionId, replicaGroupId);
               for (String existingInstance : existingInstances) {
                 Integer existingPool = instanceToPoolMap.get(existingInstance);
                 if (existingPool != null) {
-                  if (existingPools.add(existingPool)) {
-                    poolsToSelect.add(existingPool);
+                  if (!existingPoolsToExistingInstancesMap.containsKey(existingPool)) {
+                    existingPoolsToExistingInstancesMap.put(existingPool, new HashSet<>());
                   }
-                  foundExistingPoolForReplicaGroup = true;
-                  break;
+                  existingPoolsToExistingInstancesMap.computeIfAbsent(existingPool, k -> new HashSet<>())
+                      .add(existingInstance);
                 }
               }
             }
           }
-          LOGGER.info("Keep the same pool: {} for table: {}", existingPools, _tableNameWithType);
-          // Pick a pool from remainingPools that isn't used before.
-          List<Integer> remainingPools = new ArrayList<>(pools);
-          remainingPools.removeAll(existingPools);
-          // Select from the remaining pools.
-          int remainingNumPoolsToSelect = numPoolsToSelect - poolsToSelect.size();
-          for (int i = 0; i < remainingNumPoolsToSelect; i++) {
-            poolsToSelect.add(remainingPools.remove(i % remainingPools.size()));
+
+          // Use a max heap to track the number of servers used for all the pools.
+          PriorityQueue<Pairs.IntPair> maxHeap = new PriorityQueue<>(pools.size(), Pairs.intPairComparator(false));
+          for (int pool : pools) {
+            maxHeap.add(new Pairs.IntPair(existingPoolsToExistingInstancesMap.get(pool).size(), pool));
           }
+
+          // Pick the pools from the max heap, so that data movement be minimized.
+          for (int i = 0; i < numPoolsToSelect; i++) {
+            Pairs.IntPair pair = maxHeap.remove();
+            poolsToSelect.add(pair.getRight());
+          }
+          LOGGER.info("The selected pools: " + poolsToSelect);
         } else {
           // Select pools based on the table name hash to evenly distribute the tables
           List<Integer> poolsInCluster = new ArrayList<>(pools);

@@ -74,6 +74,9 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
       int numReplicaGroups = _replicaGroupPartitionConfig.getNumReplicaGroups();
       Preconditions.checkState(numReplicaGroups > 0, "Number of replica-groups must be positive");
       Map<Integer, List<Integer>> poolToReplicaGroupIdsMap = new TreeMap<>();
+      Map<Integer, Set<String>> existingPoolsToExistingInstancesMap = new TreeMap<>();
+      Map<Integer, Set<Integer>> existingPoolToExistingReplicaGroupIdsMap = new TreeMap<>();
+      Map<Integer, Set<String>> existingReplicaGroupIdToExistingInstancesMap = new TreeMap<>();
       Map<Integer, Integer> replicaGroupIdToPoolMap = new TreeMap<>();
       Map<Integer, Set<String>> poolToCandidateInstancesMap = new TreeMap<>();
       Map<String, Integer> instanceToPoolMap = new HashMap<>();
@@ -89,26 +92,70 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
       }
 
       if (_minimizeDataMovement && _existingInstancePartitions != null) {
-        // Keep the same pool for the replica group if it's already been used for the table.
+        // Collect the stats between the existing pools, existing replica groups, and existing instances.
         int existingNumPartitions = _existingInstancePartitions.getNumPartitions();
         int existingNumReplicaGroups = _existingInstancePartitions.getNumReplicaGroups();
-        int numCommonReplicaGroups = Math.min(numReplicaGroups, existingNumReplicaGroups);
-        for (int replicaGroupId = 0; replicaGroupId < numCommonReplicaGroups; replicaGroupId++) {
-          boolean foundExistingReplicaGroup = false;
-          for (int partitionId = 0; partitionId < existingNumPartitions & !foundExistingReplicaGroup; partitionId++) {
+        for (int replicaGroupId = 0; replicaGroupId < existingNumReplicaGroups; replicaGroupId++) {
+          for (int partitionId = 0; partitionId < existingNumPartitions; partitionId++) {
             List<String> existingInstances = _existingInstancePartitions.getInstances(partitionId, replicaGroupId);
             for (String existingInstance : existingInstances) {
               Integer existingPool = instanceToPoolMap.get(existingInstance);
-              if (existingPool != null & pools.contains(existingPool)) {
-                poolToReplicaGroupIdsMap.computeIfAbsent(existingPool, k -> new ArrayList<>()).add(replicaGroupId);
-                replicaGroupIdToPoolMap.put(replicaGroupId, existingPool);
-                foundExistingReplicaGroup = true;
-                break;
+              if (existingPool != null) {
+                existingPoolsToExistingInstancesMap.computeIfAbsent(existingPool, k -> new HashSet<>())
+                    .add(existingInstance);
+                existingPoolToExistingReplicaGroupIdsMap.computeIfAbsent(existingPool, k -> new HashSet<>())
+                    .add(replicaGroupId);
+                existingReplicaGroupIdToExistingInstancesMap.computeIfAbsent(replicaGroupId, k -> new HashSet<>())
+                    .add(existingInstance);
               }
             }
           }
         }
-        // Use a min heap to track the least frequently picked pool among all the pools
+
+        // Use a max heap to track the number of servers used for the given pools,
+        // so that pool with max number of existing instances will be considered first.
+        PriorityQueue<Pairs.IntPair> maxHeap = new PriorityQueue<>(pools.size(), Pairs.intPairComparator(false));
+        for (int pool : pools) {
+          maxHeap.add(
+              new Pairs.IntPair(existingPoolsToExistingInstancesMap.computeIfAbsent(pool, k -> new HashSet<>()).size(),
+                  pool));
+        }
+
+        // Get the maximum number of replica groups per pool.
+        int maxNumberOfReplicaGroupPerPool = numReplicaGroups / pools.size();
+        // Given a pool number, assign replica group which has the max number of existing instances.
+        // Repeat this process until the max number of replica groups per pool is reached.
+        while (!maxHeap.isEmpty()) {
+          Pairs.IntPair pair = maxHeap.remove();
+          int poolNumber = pair.getRight();
+          for (int i = 0; i < maxNumberOfReplicaGroupPerPool; i++) {
+            Set<Integer> existingReplicaGroups = existingPoolToExistingReplicaGroupIdsMap.get(poolNumber);
+            if (existingReplicaGroups == null || existingReplicaGroups.isEmpty()) {
+              continue;
+            }
+            int targetReplicaGroupId = -1;
+            int maxNumInstances = 0;
+            for (int existingReplicaGroupId : existingReplicaGroups) {
+              int numExistingInstances =
+                  existingReplicaGroupIdToExistingInstancesMap.getOrDefault(existingReplicaGroupId, new HashSet<>())
+                      .size();
+              if (numExistingInstances > maxNumInstances) {
+                maxNumInstances = numExistingInstances;
+                targetReplicaGroupId = existingReplicaGroupId;
+              }
+            }
+            // If target existing replica group cannot be found, it means it should be chosen from a new replica group.
+            if (targetReplicaGroupId > -1) {
+              poolToReplicaGroupIdsMap.computeIfAbsent(poolNumber, k -> new ArrayList<>()).add(targetReplicaGroupId);
+              replicaGroupIdToPoolMap.put(targetReplicaGroupId, poolNumber);
+              // Clear the stats so that the same replica group won't be picked up again in later iteration.
+              existingReplicaGroupIdToExistingInstancesMap.get(targetReplicaGroupId).clear();
+            }
+          }
+        }
+
+        // If there is any new replica group added, choose pool which is least frequently picked up.
+        // Use a min heap to track the least frequently picked pool among all the pools.
         PriorityQueue<Pairs.IntPair> minHeap = new PriorityQueue<>(pools.size(), Pairs.intPairComparator());
         for (int pool : pools) {
           int numExistingReplicaGroups =
@@ -190,7 +237,7 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
         int existingNumReplicaGroups = _existingInstancePartitions.getNumReplicaGroups();
         int numCommonReplicaGroups = Math.min(numReplicaGroups, existingNumReplicaGroups);
 
-        Map<Integer, Set<String>> replicaGroupIdToExistingInstancesMap = new TreeMap<>();
+        existingReplicaGroupIdToExistingInstancesMap = new TreeMap<>();
         // Step 1: find out the replica groups and their existing instances,
         //   so that these instances can be filtered out and won't be chosen for the other replica group.
         for (int replicaGroupId = 0; replicaGroupId < numCommonReplicaGroups; replicaGroupId++) {
@@ -202,7 +249,7 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
 
           for (int partitionId = 0; partitionId < existingNumPartitions; partitionId++) {
             List<String> existingInstances = _existingInstancePartitions.getInstances(partitionId, replicaGroupId);
-            replicaGroupIdToExistingInstancesMap.computeIfAbsent(replicaGroupId, k -> new HashSet<>())
+            existingReplicaGroupIdToExistingInstancesMap.computeIfAbsent(replicaGroupId, k -> new HashSet<>())
                 .addAll(existingInstances);
           }
         }
@@ -215,7 +262,7 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
               otherReplicaGroupId < existingNumReplicaGroups && otherReplicaGroupId < numReplicaGroups;
               otherReplicaGroupId++) {
             if (replicaGroupId != otherReplicaGroupId) {
-              candidateInstances.removeAll(replicaGroupIdToExistingInstancesMap.get(otherReplicaGroupId));
+              candidateInstances.removeAll(existingReplicaGroupIdToExistingInstancesMap.get(otherReplicaGroupId));
             }
           }
           LinkedHashSet<String> chosenCandidateInstances = new LinkedHashSet<>();
