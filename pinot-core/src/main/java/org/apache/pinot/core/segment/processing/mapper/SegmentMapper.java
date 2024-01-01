@@ -244,4 +244,7 @@ public class SegmentMapper {
   public void resetConstraintsChecker() {
     _constraintsChecker.reset();
   }
+  public boolean isAdaptiveConstraintsCheckerEnabled() {
+    return !(_constraintsChecker.getBytesLimit() == Long.MAX_VALUE);
+  }
 }

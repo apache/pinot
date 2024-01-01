@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -161,8 +160,11 @@ public class SegmentProcessorFramework {
       // Reduce phase.
       Consumer<Object> observer = doReduce(_partitionToFileManagerMap);
 
+      boolean isAdaptiveConstraintCheckerEnabled = mapper.isAdaptiveConstraintsCheckerEnabled();
+
       // Segment creation phase.
-      outputSegmentDirs.addAll(generateSegment(_partitionToFileManagerMap, observer));
+      outputSegmentDirs.addAll(
+          generateSegment(_partitionToFileManagerMap, observer, isAdaptiveConstraintCheckerEnabled));
     }
     return outputSegmentDirs;
   }
@@ -184,7 +186,7 @@ public class SegmentProcessorFramework {
   }
 
   private Consumer<Object> doReduce(Map<String, GenericRowFileManager> partitionToFileManagerMap)
-      throws Exception{
+      throws Exception {
     LOGGER.info("Beginning reduce phase on partitions: {}", partitionToFileManagerMap.keySet());
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
     int totalCount = partitionToFileManagerMap.keySet().size();
@@ -202,7 +204,7 @@ public class SegmentProcessorFramework {
   }
 
   private List<File> generateSegment(Map<String, GenericRowFileManager> partitionToFileManagerMap,
-      Consumer<Object> observer)
+      Consumer<Object> observer, boolean isAdaptiveConstraintCheckerEnabled)
       throws Exception {
     LOGGER.info("Beginning segment creation phase on partitions: {}", partitionToFileManagerMap.keySet());
     List<File> outputSegmentDirs = new ArrayList<>();
@@ -237,7 +239,7 @@ public class SegmentProcessorFramework {
         GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
         int maxNumRecordsPerSegment;
         for (int startRowId = 0; startRowId < numRows; startRowId += maxNumRecordsPerSegment, sequenceId++) {
-          maxNumRecordsPerSegment = _segmentNumRowProvider.getNumRows();
+          maxNumRecordsPerSegment = isAdaptiveConstraintCheckerEnabled ? numRows : _segmentNumRowProvider.getNumRows();
           int endRowId = Math.min(startRowId + maxNumRecordsPerSegment, numRows);
           LOGGER.info("Start creating segment of sequenceId: {} with row range: {} to {}", sequenceId, startRowId,
               endRowId);
