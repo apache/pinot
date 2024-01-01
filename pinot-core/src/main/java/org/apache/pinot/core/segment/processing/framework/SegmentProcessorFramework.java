@@ -160,11 +160,9 @@ public class SegmentProcessorFramework {
       // Reduce phase.
       Consumer<Object> observer = doReduce(_partitionToFileManagerMap);
 
-      boolean isAdaptiveConstraintCheckerEnabled = mapper.isAdaptiveConstraintsCheckerEnabled();
-
       // Segment creation phase.
       outputSegmentDirs.addAll(
-          generateSegment(_partitionToFileManagerMap, observer, isAdaptiveConstraintCheckerEnabled));
+          generateSegment(_partitionToFileManagerMap, observer, mapper.isAdaptiveConstraintsCheckerEnabled()));
     }
     return outputSegmentDirs;
   }

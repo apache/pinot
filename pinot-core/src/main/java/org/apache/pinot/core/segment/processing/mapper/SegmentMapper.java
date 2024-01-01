@@ -76,11 +76,12 @@ public class SegmentMapper {
   private final String[] _partitionsBuffer;
   // NOTE: Use TreeMap so that the order is deterministic
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
-  AdaptiveSizeBasedConstraintsChecker _constraintsChecker = new AdaptiveSizeBasedConstraintsChecker(Long.MAX_VALUE);
+  AdaptiveSizeBasedConstraintsChecker _constraintsChecker;
   private List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private List<StatefulRecordReaderFileConfig> _statefulRecordReaderFileConfigs = new ArrayList<>();
   private int _currentRecordReaderIndex = 0;
   private List<RecordTransformer> _customRecordTransformers;
+  private final boolean _isSizeBasedConstraintsCheckerEnabled;
 
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
@@ -115,6 +116,12 @@ public class SegmentMapper {
     for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
       _statefulRecordReaderFileConfigs.add(new StatefulRecordReaderFileConfig(recordReaderFileConfig));
     }
+
+    // initialize constraints checker
+    _constraintsChecker = new AdaptiveSizeBasedConstraintsChecker(
+        Long.parseLong(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold()));
+
+    _isSizeBasedConstraintsCheckerEnabled = _constraintsChecker.getBytesLimit() != Long.MAX_VALUE;
   }
 
   /**
@@ -181,7 +188,7 @@ public class SegmentMapper {
   private void mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
-    while (recordReader.hasNext() && _constraintsChecker.canWrite()) {
+    while (recordReader.hasNext() && (!_isSizeBasedConstraintsCheckerEnabled || _constraintsChecker.canWrite())) {
       reuse = recordReader.next(reuse);
 
       // TODO: Add ComplexTypeTransformer here. Currently it is not idempotent so cannot add it
@@ -245,6 +252,6 @@ public class SegmentMapper {
     _constraintsChecker.reset();
   }
   public boolean isAdaptiveConstraintsCheckerEnabled() {
-    return !(_constraintsChecker.getBytesLimit() == Long.MAX_VALUE);
+    return _isSizeBasedConstraintsCheckerEnabled;
   }
 }

@@ -36,17 +36,20 @@ public class SegmentConfig {
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;
   private final String _fixedSegmentName;
+  private final String _intermediateFileSizeThresholdInBytes;
 
   @JsonCreator
   private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment", required = true) int maxNumRecordsPerSegment,
       @JsonProperty("segmentNamePrefix") @Nullable String segmentNamePrefix,
       @JsonProperty("segmentNamePostfix") @Nullable String segmentNamePostfix,
-      @JsonProperty("fixedSegmentName") @Nullable String fixedSegmentName) {
+      @JsonProperty("fixedSegmentName") @Nullable String fixedSegmentName,
+      @JsonProperty("intermediateFileSizeThreshold") @Nullable String intermediateFileSizeThresholdInBytes) {
     Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
     _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
     _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;
     _fixedSegmentName = fixedSegmentName;
+    _intermediateFileSizeThresholdInBytes = intermediateFileSizeThresholdInBytes;
   }
 
   /**
@@ -70,6 +73,10 @@ public class SegmentConfig {
   public String getFixedSegmentName() {
     return _fixedSegmentName;
   }
+  @Nullable
+  public String getIntermediateFileSizeThreshold() {
+    return _intermediateFileSizeThresholdInBytes;
+  }
 
   /**
    * Builder for SegmentConfig
@@ -79,6 +86,7 @@ public class SegmentConfig {
     private String _segmentNamePrefix;
     private String _segmentNamePostfix;
     private String _fixedSegmentName;
+    private String _intermediateFileSizeThresholdInBytes = Long.toString(Long.MAX_VALUE);
 
     public Builder setMaxNumRecordsPerSegment(int maxNumRecordsPerSegment) {
       _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
@@ -99,16 +107,22 @@ public class SegmentConfig {
       _fixedSegmentName = fixedSegmentName;
       return this;
     }
+    public Builder setIntermediateFileSizeThreshold(String intermediateFileSizeThresholdInBytes) {
+      _intermediateFileSizeThresholdInBytes = intermediateFileSizeThresholdInBytes;
+      return this;
+    }
 
     public SegmentConfig build() {
       Preconditions.checkState(_maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
-      return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNamePrefix, _segmentNamePostfix, _fixedSegmentName);
+      return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNamePrefix, _segmentNamePostfix, _fixedSegmentName,
+          _intermediateFileSizeThresholdInBytes);
     }
   }
 
   @Override
   public String toString() {
-    return "SegmentConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment + ", _segmentNamePrefix='"
+    return "SegmentConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment
+        + ",_intermediateFileSizeThresholdInBytes=" + _intermediateFileSizeThresholdInBytes + ", _segmentNamePrefix='"
         + _segmentNamePrefix + '\'' + ", _segmentNamePostfix='" + _segmentNamePostfix + '\'' + ", _fixedSegmentName='"
         + _fixedSegmentName + '\'' + '}';
   }
