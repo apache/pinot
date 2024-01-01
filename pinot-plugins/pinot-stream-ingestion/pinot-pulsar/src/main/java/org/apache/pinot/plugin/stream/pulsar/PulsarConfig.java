@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.net.MalformedURLException;
@@ -105,7 +106,8 @@ public class PulsarConfig {
     _audience = getConfigValue(streamConfigMap, OAUTH_AUDIENCE);
   }
 
-  protected void validateOAuthCredFile() {
+  @VisibleForTesting
+  private void validateOAuthCredFile() {
     try {
       URL credFilePathUrl = new URL(_credentialsFilePath);
       if (!"file".equals(credFilePathUrl.getProtocol())) {
