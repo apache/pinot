@@ -68,6 +68,7 @@ public class SegmentProcessorFramework {
   private final File _segmentsOutputDir;
   private Map<String, GenericRowFileManager> _partitionToFileManagerMap;
   private final SegmentNumRowProvider _segmentNumRowProvider;
+  private int _segmentId = 0;
 
   /**
    * Initializes the SegmentProcessorFramework with record readers, config and working directory. We will now rely on
@@ -144,6 +145,7 @@ public class SegmentProcessorFramework {
       throws Exception {
     List<File> outputSegmentDirs = new ArrayList<>();
     int numRecordReaders = _recordReaderFileConfigs.size();
+    resetSegmentId();
     SegmentMapper mapper =
         new SegmentMapper(_recordReaderFileConfigs, _customRecordTransformers, _segmentProcessorConfig,
             _mapperOutputDir);
@@ -224,7 +226,7 @@ public class SegmentProcessorFramework {
       generatorConfig.setSegmentNamePostfix(segmentNamePostfix);
     }
 
-    int sequenceId = 0;
+    int sequenceId = _segmentId;
     for (Map.Entry<String, GenericRowFileManager> entry : partitionToFileManagerMap.entrySet()) {
       String partitionId = entry.getKey();
       GenericRowFileManager fileManager = entry.getValue();
@@ -254,11 +256,15 @@ public class SegmentProcessorFramework {
           _segmentNumRowProvider.updateSegmentInfo(driver.getSegmentStats().getTotalDocCount(),
               FileUtils.sizeOfDirectory(driver.getOutputDirectory()));
         }
+        _segmentId = sequenceId;
       } finally {
         fileManager.cleanUp();
       }
     }
     LOGGER.info("Successfully created segments: {}", outputSegmentDirs);
     return outputSegmentDirs;
+  }
+  private void resetSegmentId() {
+    _segmentId = 0;
   }
 }

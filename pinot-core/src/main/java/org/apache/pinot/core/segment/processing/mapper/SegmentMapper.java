@@ -145,7 +145,6 @@ public class SegmentMapper {
       throws Exception {
     Consumer<Object> observer = _processorConfig.getProgressObserver();
     int totalCount = _recordReaderFileConfigs.size();
-    int count = 1;
     GenericRow reuse = new GenericRow();
     int i;
     for (i = _currentRecordReaderIndex; i < _recordReaderFileConfigs.size(); i++) {
@@ -158,7 +157,7 @@ public class SegmentMapper {
           recordReader =
               RecordReaderFactory.getRecordReader(recordReaderFileConfig._fileFormat, recordReaderFileConfig._dataFile,
                   recordReaderFileConfig._fieldsToRead, recordReaderFileConfig._recordReaderConfig);
-          mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
+          mapAndTransformRow(recordReader, reuse, observer, _currentRecordReaderIndex, totalCount);
           if (!_constraintsChecker.canWrite()) {
             LOGGER.info("Stopping record readers at index: {} as size limit reached", i);
             break;
@@ -169,13 +168,12 @@ public class SegmentMapper {
           }
         }
       } else {
-        mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
+        mapAndTransformRow(recordReader, reuse, observer, _currentRecordReaderIndex, totalCount);
         if (!_constraintsChecker.canWrite()) {
           LOGGER.info("Stopping record readers at index: {} as size limit reached", i);
           break;
         }
       }
-      count++;
     }
 
     for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
@@ -212,6 +210,9 @@ public class SegmentMapper {
       reuse.clear();
     }
     if (!_constraintsChecker.canWrite()) {
+      observer.accept(String.format(
+          "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
+          _constraintsChecker.getNumBytesWritten(), _constraintsChecker.getBytesLimit()));
       LOGGER.info("Stopping record readers at index: {} as size limit reached", _currentRecordReaderIndex);
       _statefulRecordReaderFileConfigs.get(_currentRecordReaderIndex).setRecordReader(recordReader);
     }
