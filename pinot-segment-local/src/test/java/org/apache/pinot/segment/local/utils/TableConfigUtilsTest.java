@@ -1450,18 +1450,6 @@ public class TableConfigUtilsTest {
       // expected
     }
 
-    starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("myCol"), null, null,
-        Arrays.asList(new StarTreeAggregationConfig("myCol", "DistinctCountThetaSketch", CompressionCodec.LZ4),
-            new StarTreeAggregationConfig("myCol", "DistinctCountRawThetaSketch", CompressionCodec.LZ4)), 1);
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setStarTreeIndexConfigs(Arrays.asList(starTreeIndexConfig)).build();
-    try {
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail("Should fail for invalid StarTreeIndex config with duplicate function column pair");
-    } catch (Exception e) {
-      // expected
-    }
-
     starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList("multiValCol"), Arrays.asList("multiValCol"),
         Arrays.asList("SUM__multiValCol"), null, 1);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
