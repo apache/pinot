@@ -559,9 +559,6 @@
                 <manifest>
                   <mainClass>org.apache.pinot.tools.PinotToolLauncher</mainClass>
                 </manifest>
-                <manifestEntries>
-                  <Multi-Release>true</Multi-Release>
-                </manifestEntries>
               </archive>
               <finalName>pinot-tool-launcher</finalName>
             </configuration>

@@ -1551,7 +1551,6 @@
                 <Implementation-Version>${project.version}-${buildNumber}</Implementation-Version>
                 <Implementation-Vendor-Id>${project.groupId}</Implementation-Vendor-Id>
                 <Implementation-Vendor>${project.organization.name}</Implementation-Vendor>
-                <Multi-Release>true</Multi-Release>
               </manifestEntries>
             </archive>
           </configuration>
