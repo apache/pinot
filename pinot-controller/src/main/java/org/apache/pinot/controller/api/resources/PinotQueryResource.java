@@ -108,7 +108,7 @@ public class PinotQueryResource {
   public String handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
-      if(!requestJson.has("sql")){
+      if (!requestJson.has("sql")) {
         throw new IllegalStateException("JSON Payload is missing the query string field 'sql'");
       }
       String sqlQuery = requestJson.get("sql").asText();
