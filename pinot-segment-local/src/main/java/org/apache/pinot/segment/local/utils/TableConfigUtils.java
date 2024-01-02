@@ -1025,6 +1025,7 @@ public final class TableConfigUtils {
     }
 
     List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
+    HashSet<AggregationFunctionColumnPair> aggregatedTypes = new HashSet<>();
     if (starTreeIndexConfigList != null) {
       for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
         // Dimension split order cannot be null
@@ -1041,6 +1042,12 @@ public final class TableConfigUtils {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                   + "in the form <Aggregation function>__<Column name>");
             }
+            AggregationFunctionColumnPair aggregatedType =
+                AggregationFunctionColumnPair.resolveToAggregatedType(columnPair);
+            Preconditions.checkState(!aggregatedTypes.contains(aggregatedType),
+                "Invalid StarTreeIndex config: " + columnPair + " already matches existing "
+                    + "function column pair: " + aggregatedType + ".  Duplicate must be removed.");
+            aggregatedTypes.add(aggregatedType);
             String columnName = columnPair.getColumn();
             if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
               columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
@@ -1056,6 +1063,12 @@ public final class TableConfigUtils {
             } catch (Exception e) {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
             }
+            AggregationFunctionColumnPair aggregatedType =
+                AggregationFunctionColumnPair.resolveToAggregatedType(columnPair);
+            Preconditions.checkState(!aggregatedTypes.contains(aggregatedType),
+                "Invalid StarTreeIndex config: " + columnPair + " already matches existing "
+                    + "function column pair: " + aggregatedType + ".  Duplicate must be removed.");
+            aggregatedTypes.add(aggregatedType);
             String columnName = columnPair.getColumn();
             if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
               columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
