@@ -45,6 +45,7 @@ public abstract class FileWriter implements Writer {
     while (ingestedDocs < totalDocs) {
       try (java.io.FileWriter writer =
           new java.io.FileWriter(new File(_spec.getBaseDir(), String.format("output_%d%s", fileIndex, extension)))) {
+        preprocess(writer);
         for (int j = 0; j < docsPerFile && ingestedDocs < totalDocs; j++) {
           String appendString = generateRow(_spec.getGenerator());
           writer.append(appendString).append('\n');
@@ -53,6 +54,10 @@ public abstract class FileWriter implements Writer {
       }
       fileIndex++;
     }
+  }
+
+  protected void preprocess(java.io.FileWriter writer)
+      throws Exception {
   }
 
   protected String getExtension() {
