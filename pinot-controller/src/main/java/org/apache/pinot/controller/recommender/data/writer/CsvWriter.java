@@ -25,6 +25,14 @@ import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 
 
 public class CsvWriter extends FileWriter {
+  private String _headers;
+
+  @Override
+  public void init(WriterSpec spec) {
+    super.init(spec);
+    _headers = StringUtils.join(_spec.getGenerator().nextRow().keySet(), ",");
+  }
+
   @Override
   protected String generateRow(DataGenerator generator) {
     Map<String, Object> row = generator.nextRow();
@@ -41,8 +49,7 @@ public class CsvWriter extends FileWriter {
   @Override
   protected void preprocess(java.io.FileWriter writer)
       throws Exception {
-    final String headers = StringUtils.join(_spec.getGenerator().nextRow().keySet(), ",");
-    writer.append(headers).append('\n');
+    writer.append(_headers).append('\n');
   }
 
   private Object serializeIfMultiValue(Object obj) {
