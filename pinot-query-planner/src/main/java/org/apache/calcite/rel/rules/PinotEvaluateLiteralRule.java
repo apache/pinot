@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
 import org.apache.calcite.plan.RelOptRule;
@@ -36,6 +37,7 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexShuttle;
+import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.NlsString;
@@ -159,6 +161,16 @@ public class PinotEvaluateLiteralRule {
       FunctionInvoker invoker = new FunctionInvoker(functionInfo);
       invoker.convertTypes(arguments);
       resultValue = invoker.invoke(arguments);
+      if (rexNodeType.getSqlTypeName() == SqlTypeName.ARRAY) {
+        RelDataType componentType = rexNodeType.getComponentType();
+        if (componentType != null) {
+          if (Objects.requireNonNull(componentType.getSqlTypeName()) == SqlTypeName.CHAR) {
+            // Calcite uses CHAR for STRING, but we need to use VARCHAR for STRING
+            rexNodeType = rexBuilder.getTypeFactory().createArrayType(
+                rexBuilder.getTypeFactory().createSqlType(SqlTypeName.VARCHAR), -1);
+          }
+        }
+      }
     } catch (Exception e) {
       throw new SqlCompilationException(
           "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: " + Arrays.toString(
@@ -170,7 +182,17 @@ public class PinotEvaluateLiteralRule {
       throw new SqlCompilationException(
           "Caught exception while converting result value: " + resultValue + " to type: " + rexNodeType, e);
     }
+    if (resultValue == null) {
+      return rexBuilder.makeNullLiteral(rexNodeType);
+    }
     try {
+      if (rexNodeType instanceof ArraySqlType) {
+        List<Object> resultValues = new ArrayList<>();
+        for (Object value : (Object[]) resultValue) {
+          resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
+        }
+        return rexBuilder.makeLiteral(resultValues, rexNodeType, false);
+      }
       return rexBuilder.makeLiteral(resultValue, rexNodeType, false);
     } catch (Exception e) {
       throw new SqlCompilationException(

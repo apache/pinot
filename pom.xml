@@ -145,7 +145,7 @@
     <!-- hadoop-common, spark-core use commons-net -->
     <commons-net.version>3.10.0</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.2.22</dropwizard-metrics.version>
+    <dropwizard-metrics.version>4.2.23</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.4</snappy-java.version>
     <zstd-jni.version>1.5.5-11</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
@@ -156,7 +156,7 @@
     <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.26</jmh.version>
-    <audienceannotations.version>0.13.0</audienceannotations.version>
+    <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.3</clp-ffi.version>
     <stax2-api.version>4.1</stax2-api.version>
     <aws.sdk.version>2.20.137</aws.sdk.version>
@@ -259,7 +259,7 @@
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpclient</artifactId>
-        <version>4.5.13</version>
+        <version>4.5.14</version>
         <exclusions>
           <exclusion>
             <groupId>commons-logging</groupId>
@@ -455,7 +455,7 @@
       <dependency>
         <groupId>com.google.auto.service</groupId>
         <artifactId>auto-service</artifactId>
-        <version>1.0.1</version>
+        <version>1.1.1</version>
         <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
       </dependency>
       <dependency>

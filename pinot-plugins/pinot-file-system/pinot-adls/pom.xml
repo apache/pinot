@@ -68,7 +68,7 @@
       <dependency>
         <groupId>com.azure</groupId>
         <artifactId>azure-core</artifactId>
-        <version>1.37.0</version>
+        <version>1.45.1</version>
       </dependency>
       <dependency>
         <groupId>io.projectreactor</groupId>

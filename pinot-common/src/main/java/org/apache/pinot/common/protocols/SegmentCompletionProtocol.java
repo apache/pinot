@@ -255,6 +255,7 @@ public class SegmentCompletionProtocol {
         _memoryUsedBytes = MEMORY_USED_BYTES_DEFAULT;
         _segmentSizeBytes = SEGMENT_SIZE_BYTES_DEFAULT;
         _streamPartitionMsgOffset = null;
+        _reason = null;
       }
 
       public Params(Params params) {
@@ -269,6 +270,7 @@ public class SegmentCompletionProtocol {
         _memoryUsedBytes = params.getMemoryUsedBytes();
         _segmentSizeBytes = params.getSegmentSizeBytes();
         _streamPartitionMsgOffset = params.getStreamPartitionMsgOffset();
+        _reason = params.getReason();
       }
 
       @Deprecated
