@@ -48,6 +48,7 @@ public class StreamConfig {
 
   public static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
+  public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS_KINESIS = 600_000;
   public static final int DEFAULT_IDLE_TIMEOUT_MILLIS = 3 * 60 * 1000;
 
   private static final double CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED = -1;
@@ -142,7 +143,10 @@ public class StreamConfig {
     }
     _connectionTimeoutMillis = connectionTimeoutMillis;
 
-    int fetchTimeoutMillis = DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS;
+    // For Kinesis, we need to set a higher fetch timeout to avoid getting stuck in empty records loop
+    int fetchTimeoutMillis =
+        !_consumerFactoryClassName.contains("KinesisConsumerFactory") ? DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS_KINESIS
+            : DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS;
     String fetchTimeoutKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS);
     String fetchTimeoutValue = streamConfigMap.get(fetchTimeoutKey);
