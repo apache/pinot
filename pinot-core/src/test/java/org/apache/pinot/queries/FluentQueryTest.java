@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
@@ -28,6 +29,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.utils.ReadMode;
@@ -80,6 +82,11 @@ public class FluentQueryTest {
       _extraQueryOptions = extraQueryOptions;
     }
 
+    public OnFirstInstance onFirstInstance(String... content) {
+      return new OnFirstInstance(_tableConfig, _schema, _baseDir, false, _baseQueriesTest, _extraQueryOptions)
+          .andSegment(content);
+    }
+
     public OnFirstInstance onFirstInstance(Object[]... content) {
       return new OnFirstInstance(_tableConfig, _schema, _baseDir, false, _baseQueriesTest, _extraQueryOptions)
           .andSegment(content);
@@ -107,6 +114,11 @@ public class FluentQueryTest {
       } catch (IOException ex) {
         throw new UncheckedIOException(ex);
       }
+    }
+
+    TableWithSegments andSegment(String... tableText) {
+      _segmentContents.add(new FakeSegmentContent(_schema, tableText));
+      return this;
     }
 
     public TableWithSegments andSegment(Object[]... content) {
@@ -183,7 +195,19 @@ public class FluentQueryTest {
       return this;
     }
 
+    public OnFirstInstance andSegment(String... tableText) {
+      super.andSegment(tableText);
+      return this;
+    }
+
     public OnSecondInstance andOnSecondInstance(Object[]... content) {
+      processSegments();
+      return new OnSecondInstance(
+          _tableConfig, _schema, _indexDir.getParentFile(), !_onSecondInstance, _baseQueriesTest, _extraQueryOptions)
+          .andSegment(content);
+    }
+
+    public OnSecondInstance andOnSecondInstance(String... content) {
       processSegments();
       return new OnSecondInstance(
           _tableConfig, _schema, _indexDir.getParentFile(), !_onSecondInstance, _baseQueriesTest, _extraQueryOptions)
@@ -201,6 +225,11 @@ public class FluentQueryTest {
       _segmentContents.add(new FakeSegmentContent(content));
       return this;
     }
+
+    public OnSecondInstance andSegment(String... tableText) {
+      super.andSegment(tableText);
+      return this;
+    }
   }
 
   public static class QueryExecuted {
@@ -216,28 +245,14 @@ public class FluentQueryTest {
     }
 
     public QueryExecuted thenResultIs(String... tableText) {
-      String header = tableText[0];
-      List<PinotDataType> dataTypes = Arrays.stream(header.split("\\|"))
-          .map(String::trim)
-          .map(txt -> txt.toUpperCase(Locale.US))
-          .map(PinotDataType::valueOf)
-          .collect(Collectors.toList());
-      Object[][] rows = new Object[tableText.length - 1][];
-      for (int i = 1; i < tableText.length; i++) {
-        String[] rawCells = tableText[i].split("\\|");
-        Object[] convertedRow = new Object[dataTypes.size()];
-        for (int col = 0; col < rawCells.length; col++) {
-          String rawCell = rawCells[col].trim();
-          Object converted;
-          if (rawCell.equalsIgnoreCase("null")) {
-            converted = null;
-          } else {
-            converted = dataTypes.get(col).convert(rawCell, PinotDataType.STRING);
-          }
-          convertedRow[col] = converted;
-        }
-        rows[i - 1] = convertedRow;
-      }
+      Object[][] rows = tableAsRows(
+          headerCells -> Arrays.stream(headerCells)
+              .map(String::trim)
+              .map(txt -> txt.toUpperCase(Locale.US))
+              .map(PinotDataType::valueOf)
+              .collect(Collectors.toList()),
+          tableText
+      );
       thenResultIs(rows);
 
       return this;
@@ -283,7 +298,69 @@ public class FluentQueryTest {
     }
   }
 
+  public static Object[][] tableAsRows(Function<String[], List<PinotDataType>> extractDataTypes, String... tableText) {
+    String header = tableText[0];
+    String[] headerCells = header.split("\\|");
+
+    List<PinotDataType> dataTypes = extractDataTypes.apply(headerCells);
+
+    for (int i = 0; i < dataTypes.size(); i++) {
+      PinotDataType dataType = dataTypes.get(i);
+      if (!dataType.isSingleValue()) {
+        throw new IllegalArgumentException(
+            "Multi value columns are not supported and the " + i + "th column is of type " + dataType
+                + " which is multivalued");
+      }
+    }
+
+    Object[][] rows = new Object[tableText.length - 1][];
+    for (int i = 1; i < tableText.length; i++) {
+      String[] rawCells = tableText[i].split("\\|");
+      Object[] convertedRow = new Object[dataTypes.size()];
+      for (int col = 0; col < rawCells.length; col++) {
+        String rawCell = rawCells[col].trim();
+        Object converted;
+        if (rawCell.equalsIgnoreCase("null")) {
+          converted = null;
+        } else {
+          converted = dataTypes.get(col).convert(rawCell, PinotDataType.STRING);
+        }
+        convertedRow[col] = converted;
+      }
+      rows[i - 1] = convertedRow;
+    }
+    return rows;
+  }
+
   public static class FakeSegmentContent extends ArrayList<List<Object>> {
+
+    public FakeSegmentContent(Schema schema, String... tableText) {
+      super(tableText.length - 1);
+
+      Object[][] rows = FluentQueryTest.tableAsRows(
+          headerCells -> {
+            List<PinotDataType> dataTypes = new ArrayList<>();
+            for (String headerCell : headerCells) {
+              String columnName = headerCell.trim();
+              FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
+              if (fieldSpec.isVirtualColumn()) {
+                throw new IllegalArgumentException("Virtual columns like " + columnName + " cannot be set here");
+              }
+              if (!fieldSpec.isSingleValueField()) {
+                throw new IllegalArgumentException(
+                    "Multi valued columns like " + columnName + " cannot be set as text");
+              }
+              dataTypes.add(PinotDataType.getPinotDataTypeForIngestion(fieldSpec));
+            }
+            return dataTypes;
+          },
+          tableText);
+
+      for (Object[] row : rows) {
+        add(Arrays.asList(row));
+      }
+    }
+
     public FakeSegmentContent(Object[]... rows) {
       super(rows.length);
       for (Object[] row : rows) {

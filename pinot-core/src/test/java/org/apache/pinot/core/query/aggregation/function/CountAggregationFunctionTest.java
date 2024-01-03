@@ -113,11 +113,13 @@ public class CountAggregationFunctionTest {
         .withNullHandling(false)
         .givenTable(_nullableIntSchema, _nullableIntTableConfig)
         .onFirstInstance(
-            new Object[] {1}
+            "myInt",
+            "1"
         )
         .andOnSecondInstance(
-            new Object[] {2},
-            new Object[] {null}
+            "myInt",
+            "2",
+            "null"
         )
         .whenQuery("select myInt, COUNT(myInt) from testTable group by myInt order by myInt")
         .thenResultIs("INTEGER | LONG",
@@ -134,11 +136,13 @@ public class CountAggregationFunctionTest {
         .withNullHandling(true)
         .givenTable(_nullableIntSchema, _nullableIntTableConfig)
         .onFirstInstance(
-            new Object[] {1}
+            "myInt",
+            "1"
         )
         .andOnSecondInstance(
-            new Object[] {2},
-            new Object[] {null}
+            "myInt",
+            "2",
+            "null"
         )
         .whenQuery("select myInt, COUNT(myInt) from testTable group by myInt order by myInt")
         .thenResultIs(
@@ -155,11 +159,13 @@ public class CountAggregationFunctionTest {
         .withNullHandling(false)
         .givenTable(_nullableIntSchema, _nullableIntTableConfig)
         .onFirstInstance(
-            new Object[] {1}
+            "myInt",
+            "1"
         )
         .andOnSecondInstance(
-            new Object[] {2},
-            new Object[] {null}
+            "myInt",
+            "2",
+            "null"
         )
         .whenQuery("select myInt, COUNT(*) from testTable group by myInt order by myInt")
         .thenResultIs("INTEGER | LONG",
@@ -175,11 +181,13 @@ public class CountAggregationFunctionTest {
         .withNullHandling(true)
         .givenTable(_nullableIntSchema, _nullableIntTableConfig)
         .onFirstInstance(
-            new Object[] {1}
+            "myInt",
+            "1"
         )
         .andOnSecondInstance(
-            new Object[] {2},
-            new Object[] {null}
+            "myInt",
+            "2",
+            "null"
         )
         .whenQuery("select myInt, COUNT(*) from testTable group by myInt order by myInt")
         .thenResultIs("INTEGER | LONG",
