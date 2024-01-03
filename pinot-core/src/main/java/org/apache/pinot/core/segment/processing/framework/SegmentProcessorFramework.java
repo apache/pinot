@@ -148,6 +148,7 @@ public class SegmentProcessorFramework {
         new SegmentMapper(_recordReaderFileConfigs, _customRecordTransformers, _segmentProcessorConfig,
             _mapperOutputDir);
     int nextRecordReaderIndexToBeProcessed = 0;
+    int segmentSequenceId = 0;
 
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
       mapper.resetConstraintsChecker();
@@ -163,7 +164,7 @@ public class SegmentProcessorFramework {
 
       // Segment creation phase.
       outputSegmentDirs.addAll(
-          generateSegment(_partitionToFileManagerMap, observer, mapper.isAdaptiveConstraintsCheckerEnabled()));
+          generateSegment(_partitionToFileManagerMap, observer, segmentSequenceId));
 
       // Update next record index to be processed.
       nextRecordReaderIndexToBeProcessed = getNextRecordReaderIndexToBeProcessed(nextRecordReaderIndexToBeProcessed);
@@ -217,7 +218,7 @@ public class SegmentProcessorFramework {
   }
 
   private List<File> generateSegment(Map<String, GenericRowFileManager> partitionToFileManagerMap,
-      Consumer<Object> observer, boolean isAdaptiveConstraintCheckerEnabled)
+      Consumer<Object> observer, int sequenceId)
       throws Exception {
     LOGGER.info("Beginning segment creation phase on partitions: {}", partitionToFileManagerMap.keySet());
     List<File> outputSegmentDirs = new ArrayList<>();
@@ -239,7 +240,6 @@ public class SegmentProcessorFramework {
       generatorConfig.setSegmentNamePostfix(segmentNamePostfix);
     }
 
-    int sequenceId = 0;
     for (Map.Entry<String, GenericRowFileManager> entry : _partitionToFileManagerMap.entrySet()) {
       String partitionId = entry.getKey();
       GenericRowFileManager fileManager = entry.getValue();
