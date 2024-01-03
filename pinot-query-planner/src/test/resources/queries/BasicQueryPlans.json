@@ -40,7 +40,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[+($2, $6)])",
-          "\n  LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
+          "\n  LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
           "\n    LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -51,7 +51,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(col1=[$0], colsum=[+($2, $6)])",
-          "\n  LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
+          "\n  LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
           "\n    LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -64,7 +64,7 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(EXPR$0=[DATETRUNC('DAY', $6)])",
+          "\n      LogicalProject(EXPR$0=[DATETRUNC(_UTF-8'DAY', $6)])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -77,7 +77,7 @@
           "\nLogicalSort(offset=[0], fetch=[10])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
-          "\n      LogicalProject(day=[DATETRUNC('DAY', $6)])",
+          "\n      LogicalProject(day=[DATETRUNC(_UTF-8'DAY', $6)])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -91,7 +91,7 @@
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()])",
-          "\n        LogicalProject($f0=[CAST(CASE(>($2, 10), '1':VARCHAR, >($2, 20), '2':VARCHAR, >($2, 30), '3':VARCHAR, >($2, 40), '4':VARCHAR, >($2, 50), '5':VARCHAR, '0':VARCHAR)):DECIMAL(1000, 500) NOT NULL])",
+          "\n        LogicalProject($f0=[CAST(CASE(>($2, 10), _UTF-8'1':VARCHAR CHARACTER SET \"UTF-8\", >($2, 20), _UTF-8'2':VARCHAR CHARACTER SET \"UTF-8\", >($2, 30), _UTF-8'3':VARCHAR CHARACTER SET \"UTF-8\", >($2, 40), _UTF-8'4':VARCHAR CHARACTER SET \"UTF-8\", >($2, 50), _UTF-8'5':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'0':VARCHAR CHARACTER SET \"UTF-8\")):DECIMAL(1000, 500) NOT NULL])",
           "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
