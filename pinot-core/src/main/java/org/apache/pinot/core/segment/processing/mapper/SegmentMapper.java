@@ -20,7 +20,6 @@ package org.apache.pinot.core.segment.processing.mapper;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -32,7 +31,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.AdaptiveSizeBasedConstraintsChecker;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
-import org.apache.pinot.core.segment.processing.framework.StatefulRecordReaderFileConfig;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
@@ -78,8 +76,6 @@ public class SegmentMapper {
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
   AdaptiveSizeBasedConstraintsChecker _constraintsChecker;
   private List<RecordReaderFileConfig> _recordReaderFileConfigs;
-  private List<StatefulRecordReaderFileConfig> _statefulRecordReaderFileConfigs = new ArrayList<>();
-  private int _currentRecordReaderIndex = 0;
   private List<RecordTransformer> _customRecordTransformers;
   private final boolean _isSizeBasedConstraintsCheckerEnabled;
 
@@ -112,11 +108,6 @@ public class SegmentMapper {
         _recordReaderFileConfigs.size(), _mapperOutputDir, _timeHandler.getClass(),
         Arrays.stream(_partitioners).map(p -> p.getClass().toString()).collect(Collectors.joining(",")));
 
-    // initialize stateful record reader file configs.
-    for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
-      _statefulRecordReaderFileConfigs.add(new StatefulRecordReaderFileConfig(recordReaderFileConfig));
-    }
-
     // initialize constraints checker
     _constraintsChecker = new AdaptiveSizeBasedConstraintsChecker(
         Long.parseLong(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold()));
@@ -144,42 +135,48 @@ public class SegmentMapper {
   private Map<String, GenericRowFileManager> doMap()
       throws Exception {
     Consumer<Object> observer = _processorConfig.getProgressObserver();
+    int count = 1;
     int totalCount = _recordReaderFileConfigs.size();
     GenericRow reuse = new GenericRow();
-    int i;
-    for (i = _currentRecordReaderIndex; i < _recordReaderFileConfigs.size(); i++) {
-      StatefulRecordReaderFileConfig statefulRecordReaderFileConfig = _statefulRecordReaderFileConfigs.get(i);
-      RecordReader recordReader = statefulRecordReaderFileConfig.getRecordReader();
-      RecordReaderFileConfig recordReaderFileConfig = statefulRecordReaderFileConfig.getRecordReaderFileConfig();
+    for (int i = 0; i < _recordReaderFileConfigs.size(); i++) {
+      RecordReaderFileConfig recordReaderFileConfig = _recordReaderFileConfigs.get(i);
+      RecordReader recordReader = recordReaderFileConfig._recordReader;
       if (recordReader == null) {
         // We create and use the recordReader here.
         try {
           recordReader =
               RecordReaderFactory.getRecordReader(recordReaderFileConfig._fileFormat, recordReaderFileConfig._dataFile,
                   recordReaderFileConfig._fieldsToRead, recordReaderFileConfig._recordReaderConfig);
-          mapAndTransformRow(recordReader, reuse, observer, _currentRecordReaderIndex, totalCount);
+          mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
+          _recordReaderFileConfigs.get(i)._recordReader = recordReader;
           if (!_constraintsChecker.canWrite()) {
             LOGGER.info("Stopping record readers at index: {} as size limit reached", i);
             break;
           }
         } finally {
-          if (recordReader != null) {
+          if (recordReader != null && !recordReader.hasNext()) {
             recordReader.close();
           }
         }
       } else {
-        mapAndTransformRow(recordReader, reuse, observer, _currentRecordReaderIndex, totalCount);
+        if (!recordReader.hasNext()) {
+          LOGGER.info("Skipping record reader as it is already processed at index: {}", i);
+          count++;
+          continue;
+        }
+        mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
+        _recordReaderFileConfigs.get(i)._recordReader = recordReader;
         if (!_constraintsChecker.canWrite()) {
           LOGGER.info("Stopping record readers at index: {} as size limit reached", i);
           break;
         }
       }
+      count++;
     }
 
     for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
       fileManager.closeFileWriter();
     }
-    _currentRecordReaderIndex = i;
     return _partitionToFileManagerMap;
   }
 
@@ -213,8 +210,9 @@ public class SegmentMapper {
       observer.accept(String.format(
           "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
           _constraintsChecker.getNumBytesWritten(), _constraintsChecker.getBytesLimit()));
-      LOGGER.info("Stopping record readers at index: {} as size limit reached", _currentRecordReaderIndex);
-      _statefulRecordReaderFileConfigs.get(_currentRecordReaderIndex).setRecordReader(recordReader);
+      LOGGER.info(String.format(
+          "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
+          _constraintsChecker.getNumBytesWritten(), _constraintsChecker.getBytesLimit()));
     }
   }
 
@@ -246,9 +244,6 @@ public class SegmentMapper {
     return fileManager.getFileWriter().writeData(row);
   }
 
-  public int getCurrentRecordReaderIndex() {
-    return _currentRecordReaderIndex;
-  }
   public void resetConstraintsChecker() {
     _constraintsChecker.reset();
   }
