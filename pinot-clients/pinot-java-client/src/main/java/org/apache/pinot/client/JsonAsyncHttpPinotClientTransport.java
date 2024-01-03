@@ -21,6 +21,8 @@ package org.apache.pinot.client;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.JdkSslContext;
 import io.netty.handler.ssl.SslContext;
 import java.io.IOException;
 import java.util.HashMap;
@@ -29,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -65,6 +68,14 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     _extraOptionStr = DEFAULT_EXTRA_QUERY_OPTION_STRING;
     _httpClient = Dsl.asyncHttpClient(Dsl.config().setRequestTimeout(_brokerReadTimeout));
     _useMultistageEngine = false;
+  }
+
+  @Deprecated
+  public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,
+      boolean useMultistageEngine, @Nullable SSLContext sslContext, ConnectionTimeouts connectionTimeouts,
+      TlsProtocols tlsProtocols, @Nullable String appId) {
+      this(headers, scheme, extraOptionString, useMultistageEngine, (sslContext == null) ? null
+        : new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL), connectionTimeouts, tlsProtocols, appId);
   }
 
   public JsonAsyncHttpPinotClientTransport(Map<String, String> headers, String scheme, String extraOptionString,

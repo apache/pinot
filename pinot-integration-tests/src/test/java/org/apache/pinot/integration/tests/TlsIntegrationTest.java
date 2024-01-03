@@ -284,7 +284,9 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       factory.setScheme(CommonConstants.HTTPS_PROTOCOL);
       try {
         factory.setSslContext(sslContextBuilder.build());
-      } catch (SSLException ignored) { }
+      } catch (SSLException sslException) {
+        Assert.fail("sslContext build failed", sslException);
+      }
 
       _pinotConnection =
           ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
