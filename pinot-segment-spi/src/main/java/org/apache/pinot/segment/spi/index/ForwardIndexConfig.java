@@ -20,6 +20,7 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 import java.util.Objects;
@@ -33,7 +34,7 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 public class ForwardIndexConfig extends IndexConfig {
   public static final int DEFAULT_RAW_WRITER_VERSION = 2;
-  public static final ForwardIndexConfig DISABLED = new ForwardIndexConfig(true, null, null, null, null);
+  public static final ForwardIndexConfig DISABLED = new ForwardIndexConfig(true, null, null, null, null, null);
   public static final ForwardIndexConfig DEFAULT = new Builder().build();
 
   @Nullable
@@ -43,21 +44,86 @@ public class ForwardIndexConfig extends IndexConfig {
 
   @Nullable
   private final DictIdCompressionType _dictIdCompressionType;
+  @Nullable
+  private final CompressionCodec _compressionCodec;
 
   @JsonCreator
   public ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
+      @JsonProperty("compressionCodec") @Nullable CompressionCodec compressionCodec,
       @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
       @JsonProperty("deriveNumDocsPerChunk") Boolean deriveNumDocsPerChunk,
       @JsonProperty("rawIndexWriterVersion") Integer rawIndexWriterVersion,
       @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType) {
     super(disabled);
-    _chunkCompressionType = chunkCompressionType;
     _deriveNumDocsPerChunk = deriveNumDocsPerChunk != null && deriveNumDocsPerChunk;
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? DEFAULT_RAW_WRITER_VERSION : rawIndexWriterVersion;
-    _dictIdCompressionType = dictIdCompressionType;
+    if (compressionCodec != null) {
+      _compressionCodec = compressionCodec;
+      switch (compressionCodec) {
+        case PASS_THROUGH:
+          _chunkCompressionType = ChunkCompressionType.PASS_THROUGH;
+          _dictIdCompressionType = null;
+          break;
+        case SNAPPY:
+          _chunkCompressionType = ChunkCompressionType.SNAPPY;
+          _dictIdCompressionType = null;
+          break;
+        case ZSTANDARD:
+          _chunkCompressionType = ChunkCompressionType.ZSTANDARD;
+          _dictIdCompressionType = null;
+          break;
+        case LZ4:
+          _chunkCompressionType = ChunkCompressionType.LZ4;
+          _dictIdCompressionType = null;
+          break;
+        case MV_ENTRY_DICT:
+          _dictIdCompressionType = DictIdCompressionType.MV_ENTRY_DICT;
+          _chunkCompressionType = null;
+          break;
+        default:
+          throw new IllegalStateException("Unsupported compression codec: " + compressionCodec);
+      }
+    } else {
+      if (chunkCompressionType != null && dictIdCompressionType != null) {
+        throw new IllegalArgumentException(
+            "chunkCompressionType and dictIdCompressionType should not be used together");
+      }
+      _chunkCompressionType = chunkCompressionType;
+      _dictIdCompressionType = dictIdCompressionType;
+      if (chunkCompressionType != null) {
+        switch (chunkCompressionType) {
+
+          case PASS_THROUGH:
+            _compressionCodec = CompressionCodec.PASS_THROUGH;
+            break;
+          case SNAPPY:
+            _compressionCodec = CompressionCodec.SNAPPY;
+            break;
+          case ZSTANDARD:
+            _compressionCodec = CompressionCodec.ZSTANDARD;
+            break;
+          case LZ4:
+            _compressionCodec = CompressionCodec.LZ4;
+            break;
+          default:
+            throw new IllegalStateException("Unsupported chunk compression type: " + chunkCompressionType);
+        }
+      } else if (_dictIdCompressionType != null) {
+        switch (dictIdCompressionType) {
+          case MV_ENTRY_DICT:
+            _compressionCodec = CompressionCodec.MV_ENTRY_DICT;
+            break;
+          default:
+            throw new IllegalStateException("Unsupported dictionary compression type: " + dictIdCompressionType);
+        }
+      } else {
+        _compressionCodec = null;
+      }
+    }
   }
 
   @Nullable
+  @JsonIgnore
   public ChunkCompressionType getChunkCompressionType() {
     return _chunkCompressionType;
   }
@@ -70,6 +136,12 @@ public class ForwardIndexConfig extends IndexConfig {
     return _rawIndexWriterVersion;
   }
 
+  @Nullable
+  public CompressionCodec getCompressionCodec() {
+    return _compressionCodec;
+  }
+
+  @JsonIgnore
   @Nullable
   public DictIdCompressionType getDictIdCompressionType() {
     return _dictIdCompressionType;
@@ -100,6 +172,8 @@ public class ForwardIndexConfig extends IndexConfig {
 
   public static class Builder {
     @Nullable
+    private CompressionCodec _compressionCodec;
+    @Nullable
     private ChunkCompressionType _chunkCompressionType;
     private boolean _deriveNumDocsPerChunk = false;
     private int _rawIndexWriterVersion = DEFAULT_RAW_WRITER_VERSION;
@@ -111,6 +185,7 @@ public class ForwardIndexConfig extends IndexConfig {
     }
 
     public Builder(ForwardIndexConfig other) {
+      _compressionCodec = other._compressionCodec;
       _chunkCompressionType = other.getChunkCompressionType();
       _deriveNumDocsPerChunk = other._deriveNumDocsPerChunk;
       _rawIndexWriterVersion = other._rawIndexWriterVersion;
@@ -188,8 +263,8 @@ public class ForwardIndexConfig extends IndexConfig {
     }
 
     public ForwardIndexConfig build() {
-      return new ForwardIndexConfig(false, _chunkCompressionType, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
-          _dictIdCompressionType);
+      return new ForwardIndexConfig(false, _compressionCodec, _chunkCompressionType, _deriveNumDocsPerChunk,
+          _rawIndexWriterVersion, _dictIdCompressionType);
     }
   }
 }
