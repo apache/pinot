@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -102,6 +103,9 @@ public class QuickstartRunner {
       // configure the controller to schedule tasks when minion is enabled
       _configOverrides.put("controller.task.scheduler.enabled", true);
       _configOverrides.put("controller.task.skipLateCronSchedule", true);
+      // Adding for tests
+      _configOverrides.put("controller.restlet.api.resource.packages",
+          "ai.startree.restlet.api.resource,org.apache.pinot.controller.api.resources");
     }
     _zkExternalAddress = zkExternalAddress;
     _deleteExistingData = deleteExistingData;
