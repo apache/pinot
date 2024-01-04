@@ -45,6 +45,10 @@ public class SegmentConfig {
       @JsonProperty("fixedSegmentName") @Nullable String fixedSegmentName,
       @JsonProperty("intermediateFileSizeThreshold") @Nullable String intermediateFileSizeThresholdInBytes) {
     Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
+    if (intermediateFileSizeThresholdInBytes != null) {
+      Preconditions.checkState(Long.parseLong(intermediateFileSizeThresholdInBytes) > 0,
+          "Intermediate file size threshold must be > 0");
+    }
     _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
     _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;

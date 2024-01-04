@@ -138,28 +138,35 @@ public class SegmentProcessorFramework {
       throws Exception {
     List<File> outputSegmentDirs = new ArrayList<>();
     int numRecordReaders = _recordReaderFileConfigs.size();
+    int nextRecordReaderIndexToBeProcessed = 0;
+
+    // Initialise the mapper.
     SegmentMapper mapper =
         new SegmentMapper(_recordReaderFileConfigs, _customRecordTransformers, _segmentProcessorConfig,
             _mapperOutputDir);
-    int nextRecordReaderIndexToBeProcessed = 0;
+
 
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
+      // Reset the constraints checker for each iteration.
       mapper.resetConstraintsChecker();
+
       // Map phase.
       Map<String, GenericRowFileManager> partitionToFileManagerMap = doMap(mapper);
 
-      if (partitionToFileManagerMap == null) {
-        return Collections.emptyList();
+      // Check for mapper output files, if no files are generated, skip the reducer phase and move on to the next
+      // iteration.
+      if (partitionToFileManagerMap.isEmpty()) {
+        nextRecordReaderIndexToBeProcessed = getNextRecordReaderIndexToBeProcessed(nextRecordReaderIndexToBeProcessed);
+        continue;
       }
 
       // Reduce phase.
-      Consumer<Object> observer = doReduce(partitionToFileManagerMap);
+      doReduce(partitionToFileManagerMap);
 
-      // Segment creation phase.
-      outputSegmentDirs.addAll(
-          generateSegment(partitionToFileManagerMap, observer));
+      // Segment creation phase. Add the created segments to the final list.
+      outputSegmentDirs.addAll(generateSegment(partitionToFileManagerMap));
 
-      // Update next record index to be processed.
+      // Update next record reader index to be processed.
       nextRecordReaderIndexToBeProcessed = getNextRecordReaderIndexToBeProcessed(nextRecordReaderIndexToBeProcessed);
     }
     return outputSegmentDirs;
@@ -185,7 +192,7 @@ public class SegmentProcessorFramework {
       // Check for mapper output files
       if (partitionToFileManagerMap.isEmpty()) {
         LOGGER.info("No partition generated from mapper phase, skipping the reducer phase");
-        return null;
+        return Collections.emptyMap();
       }
       return partitionToFileManagerMap;
     } catch (Exception e) {
@@ -199,7 +206,7 @@ public class SegmentProcessorFramework {
     }
   }
 
-  private Consumer<Object> doReduce(Map<String, GenericRowFileManager> partitionToFileManagerMap)
+  private void doReduce(Map<String, GenericRowFileManager> partitionToFileManagerMap)
       throws Exception {
     LOGGER.info("Beginning reduce phase on partitions: {}", partitionToFileManagerMap.keySet());
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
@@ -214,11 +221,9 @@ public class SegmentProcessorFramework {
       Reducer reducer = ReducerFactory.getReducer(partitionId, fileManager, _segmentProcessorConfig, _reducerOutputDir);
       entry.setValue(reducer.reduce());
     }
-    return observer;
   }
 
-  private List<File> generateSegment(Map<String, GenericRowFileManager> partitionToFileManagerMap,
-      Consumer<Object> observer)
+  private List<File> generateSegment(Map<String, GenericRowFileManager> partitionToFileManagerMap)
       throws Exception {
     LOGGER.info("Beginning segment creation phase on partitions: {}", partitionToFileManagerMap.keySet());
     List<File> outputSegmentDirs = new ArrayList<>();
@@ -229,6 +234,7 @@ public class SegmentProcessorFramework {
     String fixedSegmentName = _segmentProcessorConfig.getSegmentConfig().getFixedSegmentName();
     SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     generatorConfig.setOutDir(_segmentsOutputDir.getPath());
+    Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
 
     if (tableConfig.getIndexingConfig().getSegmentNameGeneratorType() != null) {
       generatorConfig.setSegmentNameGenerator(
