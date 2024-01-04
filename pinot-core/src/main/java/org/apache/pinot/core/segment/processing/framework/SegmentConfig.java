@@ -90,7 +90,7 @@ public class SegmentConfig {
     private String _segmentNamePrefix;
     private String _segmentNamePostfix;
     private String _fixedSegmentName;
-    private String _intermediateFileSizeThresholdInBytes = Long.toString(1000000000L);
+    private String _intermediateFileSizeThresholdInBytes = Long.toString(Long.MAX_VALUE);
 
     public Builder setMaxNumRecordsPerSegment(int maxNumRecordsPerSegment) {
       _maxNumRecordsPerSegment = maxNumRecordsPerSegment;

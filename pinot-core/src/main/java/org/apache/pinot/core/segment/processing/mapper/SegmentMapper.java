@@ -112,6 +112,7 @@ public class SegmentMapper {
     _constraintsChecker = new AdaptiveSizeBasedConstraintsChecker(
         Long.parseLong(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold()));
 
+    // Check if size based constraints checker is enabled.
     _isSizeBasedConstraintsCheckerEnabled = _constraintsChecker.getBytesLimit() != Long.MAX_VALUE;
   }
 
