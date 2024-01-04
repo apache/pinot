@@ -103,9 +103,6 @@ public class QuickstartRunner {
       // configure the controller to schedule tasks when minion is enabled
       _configOverrides.put("controller.task.scheduler.enabled", true);
       _configOverrides.put("controller.task.skipLateCronSchedule", true);
-      // Adding for tests
-      _configOverrides.put("controller.restlet.api.resource.packages",
-          "ai.startree.restlet.api.resource,org.apache.pinot.controller.api.resources");
     }
     _zkExternalAddress = zkExternalAddress;
     _deleteExistingData = deleteExistingData;
