@@ -102,7 +102,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
             "1",
             "null"
         ).whenQuery("select mode(myField) as mode from testTable")
-        .thenResultIs("DOUBLE", aggrWithoutNullResult(scenario._dataType));
+        .thenResultIs("DOUBLE", "1");
   }
 
   String aggrSvWithoutNullResult(FieldSpec.DataType dt) {
@@ -142,7 +142,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
             "1",
             "null"
         ).whenQuery("select 'cte', mode(myField) as mode from testTable group by 'cte'")
-        .thenResultIs("STRING | DOUBLE", "cte | " + aggrSvWithoutNullResult(scenario._dataType));
+        .thenResultIs("STRING | DOUBLE", "cte | 1");
   }
 
   String aggrMvWithoutNullResult(FieldSpec.DataType dt) {
@@ -182,6 +182,6 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
             "1",
             "null"
         ).whenQuery("select 'cte1' as cte1, 'cte2' as cte2, mode(myField) as mode from testTable group by cte1, cte2")
-        .thenResultIs("STRING | STRING | DOUBLE", "cte1 | cte2 | " + aggrMvWithoutNullResult(scenario._dataType));
+        .thenResultIs("STRING | STRING | DOUBLE", "cte1 | cte2 | 1");
   }
 }
