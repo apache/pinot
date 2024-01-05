@@ -49,7 +49,7 @@ public class AggregationFunctionFactory {
 
   /**
    * Given the function information, returns a new instance of the corresponding aggregation function.
-   * <p>NOTE: Underscores in the function name are ignored.
+   * <p>NOTE: Underscores in the function name are ignored in V1.
    */
   public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
     try {
