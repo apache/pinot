@@ -124,7 +124,7 @@ public class RealtimeSegmentConverterTest {
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
-    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
+    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true, null);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
@@ -196,7 +196,7 @@ public class RealtimeSegmentConverterTest {
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
-    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
+    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true, null);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
@@ -276,7 +276,7 @@ public class RealtimeSegmentConverterTest {
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
-    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
+    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true, null);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
@@ -348,7 +348,7 @@ public class RealtimeSegmentConverterTest {
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
-    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
+    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true, null);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)

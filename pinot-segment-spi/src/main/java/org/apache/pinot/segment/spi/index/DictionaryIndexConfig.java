@@ -28,22 +28,26 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 public class DictionaryIndexConfig extends IndexConfig {
 
-  public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig(false, false, false);
-  public static final DictionaryIndexConfig DISABLED = new DictionaryIndexConfig(true, false, false);
+  public static final DictionaryIndexConfig DEFAULT = new DictionaryIndexConfig(false, false, false, null);
+  public static final DictionaryIndexConfig DISABLED = new DictionaryIndexConfig(true, false, false, null);
 
   private final boolean _onHeap;
   private final boolean _useVarLengthDictionary;
+  private final OnHeapDictionaryConfig _onHeapDictionaryConfig;
 
-  public DictionaryIndexConfig(Boolean onHeap, @Nullable Boolean useVarLengthDictionary) {
-    this(false, onHeap, useVarLengthDictionary);
+  public DictionaryIndexConfig(Boolean onHeap, @Nullable Boolean useVarLengthDictionary,
+      @Nullable OnHeapDictionaryConfig onHeapDictionaryConfig) {
+    this(false, onHeap, useVarLengthDictionary, onHeapDictionaryConfig);
   }
 
   @JsonCreator
   public DictionaryIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("onHeap") Boolean onHeap,
-      @JsonProperty("useVarLengthDictionary") @Nullable Boolean useVarLengthDictionary) {
+      @JsonProperty("useVarLengthDictionary") @Nullable Boolean useVarLengthDictionary,
+      @JsonProperty("onHeapConfig") @Nullable OnHeapDictionaryConfig onHeapDictionaryConfig) {
     super(disabled);
     _onHeap = onHeap != null && onHeap;
     _useVarLengthDictionary = Boolean.TRUE.equals(useVarLengthDictionary);
+    _onHeapDictionaryConfig = _onHeap ? onHeapDictionaryConfig : null;
   }
 
   public static DictionaryIndexConfig disabled() {
@@ -58,6 +62,10 @@ public class DictionaryIndexConfig extends IndexConfig {
     return _useVarLengthDictionary;
   }
 
+  public OnHeapDictionaryConfig getOnHeapDictionaryConfig() {
+    return _onHeapDictionaryConfig;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -67,19 +75,21 @@ public class DictionaryIndexConfig extends IndexConfig {
       return false;
     }
     DictionaryIndexConfig that = (DictionaryIndexConfig) o;
-    return _onHeap == that._onHeap && _useVarLengthDictionary == that._useVarLengthDictionary;
+    return _onHeap == that._onHeap && _useVarLengthDictionary == that._useVarLengthDictionary && Objects.equals(
+        _onHeapDictionaryConfig, that._onHeapDictionaryConfig);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_onHeap, _useVarLengthDictionary);
+    return Objects.hash(_onHeap, _useVarLengthDictionary, _onHeapDictionaryConfig);
   }
 
   @Override
   public String toString() {
     if (isEnabled()) {
+      String onHeapDictionaryConfigStr = _onHeapDictionaryConfig == null ? "null" : _onHeapDictionaryConfig.toString();
       return "DictionaryIndexConfig{" + "\"onHeap\":" + _onHeap + ", \"useVarLengthDictionary\":"
-          + _useVarLengthDictionary + "}";
+          + _useVarLengthDictionary + ", \"onHeapDictionaryConfig\":" + onHeapDictionaryConfigStr + "}";
     } else {
       return "DictionaryIndexConfig{" + "\"disabled\": true}";
     }
