@@ -89,13 +89,13 @@ public class PinotOperatorTable implements SqlOperatorTable {
    * Look up operators based on case-sensitiveness.
    */
   private Collection<SqlOperator> lookUpOperators(String name) {
-    return PinotFunctionRegistry.getOperatorMap().range(name, FunctionRegistry.CASE_SENSITIVITY).stream()
+    return FunctionRegistry.getOperatorMap().range(name, FunctionRegistry.CASE_SENSITIVITY).stream()
         .map(Map.Entry::getValue).collect(Collectors.toSet());
   }
 
   @Override
   public List<SqlOperator> getOperatorList() {
-    return PinotFunctionRegistry.getOperatorMap().map().values().stream().flatMap(List::stream)
+    return FunctionRegistry.getOperatorMap().map().values().stream().flatMap(List::stream)
         .collect(Collectors.toList());
   }
 }

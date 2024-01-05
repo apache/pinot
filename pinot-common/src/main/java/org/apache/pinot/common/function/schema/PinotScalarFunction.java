@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function.registry;
+package org.apache.pinot.common.function.schema;
 
 import java.lang.reflect.Method;
 import org.apache.calcite.rel.type.RelDataType;
