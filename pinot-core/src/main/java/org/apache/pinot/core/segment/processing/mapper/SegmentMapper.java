@@ -248,7 +248,4 @@ public class SegmentMapper {
   public void resetConstraintsChecker() {
     _constraintsChecker.reset();
   }
-  public boolean isAdaptiveConstraintsCheckerEnabled() {
-    return _isSizeBasedConstraintsCheckerEnabled;
-  }
 }
