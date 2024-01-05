@@ -141,10 +141,6 @@ const getTenantsData = () => {
   });
 };
 
-const getTenantData = (tenant: string) => {
-
-}
-
 // This method is used to fetch all instances on cluster manager home page
 // API: /instances
 // Expected Output: {Controller: ['Controller1', 'Controller2'], Broker: ['Broker1', 'Broker2']}

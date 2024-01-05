@@ -500,9 +500,9 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
                 Delete Schema
               </CustomButton>
               <CustomButton
-                isDisabled={true} onClick={()=>{console.log('truncate table');}}
-                // tooltipTitle="Truncate Table"
-                // enableTooltip={true}
+                isDisabled={true} onClick={()=>{}}
+                tooltipTitle="Truncate Table"
+                enableTooltip={true}
               >
                 Truncate Table
               </CustomButton>

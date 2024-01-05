@@ -57,9 +57,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
         <SimpleAccordion headerTitle="Operations" showSearchBox={false}>
           <div>
             <CustomButton
-              onClick={() => {
-                console.log('rebalance');
-              }}
+              onClick={() => {}}
               tooltipTitle="Recalculates the segment to server mapping for all tables in this tenant"
               enableTooltip={true}
               isDisabled={true}
@@ -67,9 +65,7 @@ const TenantPage = ({ match }: RouteComponentProps<Props>) => {
               Rebalance Server Tenant
             </CustomButton>
             <CustomButton
-              onClick={() => {
-                console.log('rebuild');
-              }}
+              onClick={() => {}}
               tooltipTitle="Rebuilds brokerResource mappings for all tables in this tenant"
               enableTooltip={true}
               isDisabled={true}

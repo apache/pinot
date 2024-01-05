@@ -39,12 +39,9 @@ const InstanceListingPage = () => {
   const classes = useStyles();
 
   const [fetching, setFetching] = useState(true);
-  // const [instances, setInstances] = useState<DataTable>();
   const [clusterName, setClusterName] = useState('');
 
   const fetchData = async () => {
-    // const instanceResponse = await PinotMethodUtils.getAllInstances();
-    // setInstances(pick(instanceResponse, instanceType));
     let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
     if(!clusterNameRes){
       clusterNameRes = await PinotMethodUtils.getClusterName();
