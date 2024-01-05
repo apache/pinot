@@ -109,8 +109,8 @@ public class SegmentMapper {
         Arrays.stream(_partitioners).map(p -> p.getClass().toString()).collect(Collectors.joining(",")));
 
     // initialize constraints checker
-    _constraintsChecker = new AdaptiveSizeBasedConstraintsChecker(
-        Long.parseLong(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold()));
+    _constraintsChecker =
+        new AdaptiveSizeBasedConstraintsChecker(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold());
 
     // Check if size based constraints checker is enabled.
     _isSizeBasedConstraintsCheckerEnabled = _constraintsChecker.getBytesLimit() != Long.MAX_VALUE;

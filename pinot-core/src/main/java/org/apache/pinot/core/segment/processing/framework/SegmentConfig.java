@@ -31,24 +31,23 @@ import javax.annotation.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentConfig {
   public static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
+  public static final long DEFAULT_INTERMEDIATE_FILE_SIZE_THRESHOLD = Long.MAX_VALUE;
 
   private final int _maxNumRecordsPerSegment;
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;
   private final String _fixedSegmentName;
-  private final String _intermediateFileSizeThresholdInBytes;
+  private final long _intermediateFileSizeThresholdInBytes;
 
   @JsonCreator
   private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment", required = true) int maxNumRecordsPerSegment,
       @JsonProperty("segmentNamePrefix") @Nullable String segmentNamePrefix,
       @JsonProperty("segmentNamePostfix") @Nullable String segmentNamePostfix,
       @JsonProperty("fixedSegmentName") @Nullable String fixedSegmentName,
-      @JsonProperty("intermediateFileSizeThreshold") @Nullable String intermediateFileSizeThresholdInBytes) {
+      @JsonProperty(value = "intermediateFileSizeThresholdInBytes", required = true)
+      long intermediateFileSizeThresholdInBytes) {
     Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
-    if (intermediateFileSizeThresholdInBytes != null) {
-      Preconditions.checkState(Long.parseLong(intermediateFileSizeThresholdInBytes) > 0,
-          "Intermediate file size threshold must be > 0");
-    }
+    Preconditions.checkState(intermediateFileSizeThresholdInBytes > 0, "Intermediate file size threshold must be > 0");
     _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
     _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;
@@ -77,8 +76,8 @@ public class SegmentConfig {
   public String getFixedSegmentName() {
     return _fixedSegmentName;
   }
-  @Nullable
-  public String getIntermediateFileSizeThreshold() {
+
+  public long getIntermediateFileSizeThreshold() {
     return _intermediateFileSizeThresholdInBytes;
   }
 
@@ -87,10 +86,11 @@ public class SegmentConfig {
    */
   public static class Builder {
     private int _maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
+    private long _intermediateFileSizeThresholdInBytes = DEFAULT_INTERMEDIATE_FILE_SIZE_THRESHOLD;
     private String _segmentNamePrefix;
     private String _segmentNamePostfix;
     private String _fixedSegmentName;
-    private String _intermediateFileSizeThresholdInBytes = Long.toString(Long.MAX_VALUE);
+
 
     public Builder setMaxNumRecordsPerSegment(int maxNumRecordsPerSegment) {
       _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
@@ -111,13 +111,15 @@ public class SegmentConfig {
       _fixedSegmentName = fixedSegmentName;
       return this;
     }
-    public Builder setIntermediateFileSizeThreshold(String intermediateFileSizeThresholdInBytes) {
+    public Builder setIntermediateFileSizeThreshold(long intermediateFileSizeThresholdInBytes) {
       _intermediateFileSizeThresholdInBytes = intermediateFileSizeThresholdInBytes;
       return this;
     }
 
     public SegmentConfig build() {
       Preconditions.checkState(_maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
+      Preconditions.checkState(_intermediateFileSizeThresholdInBytes > 0,
+          "Intermediate file size threshold must be > 0");
       return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNamePrefix, _segmentNamePostfix, _fixedSegmentName,
           _intermediateFileSizeThresholdInBytes);
     }
@@ -126,7 +128,7 @@ public class SegmentConfig {
   @Override
   public String toString() {
     return "SegmentConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment
-        + ",_intermediateFileSizeThresholdInBytes=" + _intermediateFileSizeThresholdInBytes + ", _segmentNamePrefix='"
+        + ", _intermediateFileSizeThresholdInBytes=" + _intermediateFileSizeThresholdInBytes + ", _segmentNamePrefix='"
         + _segmentNamePrefix + '\'' + ", _segmentNamePostfix='" + _segmentNamePostfix + '\'' + ", _fixedSegmentName='"
         + _fixedSegmentName + '\'' + '}';
   }
