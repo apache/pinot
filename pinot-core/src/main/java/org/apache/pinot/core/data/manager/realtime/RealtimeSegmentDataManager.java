@@ -418,11 +418,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     try {
       _partitionGroupConsumer.validateStreamState(_currentOffset);
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionGroupId,
-              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 0);
     } catch (PermanentConsumerException pce) {
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionGroupId,
-              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 1);
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
+              1L);
       _segmentLogger.error(pce.getMessage());
       throw pce;
     }
