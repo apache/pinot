@@ -20,11 +20,10 @@ package org.apache.calcite.jdbc;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaPlus;
-import org.apache.pinot.common.function.registry.PinotFunction;
-import org.apache.pinot.common.function.sql.PinotFunctionRegistry;
+import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.schema.PinotFunction;
 
 
 /**
@@ -55,8 +54,8 @@ public class CalciteSchemaBuilder {
   public static CalciteSchema asRootSchema(Schema root) {
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, "", root);
     SchemaPlus schemaPlus = rootSchema.plus();
-    for (Map.Entry<String, List<PinotFunction>> e : PinotFunctionRegistry.getFunctionMap().map().entrySet()) {
-      for (Function f : e.getValue()) {
+    for (Map.Entry<String, List<PinotFunction>> e : FunctionRegistry.getFunctionMap().map().entrySet()) {
+      for (PinotFunction f : e.getValue()) {
         schemaPlus.add(e.getKey(), f);
       }
     }

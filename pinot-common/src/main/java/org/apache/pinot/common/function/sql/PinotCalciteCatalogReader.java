@@ -81,9 +81,14 @@ import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**
  * ============================================================================
- * THIS CLASS IS COPIED FROM Calcite's {@link org.apache.calcite.prepare.CalciteCatalogReader} and modified the
- * case sensitivity of Function lookup. which is ALWAYS case-insensitive regardless of conventions on
- * column/table identifier.
+ * THIS CLASS IS COPIED FROM Calcite's {@link org.apache.calcite.prepare.CalciteCatalogReader} and modified
+ * <ul>
+ *   <li>the case sensitivity of Function lookup. Pinot ALWAYS resolve case-insensitive function regardless of
+ *   case sensitivity conventions of column/table identifier.</li>
+ *   <li>made the {@link PinotCalciteCatalogReader#toOp(SqlIdentifier, org.apache.calcite.schema.Function)}</li> method
+ *   public access for overriding behavior for catalog function operand/return type inference.
+ * </ul>
+ *
  * ============================================================================
  *
  * Pinot's implementation of {@link org.apache.calcite.prepare.Prepare.CatalogReader}
@@ -312,8 +317,14 @@ public class PinotCalciteCatalogReader implements Prepare.CatalogReader {
   }
 
   /** Converts a function to a {@link org.apache.calcite.sql.SqlOperator}. */
+  // ====================================================================
+  // LINES CHANGED BELOW
+  // ====================================================================
   public static SqlOperator toOp(SqlIdentifier name,
       final org.apache.calcite.schema.Function function) {
+    // ====================================================================
+    // LINES CHANGED ABOVE
+    // ====================================================================
     final Function<RelDataTypeFactory, List<RelDataType>> argTypesFactory =
         typeFactory -> function.getParameters()
             .stream()

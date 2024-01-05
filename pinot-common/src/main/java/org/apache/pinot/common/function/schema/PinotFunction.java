@@ -16,13 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.function.registry;
+package org.apache.pinot.common.function.schema;
 
 import org.apache.calcite.schema.Function;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 
 
+/**
+ * Function Schema used to resolve function signature by {@link org.apache.pinot.common.function.FunctionRegistry} and
+ * {@link org.apache.pinot.common.function.sql.PinotCalciteCatalogReader}.
+ */
 public interface PinotFunction extends Function {
   SqlOperandTypeChecker getOperandTypeChecker();
   SqlReturnTypeInference getReturnTypeInference();
