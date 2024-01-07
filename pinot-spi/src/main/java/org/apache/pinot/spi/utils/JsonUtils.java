@@ -719,4 +719,18 @@ public class JsonUtils {
       }
     }
   }
+
+  public static List<Map<String, String>> flatten(String jsonString, JsonIndexConfig jsonIndexConfig) throws IOException {
+    JsonNode jsonNode;
+    try {
+      jsonNode = JsonUtils.stringToJsonNode(jsonString);
+    } catch (IOException e) {
+      if (jsonIndexConfig.getSkipInvalidJson()) {
+        return Collections.singletonList(Collections.singletonMap(VALUE_KEY, SKIPPED_VALUE_REPLACEMENT));
+      } else {
+        throw e;
+      }
+    }
+    return JsonUtils.flatten(jsonNode, jsonIndexConfig);
+  }
 }
