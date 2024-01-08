@@ -293,7 +293,15 @@ public class FluentQueryTest {
           if (actualCell != null && expectedCell != null) {
             Assert.assertEquals(actualCell.getClass(), expectedCell.getClass(), "On row " + i + " and column " + j);
           }
-          Assert.assertEquals(actualCell, expectedCell, "On row " + i + " and column " + j);
+          if (expectedCell == null) {
+            Assert.assertNull(actualCell, "On row " + i + " and column " + j + ". Actual value was "
+                + "not null value '" + actualCell + "'");
+          } else if (actualCell == null) {
+            Assert.fail("On row " + i + " and column " + j + ". Actual value was null when expecting not null "
+                + "value '" + expectedCell + "'");
+          } else {
+            Assert.assertEquals(actualCell, expectedCell, "On row " + i + " and column " + j);
+          }
         }
       }
       Assert.assertEquals(actualRows.size(), expectedResult.length, "Unexpected number of rows");
@@ -341,6 +349,8 @@ public class FluentQueryTest {
         Object converted;
         if (rawCell.equalsIgnoreCase("null")) {
           converted = null;
+        } else if (rawCell.equalsIgnoreCase("\"null\"")) {
+          converted = dataTypes.get(col).convert("null", PinotDataType.STRING);
         } else {
           converted = dataTypes.get(col).convert(rawCell, PinotDataType.STRING);
         }
