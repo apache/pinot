@@ -294,10 +294,10 @@ public class FluentQueryTest {
             Assert.assertEquals(actualCell.getClass(), expectedCell.getClass(), "On row " + i + " and column " + j);
           }
           if (expectedCell == null) {
-            Assert.assertNull(actualCell, "On row " + i + " and column " + j + ". Actual value was "
-                + "not null value '" + actualCell + "'");
+            Assert.assertNull(actualCell, "On row " + i + " and column " + j + ". "
+                + "Actual value is '" + actualCell + "', which is not null");
           } else if (actualCell == null) {
-            Assert.fail("On row " + i + " and column " + j + ". Actual value was null when expecting not null "
+            Assert.fail("On row " + i + " and column " + j + ". Actual value is null when expecting not null "
                 + "value '" + expectedCell + "'");
           } else {
             Assert.assertEquals(actualCell, expectedCell, "On row " + i + " and column " + j);
