@@ -45,7 +45,8 @@ public class LiteralValueOperator extends MultiStageOperator {
     super(context);
     _dataSchema = dataSchema;
     _rexLiteralBlock = constructBlock(rexLiteralRows);
-    _isLiteralBlockReturned = false;
+    // only return a single literal block when it is the 1st virtual server. otherwise, result will be duplicated.
+    _isLiteralBlockReturned = context.getId().getVirtualServerId() != 0;
   }
 
   @Override
