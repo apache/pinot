@@ -302,17 +302,17 @@ public class AggregationFunctionFactory {
             DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
             switch (dataType) {
               case BOOLEAN:
-                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, true);
+                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled, true);
               case INT:
-                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, false);
+                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled, false);
               case LONG:
-                return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case FLOAT:
-                return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case DOUBLE:
-                return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case STRING:
-                return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               default:
                 throw new IllegalArgumentException("Unsupported data type for LAST_WITH_TIME: " + dataType);
             }

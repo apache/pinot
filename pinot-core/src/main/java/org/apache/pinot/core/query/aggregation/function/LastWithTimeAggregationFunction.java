@@ -29,9 +29,11 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.IntLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.IntIterator;
 
 
 /**
@@ -47,14 +49,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
-    extends BaseSingleInputAggregationFunction<ValueLongPair<V>, V> {
+    extends NullableSingleInputAggregationFunction<ValueLongPair<V>, V> {
   protected final ExpressionContext _timeCol;
   private final ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> _objectSerDe;
 
   public LastWithTimeAggregationFunction(ExpressionContext dataCol,
       ExpressionContext timeCol,
-      ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe) {
-    super(dataCol);
+      ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe, boolean nullHandlingEnabled) {
+    super(dataCol, nullHandlingEnabled);
     _timeCol = timeCol;
     _objectSerDe = objectSerDe;
   }
@@ -63,8 +65,7 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
 
   public abstract ValueLongPair<V> getDefaultValueTimePair();
 
-  public abstract void aggregateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, BlockValSet timeValSet);
+  public abstract V readCell(BlockValSet block, int docId);
 
   public abstract void aggregateGroupResultWithRawDataSv(int length,
       int[] groupKeyArray,
@@ -100,7 +101,27 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet blockTimeSet = blockValSetMap.get(_timeCol);
     if (blockValSet.getValueType() != DataType.BYTES) {
-      aggregateResultWithRawData(length, aggregationResultHolder, blockValSet, blockTimeSet);
+      IntLongPair defaultPair = new IntLongPair(Integer.MIN_VALUE, Long.MAX_VALUE);
+      long[] timeValues = blockTimeSet.getLongValuesSV();
+
+      IntIterator nullIdxIterator = orNullIterator(blockValSet, blockTimeSet);
+      IntLongPair bestPair = foldNotNull(length, nullIdxIterator, defaultPair, (pair, from, to) -> {
+        IntLongPair actualPair = pair;
+        for (int i = from; i < to; i++) {
+          long time = timeValues[i];
+          if (time <= actualPair.getTime()) {
+            actualPair = new IntLongPair(i, time);
+          }
+        }
+        return actualPair;
+      });
+      V bestValue;
+      if (bestPair.getValue() < 0) {
+        bestValue = getDefaultValueTimePair().getValue();
+      } else {
+        bestValue = readCell(blockValSet, bestPair.getValue());
+      }
+      setAggregationResult(aggregationResultHolder, bestValue, bestPair.getTime());
     } else {
       ValueLongPair<V> defaultValueLongPair = getDefaultValueTimePair();
       V lastData = defaultValueLongPair.getValue();
