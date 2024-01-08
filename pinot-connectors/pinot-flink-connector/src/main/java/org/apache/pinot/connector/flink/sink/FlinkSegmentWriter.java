@@ -40,6 +40,7 @@ import org.apache.flink.metrics.Gauge;
 import org.apache.flink.metrics.MetricGroup;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
+import org.apache.pinot.segment.local.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -77,6 +78,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private String _outputDirURI;
   private Schema _schema;
   private Set<String> _fieldsToRead;
+  private RecordEnricherPipeline _recordEnricherPipeline;
   private RecordTransformer _recordTransformer;
 
   private File _stagingDir;
@@ -137,6 +139,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
 
     _schema = schema;
     _fieldsToRead = _schema.getColumnNames();
+    _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(_tableConfig);
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_schema);
     _reusableRecord = new GenericData.Record(_avroSchema);
@@ -172,6 +175,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
   public void collect(GenericRow row)
       throws IOException {
     long startTime = System.currentTimeMillis();
+    _recordEnricherPipeline.run(row);
     GenericRow transform = _recordTransformer.transform(row);
     SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transform, _reusableRecord, _fieldsToRead);
     _rowCount++;
