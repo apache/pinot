@@ -16,8 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.segment.processing.framework;
+package org.apache.pinot.core.segment.processing.genericrow;
 
-public interface AdaptiveConstrainsChecker {
-  boolean canWrite();
+import java.io.IOException;
+import org.apache.pinot.spi.data.readers.GenericRow;
+
+
+public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<GenericRowFileWriter, GenericRow> {
+
+  private final long _bytesLimit;
+  private long _numBytesWritten;
+
+  public AdaptiveSizeBasedWriter(long bytesLimit) {
+    _bytesLimit = bytesLimit;
+    _numBytesWritten = 0;
+  }
+
+  public long getBytesLimit() {
+    return _bytesLimit;
+  }
+  public long getNumBytesWritten() {
+    return _numBytesWritten;
+  }
+
+  @Override
+  public boolean canWrite() {
+    return _numBytesWritten < _bytesLimit;
+  }
+
+  @Override
+  public void write(GenericRowFileWriter writer, GenericRow row) throws IOException {
+    _numBytesWritten += writer.writeData(row);
+  }
 }

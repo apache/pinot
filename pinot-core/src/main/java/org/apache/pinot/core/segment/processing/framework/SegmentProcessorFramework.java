@@ -140,15 +140,11 @@ public class SegmentProcessorFramework {
     int numRecordReaders = _recordReaderFileConfigs.size();
     int nextRecordReaderIndexToBeProcessed = 0;
 
-    // Initialise the mapper.
-    SegmentMapper mapper =
-        new SegmentMapper(_recordReaderFileConfigs, _customRecordTransformers, _segmentProcessorConfig,
-            _mapperOutputDir);
-
-
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
-      // Reset the constraints checker for each iteration.
-      mapper.resetConstraintsChecker();
+      // Initialise the mapper.
+      SegmentMapper mapper =
+          new SegmentMapper(_recordReaderFileConfigs, _customRecordTransformers, _segmentProcessorConfig,
+              _mapperOutputDir);
 
       // Map phase.
       Map<String, GenericRowFileManager> partitionToFileManagerMap = doMap(mapper);

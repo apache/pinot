@@ -29,9 +29,10 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.core.segment.processing.framework.AdaptiveSizeBasedConstraintsChecker;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
+import org.apache.pinot.core.segment.processing.genericrow.AdaptiveSizeBasedWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
+import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
@@ -74,7 +75,7 @@ public class SegmentMapper {
   private final String[] _partitionsBuffer;
   // NOTE: Use TreeMap so that the order is deterministic
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
-  AdaptiveSizeBasedConstraintsChecker _constraintsChecker;
+  AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
   private List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private List<RecordTransformer> _customRecordTransformers;
 
@@ -107,9 +108,9 @@ public class SegmentMapper {
         _recordReaderFileConfigs.size(), _mapperOutputDir, _timeHandler.getClass(),
         Arrays.stream(_partitioners).map(p -> p.getClass().toString()).collect(Collectors.joining(",")));
 
-    // initialize constraints checker
-    _constraintsChecker =
-        new AdaptiveSizeBasedConstraintsChecker(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold());
+    // initialize adaptive writer.
+    _adaptiveSizeBasedWriter =
+        new AdaptiveSizeBasedWriter(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold());
   }
 
   /**
@@ -146,7 +147,7 @@ public class SegmentMapper {
                   recordReaderFileConfig._fieldsToRead, recordReaderFileConfig._recordReaderConfig);
           mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
           _recordReaderFileConfigs.get(i)._recordReader = recordReader;
-          if (!_constraintsChecker.canWrite()) {
+          if (!_adaptiveSizeBasedWriter.canWrite()) {
             LOGGER.info("Stopping record readers at index: {} as size limit reached", i);
             break;
           }
@@ -163,7 +164,7 @@ public class SegmentMapper {
         }
         mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
         _recordReaderFileConfigs.get(i)._recordReader = recordReader;
-        if (!_constraintsChecker.canWrite()) {
+        if (!_adaptiveSizeBasedWriter.canWrite()) {
           LOGGER.info("Stopping record readers at index: {} as size limit reached", i);
           break;
         }
@@ -180,7 +181,7 @@ public class SegmentMapper {
   private void mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
-    while (recordReader.hasNext() && (_constraintsChecker.canWrite())) {
+    while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
       reuse = recordReader.next(reuse);
 
       // TODO: Add ComplexTypeTransformer here. Currently it is not idempotent so cannot add it
@@ -190,35 +191,33 @@ public class SegmentMapper {
         for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
           GenericRow transformedRow = _recordTransformer.transform(row);
           if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            long bytesWritten = writeRecord(transformedRow);
-            _constraintsChecker.updateNumBytesWritten(bytesWritten);
+            writeRecord(transformedRow);
           }
         }
       } else {
         GenericRow transformedRow = _recordTransformer.transform(reuse);
         if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-          long bytesWritten = writeRecord(transformedRow);
-          _constraintsChecker.updateNumBytesWritten(bytesWritten);
+          writeRecord(transformedRow);
         }
       }
       reuse.clear();
     }
-    if (!_constraintsChecker.canWrite()) {
+    if (!_adaptiveSizeBasedWriter.canWrite()) {
       observer.accept(String.format(
           "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
-          _constraintsChecker.getNumBytesWritten(), _constraintsChecker.getBytesLimit()));
+          _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
       LOGGER.info(String.format(
           "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
-          _constraintsChecker.getNumBytesWritten(), _constraintsChecker.getBytesLimit()));
+          _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
     }
   }
 
-  private long writeRecord(GenericRow row)
+  private void writeRecord(GenericRow row)
       throws IOException {
     String timePartition = _timeHandler.handleTime(row);
     if (timePartition == null) {
       // Record not in the valid time range
-      return -1;
+      return;
     }
     _partitionsBuffer[0] = timePartition;
 
@@ -238,10 +237,10 @@ public class SegmentMapper {
       _partitionToFileManagerMap.put(partition, fileManager);
     }
 
-    return fileManager.getFileWriter().writeData(row);
-  }
+    // Get the file writer.
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
 
-  public void resetConstraintsChecker() {
-    _constraintsChecker.reset();
+    // Write the row.
+    _adaptiveSizeBasedWriter.write(fileWriter, row);
   }
 }
