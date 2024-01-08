@@ -25,29 +25,15 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.queries.FluentQueryTest;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class CountAggregationFunctionTest {
+public class CountAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
   private File _baseDir;
-
-  private final Schema _nullableIntSchema = new Schema.SchemaBuilder()
-      .setSchemaName("testTable")
-      .setEnableColumnBasedNullHandling(true)
-      .addDimensionField("myInt", FieldSpec.DataType.INT, f -> f.setNullable(true))
-      .build();
-
-  private final TableConfig _nullableIntTableConfig = new TableConfigBuilder(TableType.OFFLINE)
-      .setTableName("testTable")
-      .build();
 
   @BeforeClass
   void createBaseDir() {
@@ -70,7 +56,7 @@ public class CountAggregationFunctionTest {
   public void list() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(_nullableIntSchema, _nullableIntTableConfig)
+        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[] {1}
         )
@@ -78,7 +64,7 @@ public class CountAggregationFunctionTest {
             new Object[] {2},
             new Object[] {null}
         )
-        .whenQuery("select myInt from testTable order by myInt")
+        .whenQuery("select myField from testTable order by myField")
         .thenResultIs("INTEGER",
             "-2147483648",
             "1",
@@ -90,7 +76,7 @@ public class CountAggregationFunctionTest {
   public void listNullHandlingEnabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(true)
-        .givenTable(_nullableIntSchema, _nullableIntTableConfig)
+        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[] {1}
         )
@@ -98,7 +84,7 @@ public class CountAggregationFunctionTest {
             new Object[] {2},
             new Object[] {null}
         )
-        .whenQuery("select myInt from testTable order by myInt")
+        .whenQuery("select myField from testTable order by myField")
         .thenResultIs("INTEGER",
             "1",
             "2",
@@ -110,17 +96,17 @@ public class CountAggregationFunctionTest {
   public void countNullWhenHandlingDisabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(_nullableIntSchema, _nullableIntTableConfig)
+        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
-            "myInt",
+            "myField",
             "1"
         )
         .andOnSecondInstance(
-            "myInt",
+            "myField",
             "2",
             "null"
         )
-        .whenQuery("select myInt, COUNT(myInt) from testTable group by myInt order by myInt")
+        .whenQuery("select myField, COUNT(myField) from testTable group by myField order by myField")
         .thenResultIs("INTEGER | LONG",
             "-2147483648 | 1",
             "1           | 1",
@@ -133,17 +119,17 @@ public class CountAggregationFunctionTest {
   public void countNullWhenHandlingEnabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(true)
-        .givenTable(_nullableIntSchema, _nullableIntTableConfig)
+        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
-            "myInt",
+            "myField",
             "1"
         )
         .andOnSecondInstance(
-            "myInt",
+            "myField",
             "2",
             "null"
         )
-        .whenQuery("select myInt, COUNT(myInt) from testTable group by myInt order by myInt")
+        .whenQuery("select myField, COUNT(myField) from testTable group by myField order by myField")
         .thenResultIs(
             "INTEGER | LONG",
             "1    | 1",
@@ -156,17 +142,17 @@ public class CountAggregationFunctionTest {
   public void countStarNullWhenHandlingDisabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(_nullableIntSchema, _nullableIntTableConfig)
+        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
-            "myInt",
+            "myField",
             "1"
         )
         .andOnSecondInstance(
-            "myInt",
+            "myField",
             "2",
             "null"
         )
-        .whenQuery("select myInt, COUNT(*) from testTable group by myInt order by myInt")
+        .whenQuery("select myField, COUNT(*) from testTable group by myField order by myField")
         .thenResultIs("INTEGER | LONG",
             "-2147483648 | 1",
             "1    | 1",
@@ -178,17 +164,17 @@ public class CountAggregationFunctionTest {
   public void countStarNullWhenHandlingEnabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(true)
-        .givenTable(_nullableIntSchema, _nullableIntTableConfig)
+        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
-            "myInt",
+            "myField",
             "1"
         )
         .andOnSecondInstance(
-            "myInt",
+            "myField",
             "2",
             "null"
         )
-        .whenQuery("select myInt, COUNT(*) from testTable group by myInt order by myInt")
+        .whenQuery("select myField, COUNT(*) from testTable group by myField order by myField")
         .thenResultIs("INTEGER | LONG",
             "1    | 1",
             "2    | 1",
