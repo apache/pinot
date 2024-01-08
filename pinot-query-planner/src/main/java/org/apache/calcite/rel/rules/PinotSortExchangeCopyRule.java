@@ -42,6 +42,7 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
 
   public static final PinotSortExchangeCopyRule SORT_EXCHANGE_COPY =
       PinotSortExchangeCopyRule.Config.DEFAULT.toRule();
+  private static final int DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD = 10_000;
   private static final TypeFactory TYPE_FACTORY = new TypeFactory(new TypeSystem());
   private static final RexBuilder REX_BUILDER = new RexBuilder(TYPE_FACTORY);
   private static final RexLiteral REX_ZERO = REX_BUILDER.makeLiteral(0,
@@ -86,6 +87,10 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
     } else {
       int total = RexExpressionUtils.getValueAsInt(sort.fetch) + RexExpressionUtils.getValueAsInt(sort.offset);
       fetch = REX_BUILDER.makeLiteral(total, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER));
+    }
+    // do not transform sort-exchange copy when there's no fetch limit, or fetch amount is larger than threshold
+    if (fetch == null || RexExpressionUtils.getValueAsInt(fetch) > DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD) {
+      return;
     }
 
     final RelNode newExchangeInput = sort.copy(sort.getTraitSet(), exchange.getInput(), collation, null, fetch);
