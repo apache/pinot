@@ -31,7 +31,7 @@
           "\n    LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col1=[$0])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col2=[$1], col3=[$2])",
@@ -141,7 +141,7 @@
           "\n  LogicalAggregate(group=[{0, 1}], EXPR$2=[$SUM0($2)])",
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($0, 'a'))])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($0, _UTF-8'a'))])",
           "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -156,7 +156,7 @@
           "\n    LogicalAggregate(group=[{0}], EXPR$1=[COUNT()], EXPR$2=[$SUM0($1)], EXPR$3=[$SUM0($2)], agg#3=[MAX($1)], agg#4=[MIN($1)])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col2=[$1], col3=[$2], $f2=[CAST($0):DECIMAL(1000, 500) NOT NULL])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
+          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
           "\n            LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -169,7 +169,7 @@
           "\nLogicalFilter(condition=[>($1, 10)])",
           "\n  LogicalAggregate(group=[{0}], EXPR$1=[COUNT()], EXPR$2=[$SUM0($1)], EXPR$3=[$SUM0($2)])",
           "\n    LogicalProject(col2=[$1], col3=[$2], $f2=[CAST($0):DECIMAL(1000, 500) NOT NULL])",
-          "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
+          "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
           "\n        LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -181,7 +181,7 @@
           "Execution Plan",
           "\nLogicalAggregate(group=[{0}], EXPR$1=[COUNT()], EXPR$2=[$SUM0($1)], EXPR$3=[$SUM0($2)])",
           "\n  LogicalProject(col2=[$1], col3=[$2], $f2=[CAST($0):DECIMAL(1000, 500) NOT NULL])",
-          "\n    LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
+          "\n    LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
           "\n      LogicalTableScan(table=[[a]])",
           "\n"
         ]

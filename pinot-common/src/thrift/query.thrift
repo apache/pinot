@@ -81,6 +81,11 @@ union Literal {
   10: optional binary bigDecimalValue;
   // Use i32 to represent float since there is no native float type
   11: optional i32 floatValue;
+  12: optional list<i32> intArrayValue;
+  13: optional list<i64> longArrayValue;
+  14: optional list<i32> floatArrayValue;
+  15: optional list<double> doubleArrayValue;
+  16: optional list<string> stringArrayValue;
 }
 
 struct Identifier {

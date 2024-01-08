@@ -17,18 +17,15 @@
  * under the License.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Grid, makeStyles } from '@material-ui/core';
-import { TableData } from 'Models';
-import AppLoader from '../components/AppLoader';
-import PinotMethodUtils from '../utils/PinotMethodUtils';
-import CustomizedTables from '../components/Table';
 import CustomButton from '../components/CustomButton';
 import SimpleAccordion from '../components/SimpleAccordion';
 import AddSchemaOp from '../components/Homepage/Operations/AddSchemaOp';
 import AddOfflineTableOp from '../components/Homepage/Operations/AddOfflineTableOp';
 import AddRealtimeTableOp from '../components/Homepage/Operations/AddRealtimeTableOp';
-import Skeleton from '@material-ui/lab/Skeleton';
+import AsyncPinotTables from '../components/AsyncPinotTables';
+import { AsyncPinotSchemas } from '../components/AsyncPinotSchemas';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -44,27 +41,9 @@ const useStyles = makeStyles(() => ({
   },
 }));
 
-const TableTooltipData = [
-  null,
-  'Uncompressed size of all data segments with replication',
-  'Estimated size of all data segments with replication, in case any servers are not reachable for actual size',
-  null,
-  'GOOD if all replicas of all segments are up',
-];
-
 const TablesListingPage = () => {
   const classes = useStyles();
 
-  const [schemaDetails, setSchemaDetails] = useState<TableData>({
-    columns: PinotMethodUtils.allSchemaDetailsColumnHeader,
-    records: [],
-    isLoading: true,
-  });
-  const [tableData, setTableData] = useState<TableData>({
-    columns: PinotMethodUtils.allTableDetailsColumnHeader,
-    records: [],
-    isLoading: true,
-  });
   const [showSchemaModal, setShowSchemaModal] = useState(false);
   const [showAddOfflineTableModal, setShowAddOfflineTableModal] = useState(
     false
@@ -72,55 +51,11 @@ const TablesListingPage = () => {
   const [showAddRealtimeTableModal, setShowAddRealtimeTableModal] = useState(
     false
   );
-
-  const loading = { customRenderer: <Skeleton animation={'wave'} /> };
-
-  const fetchData = async () => {
-    const schemaResponse = await PinotMethodUtils.getQuerySchemaList();
-    const schemaList = [];
-    const schemaData = [];
-    schemaResponse.records.map((record) => {
-      schemaList.push(...record);
-    });
-    schemaList.map((schema) => {
-      schemaData.push([schema].concat([...Array(PinotMethodUtils.allSchemaDetailsColumnHeader.length - 1)].map((e) => loading)));
-    });
-    const tablesResponse = await PinotMethodUtils.getQueryTablesList({
-      bothType: true,
-    });
-    const tablesList = [];
-    const tableData = [];
-    tablesResponse.records.map((record) => {
-      tablesList.push(...record);
-    });
-    tablesList.map((table) => {
-      tableData.push([table].concat([...Array(PinotMethodUtils.allTableDetailsColumnHeader.length - 1)].map((e) => loading)));
-    });
-    // Set the table data to "Loading..." at first as tableSize can take minutes to fetch
-    // for larger tables.
-    setTableData({
-      columns: PinotMethodUtils.allTableDetailsColumnHeader,
-      records: tableData,
-      isLoading: false,
-    });
-
-    // Set just the column headers so these do not have to load with the data
-    setSchemaDetails({
-      columns: PinotMethodUtils.allSchemaDetailsColumnHeader,
-      records: schemaData,
-      isLoading: false,
-    });
-
-    // these implicitly set isLoading=false by leaving it undefined
-    const tableDetails = await PinotMethodUtils.getAllTableDetails(tablesList);
-    setTableData(tableDetails);
-    const schemaDetailsData = await PinotMethodUtils.getAllSchemaDetails(schemaList);
-    setSchemaDetails(schemaDetailsData);
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  // This is used to refresh the tables and schemas data after a new table or schema is added.
+  // This is quite hacky, but it's simpler than trying to useRef or useContext to maintain
+  // a link between this component and the child table and schema components.
+  const [tablesKey, setTablesKey] = useState(0);
+  const [schemasKey, setSchemasKey] = useState(0);
 
   return (
     <Grid item xs className={classes.gridContainer}>
@@ -157,29 +92,20 @@ const TablesListingPage = () => {
           </div>
         </SimpleAccordion>
       </div>
-      <CustomizedTables
+      <AsyncPinotTables
+        key={`table-${tablesKey}`}
         title="Tables"
-        data={tableData}
-        addLinks
-        baseURL="/tenants/table/"
-        showSearchBox={true}
-        inAccordionFormat={true}
-        tooltipData={TableTooltipData}
+        baseUrl="/tenants/table/"
       />
-      <CustomizedTables
-        title="Schemas"
-        data={schemaDetails}
-        showSearchBox={true}
-        inAccordionFormat={true}
-        addLinks
-        baseURL="/tenants/schema/"
-      />
+      <AsyncPinotSchemas key={`schema-${schemasKey}`} />
       {showSchemaModal && (
         <AddSchemaOp
           hideModal={() => {
             setShowSchemaModal(false);
           }}
-          fetchData={fetchData}
+          fetchData={() => {
+            setSchemasKey((prevKey) => prevKey + 1);
+          }}
         />
       )}
       {showAddOfflineTableModal && (
@@ -187,7 +113,9 @@ const TablesListingPage = () => {
           hideModal={() => {
             setShowAddOfflineTableModal(false);
           }}
-          fetchData={fetchData}
+          fetchData={() => {
+            setTablesKey((prevKey) => prevKey + 1);
+          }}
           tableType={'OFFLINE'}
         />
       )}
@@ -196,7 +124,9 @@ const TablesListingPage = () => {
           hideModal={() => {
             setShowAddRealtimeTableModal(false);
           }}
-          fetchData={fetchData}
+          fetchData={() => {
+            setTablesKey((prevKey) => prevKey + 1);
+          }}
           tableType={'REALTIME'}
         />
       )}

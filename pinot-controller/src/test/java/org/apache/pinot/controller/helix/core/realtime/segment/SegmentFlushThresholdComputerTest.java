@@ -26,6 +26,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.pinot.common.protocols.SegmentCompletionProtocol.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -103,6 +104,28 @@ public class SegmentFlushThresholdComputerTest {
         "newSegmentName");
 
     assertEquals(threshold, segmentSizeThreshold);
+  }
+
+  @Test
+  public void testUseLastSegmentsThresholdIfSegmentIsCommittingDueToForceCommit() {
+    long committingSegmentSizeBytes = 500_000L;
+    int committingSegmentSizeThreshold = 25_000;
+    SegmentFlushThresholdComputer computer = new SegmentFlushThresholdComputer();
+
+    CommittingSegmentDescriptor committingSegmentDescriptor = mock(CommittingSegmentDescriptor.class);
+    when(committingSegmentDescriptor.getSegmentSizeBytes()).thenReturn(committingSegmentSizeBytes);
+    when(committingSegmentDescriptor.getStopReason()).thenReturn(REASON_FORCE_COMMIT_MESSAGE_RECEIVED);
+
+    SegmentZKMetadata committingSegmentZKMetadata = mock(SegmentZKMetadata.class);
+    when(committingSegmentZKMetadata.getSizeThresholdToFlushSegment()).thenReturn(committingSegmentSizeThreshold);
+
+    StreamConfig streamConfig = mock(StreamConfig.class);
+
+    int newSegmentSizeThreshold =
+        computer.computeThreshold(streamConfig, committingSegmentDescriptor, committingSegmentZKMetadata,
+            "newSegmentName");
+
+    assertEquals(newSegmentSizeThreshold, committingSegmentSizeThreshold);
   }
 
   @Test
