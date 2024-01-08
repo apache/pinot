@@ -65,13 +65,13 @@ public class FirstWithTimeAggregationFunctionTest extends AbstractAggregationFun
   void aggrWithoutNull(Scenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField | timeField",
-            "null | 1",
+            "null                   | 1",
             scenario._valAsStr1 + " | 2",
-            "null | 3"
+            "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null | 4",
+            "null                   | 4",
             scenario._valAsStr2 + " | 5",
-            "null | 6"
+            "null                   | 6"
         )
         .whenQuery("select FIRST_WITH_TIME(myField, timeField, '" + scenario._dataType + "') from testTable")
         .thenResultIs(scenario._pinotDataType.name(), scenario._defaultNullValue);
@@ -81,29 +81,29 @@ public class FirstWithTimeAggregationFunctionTest extends AbstractAggregationFun
   void aggrWithNull(Scenario scenario) {
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField | timeField",
-            "null | 1",
+            "null                   | 1",
             scenario._valAsStr1 + " | 2",
-            "null | 3"
+            "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null | 4",
+            "null                   | 4",
             scenario._valAsStr2 + " | 5",
-            "null | 6"
+            "null                   | 6"
         )
         .whenQuery("select FIRST_WITH_TIME(myField, timeField, '" + scenario._dataType + "') from testTable")
-        .thenResultIs(scenario._pinotDataType.name(), scenario._defaultNullValue);
+        .thenResultIs(scenario._pinotDataType.name(), scenario._valAsStr1);
   }
 
   @Test(dataProvider = "scenarios")
   void aggrSvWithoutNull(Scenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField | timeField",
-            "null | 1",
+            "null                   | 1",
             scenario._valAsStr1 + " | 2",
-            "null | 3"
+            "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null | 4",
+            "null                   | 4",
             scenario._valAsStr2 + " | 5",
-            "null | 6"
+            "null                   | 6"
         ).whenQuery("select 'cte', FIRST_WITH_TIME(myField, timeField, '" + scenario._dataType + "') as mode "
             + "from testTable "
             + "group by 'cte'")
@@ -114,30 +114,30 @@ public class FirstWithTimeAggregationFunctionTest extends AbstractAggregationFun
   void aggrSvWithNull(Scenario scenario) {
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField | timeField",
-            "null | 1",
+            "null                   | 1",
             scenario._valAsStr1 + " | 2",
-            "null | 3"
+            "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null | 4",
+            "null                   | 4",
             scenario._valAsStr2 + " | 5",
-            "null | 6"
+            "null                   | 6"
         ).whenQuery("select 'cte', FIRST_WITH_TIME(myField, timeField, '" + scenario._dataType + "') as mode "
             + "from testTable "
             + "group by 'cte'")
-        .thenResultIs("STRING | " + scenario._pinotDataType.name(), "cte | " + scenario._defaultNullValue);
+        .thenResultIs("STRING | " + scenario._pinotDataType.name(), "cte | " + scenario._valAsStr1);
   }
 
   @Test(dataProvider = "scenarios")
   void aggrMvWithoutNull(Scenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField | timeField",
-            "null | 1",
+            "null                   | 1",
             scenario._valAsStr1 + " | 2",
-            "null | 3"
+            "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null | 4",
+            "null                   | 4",
             scenario._valAsStr2 + " | 5",
-            "null | 6"
+            "null                   | 6"
         ).whenQuery("select 'cte1' as cte1, 'cte2' as cte2, "
             + "FIRST_WITH_TIME(myField, timeField, '" + scenario._dataType + "') as mode "
             + "from testTable "
@@ -150,18 +150,18 @@ public class FirstWithTimeAggregationFunctionTest extends AbstractAggregationFun
   void aggrMvWithNull(Scenario scenario) {
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField | timeField",
-            "null | 1",
+            "null                   | 1",
             scenario._valAsStr1 + " | 2",
-            "null | 3"
+            "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null | 4",
+            "null                   | 4",
             scenario._valAsStr2 + " | 5",
-            "null | 6"
+            "null                   | 6"
         ).whenQuery("select 'cte1' as cte1, 'cte2' as cte2, "
             + "FIRST_WITH_TIME(myField, timeField, '" + scenario._dataType + "') as mode "
             + "from testTable "
             + "group by 'cte'")
         .thenResultIs("STRING | STRING | " + scenario._pinotDataType.name(),
-            "cte1 | cte2 | " + scenario._defaultNullValue);
+            "cte1 | cte2 | " + scenario._valAsStr1);
   }
 }

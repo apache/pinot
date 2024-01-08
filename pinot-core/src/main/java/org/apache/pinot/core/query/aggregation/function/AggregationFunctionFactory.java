@@ -221,17 +221,19 @@ public class AggregationFunctionFactory {
             DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
             switch (dataType) {
               case BOOLEAN:
-                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, true);
+                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled,
+                    true);
               case INT:
-                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, false);
+                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled,
+                    false);
               case LONG:
-                return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case FLOAT:
-                return new FirstFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new FirstFloatValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case DOUBLE:
-                return new FirstDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new FirstDoubleValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case STRING:
-                return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               default:
                 throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
             }

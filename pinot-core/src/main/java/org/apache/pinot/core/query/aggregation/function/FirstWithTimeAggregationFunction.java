@@ -29,9 +29,11 @@ import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.IntLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.roaringbitmap.IntIterator;
 
 
 /**
@@ -47,14 +49,13 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
-    extends BaseSingleInputAggregationFunction<ValueLongPair<V>, V> {
+    extends NullableSingleInputAggregationFunction<ValueLongPair<V>, V> {
   protected final ExpressionContext _timeCol;
   private final ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> _objectSerDe;
 
-  public FirstWithTimeAggregationFunction(ExpressionContext dataCol,
-      ExpressionContext timeCol,
-      ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe) {
-    super(dataCol);
+  public FirstWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      ObjectSerDeUtils.ObjectSerDe<? extends ValueLongPair<V>> objectSerDe, boolean nullHandlingEnabled) {
+    super(dataCol, nullHandlingEnabled);
     _timeCol = timeCol;
     _objectSerDe = objectSerDe;
   }
@@ -63,8 +64,7 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
 
   public abstract ValueLongPair<V> getDefaultValueTimePair();
 
-  public abstract void aggregateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, BlockValSet timeValSet);
+  public abstract V readCell(BlockValSet block, int docId);
 
   public abstract void aggregateGroupResultWithRawDataSv(int length,
       int[] groupKeyArray,
@@ -100,23 +100,43 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet blockTimeSet = blockValSetMap.get(_timeCol);
     if (blockValSet.getValueType() != DataType.BYTES) {
-      aggregateResultWithRawData(length, aggregationResultHolder, blockValSet, blockTimeSet);
-    } else {
-      ValueLongPair<V> defaultValueLongPair = getDefaultValueTimePair();
-      V firstData = defaultValueLongPair.getValue();
-      long firstTime = defaultValueLongPair.getTime();
-      // Serialized FirstPair
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
-        V data = firstWithTimePair.getValue();
-        long time = firstWithTimePair.getTime();
-        if (time <= firstTime) {
-          firstTime = time;
-          firstData = data;
+      IntLongPair defaultPair = new IntLongPair(Integer.MIN_VALUE, Long.MAX_VALUE);
+      long[] timeValues = blockTimeSet.getLongValuesSV();
+
+      IntIterator nullIdxIterator = orNullIterator(blockValSet, blockTimeSet);
+      IntLongPair bestPair = foldNotNull(length, nullIdxIterator, defaultPair, (pair, from, to) -> {
+        IntLongPair actualPair = pair;
+        for (int i = from; i < to; i++) {
+          long time = timeValues[i];
+          if (time <= actualPair.getTime()) {
+            actualPair = new IntLongPair(i, time);
+          }
         }
+        return actualPair;
+      });
+      V bestValue;
+      if (bestPair.getValue() < 0) {
+        bestValue = getDefaultValueTimePair().getValue();
+      } else {
+        bestValue = readCell(blockValSet, bestPair.getValue());
       }
-      setAggregationResult(aggregationResultHolder, firstData, firstTime);
+      setAggregationResult(aggregationResultHolder, bestValue, bestPair.getTime());
+    } else {
+      // We assume bytes contain the binary serialization of FirstPair
+      ValueLongPair<V> defaultValueLongPair = getDefaultValueTimePair();
+
+      ValueLongPair<V> result = constructValueLongPair(defaultValueLongPair.getValue(), defaultValueLongPair.getTime());
+      forEachNotNullBytes(length, blockValSet, bytes -> {
+        ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytes);
+        long time = firstWithTimePair.getTime();
+
+        if (time < result.getTime()) {
+          result.setTime(time);
+          result.setValue(firstWithTimePair.getValue());
+        }
+      });
+
+      setAggregationResult(aggregationResultHolder, result.getValue(), result.getTime());
     }
   }
 
@@ -137,14 +157,13 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
           blockValSet, timeValSet);
     } else {
       // Serialized FirstPair
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+      forEachNotNullBytes(length, blockValSet, (i, bytes) -> {
+        ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytes);
         setGroupByResult(groupKeyArray[i],
             groupByResultHolder,
             firstWithTimePair.getValue(),
             firstWithTimePair.getTime());
-      }
+      });
     }
   }
 
@@ -157,15 +176,14 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
       aggregateGroupResultWithRawDataMv(length, groupKeysArray, groupByResultHolder, blockValSet, timeValSet);
     } else {
       // Serialized ValueTimePair
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+      forEachNotNullBytes(length, blockValSet, (i, bytes) -> {
+        ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytes);
         V data = firstWithTimePair.getValue();
         long time = firstWithTimePair.getTime();
         for (int groupKey : groupKeysArray[i]) {
           setGroupByResult(groupKey, groupByResultHolder, data, time);
         }
-      }
+      });
     }
   }
 
