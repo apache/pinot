@@ -77,7 +77,6 @@ public class SegmentMapper {
   AdaptiveSizeBasedConstraintsChecker _constraintsChecker;
   private List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private List<RecordTransformer> _customRecordTransformers;
-  private final boolean _isSizeBasedConstraintsCheckerEnabled;
 
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
@@ -111,9 +110,6 @@ public class SegmentMapper {
     // initialize constraints checker
     _constraintsChecker =
         new AdaptiveSizeBasedConstraintsChecker(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold());
-
-    // Check if size based constraints checker is enabled.
-    _isSizeBasedConstraintsCheckerEnabled = _constraintsChecker.getBytesLimit() != Long.MAX_VALUE;
   }
 
   /**
@@ -184,7 +180,7 @@ public class SegmentMapper {
   private void mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
-    while (recordReader.hasNext() && (!_isSizeBasedConstraintsCheckerEnabled || _constraintsChecker.canWrite())) {
+    while (recordReader.hasNext() && (_constraintsChecker.canWrite())) {
       reuse = recordReader.next(reuse);
 
       // TODO: Add ComplexTypeTransformer here. Currently it is not idempotent so cannot add it
