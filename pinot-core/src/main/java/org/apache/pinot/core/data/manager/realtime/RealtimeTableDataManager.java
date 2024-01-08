@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
@@ -62,7 +63,6 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
-import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -531,17 +531,25 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // validDocId bitmap. Otherwise, the query can return wrong results, if accessing the premature segment.
     if (_tableUpsertMetadataManager.isPreloading()) {
       // Preloading segment happens when creating table manager when server restarts, and segment is ensured to be
-      // preloaded by a single thread, so no need for segmentLock.
+      // preloaded by a single thread, so no need to take a lock.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
       registerSegment(segmentName, newSegmentManager);
       _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
       return;
     }
-    // Replacing segment may happen in two threads, i.e. the consuming thread that's committing the mutable segment
-    // and a HelixTaskExecutor thread that's bringing segment from ONLINE to CONSUMING when the server finds
-    // consuming thread can't commit the segment in time. Adding segment should be done by a single HelixTaskExecutor
-    // thread but do it with segmentLock as well for simplicity.
-    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    // Replacing segment takes multiple steps, and particularly need to access the oldSegment. Replace segment may
+    // happen in two threads, i.e. the consuming thread that's committing the mutable segment and a HelixTaskExecutor
+    // thread that's bringing segment from ONLINE to CONSUMING when the server finds consuming thread can't commit
+    // the segment in time. The slower thread takes the reference of the oldSegment here, but it may get closed by
+    // the faster thread if not synchronized. In particular, the slower thread may iterate the primary keys in the
+    // oldSegment, causing seg fault. So we have to take a lock here.
+    // However, we can't just reuse the existing segmentLocks. Because many methods of partitionUpsertMetadataManager
+    // takes this lock internally, but after taking snapshot RW lock. If we take segmentLock here (before taking
+    // snapshot RW lock), we can get into deadlock with threads calling partitionUpsertMetadataManager's other
+    // methods, like removeSegment.
+    // Adding segment should be done by a single HelixTaskExecutor thread, but do it with lock here for simplicity
+    // otherwise, we'd need to double check if oldSegmentManager is null.
+    Lock segmentLock = UpsertSegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
     segmentLock.lock();
     try {
       SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
@@ -559,6 +567,25 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       }
     } finally {
       segmentLock.unlock();
+    }
+  }
+
+  // Same as the SegmentLocks, but just for handleUpsert method to synchronize threads doing segment replacement.
+  private static class UpsertSegmentLocks {
+    private UpsertSegmentLocks() {
+    }
+
+    private static final int NUM_LOCKS = 10000;
+    private static final Lock[] LOCKS = new Lock[NUM_LOCKS];
+
+    static {
+      for (int i = 0; i < NUM_LOCKS; i++) {
+        LOCKS[i] = new ReentrantLock();
+      }
+    }
+
+    public static Lock getSegmentLock(String tableNameWithType, String segmentName) {
+      return LOCKS[Math.abs((31 * tableNameWithType.hashCode() + segmentName.hashCode()) % NUM_LOCKS)];
     }
   }
 
