@@ -147,10 +147,6 @@ public class SegmentMapper {
                   recordReaderFileConfig._fieldsToRead, recordReaderFileConfig._recordReaderConfig);
           mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
           _recordReaderFileConfigs.get(i)._recordReader = recordReader;
-          if (!_adaptiveSizeBasedWriter.canWrite()) {
-            LOGGER.info("Stopping record readers at index: {} as size limit reached", i);
-            break;
-          }
         } finally {
           if (recordReader != null && !recordReader.hasNext()) {
             recordReader.close();
@@ -164,10 +160,15 @@ public class SegmentMapper {
         }
         mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
         _recordReaderFileConfigs.get(i)._recordReader = recordReader;
-        if (!_adaptiveSizeBasedWriter.canWrite()) {
-          LOGGER.info("Stopping record readers at index: {} as size limit reached", i);
-          break;
-        }
+      }
+      if (!_adaptiveSizeBasedWriter.canWrite()) {
+        observer.accept(String.format(
+            "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
+            _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
+        LOGGER.info(String.format(
+            "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
+            _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
+        break;
       }
       count++;
     }
@@ -201,14 +202,6 @@ public class SegmentMapper {
         }
       }
       reuse.clear();
-    }
-    if (!_adaptiveSizeBasedWriter.canWrite()) {
-      observer.accept(String.format(
-          "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
-          _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
-      LOGGER.info(String.format(
-          "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
-          _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
     }
   }
 
