@@ -41,7 +41,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
   private final int _maxChunkSize;
 
   // Thread local (reusable) byte[] to read bytes from data file.
-  private final ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[_lengthOfLongestEntry]);
+  private static ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[0]);
 
   public VarByteChunkSVForwardIndexReader(PinotDataBuffer dataBuffer, DataType valueType) {
     super(dataBuffer, valueType, true);
@@ -85,6 +85,10 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
 
     int length = valueEndOffset - valueStartOffset;
     byte[] bytes = _reusableBytes.get();
+    if (bytes.length < _lengthOfLongestEntry) {
+      _reusableBytes.set(new byte[_lengthOfLongestEntry]);
+      bytes = _reusableBytes.get();
+    }
     chunkBuffer.position(valueStartOffset);
     chunkBuffer.get(bytes, 0, length);
     return new String(bytes, 0, length, UTF_8);
