@@ -1780,7 +1780,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail("Should have failed table creation when delete column type is timestamp.");
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "The delete record column must be of type: String / Boolean / Numeric");
+      Assert.assertEquals(e.getMessage(),
+          "The deleteRecordColumn - timestampCol must be of type: String / Boolean / Numeric");
     }
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
@@ -1793,7 +1794,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail("Should have failed table creation when invalid delete column entered.");
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "Invalid delete record column found");
+      Assert.assertEquals(e.getMessage(), "Column invalidCol specified in deleteRecordColumn does not exist");
     }
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
@@ -1806,7 +1807,7 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail("Should have failed table creation when delete column type is multi-valued.");
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "The delete record column must be a single-valued column");
+      Assert.assertEquals(e.getMessage(), "The deleteRecordColumn - mvCol must be a single-valued column");
     }
 
     // upsert deleted-keys-ttl configs with no deleted column

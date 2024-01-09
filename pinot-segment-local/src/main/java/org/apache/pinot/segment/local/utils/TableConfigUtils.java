@@ -728,15 +728,15 @@ public final class TableConfigUtils {
       String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
       if (deleteRecordColumn != null) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
-        Preconditions.checkState(
-            fieldSpec != null,
-            "Invalid delete record column found");
-        Preconditions.checkState(
-            fieldSpec.isSingleValueField(),
-            "The delete record column must be a single-valued column");
+        Preconditions.checkState(fieldSpec != null,
+            String.format("Column %s specified in deleteRecordColumn does not exist", deleteRecordColumn));
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
         DataType dataType = fieldSpec.getDataType();
-        Preconditions.checkState(dataType == DataType.BOOLEAN || dataType == DataType.STRING
-                || dataType.isNumeric(), "The delete record column must be of type: String / Boolean / Numeric");
+        Preconditions.checkState(
+            dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
+            String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric",
+                deleteRecordColumn));
       }
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
