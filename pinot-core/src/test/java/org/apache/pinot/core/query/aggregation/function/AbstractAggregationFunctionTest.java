@@ -64,7 +64,16 @@ public class AbstractAggregationFunctionTest {
               .addDimensionField("myField", dt, f -> f.setNullable(true))
               .build()));
 
-  protected static final TableConfig SINGLE_FIELD_TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
+  protected static final Map<FieldSpec.DataType, Schema> SINGLE_NULLABLE_FIELD_AND_MULTI_FIELD_SCHEMAS =
+      Arrays.stream(VALID_DATA_TYPES)
+          .collect(Collectors.toMap(dt -> dt, dt -> new Schema.SchemaBuilder()
+              .setSchemaName("testTable")
+              .setEnableColumnBasedNullHandling(true)
+              .addDimensionField("myField", dt, f -> f.setNullable(true))
+              .addMultiValueDimension("multiField", FieldSpec.DataType.STRING)
+              .build()));
+
+  protected static final TableConfig EMPTY_TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
       .setTableName("testTable")
       .build();
 
