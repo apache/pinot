@@ -640,6 +640,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
       if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
         segmentsWithoutSnapshot.add(immutableSegment);
+        continue;
       }
       immutableSegment.persistValidDocIdsSnapshot();
       numImmutableSegments++;
