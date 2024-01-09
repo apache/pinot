@@ -1736,6 +1736,7 @@ public class TableConfigUtilsTest {
     String delCol = "myDelCol";
     String mvCol = "mvCol";
     String timestampCol = "timestampCol";
+    String invalidCol = "invalidCol";
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(stringTypeDelCol, FieldSpec.DataType.STRING)
@@ -1779,7 +1780,20 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail("Should have failed table creation when delete column type is timestamp.");
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "The delete record column must be of type: STRING / Boolean / numeric");
+      Assert.assertEquals(e.getMessage(), "The delete record column must be of type: String / Boolean / Numeric");
+    }
+
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn(invalidCol);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail("Should have failed table creation when invalid delete column entered.");
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Invalid delete record column found");
     }
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);

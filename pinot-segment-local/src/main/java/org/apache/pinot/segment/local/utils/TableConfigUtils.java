@@ -729,11 +729,14 @@ public final class TableConfigUtils {
       if (deleteRecordColumn != null) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
         Preconditions.checkState(
-            fieldSpec != null && fieldSpec.isSingleValueField(),
+            fieldSpec != null,
+            "Invalid delete record column found");
+        Preconditions.checkState(
+            fieldSpec.isSingleValueField(),
             "The delete record column must be a single-valued column");
         DataType dataType = fieldSpec.getDataType();
         Preconditions.checkState(dataType == DataType.BOOLEAN || dataType == DataType.STRING
-                || dataType.isNumeric(), "The delete record column must be of type: STRING / Boolean / numeric");
+                || dataType.isNumeric(), "The delete record column must be of type: String / Boolean / Numeric");
       }
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
