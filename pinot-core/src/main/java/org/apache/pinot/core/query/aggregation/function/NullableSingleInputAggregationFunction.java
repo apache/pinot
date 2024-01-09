@@ -233,7 +233,7 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
   }
 
   void forEachNotNullInt(int length, BlockValSet blockValSet, IntConsumer consumer) {
-    forEachNotNullDictId(length, blockValSet, (i, value) -> consumer.accept(value));
+    forEachNotNullInt(length, blockValSet, (i, value) -> consumer.accept(value));
   }
 
   void forEachNotNullInt(int length, BlockValSet blockValSet, IntValueConsumer consumer) {
