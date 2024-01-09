@@ -1479,7 +1479,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
       throw e;
     }
-    _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
+
+    try {
+      _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
+    } catch (Exception e) {
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+          new SegmentErrorInfo(now(), "Failed to initialize the RecordEnricherPipeline", e));
+      throw e;
+    }
     _transformPipeline = new TransformPipeline(tableConfig, schema);
     // Acquire semaphore to create stream consumers
     try {

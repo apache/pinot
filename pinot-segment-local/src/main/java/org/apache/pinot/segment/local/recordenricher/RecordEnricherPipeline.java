@@ -47,8 +47,8 @@ public class RecordEnricherPipeline {
         RecordEnricher enricher = (RecordEnricher) Class.forName(enrichmentConfig.getEnricherClassName()).newInstance();
         enricher.init(enrichmentConfig.getProperties());
         pipeline.add(enricher);
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to instantiate record enricher: " + enrichmentConfig.getEnricherClassName(),
+      } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+        throw new RuntimeException("Failed to instantiate record enricher" + enrichmentConfig.getEnricherClassName(),
             e);
       }
     }
