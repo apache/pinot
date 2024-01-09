@@ -382,17 +382,14 @@ public final class IngestionUtils {
       }
 
       fields.addAll(RecordEnricherPipeline.fromIngestionConfig(ingestionConfig).getColumnsToExtract());
-
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
         for (TransformConfig transformConfig : transformConfigs) {
           FunctionEvaluator expressionEvaluator =
               FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
           fields.addAll(expressionEvaluator.getArguments());
-          fields.add(
-              transformConfig.getColumnName()); // add the column itself too, so that if it is already transformed,
-          // we won't
-          // transform again
+          // add the column itself too, so that if it is already transformed, we won't transform again
+          fields.add(transformConfig.getColumnName());
         }
       }
       ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();
