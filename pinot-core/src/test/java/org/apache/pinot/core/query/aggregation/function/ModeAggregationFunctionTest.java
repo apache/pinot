@@ -215,6 +215,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
 
   @Test(dataProvider = "scenarios")
   void aggrMvWithoutNull(Scenario scenario) {
+    // TODO: This test is not actually exercising aggregateGroupByMV
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField",
             "null",
@@ -230,6 +231,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
 
   @Test(dataProvider = "scenarios")
   void aggrMvWithNull(Scenario scenario) {
+    // TODO: This test is not actually exercising aggregateGroupByMV
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField",
             "null",
