@@ -416,6 +416,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     long idleTimeoutMillis = _streamConfig.getIdleTimeoutMillis();
     _idleTimer.init();
 
+    try {
+      _partitionGroupConsumer.validateStreamState(_currentOffset);
+      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionGroupId,
+              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 0);
+    } catch (PermanentConsumerException pce) {
+      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionGroupId,
+              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 1);
+      _segmentLogger.error(pce.getMessage());
+      throw pce;
+    }
+
     StreamPartitionMsgOffset lastUpdatedOffset = _streamPartitionMsgOffsetFactory
         .create(_currentOffset);  // so that we always update the metric when we enter this method.
 
@@ -1663,15 +1674,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-    try {
-      _partitionGroupConsumer.validateStreamState(_currentOffset);
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, 0,
-              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 0);
-    } catch (PermanentConsumerException pce) {
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, 0,
-              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 1);
-      _segmentLogger.error(pce.getMessage());
-    }
     _partitionGroupConsumer.start(_currentOffset);
   }
 
@@ -1685,15 +1687,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     closePartitionGroupConsumer();
     _partitionGroupConsumer =
         _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-    try {
-      _partitionGroupConsumer.validateStreamState(_currentOffset);
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionGroupId,
-              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 0);
-    } catch (PermanentConsumerException pce) {
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionGroupId,
-              ServerGauge.INVALID_REALTIME_STREAM_STATE_EXCEPTION, 1);
-      _segmentLogger.error(pce.getMessage());
-    }
     _partitionGroupConsumer.start(_currentOffset);
   }
 

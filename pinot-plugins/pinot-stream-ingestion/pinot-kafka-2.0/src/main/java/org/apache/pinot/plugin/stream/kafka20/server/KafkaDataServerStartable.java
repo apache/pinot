@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.stream.kafka20.server;
 
 import com.google.common.base.Function;
+import com.google.common.collect.Maps;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collection;
@@ -26,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
@@ -95,8 +97,12 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
 
   @Override
   public void createTopic(String topic, Properties props) {
+    Map<String, String> map = new HashMap<>();
+    for (String key : props.stringPropertyNames()) {
+      map.put(key, props.getProperty(key));
+    }
     int partition = (Integer) props.get("partition");
-    Collection<NewTopic> topicList = Arrays.asList(new NewTopic(topic, partition, (short) 1));
+    Collection<NewTopic> topicList = Arrays.asList(new NewTopic(topic, partition, (short) 1).configs(map));
     _adminClient.createTopics(topicList);
     waitForCondition(new Function<Void, Boolean>() {
       @Nullable
