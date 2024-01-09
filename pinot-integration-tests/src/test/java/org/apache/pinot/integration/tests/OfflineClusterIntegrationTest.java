@@ -2882,15 +2882,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1, "{\"dataSchema\":{\"columnNames\":[\"SQL\",\"PLAN\"],\"columnDataTypes\":[\"STRING\","
         + "\"STRING\"]},\"rows\":[[\"EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable "
         + "GROUP BY name ORDER BY 1\",\"Execution Plan\\n"
-        + "LogicalSort(sort0=[$0], dir0=[ASC], offset=[0])\\n"
+        + "LogicalSort(sort0=[$0], dir0=[ASC])\\n"
         + "  PinotLogicalSortExchange("
         + "distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])\\n"
-        + "    LogicalSort(sort0=[$0], dir0=[ASC])\\n"
-        + "      LogicalProject(count=[$1], name=[$0])\\n"
-        + "        LogicalAggregate(group=[{0}], agg#0=[COUNT($1)])\\n"
-        + "          PinotLogicalExchange(distribution=[hash[0]])\\n"
-        + "            LogicalAggregate(group=[{17}], agg#0=[COUNT()])\\n"
-        + "              LogicalTableScan(table=[[mytable]])\\n"
+        + "    LogicalProject(count=[$1], name=[$0])\\n"
+        + "      LogicalAggregate(group=[{0}], agg#0=[COUNT($1)])\\n"
+        + "        PinotLogicalExchange(distribution=[hash[0]])\\n"
+        + "          LogicalAggregate(group=[{17}], agg#0=[COUNT()])\\n"
+        + "            LogicalTableScan(table=[[mytable]])\\n"
         + "\"]]}");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate

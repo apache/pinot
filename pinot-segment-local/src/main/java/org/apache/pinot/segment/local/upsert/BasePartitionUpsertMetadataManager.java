@@ -26,6 +26,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -627,12 +628,27 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     long startTimeMs = System.currentTimeMillis();
 
     int numImmutableSegments = 0;
+    // The segments without validDocIds snapshots should take their snapshots at last. So that when there is failure
+    // to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of valid docs across
+    // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
+    // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
+    Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     for (IndexSegment segment : _trackedSegments) {
-      if (segment instanceof ImmutableSegmentImpl) {
-        ((ImmutableSegmentImpl) segment).persistValidDocIdsSnapshot();
-        numImmutableSegments++;
-        numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+      if (!(segment instanceof ImmutableSegmentImpl)) {
+        continue;
       }
+      ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+      if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
+        segmentsWithoutSnapshot.add(immutableSegment);
+      }
+      immutableSegment.persistValidDocIdsSnapshot();
+      numImmutableSegments++;
+      numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+    }
+    for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
+      segment.persistValidDocIdsSnapshot();
+      numImmutableSegments++;
+      numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
     }
 
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,

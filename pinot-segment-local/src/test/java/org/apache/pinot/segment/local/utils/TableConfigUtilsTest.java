@@ -1674,8 +1674,22 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
       Assert.fail("Tag override must not be allowed with upsert");
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "Upsert/Dedup table cannot use tenant tag override");
+      Assert.assertEquals(e.getMessage(), "Invalid tenant tag override used for Upsert/Dedup table");
     }
+
+    // valid tag override with upsert
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(getStreamConfigs())
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .setTagOverrideConfig(new TagOverrideConfig("T1_REALTIME", "T1_REALTIME")).build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
+    // empty tag override with upsert should pass
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(getStreamConfigs())
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .setTagOverrideConfig(new TagOverrideConfig(null, null)).build();
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
 
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setUpsertConfig(upsertConfig)
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))

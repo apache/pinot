@@ -157,7 +157,9 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   private void preloadSegments()
       throws Exception {
     LOGGER.info("Preload segments from table: {} for fast upsert metadata recovery", _tableNameWithType);
-    onPreloadStart();
+    if (!onPreloadStart()) {
+      return;
+    }
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
     String instanceId = getInstanceId();
     IndexLoadingConfig indexLoadingConfig = createIndexLoadingConfig();
@@ -196,8 +198,11 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
   /**
    * Can be overridden to perform operations before preload starts.
+   *
+   * @return whether to continue the preloading logic.
    */
-  protected void onPreloadStart() {
+  protected boolean onPreloadStart() {
+    return true;
   }
 
   /**
