@@ -731,6 +731,9 @@ public final class TableConfigUtils {
         Preconditions.checkState(
             fieldSpec != null && fieldSpec.isSingleValueField(),
             "The delete record column must be a single-valued column");
+        DataType dataType = fieldSpec.getDataType();
+        Preconditions.checkState(dataType == DataType.BOOLEAN || dataType == DataType.STRING
+                || dataType.isNumeric(), "The delete record column must be of type: STRING / Boolean / numeric");
       }
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();

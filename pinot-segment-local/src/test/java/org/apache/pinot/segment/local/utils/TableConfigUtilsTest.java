@@ -1735,10 +1735,12 @@ public class TableConfigUtilsTest {
     String stringTypeDelCol = "stringTypeDelCol";
     String delCol = "myDelCol";
     String mvCol = "mvCol";
+    String timestampCol = "timestampCol";
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension(stringTypeDelCol, FieldSpec.DataType.STRING)
         .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(timestampCol, FieldSpec.DataType.TIMESTAMP)
         .addMultiValueDimension(mvCol, FieldSpec.DataType.STRING).build();
     streamConfigs = getStreamConfigs();
     streamConfigs.put("stream.kafka.consumer.type", "simple");
@@ -1768,6 +1770,19 @@ public class TableConfigUtilsTest {
     }
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn(timestampCol);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+            .setUpsertConfig(upsertConfig)
+            .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+            .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail("Should have failed table creation when delete column type is timestamp.");
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "The delete record column must be of type: STRING / Boolean / numeric");
+    }
+
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(mvCol);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
         .setUpsertConfig(upsertConfig)
@@ -1775,7 +1790,7 @@ public class TableConfigUtilsTest {
         .build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
-      Assert.fail("Shouldn have failed table creation when delete column type is multi-valued.");
+      Assert.fail("Should have failed table creation when delete column type is multi-valued.");
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(), "The delete record column must be a single-valued column");
     }
