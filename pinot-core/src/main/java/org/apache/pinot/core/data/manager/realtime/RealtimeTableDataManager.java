@@ -32,7 +32,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
@@ -63,6 +62,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -115,6 +115,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
+  private static final SegmentLocks SEGMENT_UPSERT_LOCKS = SegmentLocks.create();
 
   // TODO: Change it to BooleanSupplier
   private final Supplier<Boolean> _isServerReadyToServeQueries;
@@ -548,8 +549,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // snapshot RW lock), we can get into deadlock with threads calling partitionUpsertMetadataManager's other
     // methods, like removeSegment.
     // Adding segment should be done by a single HelixTaskExecutor thread, but do it with lock here for simplicity
-    // otherwise, we'd need to double check if oldSegmentManager is null.
-    Lock segmentLock = UpsertSegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    // otherwise, we'd need to double-check if oldSegmentManager is null.
+    Lock segmentLock = SEGMENT_UPSERT_LOCKS.getLock(_tableNameWithType, segmentName);
     segmentLock.lock();
     try {
       SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
@@ -567,25 +568,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       }
     } finally {
       segmentLock.unlock();
-    }
-  }
-
-  // Same as the SegmentLocks, but just for handleUpsert method to synchronize threads doing segment replacement.
-  private static class UpsertSegmentLocks {
-    private UpsertSegmentLocks() {
-    }
-
-    private static final int NUM_LOCKS = 10000;
-    private static final Lock[] LOCKS = new Lock[NUM_LOCKS];
-
-    static {
-      for (int i = 0; i < NUM_LOCKS; i++) {
-        LOCKS[i] = new ReentrantLock();
-      }
-    }
-
-    public static Lock getSegmentLock(String tableNameWithType, String segmentName) {
-      return LOCKS[Math.abs((31 * tableNameWithType.hashCode() + segmentName.hashCode()) % NUM_LOCKS)];
     }
   }
 
