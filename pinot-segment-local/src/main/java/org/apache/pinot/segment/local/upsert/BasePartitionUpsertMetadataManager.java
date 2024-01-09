@@ -640,6 +640,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
       if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
         segmentsWithoutSnapshot.add(immutableSegment);
+        continue;
       }
       immutableSegment.persistValidDocIdsSnapshot();
       numImmutableSegments++;
@@ -655,8 +656,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
-    _logger.info("Finished taking snapshot for {} immutable segments (out of {} total segments) in {}ms",
-        numImmutableSegments, numTrackedSegments, System.currentTimeMillis() - startTimeMs);
+    _logger.info(
+        "Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments) in {}ms",
+        numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments, System.currentTimeMillis() - startTimeMs);
   }
 
   /**
