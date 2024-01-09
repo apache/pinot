@@ -24,6 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.OnHeapDictionaryConfig;
 
 
 public class DictionaryIndexConfig extends IndexConfig {
@@ -43,7 +44,7 @@ public class DictionaryIndexConfig extends IndexConfig {
   @JsonCreator
   public DictionaryIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("onHeap") Boolean onHeap,
       @JsonProperty("useVarLengthDictionary") @Nullable Boolean useVarLengthDictionary,
-      @JsonProperty("onHeapConfig") @Nullable OnHeapDictionaryConfig onHeapDictionaryConfig) {
+      @JsonProperty("onHeapDictionaryConfig") @Nullable OnHeapDictionaryConfig onHeapDictionaryConfig) {
     super(disabled);
     _onHeap = onHeap != null && onHeap;
     _useVarLengthDictionary = Boolean.TRUE.equals(useVarLengthDictionary);

@@ -21,13 +21,14 @@ package org.apache.pinot.segment.local.segment.index.dictionary;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
-import org.apache.pinot.segment.spi.index.OnHeapDictionaryConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.OnHeapDictionaryConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -205,7 +206,7 @@ public class DictionaryIndexTypeTest {
           + "    \"indexes\" : {\n"
           + "      \"dictionary\": {\n"
           + "        \"onHeap\": true,\n"
-          + "        \"onHeapConfig\": {\n"
+          + "        \"onHeapDictionaryConfig\": {\n"
           + "          \"enableInterning\":true ,\n"
           + "          \"internerCapacity\":1000\n"
           + "        }"
@@ -224,7 +225,7 @@ public class DictionaryIndexTypeTest {
           + "    \"indexes\" : {\n"
           + "      \"dictionary\": {\n"
           + "        \"onHeap\": false,\n"
-          + "        \"onHeapConfig\": {\n"
+          + "        \"onHeapDictionaryConfig\": {\n"
           + "          \"enableInterning\":true ,\n"
           + "          \"internerCapacity\":1000\n"
           + "        }"
@@ -243,12 +244,12 @@ public class DictionaryIndexTypeTest {
           + "    \"indexes\" : {\n"
           + "      \"dictionary\": {\n"
           + "        \"onHeap\": true,\n"
-          + "        \"onHeapConfig\": {\n"
+          + "        \"onHeapDictionaryConfig\": {\n"
           + "        }"
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(true, false, null));
+      assertEquals(new DictionaryIndexConfig(true, false, new OnHeapDictionaryConfig(false, 0)));
     }
 
     @Test
@@ -260,13 +261,13 @@ public class DictionaryIndexTypeTest {
           + "    \"indexes\" : {\n"
           + "      \"dictionary\": {\n"
           + "        \"onHeap\": true,\n"
-          + "        \"onHeapConfig\": {\n"
+          + "        \"onHeapDictionaryConfig\": {\n"
           + "          \"enableInterning\":true \n"
           + "        }"
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(true, false, new OnHeapDictionaryConfig(true, 32000000)));
+      assertThrows(UncheckedIOException.class, () -> getActualConfig("dimInt", StandardIndexes.dictionary()));
     }
 
     @Test
@@ -278,13 +279,13 @@ public class DictionaryIndexTypeTest {
           + "    \"indexes\" : {\n"
           + "      \"dictionary\": {\n"
           + "        \"onHeap\": true,\n"
-          + "        \"onHeapConfig\": {\n"
+          + "        \"onHeapDictionaryConfig\": {\n"
           + "          \"internerCapacity\":1024 \n"
           + "        }"
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(true, false, null));
+      assertThrows(UncheckedIOException.class, () -> getActualConfig("dimInt", StandardIndexes.dictionary()));
     }
 
     @Test

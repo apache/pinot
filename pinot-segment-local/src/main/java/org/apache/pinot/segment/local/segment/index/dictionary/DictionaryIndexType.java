@@ -69,7 +69,6 @@ import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.IndexUtil;
-import org.apache.pinot.segment.spi.index.OnHeapDictionaryConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
@@ -80,6 +79,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.OnHeapDictionaryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -116,12 +116,15 @@ public class DictionaryIndexType
     Set<String> noDictionaryCols = indexLoadingConfig.getNoDictionaryColumns();
     Set<String> onHeapCols = indexLoadingConfig.getOnHeapDictionaryColumns();
     Set<String> varLengthCols = indexLoadingConfig.getVarLengthDictionaryColumns();
+    Map<String, OnHeapDictionaryConfig> onHeapDictionaryConfigs = indexLoadingConfig.getOnHeapDictionaryConfigs();
     for (String column : indexLoadingConfig.getAllKnownColumns()) {
       if (noDictionaryCols.contains(column)) {
         result.put(column, DictionaryIndexConfig.disabled());
       } else {
+        boolean loadOnHeap = onHeapCols.contains(column);
+        OnHeapDictionaryConfig onHeapConfig = loadOnHeap ? onHeapDictionaryConfigs.get(column) : null;
         result.put(column,
-            new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column), null));
+            new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column), onHeapConfig));
       }
     }
     return result;
@@ -172,10 +175,14 @@ public class DictionaryIndexType
       Set<String> varLength = new HashSet<>(
           ic.getVarLengthDictionaryColumns() == null ? Collections.emptyList() : ic.getVarLengthDictionaryColumns()
       );
+      Map<String, OnHeapDictionaryConfig> onHeapDictConfigMap = new HashMap<>(
+          ic.getOnHeapDictionaryConfigs() == null ? Collections.emptyMap() : ic.getOnHeapDictionaryConfigs()
+      );
+
       Function<String, DictionaryIndexConfig> valueCalculator =
-          column -> new DictionaryIndexConfig(onHeap.contains(column), varLength.contains(column), null);
-      return Sets.union(onHeap, varLength).stream()
-          .collect(Collectors.toMap(Function.identity(), valueCalculator));
+          column -> new DictionaryIndexConfig(onHeap.contains(column), varLength.contains(column),
+              onHeapDictConfigMap.get(column));
+      return Sets.union(onHeap, varLength).stream().collect(Collectors.toMap(Function.identity(), valueCalculator));
     };
 
     return fromNoDictConf
@@ -296,13 +303,13 @@ public class DictionaryIndexType
     if (loadOnHeap) {
       String columnName = metadata.getColumnName();
       OnHeapDictionaryConfig onHeapConfig = indexConfig.getOnHeapDictionaryConfig();
-      if (onHeapConfig.enableInterning()) {
+      if (onHeapConfig != null && onHeapConfig.isEnableInterning()) {
         _strInternerInfoMap.putIfAbsent(columnName, new FALFInterner<>(onHeapConfig.getInternerCapacity()));
         _byteInternerInfoMap.putIfAbsent(columnName,
             new FALFInterner<>(onHeapConfig.getInternerCapacity(), Arrays::hashCode));
       }
 
-      LOGGER.info("Loading on-heap dictionary for column: {} with interning=", columnName,
+      LOGGER.info("Loading on-heap dictionary for column: {} with interning={}", columnName,
           _strInternerInfoMap.containsKey(columnName));
     }
 

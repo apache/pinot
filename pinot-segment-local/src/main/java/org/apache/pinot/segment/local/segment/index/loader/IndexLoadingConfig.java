@@ -53,6 +53,7 @@ import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.OnHeapDictionaryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -92,6 +93,7 @@ public class IndexLoadingConfig {
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
   private Set<String> _forwardIndexDisabledColumns = new HashSet<>();
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
+  private Map<String, OnHeapDictionaryConfig> _onHeapDictionaryConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
@@ -233,8 +235,14 @@ public class IndexLoadingConfig {
     }
 
     List<String> onHeapDictionaryColumns = indexingConfig.getOnHeapDictionaryColumns();
+    Map<String, OnHeapDictionaryConfig> onHeapDictionaryConfigMap = indexingConfig.getOnHeapDictionaryConfigs();
     if (onHeapDictionaryColumns != null) {
-      _onHeapDictionaryColumns.addAll(onHeapDictionaryColumns);
+      for (String col : onHeapDictionaryColumns) {
+        _onHeapDictionaryColumns.add(col);
+        if (onHeapDictionaryConfigMap != null && onHeapDictionaryConfigMap.containsKey(col)) {
+          _onHeapDictionaryConfigs.put(col, onHeapDictionaryConfigMap.get(col));
+        }
+      }
     }
 
     String tableSegmentVersion = indexingConfig.getSegmentFormatVersion();
@@ -293,6 +301,7 @@ public class IndexLoadingConfig {
 
     ColumnConfigDeserializer<C> stdDeserializer = indexType::getConfig;
     if (indexType instanceof ConfigurableFromIndexLoadingConfig) {
+
       @SuppressWarnings("unchecked")
       Map<String, C> fromIndexLoadingConfig =
           ((ConfigurableFromIndexLoadingConfig<C>) indexType).fromIndexLoadingConfig(this);
@@ -796,6 +805,10 @@ public class IndexLoadingConfig {
 
   public Map<String, BloomFilterConfig> getBloomFilterConfigs() {
     return unmodifiable(_bloomFilterConfigs);
+  }
+
+  public Map<String, OnHeapDictionaryConfig> getOnHeapDictionaryConfigs() {
+    return unmodifiable(_onHeapDictionaryConfigs);
   }
 
   public boolean isEnableDynamicStarTreeCreation() {
