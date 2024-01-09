@@ -259,6 +259,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     long requestId = _brokerIdGenerator.get();
     requestContext.setRequestId(requestId);
+    if (httpHeaders != null) {
+      requestContext.setRequestHttpHeaders(httpHeaders.getRequestHeaders().entrySet().stream()
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    }
 
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.

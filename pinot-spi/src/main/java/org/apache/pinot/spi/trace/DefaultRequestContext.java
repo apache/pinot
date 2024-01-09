@@ -80,6 +80,7 @@ public class DefaultRequestContext implements RequestScope {
   private long _explainPlanNumMatchAllFilterSegments;
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<String> _processingExceptions = new ArrayList<>();
+  private Map<String, List<String>> _requestHttpHeaders = new HashMap<>();
 
   public DefaultRequestContext() {
   }
@@ -560,6 +561,16 @@ public class DefaultRequestContext implements RequestScope {
   @Override
   public void setProcessingExceptions(List<String> processingExceptions) {
     _processingExceptions.addAll(processingExceptions);
+  }
+
+  @Override
+  public Map<String, List<String>> getRequestHttpHeaders() {
+    return _requestHttpHeaders;
+  }
+
+  @Override
+  public void setRequestHttpHeaders(Map<String, List<String>> requestHttpHeaders) {
+    _requestHttpHeaders.putAll(requestHttpHeaders);
   }
 
   @Override
