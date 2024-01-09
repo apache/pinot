@@ -151,7 +151,6 @@ public class BasePartitionUpsertMetadataManagerTest {
     protected void addOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
         @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
         @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
-
     }
 
     @Override
@@ -161,7 +160,6 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     @Override
     protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-
     }
 
     @Override
@@ -171,7 +169,6 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     @Override
     protected void doRemoveExpiredPrimaryKeys() {
-
     }
   }
 }
