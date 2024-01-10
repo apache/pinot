@@ -93,6 +93,18 @@ public class VarLengthValueWriter implements Closeable {
   private final ByteBuffer _offsetBuffer;
   private final ByteBuffer _valueBuffer;
 
+  public VarLengthValueWriter(ByteBuffer offsetBuffer, int numValues) {
+    _offsetBuffer = offsetBuffer;
+    _offsetBuffer.put(MAGIC_BYTES);
+    _offsetBuffer.putInt(VERSION);
+    _offsetBuffer.putInt(numValues);
+    _offsetBuffer.putInt(HEADER_LENGTH);
+
+    _valueBuffer = _offsetBuffer.duplicate();
+    _valueBuffer.position(HEADER_LENGTH + (numValues + 1) * Integer.BYTES);
+    _fileChannel = null;
+  }
+
   public VarLengthValueWriter(File outputFile, int numValues)
       throws IOException {
     _fileChannel = new RandomAccessFile(outputFile, "rw").getChannel();
@@ -124,11 +136,14 @@ public class VarLengthValueWriter implements Closeable {
       throws IOException {
     int fileLength = _valueBuffer.position();
     _offsetBuffer.putInt(fileLength);
-    _fileChannel.truncate(fileLength);
-    _fileChannel.close();
-    if (CleanerUtil.UNMAP_SUPPORTED) {
-      CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
-      cleaner.freeBuffer(_offsetBuffer);
+
+    if (_fileChannel != null) {
+      _fileChannel.truncate(fileLength);
+      _fileChannel.close();
+      if (CleanerUtil.UNMAP_SUPPORTED) {
+        CleanerUtil.BufferCleaner cleaner = CleanerUtil.getCleaner();
+        cleaner.freeBuffer(_offsetBuffer);
+      }
     }
   }
 }

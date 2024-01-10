@@ -21,21 +21,44 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Arrays;
 import java.util.Set;
+import org.apache.pinot.segment.local.recordenricher.clp.CLPEncodingEnricher;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.spi.config.table.FieldConfig;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
+  public static class CLPStats {
+    private String[] _sortedLogTypeValues;
+    private String[] _sortedDictVarValues;
+    private final CLPEncodingEnricher
+
+    public void collect(String logLine) {
+
+    }
+
+    public void close() {
+
+    }
+  }
   private Set<String> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   private int _minLength = Integer.MAX_VALUE;
   private int _maxLength = 0;
   private int _maxRowLength = 0;
   private String[] _sortedValues;
   private boolean _sealed = false;
+  private CLPStats _clpStats;
 
   public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
+    if (_fieldConfig != null) {
+      if (_fieldConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+        _clpStats = new CLPStats();
+      }
+    }
   }
 
   @Override

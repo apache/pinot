@@ -156,6 +156,9 @@ public class ForwardIndexConfig extends IndexConfig {
         case LZ4:
           _chunkCompressionType = ChunkCompressionType.LZ4;
           break;
+        case CLP:
+          _chunkCompressionType = ChunkCompressionType.CLP;
+          break;
         case MV_ENTRY_DICT:
           _dictIdCompressionType = DictIdCompressionType.MV_ENTRY_DICT;
           break;

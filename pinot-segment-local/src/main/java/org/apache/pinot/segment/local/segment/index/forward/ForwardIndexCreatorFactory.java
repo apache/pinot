@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsort
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
@@ -77,7 +78,7 @@ public class ForwardIndexCreatorFactory {
       int writerVersion = indexConfig.getRawIndexWriterVersion();
       if (fieldSpec.isSingleValueField()) {
         return getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion);
+            context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion, context.getColumnStatistics());
       } else {
         return getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
             context.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
@@ -92,7 +93,7 @@ public class ForwardIndexCreatorFactory {
    */
   public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File indexDir, ChunkCompressionType compressionType,
       String column, DataType storedType, int numTotalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
-      int writerVersion)
+      int writerVersion, ColumnStatistics columnStatistics)
       throws IOException {
     switch (storedType) {
       case INT:
@@ -105,7 +106,7 @@ public class ForwardIndexCreatorFactory {
       case STRING:
       case BYTES:
         return new SingleValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
-            lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion);
+            lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion, columnStatistics);
       default:
         throw new IllegalStateException("Unsupported stored type: " + storedType);
     }

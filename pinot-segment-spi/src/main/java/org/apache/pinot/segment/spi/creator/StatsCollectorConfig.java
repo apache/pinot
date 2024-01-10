@@ -19,8 +19,10 @@
 package org.apache.pinot.segment.spi.creator;
 
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -36,6 +38,7 @@ public class StatsCollectorConfig {
   private final TableConfig _tableConfig;
   private final Schema _schema;
   private final SegmentPartitionConfig _segmentPartitionConfig;
+  private final Map<String, FieldConfig> _columnFieldConfigMap;
 
   /**
    * Constructor for the class.
@@ -49,6 +52,13 @@ public class StatsCollectorConfig {
     _tableConfig = tableConfig;
     _schema = schema;
     _segmentPartitionConfig = segmentPartitionConfig;
+    _columnFieldConfigMap = new HashMap<>();
+    if (tableConfig.getFieldConfigList() != null) {
+      for (FieldConfig fieldConfig : tableConfig.getFieldConfigList()) {
+        _columnFieldConfigMap.put(fieldConfig.getName(), fieldConfig);
+      }
+    }
+
   }
 
   @Nullable
@@ -88,5 +98,10 @@ public class StatsCollectorConfig {
 
   public TableConfig getTableConfig() {
     return _tableConfig;
+  }
+
+  @Nullable
+  public FieldConfig getFieldConfigForColumn(String column) {
+    return _columnFieldConfigMap.get(column);
   }
 }

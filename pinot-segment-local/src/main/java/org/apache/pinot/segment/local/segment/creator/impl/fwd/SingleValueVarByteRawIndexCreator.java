@@ -22,11 +22,13 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
+import org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWriterV1;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -57,7 +59,7 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
       int totalDocs, DataType valueType, int maxLength)
       throws IOException {
     this(baseIndexDir, compressionType, column, totalDocs, valueType, maxLength, false,
-        ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION);
+        ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION, null);
   }
 
   /**
@@ -73,14 +75,20 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
    * @throws IOException
    */
   public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
-      int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion)
+      int totalDocs, DataType valueType, int maxLength, boolean deriveNumDocsPerChunk, int writerVersion,
+      ColumnStatistics columnStatistics)
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-    int numDocsPerChunk = deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
-    _indexWriter = writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(file,
-        compressionType, totalDocs, numDocsPerChunk, maxLength, writerVersion)
-        : new VarByteChunkForwardIndexWriterV4(file, compressionType, TARGET_MAX_CHUNK_SIZE);
-    _valueType = valueType;
+    if (compressionType == ChunkCompressionType.CLP) {
+      _indexWriter = new CLPForwardIndexWriterV1(file, totalDocs, columnStatistics);
+      _valueType = valueType;
+    } else {
+      int numDocsPerChunk = deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
+      _indexWriter = writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(file,
+          compressionType, totalDocs, numDocsPerChunk, maxLength, writerVersion)
+          : new VarByteChunkForwardIndexWriterV4(file, compressionType, TARGET_MAX_CHUNK_SIZE);
+      _valueType = valueType;
+    }
   }
 
   @VisibleForTesting

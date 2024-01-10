@@ -60,7 +60,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
     }
   }
 
-  private PinotByteBuffer(ByteBuffer buffer, boolean closeable, boolean flushable) {
+  public PinotByteBuffer(ByteBuffer buffer, boolean closeable, boolean flushable) {
     super(closeable);
     _buffer = buffer;
     _flushable = flushable;
