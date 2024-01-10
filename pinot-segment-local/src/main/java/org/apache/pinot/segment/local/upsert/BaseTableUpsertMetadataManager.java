@@ -105,7 +105,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         .setPrimaryKeyColumns(primaryKeyColumns).setComparisonColumns(comparisonColumns)
         .setDeleteRecordColumn(deleteRecordColumn).setHashFunction(hashFunction)
         .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot).setEnablePreload(enablePreload)
-        .setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL).setTableIndexDir(tableIndexDir).build();
+        .setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL).setTableIndexDir(tableIndexDir)
+        .setHelixManager(_helixManager).build();
     LOGGER.info(
         "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
             + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
