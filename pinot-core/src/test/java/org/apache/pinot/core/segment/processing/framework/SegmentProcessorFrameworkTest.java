@@ -582,6 +582,51 @@ public class SegmentProcessorFrameworkTest {
   }
 
   @Test
+  public void testConfigurableMapperOutputSize()
+      throws Exception {
+    File workingDir = new File(TEMP_DIR, "multiple_segments_output");
+    FileUtils.forceMkdir(workingDir);
+    int expectedTotalDocsCount = 10;
+
+    // Default configs.
+    SegmentProcessorConfig config =
+        new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
+    List<File> outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    String[] outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
+    assertEquals(segmentMetadata.getTotalDocs(), expectedTotalDocsCount);
+    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_multipleSegments);
+
+    // Create a segmentConfig with intermediate mapper output size threshold set to the number of bytes in each row
+    // from the data. In this way, we can test if each row is written to a separate segment.
+    SegmentConfig segmentConfig =
+        new SegmentConfig.Builder().setIntermediateFileSizeThreshold(16).setSegmentNamePrefix("testPrefix")
+            .setSegmentNamePostfix("testPostfix").build();
+    config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(_tableConfig)
+        .setSchema(_schema).build();
+    framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), expectedTotalDocsCount);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
+
+    // Verify that each segment has only one row, and the segment name is correct.
+
+    for (int i = 0; i < expectedTotalDocsCount; i++) {
+      segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
+      assertEquals(segmentMetadata.getTotalDocs(), 1);
+      assertTrue(segmentMetadata.getName().matches("testPrefix_.*_testPostfix_" + i));
+    }
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_multipleSegments);
+  }
+
+  @Test
   public void testMultiValue()
       throws Exception {
     File workingDir = new File(TEMP_DIR, "output_directory_multi_value");
