@@ -89,7 +89,8 @@ public class PinotSortExchangeCopyRule extends RelRule<RelRule.Config> {
       fetch = REX_BUILDER.makeLiteral(total, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER));
     }
     // do not transform sort-exchange copy when there's no fetch limit, or fetch amount is larger than threshold
-    if (fetch == null || RexExpressionUtils.getValueAsInt(fetch) > DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD) {
+    if (!collation.getFieldCollations().isEmpty()
+        && (fetch == null || RexExpressionUtils.getValueAsInt(fetch) > DEFAULT_SORT_EXCHANGE_COPY_THRESHOLD)) {
       return;
     }
 
