@@ -50,6 +50,18 @@
         ]
       },
       {
+        "description": "Select * with super large limit",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM b LIMIT 10000000",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[10000000])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[10000000])",
+          "\n      LogicalTableScan(table=[[b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Select * order by on 2 columns with super large limit",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM b ORDER BY col1, col2 DESC LIMIT 10000000",
         "output": [
