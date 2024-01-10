@@ -316,7 +316,7 @@ public class AggregationFunctionFactory {
             }
           }
           case MINMAXRANGE:
-            return new MinMaxRangeAggregationFunction(arguments);
+            return new MinMaxRangeAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNT:
             return new DistinctCountAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:
