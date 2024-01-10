@@ -84,11 +84,9 @@ public class LastWithTimeAggregationFunctionTest extends AbstractAggregationFunc
   void aggrWithoutNull(Scenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField | timeField",
-            "null                   | 1",
             scenario._valAsStr1 + " | 2",
             "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null                   | 4",
             scenario._valAsStr2 + " | 5",
             "null                   | 6"
         )
@@ -100,11 +98,9 @@ public class LastWithTimeAggregationFunctionTest extends AbstractAggregationFunc
   void aggrWithNull(Scenario scenario) {
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField | timeField",
-            "null                   | 1",
             scenario._valAsStr1 + " | 2",
             "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null                   | 4",
             scenario._valAsStr2 + " | 5",
             "null                   | 6"
         )
@@ -116,11 +112,9 @@ public class LastWithTimeAggregationFunctionTest extends AbstractAggregationFunc
   void aggrSvWithoutNull(Scenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField | timeField",
-            "null                   | 1",
             scenario._valAsStr1 + " | 2",
             "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null                   | 4",
             scenario._valAsStr2 + " | 5",
             "null                   | 6"
         ).whenQuery("select 'cte', LAST_WITH_TIME(myField, timeField, '" + scenario._dataType + "') as mode "
@@ -133,11 +127,9 @@ public class LastWithTimeAggregationFunctionTest extends AbstractAggregationFunc
   void aggrSvWithNull(Scenario scenario) {
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField | timeField",
-            "null                   | 1",
             scenario._valAsStr1 + " | 2",
             "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null                   | 4",
             scenario._valAsStr2 + " | 5",
             "null                   | 6"
         ).whenQuery("select 'cte', LAST_WITH_TIME(myField, timeField, '" + scenario._dataType + "') as mode "
@@ -150,11 +142,9 @@ public class LastWithTimeAggregationFunctionTest extends AbstractAggregationFunc
   void aggrMvWithoutNull(Scenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField | timeField",
-            "null                   | 1",
             scenario._valAsStr1 + " | 2",
             "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null                   | 4",
             scenario._valAsStr2 + " | 5",
             "null                   | 6"
         ).whenQuery("select 'cte1' as cte1, 'cte2' as cte2, "
@@ -169,11 +159,9 @@ public class LastWithTimeAggregationFunctionTest extends AbstractAggregationFunc
   void aggrMvWithNull(Scenario scenario) {
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField | timeField",
-            "null                   | 1",
             scenario._valAsStr1 + " | 2",
             "null                   | 3"
         ).andOnSecondInstance("myField | timeField",
-            "null                   | 4",
             scenario._valAsStr2 + " | 5",
             "null                   | 6"
         ).whenQuery("select 'cte1' as cte1, 'cte2' as cte2, "

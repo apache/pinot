@@ -101,7 +101,7 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     BlockValSet blockTimeSet = blockValSetMap.get(_timeCol);
     if (blockValSet.getValueType() != DataType.BYTES) {
-      IntLongPair defaultPair = new IntLongPair(Integer.MIN_VALUE, Long.MAX_VALUE);
+      IntLongPair defaultPair = new IntLongPair(Integer.MIN_VALUE, Long.MIN_VALUE);
       long[] timeValues = blockTimeSet.getLongValuesSV();
 
       IntIterator nullIdxIterator = orNullIterator(blockValSet, blockTimeSet);
@@ -109,7 +109,7 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
         IntLongPair actualPair = pair;
         for (int i = from; i < to; i++) {
           long time = timeValues[i];
-          if (time <= actualPair.getTime()) {
+          if (time >= actualPair.getTime()) {
             actualPair = new IntLongPair(i, time);
           }
         }
@@ -123,6 +123,7 @@ public abstract class LastWithTimeAggregationFunction<V extends Comparable<V>>
       }
       setAggregationResult(aggregationResultHolder, bestValue, bestPair.getTime());
     } else {
+      // We assume bytes contain the binary serialization of FirstPair
       ValueLongPair<V> defaultValueLongPair = getDefaultValueTimePair();
       V lastData = defaultValueLongPair.getValue();
       long lastTime = defaultValueLongPair.getTime();
