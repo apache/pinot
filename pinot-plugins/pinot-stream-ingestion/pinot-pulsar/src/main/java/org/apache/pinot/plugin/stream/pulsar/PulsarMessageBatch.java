@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.RowMetadata;
@@ -38,11 +39,11 @@ import org.apache.pulsar.client.internal.DefaultImplementation;
  * them independently.
  */
 public class PulsarMessageBatch implements MessageBatch<PulsarStreamMessage> {
-  private final List<PulsarStreamMessage> _messageList = new ArrayList<>();
+  private final List<PulsarStreamMessage> _messageList = Collections.synchronizedList(new ArrayList<>());
   private final boolean _enableKeyValueStitch;
 
-  public PulsarMessageBatch(Iterable<PulsarStreamMessage> iterable, boolean enableKeyValueStitch) {
-    iterable.forEach(_messageList::add);
+  public PulsarMessageBatch(List<PulsarStreamMessage> messages, boolean enableKeyValueStitch) {
+    _messageList.addAll(messages);
     _enableKeyValueStitch = enableKeyValueStitch;
   }
 
