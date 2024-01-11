@@ -24,12 +24,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -103,6 +105,14 @@ public class AbstractSerdeIndexContract {
     return confMap.get(column).getConfig(type);
   }
 
+  protected <C extends IndexConfig> C getActualConfig2(String column, IndexType<C, ?, ?> type) {
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, _schema);
+    Map<String, FieldIndexConfigs> confMap =
+        FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema, indexLoadingConfig::getDeserializer);
+
+    return confMap.get(column).getConfig(type);
+  }
+
   protected void addFieldIndexConfig(String config)
       throws JsonProcessingException {
     addFieldIndexConfig(JsonUtils.stringToObject(config, FieldConfig.class));
@@ -119,6 +129,16 @@ public class AbstractSerdeIndexContract {
     }
     fieldConfigList.add(config);
     _tableConfig.setFieldConfigList(fieldConfigList);
+  }
+
+  protected void withIndexingConfig(String indexingConfigJson)
+      throws JsonProcessingException {
+    IndexingConfig indexingConfig = JsonUtils.stringToObject(indexingConfigJson, IndexingConfig.class);
+    withIndexingConfig(indexingConfig);
+  }
+
+  protected void withIndexingConfig(IndexingConfig indexingConfig) {
+    _tableConfig.setIndexingConfig(indexingConfig);
   }
 
   protected List<String> parseStringList(String json)
