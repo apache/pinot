@@ -26,34 +26,33 @@ import java.util.Objects;
 
 
 /**
- * Class that holds the configurations for onheap dictionary.
+ * Class that holds the configurations regarding interning.
  */
-public class OnHeapDictionaryConfig {
-  private boolean _enableInterning;
-  private int _internerCapacity;
+public class Intern {
+  public static final Intern DISABLED = new Intern(true, 0);
+
+  private boolean _disabled;
+  private int _capacity;
+
+  public Intern(int capacity) {
+    this(false, capacity);
+  }
 
   @JsonCreator
-  public OnHeapDictionaryConfig(@JsonProperty("enableInterning") boolean enableInterning,
-      @JsonProperty("internerCapacity") int internerCapacity) {
-    Preconditions.checkState(internerCapacity > 0 || !enableInterning,
-        "Invalid interner capacity: " + internerCapacity);
-    Preconditions.checkState(internerCapacity == 0 || enableInterning, "Enable interning to use internerCapacity.");
+  public Intern(@JsonProperty("disabled") boolean disabled, @JsonProperty("capacity") int capacity) {
+    Preconditions.checkState(capacity > 0 || disabled, "Invalid interner capacity: " + capacity);
+    Preconditions.checkState(capacity == 0 || !disabled, "Enable interning to use capacity > 0");
 
-    if (internerCapacity > 0 && !enableInterning) {
-      throw new IllegalArgumentException("Invalid interner capacity: " + internerCapacity);
-    }
-
-
-    _enableInterning = enableInterning;
-    _internerCapacity = internerCapacity;
+    _disabled = disabled;
+    _capacity = capacity;
   }
 
-  public boolean isEnableInterning() {
-    return _enableInterning;
+  public boolean isDisabled() {
+    return _disabled;
   }
 
-  public int getInternerCapacity() {
-    return _internerCapacity;
+  public int getCapacity() {
+    return _capacity;
   }
 
   @Override
@@ -64,17 +63,17 @@ public class OnHeapDictionaryConfig {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    OnHeapDictionaryConfig that = (OnHeapDictionaryConfig) o;
-    return _enableInterning == that._enableInterning && _internerCapacity == that._internerCapacity;
+    Intern that = (Intern) o;
+    return _disabled == that._disabled && _capacity == that._capacity;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _enableInterning, _internerCapacity);
+    return Objects.hash(super.hashCode(), _disabled, _capacity);
   }
 
   @Override
   public String toString() {
-    return "\"enableInterning\":" + _enableInterning + ", \"internerCapacity\":" + _internerCapacity;
+    return "\"disabled\":" + _disabled + ", \"internerCapacity\":" + _capacity;
   }
 }

@@ -51,6 +51,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.Intern;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -196,7 +197,7 @@ public class RealtimeSegmentConverterTest {
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
-    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true, null);
+    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true, Intern.DISABLED);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
@@ -276,7 +277,7 @@ public class RealtimeSegmentConverterTest {
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
-    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true, null);
+    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true, Intern.DISABLED);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
@@ -348,7 +349,7 @@ public class RealtimeSegmentConverterTest {
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
-    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true, null);
+    DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true, Intern.DISABLED);
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)

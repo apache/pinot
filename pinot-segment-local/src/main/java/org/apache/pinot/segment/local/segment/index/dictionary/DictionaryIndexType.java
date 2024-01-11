@@ -19,20 +19,19 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -79,7 +78,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.OnHeapDictionaryConfig;
+import org.apache.pinot.spi.config.table.Intern;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -94,11 +93,6 @@ public class DictionaryIndexType
     implements ConfigurableFromIndexLoadingConfig<DictionaryIndexConfig> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryIndexType.class);
   private static final List<String> EXTENSIONS = Collections.singletonList(V1Constants.Dict.FILE_EXTENSION);
-
-  // Map containing columnName as key and the interner as value. The interner is common across all the segments.
-  // TODO: Check if tablename can be appended to the columnName.
-  private static Map<String, FALFInterner<String>> _strInternerInfoMap = new ConcurrentHashMap<>();
-  private static Map<String, FALFInterner<byte[]>> _byteInternerInfoMap = new ConcurrentHashMap<>();
 
   protected DictionaryIndexType() {
     super(StandardIndexes.DICTIONARY_ID);
@@ -116,15 +110,13 @@ public class DictionaryIndexType
     Set<String> noDictionaryCols = indexLoadingConfig.getNoDictionaryColumns();
     Set<String> onHeapCols = indexLoadingConfig.getOnHeapDictionaryColumns();
     Set<String> varLengthCols = indexLoadingConfig.getVarLengthDictionaryColumns();
-    Map<String, OnHeapDictionaryConfig> onHeapDictionaryConfigs = indexLoadingConfig.getOnHeapDictionaryConfigs();
     for (String column : indexLoadingConfig.getAllKnownColumns()) {
       if (noDictionaryCols.contains(column)) {
         result.put(column, DictionaryIndexConfig.disabled());
       } else {
-        boolean loadOnHeap = onHeapCols.contains(column);
-        OnHeapDictionaryConfig onHeapConfig = loadOnHeap ? onHeapDictionaryConfigs.get(column) : null;
+        // Intern configs can only be used through FieldConfigLists.
         result.put(column,
-            new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column), onHeapConfig));
+            new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column), Intern.DISABLED));
       }
     }
     return result;
@@ -175,13 +167,10 @@ public class DictionaryIndexType
       Set<String> varLength = new HashSet<>(
           ic.getVarLengthDictionaryColumns() == null ? Collections.emptyList() : ic.getVarLengthDictionaryColumns()
       );
-      Map<String, OnHeapDictionaryConfig> onHeapDictConfigMap = new HashMap<>(
-          ic.getOnHeapDictionaryConfigs() == null ? Collections.emptyMap() : ic.getOnHeapDictionaryConfigs()
-      );
 
+      // Intern configs can only be used through FieldConfigLists.
       Function<String, DictionaryIndexConfig> valueCalculator =
-          column -> new DictionaryIndexConfig(onHeap.contains(column), varLength.contains(column),
-              onHeapDictConfigMap.get(column));
+          column -> new DictionaryIndexConfig(onHeap.contains(column), varLength.contains(column), Intern.DISABLED);
       return Sets.union(onHeap, varLength).stream().collect(Collectors.toMap(Function.identity(), valueCalculator));
     };
 
@@ -296,21 +285,21 @@ public class DictionaryIndexType
     return read(dataBuffer, columnMetadata, DictionaryIndexConfig.DEFAULT);
   }
 
+
   public static Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, DictionaryIndexConfig indexConfig)
       throws IOException {
+    return read(dataBuffer, metadata, indexConfig, null);
+  }
+
+  public static Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+      DictionaryIndexConfig indexConfig, String internIdentifierStr)
+      throws IOException {
+
     FieldSpec.DataType dataType = metadata.getDataType();
     boolean loadOnHeap = indexConfig.isOnHeap();
+    String columnName = metadata.getColumnName();
     if (loadOnHeap) {
-      String columnName = metadata.getColumnName();
-      OnHeapDictionaryConfig onHeapConfig = indexConfig.getOnHeapDictionaryConfig();
-      if (onHeapConfig != null && onHeapConfig.isEnableInterning()) {
-        _strInternerInfoMap.putIfAbsent(columnName, new FALFInterner<>(onHeapConfig.getInternerCapacity()));
-        _byteInternerInfoMap.putIfAbsent(columnName,
-            new FALFInterner<>(onHeapConfig.getInternerCapacity(), Arrays::hashCode));
-      }
-
-      LOGGER.info("Loading on-heap dictionary for column: {} with interning={}", columnName,
-          _strInternerInfoMap.containsKey(columnName));
+      LOGGER.info("Loading on-heap dictionary for column: {}, intern={}", columnName, internIdentifierStr != null);
     }
 
     int length = metadata.getCardinality();
@@ -333,9 +322,20 @@ public class DictionaryIndexType
             : new BigDecimalDictionary(dataBuffer, length, numBytesPerValue);
       case STRING:
         numBytesPerValue = metadata.getColumnMaxLength();
-        String colName = metadata.getColumnName();
-        return loadOnHeap ? new OnHeapStringDictionary(dataBuffer, length, numBytesPerValue,
-            _strInternerInfoMap.get(colName), _byteInternerInfoMap.get(colName))
+
+        // If interning is enabled, get the required interners.
+        FALFInterner<String> strInterner = null;
+        FALFInterner<byte[]> byteInterner = null;
+        Intern internConfig = indexConfig.getIntern();
+        if (internConfig != null && !internConfig.isDisabled()) {
+          Preconditions.checkState(loadOnHeap, "Interning is only supported for on-heap dictionaries.");
+          DictionaryInternerHolder internerHolder = DictionaryInternerHolder.getInstance();
+          strInterner = internerHolder.getStrInterner(internIdentifierStr, internConfig.getCapacity());
+          byteInterner = internerHolder.getByteInterner(internIdentifierStr, internConfig.getCapacity());
+          LOGGER.info("Enabling interning for dictionary column: {}", columnName);
+        }
+
+        return loadOnHeap ? new OnHeapStringDictionary(dataBuffer, length, numBytesPerValue, strInterner, byteInterner)
             : new StringDictionary(dataBuffer, length, numBytesPerValue);
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();
@@ -379,8 +379,29 @@ public class DictionaryIndexType
     @Override
     protected Dictionary createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
         DictionaryIndexConfig indexConfig)
-          throws IOException, IndexReaderConstraintException {
+        throws IOException, IndexReaderConstraintException {
       return DictionaryIndexType.read(dataBuffer, metadata, indexConfig);
+    }
+
+    @Override
+    public Dictionary createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+        ColumnMetadata metadata) throws IOException, IndexReaderConstraintException {
+      String colName = metadata.getColumnName();
+
+      if (!segmentReader.hasIndexFor(colName, StandardIndexes.dictionary())) {
+        return null;
+      }
+
+      PinotDataBuffer buffer = segmentReader.getIndexFor(colName, StandardIndexes.dictionary());
+      DictionaryIndexConfig config = fieldIndexConfigs.getConfig(StandardIndexes.dictionary());
+      String tableName = segmentReader.toSegmentDirectory().getSegmentMetadata().getTableName();
+      String internIdentifierStr = DictionaryInternerHolder.getInstance().createIdentifier(tableName, colName);
+
+      try {
+        return DictionaryIndexType.read(buffer, metadata, config, internIdentifierStr);
+      } catch (RuntimeException ex) {
+        throw new RuntimeException("Cannot read index " + StandardIndexes.dictionary() + " for column " + colName, ex);
+      }
     }
   }
 

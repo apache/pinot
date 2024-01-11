@@ -28,7 +28,7 @@ import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.OnHeapDictionaryConfig;
+import org.apache.pinot.spi.config.table.Intern;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -135,7 +135,7 @@ public class DictionaryIndexTypeTest {
         throws IOException {
       _tableConfig.getIndexingConfig()
           .setOnHeapDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
-      assertEquals(new DictionaryIndexConfig(true, null, null));
+      assertEquals(new DictionaryIndexConfig(true, null, Intern.DISABLED));
     }
 
     @Test
@@ -143,7 +143,7 @@ public class DictionaryIndexTypeTest {
         throws IOException {
       _tableConfig.getIndexingConfig()
           .setVarLengthDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
-      assertEquals(new DictionaryIndexConfig(false, true, null));
+      assertEquals(new DictionaryIndexConfig(false, true, Intern.DISABLED));
     }
 
     @Test
@@ -198,7 +198,7 @@ public class DictionaryIndexTypeTest {
     }
 
     @Test
-    public void newOnHeapWithConfig()
+    public void newOnHeapWithInternConfig()
         throws IOException {
       addFieldIndexConfig(""
           + " {\n"
@@ -206,18 +206,17 @@ public class DictionaryIndexTypeTest {
           + "    \"indexes\" : {\n"
           + "      \"dictionary\": {\n"
           + "        \"onHeap\": true,\n"
-          + "        \"onHeapDictionaryConfig\": {\n"
-          + "          \"enableInterning\":true ,\n"
-          + "          \"internerCapacity\":1000\n"
+          + "        \"intern\": {\n"
+          + "          \"capacity\":1000\n"
           + "        }"
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(true, false, new OnHeapDictionaryConfig(true, 1000)));
+      assertEquals(new DictionaryIndexConfig(true, false, new Intern(1000)));
     }
 
     @Test
-    public void newDisabledOnHeapWithConfig()
+    public void newDisabledOnHeapWithInternConfig()
         throws IOException {
       addFieldIndexConfig(""
           + " {\n"
@@ -225,14 +224,13 @@ public class DictionaryIndexTypeTest {
           + "    \"indexes\" : {\n"
           + "      \"dictionary\": {\n"
           + "        \"onHeap\": false,\n"
-          + "        \"onHeapDictionaryConfig\": {\n"
-          + "          \"enableInterning\":true ,\n"
-          + "          \"internerCapacity\":1000\n"
+          + "        \"intern\": {\n"
+          + "          \"capacity\":1000\n"
           + "        }"
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(false, false, null));
+      assertThrows(UncheckedIOException.class, () -> getActualConfig("dimInt", StandardIndexes.dictionary()));
     }
 
     @Test
@@ -244,43 +242,7 @@ public class DictionaryIndexTypeTest {
           + "    \"indexes\" : {\n"
           + "      \"dictionary\": {\n"
           + "        \"onHeap\": true,\n"
-          + "        \"onHeapDictionaryConfig\": {\n"
-          + "        }"
-          + "      }"
-          + "    }\n"
-          + " }");
-      assertEquals(new DictionaryIndexConfig(true, false, new OnHeapDictionaryConfig(false, 0)));
-    }
-
-    @Test
-    public void newOnHeapWithPartialConfig1()
-        throws IOException {
-      addFieldIndexConfig(""
-          + " {\n"
-          + "    \"name\": \"dimInt\","
-          + "    \"indexes\" : {\n"
-          + "      \"dictionary\": {\n"
-          + "        \"onHeap\": true,\n"
-          + "        \"onHeapDictionaryConfig\": {\n"
-          + "          \"enableInterning\":true \n"
-          + "        }"
-          + "      }"
-          + "    }\n"
-          + " }");
-      assertThrows(UncheckedIOException.class, () -> getActualConfig("dimInt", StandardIndexes.dictionary()));
-    }
-
-    @Test
-    public void newOnHeapWithPartialConfig2()
-        throws IOException {
-      addFieldIndexConfig(""
-          + " {\n"
-          + "    \"name\": \"dimInt\","
-          + "    \"indexes\" : {\n"
-          + "      \"dictionary\": {\n"
-          + "        \"onHeap\": true,\n"
-          + "        \"onHeapDictionaryConfig\": {\n"
-          + "          \"internerCapacity\":1024 \n"
+          + "        \"intern\": {\n"
           + "        }"
           + "      }"
           + "    }\n"

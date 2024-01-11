@@ -92,8 +92,6 @@ public class IndexingConfig extends BaseJsonConfig {
 
   private JsonNode _tierOverwrites;
 
-  private Map<String, OnHeapDictionaryConfig> _onHeapDictionaryConfigs;
-
   @Nullable
   public List<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
@@ -287,15 +285,6 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
     _varLengthDictionaryColumns = varLengthDictionaryColumns;
-  }
-
-  @Nullable
-  public Map<String, OnHeapDictionaryConfig> getOnHeapDictionaryConfigs() {
-    return _onHeapDictionaryConfigs;
-  }
-
-  public void setOnHeapDictionaryConfigs(Map<String, OnHeapDictionaryConfig> onHeapDictionaryConfigs) {
-    _onHeapDictionaryConfigs = onHeapDictionaryConfigs;
   }
 
   public boolean isEnableDefaultStarTree() {

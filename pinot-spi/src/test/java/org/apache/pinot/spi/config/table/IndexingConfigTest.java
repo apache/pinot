@@ -44,9 +44,6 @@ public class IndexingConfigTest {
     indexingConfig.setSortedColumn(sortedColumn);
     List<String> onHeapDictionaryColumns = Arrays.asList("x", "y", "z");
     indexingConfig.setOnHeapDictionaryColumns(onHeapDictionaryColumns);
-    Map<String, OnHeapDictionaryConfig> onHeapDictConfigs = new HashMap<>();
-    onHeapDictConfigs.put("x", new OnHeapDictionaryConfig(true, 321));
-    indexingConfig.setOnHeapDictionaryConfigs(onHeapDictConfigs);
     List<String> bloomFilterColumns = Arrays.asList("a", "b");
     indexingConfig.setBloomFilterColumns(bloomFilterColumns);
     Map<String, BloomFilterConfig> bloomFilterConfigs = new HashMap<>();
@@ -68,7 +65,6 @@ public class IndexingConfigTest {
     assertEquals(indexingConfig.getInvertedIndexColumns(), invertedIndexColumns);
     assertEquals(indexingConfig.getSortedColumn(), sortedColumn);
     assertEquals(indexingConfig.getOnHeapDictionaryColumns(), onHeapDictionaryColumns);
-    assertEquals(indexingConfig.getOnHeapDictionaryConfigs(), onHeapDictConfigs);
     assertEquals(indexingConfig.getBloomFilterColumns(), bloomFilterColumns);
     assertEquals(indexingConfig.getBloomFilterConfigs(), bloomFilterConfigs);
     assertEquals(indexingConfig.getNoDictionaryConfig(), noDictionaryConfig);
