@@ -21,23 +21,20 @@ package org.apache.pinot.segment.local.io.writer.impl;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
-import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
-import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
-import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
@@ -50,26 +47,51 @@ import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
   // version (int, 4) + logType dict offset (int, 4) + logType fwd index offset (int, 4) +
   // dictVar dict offset (int, 4) + dictVar fwd index offset (int, 4) +
-  private static final int HEADER_SIZE = 20;
+  private final String _column;
+  private final File _baseIndexDir;
   private final FileChannel _dataFile;
-  private final ByteBuffer _header;
   private final ByteBuffer _fileBuffer;
   private final EncodedMessage _clpEncodedMessage;
   private final MessageEncoder _clpMessageEncoder;
-  private final Set<String> _logTypes = new TreeSet<>();
-  private final Set<String> _dictVars = new TreeSet<>();
-  private List<String> _logs;
+  private final StringColumnPreIndexStatsCollector.CLPStats _clpStats;
+  private final SegmentDictionaryCreator _logTypeDictCreator;
+  private final SegmentDictionaryCreator _dictVarsDictCreator;
+  private final FixedBitSVForwardIndexWriter _logTypeFwdIndexWriter;
+  private final FixedBitMVForwardIndexWriter _dictVarsFwdIndexWriter;
+  private final MultiValueFixedByteRawIndexCreator _encodedVarsFwdIndexWriter;
 
-  public CLPForwardIndexWriterV1(File file, int numDocs, ColumnStatistics columnStatistics)
+  public CLPForwardIndexWriterV1(File baseIndexDir, File indexFile, String column, int numDocs,
+      ColumnStatistics columnStatistics)
       throws IOException {
-    _dataFile = new RandomAccessFile(file, "rw").getChannel();
+    _column = column;
+    _baseIndexDir = baseIndexDir;
+    _dataFile = new RandomAccessFile(indexFile, "rw").getChannel();
     _fileBuffer = _dataFile.map(FileChannel.MapMode.READ_WRITE, 0, Integer.MAX_VALUE);
-    _header = _fileBuffer.duplicate();
-    _header.position(0);
-    _header.limit(HEADER_SIZE);
 
-    _header.putInt(0); // version
-    _header.putInt(HEADER_SIZE); // logType dict offset
+    StringColumnPreIndexStatsCollector statsCollector = (StringColumnPreIndexStatsCollector) columnStatistics;
+    _clpStats = statsCollector.getClpStats();
+    _logTypeDictCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(_column + "_clp_logtype.dict", FieldSpec.DataType.STRING, true), _baseIndexDir, true);
+    _logTypeDictCreator.build(_clpStats.getSortedLogTypeValues());
+
+    _dictVarsDictCreator = new SegmentDictionaryCreator(
+        new DimensionFieldSpec(_column + "_clp_dictvars.dict", FieldSpec.DataType.STRING, false), _baseIndexDir, true);
+    _dictVarsDictCreator.build(_clpStats.getSortedDictVarValues());
+
+    File logTypeFwdIndexFile = new File(_baseIndexDir, column + "_clp_logtype.fwd");
+    _logTypeFwdIndexWriter = new FixedBitSVForwardIndexWriter(logTypeFwdIndexFile, numDocs,
+        PinotDataBitSet.getNumBitsPerValue(_clpStats.getSortedLogTypeValues().length - 1));
+
+    File dictVarsFwdIndexFile = new File(_baseIndexDir, column + "_clp_dictvars.fwd");
+    _dictVarsFwdIndexWriter =
+        new FixedBitMVForwardIndexWriter(dictVarsFwdIndexFile, numDocs, _clpStats.getTotalNumberOfDictVars(),
+            PinotDataBitSet.getNumBitsPerValue(_clpStats.getSortedDictVarValues().length - 1));
+
+    _encodedVarsFwdIndexWriter =
+        new MultiValueFixedByteRawIndexCreator(_baseIndexDir, ChunkCompressionType.PASS_THROUGH,
+            column + "_clp_encodedvars.fwd", numDocs, FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(),
+            false, -1);
+    _clpStats.clear();
 
     _clpEncodedMessage = new EncodedMessage();
     _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
@@ -85,22 +107,32 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
   public void putString(String value) {
     String logtype;
     String[] dictVars;
+    Long[] encodedVars;
 
     try {
       _clpMessageEncoder.encodeMessage(value, _clpEncodedMessage);
       logtype = _clpEncodedMessage.getLogTypeAsString();
       dictVars = _clpEncodedMessage.getDictionaryVarsAsStrings();
+      encodedVars = _clpEncodedMessage.getEncodedVarsAsBoxedLongs();
     } catch (IOException e) {
       throw new IllegalArgumentException("Failed to encode message: " + value, e);
     }
 
-    // TODO: move this to stats collector so we won't need to store the whole logline
-    // collect logType in set
-    _logTypes.add(logtype);
-    // collect dictVars in set
-    _dictVars.addAll(Arrays.asList(dictVars));
-    // collect encodedVars in set
-    _logs.add(value);
+    addCLPFields(logtype, dictVars, encodedVars);
+  }
+
+  private void addCLPFields(String logtype, String[] dictVars, Long[] encodedVars) {
+    int logTypeDictId = _logTypeDictCreator.indexOfSV(logtype);
+    int[] dictVarDictIds = _dictVarsDictCreator.indexOfMV(dictVars);
+
+    _logTypeFwdIndexWriter.putDictId(logTypeDictId);
+    _dictVarsFwdIndexWriter.putDictIds(dictVarDictIds);
+
+    long[] encodedVarsUnboxed = new long[encodedVars.length];
+    for (int i = 0; i < encodedVars.length; i++) {
+      encodedVarsUnboxed[i] = encodedVars[i].longValue();
+    }
+    _encodedVarsFwdIndexWriter.putLongMV(encodedVarsUnboxed);
   }
 
   @Override
@@ -121,63 +153,5 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
   @Override
   public void close()
       throws IOException {
-    // Build dictionary for logType
-    Object2IntOpenHashMap<Object> logTypeDict = new Object2IntOpenHashMap<>(_logTypes.size());
-    int logTypeDictId = 0;
-    byte[][] sortedStringBytes = new byte[_logTypes.size()][];
-    for (String logType : _logTypes) {
-      sortedStringBytes[logTypeDictId] = logType.getBytes(StandardCharsets.UTF_8);
-      logTypeDict.put(logType, logTypeDictId);
-      logTypeDictId++;
-    }
-
-    ByteBuffer logTypeDictBuffer = _fileBuffer.duplicate();
-    logTypeDictBuffer.position(HEADER_SIZE);
-    try (VarLengthValueWriter writer = new VarLengthValueWriter(logTypeDictBuffer, _logTypes.size())) {
-      for (byte[] value : sortedStringBytes) {
-        writer.add(value);
-      }
-    }
-    _header.putInt(HEADER_SIZE + logTypeDictBuffer.position()); // dictVar dictionary start offset
-
-    // Build dictionary for dictVars
-    Object2IntOpenHashMap<Object> dictVarsDict = new Object2IntOpenHashMap<>(_dictVars.size());
-    byte[][] sortedDictIds = new byte[_dictVars.size()][];
-    int dictVarsDictId = 0;
-    for (String dictVar : _dictVars) {
-      sortedDictIds[dictVarsDictId] = dictVar.getBytes(StandardCharsets.UTF_8);
-      dictVarsDict.put(dictVar, dictVarsDictId);
-      dictVarsDictId++;
-    }
-
-    ByteBuffer dictEncodedDictBuffer = _fileBuffer.duplicate();
-    dictEncodedDictBuffer.position(HEADER_SIZE + logTypeDictBuffer.position());
-    try (VarLengthValueWriter writer = new VarLengthValueWriter(dictEncodedDictBuffer, _dictVars.size())) {
-      for (byte[] value : sortedDictIds) {
-        writer.add(value);
-      }
-    }
-
-    _header.putInt(HEADER_SIZE + logTypeDictBuffer.position()
-        + dictEncodedDictBuffer.position()); // encoded vars index start offset
-
-    // fwd index for logType
-    ByteBuffer logTypeFwdIndexBuffer = _fileBuffer.duplicate();
-    logTypeFwdIndexBuffer.position(HEADER_SIZE + logTypeDictBuffer.position() + dictEncodedDictBuffer.position());
-
-    FixedBitIntReaderWriter fixedBitIntReaderWriter =
-        new FixedBitIntReaderWriter(new PinotByteBuffer(logTypeFwdIndexBuffer, true, false), _logs.size(),
-            PinotDataBitSet.getNumBitsPerValue(_logTypes.size() - 1));
-
-    // fwd index for dictVars
-    ByteBuffer dictVarsFwdIndexBuffer = _fileBuffer.duplicate();
-    dictVarsFwdIndexBuffer.position(HEADER_SIZE + logTypeDictBuffer.position() + dictEncodedDictBuffer.position()
-        + PinotDataBitSet.getNumBitsPerValue(_logTypes.size() - 1) * _logs.size());
-    FixedBitMVForwardIndexWriter dictVarsFwdIndexWriter =
-        new FixedBitMVForwardIndexWriter(new PinotByteBuffer(dictVarsFwdIndexBuffer, true, false), _logs.size(),
-            PinotDataBitSet.getNumBitsPerValue(_dictVars.size() - 1));
-
-    // Write header
-    _header.putInt(0, logTypeDict.size());
   }
 }

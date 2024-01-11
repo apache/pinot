@@ -80,7 +80,7 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     if (compressionType == ChunkCompressionType.CLP) {
-      _indexWriter = new CLPForwardIndexWriterV1(file, totalDocs, columnStatistics);
+      _indexWriter = new CLPForwardIndexWriterV1(baseIndexDir, file, column, totalDocs, columnStatistics);
       _valueType = valueType;
     } else {
       int numDocsPerChunk = deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;

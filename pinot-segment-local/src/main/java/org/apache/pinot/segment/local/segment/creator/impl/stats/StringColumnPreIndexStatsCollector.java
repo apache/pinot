@@ -18,30 +18,24 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
+import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
+import com.yscope.clp.compressorfrontend.EncodedMessage;
+import com.yscope.clp.compressorfrontend.MessageEncoder;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
-import org.apache.pinot.segment.local.recordenricher.clp.CLPEncodingEnricher;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
-import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  public static class CLPStats {
-    private String[] _sortedLogTypeValues;
-    private String[] _sortedDictVarValues;
-    private final CLPEncodingEnricher
-
-    public void collect(String logLine) {
-
-    }
-
-    public void close() {
-
+  public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
+    super(column, statsCollectorConfig);
+    if (_fieldConfig != null && _fieldConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+      _clpStats = new CLPStats();
     }
   }
   private Set<String> _values = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
@@ -51,15 +45,6 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   private String[] _sortedValues;
   private boolean _sealed = false;
   private CLPStats _clpStats;
-
-  public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
-    super(column, statsCollectorConfig);
-    if (_fieldConfig != null) {
-      if (_fieldConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
-        _clpStats = new CLPStats();
-      }
-    }
-  }
 
   @Override
   public void collect(Object entry) {
@@ -71,6 +56,9 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       for (Object obj : values) {
         String value = (String) obj;
         _values.add(value);
+        if (_clpStats != null) {
+          _clpStats.collect(value);
+        }
 
         int length = value.getBytes(UTF_8).length;
         _minLength = Math.min(_minLength, length);
@@ -84,6 +72,9 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     } else {
       String value = (String) entry;
       addressSorted(value);
+      if (_clpStats != null) {
+        _clpStats.collect(value);
+      }
       if (_values.add(value)) {
         if (isPartitionEnabled()) {
           updatePartition(value);
@@ -95,6 +86,10 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       }
       _totalNumberOfEntries++;
     }
+  }
+
+  public CLPStats getClpStats() {
+    return _clpStats;
   }
 
   @Override
@@ -148,7 +143,80 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       _sortedValues = _values.toArray(new String[0]);
       _values = null;
       Arrays.sort(_sortedValues);
+      if (_clpStats != null) {
+        _clpStats.seal();
+      }
       _sealed = true;
+    }
+  }
+
+  public static class CLPStats {
+    int _totalNumberOfDictVars = 0;
+    private String[] _sortedLogTypeValues;
+    int _totalNumberOfEncodedVars = 0;
+    private String[] _sortedDictVarValues;
+
+    public int getMaxNumberOfEncodedVars() {
+      return _maxNumberOfEncodedVars;
+    }
+
+    int _maxNumberOfEncodedVars = 0;
+    private Set<String> _logTypes = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
+    private Set<String> _dictVars = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
+    private final EncodedMessage _clpEncodedMessage;
+    private final MessageEncoder _clpMessageEncoder;
+    public CLPStats() {
+      _clpEncodedMessage = new EncodedMessage();
+      _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
+          BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
+    }
+
+    public int getTotalNumberOfDictVars() {
+      return _totalNumberOfDictVars;
+    }
+
+    public int getTotalNumberOfEncodedVars() {
+      return _totalNumberOfEncodedVars;
+    }
+
+    public void collect(String value) {
+      String logType;
+      String[] dictVars;
+      try {
+        _clpMessageEncoder.encodeMessage(value, _clpEncodedMessage);
+        logType = _clpEncodedMessage.getLogTypeAsString();
+        dictVars = _clpEncodedMessage.getDictionaryVarsAsStrings();
+      } catch (IOException e) {
+        throw new IllegalArgumentException("Failed to encode message: " + value, e);
+      }
+      _logTypes.add(logType);
+      _dictVars.addAll(Arrays.asList(dictVars));
+      _totalNumberOfDictVars += dictVars.length;
+      _totalNumberOfEncodedVars += _clpEncodedMessage.getEncodedVarsAsBoxedLongs().length;
+      _maxNumberOfEncodedVars =
+          Math.max(_maxNumberOfEncodedVars, _clpEncodedMessage.getEncodedVarsAsBoxedLongs().length);
+    }
+
+    public void seal() {
+      _sortedLogTypeValues = _logTypes.toArray(new String[0]);
+      _logTypes = null;
+      Arrays.sort(_sortedLogTypeValues);
+      _sortedDictVarValues = _dictVars.toArray(new String[0]);
+      _dictVars = null;
+      Arrays.sort(_sortedDictVarValues);
+    }
+
+    public void clear() {
+      _sortedLogTypeValues = null;
+      _sortedDictVarValues = null;
+    }
+
+    public String[] getSortedLogTypeValues() {
+      return _sortedLogTypeValues;
+    }
+
+    public String[] getSortedDictVarValues() {
+      return _sortedDictVarValues;
     }
   }
 }

@@ -20,9 +20,12 @@ package org.apache.pinot.segment.local.segment.creator;
 
 import java.io.File;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +57,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -529,5 +533,22 @@ public class DictionariesTest {
       default:
         throw new IllegalArgumentException("Illegal data type for stats builder: " + dataType);
     }
+  }
+
+  @Test
+  public void clpTest() {
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec("column1", DataType.STRING, true));
+    List<FieldConfig> fieldConfigList = new ArrayList<>();
+    fieldConfigList.add(new FieldConfig("column1", FieldConfig.EncodingType.RAW, Collections.EMPTY_LIST,
+        FieldConfig.CompressionCodec.CLP, Collections.EMPTY_MAP));
+    _tableConfig.setFieldConfigList(fieldConfigList);
+    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, schema, null);
+    StringColumnPreIndexStatsCollector statsCollector = new StringColumnPreIndexStatsCollector("column1", statsCollectorConfig);
+    statsCollector.collect("2023/10/26 00:03:10.168 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective: true");
+    statsCollector.collect("2023/10/26 00:03:10.169 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32d_DEFAULT)] Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective: true");
+
+    statsCollector.seal();
+    System.out.println(statsCollector.getClpStats());
   }
 }
