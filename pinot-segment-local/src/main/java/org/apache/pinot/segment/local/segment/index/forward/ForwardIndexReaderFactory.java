@@ -19,7 +19,12 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.mchange.lang.ByteUtils;
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.lucene.util.ArrayUtil;
+import org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWriterV1;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVEntryDictForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
@@ -83,6 +88,13 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
         }
       }
     } else {
+      if (dataBuffer.size() >= CLPForwardIndexWriterV1.MAGIC_BYTES.length) {
+        byte[] magicBytes = new byte[CLPForwardIndexWriterV1.MAGIC_BYTES.length];
+        dataBuffer.copyTo(0, magicBytes);
+        if (ArrayUtils.isEquals(magicBytes, CLPForwardIndexWriterV1.MAGIC_BYTES)) {
+          return new CLPForwardIndexReaderV1(dataBuffer);
+        }
+      }
       return createRawIndexReader(dataBuffer, metadata.getDataType().getStoredType(), metadata.isSingleValue());
     }
   }
