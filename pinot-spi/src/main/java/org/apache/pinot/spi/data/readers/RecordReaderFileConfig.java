@@ -34,6 +34,7 @@ public class RecordReaderFileConfig {
   public final File _dataFile;
   public final Set<String> _fieldsToRead;
   public final RecordReaderConfig _recordReaderConfig;
+  private final boolean _canModifyRecordReader;
   // Record Readers created/passed from clients.
   public RecordReader _recordReader;
 
@@ -45,6 +46,7 @@ public class RecordReaderFileConfig {
     _fieldsToRead = fieldsToRead;
     _recordReaderConfig = recordReaderConfig;
     _recordReader = null;
+    _canModifyRecordReader = true;
   }
 
   // Pass in the reader instance directly
@@ -54,5 +56,21 @@ public class RecordReaderFileConfig {
     _dataFile = null;
     _fieldsToRead = null;
     _recordReaderConfig = null;
+    _canModifyRecordReader = false;
+  }
+
+  public RecordReader getRecordReader()
+      throws Exception {
+    if (_recordReader == null) {
+      _recordReader = RecordReaderFactory.getRecordReader(_fileFormat, _dataFile, _fieldsToRead, _recordReaderConfig);
+    }
+    return _recordReader;
+  }
+
+  public void closeRecordReader()
+      throws Exception {
+    if (_recordReader != null && _canModifyRecordReader) {
+      _recordReader.close();
+    }
   }
 }

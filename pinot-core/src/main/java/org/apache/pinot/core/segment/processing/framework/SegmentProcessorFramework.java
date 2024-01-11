@@ -143,8 +143,8 @@ public class SegmentProcessorFramework {
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
       // Initialise the mapper.
       SegmentMapper mapper =
-          new SegmentMapper(_recordReaderFileConfigs, _customRecordTransformers, _segmentProcessorConfig,
-              _mapperOutputDir);
+          new SegmentMapper(_recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders),
+              _customRecordTransformers, _segmentProcessorConfig, _mapperOutputDir);
 
       // Map phase.
       Map<String, GenericRowFileManager> partitionToFileManagerMap = doMap(mapper);
@@ -183,7 +183,7 @@ public class SegmentProcessorFramework {
     Map<String, GenericRowFileManager> partitionToFileManagerMap = new HashMap<>();
     try {
       // Map phase
-      partitionToFileManagerMap = mapper.map();
+      partitionToFileManagerMap = mapper.map(_recordReaderFileConfigs.size());
 
       // Check for mapper output files
       if (partitionToFileManagerMap.isEmpty()) {

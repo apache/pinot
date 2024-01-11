@@ -47,7 +47,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
@@ -117,10 +116,10 @@ public class SegmentMapper {
    * Reads the input records and generates partitioned generic row files into the mapper output directory.
    * Records for each partition are put into a directory of the partition name within the mapper output directory.
    */
-  public Map<String, GenericRowFileManager> map()
+  public Map<String, GenericRowFileManager> map(int totalRecordReaderSize)
       throws Exception {
     try {
-      return doMap();
+      return doMap(totalRecordReaderSize);
     } catch (Exception e) {
       // Cleaning up resources created by the mapper, leaving others to the caller like the input _recordReaders.
       for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
@@ -130,38 +129,15 @@ public class SegmentMapper {
     }
   }
 
-  private Map<String, GenericRowFileManager> doMap()
+  private Map<String, GenericRowFileManager> doMap(int totalRecordReaderSize)
       throws Exception {
     Consumer<Object> observer = _processorConfig.getProgressObserver();
-    int count = 1;
-    int totalCount = _recordReaderFileConfigs.size();
+    int count = totalRecordReaderSize - _recordReaderFileConfigs.size() + 1;
     GenericRow reuse = new GenericRow();
-    for (int i = 0; i < _recordReaderFileConfigs.size(); i++) {
-      RecordReaderFileConfig recordReaderFileConfig = _recordReaderFileConfigs.get(i);
-      RecordReader recordReader = recordReaderFileConfig._recordReader;
-      if (recordReader == null) {
-        // We create and use the recordReader here.
-        try {
-          recordReader =
-              RecordReaderFactory.getRecordReader(recordReaderFileConfig._fileFormat, recordReaderFileConfig._dataFile,
-                  recordReaderFileConfig._fieldsToRead, recordReaderFileConfig._recordReaderConfig);
-          mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
-          _recordReaderFileConfigs.get(i)._recordReader = recordReader;
-        } finally {
-          if (recordReader != null && !recordReader.hasNext()) {
-            recordReader.close();
-          }
-        }
-      } else {
-        if (!recordReader.hasNext()) {
-          LOGGER.info("Skipping record reader as it is already processed at index: {}", i);
-          count++;
-          continue;
-        }
-        mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
-        _recordReaderFileConfigs.get(i)._recordReader = recordReader;
-      }
-      if (!_adaptiveSizeBasedWriter.canWrite()) {
+    for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
+      RecordReader recordReader = recordReaderFileConfig.getRecordReader();
+      boolean shouldTerminateMapPhase = mapAndTransformRow(recordReader, reuse, observer, count, totalRecordReaderSize);
+      if (shouldTerminateMapPhase) {
         observer.accept(String.format(
             "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
             _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
@@ -170,6 +146,7 @@ public class SegmentMapper {
             _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
         break;
       }
+      recordReaderFileConfig.closeRecordReader();
       count++;
     }
 
@@ -179,7 +156,7 @@ public class SegmentMapper {
     return _partitionToFileManagerMap;
   }
 
-  private void mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
+  private boolean mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
     while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
@@ -203,6 +180,7 @@ public class SegmentMapper {
       }
       reuse.clear();
     }
+    return (recordReader.hasNext() && !_adaptiveSizeBasedWriter.canWrite());
   }
 
   private void writeRecord(GenericRow row)

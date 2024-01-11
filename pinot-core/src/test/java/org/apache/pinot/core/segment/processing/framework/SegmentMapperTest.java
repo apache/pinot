@@ -144,7 +144,7 @@ public class SegmentMapperTest {
     SegmentMapper segmentMapper =
         new SegmentMapper(Collections.singletonList(new RecordReaderFileConfig(segmentRecordReader)),
             Collections.emptyList(), processorConfig, mapperOutputDir);
-    Map<String, GenericRowFileManager> partitionToFileManagerMap = segmentMapper.map();
+    Map<String, GenericRowFileManager> partitionToFileManagerMap = segmentMapper.map(1);
     segmentRecordReader.close();
 
     assertEquals(partitionToFileManagerMap.size(), partitionToRecords.size());
