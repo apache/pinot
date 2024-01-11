@@ -136,8 +136,10 @@ public class SegmentMapper {
     GenericRow reuse = new GenericRow();
     for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
       RecordReader recordReader = recordReaderFileConfig.getRecordReader();
-      boolean shouldTerminateMapPhase = mapAndTransformRow(recordReader, reuse, observer, count, totalRecordReaderSize);
-      if (shouldTerminateMapPhase) {
+      mapAndTransformRow(recordReader, reuse, observer, count, totalRecordReaderSize);
+
+      // Terminate the map phase if intermediate file size has crossed the threshold.
+      if (!_adaptiveSizeBasedWriter.canWrite()) {
         observer.accept(String.format(
             "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
             _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
@@ -156,7 +158,7 @@ public class SegmentMapper {
     return _partitionToFileManagerMap;
   }
 
-  private boolean mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
+  private void mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
     while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
@@ -180,7 +182,6 @@ public class SegmentMapper {
       }
       reuse.clear();
     }
-    return (recordReader.hasNext() && !_adaptiveSizeBasedWriter.canWrite());
   }
 
   private void writeRecord(GenericRow row)
