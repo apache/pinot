@@ -19,7 +19,8 @@
 
 -->
 
-to compile, use command: mvn clean install package -P build-shaded-jar -DskipTests
+to compile, use command: (refer to .buildkite/release.sh)
+mvn clean install -Dgpg.skip=true -Drat.skip=true -Dlicense.skip=true -DskipTests -Dmaven.javadoc.skip=true -P build-shaded-jar
 
 to release, use job: https://ci.uberinternal.com/job/pinot-release/
 
