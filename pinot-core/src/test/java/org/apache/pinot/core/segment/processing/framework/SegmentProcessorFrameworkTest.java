@@ -584,7 +584,7 @@ public class SegmentProcessorFrameworkTest {
   @Test
   public void testConfigurableMapperOutputSize()
       throws Exception {
-    File workingDir = new File(TEMP_DIR, "multiple_segments_output");
+    File workingDir = new File(TEMP_DIR, "configurable_mapper_test_output");
     FileUtils.forceMkdir(workingDir);
     int expectedTotalDocsCount = 10;
 

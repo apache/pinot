@@ -141,7 +141,7 @@ public class SegmentProcessorFramework {
     int nextRecordReaderIndexToBeProcessed = 0;
 
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
-      // Initialise the mapper.
+      // Initialise the mapper. Eliminate the record readers that have been processed in the previous iterations.
       SegmentMapper mapper =
           new SegmentMapper(_recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders),
               _customRecordTransformers, _segmentProcessorConfig, _mapperOutputDir);
@@ -171,8 +171,8 @@ public class SegmentProcessorFramework {
 
   private int getNextRecordReaderIndexToBeProcessed(int currentRecordIndex) {
     for (int i = currentRecordIndex; i < _recordReaderFileConfigs.size(); i++) {
-      RecordReader recordReader = _recordReaderFileConfigs.get(i)._recordReader;
-      if (recordReader == null || recordReader.hasNext()) {
+      RecordReaderFileConfig recordReaderFileConfig = _recordReaderFileConfigs.get(i);
+      if (!recordReaderFileConfig.isRecordReaderInitialized() || !recordReaderFileConfig.isRecordReaderDone()) {
         return i;
       }
     }

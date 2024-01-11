@@ -37,6 +37,7 @@ public class RecordReaderFileConfig {
   private final boolean _canModifyRecordReader;
   // Record Readers created/passed from clients.
   public RecordReader _recordReader;
+  private boolean _isRecordReaderInitialized;
 
   // Pass in the info needed to initialize the reader
   public RecordReaderFileConfig(FileFormat fileFormat, File dataFile, Set<String> fieldsToRead,
@@ -47,6 +48,7 @@ public class RecordReaderFileConfig {
     _recordReaderConfig = recordReaderConfig;
     _recordReader = null;
     _canModifyRecordReader = true;
+    _isRecordReaderInitialized = false;
   }
 
   // Pass in the reader instance directly
@@ -57,20 +59,34 @@ public class RecordReaderFileConfig {
     _fieldsToRead = null;
     _recordReaderConfig = null;
     _canModifyRecordReader = false;
+    _isRecordReaderInitialized = true;
   }
 
   public RecordReader getRecordReader()
       throws Exception {
-    if (_recordReader == null) {
+    if (!_isRecordReaderInitialized) {
       _recordReader = RecordReaderFactory.getRecordReader(_fileFormat, _dataFile, _fieldsToRead, _recordReaderConfig);
+      _isRecordReaderInitialized = true;
     }
     return _recordReader;
   }
 
   public void closeRecordReader()
       throws Exception {
-    if (_recordReader != null && _canModifyRecordReader) {
+    // If RecordReaderFileConfig did not create the RecordReader, then it should not close it.
+    if (_isRecordReaderInitialized && _canModifyRecordReader) {
       _recordReader.close();
     }
+  }
+
+  public boolean isRecordReaderDone() {
+    if (_isRecordReaderInitialized) {
+      return !_recordReader.hasNext();
+    }
+    return false;
+  }
+
+  public boolean isRecordReaderInitialized() {
+    return _isRecordReaderInitialized;
   }
 }
