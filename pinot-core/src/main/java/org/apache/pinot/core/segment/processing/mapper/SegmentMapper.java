@@ -74,7 +74,7 @@ public class SegmentMapper {
   private final String[] _partitionsBuffer;
   // NOTE: Use TreeMap so that the order is deterministic
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
-  AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
+  private AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
   private List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private List<RecordTransformer> _customRecordTransformers;
 
@@ -121,7 +121,7 @@ public class SegmentMapper {
     try {
       return doMap(totalRecordReaderSize);
     } catch (Exception e) {
-      // Cleaning up resources created by the mapper, leaving others to the caller like the input _recordReaders.
+      // Cleaning up resources created by the mapper.
       for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
         fileManager.cleanUp();
       }

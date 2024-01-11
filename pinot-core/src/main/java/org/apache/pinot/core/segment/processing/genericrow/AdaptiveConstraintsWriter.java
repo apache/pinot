@@ -21,7 +21,13 @@ package org.apache.pinot.core.segment.processing.genericrow;
 import java.io.IOException;
 
 
+/**
+ * Interface to for a writer which can track constraints. This will be used by SegmentProcessorFramework.
+ */
+
 public interface AdaptiveConstraintsWriter<W, D> {
   boolean canWrite();
-  void write(W writer, D dataUnit) throws IOException;
+
+  void write(W writer, D dataUnit)
+      throws IOException;
 }
