@@ -261,6 +261,11 @@ public class SketchFunctions {
     return diff.getResult(false, null, false);
   }
 
+  @ScalarFunction(names = {"stringToThetaSketch", "string_to_theta_sketch"})
+  public static byte[] stringToThetaSketch(String hexEncodedString) {
+    return asThetaSketch(hexEncodedString).toByteArray();
+  }
+
   @ScalarFunction(names = {"thetaSketchToString", "theta_sketch_to_string"})
   public static String thetaSketchToString(Object sketchObject) {
     return asThetaSketch(sketchObject).toString();
