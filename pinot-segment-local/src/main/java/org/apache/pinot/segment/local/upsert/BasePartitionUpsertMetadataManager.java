@@ -522,13 +522,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
 
-    HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
-    PropertyKey propertyKey = dataAccessor.keyBuilder().idealStates(_tableNameWithType);
-    IdealState idealState = dataAccessor.getProperty(propertyKey);
-    if (!idealState.isEnabled()) {
-      _logger.info("Skip removing segment: {} because the ideal state for the table {} is disabled", segmentName,
-          _tableNameWithType);
-      return;
+    if (_helixManager != null) {
+      HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
+      PropertyKey propertyKey = dataAccessor.keyBuilder().idealStates(_tableNameWithType);
+      IdealState idealState = dataAccessor.getProperty(propertyKey);
+      if (!idealState.isEnabled()) {
+        _logger.info("Skip removing segment: {} because the ideal state for the table {} is disabled", segmentName,
+            _tableNameWithType);
+        return;
+      }
     }
 
     if (!startOperation()) {
