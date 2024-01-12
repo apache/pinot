@@ -6,7 +6,9 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWriterV1;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -75,5 +77,11 @@ public class CLPWriterTest {
       clpForwardIndexWriterV1.putString(logLine);
     }
     clpForwardIndexWriterV1.close();
+
+    PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+    CLPForwardIndexReaderV1 clpForwardIndexReaderV1 = new CLPForwardIndexReaderV1(pinotDataBuffer, logLines.size());
+    for (int i = 0; i < logLines.size(); i++) {
+      System.out.println(clpForwardIndexReaderV1.getString(i, clpForwardIndexReaderV1.createContext()));
+    }
   }
 }

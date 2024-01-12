@@ -101,7 +101,7 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
     _encodedVarsFwdIndexFile = new File(_baseIndexDir, column + "_clp_encodedvars.fwd");
     _encodedVarsFwdIndexWriter =
         new MultiValueFixedByteRawIndexCreator(_encodedVarsFwdIndexFile, ChunkCompressionType.PASS_THROUGH, numDocs,
-            FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), false, 2);
+            FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), false, VarByteChunkForwardIndexWriterV4.VERSION);
     _clpStats.clear();
 
     _clpEncodedMessage = new EncodedMessage();
@@ -175,14 +175,15 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
     _dictVarsFwdIndexWriter.close();
     _encodedVarsFwdIndexWriter.close();
 
-    int totalSize = MAGIC_BYTES.length + 10 * 4 + (int) _logTypeDictFile.length() + (int) _dictVarsDictFile.length() +
+    int totalSize = MAGIC_BYTES.length + 9 * 4 + (int) _logTypeDictFile.length() + (int) _dictVarsDictFile.length() +
         (int) _logTypeFwdIndexFile.length() + (int) _dictVarsFwdIndexFile.length() +
         (int) _encodedVarsFwdIndexFile.length();
 
     _fileBuffer.put(MAGIC_BYTES);
     _fileBuffer.putInt(1); // version
-    _fileBuffer.putInt((int) _numDocs); // logType fwd index length
-    _fileBuffer.putInt(_clpStats.getTotalNumberOfEncodedVars());
+    _fileBuffer.putInt(_clpStats.getTotalNumberOfDictVars());
+    _fileBuffer.putInt(_logTypeDictCreator.getNumBytesPerEntry());
+    _fileBuffer.putInt(_dictVarsDictCreator.getNumBytesPerEntry());
     _fileBuffer.putInt((int) _logTypeDictFile.length()); // logType dict length
     _fileBuffer.putInt((int) _dictVarsDictFile.length()); // dictVars dict length
     _fileBuffer.putInt((int) _logTypeFwdIndexFile.length()); // logType fwd index length

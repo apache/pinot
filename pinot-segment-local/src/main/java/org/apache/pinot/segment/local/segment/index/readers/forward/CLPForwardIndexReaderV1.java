@@ -34,7 +34,9 @@ import static org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWrite
 public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexReaderContext> {
   private final int _version;
   private final int _numDocs;
-  private final int _totalEncodedVarValues;
+  private final int _totalDictVarValues;
+  private final int _logTypeDictNumBytesPerValue;
+  private final int _dictVarsDictNumBytesPerValue;
   private final VarLengthValueReader _logTypeDictReader;
   private final VarLengthValueReader _dictVarsDictReader;
   private final FixedBitSVForwardIndexReader _logTypeFwdIndexReader;
@@ -43,13 +45,16 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexR
   private final VarByteChunkForwardIndexReaderV4.ReaderContext _encodedVarContext;
   private final MessageDecoder _clpMessageDecoder;
 
-  public CLPForwardIndexReaderV1(PinotDataBuffer pinotDataBuffer) {
+  public CLPForwardIndexReaderV1(PinotDataBuffer pinotDataBuffer, int numDocs) {
+    _numDocs = numDocs;
     int offset = MAGIC_BYTES.length;
     _version = pinotDataBuffer.getInt(offset);
     offset += 4;
-    _numDocs = pinotDataBuffer.getInt(offset);
+    _totalDictVarValues = pinotDataBuffer.getInt(offset);
     offset += 4;
-    _totalEncodedVarValues = pinotDataBuffer.getInt(offset);
+    _logTypeDictNumBytesPerValue = pinotDataBuffer.getInt(offset);
+    offset += 4;
+    _dictVarsDictNumBytesPerValue = pinotDataBuffer.getInt(offset);
     offset += 4;
 
     int logTypeDictLength = pinotDataBuffer.getInt(offset);
@@ -63,24 +68,24 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexR
     int encodedVarFwdIndexLength = pinotDataBuffer.getInt(offset);
     offset += 4;
 
-    _logTypeDictReader = new VarLengthValueReader(pinotDataBuffer.view(offset, logTypeDictLength));
+    _logTypeDictReader = new VarLengthValueReader(pinotDataBuffer.view(offset, offset + logTypeDictLength));
     offset += logTypeDictLength;
 
-    _dictVarsDictReader = new VarLengthValueReader(pinotDataBuffer.view(offset, dictVarDictLength));
+    _dictVarsDictReader = new VarLengthValueReader(pinotDataBuffer.view(offset, offset + dictVarDictLength));
     offset += dictVarDictLength;
 
     _logTypeFwdIndexReader =
-        new FixedBitSVForwardIndexReader(pinotDataBuffer.view(offset, logTypeFwdIndexLength), _numDocs,
-            PinotDataBitSet.getNumBitsPerValue(_dictVarsDictReader.getNumValues() - 1));
+        new FixedBitSVForwardIndexReader(pinotDataBuffer.view(offset, offset + logTypeFwdIndexLength), _numDocs,
+            PinotDataBitSet.getNumBitsPerValue(_logTypeDictReader.getNumValues() - 1));
     offset += logTypeFwdIndexLength;
 
     _dictVarsFwdIndexReader =
-        new FixedBitMVForwardIndexReader(pinotDataBuffer.view(offset, dictVarsFwdIndexLength), _numDocs,
-            _totalEncodedVarValues, PinotDataBitSet.getNumBitsPerValue(_dictVarsDictReader.getNumValues() - 1));
+        new FixedBitMVForwardIndexReader(pinotDataBuffer.view(offset, offset + dictVarsFwdIndexLength), _numDocs,
+            _totalDictVarValues, PinotDataBitSet.getNumBitsPerValue(_dictVarsDictReader.getNumValues() - 1));
     offset += dictVarsFwdIndexLength;
 
     _encodedVarFwdIndexReader =
-        new VarByteChunkForwardIndexReaderV4(pinotDataBuffer.view(offset, encodedVarFwdIndexLength),
+        new VarByteChunkForwardIndexReaderV4(pinotDataBuffer.view(offset, offset + encodedVarFwdIndexLength),
             FieldSpec.DataType.LONG, false);
     offset += encodedVarFwdIndexLength;
     _encodedVarContext = _encodedVarFwdIndexReader.createContext();
@@ -107,12 +112,14 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexR
   @Override
   public String getString(int docId, ForwardIndexReaderContext context) {
     int logTypeDictId = _logTypeFwdIndexReader.getDictId(docId, _logTypeFwdIndexReader.createContext());
-    String logType = _logTypeDictReader.getUnpaddedString(logTypeDictId, 10000, new byte[10000]);
+    String logType = _logTypeDictReader.getUnpaddedString(logTypeDictId, _logTypeDictNumBytesPerValue,
+        new byte[_logTypeDictNumBytesPerValue]);
     int[] dictVarsDictIds = _dictVarsFwdIndexReader.getDictIdMV(docId, _dictVarsFwdIndexReader.createContext());
 
     String[] dictVars = new String[dictVarsDictIds.length];
     for (int i = 0; i < dictVarsDictIds.length; i++) {
-      dictVars[i] = _dictVarsDictReader.getUnpaddedString(dictVarsDictIds[i], 10000, new byte[10000]);
+      dictVars[i] = _dictVarsDictReader.getUnpaddedString(dictVarsDictIds[i], _dictVarsDictNumBytesPerValue,
+          new byte[_dictVarsDictNumBytesPerValue]);
     }
     long[] encodedVar = _encodedVarFwdIndexReader.getLongMV(docId, _encodedVarContext);
 

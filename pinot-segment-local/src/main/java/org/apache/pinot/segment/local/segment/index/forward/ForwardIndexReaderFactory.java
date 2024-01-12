@@ -92,7 +92,7 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
         byte[] magicBytes = new byte[CLPForwardIndexWriterV1.MAGIC_BYTES.length];
         dataBuffer.copyTo(0, magicBytes);
         if (ArrayUtils.isEquals(magicBytes, CLPForwardIndexWriterV1.MAGIC_BYTES)) {
-          return new CLPForwardIndexReaderV1(dataBuffer);
+          return new CLPForwardIndexReaderV1(dataBuffer, metadata.getTotalDocs());
         }
       }
       return createRawIndexReader(dataBuffer, metadata.getDataType().getStoredType(), metadata.isSingleValue());
