@@ -74,6 +74,6 @@ public class Intern {
 
   @Override
   public String toString() {
-    return "\"disabled\":" + _disabled + ", \"internerCapacity\":" + _capacity;
+    return "\"disabled\":" + _disabled + ", \"capacity\":" + _capacity;
   }
 }

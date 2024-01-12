@@ -53,12 +53,6 @@ public class DictionaryInternerHolder {
   }
 
   public String createIdentifier(String tableName, String colName) {
-    int initialCapacity = tableName.length() + colName.length() + 1;
-    StringBuilder identifierBuilder = new StringBuilder(initialCapacity);
-    identifierBuilder.append(tableName);
-    identifierBuilder.append(':');
-    identifierBuilder.append(colName);
-
-    return identifierBuilder.toString();
+    return tableName + ":" + colName;
   }
 }

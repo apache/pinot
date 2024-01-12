@@ -135,7 +135,7 @@ public class DictionaryIndexTypeTest {
         throws IOException {
       _tableConfig.getIndexingConfig()
           .setOnHeapDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
-      assertEquals(new DictionaryIndexConfig(true, null, Intern.DISABLED));
+      assertEquals(new DictionaryIndexConfig(true, null, null));
     }
 
     @Test
@@ -143,7 +143,7 @@ public class DictionaryIndexTypeTest {
         throws IOException {
       _tableConfig.getIndexingConfig()
           .setVarLengthDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
-      assertEquals(new DictionaryIndexConfig(false, true, Intern.DISABLED));
+      assertEquals(new DictionaryIndexConfig(false, true, null));
     }
 
     @Test

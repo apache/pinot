@@ -303,9 +303,7 @@ public class IndexLoadingConfig {
         deserializer = IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig);
       } else if (_segmentTier == null) {
         deserializer =
-            stdDeserializer.withFallbackAlternative(IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig));
-//        deserializer =
-//            IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig).withFallbackAlternative(stdDeserializer);
+            IndexConfigDeserializer.fromMap(table -> fromIndexLoadingConfig).withFallbackAlternative(stdDeserializer);
       } else {
         // No need to fall back to fromIndexLoadingConfig which contains index configs for default tier, when looking
         // for tier specific index configs.

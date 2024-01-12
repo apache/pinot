@@ -37,6 +37,10 @@ public class DictionaryIndexConfig extends IndexConfig {
   private final boolean _useVarLengthDictionary;
   private final Intern _intern;
 
+  public DictionaryIndexConfig(Boolean onHeap, @Nullable Boolean useVarLengthDictionary) {
+    this(onHeap, useVarLengthDictionary, null);
+  }
+
   public DictionaryIndexConfig(Boolean onHeap, @Nullable Boolean useVarLengthDictionary, Intern intern) {
     this(false, onHeap, useVarLengthDictionary, intern);
   }

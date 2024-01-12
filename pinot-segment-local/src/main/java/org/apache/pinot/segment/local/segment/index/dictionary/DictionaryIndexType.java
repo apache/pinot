@@ -114,9 +114,8 @@ public class DictionaryIndexType
       if (noDictionaryCols.contains(column)) {
         result.put(column, DictionaryIndexConfig.disabled());
       } else {
-        // Intern configs can only be used through FieldConfigLists.
-        result.put(column,
-            new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column), Intern.DISABLED));
+        // Intern configs can only be used if dictionary is enabled through FieldConfigLists.
+        result.put(column, new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column)));
       }
     }
     return result;
@@ -168,10 +167,11 @@ public class DictionaryIndexType
           ic.getVarLengthDictionaryColumns() == null ? Collections.emptyList() : ic.getVarLengthDictionaryColumns()
       );
 
-      // Intern configs can only be used through FieldConfigLists.
+      // Intern configs can only be used if dictionary is enabled through FieldConfigLists.
       Function<String, DictionaryIndexConfig> valueCalculator =
-          column -> new DictionaryIndexConfig(onHeap.contains(column), varLength.contains(column), Intern.DISABLED);
-      return Sets.union(onHeap, varLength).stream().collect(Collectors.toMap(Function.identity(), valueCalculator));
+          column -> new DictionaryIndexConfig(onHeap.contains(column), varLength.contains(column));
+      return Sets.union(onHeap, varLength).stream()
+          .collect(Collectors.toMap(Function.identity(), valueCalculator));
     };
 
     return fromNoDictConf
@@ -284,7 +284,6 @@ public class DictionaryIndexType
         segmentReader.getIndexFor(columnMetadata.getColumnName(), StandardIndexes.dictionary());
     return read(dataBuffer, columnMetadata, DictionaryIndexConfig.DEFAULT);
   }
-
 
   public static Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, DictionaryIndexConfig indexConfig)
       throws IOException {
