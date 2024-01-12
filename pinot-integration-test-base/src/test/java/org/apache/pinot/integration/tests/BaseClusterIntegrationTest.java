@@ -36,6 +36,8 @@ import java.util.Properties;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
@@ -43,6 +45,7 @@ import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
+import org.apache.pinot.plugin.stream.kafka20.server.KafkaDataServerStartable;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -345,6 +348,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1")
         .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
@@ -664,6 +668,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     for (StreamDataServerStartable kafkaStarter : _kafkaStarters) {
       kafkaStarter.stop();
     }
+  }
+
+  protected AdminClient getKafkaAdminClient() {
+    return ((KafkaDataServerStartable)_kafkaStarters.get(0)).getAdminClient();
   }
 
   /**

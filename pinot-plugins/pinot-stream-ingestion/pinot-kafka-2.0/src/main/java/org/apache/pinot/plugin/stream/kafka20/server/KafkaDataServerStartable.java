@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.stream.kafka20.server;
 
 import com.google.common.base.Function;
-import com.google.common.collect.Maps;
 import java.io.File;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,7 +26,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
@@ -121,6 +119,10 @@ public class KafkaDataServerStartable implements StreamDataServerStartable {
   @Override
   public int getPort() {
     return _port;
+  }
+
+  public AdminClient getAdminClient() {
+    return _adminClient;
   }
 
   private static void waitForCondition(Function<Void, Boolean> condition, long checkIntervalMs, long timeoutMs,
