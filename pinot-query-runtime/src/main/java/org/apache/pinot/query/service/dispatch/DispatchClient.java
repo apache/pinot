@@ -75,11 +75,13 @@ class DispatchClient {
         }
         if (config.getTlsConfig().getSslProvider() != null) {
           sslContextBuilder =
-                  GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(config.getTlsConfig().getSslProvider()));
+                  GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(config.getTlsConfig()
+                      .getSslProvider()));
         } else {
           sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
         }
-        _channel = NettyChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
+        _channel = NettyChannelBuilder.forAddress(host, port)
+            .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
                 .sslContext(sslContextBuilder.build()).build();
         ;
       } catch (SSLException e) {
