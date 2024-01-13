@@ -271,6 +271,7 @@ public enum TransformFunctionType {
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY)), "vector_norm"),
 
   ARRAY_VALUE_CONSTRUCTOR("arrayValueConstructor", "array_value_constructor"),
+  ARRAY_GENERATE("arrayGenerate", "array_generate"),
 
   // Trigonometry
   SIN("sin"),
