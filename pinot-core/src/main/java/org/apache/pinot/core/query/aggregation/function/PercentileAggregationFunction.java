@@ -31,7 +31,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class PercentileAggregationFunction extends BaseSingleInputAggregationFunction<DoubleArrayList, Double> {
+public class PercentileAggregationFunction extends NullableSingleInputAggregationFunction<DoubleArrayList, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   //version 0 functions specified in the of form PERCENTILE<2-digits>(column)
@@ -39,14 +39,14 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
   protected final int _version;
   protected final double _percentile;
 
-  public PercentileAggregationFunction(ExpressionContext expression, int percentile) {
-    super(expression);
+  public PercentileAggregationFunction(ExpressionContext expression, int percentile, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
     _version = 0;
     _percentile = percentile;
   }
 
-  public PercentileAggregationFunction(ExpressionContext expression, double percentile) {
-    super(expression);
+  public PercentileAggregationFunction(ExpressionContext expression, double percentile, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
     _version = 1;
     _percentile = percentile;
   }
@@ -77,33 +77,30 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     DoubleArrayList valueList = getValueList(aggregationResultHolder);
-    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
-    for (int i = 0; i < length; i++) {
-      valueList.add(valueArray[i]);
-    }
+    forEachNotNullDouble(length, blockValSetMap.get(_expression), value -> {
+      valueList.add(value);
+    });
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
-    for (int i = 0; i < length; i++) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    forEachNotNullDouble(length, blockValSet, (i, value) -> {
       DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-      valueList.add(valueArray[i]);
-    }
+      valueList.add(value);
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
-    for (int i = 0; i < length; i++) {
-      double value = valueArray[i];
+    forEachNotNullDouble(length, blockValSetMap.get(_expression), (i, value) -> {
       for (int groupKey : groupKeysArray[i]) {
         DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
         valueList.add(value);
       }
-    }
+    });
   }
 
   @Override
@@ -146,7 +143,11 @@ public class PercentileAggregationFunction extends BaseSingleInputAggregationFun
   public Double extractFinalResult(DoubleArrayList intermediateResult) {
     int size = intermediateResult.size();
     if (size == 0) {
-      return DEFAULT_FINAL_RESULT;
+      if (_nullHandlingEnabled) {
+        return null;
+      } else {
+        return DEFAULT_FINAL_RESULT;
+      }
     } else {
       double[] values = intermediateResult.elements();
       Arrays.sort(values, 0, size);

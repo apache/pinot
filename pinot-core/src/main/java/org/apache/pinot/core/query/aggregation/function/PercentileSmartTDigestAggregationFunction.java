@@ -50,15 +50,15 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * - compression: Compression for the converted TDigest, 100 by default.
  * Example of third argument: 'threshold=10000;compression=50'
  */
-public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAggregationFunction<Object, Double> {
+public class PercentileSmartTDigestAggregationFunction extends NullableSingleInputAggregationFunction<Object, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   private final double _percentile;
   private final int _threshold;
   private final int _compression;
 
-  public PercentileSmartTDigestAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public PercentileSmartTDigestAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
     try {
       _percentile = arguments.get(1).getLiteral().getDoubleValue();
     } catch (Exception e) {
@@ -128,39 +128,49 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
         blockValSet.isSingleValue() ? "" : "_MV");
   }
 
-  private static void aggregateIntoTDigest(int length, AggregationResultHolder aggregationResultHolder,
+  private void aggregateIntoTDigest(int length, AggregationResultHolder aggregationResultHolder,
       BlockValSet blockValSet) {
     TDigest tDigest = aggregationResultHolder.getResult();
     if (blockValSet.isSingleValue()) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        tDigest.add(doubleValues[i]);
-      }
+      forEachNotNullDouble(length, blockValSet, value -> {
+        tDigest.add(value);
+      });
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
-      for (int i = 0; i < length; i++) {
-        for (double value : doubleValues[i]) {
-          tDigest.add(value);
+      forEachNotNull(length, blockValSet, ((fromInclusive, toExclusive) -> {
+        for (int i = fromInclusive; i < toExclusive; i++) {
+          for (double value : doubleValues[i]) {
+            tDigest.add(value);
+          }
         }
-      }
+      }));
     }
   }
 
-  private void aggregateIntoValueList(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet) {
+  private DoubleArrayList getOrCreateList(int length, AggregationResultHolder aggregationResultHolder) {
     DoubleArrayList valueList = aggregationResultHolder.getResult();
     if (valueList == null) {
       valueList = new DoubleArrayList(length);
       aggregationResultHolder.setValue(valueList);
     }
+    return valueList;
+  }
+
+  private void aggregateIntoValueList(int length, AggregationResultHolder aggregationResultHolder,
+      BlockValSet blockValSet) {
+    DoubleArrayList valueList = getOrCreateList(length, aggregationResultHolder);
     if (blockValSet.isSingleValue()) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      valueList.addElements(valueList.size(), doubleValues, 0, length);
+      forEachNotNull(length, blockValSet, (from, toEx) ->
+        valueList.addElements(valueList.size(), doubleValues, from, toEx - from)
+      );
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
-      for (int i = 0; i < length; i++) {
-        valueList.addElements(valueList.size(), doubleValues[i]);
-      }
+      forEachNotNull(length, blockValSet, (from, toEx) -> {
+        for (int i = from; i < toEx; i++) {
+          valueList.addElements(valueList.size(), doubleValues[i]);
+        }
+      });
     }
     if (valueList.size() > _threshold) {
       aggregationResultHolder.setValue(convertValueListToTDigest(valueList));
@@ -182,17 +192,18 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     validateValueType(blockValSet);
     if (blockValSet.isSingleValue()) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
+      forEachNotNullDouble(length, blockValSet, (i, value) -> {
         DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-        valueList.add(doubleValues[i]);
-      }
+        valueList.add(value);
+      });
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
-      for (int i = 0; i < length; i++) {
-        DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-        valueList.addElements(valueList.size(), doubleValues[i]);
-      }
+      forEachNotNull(length, blockValSet, (from, toEx) -> {
+        for (int i = from; i < toEx; i++) {
+          DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
+          valueList.addElements(valueList.size(), doubleValues[i]);
+        }
+      });
     }
   }
 
@@ -211,20 +222,21 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     validateValueType(blockValSet);
     if (blockValSet.isSingleValue()) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
+      forEachNotNullDouble(length, blockValSet, (i, value) -> {
         for (int groupKey : groupKeysArray[i]) {
-          getValueList(groupByResultHolder, groupKey).add(doubleValues[i]);
+          getValueList(groupByResultHolder, groupKey).add(value);
         }
-      }
+      });
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
-          valueList.addElements(valueList.size(), doubleValues[i]);
+      forEachNotNull(length, blockValSet, (from, toEx) -> {
+        for (int i = from; i < toEx; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
+            valueList.addElements(valueList.size(), doubleValues[i]);
+          }
         }
-      }
+      });
     }
   }
 
@@ -285,7 +297,11 @@ public class PercentileSmartTDigestAggregationFunction extends BaseSingleInputAg
       DoubleArrayList valueList = (DoubleArrayList) intermediateResult;
       int size = valueList.size();
       if (size == 0) {
-        return DEFAULT_FINAL_RESULT;
+        if (_nullHandlingEnabled) {
+          return null;
+        } else {
+          return DEFAULT_FINAL_RESULT;
+        }
       } else {
         double[] values = valueList.elements();
         Arrays.sort(values, 0, size);

@@ -28,8 +28,8 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 public class PercentileRawKLLAggregationFunction extends PercentileKLLAggregationFunction {
 
-  public PercentileRawKLLAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+  public PercentileRawKLLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments, nullHandlingEnabled);
   }
 
   @Override

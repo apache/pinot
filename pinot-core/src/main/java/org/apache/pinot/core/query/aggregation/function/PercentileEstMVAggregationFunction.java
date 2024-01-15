@@ -30,11 +30,11 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class PercentileEstMVAggregationFunction extends PercentileEstAggregationFunction {
 
   public PercentileEstMVAggregationFunction(ExpressionContext expression, int percentile) {
-    super(expression, percentile);
+    super(expression, percentile, false);
   }
 
   public PercentileEstMVAggregationFunction(ExpressionContext expression, double percentile) {
-    super(expression, percentile);
+    super(expression, percentile, false);
   }
 
   @Override

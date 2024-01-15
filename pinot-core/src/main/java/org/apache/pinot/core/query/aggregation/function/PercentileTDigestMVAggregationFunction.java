@@ -30,16 +30,16 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAggregationFunction {
 
   public PercentileTDigestMVAggregationFunction(ExpressionContext expression, int percentile) {
-    super(expression, percentile);
+    super(expression, percentile, false);
   }
 
   public PercentileTDigestMVAggregationFunction(ExpressionContext expression, double percentile) {
-    super(expression, percentile);
+    super(expression, percentile, false);
   }
 
   public PercentileTDigestMVAggregationFunction(ExpressionContext expression, double percentile,
       int compressionFactor) {
-    super(expression, percentile, compressionFactor);
+    super(expression, percentile, compressionFactor, false);
   }
 
   @Override

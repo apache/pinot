@@ -37,12 +37,14 @@ public class PercentileRawEstAggregationFunction
     extends BaseSingleInputAggregationFunction<QuantileDigest, SerializedQuantileDigest> {
   private final PercentileEstAggregationFunction _percentileEstAggregationFunction;
 
-  public PercentileRawEstAggregationFunction(ExpressionContext expressionContext, double percentile) {
-    this(expressionContext, new PercentileEstAggregationFunction(expressionContext, percentile));
+  public PercentileRawEstAggregationFunction(ExpressionContext expressionContext, double percentile,
+      boolean nullHandlingEnabled) {
+    this(expressionContext, new PercentileEstAggregationFunction(expressionContext, percentile, nullHandlingEnabled));
   }
 
-  public PercentileRawEstAggregationFunction(ExpressionContext expressionContext, int percentile) {
-    this(expressionContext, new PercentileEstAggregationFunction(expressionContext, percentile));
+  public PercentileRawEstAggregationFunction(ExpressionContext expressionContext, int percentile,
+      boolean nullHandlingEnabled) {
+    this(expressionContext, new PercentileEstAggregationFunction(expressionContext, percentile, nullHandlingEnabled));
   }
 
   protected PercentileRawEstAggregationFunction(ExpressionContext expression,

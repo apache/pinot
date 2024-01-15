@@ -32,7 +32,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class PercentileKLLMVAggregationFunction extends PercentileKLLAggregationFunction {
 
   public PercentileKLLMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments);
+    super(arguments, false);
   }
 
   @Override
