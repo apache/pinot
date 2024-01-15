@@ -136,16 +136,10 @@ public class SegmentMapper {
     GenericRow reuse = new GenericRow();
     for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
       RecordReader recordReader = recordReaderFileConfig.getRecordReader();
-      mapAndTransformRow(recordReader, reuse, observer, count, totalRecordReaderSize);
+      boolean shouldMapperTerminate = mapAndTransformRow(recordReader, reuse, observer, count, totalRecordReaderSize);
 
       // Terminate the map phase if intermediate file size has crossed the threshold.
-      if (!_adaptiveSizeBasedWriter.canWrite() && recordReader.hasNext()) {
-        observer.accept(String.format(
-            "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
-            _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
-        LOGGER.info(String.format(
-            "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
-            _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
+      if (shouldMapperTerminate) {
         break;
       }
       recordReaderFileConfig.closeRecordReader();
@@ -158,7 +152,7 @@ public class SegmentMapper {
     return _partitionToFileManagerMap;
   }
 
-  private void mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
+  private boolean mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
     while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
@@ -182,6 +176,16 @@ public class SegmentMapper {
       }
       reuse.clear();
     }
+    if (!_adaptiveSizeBasedWriter.canWrite() && recordReader.hasNext()) {
+      observer.accept(String.format(
+          "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
+          _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
+      LOGGER.info(String.format(
+          "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
+          _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
+      return true;
+    }
+    return false;
   }
 
   private void writeRecord(GenericRow row)

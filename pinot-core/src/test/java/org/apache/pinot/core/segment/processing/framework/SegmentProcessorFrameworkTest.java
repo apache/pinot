@@ -675,7 +675,7 @@ public class SegmentProcessorFrameworkTest {
     assertTrue(FileUtils.isEmptyDirectory(workingDir));
     rewindRecordReaders(_multipleSegments);
 
-    // Test 6: RecordReader should be closed when recordReader is passed to RecordReaderFileConfig (without mapper
+    // Test 6: RecordReader should be closed when recordReader is created inside RecordReaderFileConfig (without mapper
     // output size threshold configured).
 
     ClassLoader classLoader = getClass().getClassLoader();
@@ -729,7 +729,7 @@ public class SegmentProcessorFrameworkTest {
     assertFalse(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
     FileUtils.cleanDirectory(workingDir);
 
-    // Test 8: RecordReader should be closed when recordReader is passed to RecordReaderFileConfig (With mapper
+    // Test 8: RecordReader should be closed when recordReader is created inside RecordReaderFileConfig (With mapper
     // output size threshold configured).
 
     expectedTotalDocsCount = 51;
@@ -745,7 +745,7 @@ public class SegmentProcessorFrameworkTest {
             Collections.emptyList(), null);
     outputSegments = frameworkWithRecordReaderFileConfig.process();
 
-    // Verify that each segment has only one row, and the segment name is correct.
+    // Verify that each segment has only one row.
     for (int i = 0; i < expectedTotalDocsCount; i++) {
       segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
       assertEquals(segmentMetadata.getTotalDocs(), 1);
@@ -768,7 +768,7 @@ public class SegmentProcessorFrameworkTest {
             Collections.emptyList(), null);
     outputSegments = frameworkWithDelegateRecordReader.process();
 
-    // Verify that each segment has only one row, and the segment name is correct.
+    // Verify that each segment has only one row.
     for (int i = 0; i < expectedTotalDocsCount; i++) {
       segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
       assertEquals(segmentMetadata.getTotalDocs(), 1);
