@@ -147,9 +147,9 @@ public class MergeTaskUtils {
     if (maxNumRecordsPerSegment != null) {
       segmentConfigBuilder.setMaxNumRecordsPerSegment(Integer.parseInt(maxNumRecordsPerSegment));
     }
-    String intermediateFileSizeThreshold = taskConfig.get(MergeTask.INTERMEDIATE_FILE_SIZE_KEY);
-    if (intermediateFileSizeThreshold != null) {
-      segmentConfigBuilder.setIntermediateFileSizeThreshold(Long.parseLong(intermediateFileSizeThreshold));
+    String segmentMapperFileSizeThreshold = taskConfig.get(MergeTask.SEGMENT_MAPPER_FILE_SIZE_IN_BYTES);
+    if (segmentMapperFileSizeThreshold != null) {
+      segmentConfigBuilder.setIntermediateFileSizeThreshold(Long.parseLong(segmentMapperFileSizeThreshold));
     }
     segmentConfigBuilder.setSegmentNamePrefix(taskConfig.get(MergeTask.SEGMENT_NAME_PREFIX_KEY));
     segmentConfigBuilder.setSegmentNamePostfix(taskConfig.get(MergeTask.SEGMENT_NAME_POSTFIX_KEY));

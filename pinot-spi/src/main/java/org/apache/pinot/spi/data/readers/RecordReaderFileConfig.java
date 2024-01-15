@@ -34,7 +34,7 @@ public class RecordReaderFileConfig {
   public final File _dataFile;
   public final Set<String> _fieldsToRead;
   public final RecordReaderConfig _recordReaderConfig;
-  private final boolean _canModifyRecordReader;
+  private final boolean _isDelegateReader;
   // Record Readers created/passed from clients.
   public RecordReader _recordReader;
   private boolean _isRecordReaderInitialized;
@@ -47,7 +47,7 @@ public class RecordReaderFileConfig {
     _fieldsToRead = fieldsToRead;
     _recordReaderConfig = recordReaderConfig;
     _recordReader = null;
-    _canModifyRecordReader = true;
+    _isDelegateReader = true;
     _isRecordReaderInitialized = false;
   }
 
@@ -58,7 +58,7 @@ public class RecordReaderFileConfig {
     _dataFile = null;
     _fieldsToRead = null;
     _recordReaderConfig = null;
-    _canModifyRecordReader = false;
+    _isDelegateReader = false;
     _isRecordReaderInitialized = true;
   }
 
@@ -74,7 +74,7 @@ public class RecordReaderFileConfig {
   public void closeRecordReader()
       throws Exception {
     // If RecordReaderFileConfig did not create the RecordReader, then it should not close it.
-    if (_isRecordReaderInitialized && _canModifyRecordReader) {
+    if (_isRecordReaderInitialized && _isDelegateReader) {
       _recordReader.close();
     }
   }

@@ -31,28 +31,28 @@ import javax.annotation.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentConfig {
   public static final int DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
-  public static final long DEFAULT_INTERMEDIATE_FILE_SIZE_THRESHOLD = Long.MAX_VALUE;
+  public static final long DEFAULT_SEGMENT_MAPPER_FILE_SIZE_IN_BYTES = Long.MAX_VALUE;
 
   private final int _maxNumRecordsPerSegment;
   private final String _segmentNamePrefix;
   private final String _segmentNamePostfix;
   private final String _fixedSegmentName;
-  private final long _intermediateFileSizeThresholdInBytes;
+  private final long _segmentMapperFileSizeThresholdInBytes;
 
   @JsonCreator
   private SegmentConfig(@JsonProperty(value = "maxNumRecordsPerSegment", required = true) int maxNumRecordsPerSegment,
       @JsonProperty("segmentNamePrefix") @Nullable String segmentNamePrefix,
       @JsonProperty("segmentNamePostfix") @Nullable String segmentNamePostfix,
       @JsonProperty("fixedSegmentName") @Nullable String fixedSegmentName,
-      @JsonProperty(value = "intermediateFileSizeThresholdInBytes", required = true)
-      long intermediateFileSizeThresholdInBytes) {
+      @JsonProperty(value = "segmentMapperFileSizeThresholdInBytes", required = true)
+      long segmentMapperFileSizeThresholdInBytes) {
     Preconditions.checkState(maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
-    Preconditions.checkState(intermediateFileSizeThresholdInBytes > 0, "Intermediate file size threshold must be > 0");
+    Preconditions.checkState(segmentMapperFileSizeThresholdInBytes > 0, "Intermediate file size threshold must be > 0");
     _maxNumRecordsPerSegment = maxNumRecordsPerSegment;
     _segmentNamePrefix = segmentNamePrefix;
     _segmentNamePostfix = segmentNamePostfix;
     _fixedSegmentName = fixedSegmentName;
-    _intermediateFileSizeThresholdInBytes = intermediateFileSizeThresholdInBytes;
+    _segmentMapperFileSizeThresholdInBytes = segmentMapperFileSizeThresholdInBytes;
   }
 
   /**
@@ -78,7 +78,7 @@ public class SegmentConfig {
   }
 
   public long getIntermediateFileSizeThreshold() {
-    return _intermediateFileSizeThresholdInBytes;
+    return _segmentMapperFileSizeThresholdInBytes;
   }
 
   /**
@@ -86,7 +86,7 @@ public class SegmentConfig {
    */
   public static class Builder {
     private int _maxNumRecordsPerSegment = DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT;
-    private long _intermediateFileSizeThresholdInBytes = DEFAULT_INTERMEDIATE_FILE_SIZE_THRESHOLD;
+    private long _segmentMapperFileSizeThresholdInBytes = DEFAULT_SEGMENT_MAPPER_FILE_SIZE_IN_BYTES;
     private String _segmentNamePrefix;
     private String _segmentNamePostfix;
     private String _fixedSegmentName;
@@ -111,25 +111,25 @@ public class SegmentConfig {
       _fixedSegmentName = fixedSegmentName;
       return this;
     }
-    public Builder setIntermediateFileSizeThreshold(long intermediateFileSizeThresholdInBytes) {
-      _intermediateFileSizeThresholdInBytes = intermediateFileSizeThresholdInBytes;
+    public Builder setIntermediateFileSizeThreshold(long segmentMapperFileSizeThresholdInBytes) {
+      _segmentMapperFileSizeThresholdInBytes = segmentMapperFileSizeThresholdInBytes;
       return this;
     }
 
     public SegmentConfig build() {
       Preconditions.checkState(_maxNumRecordsPerSegment > 0, "Max num records per segment must be > 0");
-      Preconditions.checkState(_intermediateFileSizeThresholdInBytes > 0,
+      Preconditions.checkState(_segmentMapperFileSizeThresholdInBytes > 0,
           "Intermediate file size threshold must be > 0");
       return new SegmentConfig(_maxNumRecordsPerSegment, _segmentNamePrefix, _segmentNamePostfix, _fixedSegmentName,
-          _intermediateFileSizeThresholdInBytes);
+          _segmentMapperFileSizeThresholdInBytes);
     }
   }
 
   @Override
   public String toString() {
     return "SegmentConfig{" + "_maxNumRecordsPerSegment=" + _maxNumRecordsPerSegment
-        + ", _intermediateFileSizeThresholdInBytes=" + _intermediateFileSizeThresholdInBytes + ", _segmentNamePrefix='"
-        + _segmentNamePrefix + '\'' + ", _segmentNamePostfix='" + _segmentNamePostfix + '\'' + ", _fixedSegmentName='"
-        + _fixedSegmentName + '\'' + '}';
+        + ", _segmentMapperFileSizeThresholdInBytes=" + _segmentMapperFileSizeThresholdInBytes
+        + ", _segmentNamePrefix='" + _segmentNamePrefix + '\'' + ", _segmentNamePostfix='" + _segmentNamePostfix + '\''
+        + ", _fixedSegmentName='" + _fixedSegmentName + '\'' + '}';
   }
 }

@@ -178,7 +178,7 @@ public class MergeTaskUtilsTest {
     taskConfig.put(MergeTask.SEGMENT_NAME_PREFIX_KEY, "myPrefix");
     taskConfig.put(MergeTask.SEGMENT_NAME_POSTFIX_KEY, "myPostfix");
     taskConfig.put(MergeTask.FIXED_SEGMENT_NAME_KEY, "mySegment");
-    taskConfig.put(MergeTask.INTERMEDIATE_FILE_SIZE_KEY, "1000000000");
+    taskConfig.put(MergeTask.SEGMENT_MAPPER_FILE_SIZE_IN_BYTES, "1000000000");
     SegmentConfig segmentConfig = MergeTaskUtils.getSegmentConfig(taskConfig);
     assertEquals(segmentConfig.getMaxNumRecordsPerSegment(), 10000);
     assertEquals(segmentConfig.getSegmentNamePrefix(), "myPrefix");
@@ -187,7 +187,7 @@ public class MergeTaskUtilsTest {
     assertEquals(segmentConfig.getFixedSegmentName(), "mySegment");
     assertEquals(segmentConfig.getIntermediateFileSizeThreshold(), 1000000000L);
     assertEquals(segmentConfig.toString(),
-        "SegmentConfig{_maxNumRecordsPerSegment=10000, _intermediateFileSizeThresholdInBytes=1000000000, "
+        "SegmentConfig{_maxNumRecordsPerSegment=10000, _segmentMapperFileSizeThresholdInBytes=1000000000, "
             + "_segmentNamePrefix='myPrefix', _segmentNamePostfix='myPostfix', _fixedSegmentName='mySegment'}");
 
     segmentConfig = MergeTaskUtils.getSegmentConfig(Collections.emptyMap());
