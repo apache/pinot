@@ -102,39 +102,39 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     double deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
     File tableIndexDir = tableDataManager.getTableDataDir();
 
+    // Server level config honoured only when table level config is not set to true
+    if (tableDataManager.getTableDataManagerConfig() != null
+        && tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig() != null
+        && tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig().getUpsertDefaultEnableSnapshot()
+        != null && !enableSnapshot) {
+      enableSnapshot = Boolean.parseBoolean(
+          tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig().getUpsertDefaultEnableSnapshot());
+    }
+
+    // Server level config honoured only when table level config is not set to true
+    if (tableDataManager.getTableDataManagerConfig() != null
+        && tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig() != null
+        && tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig().getUpsertDefaultEnablePreload()
+        != null && !enablePreload) {
+      enablePreload = Boolean.parseBoolean(
+          tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig().getUpsertDefaultEnablePreload());
+    }
+
+    _context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
+        .setPrimaryKeyColumns(primaryKeyColumns).setComparisonColumns(comparisonColumns)
+        .setDeleteRecordColumn(deleteRecordColumn).setHashFunction(hashFunction)
+        .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot).setEnablePreload(enablePreload)
+        .setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL).setTableIndexDir(tableIndexDir).build();
+    LOGGER.info(
+        "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
+            + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
+            + " deleted Keys TTL: {}, table index dir: {}", getClass().getSimpleName(), _tableNameWithType,
+        primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction, upsertConfig.getMode(), enableSnapshot,
+        enablePreload, metadataTTL, deletedKeysTTL, tableIndexDir);
+
+    initCustomVariables();
+
     if (enableSnapshot && enablePreload && segmentPreloadExecutor != null) {
-      // Server level config honoured only when table level config is not set to true
-      enableSnapshot = upsertConfig.isEnableSnapshot();
-      if (tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig().getUpsertDefaultEnableSnapshot()
-          != null && !enableSnapshot) {
-        enableSnapshot = Boolean.parseBoolean(
-            tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig()
-                .getUpsertDefaultEnableSnapshot());
-      }
-
-      enablePreload = upsertConfig.isEnablePreload();
-
-      // Server level config honoured only when table level config is not set to true
-      if (tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig().getUpsertDefaultEnablePreload()
-          != null && !enablePreload) {
-        enablePreload = Boolean.parseBoolean(tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig()
-            .getUpsertDefaultEnablePreload());
-      }
-
-      _context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
-          .setPrimaryKeyColumns(primaryKeyColumns).setComparisonColumns(comparisonColumns)
-          .setDeleteRecordColumn(deleteRecordColumn).setHashFunction(hashFunction)
-          .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot)
-          .setEnablePreload(enablePreload).setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL)
-          .setTableIndexDir(tableIndexDir).build();
-      LOGGER.info(
-          "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
-              + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
-              + " deleted Keys TTL: {}, table index dir: {}", getClass().getSimpleName(), _tableNameWithType,
-          primaryKeyColumns, comparisonColumns, deleteRecordColumn, hashFunction, upsertConfig.getMode(),
-          enableSnapshot, enablePreload, metadataTTL, deletedKeysTTL, tableIndexDir);
-
-      initCustomVariables();
 
       // Preloading the segments with snapshots for fast upsert metadata recovery.
       // Note that there is an implicit waiting logic between the thread doing the segment preloading here and the
