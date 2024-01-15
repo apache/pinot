@@ -153,29 +153,29 @@ public class DictionariesTest {
           Assert.assertTrue(heapDictionary instanceof IntDictionary);
           Assert.assertTrue(mmapDictionary instanceof IntDictionary);
           int firstInt = heapDictionary.getIntValue(0);
-          Assert.assertEquals(heapDictionary.indexOf(firstInt), heapDictionary.indexOf("" + firstInt));
-          Assert.assertEquals(mmapDictionary.indexOf(firstInt), mmapDictionary.indexOf("" + firstInt));
+          Assert.assertEquals(heapDictionary.indexOf(firstInt), heapDictionary.indexOf(String.valueOf(firstInt)));
+          Assert.assertEquals(mmapDictionary.indexOf(firstInt), mmapDictionary.indexOf(String.valueOf(firstInt)));
           break;
         case LONG:
           Assert.assertTrue(heapDictionary instanceof LongDictionary);
           Assert.assertTrue(mmapDictionary instanceof LongDictionary);
           long firstLong = heapDictionary.getLongValue(0);
-          Assert.assertEquals(heapDictionary.indexOf(firstLong), heapDictionary.indexOf("" + firstLong));
-          Assert.assertEquals(mmapDictionary.indexOf(firstLong), mmapDictionary.indexOf("" + firstLong));
+          Assert.assertEquals(heapDictionary.indexOf(firstLong), heapDictionary.indexOf(String.valueOf(firstLong)));
+          Assert.assertEquals(mmapDictionary.indexOf(firstLong), mmapDictionary.indexOf(String.valueOf(firstLong)));
           break;
         case FLOAT:
           Assert.assertTrue(heapDictionary instanceof FloatDictionary);
           Assert.assertTrue(mmapDictionary instanceof FloatDictionary);
           float firstFloat = heapDictionary.getFloatValue(0);
-          Assert.assertEquals(heapDictionary.indexOf(firstFloat), heapDictionary.indexOf("" + firstFloat));
-          Assert.assertEquals(mmapDictionary.indexOf(firstFloat), mmapDictionary.indexOf("" + firstFloat));
+          Assert.assertEquals(heapDictionary.indexOf(firstFloat), heapDictionary.indexOf(String.valueOf(firstFloat)));
+          Assert.assertEquals(mmapDictionary.indexOf(firstFloat), mmapDictionary.indexOf(String.valueOf(firstFloat)));
           break;
         case DOUBLE:
           Assert.assertTrue(heapDictionary instanceof DoubleDictionary);
           Assert.assertTrue(mmapDictionary instanceof DoubleDictionary);
           double firstDouble = heapDictionary.getDoubleValue(0);
-          Assert.assertEquals(heapDictionary.indexOf(firstDouble), heapDictionary.indexOf("" + firstDouble));
-          Assert.assertEquals(mmapDictionary.indexOf(firstDouble), mmapDictionary.indexOf("" + firstDouble));
+          Assert.assertEquals(heapDictionary.indexOf(firstDouble), heapDictionary.indexOf(String.valueOf(firstDouble)));
+          Assert.assertEquals(mmapDictionary.indexOf(firstDouble), mmapDictionary.indexOf(String.valueOf(firstDouble)));
           break;
         case BIG_DECIMAL:
           Assert.assertTrue(heapDictionary instanceof BigDecimalDictionary);
@@ -544,9 +544,14 @@ public class DictionariesTest {
         FieldConfig.CompressionCodec.CLP, Collections.EMPTY_MAP));
     _tableConfig.setFieldConfigList(fieldConfigList);
     StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, schema, null);
-    StringColumnPreIndexStatsCollector statsCollector = new StringColumnPreIndexStatsCollector("column1", statsCollectorConfig);
-    statsCollector.collect("2023/10/26 00:03:10.168 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective: true");
-    statsCollector.collect("2023/10/26 00:03:10.169 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32d_DEFAULT)] Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective: true");
+    StringColumnPreIndexStatsCollector statsCollector =
+        new StringColumnPreIndexStatsCollector("column1", statsCollectorConfig);
+    statsCollector.collect(
+        "2023/10/26 00:03:10.168 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] "
+            + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective: true");
+    statsCollector.collect(
+        "2023/10/26 00:03:10.169 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32d_DEFAULT)] "
+            + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective: true");
 
     statsCollector.seal();
     System.out.println(statsCollector.getClpStats());

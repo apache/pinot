@@ -58,7 +58,6 @@ public class StatsCollectorConfig {
         _columnFieldConfigMap.put(fieldConfig.getName(), fieldConfig);
       }
     }
-
   }
 
   @Nullable

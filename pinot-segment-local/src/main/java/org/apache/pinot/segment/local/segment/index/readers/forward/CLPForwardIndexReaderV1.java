@@ -23,13 +23,11 @@ import com.yscope.clp.compressorfrontend.MessageDecoder;
 import java.io.IOException;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
+import org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWriterV1;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
-
-import static org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWriterV1.MAGIC_BYTES;
-
 
 public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexReaderContext> {
   private final int _version;
@@ -47,7 +45,7 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexR
 
   public CLPForwardIndexReaderV1(PinotDataBuffer pinotDataBuffer, int numDocs) {
     _numDocs = numDocs;
-    int offset = MAGIC_BYTES.length;
+    int offset = CLPForwardIndexWriterV1.MAGIC_BYTES.length;
     _version = pinotDataBuffer.getInt(offset);
     offset += 4;
     _totalDictVarValues = pinotDataBuffer.getInt(offset);
@@ -131,8 +129,6 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexR
   }
 
   @Override
-  public void close()
-      throws IOException {
-
+  public void close() throws IOException {
   }
 }

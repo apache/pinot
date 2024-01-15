@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.spi.data.FieldSpec;
 
+
 /**
  * HEADER
  *  version
@@ -101,7 +102,8 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
     _encodedVarsFwdIndexFile = new File(_baseIndexDir, column + "_clp_encodedvars.fwd");
     _encodedVarsFwdIndexWriter =
         new MultiValueFixedByteRawIndexCreator(_encodedVarsFwdIndexFile, ChunkCompressionType.PASS_THROUGH, numDocs,
-            FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), false, VarByteChunkForwardIndexWriterV4.VERSION);
+            FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), false,
+            VarByteChunkForwardIndexWriterV4.VERSION);
     _clpStats.clear();
 
     _clpEncodedMessage = new EncodedMessage();
@@ -175,9 +177,9 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
     _dictVarsFwdIndexWriter.close();
     _encodedVarsFwdIndexWriter.close();
 
-    int totalSize = MAGIC_BYTES.length + 9 * 4 + (int) _logTypeDictFile.length() + (int) _dictVarsDictFile.length() +
-        (int) _logTypeFwdIndexFile.length() + (int) _dictVarsFwdIndexFile.length() +
-        (int) _encodedVarsFwdIndexFile.length();
+    int totalSize = MAGIC_BYTES.length + 9 * 4 + (int) _logTypeDictFile.length() + (int) _dictVarsDictFile.length()
+        + (int) _logTypeFwdIndexFile.length() + (int) _dictVarsFwdIndexFile.length()
+        + (int) _encodedVarsFwdIndexFile.length();
 
     _fileBuffer.put(MAGIC_BYTES);
     _fileBuffer.putInt(1); // version

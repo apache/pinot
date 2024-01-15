@@ -19,9 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
-import com.mchange.lang.ByteUtils;
 import org.apache.commons.lang.ArrayUtils;
-import org.apache.lucene.util.ArrayUtil;
 import org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWriterV1;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
@@ -49,24 +47,12 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<ForwardIndexConfig, ForwardIndexReader> {
   private static volatile ForwardIndexReaderFactory _instance = new ForwardIndexReaderFactory();
 
-  public static void setInstance(ForwardIndexReaderFactory factory) {
-    _instance = factory;
-  }
-
   public static ForwardIndexReaderFactory getInstance() {
     return _instance;
   }
 
-  @Override
-  protected IndexType<ForwardIndexConfig, ForwardIndexReader, ?> getIndexType() {
-    return StandardIndexes.forward();
-  }
-
-  @Override
-  protected ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-      ForwardIndexConfig indexConfig)
-      throws IndexReaderConstraintException {
-    return createIndexReader(dataBuffer, metadata);
+  public static void setInstance(ForwardIndexReaderFactory factory) {
+    _instance = factory;
   }
 
   public static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
@@ -103,9 +89,8 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
       boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
     if (isSingleValue && storedType.isFixedWidth()) {
-      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION
-          ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
-          : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
+      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION ? new FixedBytePower2ChunkSVForwardIndexReader(
+          dataBuffer, storedType) : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
     }
 
     if (version == VarByteChunkForwardIndexWriterV4.VERSION) {
@@ -128,5 +113,17 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
         return new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
       }
     }
+  }
+
+  @Override
+  protected IndexType<ForwardIndexConfig, ForwardIndexReader, ?> getIndexType() {
+    return StandardIndexes.forward();
+  }
+
+  @Override
+  protected ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+      ForwardIndexConfig indexConfig)
+      throws IndexReaderConstraintException {
+    return createIndexReader(dataBuffer, metadata);
   }
 }
