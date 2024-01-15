@@ -24,6 +24,8 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -48,8 +50,11 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private boolean _isStopped = false;
   private RebalanceResult.Status _stopStatus;
 
+  private ControllerMetrics _controllerMetrics;
+
   public ZkBasedTableRebalanceObserver(String tableNameWithType, String rebalanceJobId,
-      TableRebalanceContext tableRebalanceContext, PinotHelixResourceManager pinotHelixResourceManager) {
+      TableRebalanceContext tableRebalanceContext, PinotHelixResourceManager pinotHelixResourceManager,
+      ControllerMetrics controllerMetrics) {
     Preconditions.checkState(tableNameWithType != null, "Table name cannot be null");
     Preconditions.checkState(rebalanceJobId != null, "rebalanceId cannot be null");
     Preconditions.checkState(pinotHelixResourceManager != null, "PinotHelixManager cannot be null");
@@ -59,12 +64,14 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     _tableRebalanceProgressStats = new TableRebalanceProgressStats();
     _tableRebalanceContext = tableRebalanceContext;
     _numUpdatesToZk = 0;
+    _controllerMetrics = controllerMetrics;
   }
 
   @Override
   public void onTrigger(Trigger trigger, Map<String, Map<String, String>> currentState,
       Map<String, Map<String, String>> targetState) {
     boolean updatedStatsInZk = false;
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType, ControllerGauge.TABLE_REBALANCE_IN_PROGRESS, 1);
     switch (trigger) {
       case START_TRIGGER:
         updateOnStart(currentState, targetState);
@@ -119,6 +126,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   public void onSuccess(String msg) {
     Preconditions.checkState(RebalanceResult.Status.DONE != _tableRebalanceProgressStats.getStatus(),
         "Table Rebalance already completed");
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType, ControllerGauge.TABLE_REBALANCE_IN_PROGRESS, 0);
     long timeToFinishInSeconds = (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000L;
     _tableRebalanceProgressStats.setCompletionStatusMsg(msg);
     _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
@@ -132,6 +140,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
 
   @Override
   public void onError(String errorMsg) {
+    _controllerMetrics.setValueOfTableGauge(_tableNameWithType, ControllerGauge.TABLE_REBALANCE_IN_PROGRESS, 0);
     long timeToFinishInSeconds = (System.currentTimeMillis() - _tableRebalanceProgressStats.getStartTimeMs()) / 1000;
     _tableRebalanceProgressStats.setTimeToFinishInSeconds(timeToFinishInSeconds);
     _tableRebalanceProgressStats.setStatus(RebalanceResult.Status.FAILED);
