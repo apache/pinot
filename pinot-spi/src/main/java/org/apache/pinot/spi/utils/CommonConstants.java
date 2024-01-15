@@ -98,9 +98,9 @@ public class CommonConstants {
     public static final int DEFAULT_HYPERLOGLOG_PLUS_P = 14;
     public static final int DEFAULT_HYPERLOGLOG_PLUS_SP = 0;
 
-    // 2 to the power of 16, for tradeoffs see datasketches library documentation:
+    // 2 to the power of 14, for tradeoffs see datasketches library documentation:
     // https://datasketches.apache.org/docs/Theta/ThetaErrorTable.html
-    public static final int DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES = 65536;
+    public static final int DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES = 16384;
 
     public static final int DEFAULT_TUPLE_SKETCH_LGK = 16;
 
@@ -234,6 +234,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
     public static final long DEFAULT_BROKER_TIMEOUT_MS = 10_000L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
+    public static final String CONFIG_OF_BROKER_INSTANCE_TAGS = "pinot.broker.instance.tags";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.broker.swagger.use.https";
     // Comma separated list of packages that contains javax service resources.

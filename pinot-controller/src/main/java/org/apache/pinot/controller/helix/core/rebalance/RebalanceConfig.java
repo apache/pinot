@@ -61,6 +61,14 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "1")
   private int _minAvailableReplicas = DEFAULT_MIN_REPLICAS_TO_KEEP_UP_FOR_NO_DOWNTIME;
 
+  // For no-downtime rebalance, whether to enable low disk mode during rebalance. When enabled, segments will first be
+  // offloaded from servers, then added to servers after offload is done while maintaining the min available replicas.
+  // It may increase the total time of the rebalance, but can be useful when servers are low on disk space, and we want
+  // to scale up the cluster and rebalance the table to more servers.
+  @JsonProperty("lowDiskMode")
+  @ApiModelProperty(example = "false")
+  private boolean _lowDiskMode = false;
+
   // Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot be achieved)
   // When using best-efforts to rebalance, the following scenarios won't fail the rebalance (will log warnings instead):
   // - Segment falls into ERROR state in ExternalView -> count ERROR state as good state
@@ -148,6 +156,14 @@ public class RebalanceConfig {
 
   public void setMinAvailableReplicas(int minAvailableReplicas) {
     _minAvailableReplicas = minAvailableReplicas;
+  }
+
+  public boolean isLowDiskMode() {
+    return _lowDiskMode;
+  }
+
+  public void setLowDiskMode(boolean lowDiskMode) {
+    _lowDiskMode = lowDiskMode;
   }
 
   public boolean isBestEfforts() {

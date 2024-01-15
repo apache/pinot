@@ -25,9 +25,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
@@ -58,9 +58,11 @@ public class TextIndexUtils {
   }
 
   static boolean hasTextIndex(File segDir, String column) {
+    //@formatter:off
     return new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION).exists();
+    //@formatter:on
   }
 
   public static boolean isFstTypeNative(@Nullable Map<String, String> textIndexProperties) {
@@ -79,37 +81,37 @@ public class TextIndexUtils {
     return SegmentDirectoryPaths.findTextIndexIndexFile(indexDir, column) != null ? FSTType.LUCENE : FSTType.NATIVE;
   }
 
-  @Nonnull
   public static List<String> extractStopWordsInclude(String colName,
       Map<String, Map<String, String>> columnProperties) {
     return extractStopWordsInclude(columnProperties.getOrDefault(colName, null));
   }
 
-  @Nonnull
   public static List<String> extractStopWordsExclude(String colName,
       Map<String, Map<String, String>> columnProperties) {
     return extractStopWordsExclude(columnProperties.getOrDefault(colName, null));
   }
 
-  @Nonnull
   public static List<String> extractStopWordsInclude(Map<String, String> columnProperty) {
     return parseEntryAsString(columnProperty, FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY);
   }
 
-  @Nonnull
   public static List<String> extractStopWordsExclude(Map<String, String> columnProperty) {
     return parseEntryAsString(columnProperty, FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY);
   }
 
-  @Nonnull
-  private static List<String> parseEntryAsString(@Nullable Map<String, String> columnProperties,
-      String stopWordKey) {
+  private static List<String> parseEntryAsString(@Nullable Map<String, String> columnProperties, String stopWordKey) {
     if (columnProperties == null) {
-      return Collections.EMPTY_LIST;
+      return Collections.emptyList();
     }
     String includeWords = columnProperties.getOrDefault(stopWordKey, "");
-    return Arrays.stream(includeWords.split(FieldConfig.TEXT_INDEX_STOP_WORD_SEPERATOR))
-        .map(String::trim).collect(Collectors.toList());
+    return Arrays.stream(includeWords.split(FieldConfig.TEXT_INDEX_STOP_WORD_SEPERATOR)).map(String::trim)
+        .collect(Collectors.toList());
+  }
+
+  public static Analyzer getAnalyzerFromClassName(String luceneAnalyzerClass)
+      throws ReflectiveOperationException {
+    // Support instantiation with default constructor for now unless customized
+    return (Analyzer) Class.forName(luceneAnalyzerClass).getConstructor().newInstance();
   }
 
   public static StandardAnalyzer getStandardAnalyzerWithCustomizedStopWords(@Nullable List<String> stopWordsInclude,

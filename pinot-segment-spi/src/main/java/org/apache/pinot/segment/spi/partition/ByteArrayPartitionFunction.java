@@ -42,8 +42,8 @@ public class ByteArrayPartitionFunction implements PartitionFunction {
   }
 
   @Override
-  public int getPartition(Object value) {
-    return abs(Arrays.hashCode(value.toString().getBytes(UTF_8))) % _numPartitions;
+  public int getPartition(String value) {
+    return abs(Arrays.hashCode(value.getBytes(UTF_8))) % _numPartitions;
   }
 
   @Override

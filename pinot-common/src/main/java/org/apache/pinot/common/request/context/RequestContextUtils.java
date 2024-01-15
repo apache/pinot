@@ -37,10 +37,13 @@ import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -241,6 +244,14 @@ public class RequestContextUtils {
       case JSON_MATCH:
         return FilterContext.forPredicate(
             new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+      case VECTOR_SIMILARITY:
+        ExpressionContext lhs = getExpression(operands.get(0));
+        float[] vectorValue = getVectorValue(operands.get(1));
+        int topK = VectorSimilarityPredicate.DEFAULT_TOP_K;
+        if (operands.size() == 3) {
+          topK = (int) operands.get(2).getLiteral().getLongValue();
+        }
+        return FilterContext.forPredicate(new VectorSimilarityPredicate(lhs, vectorValue, topK));
       case IS_NULL:
         return FilterContext.forPredicate(new IsNullPredicate(getExpression(operands.get(0))));
       case IS_NOT_NULL:
@@ -250,15 +261,38 @@ public class RequestContextUtils {
     }
   }
 
-  private static String getStringValue(Expression thriftExpression) {
-    if (thriftExpression.getType() != ExpressionType.LITERAL) {
+  public static String getStringValue(Expression thriftExpression) {
+    Literal literal = thriftExpression.getLiteral();
+    if (literal == null) {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
-    if (thriftExpression.getLiteral().getSetField() == Literal._Fields.NULL_VALUE) {
-      return "null";
+    switch (literal.getSetField()) {
+      case BOOL_VALUE:
+        return Boolean.toString(literal.getBoolValue());
+      case BYTE_VALUE:
+        return Byte.toString(literal.getByteValue());
+      case SHORT_VALUE:
+        return Short.toString(literal.getShortValue());
+      case INT_VALUE:
+        return Integer.toString(literal.getIntValue());
+      case LONG_VALUE:
+        return Long.toString(literal.getLongValue());
+      case FLOAT_VALUE:
+        return Float.toString(literal.getFloatValue());
+      case DOUBLE_VALUE:
+        return Double.toString(literal.getDoubleValue());
+      case BIG_DECIMAL_VALUE:
+        return BigDecimalUtils.deserialize(literal.getBigDecimalValue()).toPlainString();
+      case STRING_VALUE:
+        return literal.getStringValue();
+      case BINARY_VALUE:
+        return BytesUtils.toHexString(literal.getBinaryValue());
+      case NULL_VALUE:
+        return "null";
+      default:
+        throw new IllegalStateException("Unsupported literal type: " + literal.getSetField());
     }
-    return thriftExpression.getLiteral().getFieldValue().toString();
   }
 
   /**
@@ -395,6 +429,13 @@ public class RequestContextUtils {
         return FilterContext.forPredicate(new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
       case JSON_MATCH:
         return FilterContext.forPredicate(new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
+      case VECTOR_SIMILARITY:
+        int topK = VectorSimilarityPredicate.DEFAULT_TOP_K;
+        if (operands.size() == 3) {
+          topK = (int) operands.get(2).getLiteral().getLongValue();
+        }
+        return FilterContext.forPredicate(
+            new VectorSimilarityPredicate(operands.get(0), getVectorValue(operands.get(1)), topK));
       case IS_NULL:
         return FilterContext.forPredicate(new IsNullPredicate(operands.get(0)));
       case IS_NOT_NULL:
@@ -413,5 +454,31 @@ public class RequestContextUtils {
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
     return expressionContext.getLiteral().getStringValue();
+  }
+
+  private static float[] getVectorValue(ExpressionContext expressionContext) {
+    if (expressionContext.getType() != ExpressionContext.Type.FUNCTION) {
+      throw new BadQueryRequestException(
+          "Pinot does not support column or function on the right-hand side of the predicate");
+    }
+    float[] vector = new float[expressionContext.getFunction().getArguments().size()];
+    for (int i = 0; i < expressionContext.getFunction().getArguments().size(); i++) {
+      vector[i] =
+          Float.parseFloat(expressionContext.getFunction().getArguments().get(i).getLiteral().getValue().toString());
+    }
+    return vector;
+  }
+
+  private static float[] getVectorValue(Expression thriftExpression) {
+    if (thriftExpression.getType() != ExpressionType.FUNCTION) {
+      throw new BadQueryRequestException(
+          "Pinot does not support column or function on the right-hand side of the predicate");
+    }
+    float[] vector = new float[thriftExpression.getFunctionCall().getOperandsSize()];
+    for (int i = 0; i < thriftExpression.getFunctionCall().getOperandsSize(); i++) {
+      vector[i] = Float.parseFloat(
+          Double.toString(thriftExpression.getFunctionCall().getOperands().get(i).getLiteral().getDoubleValue()));
+    }
+    return vector;
   }
 }

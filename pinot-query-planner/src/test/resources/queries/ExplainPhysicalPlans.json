@@ -51,11 +51,11 @@
         ]
       },
       {
-        "sql": "SELECT {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_key='num', partition_size='4') */ GROUP BY {tbl1}.name"
+        "sql": "SELECT {tbl1}.name, SUM({tbl1}.val) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ GROUP BY {tbl1}.name"
       },
       {
         "description": "explain plan with join with colocated tables, not on partition key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, a.col3, b.col3 FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */ ON a.col1 = b.col2 WHERE b.col3 > 0",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, a.col3, b.col3 FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ ON a.col1 = b.col2 WHERE b.col3 > 0",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -82,7 +82,7 @@
       },
       {
         "description": "explain plan with join with colocated tables, one-sided on partition key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, a.col3, b.col3 FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */ ON a.col1 = b.col1 WHERE b.col3 > 0",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, a.col3, b.col3 FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ ON a.col1 = b.col1 WHERE b.col3 > 0",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -109,7 +109,7 @@
       },
       {
         "description": "explain plan with join with colocated tables, both-sided on partition key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, a.col3, b.col3 FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */ ON a.col2 = b.col1 WHERE b.col3 > 0",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, a.col3, b.col3 FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ ON a.col2 = b.col1 WHERE b.col3 > 0",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:2|[2] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -138,7 +138,7 @@
       },
       {
         "description": "explain plan with semi-join + group-by with colocated tables",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, COUNT(*) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT b.col1    FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */    WHERE b.col1 = 'z' )  GROUP BY a.col1",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, COUNT(*) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT b.col1    FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */    WHERE b.col1 = 'z' )  GROUP BY a.col1",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -166,7 +166,7 @@
       },
       {
         "description": "explain plan with semi-join + group-by with colocated tables with colocated hints",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ a.col1, COUNT(*) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT b.col1    FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */    WHERE b.col1 = 'z' )  GROUP BY a.col1",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true') */ a.col1, COUNT(*) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT b.col1    FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */    WHERE b.col1 = 'z' )  GROUP BY a.col1",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -194,7 +194,7 @@
       },
       {
         "description": "explain plan with direct group-by with pre-partitioned tables on partition key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  GROUP BY a.col2",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */  GROUP BY a.col2",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:2|[2] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -214,7 +214,7 @@
       },
       {
         "description": "explain plan with direct group-by with pre-partitioned tables on non-partition key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  GROUP BY a.col1",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */  GROUP BY a.col1",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -232,7 +232,7 @@
       },
       {
         "description": "explain plan with direct group-by with pre-partitioned tables on both partition and non-partition key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  GROUP BY a.col1, a.col2",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */  GROUP BY a.col1, a.col2",
         "comments": "TODO: currently we do not support minimum hash-set thus we repartition from col2 to (col1, col2), but once we support this should not have repartitioning.",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
@@ -251,17 +251,19 @@
       },
       {
         "description": "explain plan with direct inner join + group-by with colocated tables on join key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */    ON a.col2 = b.col1  WHERE b.col3 > 0  GROUP BY a.col2",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */  JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */    ON a.col2 = b.col1  WHERE b.col3 > 0  GROUP BY a.col2",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
-          "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
-          "└── [1]@localhost:2|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
-          "    └── [1]@localhost:2|[0] AGGREGATE_FINAL\n",
-          "        └── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
-          "            ├── [2]@localhost:2|[2] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
-          "            ├── [2]@localhost:2|[3] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
-          "            ├── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
-          "            └── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1],[1]@localhost:2|[0]}\n",
+          "├── [1]@localhost:2|[2] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "├── [1]@localhost:2|[3] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "├── [1]@localhost:1|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:1|[1] AGGREGATE_FINAL\n",
+          "        └── [1]@localhost:1|[1] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            ├── [2]@localhost:2|[2] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[2]} (Subtree Omitted)\n",
+          "            ├── [2]@localhost:2|[3] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[3]} (Subtree Omitted)\n",
+          "            ├── [2]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[0]} (Subtree Omitted)\n",
+          "            └── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1]}\n",
           "                └── [2]@localhost:1|[1] AGGREGATE_LEAF\n",
           "                    └── [2]@localhost:1|[1] JOIN\n",
           "                        ├── [2]@localhost:1|[1] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
@@ -284,7 +286,7 @@
       },
       {
         "description": "explain plan with direct inner join + group-by with colocated tables on non-join key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, SUM(a.col3)  FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  JOIN b /*+ tableOptions(partition_key='col1', partition_size='4') */    ON a.col2 = b.col1  WHERE b.col3 > 0  GROUP BY a.col1",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, SUM(a.col3)  FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */  JOIN b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */    ON a.col2 = b.col1  WHERE b.col3 > 0  GROUP BY a.col1",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -317,7 +319,7 @@
       },
       {
         "description": "explain plan with semi join from grouped right table, then group-by with colocated tables on join key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3)  FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT col2    FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */    WHERE b.col3 > 0    GROUP BY col2 HAVING COUNT(*) > 1 )  GROUP BY a.col2",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col2, SUM(a.col3)  FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT col2    FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */    WHERE b.col3 > 0    GROUP BY col2 HAVING COUNT(*) > 1 )  GROUP BY a.col2",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:2|[2] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -353,7 +355,7 @@
       },
       {
         "description": "explain plan with semi join from grouped right table, then group-by with colocated tables on non-join key",
-        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, SUM(a.col3)  FROM a /*+ tableOptions(partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT col1    FROM b /*+ tableOptions(partition_key='col1', partition_size='4') */    WHERE b.col3 > 0    GROUP BY col1 HAVING COUNT(*) > 1 )  GROUP BY a.col1",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, SUM(a.col3)  FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */  WHERE a.col2 IN (   SELECT col1    FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */    WHERE b.col3 > 0    GROUP BY col1 HAVING COUNT(*) > 1 )  GROUP BY a.col1",
         "output": [
           "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
           "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
@@ -384,6 +386,67 @@
           "                                                    └── [4]@localhost:1|[1] AGGREGATE_LEAF\n",
           "                                                        └── [4]@localhost:1|[1] FILTER\n",
           "                                                            └── [4]@localhost:1|[1] TABLE SCAN (b) null\n",
+          ""
+        ]
+      },
+      {
+        "description": "explain plan with join after group-by on both tables on both of the group keys",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT * FROM ( SELECT a.col2 AS col2 FROM a GROUP BY a.col2 HAVING COUNT(*) > 10 ) tmpA JOIN (SELECT b.col1 AS col1, SUM(b.col3) AS val FROM b GROUP BY b.col1 ) tmpB ON tmpA.col2 = tmpB.col1",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
+          "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:2|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:2|[0] JOIN\n",
+          "        ├── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "        │   ├── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1]} (Subtree Omitted)\n",
+          "        │   └── [2]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[0]}\n",
+          "        │       └── [2]@localhost:2|[0] PROJECT\n",
+          "        │           └── [2]@localhost:2|[0] FILTER\n",
+          "        │               └── [2]@localhost:2|[0] AGGREGATE_FINAL\n",
+          "        │                   └── [2]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "        │                       ├── [3]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[2]@localhost:1|[1],[2]@localhost:2|[0]} (Subtree Omitted)\n",
+          "        │                       └── [3]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[2]@localhost:1|[1],[2]@localhost:2|[0]}\n",
+          "        │                           └── [3]@localhost:2|[0] AGGREGATE_LEAF\n",
+          "        │                               └── [3]@localhost:2|[0] TABLE SCAN (a) null\n",
+          "        └── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            ├── [4]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1]} (Subtree Omitted)\n",
+          "            └── [4]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[0]}\n",
+          "                └── [4]@localhost:2|[0] AGGREGATE_FINAL\n",
+          "                    └── [4]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "                        └── [5]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[4]@localhost:1|[1],[4]@localhost:2|[0]}\n",
+          "                            └── [5]@localhost:1|[0] AGGREGATE_LEAF\n",
+          "                                └── [5]@localhost:1|[0] TABLE SCAN (b) null\n",
+          ""
+        ]
+      },
+      {
+        "description": "explain plan with join after group-by on both tables on both of the group keys, then group by again on join key --> should optimized out the aggregate b/c it is already unique",
+        "sql": "EXPLAIN IMPLEMENTATION PLAN FOR SELECT col2, SUM(val) FROM ( SELECT a.col2 AS col2 FROM a GROUP BY a.col2 HAVING COUNT(*) > 10 ) tmpA JOIN (SELECT b.col1 AS col1, SUM(b.col3) AS val FROM b GROUP BY b.col1 ) tmpB ON tmpA.col2 = tmpB.col1 GROUP BY col2",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
+          "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:2|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:2|[0] PROJECT\n",
+          "        └── [1]@localhost:2|[0] JOIN\n",
+          "            ├── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │   ├── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1]} (Subtree Omitted)\n",
+          "            │   └── [2]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[0]}\n",
+          "            │       └── [2]@localhost:2|[0] PROJECT\n",
+          "            │           └── [2]@localhost:2|[0] FILTER\n",
+          "            │               └── [2]@localhost:2|[0] AGGREGATE_FINAL\n",
+          "            │                   └── [2]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │                       ├── [3]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[2]@localhost:1|[1],[2]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            │                       └── [3]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[2]@localhost:1|[1],[2]@localhost:2|[0]}\n",
+          "            │                           └── [3]@localhost:2|[0] AGGREGATE_LEAF\n",
+          "            │                               └── [3]@localhost:2|[0] TABLE SCAN (a) null\n",
+          "            └── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "                ├── [4]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:1|[1]} (Subtree Omitted)\n",
+          "                └── [4]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)[PARTITIONED]->{[1]@localhost:2|[0]}\n",
+          "                    └── [4]@localhost:2|[0] AGGREGATE_FINAL\n",
+          "                        └── [4]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "                            └── [5]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[4]@localhost:1|[1],[4]@localhost:2|[0]}\n",
+          "                                └── [5]@localhost:1|[0] AGGREGATE_LEAF\n",
+          "                                    └── [5]@localhost:1|[0] TABLE SCAN (b) null\n",
           ""
         ]
       }

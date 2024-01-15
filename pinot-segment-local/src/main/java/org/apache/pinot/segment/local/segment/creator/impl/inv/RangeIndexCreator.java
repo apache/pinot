@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
@@ -321,6 +322,7 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
     try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(_rangeIndexFile));
         DataOutputStream header = new DataOutputStream(bos);
         FileOutputStream fos = new FileOutputStream(_rangeIndexFile);
+        FileChannel channel = fos.getChannel();
         DataOutputStream dataOutputStream = new DataOutputStream(new BufferedOutputStream(fos))) {
 
       //VERSION
@@ -358,7 +360,8 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
       long bitmapOffset = bytesWritten + bitmapOffsetHeaderSize;
       header.writeLong(bitmapOffset);
       bytesWritten += Long.BYTES;
-      fos.getChannel().position(bitmapOffset);
+
+      channel.position(bitmapOffset);
 
       for (int i = 0; i < ranges.size(); i++) {
         Pair<Integer, Integer> range = ranges.get(i);

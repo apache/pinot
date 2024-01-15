@@ -65,14 +65,12 @@ public class PinotDispatchPlanner {
     // 3. add worker assignment after the dispatchable plan context is fulfilled after the visit.
     context.getWorkerManager().assignWorkers(rootFragment, context);
     // 4. compute the mailbox assignment for each stage.
-    // TODO: refactor this to be a pluggable interface.
     rootNode.visit(MailboxAssignmentVisitor.INSTANCE, context);
     // 5. Run physical optimizations
     runPhysicalOptimizers(rootNode, context, _tableCache);
     // 6. Run validations
     runValidations(rootFragment, context);
     // 7. convert it into query plan.
-    // TODO: refactor this to be a pluggable interface.
     return finalizeDispatchableSubPlan(rootFragment, context);
   }
 

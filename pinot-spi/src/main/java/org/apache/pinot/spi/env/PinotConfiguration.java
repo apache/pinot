@@ -30,7 +30,7 @@ import org.apache.commons.configuration2.CompositeConfiguration;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.convert.DefaultListDelimiterHandler;
+import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
@@ -165,7 +165,7 @@ public class PinotConfiguration {
 
     return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(e -> {
       MapConfiguration mapConfiguration = new MapConfiguration(e);
-      mapConfiguration.setListDelimiterHandler(new DefaultListDelimiterHandler(','));
+      mapConfiguration.setListDelimiterHandler(new LegacyListDelimiterHandler(','));
       return mapConfiguration;
     }), propertiesFromConfigPaths).collect(Collectors.toList());
   }
@@ -186,11 +186,11 @@ public class PinotConfiguration {
     try {
       PropertiesConfiguration propertiesConfiguration;
       if (configPath.startsWith("classpath:")) {
-        propertiesConfiguration = CommonsConfigurationUtils.loadFromInputStream(
+        propertiesConfiguration = CommonsConfigurationUtils.fromInputStream(
             PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())),
             true, true);
       } else {
-        propertiesConfiguration = CommonsConfigurationUtils.loadFromPath(configPath, true, true);
+        propertiesConfiguration = CommonsConfigurationUtils.fromPath(configPath, true, true);
       }
       return propertiesConfiguration;
     } catch (ConfigurationException e) {

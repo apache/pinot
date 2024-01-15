@@ -207,12 +207,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    * @param value Value for which String value needs to be returned
    * @return String value for the object.
    */
-  protected static String getStringValue(Object value) {
+  public static String getStringValue(Object value) {
+    if (value instanceof BigDecimal) {
+      return ((BigDecimal) value).toPlainString();
+    }
     if (value instanceof byte[]) {
       return BytesUtils.toHexString((byte[]) value);
-    } else {
-      return value.toString();
     }
+    return value.toString();
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
@@ -560,6 +562,19 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       } catch (Exception e) {
         throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
       }
+    }
+
+    /**
+     * Converts the given value of the data type to string.The input value for BYTES type should be byte[].
+     */
+    public String toString(Object value) {
+      if (this == BIG_DECIMAL) {
+        return ((BigDecimal) value).toPlainString();
+      }
+      if (this == BYTES) {
+        return BytesUtils.toHexString((byte[]) value);
+      }
+      return value.toString();
     }
 
     /**

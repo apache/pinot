@@ -35,8 +35,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -142,6 +142,9 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   public boolean hasIndexFor(String column, IndexType<?, ?, ?> type) {
     if (type == StandardIndexes.text()) {
       return TextIndexUtils.hasTextIndex(_segmentDirectory, column);
+    }
+    if (type == StandardIndexes.vector()) {
+      return VectorIndexUtils.hasVectorIndex(_segmentDirectory, column);
     }
     IndexKey key = new IndexKey(column, type);
     return _columnEntries.containsKey(key);
@@ -361,6 +364,10 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     // Text index is kept in its own files, thus can be removed directly.
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);
+      return;
+    }
+    if (indexType == StandardIndexes.vector()) {
+      VectorIndexUtils.cleanupVectorIndex(_segmentDirectory, columnName);
       return;
     }
     // Only remember to cleanup indices upon close(), if any existing

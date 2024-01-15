@@ -34,6 +34,7 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 
 
 public abstract class BaseDataSource implements DataSource {
@@ -112,5 +113,11 @@ public abstract class BaseDataSource implements DataSource {
   @Override
   public NullValueVectorReader getNullValueVector() {
     return getIndex(StandardIndexes.nullValueVector());
+  }
+
+  @Nullable
+  @Override
+  public VectorIndexReader getVectorIndex() {
+    return getIndex(StandardIndexes.vector());
   }
 }

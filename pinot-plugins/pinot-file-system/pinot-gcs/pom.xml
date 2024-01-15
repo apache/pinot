@@ -38,10 +38,6 @@
     <phase.prop>package</phase.prop>
   </properties>
   <dependencies>
-    <dependency>
-      <groupId>commons-configuration</groupId>
-      <artifactId>commons-configuration</artifactId>
-    </dependency>
     <!-- google cloud storage -->
     <dependency>
       <groupId>com.google.cloud</groupId>

@@ -29,7 +29,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -77,7 +77,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   public SegmentLocalFSDirectory(File directory, ReadMode readMode)
-      throws IOException {
+      throws IOException, ConfigurationException {
     this(directory, new SegmentMetadataImpl(directory), readMode);
   }
 
@@ -269,7 +269,11 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
         break;
     }
     if (CollectionUtils.isNotEmpty(_segmentMetadata.getStarTreeV2MetadataList())) {
-      _starTreeIndexReader = new StarTreeIndexReader(_segmentDirectory, _segmentMetadata, _readMode);
+      try {
+        _starTreeIndexReader = new StarTreeIndexReader(_segmentDirectory, _segmentMetadata, _readMode);
+      } catch (ConfigurationException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 

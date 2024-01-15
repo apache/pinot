@@ -179,7 +179,7 @@ public class PinotConfigurationTest {
   @Test
   public void assertPropertiesFromBaseConfiguration()
       throws ConfigurationException {
-    PropertiesConfiguration propertiesConfiguration = CommonsConfigurationUtils.loadFromPath(
+    PropertiesConfiguration propertiesConfiguration = CommonsConfigurationUtils.fromPath(
         PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile(),
         true, true);
 

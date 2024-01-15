@@ -29,6 +29,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -705,8 +706,10 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
-    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null,
-        "Upsert/Dedup table cannot use tenant tag override");
+    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (Objects.equals(
+            tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming(),
+            tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted())),
+        "Invalid tenant tag override used for Upsert/Dedup table");
 
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -728,9 +731,15 @@ public final class TableConfigUtils {
       String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
       if (deleteRecordColumn != null) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
+        Preconditions.checkState(fieldSpec != null,
+            String.format("Column %s specified in deleteRecordColumn does not exist", deleteRecordColumn));
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
+        DataType dataType = fieldSpec.getDataType();
         Preconditions.checkState(
-            fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
-            "The delete record column must be a single-valued BOOLEAN column");
+            dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
+            String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric",
+                deleteRecordColumn));
       }
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
@@ -760,22 +769,29 @@ public final class TableConfigUtils {
   @VisibleForTesting
   static void validateTTLForUpsertConfig(TableConfig tableConfig, Schema schema) {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    if (upsertConfig == null || upsertConfig.getMetadataTTL() == 0) {
+    if (upsertConfig == null || (upsertConfig.getMetadataTTL() == 0 && upsertConfig.getDeletedKeysTTL() == 0)) {
       return;
     }
 
     List<String> comparisonColumns = upsertConfig.getComparisonColumns();
     if (CollectionUtils.isNotEmpty(comparisonColumns)) {
       Preconditions.checkState(comparisonColumns.size() == 1,
-          "Upsert TTL does not work with multiple comparison columns");
+          "MetadataTTL / DeletedKeysTTL does not work with multiple comparison columns");
       String comparisonColumn = comparisonColumns.get(0);
       DataType comparisonColumnDataType = schema.getFieldSpecFor(comparisonColumn).getDataType();
       Preconditions.checkState(comparisonColumnDataType.isNumeric(),
-          "Upsert TTL must have comparison column: %s in numeric type, found: %s", comparisonColumn,
-          comparisonColumnDataType);
+          "MetadataTTL / DeletedKeysTTL must have comparison column: %s in numeric type, found: %s",
+          comparisonColumn, comparisonColumnDataType);
     }
 
-    Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
+    if (upsertConfig.getMetadataTTL() > 0) {
+      Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
+    }
+
+    if (upsertConfig.getDeletedKeysTTL() > 0) {
+      Preconditions.checkState(upsertConfig.getDeleteRecordColumn() != null,
+          "Deleted Keys TTL can only be enabled with deleteRecordColumn set.");
+    }
   }
 
   /**

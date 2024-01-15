@@ -23,7 +23,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
-import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -39,7 +38,7 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class LuceneFSTIndexCreator implements FSTIndexCreator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexCreator.class);
   private final File _fstIndexFile;
   private final FSTBuilder _fstBuilder;
   Integer _dictId;

@@ -116,7 +116,7 @@ public class S3PinotFS extends BasePinotFS {
             AwsBasicCredentials.create(s3Config.getAccessKey(), s3Config.getSecretKey());
         awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
       } else {
-        awsCredentialsProvider = DefaultCredentialsProvider.create();
+        awsCredentialsProvider = DefaultCredentialsProvider.builder().build();
       }
 
       // IAM Role based access
