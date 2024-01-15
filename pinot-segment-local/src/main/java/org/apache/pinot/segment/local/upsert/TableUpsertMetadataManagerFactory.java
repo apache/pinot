@@ -50,7 +50,7 @@ public class TableUpsertMetadataManagerFactory {
           tableNameWithType);
       try {
         metadataManager =
-            (TableUpsertMetadataManager) Class.forName(metadataManagerClass).getConstructor().newInstance();
+            (TableUpsertMetadataManager) Class.forName(metadataManagerClass).newInstance();
       } catch (Exception e) {
         throw new RuntimeException(
             String.format("Caught exception while constructing TableUpsertMetadataManager with class: %s for table: %s",

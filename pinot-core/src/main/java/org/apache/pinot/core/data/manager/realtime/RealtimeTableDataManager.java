@@ -699,6 +699,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return _instanceId;
   }
 
+  @VisibleForTesting
+  public TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return _tableUpsertMetadataManager;
+  }
+
   /**
    * Validate a schema against the table config for real-time record consumption.
    * Ideally, we should validate these things when schema is added or table is created, but either of these

@@ -29,9 +29,16 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.integration.tests.models.DummyTableUpsertMetadataManager;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
+import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -82,8 +89,9 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     addSchema(schema);
 
     Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    TableConfig tableConfig = createCSVUpsertTableConfig(getTableName(), getKafkaTopic(),
-        getNumKafkaPartitions(), csvDecoderProperties, null, PRIMARY_KEY_COL);
+    TableConfig tableConfig =
+        createCSVUpsertTableConfig(getTableName(), getKafkaTopic(), getNumKafkaPartitions(), csvDecoderProperties, null,
+            PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
 
     // Wait for all documents loaded
@@ -136,8 +144,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
   private Schema createSchema(String schemaFileName)
       throws IOException {
-    InputStream inputStream =
-        BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(schemaFileName);
+    InputStream inputStream = BaseClusterIntegrationTest.class.getClassLoader().getResourceAsStream(schemaFileName);
     Assert.assertNotNull(inputStream);
     return Schema.fromInputStream(inputStream);
   }
@@ -181,8 +188,9 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     Schema upsertSchema = createSchema();
     upsertSchema.setSchemaName(tableName);
     addSchema(upsertSchema);
-    TableConfig tableConfig = createCSVUpsertTableConfig(tableName, kafkaTopicName,
-        getNumKafkaPartitions(), csvDecoderProperties, upsertConfig, PRIMARY_KEY_COL);
+    TableConfig tableConfig =
+        createCSVUpsertTableConfig(tableName, kafkaTopicName, getNumKafkaPartitions(), csvDecoderProperties,
+            upsertConfig, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
 
     // Push initial 10 upsert records - 3 pks 100, 101 and 102
@@ -222,9 +230,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     Assert.assertEquals(rs.getString(0, playerIdColumnIndex), "101");
 
     // Validate deleted records
-    rs = getPinotConnection()
-        .execute("SELECT playerId FROM " + tableName
-            + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
+    rs = getPinotConnection().execute(
+        "SELECT playerId FROM " + tableName + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
     Assert.assertEquals(rs.getRowCount(), 2);
     for (int i = 0; i < rs.getRowCount(); i++) {
       String playerId = rs.getString(i, 0);
@@ -245,17 +252,16 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     }, 100L, 600_000L, "Failed to load all upsert records for testDeleteWithFullUpsert");
 
     // Validate: pk is queryable and all columns are overwritten with new value
-    rs = getPinotConnection()
-        .execute("SELECT playerId, name, game FROM " + tableName + " WHERE playerId = 100").getResultSet(0);
+    rs = getPinotConnection().execute("SELECT playerId, name, game FROM " + tableName + " WHERE playerId = 100")
+        .getResultSet(0);
     Assert.assertEquals(rs.getRowCount(), 1);
     Assert.assertEquals(rs.getInt(0, 0), 100);
     Assert.assertEquals(rs.getString(0, 1), "Zook-New");
     Assert.assertEquals(rs.getString(0, 2), "null");
 
     // Validate: pk lineage still exists
-    rs = getPinotConnection()
-        .execute("SELECT playerId, name FROM " + tableName
-            + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
+    rs = getPinotConnection().execute(
+        "SELECT playerId, name FROM " + tableName + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
 
     Assert.assertTrue(rs.getRowCount() > 1);
 
@@ -269,8 +275,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
 
-    testDeleteWithPartialUpsert(getKafkaTopic() + "-partial-upsert-with-deletes",
-        "gameScoresPartialUpsertWithDelete", upsertConfig);
+    testDeleteWithPartialUpsert(getKafkaTopic() + "-partial-upsert-with-deletes", "gameScoresPartialUpsertWithDelete",
+        upsertConfig);
   }
 
   protected void testDeleteWithPartialUpsert(String kafkaTopicName, String tableName, UpsertConfig upsertConfig)
@@ -288,8 +294,9 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     Schema partialUpsertSchema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
     partialUpsertSchema.setSchemaName(tableName);
     addSchema(partialUpsertSchema);
-    TableConfig tableConfig = createCSVUpsertTableConfig(tableName, kafkaTopicName,
-        getNumKafkaPartitions(), csvDecoderProperties, upsertConfig, PRIMARY_KEY_COL);
+    TableConfig tableConfig =
+        createCSVUpsertTableConfig(tableName, kafkaTopicName, getNumKafkaPartitions(), csvDecoderProperties,
+            upsertConfig, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
 
     // Push initial 10 upsert records - 3 pks 100, 101 and 102
@@ -329,9 +336,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     Assert.assertEquals(rs.getString(0, playerIdColumnIndex), "101");
 
     // Validate deleted records
-    rs = getPinotConnection()
-        .execute("SELECT playerId FROM " + tableName
-            + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
+    rs = getPinotConnection().execute(
+        "SELECT playerId FROM " + tableName + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
     Assert.assertEquals(rs.getRowCount(), 2);
     for (int i = 0; i < rs.getRowCount(); i++) {
       String playerId = rs.getString(i, 0);
@@ -352,22 +358,48 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     }, 100L, 600_000L, "Failed to load all upsert records for testDeleteWithFullUpsert");
 
     // Validate: pk is queryable and all columns are overwritten with new value
-    rs = getPinotConnection()
-        .execute("SELECT playerId, name, game FROM " + tableName
-            + " WHERE playerId = 100").getResultSet(0);
+    rs = getPinotConnection().execute("SELECT playerId, name, game FROM " + tableName + " WHERE playerId = 100")
+        .getResultSet(0);
     Assert.assertEquals(rs.getRowCount(), 1);
     Assert.assertEquals(rs.getInt(0, 0), 100);
     Assert.assertEquals(rs.getString(0, 1), "Zook");
     Assert.assertEquals(rs.getString(0, 2), "[\"null\"]");
 
     // Validate: pk lineage still exists
-    rs = getPinotConnection()
-        .execute("SELECT playerId, name FROM " + tableName
-            + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
+    rs = getPinotConnection().execute(
+        "SELECT playerId, name FROM " + tableName + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
 
     Assert.assertTrue(rs.getRowCount() > 1);
 
     // TEARDOWN
     dropRealtimeTable(tableName);
+  }
+
+  @Test
+  public void testDefaultMetadataManagerClass()
+      throws Exception {
+    PinotConfiguration config = getServerConf(12345);
+    config.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "."
+            + HelixInstanceDataManagerConfig.UPSERT_DEFAULT_METADATA_MANAGER_CLASS,
+        DummyTableUpsertMetadataManager.class.getName());
+
+    BaseServerStarter serverStarter = startOneServer(config);
+    String dummyTableName = "dummyTable123";
+    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+
+    TableConfig tableConfig =
+        createCSVUpsertTableConfig(dummyTableName, getKafkaTopic(), getNumKafkaPartitions(), csvDecoderProperties, null,
+            PRIMARY_KEY_COL);
+    Schema schema = createSchema();
+    schema.setSchemaName(dummyTableName);
+    addSchema(schema);
+    addTableConfig(tableConfig);
+
+    Thread.sleep(10000L);
+    RealtimeTableDataManager tableDataManager =
+        (RealtimeTableDataManager) serverStarter.getServerInstance().getInstanceDataManager()
+            .getTableDataManager(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(dummyTableName));
+    Assert.assertTrue(tableDataManager.getTableUpsertMetadataManager() instanceof DummyTableUpsertMetadataManager);
+    serverStarter.stop();
   }
 }
