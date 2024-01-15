@@ -964,6 +964,14 @@ public class DistinctCountThetaSketchAggregationFunction
   @Override
   public List<ThetaSketchAccumulator> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     List result = groupByResultHolder.getResult(groupKey);
+    if (result == null) {
+      int numSketches = _filterEvaluators.size() + 1;
+      List<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(numSketches);
+      for (int i = 0; i < numSketches; i++) {
+        thetaSketchAccumulators.add(new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold));
+      }
+      return thetaSketchAccumulators;
+    }
 
     if (result.get(0) instanceof Sketch) {
       int numSketches = result.size();

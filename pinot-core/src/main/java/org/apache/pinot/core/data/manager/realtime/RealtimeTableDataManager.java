@@ -115,6 +115,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
+  private static final SegmentLocks SEGMENT_UPSERT_LOCKS = SegmentLocks.create();
 
   // TODO: Change it to BooleanSupplier
   private final Supplier<Boolean> _isServerReadyToServeQueries;
@@ -531,17 +532,25 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // validDocId bitmap. Otherwise, the query can return wrong results, if accessing the premature segment.
     if (_tableUpsertMetadataManager.isPreloading()) {
       // Preloading segment happens when creating table manager when server restarts, and segment is ensured to be
-      // preloaded by a single thread, so no need for segmentLock.
+      // preloaded by a single thread, so no need to take a lock.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
       registerSegment(segmentName, newSegmentManager);
       _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
       return;
     }
-    // Replacing segment may happen in two threads, i.e. the consuming thread that's committing the mutable segment
-    // and a HelixTaskExecutor thread that's bringing segment from ONLINE to CONSUMING when the server finds
-    // consuming thread can't commit the segment in time. Adding segment should be done by a single HelixTaskExecutor
-    // thread but do it with segmentLock as well for simplicity.
-    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    // Replacing segment takes multiple steps, and particularly need to access the oldSegment. Replace segment may
+    // happen in two threads, i.e. the consuming thread that's committing the mutable segment and a HelixTaskExecutor
+    // thread that's bringing segment from ONLINE to CONSUMING when the server finds consuming thread can't commit
+    // the segment in time. The slower thread takes the reference of the oldSegment here, but it may get closed by
+    // the faster thread if not synchronized. In particular, the slower thread may iterate the primary keys in the
+    // oldSegment, causing seg fault. So we have to take a lock here.
+    // However, we can't just reuse the existing segmentLocks. Because many methods of partitionUpsertMetadataManager
+    // takes this lock internally, but after taking snapshot RW lock. If we take segmentLock here (before taking
+    // snapshot RW lock), we can get into deadlock with threads calling partitionUpsertMetadataManager's other
+    // methods, like removeSegment.
+    // Adding segment should be done by a single HelixTaskExecutor thread, but do it with lock here for simplicity
+    // otherwise, we'd need to double-check if oldSegmentManager is null.
+    Lock segmentLock = SEGMENT_UPSERT_LOCKS.getLock(_tableNameWithType, segmentName);
     segmentLock.lock();
     try {
       SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);

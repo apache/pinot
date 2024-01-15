@@ -1746,26 +1746,30 @@ public class TableConfigUtilsTest {
     }
 
     // Table upsert with delete column
-    String incorrectTypeDelCol = "incorrectTypeDeleteCol";
+    String stringTypeDelCol = "stringTypeDelCol";
     String delCol = "myDelCol";
+    String mvCol = "mvCol";
+    String timestampCol = "timestampCol";
+    String invalidCol = "invalidCol";
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).setPrimaryKeyColumns(Lists.newArrayList("myPkCol"))
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .addSingleValueDimension(incorrectTypeDelCol, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN).build();
+        .addSingleValueDimension(stringTypeDelCol, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(delCol, FieldSpec.DataType.BOOLEAN)
+        .addSingleValueDimension(timestampCol, FieldSpec.DataType.TIMESTAMP)
+        .addMultiValueDimension(mvCol, FieldSpec.DataType.STRING).build();
     streamConfigs = getStreamConfigs();
     streamConfigs.put("stream.kafka.consumer.type", "simple");
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setDeleteRecordColumn(incorrectTypeDelCol);
+    upsertConfig.setDeleteRecordColumn(stringTypeDelCol);
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
         .setUpsertConfig(upsertConfig)
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .build();
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
-      Assert.fail("Invalid delete column type (string) should have failed table creation");
     } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "The delete record column must be a single-valued BOOLEAN column");
+      Assert.fail("Shouldn't fail table creation when delete column type is single-valued.");
     }
 
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
@@ -1777,7 +1781,47 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
-      Assert.fail("Shouldn't fail table creation when delete column type is boolean.");
+      Assert.fail("Shouldn't fail table creation when delete column type is single-valued.");
+    }
+
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn(timestampCol);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+            .setUpsertConfig(upsertConfig)
+            .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+            .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail("Should have failed table creation when delete column type is timestamp.");
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "The deleteRecordColumn - timestampCol must be of type: String / Boolean / Numeric");
+    }
+
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn(invalidCol);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail("Should have failed table creation when invalid delete column entered.");
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Column invalidCol specified in deleteRecordColumn does not exist");
+    }
+
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn(mvCol);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig)
+        .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      Assert.fail("Should have failed table creation when delete column type is multi-valued.");
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "The deleteRecordColumn - mvCol must be a single-valued column");
     }
 
     // upsert deleted-keys-ttl configs with no deleted column
