@@ -554,6 +554,6 @@ public class DictionariesTest {
             + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective: true");
 
     statsCollector.seal();
-    System.out.println(statsCollector.getClpStats());
+    System.out.println(statsCollector.getCLPStats());
   }
 }

@@ -33,6 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -78,8 +79,8 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
     _dataFile = new RandomAccessFile(indexFile, "rw").getChannel();
     _fileBuffer = _dataFile.map(FileChannel.MapMode.READ_WRITE, 0, Integer.MAX_VALUE);
 
-    StringColumnPreIndexStatsCollector statsCollector = (StringColumnPreIndexStatsCollector) columnStatistics;
-    _clpStats = statsCollector.getClpStats();
+    CLPStatsProvider statsCollector = (CLPStatsProvider) columnStatistics;
+    _clpStats = statsCollector.getCLPStats();
     _logTypeDictFile = new File(_baseIndexDir, _column + "_clp_logtype.dict");
     _logTypeDictCreator =
         new SegmentDictionaryCreator(_column + "_clp_logtype.dict", FieldSpec.DataType.STRING, _logTypeDictFile, true);

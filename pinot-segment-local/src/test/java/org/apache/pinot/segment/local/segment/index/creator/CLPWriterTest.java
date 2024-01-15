@@ -96,7 +96,7 @@ public class CLPWriterTest {
     }
 
     statsCollector.seal();
-    System.out.println(statsCollector.getClpStats());
+    System.out.println(statsCollector.getCLPStats());
 
     File tmpDir = new File("/tmp/");
     File indexFile = new File(tmpDir, "column1.fwd");
