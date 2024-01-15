@@ -28,6 +28,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
+import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -87,8 +88,6 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
     TableConfig tableConfig = createUpsertTableConfig(avroFiles.get(0), PRIMARY_KEY_COL, null, getNumKafkaPartitions());
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     assertNotNull(upsertConfig);
-    upsertConfig.setEnableSnapshot(true);
-    upsertConfig.setEnablePreload(true);
     addTableConfig(tableConfig);
 
     // Create and upload segments
@@ -104,6 +103,10 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   protected void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
         "1");
+    serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "."
+        + HelixInstanceDataManagerConfig.UPSERT_DEFAULT_ENABLE_PRELOAD, "true");
+    serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "."
+        + HelixInstanceDataManagerConfig.UPSERT_DEFAULT_ENABLE_SNAPSHOT, "true");
   }
 
   @AfterClass
