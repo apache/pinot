@@ -110,7 +110,7 @@ public final class VarByteChunkSVForwardIndexReader extends BaseChunkForwardInde
 
   private byte[] getOrExpandByteArray() {
     byte[] bytes = _reusableBytes.get();
-    if (bytes == null || bytes.length < _lengthOfLongestEntry) {
+    if (bytes.length < _lengthOfLongestEntry) {
       _reusableBytes.set(new byte[_lengthOfLongestEntry]);
       bytes = _reusableBytes.get();
     }
