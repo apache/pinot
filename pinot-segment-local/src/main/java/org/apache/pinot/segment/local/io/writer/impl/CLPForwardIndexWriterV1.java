@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.StandardOpenOption;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
@@ -192,11 +193,11 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
     _fileBuffer.putInt((int) _dictVarsFwdIndexFile.length()); // dictVars fwd index length
     _fileBuffer.putInt((int) _encodedVarsFwdIndexFile.length()); // encodedVars fwd index length
 
-    _fileBuffer.put(FileUtils.readFileToByteArray(_logTypeDictFile));
-    _fileBuffer.put(FileUtils.readFileToByteArray(_dictVarsDictFile));
-    _fileBuffer.put(FileUtils.readFileToByteArray(_logTypeFwdIndexFile));
-    _fileBuffer.put(FileUtils.readFileToByteArray(_dictVarsFwdIndexFile));
-    _fileBuffer.put(FileUtils.readFileToByteArray(_encodedVarsFwdIndexFile));
+    copyFileIntoBuffer(_logTypeDictFile);
+    copyFileIntoBuffer(_dictVarsDictFile);
+    copyFileIntoBuffer(_logTypeFwdIndexFile);
+    copyFileIntoBuffer(_dictVarsFwdIndexFile);
+    copyFileIntoBuffer(_encodedVarsFwdIndexFile);
 
     _dataFile.truncate(totalSize);
 
@@ -206,5 +207,11 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
     FileUtils.deleteQuietly(_logTypeFwdIndexFile);
     FileUtils.deleteQuietly(_dictVarsFwdIndexFile);
     FileUtils.deleteQuietly(_encodedVarsFwdIndexFile);
+  }
+
+  private void copyFileIntoBuffer(File file) throws IOException {
+    try (FileChannel from = (FileChannel.open(file.toPath(), StandardOpenOption.READ))) {
+      _fileBuffer.put(from.map(FileChannel.MapMode.READ_ONLY, 0, file.length()));
+    }
   }
 }
