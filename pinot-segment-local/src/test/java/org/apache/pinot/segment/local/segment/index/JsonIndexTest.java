@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -374,7 +373,7 @@ public class JsonIndexTest {
   }
 
   @Test
-  public void TestSkipInvalidJson() throws Exception {
+  public void testSkipInvalidJson() throws Exception {
     JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
     jsonIndexConfig.setSkipInvalidJson(true);
     // the braces don't match and cannot be parsed
@@ -399,7 +398,8 @@ public class JsonIndexTest {
       Map<String, RoaringBitmap> onHeapRes = onHeapIndexReader.getMatchingDocsMap("");
       Map<String, RoaringBitmap> offHeapRes = offHeapIndexReader.getMatchingDocsMap("");
       Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingDocsMap("");
-      Map<String, RoaringBitmap> expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
+      Map<String, RoaringBitmap> expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT,
+          RoaringBitmap.bitmapOf(0));
       Assert.assertEquals(expectedRes, onHeapRes);
       Assert.assertEquals(expectedRes, offHeapRes);
       Assert.assertEquals(expectedRes, mutableRes);

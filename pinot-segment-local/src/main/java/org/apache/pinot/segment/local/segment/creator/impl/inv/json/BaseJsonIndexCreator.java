@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.inv.json;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;

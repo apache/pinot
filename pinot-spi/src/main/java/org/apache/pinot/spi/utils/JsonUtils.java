@@ -76,6 +76,8 @@ public class JsonUtils {
   public static final String ARRAY_INDEX_KEY = ".$index";
   public static final String SKIPPED_VALUE_REPLACEMENT = "$SKIPPED$";
   public static final int MAX_COMBINATIONS = 100_000;
+  private static final List<Map<String, String>> SKIPPED_FLATTENED_RECORD =
+      Collections.singletonList(Collections.singletonMap(VALUE_KEY, SKIPPED_VALUE_REPLACEMENT));
 
   // For querying
   public static final String WILDCARD = "*";
@@ -720,13 +722,14 @@ public class JsonUtils {
     }
   }
 
-  public static List<Map<String, String>> flatten(String jsonString, JsonIndexConfig jsonIndexConfig) throws IOException {
+  public static List<Map<String, String>> flatten(String jsonString, JsonIndexConfig jsonIndexConfig)
+      throws IOException {
     JsonNode jsonNode;
     try {
       jsonNode = JsonUtils.stringToJsonNode(jsonString);
     } catch (IOException e) {
       if (jsonIndexConfig.getSkipInvalidJson()) {
-        return Collections.singletonList(Collections.singletonMap(VALUE_KEY, SKIPPED_VALUE_REPLACEMENT));
+        return SKIPPED_FLATTENED_RECORD;
       } else {
         throw e;
       }
