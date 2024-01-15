@@ -55,10 +55,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -588,10 +585,11 @@ public class SegmentProcessorFrameworkTest {
     FileUtils.forceMkdir(workingDir);
     int expectedTotalDocsCount = 10;
 
-    // Default configs.
+    // Test 1 :  Default case i.e. no limit to mapper output file size (single record reader).
+
     SegmentProcessorConfig config =
         new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
-    SegmentProcessorFramework framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
     List<File> outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
     String[] outputDirs = workingDir.list();
@@ -600,13 +598,52 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(segmentMetadata.getTotalDocs(), expectedTotalDocsCount);
     assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
     FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
+
+    // Test 2 :  Default case i.e. no limit to mapper output file size (multiple record readers).
+    config = new SegmentProcessorConfig.Builder().setTableConfig(_tableConfig).setSchema(_schema).build();
+    framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), 1);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
+    segmentMetadata = new SegmentMetadataImpl(outputSegments.get(0));
+    assertEquals(segmentMetadata.getTotalDocs(), expectedTotalDocsCount);
+    assertEquals(segmentMetadata.getName(), "myTable_1597719600000_1597892400000_0");
+    FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_multipleSegments);
+
+    // Test 3 :  Test mapper with threshold output size (single record reader).
 
     // Create a segmentConfig with intermediate mapper output size threshold set to the number of bytes in each row
     // from the data. In this way, we can test if each row is written to a separate segment.
     SegmentConfig segmentConfig =
         new SegmentConfig.Builder().setIntermediateFileSizeThreshold(16).setSegmentNamePrefix("testPrefix")
             .setSegmentNamePostfix("testPostfix").build();
+    config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(_tableConfig)
+        .setSchema(_schema).build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), expectedTotalDocsCount);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
+
+    // Verify that each segment has only one row, and the segment name is correct.
+
+    for (int i = 0; i < expectedTotalDocsCount; i++) {
+      segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
+      assertEquals(segmentMetadata.getTotalDocs(), 1);
+      assertTrue(segmentMetadata.getName().matches("testPrefix_.*_testPostfix_" + i));
+    }
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
+
+    // Test 4 :  Test mapper with threshold output size (multiple record readers).
+
+    // Create a segmentConfig with intermediate mapper output size threshold set to the number of bytes in each row
+    // from the data. In this way, we can test if each row is written to a separate segment.
+    segmentConfig = new SegmentConfig.Builder().setIntermediateFileSizeThreshold(16).setSegmentNamePrefix("testPrefix")
+        .setSegmentNamePostfix("testPostfix").build();
     config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(_tableConfig)
         .setSchema(_schema).build();
     framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
@@ -624,6 +661,122 @@ public class SegmentProcessorFrameworkTest {
     }
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_multipleSegments);
+
+    // Test 5 :  Test with injected failure in mapper to verify output directory is cleaned up.
+
+    List<RecordReader> testList = new ArrayList<>(_multipleSegments);
+    testList.set(1, null);
+    segmentConfig = new SegmentConfig.Builder().setIntermediateFileSizeThreshold(16).setSegmentNamePrefix("testPrefix")
+        .setSegmentNamePostfix("testPostfix").build();
+    config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(_tableConfig)
+        .setSchema(_schema).build();
+    SegmentProcessorFramework failureTest = new SegmentProcessorFramework(testList, config, workingDir);
+    assertThrows(NullPointerException.class, failureTest::process);
+    assertTrue(FileUtils.isEmptyDirectory(workingDir));
+    rewindRecordReaders(_multipleSegments);
+
+    // Test 6: RecordReader should be closed when recordReader is passed to RecordReaderFileConfig (without mapper
+    // output size threshold configured).
+
+    ClassLoader classLoader = getClass().getClassLoader();
+    URL resource = classLoader.getResource("data/dimBaseballTeams.csv");
+    RecordReaderFileConfig recordReaderFileConfig =
+        new RecordReaderFileConfig(FileFormat.CSV, new File(resource.toURI()), null, null);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName("mySchema").addSingleValueDimension("teamId", DataType.STRING, "")
+            .addSingleValueDimension("teamName", DataType.STRING, "")
+            .addDateTime("time", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+
+    config = new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema).build();
+
+    SegmentProcessorFramework frameworkWithRecordReaderFileConfig =
+        new SegmentProcessorFramework(config, workingDir, ImmutableList.of(recordReaderFileConfig),
+            Collections.emptyList(), null);
+    outputSegments = frameworkWithRecordReaderFileConfig.process();
+
+    // Verify the number of segments created and the total docs.
+    assertEquals(outputSegments.size(), 1);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
+    segmentMetadata = segment.getSegmentMetadata();
+    assertEquals(segmentMetadata.getTotalDocs(), 51);
+
+    // Verify that the record reader is closed from RecordReaderFileConfig.
+    assertTrue(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
+    FileUtils.cleanDirectory(workingDir);
+
+    // Test 7: RecordReader should not be closed when recordReader is passed to RecordReaderFileConfig. (Without
+    // mapper output size threshold configured)
+
+    RecordReader recordReader = recordReaderFileConfig.getRecordReader();
+    recordReader.rewind();
+
+    // Pass the recordReader to RecordReaderFileConfig.
+    recordReaderFileConfig = new RecordReaderFileConfig(recordReader);
+    SegmentProcessorFramework frameworkWithDelegateRecordReader =
+        new SegmentProcessorFramework(config, workingDir, ImmutableList.of(recordReaderFileConfig),
+            Collections.emptyList(), null);
+    outputSegments = frameworkWithDelegateRecordReader.process();
+
+    // Verify the number of segments created and the total docs.
+    assertEquals(outputSegments.size(), 1);
+    segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
+    segmentMetadata = segment.getSegmentMetadata();
+    assertEquals(segmentMetadata.getTotalDocs(), 51);
+
+    // Verify that the record reader is not closed from RecordReaderFileConfig.
+    assertFalse(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
+    FileUtils.cleanDirectory(workingDir);
+
+    // Test 8: RecordReader should be closed when recordReader is passed to RecordReaderFileConfig (With mapper
+    // output size threshold configured).
+
+    expectedTotalDocsCount = 51;
+    recordReaderFileConfig = new RecordReaderFileConfig(FileFormat.CSV, new File(resource.toURI()), null, null);
+
+    segmentConfig = new SegmentConfig.Builder().setIntermediateFileSizeThreshold(19).setSegmentNamePrefix("testPrefix")
+        .setSegmentNamePostfix("testPostfix").build();
+    config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(tableConfig)
+        .setSchema(schema).build();
+
+    frameworkWithRecordReaderFileConfig =
+        new SegmentProcessorFramework(config, workingDir, ImmutableList.of(recordReaderFileConfig),
+            Collections.emptyList(), null);
+    outputSegments = frameworkWithRecordReaderFileConfig.process();
+
+    // Verify that each segment has only one row, and the segment name is correct.
+    for (int i = 0; i < expectedTotalDocsCount; i++) {
+      segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
+      assertEquals(segmentMetadata.getTotalDocs(), 1);
+    }
+
+    // Verify that the record reader is closed from RecordReaderFileConfig.
+    assertTrue(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
+    FileUtils.cleanDirectory(workingDir);
+
+    // Test 9: RecordReader should not be closed when recordReader is passed to RecordReaderFileConfig (With mapper
+    // output size threshold configured).
+
+    recordReader = recordReaderFileConfig.getRecordReader();
+    recordReader.rewind();
+
+    // Pass the recordReader to RecordReaderFileConfig.
+    recordReaderFileConfig = new RecordReaderFileConfig(recordReader);
+    frameworkWithDelegateRecordReader =
+        new SegmentProcessorFramework(config, workingDir, ImmutableList.of(recordReaderFileConfig),
+            Collections.emptyList(), null);
+    outputSegments = frameworkWithDelegateRecordReader.process();
+
+    // Verify that each segment has only one row, and the segment name is correct.
+    for (int i = 0; i < expectedTotalDocsCount; i++) {
+      segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
+      assertEquals(segmentMetadata.getTotalDocs(), 1);
+    }
+
+    // Verify that the record reader is not closed from RecordReaderFileConfig.
+    assertFalse(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
+    FileUtils.cleanDirectory(workingDir);
   }
 
   @Test

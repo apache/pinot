@@ -172,7 +172,7 @@ public class SegmentProcessorFramework {
   private int getNextRecordReaderIndexToBeProcessed(int currentRecordIndex) {
     for (int i = currentRecordIndex; i < _recordReaderFileConfigs.size(); i++) {
       RecordReaderFileConfig recordReaderFileConfig = _recordReaderFileConfigs.get(i);
-      if (!recordReaderFileConfig.isRecordReaderInitialized() || !recordReaderFileConfig.isRecordReaderDone()) {
+      if (!recordReaderFileConfig.isRecordReaderDone()) {
         return i;
       }
     }

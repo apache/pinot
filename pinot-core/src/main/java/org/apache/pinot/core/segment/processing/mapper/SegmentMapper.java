@@ -139,7 +139,7 @@ public class SegmentMapper {
       mapAndTransformRow(recordReader, reuse, observer, count, totalRecordReaderSize);
 
       // Terminate the map phase if intermediate file size has crossed the threshold.
-      if (!_adaptiveSizeBasedWriter.canWrite()) {
+      if (!_adaptiveSizeBasedWriter.canWrite() && recordReader.hasNext()) {
         observer.accept(String.format(
             "Stopping record readers at index: %d as size limit reached, bytes written = %d, bytes limit = %d", count,
             _adaptiveSizeBasedWriter.getNumBytesWritten(), _adaptiveSizeBasedWriter.getBytesLimit()));
