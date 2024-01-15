@@ -105,7 +105,7 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitMailboxSend(MailboxSendNode node, DispatchablePlanContext context) {
     node.getInputs().get(0).visit(this, context);
     DispatchablePlanMetadata dispatchablePlanMetadata = getOrCreateDispatchablePlanMetadata(node, context);
-    dispatchablePlanMetadata.setPartitioned(node.isPartitioned());
+    dispatchablePlanMetadata.setPrePartitioned(node.isPrePartitioned());
     context.getDispatchablePlanStageRootMap().put(node.getPlanFragmentId(), node);
     return null;
   }

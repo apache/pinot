@@ -59,12 +59,19 @@ import static org.testng.Assert.assertTrue;
 public class ConcurrentMapTableUpsertMetadataManagerTest {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), "ConcurrentMapTableUpsertMetadataManagerTest");
+  private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
+  private static final File TABLE_DATA_DIR = new File(TEMP_DIR, REALTIME_TABLE_NAME);
+
+  private TableDataManager _tableDataManager;
   private ExecutorService _segmentPreloadExecutor;
 
   @BeforeClass
   public void setUp()
       throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
+    ServerMetrics.register(mock(ServerMetrics.class));
+    _tableDataManager = mock(TableDataManager.class);
+    when(_tableDataManager.getTableDataDir()).thenReturn(TABLE_DATA_DIR);
     _segmentPreloadExecutor = Executors.newFixedThreadPool(1);
   }
 
@@ -86,16 +93,14 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     // Preloading is skipped as snapshot is not enabled.
     ConcurrentMapTableUpsertMetadataManager mgr = new ConcurrentMapTableUpsertMetadataManager();
     assertFalse(mgr.isPreloading());
-    mgr.init(tableConfig, schema, mock(TableDataManager.class), mock(ServerMetrics.class), mock(HelixManager.class),
-        _segmentPreloadExecutor);
+    mgr.init(tableConfig, schema, _tableDataManager, mock(HelixManager.class), _segmentPreloadExecutor);
     assertFalse(mgr.isPreloading());
 
     // Preloading is skipped as preloading is not turned on.
     upsertConfig.setEnableSnapshot(true);
     mgr = new ConcurrentMapTableUpsertMetadataManager();
     assertFalse(mgr.isPreloading());
-    mgr.init(tableConfig, schema, mock(TableDataManager.class), mock(ServerMetrics.class), mock(HelixManager.class),
-        _segmentPreloadExecutor);
+    mgr.init(tableConfig, schema, _tableDataManager, mock(HelixManager.class), _segmentPreloadExecutor);
     assertFalse(mgr.isPreloading());
 
     upsertConfig.setEnablePreload(true);
@@ -103,8 +108,7 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     assertFalse(mgr.isPreloading());
     // The preloading logic will hit on error as the HelixManager mock is not fully setup. But failure of preloading
     // should not fail the init() method.
-    mgr.init(tableConfig, schema, mock(TableDataManager.class), mock(ServerMetrics.class), mock(HelixManager.class),
-        _segmentPreloadExecutor);
+    mgr.init(tableConfig, schema, _tableDataManager, mock(HelixManager.class), _segmentPreloadExecutor);
     assertFalse(mgr.isPreloading());
   }
 
@@ -141,14 +145,13 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     };
 
     // Setup mocks for TableConfig and Schema.
-    String tableNameWithType = "myTable_REALTIME";
     TableConfig tableConfig = mock(TableConfig.class);
     UpsertConfig upsertConfig = new UpsertConfig();
     upsertConfig.setComparisonColumn("ts");
     upsertConfig.setEnablePreload(true);
     upsertConfig.setEnableSnapshot(true);
     when(tableConfig.getUpsertConfig()).thenReturn(upsertConfig);
-    when(tableConfig.getTableName()).thenReturn(tableNameWithType);
+    when(tableConfig.getTableName()).thenReturn(REALTIME_TABLE_NAME);
     Schema schema = mock(Schema.class);
     when(schema.getPrimaryKeyColumns()).thenReturn(Collections.singletonList("pk"));
 
@@ -169,16 +172,18 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     SegmentZKMetadata realtimeSegmentZKMetadata = new SegmentZKMetadata("online_seg01");
     realtimeSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     when(propertyStore.get(
-        eq(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, "online_seg01")), any(),
+        eq(ZKMetadataProvider.constructPropertyStorePathForSegment(REALTIME_TABLE_NAME, "online_seg01")), any(),
         anyInt())).thenReturn(realtimeSegmentZKMetadata.toZNRecord());
     realtimeSegmentZKMetadata = new SegmentZKMetadata("online_seg02");
     realtimeSegmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     when(propertyStore.get(
-        eq(ZKMetadataProvider.constructPropertyStorePathForSegment(tableNameWithType, "online_seg02")), any(),
+        eq(ZKMetadataProvider.constructPropertyStorePathForSegment(REALTIME_TABLE_NAME, "online_seg02")), any(),
         anyInt())).thenReturn(realtimeSegmentZKMetadata.toZNRecord());
 
     // No snapshot file for online_seg01, so it's skipped.
     TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getTableDataDir()).thenReturn(TABLE_DATA_DIR);
+
     File seg01IdxDir = new File(TEMP_DIR, "online_seg01");
     FileUtils.forceMkdir(seg01IdxDir);
     when(tableDataManager.getSegmentDataDir("online_seg01", null, tableConfig)).thenReturn(seg01IdxDir);
@@ -189,7 +194,7 @@ public class ConcurrentMapTableUpsertMetadataManagerTest {
     when(tableDataManager.getSegmentDataDir("online_seg02", null, tableConfig)).thenReturn(seg02IdxDir);
 
     assertFalse(mgr.isPreloading());
-    mgr.init(tableConfig, schema, tableDataManager, mock(ServerMetrics.class), helixManager, _segmentPreloadExecutor);
+    mgr.init(tableConfig, schema, tableDataManager, helixManager, _segmentPreloadExecutor);
     assertEquals(preloadedSegments.size(), 1);
     assertTrue(preloadedSegments.contains("online_seg02"));
     assertTrue(wasPreloading.get());

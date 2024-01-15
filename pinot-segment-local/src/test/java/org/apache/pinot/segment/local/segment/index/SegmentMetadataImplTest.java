@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
@@ -69,7 +70,7 @@ public class SegmentMetadataImplTest {
 
   @Test
   public void testToJson()
-      throws IOException {
+      throws IOException, ConfigurationException {
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(_segmentDirectory);
     Assert.assertNotNull(metadata);
 

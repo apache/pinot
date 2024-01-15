@@ -117,6 +117,13 @@ public class SegmentDirectoryPaths {
     return findFormatFile(indexDir, file);
   }
 
+  @Nullable
+  @VisibleForTesting
+  public static File findVectorIndexIndexFile(File segmentIndexDir, String column) {
+    String vectorIndexDirectory = column + V1Constants.Indexes.VECTOR_HNSW_INDEX_FILE_EXTENSION;
+    return findFormatFile(segmentIndexDir, vectorIndexDirectory);
+  }
+
   /**
    * Find a file in any segment version.
    * <p>Index directory passed in should be top level segment directory.

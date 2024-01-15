@@ -20,6 +20,10 @@ package org.apache.pinot.core.function.scalar;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import java.math.BigDecimal;
+import org.apache.datasketches.cpc.CpcSketch;
+import org.apache.datasketches.memory.Memory;
+import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.theta.Sketches;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.Assert;
@@ -48,6 +52,15 @@ public class SketchFunctionsTest {
     Assert.assertEquals(thetaEstimate(SketchFunctions.toThetaSketch(null, 1024)), 0.0);
     Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toThetaSketch(new Object()));
     Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toThetaSketch(new Object(), 1024));
+  }
+
+  @Test
+  public void thetaThetaSketchSummary() {
+    for (Object i : _inputs) {
+      Sketch sketch = Sketches.wrapSketch(Memory.wrap(SketchFunctions.toThetaSketch(i)));
+      Assert.assertEquals(SketchFunctions.thetaSketchToString(sketch), sketch.toString());
+    }
+    Assert.assertThrows(RuntimeException.class, () -> SketchFunctions.thetaSketchToString(new Object()));
   }
 
   private long hllEstimate(byte[] bytes) {
@@ -95,6 +108,15 @@ public class SketchFunctionsTest {
     Assert.assertEquals(cpcEstimate(SketchFunctions.toCpcSketch(null, 11)), 0.0);
     Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toCpcSketch(new Object()));
     Assert.assertThrows(IllegalArgumentException.class, () -> SketchFunctions.toCpcSketch(new Object(), 11));
+  }
+
+  @Test
+  public void thetaCpcSketchToString() {
+    for (Object i : _inputs) {
+      CpcSketch sketch = CpcSketch.heapify(Memory.wrap(SketchFunctions.toCpcSketch(i)));
+      Assert.assertEquals(SketchFunctions.cpcSketchToString(sketch), sketch.toString());
+    }
+    Assert.assertThrows(RuntimeException.class, () -> SketchFunctions.cpcSketchToString(new Object()));
   }
 
   private long ullEstimate(byte[] bytes) {

@@ -56,7 +56,7 @@ public class MailboxReceiveNode extends AbstractPlanNode {
 
   // this is only available during planning and should not be relied
   // on in any post-serialization code
-  private transient PlanNode _sender;
+  private transient MailboxSendNode _sender;
 
   public MailboxReceiveNode(int planFragmentId) {
     super(planFragmentId);
@@ -65,7 +65,7 @@ public class MailboxReceiveNode extends AbstractPlanNode {
   public MailboxReceiveNode(int planFragmentId, DataSchema dataSchema, int senderStageId,
       RelDistribution.Type distributionType, PinotRelExchangeType exchangeType,
       @Nullable List<Integer> distributionKeys, @Nullable List<RelFieldCollation> fieldCollations,
-      boolean isSortOnSender, boolean isSortOnReceiver, PlanNode sender) {
+      boolean isSortOnSender, boolean isSortOnReceiver, MailboxSendNode sender) {
     super(planFragmentId, dataSchema);
     _senderStageId = senderStageId;
     _distributionType = distributionType;
@@ -147,7 +147,7 @@ public class MailboxReceiveNode extends AbstractPlanNode {
     return _isSortOnReceiver;
   }
 
-  public PlanNode getSender() {
+  public MailboxSendNode getSender() {
     return _sender;
   }
 

@@ -51,7 +51,9 @@ public class DoubleColumnPreIndexStatsCollector extends AbstractColumnStatistics
       double value = (double) entry;
       addressSorted(value);
       if (_values.add(value)) {
-        updatePartition(value);
+        if (isPartitionEnabled()) {
+          updatePartition(Double.toString(value));
+        }
       }
 
       _totalNumberOfEntries++;

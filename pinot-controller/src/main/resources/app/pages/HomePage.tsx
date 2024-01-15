@@ -17,19 +17,24 @@
  * under the License.
  */
 
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
+import { get, union } from 'lodash';
 import { Grid, makeStyles, Paper, Box } from '@material-ui/core';
-import { TableData, DataTable } from 'Models';
 import { Link } from 'react-router-dom';
-import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import TenantsListing from '../components/Homepage/TenantsListing';
 import Instances from '../components/Homepage/InstancesTables';
 import ClusterConfig from '../components/Homepage/ClusterConfig';
 import useTaskTypesTable from '../components/Homepage/useTaskTypesTable';
+import Skeleton from '@material-ui/lab/Skeleton';
+import { getTenants } from '../requests';
 
 const useStyles = makeStyles((theme) => ({
-  paper:{
+  paper: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: '10px 0',
     height: '100%',
     color: '#4285f4',
@@ -43,70 +48,98 @@ const useStyles = makeStyles((theme) => ({
     '& h2, h4': {
       margin: 0,
     },
-    '& h4':{
+    '& h4': {
       textTransform: 'uppercase',
       letterSpacing: 1,
-      fontWeight: 600
+      fontWeight: 600,
     },
     '&:hover': {
-      borderColor: '#4285f4'
-    }
+      borderColor: '#4285f4',
+    },
   },
   gridContainer: {
     padding: 20,
     backgroundColor: 'white',
     maxHeight: 'calc(100vh - 70px)',
-    overflowY: 'auto'
+    overflowY: 'auto',
   },
   paperLinks: {
     textDecoration: 'none',
-    height: '100%'
-  }
+    height: '100%',
+  },
 }));
 
 const HomePage = () => {
   const classes = useStyles();
 
-  const [fetching, setFetching] = useState(true);
-  const [tenantsData, setTenantsData] = useState<TableData>({ records: [], columns: [] });
-  const [instances, setInstances] = useState<DataTable>();
   const [clusterName, setClusterName] = useState('');
-  const [tables, setTables] = useState([]);
+
+  const [fetchingTenants, setFetchingTenants] = useState(true);
+  const [tenantsCount, setTenantscount] = useState(0);
+
+  const [fetchingInstances, setFetchingInstances] = useState(true);
+  const [controllerCount, setControllerCount] = useState(0);
+  const [brokerCount, setBrokerCount] = useState(0);
+  const [serverCount, setServerCount] = useState(0);
+  const [minionCount, setMinionCount] = useState(0);
+  // const [instances, setInstances] = useState<DataTable>();
+
+  const [fetchingTables, setFetchingTables] = useState(true);
+  const [tablesCount, setTablesCount] = useState(0);
 
   const { taskTypes, taskTypesTable } = useTaskTypesTable();
 
   const fetchData = async () => {
-    const tenantsDataResponse = await PinotMethodUtils.getTenantsData();
-    const instanceResponse = await PinotMethodUtils.getAllInstances();
-    const tablesResponse = await PinotMethodUtils.getQueryTablesList({bothType: true});
-    const tablesList = [];
-    tablesResponse.records.map((record)=>{
-      tablesList.push(...record);
+    PinotMethodUtils.getAllInstances().then((res) => {
+      setControllerCount(get(res, 'Controller', []).length);
+      setBrokerCount(get(res, 'Broker', []).length);
+      setServerCount(get(res, 'Server', []).length);
+      setMinionCount(get(res, 'Minion', []).length);
+      setFetchingInstances(false);
     });
-    setTenantsData(tenantsDataResponse);
-    setInstances(instanceResponse);
-    setTables(tablesList);
-    let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
-    if(!clusterNameRes){
-      clusterNameRes = await PinotMethodUtils.getClusterName();
-    }
-    setClusterName(clusterNameRes);
-    setFetching(false);
+
+    PinotMethodUtils.getQueryTablesList({ bothType: true }).then((res) => {
+      setTablesCount(res.records.length);
+      setFetchingTables(false);
+    });
+
+    getTenants().then((res) => {
+      const tenantNames = union(
+        res.data.SERVER_TENANTS,
+        res.data.BROKER_TENANTS
+      );
+      setTenantscount(tenantNames.length);
+      setFetchingTenants(false);
+    });
+
+    fetchClusterName().then((clusterNameRes) => {
+      setClusterName(clusterNameRes);
+    });
   };
+
+  const fetchClusterName = () => {
+    let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
+    if (!clusterNameRes) {
+      return PinotMethodUtils.getClusterName();
+    } else {
+      return Promise.resolve(clusterNameRes);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
-  
-  return fetching ? (
-    <AppLoader />
-  ) : (
+
+  const loading = <Skeleton animation={'wave'} width={50} />;
+
+  return (
     <Grid item xs className={classes.gridContainer}>
       <Grid container spacing={3}>
         <Grid item xs={3}>
           <Link to="/controllers" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Controllers</h4>
-              <h2>{Array.isArray(instances.Controller) ? instances.Controller.length : 0}</h2>
+              <h2>{fetchingInstances ? loading : controllerCount}</h2>
             </Paper>
           </Link>
         </Grid>
@@ -114,7 +147,8 @@ const HomePage = () => {
           <Link to="/brokers" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Brokers</h4>
-              <h2>{Array.isArray(instances.Broker) ? instances.Broker.length : 0}</h2>
+              <h2>{fetchingInstances ? loading : brokerCount}</h2>
+              {/*<h2>{Array.isArray(instances.Broker) ? instances.Broker.length : 0}</h2>*/}
             </Paper>
           </Link>
         </Grid>
@@ -122,7 +156,8 @@ const HomePage = () => {
           <Link to="/servers" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Servers</h4>
-              <h2>{Array.isArray(instances.Server) ? instances.Server.length : 0}</h2>
+              <h2>{fetchingInstances ? loading : serverCount}</h2>
+              {/*<h2>{Array.isArray(instances.Server) ? instances.Server.length : 0}</h2>*/}
             </Paper>
           </Link>
         </Grid>
@@ -130,7 +165,8 @@ const HomePage = () => {
           <Link to="/minions" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Minions</h4>
-              <h2>{Array.isArray(instances.Minion) ? instances.Minion.length : 0}</h2>
+              <h2>{fetchingInstances ? loading : minionCount}</h2>
+              {/*<h2>{Array.isArray(instances.Minion) ? instances.Minion.length : 0}</h2>*/}
             </Paper>
           </Link>
         </Grid>
@@ -138,7 +174,8 @@ const HomePage = () => {
           <Link to="/tenants" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Tenants</h4>
-              <h2>{Array.isArray(tenantsData.records) ? tenantsData.records.length : 0}</h2>
+              <h2>{fetchingTenants ? loading : tenantsCount}</h2>
+              {/*<h2>{Array.isArray(tenantsData.records) ? tenantsData.records.length : 0}</h2>*/}
             </Paper>
           </Link>
         </Grid>
@@ -146,7 +183,8 @@ const HomePage = () => {
           <Link to="/tables" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Tables</h4>
-              <h2>{Array.isArray(tables) ? tables.length : 0}</h2>
+              <h2>{fetchingTables ? loading : tablesCount}</h2>
+              {/*<h2>{Array.isArray(tables) ? tables.length : 0}</h2>*/}
             </Paper>
           </Link>
         </Grid>
@@ -154,14 +192,18 @@ const HomePage = () => {
           <Link to="/minion-task-manager" className={classes.paperLinks}>
             <Paper className={classes.paper}>
               <h4>Minion Task Manager</h4>
-              <h2>{Array.isArray(taskTypes.records) ? taskTypes?.records?.length : 0}</h2>
+              <h2>
+                {Array.isArray(taskTypes.records)
+                  ? taskTypes?.records?.length
+                  : 0}
+              </h2>
             </Paper>
           </Link>
         </Grid>
       </Grid>
       <Box mb={3} />
-      <TenantsListing tenantsData={tenantsData} />
-      <Instances instances={instances} clusterName={clusterName} />
+      <TenantsListing />
+      <Instances clusterName={clusterName} />
 
       {taskTypesTable}
       <ClusterConfig />

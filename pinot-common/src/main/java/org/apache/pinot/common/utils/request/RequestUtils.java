@@ -24,9 +24,12 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
@@ -211,6 +214,37 @@ public class RequestUtils {
     return expression;
   }
 
+  public static Expression getLiteralExpression(int[] value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setIntArrayValue(Arrays.stream(value).boxed().collect(Collectors.toList()));
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(long[] value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setLongArrayValue(Arrays.stream(value).boxed().collect(Collectors.toList()));
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(float[] value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setFloatArrayValue(
+        IntStream.range(0, value.length).mapToObj(i -> Float.floatToRawIntBits(value[i])).collect(Collectors.toList()));
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(double[] value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setDoubleArrayValue(Arrays.stream(value).boxed().collect(Collectors.toList()));
+    return expression;
+  }
+
+  public static Expression getLiteralExpression(String[] value) {
+    Expression expression = createNewLiteralExpression();
+    expression.getLiteral().setStringArrayValue(Arrays.asList(value));
+    return expression;
+  }
+
   public static Expression getNullLiteralExpression() {
     Expression expression = createNewLiteralExpression();
     expression.getLiteral().setNullValue(true);
@@ -248,6 +282,21 @@ public class RequestUtils {
     }
     if (object instanceof Boolean) {
       return RequestUtils.getLiteralExpression((boolean) object);
+    }
+    if (object instanceof int[]) {
+      return RequestUtils.getLiteralExpression((int[]) object);
+    }
+    if (object instanceof long[]) {
+      return RequestUtils.getLiteralExpression((long[]) object);
+    }
+    if (object instanceof float[]) {
+      return RequestUtils.getLiteralExpression((float[]) object);
+    }
+    if (object instanceof double[]) {
+      return RequestUtils.getLiteralExpression((double[]) object);
+    }
+    if (object instanceof String[]) {
+      return RequestUtils.getLiteralExpression((String[]) object);
     }
     return RequestUtils.getLiteralExpression(object.toString());
   }

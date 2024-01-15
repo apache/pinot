@@ -2,6 +2,15 @@
   "literal_evaluation_tests": {
     "queries": [
       {
+        "description": "Select without from",
+        "sql": "EXPLAIN PLAN FOR SELECT 1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalValues(tuples=[[{ 1 }]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Select arithmetic expression",
         "sql": "EXPLAIN PLAN FOR SELECT 5*6,5+6 FROM d",
         "output": [
@@ -66,7 +75,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM a WHERE  dateTrunc('MONTH', ts) =  dateTrunc('MONTH', FROMDATETIME('2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss'))",
         "output": [
           "Execution Plan",
-          "\nLogicalFilter(condition=[=(DATETRUNC('MONTH', $6), 1546300800000)])",
+          "\nLogicalFilter(condition=[=(DATETRUNC(_UTF-8'MONTH', $6), 1546300800000)])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -76,7 +85,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT upper('month') FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=['MONTH'])",
+          "\nLogicalProject(EXPR$0=[_UTF-8'MONTH'])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -86,7 +95,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT concat('month', ' 1') FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[CAST('month 1':VARCHAR):VARCHAR])",
+          "\nLogicalProject(EXPR$0=[CAST(_UTF-8'month 1':VARCHAR CHARACTER SET \"UTF-8\"):VARCHAR CHARACTER SET \"UTF-8\"])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -96,7 +105,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT substr('month',2) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[CAST('nth':VARCHAR):VARCHAR])",
+          "\nLogicalProject(EXPR$0=[CAST(_UTF-8'nth':VARCHAR CHARACTER SET \"UTF-8\"):VARCHAR CHARACTER SET \"UTF-8\"])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -106,7 +115,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT upper(lower(upper(substr('month',2)))) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[CAST('NTH':VARCHAR):VARCHAR])",
+          "\nLogicalProject(EXPR$0=[CAST(_UTF-8'NTH':VARCHAR CHARACTER SET \"UTF-8\"):VARCHAR CHARACTER SET \"UTF-8\"])",
           "\n  LogicalTableScan(table=[[a]])",
           "\n"
         ]
@@ -154,7 +163,7 @@
       {
         "description": "select non-exist literal function",
         "sql": "EXPLAIN PLAN FOR Select nonExistFun(1,2) FROM a",
-        "expectedException": "Error explain query plan for.*"
+        "expectedException": ".*No match found for function signature nonExistFun.*"
       }
     ]
   }

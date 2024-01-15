@@ -28,6 +28,8 @@ import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -37,6 +39,7 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
@@ -74,6 +77,7 @@ public class StandardIndexes {
   public static final String RANGE_ID = "range_index";
   public static final String TEXT_ID = "text_index";
   public static final String H3_ID = "h3_index";
+  public static final String VECTOR_ID = "vector_index";
 
   private StandardIndexes() {
   }
@@ -126,5 +130,10 @@ public class StandardIndexes {
   public static IndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator> h3() {
     return (IndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator>)
         IndexService.getInstance().get(H3_ID);
+  }
+
+  public static IndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator> vector() {
+    return (IndexType<VectorIndexConfig, VectorIndexReader, VectorIndexCreator>)
+        IndexService.getInstance().get(VECTOR_ID);
   }
 }

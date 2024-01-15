@@ -398,7 +398,7 @@ public class SegmentPushUtils implements Serializable {
    * 3. Tar both files into a segment metadata file.
    *
    */
-  private static File generateSegmentMetadataFile(PinotFS fileSystem, URI tarFileURI)
+  public static File generateSegmentMetadataFile(PinotFS fileSystem, URI tarFileURI)
       throws Exception {
     String uuid = UUID.randomUUID().toString();
     File tarFile =

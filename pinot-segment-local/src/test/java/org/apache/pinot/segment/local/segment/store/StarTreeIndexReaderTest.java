@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
@@ -75,7 +76,7 @@ public class StarTreeIndexReaderTest {
 
   @Test
   public void testLoadStarTreeIndexBuffers()
-      throws IOException {
+      throws IOException, ConfigurationException {
     // Test with 2 index trees.
     StarTreeV2Metadata stMeta1 = mock(StarTreeV2Metadata.class);
     when(stMeta1.getDimensionsSplitOrder()).thenReturn(Arrays.asList("dim0", "dim1"));

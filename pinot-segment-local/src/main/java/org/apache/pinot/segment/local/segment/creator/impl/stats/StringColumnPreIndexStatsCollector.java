@@ -62,7 +62,9 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       String value = (String) entry;
       addressSorted(value);
       if (_values.add(value)) {
-        updatePartition(value);
+        if (isPartitionEnabled()) {
+          updatePartition(value);
+        }
         int valueLength = value.getBytes(UTF_8).length;
         _minLength = Math.min(_minLength, valueLength);
         _maxLength = Math.max(_maxLength, valueLength);
