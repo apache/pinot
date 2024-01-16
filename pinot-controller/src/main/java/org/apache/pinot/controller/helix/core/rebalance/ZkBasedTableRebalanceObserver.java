@@ -58,6 +58,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     Preconditions.checkState(tableNameWithType != null, "Table name cannot be null");
     Preconditions.checkState(rebalanceJobId != null, "rebalanceId cannot be null");
     Preconditions.checkState(pinotHelixResourceManager != null, "PinotHelixManager cannot be null");
+    Preconditions.checkArgument(controllerMetrics != null, "controllerMetrics cannot be null");
     _tableNameWithType = tableNameWithType;
     _rebalanceJobId = rebalanceJobId;
     _pinotHelixResourceManager = pinotHelixResourceManager;

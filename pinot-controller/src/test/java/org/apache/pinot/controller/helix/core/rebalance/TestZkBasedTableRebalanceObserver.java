@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.rebalance;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
@@ -30,6 +31,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ERROR;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -43,8 +45,9 @@ public class TestZkBasedTableRebalanceObserver {
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     // Mocking this. We will verify using numZkUpdate stat
     when(pinotHelixResourceManager.addControllerJobToZK(any(), any(), any())).thenReturn(true);
-    ControllerMetrics controllerMetrics = mock(ControllerMetrics.class);
-    Mockito.doNothing().when(controllerMetrics).setValueOfTableGauge(any(), any(), any());
+    ControllerMetrics controllerMetrics = Mockito.mock(ControllerMetrics.class);
+    doNothing().when(controllerMetrics).setValueOfTableGauge("dummy", ControllerGauge.TABLE_REBALANCE_IN_PROGRESS, 0);
+    doNothing().when(controllerMetrics).setValueOfTableGauge("dummy", ControllerGauge.TABLE_REBALANCE_IN_PROGRESS, 1);
     TableRebalanceContext retryCtx = new TableRebalanceContext();
     retryCtx.setConfig(new RebalanceConfig());
     ZkBasedTableRebalanceObserver observer =
