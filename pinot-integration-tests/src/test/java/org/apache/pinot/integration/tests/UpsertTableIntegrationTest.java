@@ -383,23 +383,31 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
             + HelixInstanceDataManagerConfig.UPSERT_DEFAULT_METADATA_MANAGER_CLASS,
         DummyTableUpsertMetadataManager.class.getName());
 
-    BaseServerStarter serverStarter = startOneServer(config);
-    String dummyTableName = "dummyTable123";
-    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    BaseServerStarter serverStarter = null;
+    try {
+      serverStarter = startOneServer(config);
+      String dummyTableName = "dummyTable123";
+      Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
 
-    TableConfig tableConfig =
-        createCSVUpsertTableConfig(dummyTableName, getKafkaTopic(), getNumKafkaPartitions(), csvDecoderProperties, null,
-            PRIMARY_KEY_COL);
-    Schema schema = createSchema();
-    schema.setSchemaName(dummyTableName);
-    addSchema(schema);
-    addTableConfig(tableConfig);
+      TableConfig tableConfig =
+          createCSVUpsertTableConfig(dummyTableName, getKafkaTopic(), getNumKafkaPartitions(), csvDecoderProperties,
+              null, PRIMARY_KEY_COL);
+      Schema schema = createSchema();
+      schema.setSchemaName(dummyTableName);
+      addSchema(schema);
+      addTableConfig(tableConfig);
 
-    Thread.sleep(10000L);
-    RealtimeTableDataManager tableDataManager =
-        (RealtimeTableDataManager) serverStarter.getServerInstance().getInstanceDataManager()
-            .getTableDataManager(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(dummyTableName));
-    Assert.assertTrue(tableDataManager.getTableUpsertMetadataManager() instanceof DummyTableUpsertMetadataManager);
-    serverStarter.stop();
+      Thread.sleep(10000L);
+      RealtimeTableDataManager tableDataManager =
+          (RealtimeTableDataManager) serverStarter.getServerInstance().getInstanceDataManager()
+              .getTableDataManager(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(dummyTableName));
+      Assert.assertTrue(tableDataManager.getTableUpsertMetadataManager() instanceof DummyTableUpsertMetadataManager);
+      dropRealtimeTable(dummyTableName);
+      deleteSchema(dummyTableName);
+    } finally {
+      if (serverStarter != null) {
+        serverStarter.stop();
+      }
+    }
   }
 }
