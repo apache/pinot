@@ -146,7 +146,7 @@ public class StreamConfig {
     // For Kinesis, we need to set a higher fetch timeout to avoid getting stuck in empty records loop
     // TODO: Remove this once we have a better way to handle empty records in Kinesis
     int fetchTimeoutMillis =
-        !_consumerFactoryClassName.contains("KinesisConsumerFactory") ? DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS_KINESIS
+        _consumerFactoryClassName.contains("KinesisConsumerFactory") ? DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS_KINESIS
             : DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS;
     String fetchTimeoutKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS);
