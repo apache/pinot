@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Set;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
 public interface CLPStatsProvider {
@@ -74,19 +75,34 @@ public interface CLPStatsProvider {
     public void collect(String value) {
       String logType;
       String[] dictVars;
+      Long[] encodedVars;
+
       try {
         _clpMessageEncoder.encodeMessage(value, _clpEncodedMessage);
         logType = _clpEncodedMessage.getLogTypeAsString();
         dictVars = _clpEncodedMessage.getDictionaryVarsAsStrings();
+        encodedVars = _clpEncodedMessage.getEncodedVarsAsBoxedLongs();
       } catch (IOException e) {
         throw new IllegalArgumentException("Failed to encode message: " + value, e);
       }
+
+      if (logType == null) {
+        logType = FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
+      }
+
+      if (dictVars == null) {
+        dictVars = new String[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING};
+      }
+
+      if (encodedVars == null) {
+        encodedVars = new Long[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG};
+      }
+
       _logTypes.add(logType);
       _dictVars.addAll(Arrays.asList(dictVars));
       _totalNumberOfDictVars += dictVars.length;
-      _totalNumberOfEncodedVars += _clpEncodedMessage.getEncodedVarsAsBoxedLongs().length;
-      _maxNumberOfEncodedVars =
-          Math.max(_maxNumberOfEncodedVars, _clpEncodedMessage.getEncodedVarsAsBoxedLongs().length);
+      _totalNumberOfEncodedVars += encodedVars.length;
+      _maxNumberOfEncodedVars = Math.max(_maxNumberOfEncodedVars, encodedVars.length);
     }
 
     public void seal() {

@@ -133,6 +133,18 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
       throw new IllegalArgumentException("Failed to encode message: " + value, e);
     }
 
+    if (logtype == null) {
+      logtype = FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
+    }
+
+    if (dictVars == null) {
+      dictVars = new String[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING};
+    }
+
+    if (encodedVars == null) {
+      encodedVars = new Long[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG};
+    }
+
     addCLPFields(logtype, dictVars, encodedVars);
   }
 
