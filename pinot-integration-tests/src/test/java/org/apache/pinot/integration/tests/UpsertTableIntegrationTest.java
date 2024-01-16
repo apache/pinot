@@ -22,19 +22,26 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.integration.tests.models.DummyTableUpsertMetadataManager;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -386,24 +393,41 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     BaseServerStarter serverStarter = null;
     try {
       serverStarter = startOneServer(config);
+      HelixManager helixManager = serverStarter.getServerInstance().getHelixManager();
+      InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(helixManager, serverStarter.getInstanceId());
+      // updateInstanceTags
+      String tagsString = "DummyTag_REALTIME,DummyTag_OFFLINE";
+      List<String> newTags = Arrays.asList(StringUtils.split(tagsString, ','));
+      instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), newTags);
+
+      if (!_helixDataAccessor.setProperty(_helixDataAccessor.keyBuilder().instanceConfig(serverStarter.getInstanceId()),
+          instanceConfig)) {
+        throw new RuntimeException("Failed to set instance config for instance: " + serverStarter.getInstanceId());
+      }
+
       String dummyTableName = "dummyTable123";
       Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
 
       TableConfig tableConfig =
           createCSVUpsertTableConfig(dummyTableName, getKafkaTopic(), getNumKafkaPartitions(), csvDecoderProperties,
               null, PRIMARY_KEY_COL);
+
+      TenantConfig tenantConfig = new TenantConfig(TagNameUtils.DEFAULT_TENANT_NAME, "DummyTag", null);
+
+      tableConfig.setTenantConfig(tenantConfig);
       Schema schema = createSchema();
       schema.setSchemaName(dummyTableName);
       addSchema(schema);
       addTableConfig(tableConfig);
 
-      Thread.sleep(10000L);
+      Thread.sleep(1000L);
       RealtimeTableDataManager tableDataManager =
           (RealtimeTableDataManager) serverStarter.getServerInstance().getInstanceDataManager()
               .getTableDataManager(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(dummyTableName));
       Assert.assertTrue(tableDataManager.getTableUpsertMetadataManager() instanceof DummyTableUpsertMetadataManager);
       dropRealtimeTable(dummyTableName);
       deleteSchema(dummyTableName);
+      waitForEVToDisappear(dummyTableName);
     } finally {
       if (serverStarter != null) {
         serverStarter.stop();
