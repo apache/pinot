@@ -77,13 +77,16 @@ public class SegmentMapper {
   private AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
   private List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private List<RecordTransformer> _customRecordTransformers;
+  private final int _totalNumRecordReaders;
 
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
-      List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
+      List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir,
+      int totalNumRecordReaders) {
     _recordReaderFileConfigs = recordReaderFileConfigs;
     _customRecordTransformers = customRecordTransformers;
     _processorConfig = processorConfig;
     _mapperOutputDir = mapperOutputDir;
+    _totalNumRecordReaders = totalNumRecordReaders;
 
     TableConfig tableConfig = processorConfig.getTableConfig();
     Schema schema = processorConfig.getSchema();
@@ -116,10 +119,10 @@ public class SegmentMapper {
    * Reads the input records and generates partitioned generic row files into the mapper output directory.
    * Records for each partition are put into a directory of the partition name within the mapper output directory.
    */
-  public Map<String, GenericRowFileManager> map(int totalRecordReaderSize)
+  public Map<String, GenericRowFileManager> map()
       throws Exception {
     try {
-      return doMap(totalRecordReaderSize);
+      return doMap();
     } catch (Exception e) {
       // Cleaning up resources created by the mapper.
       for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
@@ -129,14 +132,14 @@ public class SegmentMapper {
     }
   }
 
-  private Map<String, GenericRowFileManager> doMap(int totalRecordReaderSize)
+  private Map<String, GenericRowFileManager> doMap()
       throws Exception {
     Consumer<Object> observer = _processorConfig.getProgressObserver();
-    int count = totalRecordReaderSize - _recordReaderFileConfigs.size() + 1;
+    int count = _totalNumRecordReaders - _recordReaderFileConfigs.size() + 1;
     GenericRow reuse = new GenericRow();
     for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
       RecordReader recordReader = recordReaderFileConfig.getRecordReader();
-      boolean shouldMapperTerminate = mapAndTransformRow(recordReader, reuse, observer, count, totalRecordReaderSize);
+      boolean shouldMapperTerminate = mapAndTransformRow(recordReader, reuse, observer, count, _totalNumRecordReaders);
 
       // Terminate the map phase if intermediate file size has crossed the threshold.
       if (shouldMapperTerminate) {

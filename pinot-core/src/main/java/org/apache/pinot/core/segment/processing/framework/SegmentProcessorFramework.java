@@ -144,7 +144,7 @@ public class SegmentProcessorFramework {
       // Initialise the mapper. Eliminate the record readers that have been processed in the previous iterations.
       SegmentMapper mapper =
           new SegmentMapper(_recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders),
-              _customRecordTransformers, _segmentProcessorConfig, _mapperOutputDir);
+              _customRecordTransformers, _segmentProcessorConfig, _mapperOutputDir, numRecordReaders);
 
       // Map phase.
       Map<String, GenericRowFileManager> partitionToFileManagerMap = doMap(mapper);
@@ -182,7 +182,7 @@ public class SegmentProcessorFramework {
   private Map<String, GenericRowFileManager> doMap(SegmentMapper mapper)
       throws Exception {
     // Map phase
-    return mapper.map(_recordReaderFileConfigs.size());
+    return mapper.map();
   }
 
   private void doReduce(Map<String, GenericRowFileManager> partitionToFileManagerMap)
