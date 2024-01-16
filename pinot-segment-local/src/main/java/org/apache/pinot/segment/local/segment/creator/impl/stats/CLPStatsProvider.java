@@ -30,7 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 public interface CLPStatsProvider {
 
-  StringColumnPreIndexStatsCollector.CLPStats getCLPStats();
+  CLPStats getCLPStats();
 
   class CLPStats {
     private final EncodedMessage _clpEncodedMessage;
