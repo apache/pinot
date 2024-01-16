@@ -97,7 +97,8 @@ public class StarTreeBuilderUtils {
       }
     }
     if (enableDefaultStarTree) {
-      StarTreeV2BuilderConfig defaultConfig = StarTreeV2BuilderConfig.generateDefaultConfig(schema, segmentMetadata);
+      StarTreeV2BuilderConfig defaultConfig =
+          StarTreeV2BuilderConfig.generateDefaultConfig(schema, segmentMetadata.get("columns"));
       if (!builderConfigs.contains(defaultConfig)) {
         builderConfigs.add(defaultConfig);
       }

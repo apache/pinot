@@ -191,11 +191,11 @@ public class StarTreeV2BuilderConfig {
         DEFAULT_MAX_LEAF_RECORDS);
   }
 
-  public static StarTreeV2BuilderConfig generateDefaultConfig(Schema schema, JsonNode segmentMetadata) {
+  public static StarTreeV2BuilderConfig generateDefaultConfig(Schema schema, JsonNode columnsMetadata) {
     List<JsonNode> dimensionColumnMetadataList = new ArrayList<>();
     List<JsonNode> timeColumnMetadataList = new ArrayList<>();
     List<String> numericMetrics = new ArrayList<>();
-    Map<String, JsonNode> columnMetadataMap = convertJsonNodeToMap(segmentMetadata.get("columns"));
+    Map<String, JsonNode> columnMetadataMap = convertJsonNodeToMap(columnsMetadata);
 
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField() || fieldSpec.isVirtualColumn()) {
