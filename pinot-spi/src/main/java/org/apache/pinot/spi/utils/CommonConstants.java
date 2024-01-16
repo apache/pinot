@@ -350,6 +350,7 @@ public class CommonConstants {
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
+        public static final String USE_COMPLETE_REPLICA_GROUP = "useCompleteReplicaGroup";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
