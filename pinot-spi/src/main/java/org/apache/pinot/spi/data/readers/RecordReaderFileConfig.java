@@ -37,7 +37,9 @@ public class RecordReaderFileConfig {
   private final boolean _isDelegateReader;
   // Record Readers created/passed from clients.
   public RecordReader _recordReader;
+  // Track if RecordReaderFileConfig initialized the RecordReader for to aid in closing the RecordReader.
   private boolean _isRecordReaderInitialized;
+  // Track if RecordReaderFileConfig closed the RecordReader for testing purposes.
   private boolean _isRecordReaderClosed;
 
   // Pass in the info needed to initialize the reader
@@ -48,6 +50,8 @@ public class RecordReaderFileConfig {
     _fieldsToRead = fieldsToRead;
     _recordReaderConfig = recordReaderConfig;
     _recordReader = null;
+    // This is not a delegate RecordReader i.e. RecordReaderFileConfig owns the RecordReader, so it should be closed
+    // by RecordReaderFileConfig as well.
     _isDelegateReader = false;
     _isRecordReaderInitialized = false;
     _isRecordReaderClosed = false;
@@ -60,11 +64,15 @@ public class RecordReaderFileConfig {
     _dataFile = null;
     _fieldsToRead = null;
     _recordReaderConfig = null;
+    // This is a delegate RecordReader i.e. RecordReader instance has been passed to RecordReaderFileConfig instead
+    // of the configs. It means RecordReaderFileConfig does not own the RecordReader, so it should not be closed by
+    // RecordReaderFileConfig as well. The responsibility of closing the RecordReader lies with the caller.
     _isDelegateReader = true;
     _isRecordReaderInitialized = true;
     _isRecordReaderClosed = false;
   }
 
+  // Return the RecordReader instance. Initialize the RecordReader if not already initialized.
   public RecordReader getRecordReader()
       throws Exception {
     if (!_isRecordReaderInitialized) {
@@ -74,6 +82,7 @@ public class RecordReaderFileConfig {
     return _recordReader;
   }
 
+  // Close the RecordReader instance if RecordReaderFileConfig initialized it.
   public void closeRecordReader()
       throws Exception {
     // If RecordReaderFileConfig did not create the RecordReader, then it should not close it.
@@ -83,6 +92,7 @@ public class RecordReaderFileConfig {
     }
   }
 
+  // Return true if RecordReader is done processing.
   public boolean isRecordReaderDone() {
     if (_isRecordReaderInitialized) {
       return !_recordReader.hasNext();
@@ -90,11 +100,8 @@ public class RecordReaderFileConfig {
     return false;
   }
 
+  // For testing purposes only.
   public boolean isRecordReaderClosedFromRecordReaderFileConfig() {
     return _isRecordReaderClosed;
-  }
-
-  public boolean isRecordReaderInitialized() {
-    return _isRecordReaderInitialized;
   }
 }

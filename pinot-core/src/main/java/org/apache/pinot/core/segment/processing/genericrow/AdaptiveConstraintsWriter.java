@@ -22,8 +22,8 @@ import java.io.IOException;
 
 
 /**
- * Interface to for a writer which can track constraints. This will be used by SegmentProcessorFramework.
- */
+ * Interface for a writer which can track constraints. This will be used by SegmentProcessorFramework.
+ * */
 
 public interface AdaptiveConstraintsWriter<W, D> {
   boolean canWrite();

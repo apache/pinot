@@ -20,6 +20,9 @@ package org.apache.pinot.core.segment.processing.genericrow;
 
 import java.io.IOException;
 
+/**
+ * Abstraction for writing data units to a file.
+ * */
 
 public interface FileWriter<T> {
   void close() throws IOException;

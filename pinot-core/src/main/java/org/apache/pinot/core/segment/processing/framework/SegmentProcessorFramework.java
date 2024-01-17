@@ -139,15 +139,28 @@ public class SegmentProcessorFramework {
     List<File> outputSegmentDirs = new ArrayList<>();
     int numRecordReaders = _recordReaderFileConfigs.size();
     int nextRecordReaderIndexToBeProcessed = 0;
+    int iterationCount = 1;
+    Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
 
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
       // Initialise the mapper. Eliminate the record readers that have been processed in the previous iterations.
       SegmentMapper mapper =
           new SegmentMapper(_recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders),
-              _customRecordTransformers, _segmentProcessorConfig, _mapperOutputDir, numRecordReaders);
+              _customRecordTransformers, _segmentProcessorConfig, _mapperOutputDir);
+
+      LOGGER.info("Starting iteration {} with {} record readers. Starting index = {}, end index = {}", iterationCount,
+          _recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders).size(),
+          nextRecordReaderIndexToBeProcessed + 1, numRecordReaders);
+      observer.accept(String.format("Starting iteration %d with %d record readers. Starting index = %d, end index = %d",
+          iterationCount, _recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders).size(),
+          nextRecordReaderIndexToBeProcessed + 1, numRecordReaders));
 
       // Map phase.
-      Map<String, GenericRowFileManager> partitionToFileManagerMap = doMap(mapper);
+      long mapStartTimeInMs = System.currentTimeMillis();
+      Map<String, GenericRowFileManager> partitionToFileManagerMap = mapper.map();
+
+      // Log the time taken to map.
+      LOGGER.info("Finished iteration {} in {}ms", iterationCount, System.currentTimeMillis() - mapStartTimeInMs);
 
       // Check for mapper output files, if no files are generated, skip the reducer phase and move on to the next
       // iteration.
@@ -163,8 +176,28 @@ public class SegmentProcessorFramework {
       // Segment creation phase. Add the created segments to the final list.
       outputSegmentDirs.addAll(generateSegment(partitionToFileManagerMap));
 
+      // Store the starting index of the record readers that were processed in this iteration.
+      int startingProcessedRecordReaderIndex = nextRecordReaderIndexToBeProcessed;
+
       // Update next record reader index to be processed.
       nextRecordReaderIndexToBeProcessed = getNextRecordReaderIndexToBeProcessed(nextRecordReaderIndexToBeProcessed);
+
+      observer.accept(String.format(
+          "Finished processing RecordReaders %d to %d (%d might be partially processed) out of %d in iteration %d",
+          startingProcessedRecordReaderIndex + 1,
+          nextRecordReaderIndexToBeProcessed == startingProcessedRecordReaderIndex ? startingProcessedRecordReaderIndex
+              + 1 : nextRecordReaderIndexToBeProcessed,
+          nextRecordReaderIndexToBeProcessed == startingProcessedRecordReaderIndex ? startingProcessedRecordReaderIndex
+              + 1 : nextRecordReaderIndexToBeProcessed, numRecordReaders, iterationCount));
+      LOGGER.info(
+          "Finished processing RecordReaders {} to {}({} might be partially processed) out of {} in iteration {}",
+          startingProcessedRecordReaderIndex + 1,
+          nextRecordReaderIndexToBeProcessed == startingProcessedRecordReaderIndex ? startingProcessedRecordReaderIndex
+              + 1 : nextRecordReaderIndexToBeProcessed,
+          nextRecordReaderIndexToBeProcessed == startingProcessedRecordReaderIndex ? startingProcessedRecordReaderIndex
+              + 1 : nextRecordReaderIndexToBeProcessed, numRecordReaders, iterationCount);
+
+      iterationCount++;
     }
     return outputSegmentDirs;
   }
@@ -177,12 +210,6 @@ public class SegmentProcessorFramework {
       }
     }
     return _recordReaderFileConfigs.size();
-  }
-
-  private Map<String, GenericRowFileManager> doMap(SegmentMapper mapper)
-      throws Exception {
-    // Map phase
-    return mapper.map();
   }
 
   private void doReduce(Map<String, GenericRowFileManager> partitionToFileManagerMap)
