@@ -34,7 +34,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpException;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.minion.MinionClient;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.tls.TlsUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;

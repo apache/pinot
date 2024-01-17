@@ -38,7 +38,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.utils.DriverUtils;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.tls.TlsUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.LoggerFactory;
 

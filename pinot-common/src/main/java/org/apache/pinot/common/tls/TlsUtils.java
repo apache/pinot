@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.common.tls;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
@@ -28,8 +29,9 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.security.GeneralSecurityException;
+import java.nio.file.Path;
 import java.security.KeyStore;
+import java.security.SecureRandom;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.KeyManager;
@@ -37,6 +39,8 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
+import nl.altindag.ssl.SSLFactory;
+import nl.altindag.ssl.exception.GenericSSLContextException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.pinot.common.config.TlsConfig;
@@ -59,6 +63,10 @@ public final class TlsUtils {
   private static final String TRUSTSTORE_PATH = "truststore.path";
   private static final String TRUSTSTORE_PASSWORD = "truststore.password";
   private static final String SSL_PROVIDER = "ssl.provider";
+
+  private static final String FILE_SCHEME = "file";
+  private static final String FILE_SCHEME_PREFIX = FILE_SCHEME + "://";
+  private static final String FILE_SCHEME_PREFIX_WITHOUT_SLASH = FILE_SCHEME + ":";
 
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
 
@@ -213,25 +221,20 @@ public final class TlsUtils {
    */
   public static void installDefaultSSLSocketFactory(String keyStoreType, String keyStorePath, String keyStorePassword,
       String trustStoreType, String trustStorePath, String trustStorePassword) {
-    KeyManager[] keyManagers = null;
-    if (keyStorePath != null) {
-      keyManagers = createKeyManagerFactory(keyStorePath, keyStorePassword, keyStoreType).getKeyManagers();
-    }
-
-    TrustManager[] trustManagers = null;
-    if (trustStorePath != null) {
-      trustManagers = createTrustManagerFactory(trustStorePath, trustStorePassword, trustStoreType).getTrustManagers();
-    }
-
     try {
-      SSLContext sc = SSLContext.getInstance("SSL");
-      sc.init(keyManagers, trustManagers, new java.security.SecureRandom());
+      TlsResourceBundle tlsResourceBundle = createTlsBundle(keyStoreType, keyStorePath, keyStorePassword,
+          trustStoreType, trustStorePath, trustStorePassword,
+          "SSL", new java.security.SecureRandom());
+      KeyManager[] keyManagers = tlsResourceBundle.getKeyManagerFactory() == null
+          ? null : tlsResourceBundle.getKeyManagerFactory().getKeyManagers();
+      TrustManager[] trustManagers
+          = tlsResourceBundle.getTrustManagerFactory() == null
+          ? null : tlsResourceBundle.getTrustManagerFactory().getTrustManagers();
 
       // HttpsURLConnection
-      HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-
-      setSslContext(sc);
-    } catch (GeneralSecurityException e) {
+      HttpsURLConnection.setDefaultSSLSocketFactory(tlsResourceBundle.getSslContext().getSocketFactory());
+      setSslContext(tlsResourceBundle.getSslContext());
+    } catch (GenericSSLContextException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
   }
@@ -245,9 +248,9 @@ public final class TlsUtils {
     URI inputUri = new URI(storePath);
     if (StringUtils.isBlank(inputUri.getScheme())) {
       if (storePath.startsWith("/")) {
-        return new URL("file://" + storePath);
+        return new URL(FILE_SCHEME_PREFIX + storePath);
       }
-      return new URL("file://./" + storePath);
+      return new URL(FILE_SCHEME_PREFIX + "./" + storePath);
     }
     return inputUri.toURL();
   }
@@ -293,13 +296,14 @@ public final class TlsUtils {
    * @param tlsConfig TLS config
    */
   public static SslContext buildClientContext(TlsConfig tlsConfig) {
+    TlsResourceBundle tlsResourceBundle = createTlsBundle(tlsConfig);
     SslContextBuilder sslContextBuilder =
         SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
-    if (tlsConfig.getKeyStorePath() != null) {
-      sslContextBuilder.keyManager(createKeyManagerFactory(tlsConfig));
+    if (tlsResourceBundle.getKeyManagerFactory() != null) {
+      sslContextBuilder.keyManager(tlsResourceBundle.getKeyManagerFactory());
     }
-    if (tlsConfig.getTrustStorePath() != null) {
-      sslContextBuilder.trustManager(createTrustManagerFactory(tlsConfig));
+    if (tlsResourceBundle.getTrustManagerFactory() != null) {
+      sslContextBuilder.trustManager(tlsResourceBundle.getTrustManagerFactory());
     }
     try {
       return sslContextBuilder.build();
@@ -317,10 +321,11 @@ public final class TlsUtils {
     if (tlsConfig.getKeyStorePath() == null) {
       throw new IllegalArgumentException("Must provide key store path for secured server");
     }
-    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(createKeyManagerFactory(tlsConfig))
+    TlsResourceBundle tlsResourceBundle = createTlsBundle(tlsConfig);
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(tlsResourceBundle.getKeyManagerFactory())
         .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
-    if (tlsConfig.getTrustStorePath() != null) {
-      sslContextBuilder.trustManager(createTrustManagerFactory(tlsConfig));
+    if (tlsResourceBundle.getTrustManagerFactory() != null) {
+      sslContextBuilder.trustManager(tlsResourceBundle.getTrustManagerFactory());
     }
     if (tlsConfig.isClientAuthEnabled()) {
       sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
@@ -330,5 +335,101 @@ public final class TlsUtils {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Create a {@link TlsResourceBundle} instance for a given TlsConfig
+   * @param tlsConfig {@link TlsConfig}
+   * @return a {@link TlsResourceBundle} instance
+   */
+  public static TlsResourceBundle createTlsBundle(TlsConfig tlsConfig) {
+    return createTlsBundle(
+        tlsConfig.getKeyStoreType(), tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword(),
+        tlsConfig.getTrustStoreType(), tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword(),
+        null, null);
+  }
+
+  private static TlsResourceBundle createTlsBundle(
+      String keyStoreType, String keyStorePath, String keyStorePassword,
+      String trustStoreType, String trustStorePath, String trustStorePassword,
+      String sslContextProtocol, SecureRandom secureRandom) {
+    // the SSLFactory only supports file based key/trust stores
+    // when using SSLFactory, the underline KeyManager and TrustManager are swappable
+    boolean canBuildSslFactory = true;
+    try {
+      if (keyStorePath != null) {
+        URL keyStorePathUrl = makeKeyStoreUrl(keyStorePath);
+        if (!FILE_SCHEME.equals(keyStorePathUrl.toURI().getScheme())) {
+          canBuildSslFactory = false;
+        } else {
+          keyStorePath = keyStorePath.replace(FILE_SCHEME_PREFIX, "").replace(FILE_SCHEME_PREFIX_WITHOUT_SLASH, "");
+        }
+      }
+      if (trustStorePath != null) {
+        URL trustStorePathUrl = makeKeyStoreUrl(trustStorePath);
+        if (!FILE_SCHEME.equals(trustStorePathUrl.toURI().getScheme())) {
+          canBuildSslFactory = false;
+        } else {
+          trustStorePath = trustStorePath.replace(FILE_SCHEME_PREFIX, "").replace(FILE_SCHEME_PREFIX_WITHOUT_SLASH, "");
+        }
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    // build swappable TlsResourceBundle when key store and trust store are both file based
+    if (canBuildSslFactory) {
+      SSLFactory sslFactory = createSSLFactory(
+          keyStoreType, keyStorePath, keyStorePassword,
+          trustStoreType, trustStorePath, trustStorePassword,
+          sslContextProtocol, secureRandom);
+      return new TlsResourceBundle(sslFactory.getKeyManagerFactory().get(), sslFactory.getTrustManagerFactory().get(),
+          sslFactory.getSslContext());
+    } else {
+      // build non-swappable TlsResourceBundle when key store and trust store are not file based
+      // TODO: support swappable TlsResourceBundle even when key store and trust store are not file based
+      KeyManagerFactory keyManagerFactory = createKeyManagerFactory(keyStorePath, keyStorePassword, keyStoreType);
+      TrustManagerFactory trustManagerFactory
+          = createTrustManagerFactory(trustStorePath, trustStorePassword, trustStoreType);
+      SSLContext sslContext = null;
+      if (sslContextProtocol != null) {
+        try {
+          sslContext = SSLContext.getInstance(sslContextProtocol);
+          sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), secureRandom);
+        } catch (Exception e) {
+          throw new IllegalStateException(e);
+        }
+      }
+      return new TlsResourceBundle(keyManagerFactory, trustManagerFactory, sslContext);
+    }
+  }
+
+  @VisibleForTesting
+  static SSLFactory createSSLFactory(
+      String keyStoreType, String keyStorePath, String keyStorePassword,
+      String trustStoreType, String trustStorePath, String trustStorePassword,
+      String sslContextProtocol, SecureRandom secureRandom) {
+    createKeyManagerFactory(keyStorePath, keyStorePassword, keyStoreType);
+    SSLFactory.Builder sslFactoryBuilder = SSLFactory.builder();
+    if (keyStorePath != null) {
+      Preconditions.checkNotNull(keyStorePassword, "key store password must not be null");
+      sslFactoryBuilder
+          .withSwappableIdentityMaterial()
+          // need to remove the file:// or file: prefix before passing to Path.of()
+          .withIdentityMaterial(Path.of(keyStorePath), keyStorePassword.toCharArray(), keyStoreType);
+    }
+    if (trustStorePath != null) {
+      Preconditions.checkNotNull(trustStorePassword, "trust store password must not be null");
+      sslFactoryBuilder
+          .withSwappableTrustMaterial()
+          // need to remove the file:// or file: prefix before passing to Path.of()
+          .withTrustMaterial(Path.of(trustStorePath), trustStorePassword.toCharArray(), trustStoreType);
+    }
+    if (sslContextProtocol != null) {
+      sslFactoryBuilder.withSslContextAlgorithm(sslContextProtocol);
+    }
+    if (secureRandom != null) {
+      sslFactoryBuilder.withSecureRandom(secureRandom);
+    }
+    return sslFactoryBuilder.build();
   }
 }
