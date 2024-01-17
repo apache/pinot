@@ -20,12 +20,17 @@ package org.apache.pinot.spi.eventlistener.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_ALLOWLIST_QUERY_REQUEST_HEADERS;
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME;
 import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME;
 
@@ -33,6 +38,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_BROKER_EVENT_LI
 public class PinotBrokerQueryEventListenerFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotBrokerQueryEventListenerFactory.class);
   private static BrokerQueryEventListener _brokerQueryEventListener = null;
+  private static List<String> _allowlistQueryRequestHeaders = new ArrayList<>();
 
   private PinotBrokerQueryEventListenerFactory() {
   }
@@ -44,6 +50,8 @@ public class PinotBrokerQueryEventListenerFactory {
   public synchronized static void init(PinotConfiguration eventListenerConfiguration) {
     // Initializes BrokerQueryEventListener.
     initializeBrokerQueryEventListener(eventListenerConfiguration);
+    // Initializes request headers
+    initializeAllowlistQueryRequestHeaders(eventListenerConfiguration);
   }
 
   /**
@@ -79,11 +87,32 @@ public class PinotBrokerQueryEventListenerFactory {
   }
 
   /**
+   * Initializes allowlist request-headers to extract from query request.
+   * @param eventListenerConfiguration The subset of the configuration containing the event-listener-related keys
+   */
+  private static void initializeAllowlistQueryRequestHeaders(PinotConfiguration eventListenerConfiguration) {
+    List<String> allowlistQueryRequestHeaders =
+        Splitter.on(",").omitEmptyStrings().trimResults()
+            .splitToList(eventListenerConfiguration.getProperty(CONFIG_OF_ALLOWLIST_QUERY_REQUEST_HEADERS, ""));
+
+    LOGGER.info("{}: allowlist headers will be used for PinotBrokerQueryEventListener", allowlistQueryRequestHeaders);
+    registerAllowlistQueryRequestHeaders(allowlistQueryRequestHeaders);
+  }
+
+  /**
    * Registers a broker event listener.
    */
   private static void registerBrokerEventListener(BrokerQueryEventListener brokerQueryEventListener) {
     LOGGER.info("Registering broker event listener : {}", brokerQueryEventListener.getClass().getName());
     _brokerQueryEventListener = brokerQueryEventListener;
+  }
+
+  /**
+   * Registers allowlist http headers for query-requests.
+   */
+  private static void registerAllowlistQueryRequestHeaders(List<String> allowlistQueryRequestHeaders) {
+    LOGGER.info("Registering query request headers allowlist : {}", allowlistQueryRequestHeaders);
+    _allowlistQueryRequestHeaders = ImmutableList.copyOf(allowlistQueryRequestHeaders);
   }
 
   /**
@@ -102,5 +131,10 @@ public class PinotBrokerQueryEventListenerFactory {
   @VisibleForTesting
   public static BrokerQueryEventListener getBrokerQueryEventListener() {
     return getBrokerQueryEventListener(new PinotConfiguration(Collections.emptyMap()));
+  }
+
+  @VisibleForTesting
+  public static List<String> getAllowlistQueryRequestHeaders() {
+    return _allowlistQueryRequestHeaders;
   }
 }

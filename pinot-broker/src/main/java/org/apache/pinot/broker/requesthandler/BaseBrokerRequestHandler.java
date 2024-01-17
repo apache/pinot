@@ -92,6 +92,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
+import org.apache.pinot.spi.eventlistener.query.PinotBrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
@@ -261,7 +262,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     requestContext.setRequestId(requestId);
     if (httpHeaders != null) {
       requestContext.setRequestHttpHeaders(httpHeaders.getRequestHeaders().entrySet().stream()
-          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+          .filter(entry -> PinotBrokerQueryEventListenerFactory.getAllowlistQueryRequestHeaders()
+              .contains(entry.getKey())).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
     }
 
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
