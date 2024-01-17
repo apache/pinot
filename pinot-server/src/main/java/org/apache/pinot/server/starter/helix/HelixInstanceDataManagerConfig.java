@@ -131,6 +131,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = "external.view.dropped.max.wait.ms";
   private static final String EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = "external.view.dropped.check.interval.ms";
 
+  public static final String PREFIX_OF_CONFIG_OF_UPSERT = "upsert";
+
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
@@ -292,6 +294,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public long getExternalViewDroppedCheckIntervalMs() {
     return _instanceDataManagerConfiguration.getProperty(EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS,
         DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS);
+  }
+
+  @Override
+  public PinotConfiguration getUpsertConfigs() {
+    return _instanceDataManagerConfiguration.subset(PREFIX_OF_CONFIG_OF_UPSERT);
   }
 
   @Override

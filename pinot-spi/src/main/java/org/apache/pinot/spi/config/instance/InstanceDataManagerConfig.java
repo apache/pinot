@@ -68,4 +68,6 @@ public interface InstanceDataManagerConfig {
   long getExternalViewDroppedMaxWaitMs();
 
   long getExternalViewDroppedCheckIntervalMs();
+
+  PinotConfiguration getUpsertConfigs();
 }
