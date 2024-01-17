@@ -93,6 +93,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         }
         int selectedIdx;
         if (_useStickyRouting || QueryOptionsUtils.isUseStickyRouting(queryOptions)) {
+          // candidates array is always sorted
           selectedIdx = Math.abs(_tableNameWithType.hashCode() % candidates.size());
         } else {
           selectedIdx = requestId++ % candidates.size();
