@@ -101,7 +101,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     double metadataTTL = upsertConfig.getMetadataTTL();
     double deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
     File tableIndexDir = tableDataManager.getTableDataDir();
-
     _context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
         .setPrimaryKeyColumns(primaryKeyColumns).setComparisonColumns(comparisonColumns)
         .setDeleteRecordColumn(deleteRecordColumn).setHashFunction(hashFunction)

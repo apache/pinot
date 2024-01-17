@@ -44,15 +44,12 @@ public class TableUpsertMetadataManagerFactory {
     Preconditions.checkArgument(upsertConfig != null, "Must provide upsert config for table: %s", tableNameWithType);
 
     TableUpsertMetadataManager metadataManager;
-    String tableMetadataManagerClass = upsertConfig.getMetadataManagerClass();
-
-    String defaultMetadataManagerClass =
-        instanceUpsertConfigs != null ? instanceUpsertConfigs.getProperty(UPSERT_DEFAULT_METADATA_MANAGER_CLASS) : null;
-    // Use the default metadata manager class mentioned in the server config if the table config does not specify one.
-    String metadataManagerClass = tableMetadataManagerClass != null ? tableMetadataManagerClass
-        : defaultMetadataManagerClass;
+    String metadataManagerClass = upsertConfig.getMetadataManagerClass();
 
     if (instanceUpsertConfigs != null) {
+      if (metadataManagerClass == null) {
+        metadataManagerClass = instanceUpsertConfigs.getProperty(UPSERT_DEFAULT_METADATA_MANAGER_CLASS);
+      }
       // Server level config honoured only when table level config is not set to true
       if (!upsertConfig.isEnableSnapshot()) {
         upsertConfig.setEnableSnapshot(
