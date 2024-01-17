@@ -88,12 +88,13 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
       foldNotNull(length, blockValSet, (QuantileDigest) aggregationResultHolder.getResult(), (quantile, from, toEx) -> {
         int start;
         QuantileDigest quantileDigest;
-        if (quantile == null) {
-          start = from + 1;
-          quantileDigest = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[0]);
-        } else {
+        if (quantile != null) {
           start = from;
           quantileDigest = quantile;
+        } else {
+          start = from + 1;
+          quantileDigest = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[from]);
+          aggregationResultHolder.setValue(quantileDigest);
         }
         for (int i = start; i < toEx; i++) {
           quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
