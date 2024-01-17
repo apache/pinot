@@ -58,8 +58,9 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   private volatile InstancePartitions _instancePartitions;
 
   public MultiStageReplicaGroupSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
+      boolean useStickyRouting) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useStickyRouting);
   }
 
   @Override

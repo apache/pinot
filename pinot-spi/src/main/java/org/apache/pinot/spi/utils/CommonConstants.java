@@ -324,6 +324,9 @@ public class CommonConstants {
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = false;
 
+    public static final String CONFIG_OF_USE_STICKY_ROUTING = "pinot.broker.use.sticky.routing";
+    public static final boolean DEFAULT_USE_STICKY_ROUTING = false;
+
     // Broker config indicating the maximum serialized response size across all servers for a query. This value is
     // equally divided across all servers processing the query.
     public static final String CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES = "pinot.broker.max.query.response.size.bytes";
@@ -350,6 +353,7 @@ public class CommonConstants {
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
+        public static final String USE_STICKY_ROUTING = "useStickyRouting";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";

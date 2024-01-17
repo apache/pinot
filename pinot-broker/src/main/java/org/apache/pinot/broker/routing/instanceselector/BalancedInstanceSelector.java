@@ -30,6 +30,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
 
 /**
@@ -50,8 +51,9 @@ import org.apache.pinot.common.utils.HashUtil;
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   public BalancedInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
+      boolean useStickyRouting) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useStickyRouting);
   }
 
   @Override
@@ -89,7 +91,12 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         if (candidates == null) {
           continue;
         }
-        int selectedIdx = requestId++ % candidates.size();
+        int selectedIdx;
+        if (_useStickyRouting || QueryOptionsUtils.isUseStickyRouting(queryOptions)) {
+          selectedIdx = Math.abs(_tableNameWithType.hashCode() % candidates.size());
+        } else {
+          selectedIdx = requestId++ % candidates.size();
+        }
         SegmentInstanceCandidate selectedCandidate = candidates.get(selectedIdx);
         // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
         // broker or server can skip it upon any issue to process it.

@@ -146,6 +146,11 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static boolean isUseStickyRouting(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_STICKY_ROUTING, Boolean.FALSE.toString()));
+  }
+
+  @Nullable
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
     String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
     return numReplicaGroupsToQuery != null ? Integer.parseInt(numReplicaGroupsToQuery) : null;

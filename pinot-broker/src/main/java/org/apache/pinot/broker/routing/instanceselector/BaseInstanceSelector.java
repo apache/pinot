@@ -87,6 +87,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final BrokerMetrics _brokerMetrics;
   final AdaptiveServerSelector _adaptiveServerSelector;
   final Clock _clock;
+  final boolean _useStickyRouting;
 
   // These 3 variables are the cached states to help accelerate the change processing
   Set<String> _enabledInstances;
@@ -99,12 +100,18 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   private volatile SegmentStates _segmentStates;
 
   BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
+      boolean useStickyRouting) {
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
     _clock = clock;
+    _useStickyRouting = useStickyRouting;
+
+    if (_adaptiveServerSelector != null && _useStickyRouting) {
+      throw new IllegalArgumentException("AdaptiveServerSelector and stickyRouting cannot be enabled at the same time");
+    }
   }
 
   @Override
