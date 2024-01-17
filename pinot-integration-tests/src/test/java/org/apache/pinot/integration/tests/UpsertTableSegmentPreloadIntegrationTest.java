@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -26,6 +27,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
@@ -103,10 +105,12 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
   protected void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
         "1");
-    serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "."
-        + HelixInstanceDataManagerConfig.UPSERT_DEFAULT_ENABLE_PRELOAD, "true");
-    serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "."
-        + HelixInstanceDataManagerConfig.UPSERT_DEFAULT_ENABLE_SNAPSHOT, "true");
+    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
+        HelixInstanceDataManagerConfig.PREFIX_OF_CONFIG_OF_UPSERT,
+        TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_ENABLE_SNAPSHOT), "true");
+    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
+        HelixInstanceDataManagerConfig.PREFIX_OF_CONFIG_OF_UPSERT,
+        TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_ENABLE_PRELOAD), "true");
   }
 
   @AfterClass

@@ -131,9 +131,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = "external.view.dropped.max.wait.ms";
   private static final String EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = "external.view.dropped.check.interval.ms";
 
-  public static final String UPSERT_DEFAULT_METADATA_MANAGER_CLASS = "upsert.default.metadata.manager.class";
-  public static final String UPSERT_DEFAULT_ENABLE_SNAPSHOT = "upsert.default.enable.snapshot";
-  public static final String UPSERT_DEFAULT_ENABLE_PRELOAD = "upsert.default.enable.preload";
+  public static final String PREFIX_OF_CONFIG_OF_UPSERT = "upsert";
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
@@ -299,18 +297,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public String getUpsertDefaultMetadataManagerClass() {
-    return _instanceDataManagerConfiguration.getProperty(UPSERT_DEFAULT_METADATA_MANAGER_CLASS);
-  }
-
-  @Override
-  public String getUpsertDefaultEnableSnapshot() {
-    return _instanceDataManagerConfiguration.getProperty(UPSERT_DEFAULT_ENABLE_SNAPSHOT);
-  }
-
-  @Override
-  public String getUpsertDefaultEnablePreload() {
-    return _instanceDataManagerConfiguration.getProperty(UPSERT_DEFAULT_ENABLE_PRELOAD);
+  public PinotConfiguration getUpsertConfigs() {
+    return _instanceDataManagerConfiguration.subset(PREFIX_OF_CONFIG_OF_UPSERT);
   }
 
   @Override

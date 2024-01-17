@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
@@ -37,6 +38,7 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.integration.tests.models.DummyTableUpsertMetadataManager;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -386,8 +388,9 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   public void testDefaultMetadataManagerClass()
       throws Exception {
     PinotConfiguration config = getServerConf(12345);
-    config.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "."
-            + HelixInstanceDataManagerConfig.UPSERT_DEFAULT_METADATA_MANAGER_CLASS,
+    config.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
+            HelixInstanceDataManagerConfig.PREFIX_OF_CONFIG_OF_UPSERT,
+            TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_METADATA_MANAGER_CLASS),
         DummyTableUpsertMetadataManager.class.getName());
 
     BaseServerStarter serverStarter = null;

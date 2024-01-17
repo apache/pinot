@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,9 +33,12 @@ public class TableUpsertMetadataManagerFactory {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableUpsertMetadataManagerFactory.class);
+  public static final String UPSERT_DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
+  public static final String UPSERT_DEFAULT_ENABLE_SNAPSHOT = "default.enable.snapshot";
+  public static final String UPSERT_DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
 
   public static TableUpsertMetadataManager create(TableConfig tableConfig,
-      @Nullable String defaultMetadataManagerClass) {
+      @Nullable PinotConfiguration instanceUpsertConfigs) {
     String tableNameWithType = tableConfig.getTableName();
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     Preconditions.checkArgument(upsertConfig != null, "Must provide upsert config for table: %s", tableNameWithType);
@@ -42,9 +46,26 @@ public class TableUpsertMetadataManagerFactory {
     TableUpsertMetadataManager metadataManager;
     String tableMetadataManagerClass = upsertConfig.getMetadataManagerClass();
 
+    String defaultMetadataManagerClass =
+        instanceUpsertConfigs != null ? instanceUpsertConfigs.getProperty(UPSERT_DEFAULT_METADATA_MANAGER_CLASS) : null;
     // Use the default metadata manager class mentioned in the server config if the table config does not specify one.
     String metadataManagerClass = tableMetadataManagerClass != null ? tableMetadataManagerClass
         : defaultMetadataManagerClass;
+
+    if (instanceUpsertConfigs != null) {
+      // Server level config honoured only when table level config is not set to true
+      if (!upsertConfig.isEnableSnapshot()) {
+        upsertConfig.setEnableSnapshot(
+            Boolean.parseBoolean(instanceUpsertConfigs.getProperty(UPSERT_DEFAULT_ENABLE_SNAPSHOT, "false")));
+      }
+
+      // Server level config honoured only when table level config is not set to true
+      if (!upsertConfig.isEnablePreload()) {
+        upsertConfig.setEnablePreload(
+            Boolean.parseBoolean(instanceUpsertConfigs.getProperty(UPSERT_DEFAULT_ENABLE_PRELOAD, "false")));
+      }
+    }
+
     if (StringUtils.isNotEmpty(metadataManagerClass)) {
       LOGGER.info("Creating TableUpsertMetadataManager with class: {} for table: {}", metadataManagerClass,
           tableNameWithType);

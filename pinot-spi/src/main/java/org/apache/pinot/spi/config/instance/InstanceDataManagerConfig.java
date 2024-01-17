@@ -69,9 +69,5 @@ public interface InstanceDataManagerConfig {
 
   long getExternalViewDroppedCheckIntervalMs();
 
-  String getUpsertDefaultMetadataManagerClass();
-
-  String getUpsertDefaultEnableSnapshot();
-
-  String getUpsertDefaultEnablePreload();
+  PinotConfiguration getUpsertConfigs();
 }
