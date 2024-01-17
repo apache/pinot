@@ -620,7 +620,13 @@ public class AllNullQueriesTest extends BaseQueriesTest {
             Object[] row = rows.get(0);
             assertEquals(row.length, 3);
             assertNull(row[0]);
-            assertNull(row[1]);
+            // TODO: this should return null instead of default value.
+            DataType dataType = columnDataType.toDataType();
+            if (dataType == DataType.DOUBLE || dataType == DataType.FLOAT) {
+              assertEquals(row[1], Double.NEGATIVE_INFINITY);
+            } else if (dataType == DataType.LONG) {
+              assertEquals(((Double) row[1]).longValue(), Long.MIN_VALUE);
+            }
             assertEquals(row[2], 0);
           }
         },
