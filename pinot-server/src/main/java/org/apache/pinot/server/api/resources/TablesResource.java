@@ -529,31 +529,64 @@ public class TablesResource {
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Segment name", allowMultiple = true, required = true) @QueryParam("segmentNames")
+      @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames")
       List<String> segmentNames) {
+    return ResourceUtils.convertToJsonString(processValidDocIdMetadata(tableNameWithType, segmentNames));
+  }
+
+  @POST
+  @Path("/tables/{tableNameWithType}/validDocIdMetadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Provides segment validDocId metadata", notes = "Provides segment validDocId metadata")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+  })
+  public String getValidDocIdMetadata(
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType, TableSegments tableSegments) {
+    List<String> segmentNames = tableSegments.getSegments();
+    return ResourceUtils.convertToJsonString(processValidDocIdMetadata(tableNameWithType, segmentNames));
+  }
+
+  private List<Map<String, Object>> processValidDocIdMetadata(String tableNameWithType, List<String> segments) {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentNames, missingSegments);
-    if (!missingSegments.isEmpty()) {
-      throw new WebApplicationException(String.format("Table %s has missing segments", tableNameWithType),
-          Response.Status.NOT_FOUND);
+    List<SegmentDataManager> segmentDataManagers;
+    if (segments == null || segments.isEmpty()) {
+      segmentDataManagers = tableDataManager.acquireAllSegments();
+    } else {
+      segmentDataManagers = tableDataManager.acquireSegments(segments, missingSegments);
+      if (!missingSegments.isEmpty()) {
+        throw new WebApplicationException(
+            String.format("Table %s has missing segments: %s)", tableNameWithType, segments),
+            Response.Status.NOT_FOUND);
+      }
     }
     List<Map<String, Object>> allValidDocIdMetadata = new ArrayList<>();
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       try {
         IndexSegment indexSegment = segmentDataManager.getSegment();
+        if (indexSegment == null) {
+          LOGGER.warn("Table {} segment {} does not exist", tableNameWithType, segmentDataManager.getSegmentName());
+          continue;
+        }
+        // Skip the consuming segments
         if (!(indexSegment instanceof ImmutableSegmentImpl)) {
-          throw new WebApplicationException(
-              String.format("Table %s segment %s is not a immutable segment", tableNameWithType,
-                  segmentDataManager.getSegmentName()), Response.Status.BAD_REQUEST);
+          String msg = String.format("Table %s segment %s is not a immutable segment", tableNameWithType,
+              segmentDataManager.getSegmentName());
+          LOGGER.warn(msg);
+          continue;
         }
         MutableRoaringBitmap validDocIds =
             indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
         if (validDocIds == null) {
-          throw new WebApplicationException(
-              String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
-                  segmentDataManager.getSegmentName()), Response.Status.NOT_FOUND);
+          String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
+              segmentDataManager.getSegmentName());
+          LOGGER.warn(msg);
+          throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
         }
         Map<String, Object> validDocIdMetadata = new HashMap<>();
         int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
@@ -568,7 +601,7 @@ public class TablesResource {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
-    return ResourceUtils.convertToJsonString(allValidDocIdMetadata);
+    return allValidDocIdMetadata;
   }
 
   /**
