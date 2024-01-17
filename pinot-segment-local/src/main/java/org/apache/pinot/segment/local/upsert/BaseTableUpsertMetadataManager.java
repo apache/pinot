@@ -116,6 +116,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     initCustomVariables();
 
     if (enableSnapshot && enablePreload && segmentPreloadExecutor != null) {
+
       // Preloading the segments with snapshots for fast upsert metadata recovery.
       // Note that there is an implicit waiting logic between the thread doing the segment preloading here and the
       // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).
