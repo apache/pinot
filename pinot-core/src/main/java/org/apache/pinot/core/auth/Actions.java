@@ -116,6 +116,7 @@ public class Actions {
     public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";
     public static final String GET_METADATA = "GetMetadata";
     public static final String GET_PAUSE_STATUS = "GetPauseStatus";
+    public static final String GET_TABLE_RELOAD_STATUS = "GetTableReloadStatus";
     public static final String GET_ROUTING_TABLE = "GetRoutingTable";
     public static final String GET_SCHEMA = "GetSchema";
     public static final String GET_SEGMENT = "GetSegment";
@@ -135,6 +136,7 @@ public class Actions {
     public static final String REBUILD_BROKER_RESOURCE = "RebuildBrokerResource";
     public static final String REFRESH_ROUTING = "RefreshRouting";
     public static final String RELOAD_SEGMENT = "ReloadSegment";
+    public static final String RELOAD_TABLE = "ReloadTable";
     public static final String REPLACE_SEGMENT = "ReplaceSegment";
     public static final String RESUME_CONSUMPTION = "ResumeConsumption";
     public static final String UPDATE_INSTANCE_PARTITIONS = "UpdateInstancePartitions";

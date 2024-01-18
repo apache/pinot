@@ -127,6 +127,13 @@ public interface InstanceDataManager {
   void addOrReplaceSegment(String tableNameWithType, String segmentName)
       throws Exception;
 
+
+  /**
+   * Reloads the table metadata in the servers. One of the things it does it reconstruct
+   * the table metadata manager.
+   */
+  void reloadTable(String tableNameWithType, boolean force, SegmentRefreshSemaphore segmentRefreshSemaphore);
+
   /**
    * Returns all tables served by the instance.
    */

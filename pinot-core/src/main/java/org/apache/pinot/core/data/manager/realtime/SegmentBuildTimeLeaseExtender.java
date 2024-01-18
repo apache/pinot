@@ -85,7 +85,7 @@ public class SegmentBuildTimeLeaseExtender {
         LOGGER.info("Created lease extender for table: {}", tableNameWithType);
         return leaseExtender;
       } else {
-        LOGGER.warn("Lease extender for table: {} already exists", tableNameWithType);
+        LOGGER.debug("Lease extender for table: {} already exists", tableNameWithType);
         return v;
       }
     });

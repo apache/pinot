@@ -87,6 +87,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDataManager.class);
 
   protected final ConcurrentHashMap<String, SegmentDataManager> _segmentDataManagerMap = new ConcurrentHashMap<>();
+  private final long _loadTimeMs = System.currentTimeMillis();
+
   // Semaphore to restrict the maximum number of parallel segment downloads for a table.
   private Semaphore _segmentDownloadSemaphore;
 
@@ -475,6 +477,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
       throw reloadFailureException;
     }
+  }
+
+  @Override
+  public long getLoadTimeMs() {
+    return _loadTimeMs;
   }
 
   private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
