@@ -82,7 +82,7 @@
     <dependency>
       <groupId>com.google.api.grpc</groupId>
       <artifactId>proto-google-iam-v1</artifactId>
-      <version>1.0.0</version>
+      <version>1.25.0</version>
       <exclusions>
         <exclusion>
           <groupId>com.google.api.grpc</groupId>
