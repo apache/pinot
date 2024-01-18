@@ -304,7 +304,7 @@ public final class ListenerConfigUtil {
 
   private static File cacheInTempFile(String sourceUrl) {
     try {
-      URL url = TlsUtils.makeKeyStoreUrl(sourceUrl);
+      URL url = TlsUtils.makeKeyOrTrustStoreUrl(sourceUrl);
       if ("file".equals(url.getProtocol())) {
         return new File(url.getPath());
       }
