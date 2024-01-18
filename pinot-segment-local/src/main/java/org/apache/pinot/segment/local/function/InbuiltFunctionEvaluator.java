@@ -233,6 +233,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
             }
           }
         }
+        if (_functionInvoker.getMethod().isVarArgs()) {
+          return _functionInvoker.invoke(new Object[]{_arguments});
+        }
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);
       } catch (Exception e) {
@@ -255,6 +258,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
               return null;
             }
           }
+        }
+        if (_functionInvoker.getMethod().isVarArgs()) {
+          return _functionInvoker.invoke(new Object[]{_arguments});
         }
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);

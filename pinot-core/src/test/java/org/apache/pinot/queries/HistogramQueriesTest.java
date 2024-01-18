@@ -312,7 +312,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       operator.nextBlock();
     } catch (Exception e) {
       assertEquals(e.getMessage(),
-          "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0')); Reason: The number of "
+          "Invalid aggregation function: histogram(intColumn,'[0]'); Reason: The number of "
               + "bin edges must be greater than 1");
     }
 
@@ -333,7 +333,7 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       operator.nextBlock();
     } catch (Exception e) {
       assertEquals(e.getMessage(),
-          "Invalid aggregation function: histogram(intColumn,arrayvalueconstructor('0','0','1','2')); Reason: The "
+          "Invalid aggregation function: histogram(intColumn,'[0, 0, 1, 2]'); Reason: The "
               + "bin edges must be strictly increasing");
     }
 
