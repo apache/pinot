@@ -87,7 +87,16 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       SegmentStates segmentStates, Map<String, String> queryOptions) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
-    int replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
+    int replicaGroupSelected;
+    if (_useStickyRouting) {
+      // When using sticky routing, we want to iterate over the instancePartitions in order to ensure deterministic
+      // selection of replica group across queries i.e. same instance replica group id is picked each time.
+      // Since the instances within a selected replica group are iterated in order, the assignment within a selected
+      // replica group is guaranteed to be deterministic.
+      replicaGroupSelected = 0;
+    } else {
+      replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
+    }
     for (int iteration = 0; iteration < instancePartitions.getNumReplicaGroups(); iteration++) {
       int replicaGroup = (replicaGroupSelected + iteration) % instancePartitions.getNumReplicaGroups();
       try {
@@ -118,6 +127,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       // If candidates are null, we will throw an exception and log a warning.
       Preconditions.checkState(candidates != null, "Failed to find servers for segment: %s", segment);
       boolean found = false;
+      // candidates array is always sorted
       for (SegmentInstanceCandidate candidate : candidates) {
         String instance = candidate.getInstance();
         if (instanceLookUpSet.contains(instance)) {
