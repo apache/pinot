@@ -186,14 +186,12 @@ public class SegmentMapper {
       reuse.clear();
     }
     if (recordReader.hasNext() && !_adaptiveSizeBasedWriter.canWrite()) {
-      observer.accept(String.format(
+      String logMessage = String.format(
           "Stopping record readers at index: %d out of %d passed to mapper as size limit reached, bytes written = %d,"
               + " bytes " + "limit = %d", count, totalCount, _adaptiveSizeBasedWriter.getNumBytesWritten(),
-          _adaptiveSizeBasedWriter.getBytesLimit()));
-      LOGGER.info(String.format(
-          "Stopping record readers at index: %d out of %d passed to mapper as size limit reached, bytes written = %d,"
-              + " bytes " + "limit = %d", count, totalCount, _adaptiveSizeBasedWriter.getNumBytesWritten(),
-          _adaptiveSizeBasedWriter.getBytesLimit()));
+          _adaptiveSizeBasedWriter.getBytesLimit());
+      observer.accept(logMessage);
+      LOGGER.info(logMessage);
       return false;
     }
     return true;
