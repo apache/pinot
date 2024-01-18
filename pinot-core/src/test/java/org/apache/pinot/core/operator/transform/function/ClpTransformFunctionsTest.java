@@ -63,7 +63,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.fail;
 
 
-public class CLPDecodeTransformFunctionTest {
+public class ClpTransformFunctionsTest {
   private static final String SEGMENT_NAME = "testSegmentForClpDecode";
   private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
   private static final String TIMESTAMP_COLUMN = "timestampColumn";
