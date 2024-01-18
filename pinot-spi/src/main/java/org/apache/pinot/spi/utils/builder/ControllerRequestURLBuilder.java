@@ -231,10 +231,6 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "forceCommit");
   }
 
-  public String forTableToBrokerMappings() {
-    return StringUtil.join("/", _baseUrl, "brokers", "tables");
-  }
-
   public String forForceCommitJobStatus(String jobId) {
     return StringUtil.join("/", _baseUrl, "tables", "forceCommitStatus", jobId);
   }

@@ -173,8 +173,7 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
         attemptJobId);
     _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.TABLE_REBALANCE_RETRY, 1L);
     ZkBasedTableRebalanceObserver observer =
-        new ZkBasedTableRebalanceObserver(tableNameWithType, attemptJobId, retryCtx, _pinotHelixResourceManager,
-            _controllerMetrics);
+        new ZkBasedTableRebalanceObserver(tableNameWithType, attemptJobId, retryCtx, _pinotHelixResourceManager);
     RebalanceResult result =
         _pinotHelixResourceManager.rebalanceTable(tableNameWithType, tableConfig, attemptJobId, rebalanceConfig,
             observer);

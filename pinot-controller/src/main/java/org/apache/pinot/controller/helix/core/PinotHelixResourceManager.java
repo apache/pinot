@@ -3199,7 +3199,7 @@ public class PinotHelixResourceManager {
     ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver = null;
     if (trackRebalanceProgress) {
       zkBasedTableRebalanceObserver = new ZkBasedTableRebalanceObserver(tableNameWithType, rebalanceJobId,
-          TableRebalanceContext.forInitialAttempt(rebalanceJobId, rebalanceConfig), this, _controllerMetrics);
+          TableRebalanceContext.forInitialAttempt(rebalanceJobId, rebalanceConfig), this);
     }
     return rebalanceTable(tableNameWithType, tableConfig, rebalanceJobId, rebalanceConfig,
         zkBasedTableRebalanceObserver);

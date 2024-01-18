@@ -50,22 +50,20 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
   private boolean _isStopped = false;
   private RebalanceResult.Status _stopStatus;
 
-  private ControllerMetrics _controllerMetrics;
+  private final ControllerMetrics _controllerMetrics;
 
   public ZkBasedTableRebalanceObserver(String tableNameWithType, String rebalanceJobId,
-      TableRebalanceContext tableRebalanceContext, PinotHelixResourceManager pinotHelixResourceManager,
-      ControllerMetrics controllerMetrics) {
+      TableRebalanceContext tableRebalanceContext, PinotHelixResourceManager pinotHelixResourceManager) {
     Preconditions.checkState(tableNameWithType != null, "Table name cannot be null");
     Preconditions.checkState(rebalanceJobId != null, "rebalanceId cannot be null");
     Preconditions.checkState(pinotHelixResourceManager != null, "PinotHelixManager cannot be null");
-    Preconditions.checkArgument(controllerMetrics != null, "controllerMetrics cannot be null");
     _tableNameWithType = tableNameWithType;
     _rebalanceJobId = rebalanceJobId;
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _tableRebalanceProgressStats = new TableRebalanceProgressStats();
     _tableRebalanceContext = tableRebalanceContext;
     _numUpdatesToZk = 0;
-    _controllerMetrics = controllerMetrics;
+    _controllerMetrics = ControllerMetrics.get();
   }
 
   @Override
