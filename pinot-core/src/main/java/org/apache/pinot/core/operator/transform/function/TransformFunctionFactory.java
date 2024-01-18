@@ -31,6 +31,7 @@ import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
 import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
@@ -335,7 +336,12 @@ public class TransformFunctionFactory {
         String columnName = expression.getIdentifier();
         return new IdentifierTransformFunction(columnName, columnContextMap.get(columnName));
       case LITERAL:
-        return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, expression.getLiteral(),
+        LiteralContext literal = expression.getLiteral();
+        if (literal.getValue() != null && literal.getValue() instanceof ArrayList) {
+          return queryContext.getOrComputeSharedValue(ArrayLiteralTransformFunction.class, literal,
+              ArrayLiteralTransformFunction::new);
+        }
+        return queryContext.getOrComputeSharedValue(LiteralTransformFunction.class, literal,
             LiteralTransformFunction::new);
       default:
         throw new IllegalStateException();

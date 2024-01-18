@@ -159,8 +159,12 @@ public class PinotEvaluateLiteralRule {
     Object resultValue;
     try {
       FunctionInvoker invoker = new FunctionInvoker(functionInfo);
-      invoker.convertTypes(arguments);
-      resultValue = invoker.invoke(arguments);
+      if (functionInfo.getMethod().isVarArgs()) {
+        resultValue = invoker.invoke(new Object[] {arguments});
+      } else {
+        invoker.convertTypes(arguments);
+        resultValue = invoker.invoke(arguments);
+      }
       if (rexNodeType.getSqlTypeName() == SqlTypeName.ARRAY) {
         RelDataType componentType = rexNodeType.getComponentType();
         if (componentType != null) {
