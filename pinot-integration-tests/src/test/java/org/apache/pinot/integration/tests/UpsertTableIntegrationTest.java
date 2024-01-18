@@ -389,7 +389,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       throws Exception {
     PinotConfiguration config = getServerConf(12345);
     config.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
-            HelixInstanceDataManagerConfig.PREFIX_OF_CONFIG_OF_UPSERT,
+            HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
             TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_METADATA_MANAGER_CLASS),
         DummyTableUpsertMetadataManager.class.getName());
 

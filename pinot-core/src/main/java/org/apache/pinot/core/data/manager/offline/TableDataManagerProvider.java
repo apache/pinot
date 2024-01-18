@@ -27,15 +27,11 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -45,47 +41,38 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
  * Factory for {@link TableDataManager}.
  */
 public class TableDataManagerProvider {
-  private static Semaphore _segmentBuildSemaphore;
-  private static TableDataManagerParams _tableDataManagerParams;
+  private final InstanceDataManagerConfig _instanceDataManagerConfig;
+  private final Semaphore _segmentBuildSemaphore;
 
-  private TableDataManagerProvider() {
+  public TableDataManagerProvider(InstanceDataManagerConfig instanceDataManagerConfig) {
+    _instanceDataManagerConfig = instanceDataManagerConfig;
+    int maxParallelSegmentBuilds = instanceDataManagerConfig.getMaxParallelSegmentBuilds();
+    _segmentBuildSemaphore = maxParallelSegmentBuilds > 0 ? new Semaphore(maxParallelSegmentBuilds, true) : null;
   }
 
-  public static void init(InstanceDataManagerConfig instanceDataManagerConfig) {
-    int maxParallelBuilds = instanceDataManagerConfig.getMaxParallelSegmentBuilds();
-    if (maxParallelBuilds > 0) {
-      _segmentBuildSemaphore = new Semaphore(maxParallelBuilds, true);
-    }
-    _tableDataManagerParams = new TableDataManagerParams(instanceDataManagerConfig);
+  public TableDataManager getTableDataManager(TableConfig tableConfig, HelixManager helixManager) {
+    return getTableDataManager(tableConfig, helixManager, null, null, () -> true);
   }
 
-  public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig, String instanceId,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache) {
-    return getTableDataManager(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager, null,
-        errorCache, () -> true);
-  }
-
-  public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig, String instanceId,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      @Nullable ExecutorService segmentPreloadExecutor, LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
+  public TableDataManager getTableDataManager(TableConfig tableConfig, HelixManager helixManager,
+      @Nullable ExecutorService segmentPreloadExecutor,
+      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
       Supplier<Boolean> isServerReadyToServeQueries) {
     TableDataManager tableDataManager;
-    switch (tableDataManagerConfig.getTableType()) {
+    switch (tableConfig.getTableType()) {
       case OFFLINE:
-        if (tableDataManagerConfig.isDimTable()) {
-          tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableDataManagerConfig.getTableName());
+        if (tableConfig.isDimTable()) {
+          tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableConfig.getTableName());
         } else {
           tableDataManager = new OfflineTableDataManager();
         }
         break;
       case REALTIME:
-        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(
-            tableDataManagerConfig.getTableConfig());
+        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
         if (Boolean.parseBoolean(streamConfigMap.get(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE))
-            && StringUtils.isEmpty(tableDataManagerConfig.getInstanceDataManagerConfig().getSegmentStoreUri())) {
+            && StringUtils.isEmpty(_instanceDataManagerConfig.getSegmentStoreUri())) {
           throw new IllegalStateException(String.format("Table has enabled %s config. But the server has not "
-              + "configured the segmentstore uri. Configure the server config %s",
+                  + "configured the segmentstore uri. Configure the server config %s",
               StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE, CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI));
         }
         tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore, isServerReadyToServeQueries);
@@ -93,8 +80,7 @@ public class TableDataManagerProvider {
       default:
         throw new IllegalStateException();
     }
-    tableDataManager.init(tableDataManagerConfig, instanceId, propertyStore, serverMetrics, helixManager,
-        segmentPreloadExecutor, errorCache, _tableDataManagerParams);
+    tableDataManager.init(_instanceDataManagerConfig, tableConfig, helixManager, segmentPreloadExecutor, errorCache);
     return tableDataManager;
   }
 }

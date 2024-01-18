@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.spi.config.instance;
 
+import java.util.Map;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.ReadMode;
 
 
 public interface InstanceDataManagerConfig {
+
   PinotConfiguration getConfig();
 
   String getInstanceId();
@@ -69,5 +71,9 @@ public interface InstanceDataManagerConfig {
 
   long getExternalViewDroppedCheckIntervalMs();
 
-  PinotConfiguration getUpsertConfigs();
+  PinotConfiguration getUpsertConfig();
+
+  PinotConfiguration getAuthConfig();
+
+  Map<String, Map<String, String>> getTierConfigs();
 }

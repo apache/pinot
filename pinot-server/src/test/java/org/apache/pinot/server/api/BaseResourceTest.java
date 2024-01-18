@@ -30,7 +30,6 @@ import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -40,8 +39,6 @@ import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -50,6 +47,9 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -69,16 +69,16 @@ import static org.mockito.Mockito.when;
 
 public abstract class BaseResourceTest {
   private static final String AVRO_DATA_PATH = "data/test_data-mv.avro";
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "BaseResourceTest");
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseResourceTest");
   protected static final String TABLE_NAME = "testTable";
   protected static final String LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS =
-      new LLCSegmentName(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 1, 0, System.currentTimeMillis())
-          .getSegmentName();
+      new LLCSegmentName(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 1, 0,
+          System.currentTimeMillis()).getSegmentName();
   protected static final String LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE =
-      new LLCSegmentName(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 2, 0, System.currentTimeMillis())
-          .getSegmentName();
-  protected static final String SEGMENT_DOWNLOAD_URL = StringUtil
-      .join("/", "hdfs://root", TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS);
+      new LLCSegmentName(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME), 2, 0,
+          System.currentTimeMillis()).getSegmentName();
+  protected static final String SEGMENT_DOWNLOAD_URL =
+      StringUtil.join("/", "hdfs://root", TABLE_NAME, LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS);
 
   private final Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
   protected final List<ImmutableSegment> _realtimeIndexSegments = new ArrayList<>();
@@ -92,32 +92,34 @@ public abstract class BaseResourceTest {
   @BeforeClass
   public void setUp()
       throws Exception {
-    FileUtils.deleteQuietly(INDEX_DIR);
-    Assert.assertTrue(INDEX_DIR.mkdirs());
+    ServerMetrics.register(mock(ServerMetrics.class));
+
+    FileUtils.deleteQuietly(TEMP_DIR);
+    Assert.assertTrue(TEMP_DIR.mkdirs());
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
     Assert.assertNotNull(resourceUrl);
     _avroFile = new File(resourceUrl.getFile());
 
     // Mock the instance data manager
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
-    when(instanceDataManager.getTableDataManager(anyString()))
-        .thenAnswer(invocation -> _tableDataManagerMap.get(invocation.getArguments()[0]));
+    when(instanceDataManager.getTableDataManager(anyString())).thenAnswer(
+        invocation -> _tableDataManagerMap.get(invocation.getArguments()[0]));
     when(instanceDataManager.getAllTables()).thenReturn(_tableDataManagerMap.keySet());
 
     // Mock the server instance
     ServerInstance serverInstance = mock(ServerInstance.class);
     when(serverInstance.getServerMetrics()).thenReturn(mock(ServerMetrics.class));
     when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
-    when(serverInstance.getInstanceDataManager().getSegmentFileDirectory())
-        .thenReturn(FileUtils.getTempDirectoryPath());
+    when(serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(
+        FileUtils.getTempDirectoryPath());
     when(serverInstance.getHelixManager()).thenReturn(mock(HelixManager.class));
 
     // Mock the segment uploader
     SegmentUploader segmentUploader = mock(SegmentUploader.class);
-    when(segmentUploader.uploadSegment(any(File.class), eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS))))
-        .thenReturn(new URI(SEGMENT_DOWNLOAD_URL));
-    when(segmentUploader.uploadSegment(any(File.class), eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE))))
-        .thenReturn(null);
+    when(segmentUploader.uploadSegment(any(File.class),
+        eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_SUCCESS)))).thenReturn(new URI(SEGMENT_DOWNLOAD_URL));
+    when(segmentUploader.uploadSegment(any(File.class),
+        eq(new LLCSegmentName(LLC_SEGMENT_NAME_FOR_UPLOAD_FAILURE)))).thenReturn(null);
     when(instanceDataManager.getSegmentUploader()).thenReturn(segmentUploader);
 
     // Add the default tables and segments.
@@ -155,7 +157,7 @@ public abstract class BaseResourceTest {
     for (ImmutableSegment immutableSegment : _offlineIndexSegments) {
       immutableSegment.destroy();
     }
-    FileUtils.deleteQuietly(INDEX_DIR);
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 
   protected List<ImmutableSegment> setUpSegments(String tableNameWithType, int numSegments,
@@ -163,8 +165,8 @@ public abstract class BaseResourceTest {
       throws Exception {
     List<ImmutableSegment> immutableSegments = new ArrayList<>();
     for (int i = 0; i < numSegments; i++) {
-      immutableSegments
-          .add(setUpSegment(tableNameWithType, null, Integer.toString(_realtimeIndexSegments.size()), segments));
+      immutableSegments.add(
+          setUpSegment(tableNameWithType, null, Integer.toString(_realtimeIndexSegments.size()), segments));
     }
     return immutableSegments;
   }
@@ -172,30 +174,31 @@ public abstract class BaseResourceTest {
   protected ImmutableSegment setUpSegment(String tableNameWithType, String segmentName, String segmentNamePostfix,
       List<ImmutableSegment> segments)
       throws Exception {
+    File tableDataDir = new File(TEMP_DIR, tableNameWithType);
     SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, tableNameWithType);
+        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, tableDataDir, tableNameWithType);
     config.setSegmentName(segmentName);
     config.setSegmentNamePostfix(segmentNamePostfix);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap);
+        ImmutableSegmentLoader.load(new File(tableDataDir, driver.getSegmentName()), ReadMode.mmap);
     segments.add(immutableSegment);
     _tableDataManagerMap.get(tableNameWithType).addSegment(immutableSegment);
     return immutableSegment;
   }
 
-  @SuppressWarnings("unchecked")
   protected void addTable(String tableNameWithType) {
-    TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
-    when(tableDataManagerConfig.getTableName()).thenReturn(tableNameWithType);
-    when(tableDataManagerConfig.getDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
+    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+    TableConfig tableConfig = mock(TableConfig.class);
+    when(tableConfig.getTableName()).thenReturn(tableNameWithType);
+    when(tableConfig.getValidationConfig()).thenReturn(mock(SegmentsValidationAndRetentionConfig.class));
     // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager requires
     //       table config.
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(tableDataManagerConfig, "testInstance", mock(ZkHelixPropertyStore.class),
-        mock(ServerMetrics.class), mock(HelixManager.class), null, null, new TableDataManagerParams(0, false, -1));
+    tableDataManager.init(instanceDataManagerConfig, tableConfig, mock(HelixManager.class), null, null);
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }
