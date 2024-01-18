@@ -16,13 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.tls;
+package org.apache.pinot.common.utils;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -102,17 +101,10 @@ public class TlsUtilsTest {
             TRUSTSTORE_TYPE);
     SSLContext sslContext = SSLContext.getInstance("TLS");
     sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), secureRandom);
-    URL keyStoreUrl = TlsUtils.makeKeyOrTrustStoreUrl(DEFAULT_TEST_TLS_DIR + "/" + TLS_KEYSTORE_FILE);
-    URL trustStoreUrl =
-        TlsUtils.makeKeyOrTrustStoreUrl(DEFAULT_TEST_TLS_DIR + "/" + TLS_TRUSTSTORE_FILE);
-    InputStream keyStoreStream = keyStoreUrl.openStream();
-    InputStream trustStoreStream = trustStoreUrl.openStream();
     SSLFactory sslFactory =
-        TlsUtils.createSSLFactory(KEYSTORE_TYPE, keyStoreStream, PASSWORD,
-            TRUSTSTORE_TYPE, trustStoreStream, PASSWORD,
+        TlsUtils.createSSLFactory(KEYSTORE_TYPE, DEFAULT_TEST_TLS_DIR + "/" + TLS_KEYSTORE_FILE, PASSWORD,
+            TRUSTSTORE_TYPE, DEFAULT_TEST_TLS_DIR + "/" + TLS_TRUSTSTORE_FILE, PASSWORD,
             "TLS", secureRandom);
-    keyStoreStream.close();
-    trustStoreStream.close();
     KeyManagerFactory swappableKeyManagerFactory = sslFactory.getKeyManagerFactory().get();
     assertEquals(swappableKeyManagerFactory.getKeyManagers().length, keyManagerFactory.getKeyManagers().length);
     assertEquals(swappableKeyManagerFactory.getKeyManagers().length, 1);

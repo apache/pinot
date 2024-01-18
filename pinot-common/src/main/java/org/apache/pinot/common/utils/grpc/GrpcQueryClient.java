@@ -28,11 +28,11 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLException;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.tls.TlsResourceBundle;
-import org.apache.pinot.common.tls.TlsUtils;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,14 +55,10 @@ public class GrpcQueryClient {
               .usePlaintext().build();
     } else {
       try {
-        TlsResourceBundle tlsResourceBundle = TlsUtils.createTlsBundle(config.getTlsConfig());
+        SSLFactory sslFactory = TlsUtils.createSSLFactory(config.getTlsConfig());
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
-        if (tlsResourceBundle.getKeyManagerFactory() != null) {
-          sslContextBuilder.keyManager(tlsResourceBundle.getKeyManagerFactory());
-        }
-        if (tlsResourceBundle.getTrustManagerFactory() != null) {
-          sslContextBuilder.trustManager(tlsResourceBundle.getTrustManagerFactory());
-        }
+        sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
+        sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
         if (config.getTlsConfig().getSslProvider() != null) {
           sslContextBuilder =
               GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(config.getTlsConfig().getSslProvider()));

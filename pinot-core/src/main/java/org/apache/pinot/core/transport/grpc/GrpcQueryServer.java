@@ -31,6 +31,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.DataTable;
@@ -39,8 +40,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server.ServerRequest;
 import org.apache.pinot.common.proto.Server.ServerResponse;
-import org.apache.pinot.common.tls.TlsResourceBundle;
-import org.apache.pinot.common.tls.TlsUtils;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.streaming.StreamingResponseUtils;
 import org.apache.pinot.core.query.executor.QueryExecutor;
@@ -90,12 +90,10 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     if (tlsConfig.getKeyStorePath() == null) {
       throw new IllegalArgumentException("Must provide key store path for secured gRpc server");
     }
-    TlsResourceBundle tlsResourceBundle = TlsUtils.createTlsBundle(tlsConfig);
-    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(tlsResourceBundle.getKeyManagerFactory())
+    SSLFactory sslFactory = TlsUtils.createSSLFactory(tlsConfig);
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
         .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
-    if (tlsResourceBundle.getTrustManagerFactory() != null) {
-      sslContextBuilder.trustManager(tlsResourceBundle.getTrustManagerFactory());
-    }
+    sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
     if (tlsConfig.isClientAuthEnabled()) {
       sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
     }

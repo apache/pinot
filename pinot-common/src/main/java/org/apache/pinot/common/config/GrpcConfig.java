@@ -20,7 +20,7 @@ package org.apache.pinot.common.config;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.pinot.common.tls.TlsUtils;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
