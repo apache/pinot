@@ -27,8 +27,10 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
@@ -62,7 +64,7 @@ public class ServerSegmentMetadataReader {
   private final HttpClientConnectionManager _connectionManager;
 
   public ServerSegmentMetadataReader() {
-    _executor = Executors.newFixedThreadPool(1);
+    _executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     _connectionManager = new PoolingHttpClientConnectionManager();
   }
 
@@ -212,12 +214,14 @@ public class ServerSegmentMetadataReader {
     for (Map.Entry<String, List<String>> serverToSegments : serverToSegmentsMap.entrySet()) {
       List<String> segmentsForServer = serverToSegments.getValue();
       List<String> segmentsToQuery = new ArrayList<>();
-      for (String segment : segmentsForServer) {
-        if (segmentNames == null) {
-          // If segmentNames is null, query all segments
-          segmentsToQuery.add(segment);
-        } else if (segmentNames.contains(segment)) {
-          segmentsToQuery.add(segment);
+      if (segmentNames == null || segmentNames.isEmpty()) {
+        segmentsToQuery.addAll(segmentsForServer);
+      } else {
+        Set<String> segmentNamesLookUpTable = new HashSet<>(segmentNames);
+        for (String segment : segmentsForServer) {
+          if (segmentNamesLookUpTable.contains(segment)) {
+            segmentsToQuery.add(segment);
+          }
         }
       }
       serverURLsAndBodies.add(generateValidDocIdMetadataURL(tableNameWithType, segmentsToQuery,
@@ -258,7 +262,8 @@ public class ServerSegmentMetadataReader {
       LOGGER.error("Unable to get validDocIdMetadata from all servers. Expected: {}, Actual: {}", segmentNames.size(),
           returnedSegmentsCount);
     }
-    LOGGER.debug("Retrieved segment metadata from servers.");
+    LOGGER.info("Retrieved valid doc id metadata for {} segments from {} servers.", returnedSegmentsCount,
+        serverURLsAndBodies.size());
     return validDocIdMetadataInfos;
   }
 

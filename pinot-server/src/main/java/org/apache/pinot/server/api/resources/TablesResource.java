@@ -555,7 +555,7 @@ public class TablesResource {
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers;
-    if (segments == null || segments.isEmpty()) {
+    if (segments == null) {
       segmentDataManagers = tableDataManager.acquireAllSegments();
     } else {
       segmentDataManagers = tableDataManager.acquireSegments(segments, missingSegments);

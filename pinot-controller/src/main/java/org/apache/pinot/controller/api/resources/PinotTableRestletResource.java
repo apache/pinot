@@ -958,7 +958,9 @@ public class PinotTableRestletResource {
       + "aggregate valid doc id metadata of all segments for a table")
   public String getTableAggregateValidDocIdMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "A list of segments", allowMultiple = true) @QueryParam("segmentNames")
+      List<String> segmentNames) {
     LOGGER.info("Received a request to fetch aggregate valid doc id metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.OFFLINE) {
@@ -972,8 +974,9 @@ public class PinotTableRestletResource {
     try {
       TableMetadataReader tableMetadataReader =
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
-      JsonNode segmentsMetadataJson = tableMetadataReader.getAggregateValidDocIdMetadata(tableNameWithType,
-          _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      JsonNode segmentsMetadataJson =
+          tableMetadataReader.getAggregateValidDocIdMetadata(tableNameWithType, segmentNames,
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
       validDocIdMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);

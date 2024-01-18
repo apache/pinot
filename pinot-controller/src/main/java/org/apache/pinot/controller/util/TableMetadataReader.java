@@ -158,7 +158,7 @@ public class TableMetadataReader {
    * This method retrieves the aggregated valid doc id metadata for a given table.
    * @return a list of ValidDocIdMetadataInfo
    */
-  public JsonNode getAggregateValidDocIdMetadata(String tableNameWithType, int timeoutMs)
+  public JsonNode getAggregateValidDocIdMetadata(String tableNameWithType, List<String> segmentNames, int timeoutMs)
       throws InvalidConfigException {
     final Map<String, List<String>> serverToSegments =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
@@ -169,8 +169,7 @@ public class TableMetadataReader {
 
     List<ValidDocIdMetadataInfo> aggregateTableMetadataInfo =
         serverSegmentMetadataReader.getValidDocIdMetadataFromServer(tableNameWithType, serverToSegments, endpoints,
-            null, timeoutMs);
-
+            segmentNames, timeoutMs);
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
 }

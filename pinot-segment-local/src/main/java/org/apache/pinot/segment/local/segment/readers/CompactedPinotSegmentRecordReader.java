@@ -41,8 +41,7 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
   // Flag to mark whether we need to fetch another row
   boolean _nextRowReturned = true;
 
-  public CompactedPinotSegmentRecordReader(File indexDir, RoaringBitmap validDocIds)
-      throws Exception {
+  public CompactedPinotSegmentRecordReader(File indexDir, RoaringBitmap validDocIds) {
     _pinotSegmentRecordReader = new PinotSegmentRecordReader();
     _pinotSegmentRecordReader.init(indexDir, null, null);
     _validDocIdsIterator = validDocIds.getIntIterator();

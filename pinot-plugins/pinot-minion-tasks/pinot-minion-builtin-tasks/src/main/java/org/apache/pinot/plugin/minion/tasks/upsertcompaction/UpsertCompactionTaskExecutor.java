@@ -18,28 +18,21 @@
  */
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.utils.config.InstanceUtils;
-import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,9 +40,6 @@ import org.slf4j.LoggerFactory;
 
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
-  private static HelixManager _helixManager = MINION_CONTEXT.getHelixManager();
-  private static HelixAdmin _clusterManagementTool = _helixManager.getClusterManagmentTool();
-  private static String _clusterName = _helixManager.getClusterName();
 
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
@@ -63,7 +53,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     TableConfig tableConfig = getTableConfig(tableNameWithType);
-    RoaringBitmap validDocIds = getValidDocIds(tableNameWithType, configs);
+    RoaringBitmap validDocIds = MinionTaskUtils.getValidDocIds(tableNameWithType, segmentName, configs, MINION_CONTEXT);
 
     if (validDocIds.isEmpty()) {
       // prevents empty segment generation
@@ -117,37 +107,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
     }
     return config;
-  }
-
-  private static RoaringBitmap getValidDocIds(String tableNameWithType, Map<String, String> configs) {
-    String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
-    String server = getServer(segmentName, tableNameWithType);
-    InstanceConfig instanceConfig = _clusterManagementTool.getInstanceConfig(_clusterName, server);
-    String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
-
-    // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
-    // passing an empty list.
-    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
-    return serverSegmentMetadataReader.getValidDocIdsFromServer(tableNameWithType, segmentName, endpoint,
-        60_000);
-  }
-
-  @VisibleForTesting
-  public static String getServer(String segmentName, String tableNameWithType) {
-    ExternalView externalView = _clusterManagementTool.getResourceExternalView(_clusterName, tableNameWithType);
-    if (externalView == null) {
-      throw new IllegalStateException("External view does not exist for table: " + tableNameWithType);
-    }
-    Map<String, String> instanceStateMap = externalView.getStateMap(segmentName);
-    if (instanceStateMap == null) {
-      throw new IllegalStateException("Failed to find segment: " + segmentName);
-    }
-    for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
-      if (entry.getValue().equals(SegmentStateModel.ONLINE)) {
-        return entry.getKey();
-      }
-    }
-    throw new IllegalStateException("Failed to find ONLINE server for segment: " + segmentName);
   }
 
   @Override
