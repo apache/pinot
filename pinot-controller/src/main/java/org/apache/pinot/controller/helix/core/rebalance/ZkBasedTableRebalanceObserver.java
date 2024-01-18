@@ -275,3 +275,4 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     return rebalanceStats;
   }
 }
+
