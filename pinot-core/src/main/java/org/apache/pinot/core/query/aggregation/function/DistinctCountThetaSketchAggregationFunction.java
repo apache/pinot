@@ -993,8 +993,8 @@ public class DistinctCountThetaSketchAggregationFunction
     int numAccumulators = acc1.size();
     List<ThetaSketchAccumulator> mergedAccumulators = new ArrayList<>(numAccumulators);
     for (int i = 0; i < numAccumulators; i++) {
-      ThetaSketchAccumulator thetaSketchAccumulator1 = acc1.get(i);
-      ThetaSketchAccumulator thetaSketchAccumulator2 = acc2.get(i);
+      ThetaSketchAccumulator thetaSketchAccumulator1 = convertSketchAccumulator(acc1.get(i));
+      ThetaSketchAccumulator thetaSketchAccumulator2 = convertSketchAccumulator(acc2.get(i));
       if (thetaSketchAccumulator1.isEmpty()) {
         mergedAccumulators.add(thetaSketchAccumulator2);
         continue;
@@ -1031,6 +1031,20 @@ public class DistinctCountThetaSketchAggregationFunction
     }
 
     return Math.round(evaluatePostAggregationExpression(_postAggregationExpression, mergedSketches).getEstimate());
+  }
+
+  // This is ensures backward compatibility with servers that still return sketches directly.
+  // The AggregationDataTableReducer casts intermediate results to Objects and although the code compiles,
+  // types might still be incompatible at runtime due to type erasure.
+  // Due to performance overheads of redundant casts, this should be removed at some future point.
+  private ThetaSketchAccumulator convertSketchAccumulator(Object mergeResult) {
+    if (mergeResult instanceof Sketch) {
+      Sketch sketch = (Sketch) mergeResult;
+      ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold);
+      accumulator.apply(sketch);
+      return accumulator;
+    }
+    return (ThetaSketchAccumulator) mergeResult;
   }
 
   /**
