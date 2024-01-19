@@ -102,10 +102,13 @@ public class StarTreeLoaderUtils {
 
         @Override
         public DataSource getDataSource(String columnName) {
-          AggregationFunctionColumnPair originalColumnPair = AggregationFunctionColumnPair.fromColumnName(columnName);
-          AggregationFunctionColumnPair storedType =
-              AggregationFunctionColumnPair.resolveToStoredType(originalColumnPair);
-          return dataSourceMap.getOrDefault(storedType.toColumnName(), dataSourceMap.get(columnName));
+          DataSource result = dataSourceMap.get(columnName);
+          if (result == null) {
+            AggregationFunctionColumnPair originalColumnPair = AggregationFunctionColumnPair.fromColumnName(columnName);
+            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(originalColumnPair);
+            return dataSourceMap.get(storedType.toColumnName());
+          }
+          return result;
         }
 
         @Override
