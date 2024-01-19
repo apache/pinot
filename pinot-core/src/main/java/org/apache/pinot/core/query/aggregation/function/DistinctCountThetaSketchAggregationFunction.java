@@ -1033,7 +1033,7 @@ public class DistinctCountThetaSketchAggregationFunction
     return Math.round(evaluatePostAggregationExpression(_postAggregationExpression, mergedSketches).getEstimate());
   }
 
-  // This is ensures backward compatibility with servers that still return sketches directly.
+  // This ensures backward compatibility with servers that still return sketches directly.
   // The AggregationDataTableReducer casts intermediate results to Objects and although the code compiles,
   // types might still be incompatible at runtime due to type erasure.
   // Due to performance overheads of redundant casts, this should be removed at some future point.
