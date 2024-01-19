@@ -218,6 +218,22 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testIntArrayLiteralWithoutFrom(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT ARRAY[1,2,3] ";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    Assert.assertEquals(row.get(0).size(), 3);
+    Assert.assertEquals(row.get(0).get(0).asInt(), 1);
+    Assert.assertEquals(row.get(0).get(1).asInt(), 2);
+    Assert.assertEquals(row.get(0).get(2).asInt(), 3);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testLongArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -225,6 +241,22 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         String.format("SELECT "
             + "ARRAY[2147483648,2147483649,2147483650] "
             + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    Assert.assertEquals(row.get(0).size(), 3);
+    Assert.assertEquals(row.get(0).get(0).asLong(), 2147483648L);
+    Assert.assertEquals(row.get(0).get(1).asLong(), 2147483649L);
+    Assert.assertEquals(row.get(0).get(2).asLong(), 2147483650L);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testLongArrayLiteralWithoutFrom(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT ARRAY[2147483648,2147483649,2147483650]";
     JsonNode jsonNode = postQuery(query);
     JsonNode rows = jsonNode.get("resultTable").get("rows");
     Assert.assertEquals(rows.size(), 1);
@@ -256,6 +288,22 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testFloatArrayLiteralWithoutFrom(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT ARRAY[0.1, 0.2, 0.3]";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    Assert.assertEquals(row.get(0).size(), 3);
+    Assert.assertEquals(row.get(0).get(0).asDouble(), 0.1);
+    Assert.assertEquals(row.get(0).get(1).asDouble(), 0.2);
+    Assert.assertEquals(row.get(0).get(2).asDouble(), 0.3);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testDoubleArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -275,6 +323,22 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testDoubleArrayLiteralWithoutFrom(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT ARRAY[CAST(0.1 AS DOUBLE), CAST(0.2 AS DOUBLE), CAST(0.3 AS DOUBLE)]";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    Assert.assertEquals(row.get(0).size(), 3);
+    Assert.assertEquals(row.get(0).get(0).asDouble(), 0.1);
+    Assert.assertEquals(row.get(0).get(1).asDouble(), 0.2);
+    Assert.assertEquals(row.get(0).get(2).asDouble(), 0.3);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testStringArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
@@ -282,6 +346,22 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         String.format("SELECT "
             + "ARRAY['a', 'bb', 'ccc'] "
             + "FROM %s LIMIT 1", getTableName());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    Assert.assertEquals(row.get(0).size(), 3);
+    Assert.assertEquals(row.get(0).get(0).asText(), "a");
+    Assert.assertEquals(row.get(0).get(1).asText(), "bb");
+    Assert.assertEquals(row.get(0).get(2).asText(), "ccc");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testStringArrayLiteralWithoutFrom(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT ARRAY['a', 'bb', 'ccc']";
     JsonNode jsonNode = postQuery(query);
     JsonNode rows = jsonNode.get("resultTable").get("rows");
     Assert.assertEquals(rows.size(), 1);
@@ -352,7 +432,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
         fileWriter.append(recordCache.get((int) (i % (getCountStarResult() / 10)), () -> {
               // create avro record
               GenericData.Record record = new GenericData.Record(avroSchema);
-              record.put(BOOLEAN_COLUMN, RANDOM.nextBoolean());
+              record.put(BOOLEAN_COLUMN, finalI % 4 == 0 || finalI % 4 == 1);
               record.put(INT_COLUMN, finalI);
               record.put(LONG_COLUMN, finalI);
               record.put(FLOAT_COLUMN, finalI + RANDOM.nextFloat());

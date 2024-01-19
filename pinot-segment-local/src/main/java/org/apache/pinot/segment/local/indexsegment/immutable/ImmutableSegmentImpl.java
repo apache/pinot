@@ -128,22 +128,28 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public void persistValidDocIdsSnapshot() {
     File validDocIdsSnapshotFile = getValidDocIdsSnapshotFile();
     try {
-      if (validDocIdsSnapshotFile.exists()) {
-        if (!FileUtils.deleteQuietly(validDocIdsSnapshotFile)) {
-          LOGGER.warn("Cannot delete old valid doc ids snapshot file: {}, skipping", validDocIdsSnapshotFile);
-          return;
-        }
+      File tmpFile = new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
+          V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp");
+      if (tmpFile.exists()) {
+        LOGGER.warn("Previous snapshot was not taken cleanly. Remove tmp file: {}", tmpFile);
+        FileUtils.deleteQuietly(tmpFile);
       }
       MutableRoaringBitmap validDocIdsSnapshot = _validDocIds.getMutableRoaringBitmap();
-      try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(validDocIdsSnapshotFile))) {
+      try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(tmpFile))) {
         validDocIdsSnapshot.serialize(dataOutputStream);
       }
+      Preconditions.checkState(tmpFile.renameTo(validDocIdsSnapshotFile),
+          "Failed to rename tmp snapshot file: %s to snapshot file: %s", tmpFile, validDocIdsSnapshotFile);
       LOGGER.info("Persisted valid doc ids for segment: {} with: {} valid docs", getSegmentName(),
           validDocIdsSnapshot.getCardinality());
     } catch (Exception e) {
       LOGGER.warn("Caught exception while persisting valid doc ids to snapshot file: {}, skipping",
           validDocIdsSnapshotFile, e);
     }
+  }
+
+  public boolean hasValidDocIdsSnapshotFile() {
+    return getValidDocIdsSnapshotFile().exists();
   }
 
   public void deleteValidDocIdsSnapshot() {

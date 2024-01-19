@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.type;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -25,6 +27,7 @@ import org.apache.calcite.adapter.java.JavaTypeFactory;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.sql.SqlCollation;
 import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -37,23 +40,22 @@ import org.testng.annotations.Test;
 
 public class TypeFactoryTest {
   private static final TypeSystem TYPE_SYSTEM = new TypeSystem();
+  private static final JavaTypeFactory TYPE_FACTORY = new TestJavaTypeFactoryImpl(TYPE_SYSTEM);
 
   @DataProvider(name = "relDataTypeConversion")
   public Iterator<Object[]> relDataTypeConversion() {
     ArrayList<Object[]> cases = new ArrayList<>();
-
-    JavaTypeFactory javaTypeFactory = new JavaTypeFactoryImpl(TYPE_SYSTEM);
 
     for (FieldSpec.DataType dataType : FieldSpec.DataType.values()) {
       RelDataType basicType;
       RelDataType arrayType = null;
       switch (dataType) {
         case INT: {
-          basicType = javaTypeFactory.createSqlType(SqlTypeName.INTEGER);
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER);
           break;
         }
         case LONG: {
-          basicType = javaTypeFactory.createSqlType(SqlTypeName.BIGINT);
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.BIGINT);
           break;
         }
         // Map float and double to the same RelDataType so that queries like
@@ -68,33 +70,33 @@ public class TypeFactoryTest {
         // With float and double mapped to the same RelDataType, the behavior in multi-stage query engine will be the
         // same as the query in v1 query engine.
         case FLOAT: {
-          basicType = javaTypeFactory.createSqlType(SqlTypeName.DOUBLE);
-          arrayType = javaTypeFactory.createSqlType(SqlTypeName.REAL);
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.DOUBLE);
+          arrayType = TYPE_FACTORY.createSqlType(SqlTypeName.REAL);
           break;
         }
         case DOUBLE: {
-          basicType = javaTypeFactory.createSqlType(SqlTypeName.DOUBLE);
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.DOUBLE);
           break;
         }
         case BOOLEAN: {
-          basicType = javaTypeFactory.createSqlType(SqlTypeName.BOOLEAN);
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.BOOLEAN);
           break;
         }
         case TIMESTAMP: {
-          basicType = javaTypeFactory.createSqlType(SqlTypeName.TIMESTAMP);
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.TIMESTAMP);
           break;
         }
         case STRING:
         case JSON: {
-          basicType = javaTypeFactory.createSqlType(SqlTypeName.VARCHAR);
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.VARCHAR);
           break;
         }
         case BYTES: {
-          basicType = javaTypeFactory.createSqlType(SqlTypeName.VARBINARY);
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.VARBINARY);
           break;
         }
         case BIG_DECIMAL: {
-          basicType = javaTypeFactory.createSqlType(SqlTypeName.DECIMAL);
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.DECIMAL);
           break;
         }
         case LIST:
@@ -268,7 +270,9 @@ public class TypeFactoryTest {
           break;
         case "STRING_COL":
         case "JSON_COL":
-          Assert.assertEquals(field.getType(), new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR));
+          Assert.assertEquals(field.getType(),
+              TYPE_FACTORY.createTypeWithCharsetAndCollation(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR),
+                  StandardCharsets.UTF_8, SqlCollation.IMPLICIT));
           break;
         case "BYTES_COL":
           Assert.assertEquals(field.getType(), new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARBINARY));
@@ -290,8 +294,9 @@ public class TypeFactoryTest {
               new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.DOUBLE), false));
           break;
         case "STRING_ARRAY_COL":
-          Assert.assertEquals(field.getType(),
-              new ArraySqlType(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR), false));
+          Assert.assertEquals(field.getType(), new ArraySqlType(
+              TYPE_FACTORY.createTypeWithCharsetAndCollation(new BasicSqlType(TYPE_SYSTEM, SqlTypeName.VARCHAR),
+                  StandardCharsets.UTF_8, SqlCollation.IMPLICIT), false));
           break;
         case "BYTES_ARRAY_COL":
           Assert.assertEquals(field.getType(),
@@ -301,6 +306,17 @@ public class TypeFactoryTest {
           Assert.fail("Unexpected column name: " + field.getName());
           break;
       }
+    }
+  }
+
+  private static class TestJavaTypeFactoryImpl extends JavaTypeFactoryImpl {
+    public TestJavaTypeFactoryImpl(TypeSystem typeSystem) {
+      super(typeSystem);
+    }
+
+    @Override
+    public Charset getDefaultCharset() {
+      return StandardCharsets.UTF_8;
     }
   }
 

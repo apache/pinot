@@ -20,7 +20,6 @@ package org.apache.pinot.controller.recommender.data.writer;
 
 import java.io.File;
 import java.util.Objects;
-import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +28,7 @@ import org.slf4j.LoggerFactory;
 public abstract class FileWriter implements Writer {
   private static final Logger LOGGER = LoggerFactory.getLogger(FileWriter.class);
 
-  private FileWriterSpec _spec;
+  protected FileWriterSpec _spec;
   @Override
   public void init(WriterSpec spec) {
     _spec = (FileWriterSpec) spec;
@@ -38,19 +37,27 @@ public abstract class FileWriter implements Writer {
   @Override
   public void write()
       throws Exception {
-    final int numPerFiles = (int) (_spec.getTotalDocs() / _spec.getNumFiles());
-    final String headers = StringUtils.join(_spec.getGenerator().nextRow().keySet(), ",");
+    long totalDocs = _spec.getTotalDocs();
+    final long docsPerFile = (long) Math.ceil((double) totalDocs / _spec.getNumFiles());
     final String extension = getExtension() == null ? "" : String.format(".%s", getExtension());
-    for (int i = 0; i < _spec.getNumFiles(); i++) {
+    long ingestedDocs = 0;
+    int fileIndex = 0;
+    while (ingestedDocs < totalDocs) {
       try (java.io.FileWriter writer =
-          new java.io.FileWriter(new File(_spec.getBaseDir(), String.format("output_%d%s", i, extension)))) {
-        writer.append(headers).append('\n');
-        for (int j = 0; j < numPerFiles; j++) {
+          new java.io.FileWriter(new File(_spec.getBaseDir(), String.format("output_%d%s", fileIndex, extension)))) {
+        preprocess(writer);
+        for (int j = 0; j < docsPerFile && ingestedDocs < totalDocs; j++) {
           String appendString = generateRow(_spec.getGenerator());
           writer.append(appendString).append('\n');
+          ingestedDocs++;
         }
       }
+      fileIndex++;
     }
+  }
+
+  protected void preprocess(java.io.FileWriter writer)
+      throws Exception {
   }
 
   protected String getExtension() {

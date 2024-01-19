@@ -96,7 +96,7 @@ public class KinesisConnectionHandler {
         AwsBasicCredentials awsBasicCredentials = AwsBasicCredentials.create(_accessKey, _secretKey);
         awsCredentialsProvider = StaticCredentialsProvider.create(awsBasicCredentials);
       } else {
-        awsCredentialsProvider = DefaultCredentialsProvider.create();
+        awsCredentialsProvider = DefaultCredentialsProvider.builder().build();
       }
 
       if (_kinesisConfig.isIamRoleBasedAccess()) {

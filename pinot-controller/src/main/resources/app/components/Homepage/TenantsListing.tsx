@@ -17,11 +17,70 @@
  * under the License.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { union } from 'lodash';
 import CustomizedTables from '../Table';
+import { TableData } from 'Models';
+import Loading from '../Loading';
+import { getTenants, getTenantTable } from '../../requests';
+import PinotMethodUtils from '../../utils/PinotMethodUtils';
 
-const TenantsTable = ({tenantsData}) => {
-  
+const TenantsTable = () => {
+  const columns = ['Tenant Name', 'Server', 'Broker', 'Tables'];
+  const [tenantsData, setTenantsData] = useState<TableData>({
+    records: [columns.map((_) => Loading)],
+    columns: columns,
+  });
+
+  const fetchData = async () => {
+    getTenants().then((res) => {
+      const tenantNames = union(
+        res.data.SERVER_TENANTS,
+        res.data.BROKER_TENANTS
+      );
+      setTenantsData({
+        columns: columns,
+        records: tenantNames.map((tenantName) => {
+          return [tenantName, Loading, Loading, Loading];
+        }),
+      });
+
+      tenantNames.forEach((tenantName) => {
+        Promise.all([
+          PinotMethodUtils.getServerOfTenant(tenantName).then((res) => {
+            return res?.length || 0;
+          }),
+          PinotMethodUtils.getBrokerOfTenant(tenantName).then((res) => {
+            return Array.isArray(res) ? res?.length || 0 : 0;
+          }),
+          getTenantTable(tenantName).then((res) => {
+            return res?.data?.tables?.length || 0;
+          }),
+        ]).then((res) => {
+          const numServers = res[0];
+          const numBrokers = res[1];
+          const numTables = res[2];
+          setTenantsData((prev) => {
+            const newRecords = prev.records.map((record) => {
+              if (record[0] === tenantName) {
+                return [tenantName, numServers, numBrokers, numTables];
+              }
+              return record;
+            });
+            return {
+              columns: prev.columns,
+              records: newRecords,
+            };
+          });
+        });
+      });
+    });
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   return (
     <CustomizedTables
       title="Tenants"

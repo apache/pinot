@@ -89,11 +89,13 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("tbl-escape.naming").build(), "tbl-escape.naming_OFFLINE");
     factory1.addSegment("a_REALTIME", buildRows("a_REALTIME"));
     factory1.addSegment("a_REALTIME", buildRows("a_REALTIME"));
     factory1.addSegment("b_REALTIME", buildRows("b_REALTIME"));
     factory1.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
     factory1.addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
+    factory1.addSegment("tbl-escape.naming_OFFLINE", buildRows("tbl-escape.naming_OFFLINE"));
 
     MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2");
     factory2.registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME");
@@ -245,22 +247,18 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{"SET multiStageLeafLimit = 1; SELECT * FROM a", 2},
 
         // test groups limit in both leaf and intermediate stage
-        new Object[]{"SET numGroupsLimit = 1; SELECT col1, COUNT(*) FROM a GROUP BY col1", 1}, new Object[]{"SET "
-        + "numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2}, new Object[]{
-        "SET numGroupsLimit = 1; "
-            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1
-    }, new Object[]{
-        "SET numGroupsLimit = 2; "
-            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2
-    },
+        new Object[]{"SET numGroupsLimit = 1; SELECT col1, COUNT(*) FROM a GROUP BY col1", 1},
+        new Object[]{"SET " + "numGroupsLimit = 2; SELECT col1, COUNT(*) FROM a GROUP BY col1", 2},
+        new Object[]{"SET numGroupsLimit = 1; "
+            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1},
+        new Object[]{"SET numGroupsLimit = 2; "
+            + "SELECT a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 2},
         // TODO: Consider pushing down hint to the leaf stage
-        new Object[]{
-            "SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
-                + "col1, COUNT(*) FROM a GROUP BY col1", 2
-        }, new Object[]{
-        "SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
-            + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1
-    }
+        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+            + "col1, COUNT(*) FROM a GROUP BY col1", 2},
+        new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
+            + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1},
+        new Object[]{"SELECT * FROM \"tbl-escape.naming\"", 5}
     };
   }
 
@@ -304,9 +302,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         //    - checked "Illegal Json Path" as col1 is not actually a json string, but the call is correctly triggered.
         new Object[]{"SELECT CAST(jsonExtractScalar(col1, 'path', 'INT') AS INT) FROM a", "Illegal Json Path"},
         //    - checked function cannot be found b/c there's no intermediate stage impl for json_extract_scalar
-        // TODO: re-enable this test once we have implemented constructor time error pipe back.
-        // new Object[]{"SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT)"
-        //     + "FROM a JOIN b ON a.col1 = b.col1", "Cannot find function with Name: json_extract_scalar"},
+        new Object[]{"SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT)"
+            + "FROM a JOIN b ON a.col1 = b.col1", "Cannot find function with name: JSON_EXTRACT_SCALAR"},
     };
   }
 }

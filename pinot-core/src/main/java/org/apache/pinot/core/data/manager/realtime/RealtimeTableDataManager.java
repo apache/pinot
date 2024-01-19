@@ -115,6 +115,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
+  private static final SegmentLocks SEGMENT_UPSERT_LOCKS = SegmentLocks.create();
 
   // TODO: Change it to BooleanSupplier
   private final Supplier<Boolean> _isServerReadyToServeQueries;
@@ -206,7 +207,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
       // NOTE: Set _tableUpsertMetadataManager before initializing it because when preloading is enabled, we need to
       //       load segments into it
-      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig);
+      _tableUpsertMetadataManager =
+          TableUpsertMetadataManagerFactory.create(tableConfig, _instanceDataManagerConfig.getUpsertConfig());
       _tableUpsertMetadataManager.init(tableConfig, schema, this, _helixManager, _segmentPreloadExecutor);
     }
 
@@ -326,7 +328,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public String getConsumerDir() {
-    String consumerDirPath = _tableDataManagerConfig.getConsumerDir();
+    String consumerDirPath = _instanceDataManagerConfig.getConsumerDir();
     File consumerDir;
     // If a consumer directory has been configured, use it to create a per-table path under the consumer dir.
     // Otherwise, create a sub-dir under the table-specific data director and use it for consumer mmaps
@@ -389,7 +391,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     // Assign table directory and tier info to not let the segment be moved during loading/preprocessing
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
+    indexLoadingConfig.setInstanceTierConfigs(_instanceDataManagerConfig.getTierConfigs());
     indexLoadingConfig.setSegmentTier(segmentZKMetadata.getTier());
 
     File segmentDir = new File(_indexDir, segmentName);
@@ -531,17 +533,25 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // validDocId bitmap. Otherwise, the query can return wrong results, if accessing the premature segment.
     if (_tableUpsertMetadataManager.isPreloading()) {
       // Preloading segment happens when creating table manager when server restarts, and segment is ensured to be
-      // preloaded by a single thread, so no need for segmentLock.
+      // preloaded by a single thread, so no need to take a lock.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
       registerSegment(segmentName, newSegmentManager);
       _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
       return;
     }
-    // Replacing segment may happen in two threads, i.e. the consuming thread that's committing the mutable segment
-    // and a HelixTaskExecutor thread that's bringing segment from ONLINE to CONSUMING when the server finds
-    // consuming thread can't commit the segment in time. Adding segment should be done by a single HelixTaskExecutor
-    // thread but do it with segmentLock as well for simplicity.
-    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    // Replacing segment takes multiple steps, and particularly need to access the oldSegment. Replace segment may
+    // happen in two threads, i.e. the consuming thread that's committing the mutable segment and a HelixTaskExecutor
+    // thread that's bringing segment from ONLINE to CONSUMING when the server finds consuming thread can't commit
+    // the segment in time. The slower thread takes the reference of the oldSegment here, but it may get closed by
+    // the faster thread if not synchronized. In particular, the slower thread may iterate the primary keys in the
+    // oldSegment, causing seg fault. So we have to take a lock here.
+    // However, we can't just reuse the existing segmentLocks. Because many methods of partitionUpsertMetadataManager
+    // takes this lock internally, but after taking snapshot RW lock. If we take segmentLock here (before taking
+    // snapshot RW lock), we can get into deadlock with threads calling partitionUpsertMetadataManager's other
+    // methods, like removeSegment.
+    // Adding segment should be done by a single HelixTaskExecutor thread, but do it with lock here for simplicity
+    // otherwise, we'd need to double-check if oldSegmentManager is null.
+    Lock segmentLock = SEGMENT_UPSERT_LOCKS.getLock(_tableNameWithType, segmentName);
     segmentLock.lock();
     try {
       SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
@@ -686,6 +696,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public String getServerInstance() {
     return _instanceId;
+  }
+
+  @VisibleForTesting
+  public TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return _tableUpsertMetadataManager;
   }
 
   /**
