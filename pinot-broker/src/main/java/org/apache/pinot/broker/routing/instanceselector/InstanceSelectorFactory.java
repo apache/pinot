@@ -51,17 +51,18 @@ public class InstanceSelectorFactory {
 
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
-      @Nullable AdaptiveServerSelector adaptiveServerSelector, PinotConfiguration config) {
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, PinotConfiguration brokerConfig) {
     return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, adaptiveServerSelector, Clock.systemUTC(),
-        config);
+        brokerConfig);
   }
 
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
       ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics,
-      @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock, PinotConfiguration config) {
+      @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock, PinotConfiguration brokerConfig) {
     String tableNameWithType = tableConfig.getTableName();
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
-    boolean useStickyRouting = config.getProperty(CommonConstants.Broker.CONFIG_OF_USE_STICKY_ROUTING, false);
+    boolean useConsistentRouting = brokerConfig.getProperty(CommonConstants.Broker.CONFIG_OF_USE_CONSISTENT_ROUTING,
+        CommonConstants.Broker.DEFAULT_USE_CONSISTENT_ROUTING);
     if (routingConfig != null) {
       if (RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(routingConfig.getInstanceSelectorType())
           || (tableConfig.getTableType() == TableType.OFFLINE && LEGACY_REPLICA_GROUP_OFFLINE_ROUTING.equalsIgnoreCase(
@@ -69,22 +70,22 @@ public class InstanceSelectorFactory {
           && LEGACY_REPLICA_GROUP_REALTIME_ROUTING.equalsIgnoreCase(routingConfig.getRoutingTableBuilderName()))) {
         LOGGER.info("Using ReplicaGroupInstanceSelector for table: {}", tableNameWithType);
         return new ReplicaGroupInstanceSelector(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector,
-            clock, useStickyRouting);
+            clock, useConsistentRouting);
       }
       if (RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(
           routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using StrictReplicaGroupInstanceSelector for table: {}", tableNameWithType);
         return new StrictReplicaGroupInstanceSelector(tableNameWithType, propertyStore, brokerMetrics,
-            adaptiveServerSelector, clock, useStickyRouting);
+            adaptiveServerSelector, clock, useConsistentRouting);
       }
       if (RoutingConfig.MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE.equalsIgnoreCase(
           routingConfig.getInstanceSelectorType())) {
         LOGGER.info("Using {} for table: {}", routingConfig.getInstanceSelectorType(), tableNameWithType);
         return new MultiStageReplicaGroupSelector(tableNameWithType, propertyStore, brokerMetrics,
-            adaptiveServerSelector, clock, useStickyRouting);
+            adaptiveServerSelector, clock, useConsistentRouting);
       }
     }
     return new BalancedInstanceSelector(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock,
-        useStickyRouting);
+        useConsistentRouting);
   }
 }

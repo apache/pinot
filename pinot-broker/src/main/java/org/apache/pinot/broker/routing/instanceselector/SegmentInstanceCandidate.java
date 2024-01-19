@@ -25,7 +25,7 @@ import javax.annotation.concurrent.Immutable;
  * Represents an instance candidate for a segment.
  */
 @Immutable
-public class SegmentInstanceCandidate implements Comparable<SegmentInstanceCandidate> {
+public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
 
@@ -40,10 +40,5 @@ public class SegmentInstanceCandidate implements Comparable<SegmentInstanceCandi
 
   public boolean isOnline() {
     return _online;
-  }
-
-  @Override
-  public int compareTo(SegmentInstanceCandidate o) {
-    return _instance.compareTo(o._instance);
   }
 }

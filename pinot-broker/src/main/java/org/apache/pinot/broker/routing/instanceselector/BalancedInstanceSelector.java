@@ -30,8 +30,6 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-
 
 /**
  * Instance selector to balance the number of segments served by each selected server instance.
@@ -92,9 +90,9 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
           continue;
         }
         int selectedIdx;
-        if (_useStickyRouting || QueryOptionsUtils.isUseStickyRouting(queryOptions)) {
+        if (isUseConsistentRouting(queryOptions)) {
           // candidates array is always sorted
-          selectedIdx = Math.abs(_tableNameWithType.hashCode() % candidates.size());
+          selectedIdx = Math.abs(_tableNameHashForConsistentRouting % candidates.size());
         } else {
           selectedIdx = requestId++ % candidates.size();
         }

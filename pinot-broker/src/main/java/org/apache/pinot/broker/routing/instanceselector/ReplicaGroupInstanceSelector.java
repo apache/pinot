@@ -110,9 +110,9 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       int numCandidates = candidates.size();
       int instanceIdx;
 
-      if (_useStickyRouting || QueryOptionsUtils.isUseStickyRouting(queryOptions)) {
+      if (isUseConsistentRouting(queryOptions)) {
         // candidates array is always sorted
-        instanceIdx = Math.abs(_tableNameWithType.hashCode() % numCandidates);
+        instanceIdx = Math.abs(_tableNameHashForConsistentRouting % numCandidates);
       } else {
         instanceIdx = (requestId + replicaOffset) % numCandidates;
       }

@@ -45,7 +45,9 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,7 +89,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final BrokerMetrics _brokerMetrics;
   final AdaptiveServerSelector _adaptiveServerSelector;
   final Clock _clock;
-  final boolean _useStickyRouting;
+  final Boolean _useConsistentRouting;
+  final int _tableNameHashForConsistentRouting;
 
   // These 3 variables are the cached states to help accelerate the change processing
   Set<String> _enabledInstances;
@@ -101,16 +104,20 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      boolean useStickyRouting) {
+      boolean useConsistentRouting) {
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
     _clock = clock;
-    _useStickyRouting = useStickyRouting;
+    _useConsistentRouting = useConsistentRouting;
+    // Using raw table name to ensure queries spanning across REALTIME and OFFLINE tables are routed to the same
+    // instance
+    _tableNameHashForConsistentRouting = TableNameBuilder.extractRawTableName(tableNameWithType).hashCode();
 
-    if (_adaptiveServerSelector != null && _useStickyRouting) {
-      throw new IllegalArgumentException("AdaptiveServerSelector and stickyRouting cannot be enabled at the same time");
+    if (_adaptiveServerSelector != null && _useConsistentRouting) {
+      throw new IllegalArgumentException(
+          "AdaptiveServerSelector and consistent routing cannot be enabled at the same time");
     }
   }
 
@@ -434,6 +441,12 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       }
       return new SelectionResult(segmentToInstanceMap, unavailableSegmentsForRequest, 0);
     }
+  }
+
+  protected boolean isUseConsistentRouting(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(
+        queryOptions.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.USE_CONSISTENT_ROUTING,
+            _useConsistentRouting.toString()));
   }
 
   @Override
