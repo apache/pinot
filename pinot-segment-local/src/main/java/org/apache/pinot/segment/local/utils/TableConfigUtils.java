@@ -1053,11 +1053,10 @@ public final class TableConfigUtils {
             }
             AggregationFunctionColumnPair aggregatedType =
                 AggregationFunctionColumnPair.resolveToStoredType(columnPair);
-            if (aggregatedTypes.contains(aggregatedType)) {
+            if (!aggregatedTypes.add(aggregatedType)) {
               LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
                   columnPair, aggregatedType);
             }
-            aggregatedTypes.add(aggregatedType);
             String columnName = columnPair.getColumn();
             if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
               columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
