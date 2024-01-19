@@ -111,8 +111,8 @@ public class DimensionTableDataManagerTest {
         .setPrimaryKeyColumns(Collections.singletonList("teamID")).build();
   }
 
-  private TableConfig getTableConfig(boolean disablePreload) {
-    DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload);
+  private TableConfig getTableConfig(boolean disablePreload, boolean allowDuplicatePrimaryKey) {
+    DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload, allowDuplicatePrimaryKey);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("dimBaseballTeams")
         .setDimensionTableConfig(dimensionTableConfig).build();
   }
@@ -127,7 +127,7 @@ public class DimensionTableDataManagerTest {
   private DimensionTableDataManager makeTableDataManager(HelixManager helixManager) {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
-    TableConfig tableConfig = getTableConfig(false);
+    TableConfig tableConfig = getTableConfig(false, true);
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
     tableDataManager.init(instanceDataManagerConfig, tableConfig, helixManager, null, null);
@@ -258,7 +258,52 @@ public class DimensionTableDataManagerTest {
     when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
         SchemaUtils.toZNRecord(getSchema()));
     when(propertyStore.get("/CONFIGS/TABLE/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
-        TableConfigUtils.toZNRecord(getTableConfig(true)));
+        TableConfigUtils.toZNRecord(getTableConfig(true, true)));
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
+
+    // try fetching data BEFORE loading segment
+    GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
+    assertNull(resp, "Response should be null if no segment is loaded");
+
+    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+
+    // Confirm table is loaded and available for lookup
+    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
+    assertNotNull(resp, "Should return response after segment load");
+    assertEquals(resp.getFieldToValueMap().size(), 2);
+    assertEquals(resp.getValue("teamID"), "SF");
+    assertEquals(resp.getValue("teamName"), "San Francisco Giants");
+
+    // Confirm we can get FieldSpec for loaded tables columns.
+    FieldSpec spec = tableDataManager.getColumnFieldSpec("teamName");
+    assertNotNull(spec, "Should return spec for existing column");
+    assertEquals(spec.getDataType(), DataType.STRING, "Should return correct data type for teamName column");
+
+    // Confirm we can read primary column list
+    List<String> pkColumns = tableDataManager.getPrimaryKeyColumns();
+    assertEquals(pkColumns, Collections.singletonList("teamID"), "Should return PK column list");
+
+    // Remove the segment
+    List<SegmentDataManager> segmentManagers = tableDataManager.acquireAllSegments();
+    assertEquals(segmentManagers.size(), 1, "Should have exactly one segment manager");
+    SegmentDataManager segMgr = segmentManagers.get(0);
+    String segmentName = segMgr.getSegmentName();
+    tableDataManager.removeSegment(segmentName);
+    // confirm table is cleaned up
+    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
+    assertNull(resp, "Response should be null if no segment is loaded");
+  }
+
+  @Test
+  public void testLookupDisallowDuplicatePrimaryKey()
+      throws Exception {
+    HelixManager helixManager = mock(HelixManager.class);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
+        SchemaUtils.toZNRecord(getSchema()));
+    when(propertyStore.get("/CONFIGS/TABLE/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
+        TableConfigUtils.toZNRecord(getTableConfig(false, false)));
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
 
