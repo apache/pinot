@@ -88,7 +88,6 @@ rules:
   labels:
     table: "$1"
     taskType: "$2"
-
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ControllerMetrics\", name=\"pinot.controller.([^\\.]*?)\\.(\\w+).cronSchedulerJobTriggered\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerJobTriggered_$3"
   cache: true
