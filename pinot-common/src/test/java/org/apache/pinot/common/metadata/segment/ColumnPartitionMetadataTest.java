@@ -21,7 +21,8 @@ package org.apache.pinot.common.metadata.segment;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -65,6 +66,7 @@ public class ColumnPartitionMetadataTest {
   @Test
   public void testLegacyPartitionRangesConfig() {
     PropertiesConfiguration config = new PropertiesConfiguration();
+    config.setListDelimiterHandler(new LegacyListDelimiterHandler(','));
     config.setProperty("partitionRanges", LEGACY_PARTITION_RANGES_STRING);
     Set<Integer> actual = ColumnPartitionMetadata.extractPartitions(config.getList("partitionRanges"));
     assertEquals(actual, PARTITIONS);

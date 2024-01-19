@@ -289,6 +289,26 @@ public class CalciteSqlParser {
       for (Expression filter : filterExpression.getFunctionCall().getOperands()) {
         validateFilter(filter);
       }
+    } else if (operator.equals(FilterKind.VECTOR_SIMILARITY.name())) {
+      Expression vectorIdentifier = filterExpression.getFunctionCall().getOperands().get(0);
+      if (!vectorIdentifier.isSetIdentifier()) {
+        throw new IllegalStateException("The first argument of VECTOR_SIMILARITY must be an identifier of float array, "
+            + "the signature is VECTOR_SIMILARITY(float[], float[], int).");
+      }
+      Expression vectorLiteral = filterExpression.getFunctionCall().getOperands().get(1);
+      // Array Literal is a function of type 'ARRAYVALUECONSTRUCTOR' with operands of Float/Double Literals
+      if (!vectorLiteral.isSetFunctionCall() || !vectorLiteral.getFunctionCall().getOperator().equalsIgnoreCase(
+          "arrayvalueconstructor")) {
+        throw new IllegalStateException("The second argument of VECTOR_SIMILARITY must be a float array literal, "
+            + "the signature is VECTOR_SIMILARITY(float[], float[], int).");
+      }
+      if (filterExpression.getFunctionCall().getOperands().size() == 3) {
+        Expression topK = filterExpression.getFunctionCall().getOperands().get(2);
+        if (!topK.isSetLiteral()) {
+          throw new IllegalStateException("The third argument of VECTOR_SIMILARITY must be an integer literal, "
+              + "the signature is VECTOR_SIMILARITY(float[], float[], int).");
+        }
+      }
     } else {
       List<Expression> operands = filterExpression.getFunctionCall().getOperands();
       for (int i = 1; i < operands.size(); i++) {

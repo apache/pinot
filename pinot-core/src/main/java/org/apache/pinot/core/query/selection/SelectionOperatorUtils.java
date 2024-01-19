@@ -354,6 +354,8 @@ public class SelectionOperatorUtils {
 
   /**
    * Build a {@link DataTable} from a {@link Collection} of selection rows with {@link DataSchema}. (Server side)
+   *
+   * This method is allowed to modify the given rows. Specifically, it may remove nulls cells from it.
    */
   public static DataTable getDataTableFromRows(Collection<Object[]> rows, DataSchema dataSchema,
       boolean nullHandlingEnabled)

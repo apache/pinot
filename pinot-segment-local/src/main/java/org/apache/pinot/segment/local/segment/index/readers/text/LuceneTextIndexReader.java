@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
@@ -63,7 +64,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final IndexSearcher _indexSearcher;
   private final String _column;
   private final DocIdTranslator _docIdTranslator;
-  private final StandardAnalyzer _standardAnalyzer;
+  private final Analyzer _analyzer;
   private boolean _useANDForMultiTermQueries = false;
 
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
@@ -84,8 +85,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
-      _standardAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(config.getStopWordsInclude(),
-          config.getStopWordsExclude());
+      String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
+      _analyzer = luceneAnalyzerClass.equals(StandardAnalyzer.class.getName())
+          ? TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(config.getStopWordsInclude(),
+          config.getStopWordsExclude()) : TextIndexUtils.getAnalyzerFromClassName(luceneAnalyzerClass);
       LOGGER.info("Successfully read lucene index for {} from {}", _column, indexDir);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
@@ -146,7 +149,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // Lucene Query Parser is JavaCC based. It is stateful and should
       // be instantiated per query. Analyzer on the other hand is stateless
       // and can be created upfront.
-      QueryParser parser = new QueryParser(_column, _standardAnalyzer);
+      QueryParser parser = new QueryParser(_column, _analyzer);
       if (_useANDForMultiTermQueries) {
         parser.setDefaultOperator(QueryParser.Operator.AND);
       }

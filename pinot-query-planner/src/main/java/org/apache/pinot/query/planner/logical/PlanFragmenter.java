@@ -26,7 +26,6 @@ import java.util.List;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
-import org.apache.pinot.query.planner.PlanFragmentMetadata;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -159,10 +158,11 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
         distributionType == RelDistribution.Type.HASH_DISTRIBUTED ? node.getDistributionKeys() : null;
     MailboxSendNode mailboxSendNode =
         new MailboxSendNode(senderPlanFragmentId, nextPlanFragmentRoot.getDataSchema(), receiverPlanFragmentId,
-            distributionType, exchangeType, distributionKeys, node.getCollations(), node.isSortOnSender());
+            distributionType, exchangeType, distributionKeys, node.getCollations(), node.isSortOnSender(),
+            node.isPrePartitioned());
     mailboxSendNode.addInput(nextPlanFragmentRoot);
     _planFragmentMap.put(senderPlanFragmentId,
-        new PlanFragment(senderPlanFragmentId, mailboxSendNode, new PlanFragmentMetadata(), new ArrayList<>()));
+        new PlanFragment(senderPlanFragmentId, mailboxSendNode, new ArrayList<>()));
 
     // Return the MailboxReceiveNode as the leave node of the current PlanFragment.
     return new MailboxReceiveNode(receiverPlanFragmentId, nextPlanFragmentRoot.getDataSchema(), senderPlanFragmentId,

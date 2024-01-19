@@ -32,6 +32,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
+import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
@@ -44,6 +45,7 @@ import org.apache.pinot.core.operator.filter.JsonMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
 import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
+import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
@@ -56,12 +58,12 @@ import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class FilterPlanNode implements PlanNode {
-
   private final IndexSegment _indexSegment;
   private final QueryContext _queryContext;
   private final FilterContext _filter;
@@ -76,7 +78,7 @@ public class FilterPlanNode implements PlanNode {
   public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext, @Nullable FilterContext filter) {
     _indexSegment = indexSegment;
     _queryContext = queryContext;
-    _filter = filter;
+    _filter = filter != null ? filter : _queryContext.getFilter();
   }
 
   @Override
@@ -96,9 +98,8 @@ public class FilterPlanNode implements PlanNode {
     }
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
 
-    FilterContext filter = _filter != null ? _filter : _queryContext.getFilter();
-    if (filter != null) {
-      BaseFilterOperator filterOperator = constructPhysicalOperator(filter, numDocs);
+    if (_filter != null) {
+      BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
       if (queryableDocIdSnapshot != null) {
         BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
@@ -291,6 +292,11 @@ public class FilterPlanNode implements PlanNode {
               Preconditions.checkState(jsonIndex != null, "Cannot apply JSON_MATCH on column: %s without json index",
                   column);
               return new JsonMatchFilterOperator(jsonIndex, (JsonMatchPredicate) predicate, numDocs);
+            case VECTOR_SIMILARITY:
+              VectorIndexReader vectorIndex = dataSource.getVectorIndex();
+              Preconditions.checkState(vectorIndex != null,
+                  "Cannot apply VECTOR_SIMILARITY on column: %s without vector index", column);
+              return new VectorSimilarityFilterOperator(vectorIndex, (VectorSimilarityPredicate) predicate, numDocs);
             case IS_NULL:
               NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
               if (nullValueVector != null) {
@@ -312,6 +318,8 @@ public class FilterPlanNode implements PlanNode {
               return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
           }
         }
+      case CONSTANT:
+        return filter.isConstantTrue() ? new MatchAllFilterOperator(numDocs) : EmptyFilterOperator.getInstance();
       default:
         throw new IllegalStateException();
     }

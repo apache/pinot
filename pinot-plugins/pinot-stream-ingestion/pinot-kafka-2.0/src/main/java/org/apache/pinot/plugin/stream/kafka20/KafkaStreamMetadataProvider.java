@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.stream.kafka20;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
@@ -26,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
@@ -65,6 +67,23 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
         return partitionInfos.size();
       }
       throw new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic));
+    } catch (TimeoutException e) {
+      throw new TransientConsumerException(e);
+    }
+  }
+
+  @Override
+  public Set<Integer> fetchPartitionIds(long timeoutMillis) {
+    try {
+      List<PartitionInfo> partitionInfos = _consumer.partitionsFor(_topic, Duration.ofMillis(timeoutMillis));
+      if (CollectionUtils.isEmpty(partitionInfos)) {
+        throw new RuntimeException(String.format("Failed to fetch partition information for topic: %s", _topic));
+      }
+      Set<Integer> partitionIds = Sets.newHashSetWithExpectedSize(partitionInfos.size());
+      for (PartitionInfo partitionInfo : partitionInfos) {
+        partitionIds.add(partitionInfo.partition());
+      }
+      return partitionIds;
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }

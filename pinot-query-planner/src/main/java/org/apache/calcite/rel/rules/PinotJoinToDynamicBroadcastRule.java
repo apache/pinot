@@ -142,9 +142,13 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     RelNode right = join.getRight() instanceof HepRelVertex ? ((HepRelVertex) join.getRight()).getCurrentRel()
         : join.getRight();
     return left instanceof Exchange && right instanceof Exchange
-        && PinotRuleUtils.noExchangeInSubtree(left.getInput(0))
+        // left side can be pushed as dynamic exchange
+        && PinotRuleUtils.canPushDynamicBroadcastToLeaf(left.getInput(0))
         // default enable dynamic broadcast for SEMI join unless other join strategy were specified
-        && (!explicitOtherStrategy && join.getJoinType() == JoinRelType.SEMI && joinInfo.nonEquiConditions.isEmpty());
+        && !explicitOtherStrategy
+        // condition for SEMI join
+        && join.getJoinType() == JoinRelType.SEMI && joinInfo.nonEquiConditions.isEmpty()
+        && joinInfo.leftKeys.size() == 1;
   }
 
   @Override
@@ -155,16 +159,20 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     PinotLogicalExchange right = (PinotLogicalExchange) (join.getRight() instanceof HepRelVertex
         ? ((HepRelVertex) join.getRight()).getCurrentRel() : join.getRight());
 
-    PinotLogicalExchange dynamicBroadcastExchange =
-        PinotLogicalExchange.create(right.getInput(), RelDistributions.BROADCAST_DISTRIBUTED,
+    // when colocated join hint is given, dynamic broadcast exchange can be hash-distributed b/c
+    //    1. currently, dynamic broadcast only works against main table off leaf-stage; (e.g. receive node on leaf)
+    //    2. when hash key are the same but hash functions are different, it can be done via normal hash shuffle.
+    boolean isColocatedJoin = PinotHintStrategyTable.isHintOptionTrue(join.getHints(),
+        PinotHintOptions.JOIN_HINT_OPTIONS, PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
+    PinotLogicalExchange dynamicBroadcastExchange = isColocatedJoin
+        ? PinotLogicalExchange.create(right.getInput(), RelDistributions.hash(join.analyzeCondition().rightKeys),
+        PinotRelExchangeType.PIPELINE_BREAKER)
+        : PinotLogicalExchange.create(right.getInput(), RelDistributions.BROADCAST_DISTRIBUTED,
             PinotRelExchangeType.PIPELINE_BREAKER);
     Join dynamicFilterJoin =
         new LogicalJoin(join.getCluster(), join.getTraitSet(), left.getInput(), dynamicBroadcastExchange,
             join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
             ImmutableList.copyOf(join.getSystemFieldList()));
-    // adding pass-through exchange after join b/c currently leaf-stage doesn't support chaining operator(s) after JOIN
-    PinotLogicalExchange passThroughAfterJoinExchange =
-        PinotLogicalExchange.create(dynamicFilterJoin, RelDistributions.hash(join.analyzeCondition().leftKeys));
-    call.transformTo(passThroughAfterJoinExchange);
+    call.transformTo(dynamicFilterJoin);
   }
 }

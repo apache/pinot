@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.data;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -403,5 +405,48 @@ public class FieldSpecTest {
     }
     jsonString.append('}');
     return jsonString.toString();
+  }
+
+  @DataProvider(name = "nullableCases")
+  public static Object[][] nullableCases() {
+    return new Object[][] {
+        //            declared notNull, returned notNull
+        new Object[] {null},
+        new Object[] {false},
+        new Object[] {true}
+    };
+  }
+
+  @Test(dataProvider = "nullableCases")
+  void testNullability(Boolean declared)
+      throws IOException {
+    boolean expected = declared == Boolean.TRUE;
+    String json;
+    if (declared == null) {
+      json = "{\"name\": \"col1\", \"dataType\":\"BOOLEAN\"}";
+    } else {
+      json = "{\"name\": \"col1\", \"dataType\":\"BOOLEAN\", \"notNull\": " + declared + "}";
+    }
+    DimensionFieldSpec fieldSpec = JsonUtils.stringToObject(json, DimensionFieldSpec.class);
+
+    Assert.assertEquals(fieldSpec.isNotNull(), expected, "Unexpected notNull read when declared as " + declared);
+    Assert.assertEquals(fieldSpec.isNullable(), !expected, "Unexpected nullable read when declared as " + declared);
+  }
+
+  @Test(dataProvider = "nullableCases")
+  void testNullabilityIdempotency(Boolean declared)
+      throws JsonProcessingException {
+    String json;
+    if (declared == null) {
+      json = "{\"name\": \"col1\", \"dataType\":\"BOOLEAN\"}";
+    } else {
+      json = "{\"name\": \"col1\", \"dataType\":\"BOOLEAN\", \"notNull\": " + declared + "}";
+    }
+    DimensionFieldSpec fieldSpec = JsonUtils.stringToObject(json, DimensionFieldSpec.class);
+
+    String serialized = JsonUtils.objectToString(fieldSpec);
+    DimensionFieldSpec deserialized = JsonUtils.stringToObject(serialized, DimensionFieldSpec.class);
+
+    Assert.assertEquals(deserialized, fieldSpec, "Changes detected while checking serialize/deserialize idempotency");
   }
 }

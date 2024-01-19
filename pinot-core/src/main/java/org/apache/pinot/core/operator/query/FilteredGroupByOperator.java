@@ -36,11 +36,13 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils.AggregationInfo;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.trace.Tracing;
 
@@ -56,7 +58,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private final QueryContext _queryContext;
   private final AggregationFunction[] _aggregationFunctions;
   private final ExpressionContext[] _groupByExpressions;
-  private final List<Pair<AggregationFunction[], BaseProjectOperator<?>>> _projectOperators;
+  private final List<AggregationInfo> _aggregationInfos;
   private final long _numTotalDocs;
   private final DataSchema _dataSchema;
 
@@ -64,14 +66,13 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
 
-  public FilteredGroupByOperator(QueryContext queryContext,
-      List<Pair<AggregationFunction[], BaseProjectOperator<?>>> projectOperators, long numTotalDocs) {
+  public FilteredGroupByOperator(QueryContext queryContext, List<AggregationInfo> aggregationInfos, long numTotalDocs) {
     assert queryContext.getAggregationFunctions() != null && queryContext.getFilteredAggregationFunctions() != null
         && queryContext.getGroupByExpressions() != null;
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _groupByExpressions = queryContext.getGroupByExpressions().toArray(new ExpressionContext[0]);
-    _projectOperators = projectOperators;
+    _aggregationInfos = aggregationInfos;
     _numTotalDocs = numTotalDocs;
 
     // NOTE: The indexedTable expects that the data schema will have group by columns before aggregation columns
@@ -82,7 +83,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numColumns];
 
     // Extract column names and data types for group-by columns
-    BaseProjectOperator<?> projectOperator = projectOperators.get(0).getRight();
+    BaseProjectOperator<?> projectOperator = aggregationInfos.get(0).getProjectOperator();
     for (int i = 0; i < numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = _groupByExpressions[i];
       columnNames[i] = groupByExpression.toString();
@@ -105,9 +106,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   @Override
   protected GroupByResultsBlock getNextBlock() {
-    // TODO(egalpin): Support Startree query resolution when possible, even with FILTER expressions
     int numAggregations = _aggregationFunctions.length;
-
     GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[numAggregations];
     IdentityHashMap<AggregationFunction, Integer> resultHolderIndexMap =
         new IdentityHashMap<>(_aggregationFunctions.length);
@@ -116,9 +115,9 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     GroupKeyGenerator groupKeyGenerator = null;
-    for (Pair<AggregationFunction[], BaseProjectOperator<?>> pair : _projectOperators) {
-      AggregationFunction[] aggregationFunctions = pair.getLeft();
-      BaseProjectOperator<?> projectOperator = pair.getRight();
+    for (AggregationInfo aggregationInfo : _aggregationInfos) {
+      AggregationFunction[] aggregationFunctions = aggregationInfo.getFunctions();
+      BaseProjectOperator<?> projectOperator = aggregationInfo.getProjectOperator();
 
       // Perform aggregation group-by on all the blocks
       DefaultGroupByExecutor groupByExecutor;
@@ -130,13 +129,24 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         // the GroupByExecutor to have sole ownership of the GroupKeyGenerator. Therefore, we allow constructing a
         // GroupByExecutor with a pre-existing GroupKeyGenerator so that the GroupKeyGenerator can be shared across
         // loop iterations i.e. across all aggs.
-        groupByExecutor =
-            new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
+        if (aggregationInfo.isUseStarTree()) {
+          groupByExecutor =
+              new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
+        } else {
+          groupByExecutor =
+              new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
+        }
         groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
       } else {
-        groupByExecutor =
-            new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                groupKeyGenerator);
+        if (aggregationInfo.isUseStarTree()) {
+          groupByExecutor =
+              new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+                  groupKeyGenerator);
+        } else {
+          groupByExecutor =
+              new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+                  groupKeyGenerator);
+        }
       }
 
       int numDocsScanned = 0;
@@ -191,7 +201,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   @Override
   public List<Operator> getChildOperators() {
-    return _projectOperators.stream().map(Pair::getRight).collect(Collectors.toList());
+    return _aggregationInfos.stream().map(AggregationInfo::getProjectOperator).collect(Collectors.toList());
   }
 
   @Override

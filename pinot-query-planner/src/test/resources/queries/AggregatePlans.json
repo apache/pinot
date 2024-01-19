@@ -31,10 +31,9 @@
           "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$1], col3=[$2], col4=[$3])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
+          "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -46,10 +45,9 @@
           "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)], sum=[CASE(=($1, 0), null:DECIMAL(1000, 0), $0)], max=[$2])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], agg#2=[MAX($2)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], agg#2=[MAX($2)])",
-          "\n        LogicalProject(col2=[$1], col3=[$2], col4=[$3])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()], agg#2=[MAX($3)])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
+          "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -61,10 +59,9 @@
           "\nLogicalProject(avg=[/(CAST(CASE(=($1, 0), null:BIGINT, $0)):DOUBLE, $1)], count=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
+          "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -89,10 +86,9 @@
           "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)], EXPR$1=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'a'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
+          "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -104,10 +100,9 @@
           "\nLogicalProject(sum=[CASE(=($1, 0), null:BIGINT, $0)], count=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
+          "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -119,10 +114,9 @@
           "\nLogicalProject(avg=[/(CAST(CASE(=($1, 0), null:BIGINT, $0)):DOUBLE, $1)], count=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
+          "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
       },
@@ -134,10 +128,9 @@
           "\nLogicalProject(sum=[CASE(=($1, 0), null:BIGINT, $0)], count=[$1])",
           "\n  LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
-          "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, 'pink floyd'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
+          "\n          LogicalTableScan(table=[[a]])",
           "\n"
         ]
       }

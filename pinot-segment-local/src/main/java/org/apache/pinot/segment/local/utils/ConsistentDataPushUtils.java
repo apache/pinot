@@ -50,7 +50,7 @@ public class ConsistentDataPushUtils {
   private ConsistentDataPushUtils() {
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPushUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ConsistentDataPushUtils.class);
   private static final FileUploadDownloadClient FILE_UPLOAD_DOWNLOAD_CLIENT = new FileUploadDownloadClient();
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 10_000L, 2.0);
   public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";

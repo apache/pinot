@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.forward;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
@@ -29,7 +28,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
@@ -59,6 +57,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -91,54 +90,29 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   public Map<String, ForwardIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    Set<String> disabledCols = indexLoadingConfig.getForwardIndexDisabledColumns();
+    Set<String> disabledColumns = indexLoadingConfig.getForwardIndexDisabledColumns();
+    Map<String, CompressionCodec> compressionCodecMap = indexLoadingConfig.getCompressionConfigs();
     Map<String, ForwardIndexConfig> result = new HashMap<>();
-    Set<String> allColumns = Sets.union(disabledCols, indexLoadingConfig.getAllKnownColumns());
-    for (String column : allColumns) {
-      ChunkCompressionType compressionType =
-          indexLoadingConfig.getCompressionConfigs() != null
-              ? indexLoadingConfig.getCompressionConfigs().get(column)
-              : null;
-      Supplier<ForwardIndexConfig> defaultConfig = () -> {
-        if (compressionType == null) {
-          return ForwardIndexConfig.DEFAULT;
-        } else {
-          return new ForwardIndexConfig.Builder().withCompressionType(compressionType).build();
-        }
-      };
-      if (!disabledCols.contains(column)) {
-        TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-        if (tableConfig == null) {
-          result.put(column, defaultConfig.get());
-        } else {
-          List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-          if (fieldConfigList == null) {
-            result.put(column, defaultConfig.get());
-            continue;
-          }
-          FieldConfig fieldConfig = fieldConfigList.stream()
-              .filter(fc -> fc.getName().equals(column))
-              .findAny()
-              .orElse(null);
-          if (fieldConfig == null) {
-            result.put(column, defaultConfig.get());
-            continue;
-          }
-          ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder();
-          if (compressionType != null) {
-            builder.withCompressionType(compressionType);
-          } else {
-            FieldConfig.CompressionCodec compressionCodec = fieldConfig.getCompressionCodec();
-            if (compressionCodec != null) {
-              builder.withCompressionType(ChunkCompressionType.valueOf(compressionCodec.name()));
+    for (String column : indexLoadingConfig.getAllKnownColumns()) {
+      ForwardIndexConfig forwardIndexConfig;
+      if (!disabledColumns.contains(column)) {
+        CompressionCodec compressionCodec = compressionCodecMap.get(column);
+        if (compressionCodec == null) {
+          TableConfig tableConfig = indexLoadingConfig.getTableConfig();
+          if (tableConfig != null && tableConfig.getFieldConfigList() != null) {
+            FieldConfig fieldConfig =
+                tableConfig.getFieldConfigList().stream().filter(fc -> fc.getName().equals(column)).findAny()
+                    .orElse(null);
+            if (fieldConfig != null) {
+              compressionCodec = fieldConfig.getCompressionCodec();
             }
           }
-
-          result.put(column, builder.build());
         }
+        forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(compressionCodec).build();
       } else {
-        result.put(column, ForwardIndexConfig.DISABLED);
+        forwardIndexConfig = ForwardIndexConfig.DISABLED;
       }
+      result.put(column, forwardIndexConfig);
     }
     return result;
   }
@@ -169,13 +143,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           if (properties != null && isDisabled(properties)) {
             fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.DISABLED);
           } else {
-            DictionaryIndexConfig dictConfig = dictConfigs.get(fieldConfig.getName());
-            if (dictConfig != null && dictConfig.isDisabled()) {
-              fwdConfig.put(fieldConfig.getName(), createConfigFromFieldConfig(fieldConfig));
+            ForwardIndexConfig config = createConfigFromFieldConfig(fieldConfig);
+            if (!config.equals(ForwardIndexConfig.DEFAULT)) {
+              fwdConfig.put(fieldConfig.getName(), config);
             }
-            // On other case encoding is DICTIONARY. We create the default forward index by default. That means that if
-            // field config indicates for example a compression while using encoding dictionary, the compression is
-            // ignored.
             // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
             // the default `fromIndexes` deserializer.
           }
@@ -193,17 +164,12 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   }
 
   private ForwardIndexConfig createConfigFromFieldConfig(FieldConfig fieldConfig) {
-    FieldConfig.CompressionCodec compressionCodec = fieldConfig.getCompressionCodec();
     ForwardIndexConfig.Builder builder = new ForwardIndexConfig.Builder();
-    if (compressionCodec != null) {
-      builder.withCompressionType(ChunkCompressionType.valueOf(compressionCodec.name()));
-    }
-
+    builder.withCompressionCodec(fieldConfig.getCompressionCodec());
     Map<String, String> properties = fieldConfig.getProperties();
     if (properties != null) {
       builder.withLegacyProperties(properties);
     }
-
     return builder.build();
   }
 

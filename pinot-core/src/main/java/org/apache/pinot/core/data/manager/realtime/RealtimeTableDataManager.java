@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import javax.annotation.concurrent.ThreadSafe;
@@ -61,6 +62,7 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.local.utils.SchemaUtils;
+import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -113,6 +115,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
+  private static final SegmentLocks SEGMENT_UPSERT_LOCKS = SegmentLocks.create();
 
   // TODO: Change it to BooleanSupplier
   private final Supplier<Boolean> _isServerReadyToServeQueries;
@@ -204,9 +207,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
       // NOTE: Set _tableUpsertMetadataManager before initializing it because when preloading is enabled, we need to
       //       load segments into it
-      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig);
-      _tableUpsertMetadataManager.init(tableConfig, schema, this, _serverMetrics, _helixManager,
-          _segmentPreloadExecutor);
+      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig,
+          _tableDataManagerConfig.getInstanceDataManagerConfig().getUpsertConfigs());
+      _tableUpsertMetadataManager.init(tableConfig, schema, this, _helixManager, _segmentPreloadExecutor);
     }
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
@@ -528,22 +531,44 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     // Register the new segment after it is fully initialized by partitionUpsertMetadataManager, e.g. to fill up its
     // validDocId bitmap. Otherwise, the query can return wrong results, if accessing the premature segment.
-    SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
-    if (oldSegmentManager == null) {
-      if (_tableUpsertMetadataManager.isPreloading()) {
-        partitionUpsertMetadataManager.preloadSegment(immutableSegment);
-      } else {
+    if (_tableUpsertMetadataManager.isPreloading()) {
+      // Preloading segment happens when creating table manager when server restarts, and segment is ensured to be
+      // preloaded by a single thread, so no need to take a lock.
+      partitionUpsertMetadataManager.preloadSegment(immutableSegment);
+      registerSegment(segmentName, newSegmentManager);
+      _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
+      return;
+    }
+    // Replacing segment takes multiple steps, and particularly need to access the oldSegment. Replace segment may
+    // happen in two threads, i.e. the consuming thread that's committing the mutable segment and a HelixTaskExecutor
+    // thread that's bringing segment from ONLINE to CONSUMING when the server finds consuming thread can't commit
+    // the segment in time. The slower thread takes the reference of the oldSegment here, but it may get closed by
+    // the faster thread if not synchronized. In particular, the slower thread may iterate the primary keys in the
+    // oldSegment, causing seg fault. So we have to take a lock here.
+    // However, we can't just reuse the existing segmentLocks. Because many methods of partitionUpsertMetadataManager
+    // takes this lock internally, but after taking snapshot RW lock. If we take segmentLock here (before taking
+    // snapshot RW lock), we can get into deadlock with threads calling partitionUpsertMetadataManager's other
+    // methods, like removeSegment.
+    // Adding segment should be done by a single HelixTaskExecutor thread, but do it with lock here for simplicity
+    // otherwise, we'd need to double-check if oldSegmentManager is null.
+    Lock segmentLock = SEGMENT_UPSERT_LOCKS.getLock(_tableNameWithType, segmentName);
+    segmentLock.lock();
+    try {
+      SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
+      if (oldSegmentManager == null) {
         partitionUpsertMetadataManager.addSegment(immutableSegment);
+        registerSegment(segmentName, newSegmentManager);
+        _logger.info("Added new immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
+      } else {
+        IndexSegment oldSegment = oldSegmentManager.getSegment();
+        partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
+        registerSegment(segmentName, newSegmentManager);
+        _logger.info("Replaced {} segment: {} of upsert-enabled table: {}",
+            oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, _tableNameWithType);
+        releaseSegment(oldSegmentManager);
       }
-      registerSegment(segmentName, newSegmentManager);
-      _logger.info("Added new immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
-    } else {
-      IndexSegment oldSegment = oldSegmentManager.getSegment();
-      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
-      registerSegment(segmentName, newSegmentManager);
-      _logger.info("Replaced {} segment: {} of upsert-enabled table: {}",
-          oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, _tableNameWithType);
-      releaseSegment(oldSegmentManager);
+    } finally {
+      segmentLock.unlock();
     }
   }
 
@@ -671,6 +696,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public String getServerInstance() {
     return _instanceId;
+  }
+
+  @VisibleForTesting
+  public TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return _tableUpsertMetadataManager;
   }
 
   /**

@@ -22,7 +22,14 @@ import React from 'react';
 import ReactDiffViewer, {DiffMethod} from 'react-diff-viewer';
 import { map, isEqual, findIndex, findLast } from 'lodash';
 import app_state from '../app_state';
-import {DISPLAY_SEGMENT_STATUS, SEGMENT_STATUS, TableData} from 'Models';
+import {
+  DISPLAY_SEGMENT_STATUS, InstanceType,
+  PinotTableDetails,
+  SEGMENT_STATUS,
+  SegmentStatus,
+  TableData,
+} from 'Models';
+import Loading from '../components/Loading';
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
   if (ascendingFlag) {
@@ -46,6 +53,26 @@ const sortArray = function (sortingArr, keyName, ascendingFlag) {
     return 0;
   });
 };
+
+const pinotTableDetailsFormat = (tableDetails: PinotTableDetails): Array<string | number | boolean | SegmentStatus | { customRenderer: JSX.Element }> => {
+  return [
+    tableDetails.name,
+    tableDetails.estimated_size || Loading,
+    tableDetails.reported_size || Loading,
+    tableDetails.number_of_segments || Loading,
+    tableDetails.segment_status || Loading
+  ];
+}
+
+const pinotTableDetailsFromArray = (tableDetails: Array<string | number | boolean | SegmentStatus | { customRenderer: JSX.Element }>): PinotTableDetails => {
+  return {
+    name: tableDetails[0] as string,
+    estimated_size: tableDetails[1] as string,
+    reported_size: tableDetails[2] as string,
+    number_of_segments: tableDetails[3] as string,
+    segment_status: tableDetails[4] as any
+  };
+}
 
 const tableFormat = (data: TableData): Array<{ [key: string]: any }> => {
   const rows = data.records;
@@ -321,7 +348,7 @@ const encodeString = (str: string) => {
   return str;
 }
 
-const formatBytes = (bytes, decimals = 2) => {
+const formatBytes = (bytes: number, decimals = 2) => {
   if (bytes === 0) return '0 Bytes';
 
   const k = 1024;
@@ -385,6 +412,43 @@ export const getDisplaySegmentStatus = (idealState, externalView): DISPLAY_SEGME
   return DISPLAY_SEGMENT_STATUS.UPDATING;
 }
 
+export const getInstanceTypeFromInstanceName = (instanceName: string): InstanceType => {
+  if (instanceName.toLowerCase().startsWith(InstanceType.BROKER.toLowerCase())) {
+    return InstanceType.BROKER;
+  } else if (instanceName.toLowerCase().startsWith(InstanceType.CONTROLLER.toLowerCase())) {
+    return InstanceType.CONTROLLER;
+  } else if (instanceName.toLowerCase().startsWith(InstanceType.MINION.toLowerCase())) {
+    return InstanceType.MINION;
+  } else if (instanceName.toLowerCase().startsWith(InstanceType.SERVER.toLowerCase())) {
+    return InstanceType.SERVER;
+  }  else {
+    return null;
+  }
+}
+
+export const getInstanceTypeFromString = (instanceType: string): InstanceType => {
+  if (instanceType.toLowerCase() === InstanceType.BROKER.toLowerCase()) {
+    return InstanceType.BROKER;
+  } else if (instanceType.toLowerCase() === InstanceType.CONTROLLER.toLowerCase()) {
+    return InstanceType.CONTROLLER;
+  } else if (instanceType.toLowerCase() === InstanceType.MINION.toLowerCase()) {
+    return InstanceType.MINION;
+  } else if (instanceType.toLowerCase() === InstanceType.SERVER.toLowerCase()) {
+    return InstanceType.SERVER;
+  }  else {
+    return null;
+  }
+}
+
+const getLoadingTableData = (columns: string[]): TableData => {
+  return {
+    columns: columns,
+    records: [
+      columns.map((_) => Loading),
+    ],
+  };
+}
+
 export default {
   sortArray,
   tableFormat,
@@ -396,5 +460,8 @@ export default {
   syncTableSchemaData,
   encodeString,
   formatBytes,
-  splitStringByLastUnderscore
+  splitStringByLastUnderscore,
+  pinotTableDetailsFormat,
+  pinotTableDetailsFromArray,
+  getLoadingTableData
 };

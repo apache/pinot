@@ -261,6 +261,11 @@ public class SketchFunctions {
     return diff.getResult(false, null, false);
   }
 
+  @ScalarFunction(names = {"thetaSketchToString", "theta_sketch_to_string"})
+  public static String thetaSketchToString(Object sketchObject) {
+    return asThetaSketch(sketchObject).toString();
+  }
+
   private static Sketch thetaSketchUnionVar(Object... sketchObjects) {
     Union union = SET_OPERATION_BUILDER.buildUnion();
     for (Object sketchObj : sketchObjects) {
@@ -417,6 +422,11 @@ public class SketchFunctions {
     return cpcSketchUnionVar(o1, o2, o3, o4, o5);
   }
 
+  @ScalarFunction(names = {"cpcSketchToString", "cpc_sketch_to_string"})
+  public static String cpcSketchToString(Object sketchObject) {
+    return asCpcSketch(sketchObject).toString();
+  }
+
   /**
    * Create a CPC Sketch containing the input, with a configured nominal entries
    *
@@ -502,6 +512,7 @@ public class SketchFunctions {
    *
    * This adds the P value into the serialized byte stream, so it can be used easily
    */
+  @ScalarFunction
   public static byte[] fromULL(byte[] input) {
     UltraLogLog ull = UltraLogLog.wrap(input);
     return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(ull);

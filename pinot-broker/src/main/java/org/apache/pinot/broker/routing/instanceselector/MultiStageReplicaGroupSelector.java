@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -81,8 +82,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
   }
 
   @Override
-  Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
-      Map<String, String> queryOptions) {
+  Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+      SegmentStates segmentStates, Map<String, String> queryOptions) {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
     int replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();
@@ -102,14 +103,15 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
    * Returns a map from the segmentName to the corresponding server in the given replica-group. If the is not enabled,
    * we throw an exception.
    */
-  private Map<String, String> tryAssigning(List<String> segments, SegmentStates segmentStates,
-      InstancePartitions instancePartitions, int replicaId) {
+  private Pair<Map<String, String>, Map<String, String>> tryAssigning(List<String> segments,
+      SegmentStates segmentStates, InstancePartitions instancePartitions, int replicaId) {
     Set<String> instanceLookUpSet = new HashSet<>();
     for (int partition = 0; partition < instancePartitions.getNumPartitions(); partition++) {
       List<String> instances = instancePartitions.getInstances(partition, replicaId);
       instanceLookUpSet.addAll(instances);
     }
-    Map<String, String> result = new HashMap<>();
+    Map<String, String> segmentToSelectedInstanceMap = new HashMap<>();
+    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
     for (String segment : segments) {
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
       // If candidates are null, we will throw an exception and log a warning.
@@ -119,8 +121,12 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
         String instance = candidate.getInstance();
         if (instanceLookUpSet.contains(instance)) {
           found = true;
+          // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
+          // broker or server can skip it upon any issue to process it.
           if (candidate.isOnline()) {
-            result.put(segment, instance);
+            segmentToSelectedInstanceMap.put(segment, instance);
+          } else {
+            optionalSegmentToInstanceMap.put(segment, instance);
           }
           break;
         }
@@ -129,7 +135,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
         throw new RuntimeException(String.format("Unable to find an enabled instance for segment: %s", segment));
       }
     }
-    return result;
+    return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
   @VisibleForTesting

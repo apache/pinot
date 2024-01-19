@@ -42,14 +42,14 @@
     <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
     <jersey-container-grizzly2-http.version>2.39</jersey-container-grizzly2-http.version>
-    <simpleclient_common.version>0.8.1</simpleclient_common.version>
-    <grpc-proto.version>1.12.0</grpc-proto.version>
-    <grpc-context.version>1.14.0</grpc-context.version>
+    <simpleclient_common.version>0.16.0</simpleclient_common.version>
+    <grpc-proto.version>2.29.0</grpc-proto.version>
+    <grpc-context.version>1.60.1</grpc-context.version>
     <bouncycastle.version>1.75</bouncycastle.version>
     <caffeine.version>2.6.2</caffeine.version>
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
-    <commons-collections.version>4.1</commons-collections.version>
+    <commons-collections.version>4.4</commons-collections.version>
     <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
     <okio.version>1.6.0</okio.version>
   </properties>
@@ -238,6 +238,10 @@
         <exclusion>
           <groupId>commons-codec</groupId>
           <artifactId>commons-codec</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

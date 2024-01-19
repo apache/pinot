@@ -31,6 +31,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.http.Header;
 import org.apache.pinot.tools.AbstractBaseCommand;
@@ -76,6 +79,16 @@ public class AbstractBaseAdminCommand extends AbstractBaseCommand {
 
   public static String sendRequest(String requestMethod, String urlString, String payload, List<Header> headers)
       throws IOException {
+    return sendRequest(requestMethod, urlString, payload, headers, null);
+  }
+
+  public static String sendRequest(String requestMethod, String urlString, String payload, List<Header> headers,
+      @Nullable SSLContext sslContext)
+      throws IOException {
+    if (sslContext != null) {
+      // Set the default SSL socket factory to use the custom SSL context
+      HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
+    }
     final URL url = new URL(urlString);
     final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 

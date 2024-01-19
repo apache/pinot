@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
-import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
+import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
+import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 
 
 /**
@@ -27,7 +28,7 @@ import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
  * enforced traversal order, and should be implemented by subclasses.
  *
  * <p>It is recommended that implementors use private constructors and static methods to access main
- * functionality (see {@link PhysicalExplainPlanVisitor#explain(org.apache.pinot.query.planner.DispatchableSubPlan)}
+ * functionality (see {@link PhysicalExplainPlanVisitor#explain(DispatchableSubPlan)}
  * as an example of a usage of this pattern.
  *
  * @param <T> the return type for all visitsPlanNodeVisitor

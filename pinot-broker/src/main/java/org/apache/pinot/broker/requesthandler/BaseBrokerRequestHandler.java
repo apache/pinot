@@ -43,6 +43,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
@@ -94,6 +95,7 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -592,8 +594,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Calculate routing table for the query
       // TODO: Modify RoutingManager interface to directly take PinotQuery
       long routingStartTimeNs = System.nanoTime();
-      Map<ServerInstance, List<String>> offlineRoutingTable = null;
-      Map<ServerInstance, List<String>> realtimeRoutingTable = null;
+      Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable = null;
+      Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable = null;
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
       if (offlineBrokerRequest != null) {
@@ -601,7 +603,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
-          Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+          Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
+              routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             offlineRoutingTable = serverInstanceToSegmentsMap;
           } else {
@@ -617,7 +620,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         RoutingTable routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest, requestId);
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
-          Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+          Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
+              routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             realtimeRoutingTable = serverInstanceToSegmentsMap;
           } else {
@@ -1493,9 +1497,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.LONG);
         row.add(literal.getLongValue());
         break;
+      case FLOAT_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.FLOAT);
+        row.add(Float.intBitsToFloat(literal.getFloatValue()));
+        break;
       case DOUBLE_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.DOUBLE);
         row.add(literal.getDoubleValue());
+        break;
+      case BIG_DECIMAL_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.BIG_DECIMAL);
+        row.add(BigDecimalUtils.deserialize(literal.getBigDecimalValue()));
         break;
       case STRING_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.STRING);
@@ -1509,8 +1521,28 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
         row.add(null);
         break;
-      default:
+      case INT_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.INT_ARRAY);
+        row.add(literal.getIntArrayValue());
         break;
+      case LONG_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.LONG_ARRAY);
+        row.add(literal.getLongArrayValue());
+        break;
+      case FLOAT_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.FLOAT_ARRAY);
+        row.add(literal.getFloatArrayValue().stream().map(Float::intBitsToFloat).collect(Collectors.toList()));
+        break;
+      case DOUBLE_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.DOUBLE_ARRAY);
+        row.add(literal.getDoubleArrayValue());
+        break;
+      case STRING_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.STRING_ARRAY);
+        row.add(literal.getStringArrayValue());
+        break;
+      default:
+        throw new IllegalStateException("Unsupported literal: " + literal);
     }
   }
 
@@ -1815,9 +1847,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
-      RequestContext requestContext)
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+      ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
   protected static boolean isPartialResult(BrokerResponse brokerResponse) {
@@ -1858,8 +1891,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setNumSegmentsPrunedByValue(response.getNumSegmentsPrunedByValue());
     statistics.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
     statistics.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
-    statistics.setProcessingExceptions(response.getProcessingExceptions().stream().map(Object::toString).collect(
-        Collectors.toList()));
+    statistics.setProcessingExceptions(
+        response.getProcessingExceptions().stream().map(Object::toString).collect(Collectors.toList()));
   }
 
   private String getGlobalQueryId(long requestId) {
@@ -1888,8 +1921,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     final String _query;
     final Set<ServerInstance> _servers = new HashSet<>();
 
-    QueryServers(String query, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-        @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable) {
+    QueryServers(String query, @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+        @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable) {
       _query = query;
       if (offlineRoutingTable != null) {
         _servers.addAll(offlineRoutingTable.keySet());

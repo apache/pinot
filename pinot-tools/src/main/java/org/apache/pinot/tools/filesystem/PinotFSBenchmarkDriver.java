@@ -54,7 +54,7 @@ public class PinotFSBenchmarkDriver {
       Integer numSegmentsForListFilesTest, Integer dataSizeInMBsForCopyTest, Integer numOps)
       throws ConfigurationException {
     PropertiesConfiguration configuration =
-        CommonsConfigurationUtils.loadFromFile(new File(configFilePath));
+        CommonsConfigurationUtils.fromFile(new File(configFilePath));
     PinotFSFactory.init(new PinotConfiguration(configuration));
     _mode = mode;
     _baseDirectoryUri = URI.create(baseDirectoryUri);

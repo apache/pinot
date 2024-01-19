@@ -19,7 +19,7 @@
 package org.apache.pinot.server.starter.helix;
 
 import java.util.Optional;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
@@ -130,6 +130,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // be updated for a maximum of this time.
   private static final String EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = "external.view.dropped.max.wait.ms";
   private static final String EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = "external.view.dropped.check.interval.ms";
+
+  public static final String PREFIX_OF_CONFIG_OF_UPSERT = "upsert";
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
@@ -292,6 +294,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public long getExternalViewDroppedCheckIntervalMs() {
     return _instanceDataManagerConfiguration.getProperty(EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS,
         DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS);
+  }
+
+  @Override
+  public PinotConfiguration getUpsertConfigs() {
+    return _instanceDataManagerConfiguration.subset(PREFIX_OF_CONFIG_OF_UPSERT);
   }
 
   @Override

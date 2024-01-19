@@ -39,7 +39,7 @@ public class MinionConfTest {
         CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER,
         CommonConstants.Minion.DEPRECATED_PREFIX_OF_CONFIG_OF_PINOT_CRYPTER
     };
-    PropertiesConfiguration config = CommonsConfigurationUtils.loadFromPath(
+    PropertiesConfiguration config = CommonsConfigurationUtils.fromPath(
         PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-old-minion.properties")
         .getFile());
     PinotConfiguration rawCfg = new PinotConfiguration(config);
@@ -51,7 +51,7 @@ public class MinionConfTest {
     }
 
     // Check configs with new names that have the pinot.minion prefix.
-    config = CommonsConfigurationUtils.loadFromPath(
+    config = CommonsConfigurationUtils.fromPath(
         PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-new-minion.properties")
             .getFile());
     rawCfg = new PinotConfiguration(config);

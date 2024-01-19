@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.spi.env;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -34,9 +31,10 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.convert.DefaultListDelimiterHandler;
+import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.io.FileHandler;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -48,19 +46,44 @@ public class CommonsConfigurationUtils {
   private CommonsConfigurationUtils() {
   }
 
-  public static void setListDelimiterHandler(PropertiesConfiguration configuration, Character delimiter) {
-    configuration.setListDelimiterHandler(new DefaultListDelimiterHandler(delimiter));
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
+   * @param file containing properties
+   * @return a {@link PropertiesConfiguration} instance. Empty if file does not exist.
+   */
+  public static PropertiesConfiguration fromFile(File file)
+      throws ConfigurationException {
+    return fromFile(file, false, true);
   }
 
-  public static void setDefaultListDelimiterHandler(PropertiesConfiguration configuration) {
-    setListDelimiterHandler(configuration, DEFAULT_LIST_DELIMITER);
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
+   * @param stream containing properties
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromInputStream(InputStream stream)
+      throws ConfigurationException {
+    return fromInputStream(stream, false, true);
   }
 
-  public static PropertiesConfiguration loadFromPath(String path) throws ConfigurationException {
-    return loadFromPath(path, false, false);
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
+   * @param path representing the path of file
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromPath(String path)
+      throws ConfigurationException {
+    return fromPath(path, false, true);
   }
 
-  public static PropertiesConfiguration loadFromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
+   * @param path representing the path of file
+   * @param setIOFactory representing to set the IOFactory or not
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     FileHandler fileHandler = new FileHandler(config);
@@ -68,11 +91,14 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
-  public static PropertiesConfiguration loadFromInputStream(InputStream stream) throws ConfigurationException {
-    return loadFromInputStream(stream, false, false);
-  }
-
-  public static PropertiesConfiguration loadFromInputStream(InputStream stream, boolean setIOFactory,
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
+   * @param stream containing properties
+   * @param setIOFactory representing to set the IOFactory or not
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromInputStream(InputStream stream, boolean setIOFactory,
       boolean setDefaultDelimiter) throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     FileHandler fileHandler = new FileHandler(config);
@@ -80,67 +106,38 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
-  public static PropertiesConfiguration loadFromFile(File file) throws ConfigurationException {
-    return loadFromFile(file, false, false);
-  }
-
-  public static PropertiesConfiguration loadFromFile(File file, boolean setIOFactory,
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
+   * @param file containing properties
+   * @param setIOFactory representing to set the IOFactory or not
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
       boolean setDefaultDelimiter) throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     FileHandler fileHandler = new FileHandler(config);
-    fileHandler.load(file);
+    // check if file exists, load the properties otherwise set the file.
+    if (file.exists()) {
+      fileHandler.load(file);
+    } else {
+      fileHandler.setFile(file);
+    }
     return config;
   }
 
   /**
-   * Instantiate a {@link org.apache.commons.configuration.PropertiesConfiguration} from a {@link File}.
-   * @param file containing properties
-   * @return a {@link org.apache.commons.configuration.PropertiesConfiguration} instance. Empty if file does not exist.
+   * Save the propertiesConfiguration content into the provided file.
+   * @param propertiesConfiguration a {@link PropertiesConfiguration} instance.
+   * @param file a {@link File} instance.
    */
-  @Deprecated
-  public static org.apache.commons.configuration.PropertiesConfiguration fromFile(File file) {
+  public static void saveToFile(PropertiesConfiguration propertiesConfiguration, File file) {
+    Preconditions.checkNotNull(file, "File object can not be null for saving configurations");
+    FileHandler fileHandler = new FileHandler(propertiesConfiguration);
+    fileHandler.setFile(file);
     try {
-      org.apache.commons.configuration.PropertiesConfiguration propertiesConfiguration =
-          new org.apache.commons.configuration.PropertiesConfiguration();
-
-      // Commons Configuration 1.10 does not support file path containing '%'.
-      // Explicitly providing the input stream on load bypasses the problem.
-      propertiesConfiguration.setFile(file);
-      if (file.exists()) {
-        propertiesConfiguration.load(new FileInputStream(file));
-      }
-
-      return propertiesConfiguration;
-    } catch (org.apache.commons.configuration.ConfigurationException | FileNotFoundException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  /**
-   * Instantiate a {@link org.apache.commons.configuration.PropertiesConfiguration} from an inputstream.
-   * @param inputStream containing properties
-   * @return a {@link org.apache.commons.configuration.PropertiesConfiguration} instance.
-   */
-  @Deprecated
-  public static org.apache.commons.configuration.PropertiesConfiguration fromInputStream(InputStream inputStream) {
-    try {
-      org.apache.commons.configuration.PropertiesConfiguration propertiesConfiguration =
-          new org.apache.commons.configuration.PropertiesConfiguration();
-      propertiesConfiguration.load(inputStream);
-      return propertiesConfiguration;
-    } catch (org.apache.commons.configuration.ConfigurationException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Deprecated
-  public static void saveToFile(org.apache.commons.configuration.PropertiesConfiguration propertiesConfiguration,
-      File file) {
-    // Commons Configuration 1.10 does not support file path containing '%'.
-    // Explicitly providing the output stream for save bypasses the problem.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
-      propertiesConfiguration.save(fileOutputStream);
-    } catch (org.apache.commons.configuration.ConfigurationException | IOException e) {
+      fileHandler.save();
+    } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
   }
@@ -149,60 +146,16 @@ public class CommonsConfigurationUtils {
     return () -> keys;
   }
 
-  /**
-   * Provides a stream of all the keys found in a {@link Configuration}.
-   * @param configuration to iterate on keys
-   * @return a stream of keys
-   */
-  @Deprecated
-  public static Stream<String> getKeysStream(org.apache.commons.configuration.Configuration configuration) {
-    return StreamSupport.stream(getIterable(configuration.getKeys()).spliterator(), false);
-  }
-
   public static Stream<String> getKeysStream(Configuration configuration) {
     return StreamSupport.stream(getIterable(configuration.getKeys()).spliterator(), false);
-  }
-
-
-  /**
-   * Provides a list of all the keys found in a {@link Configuration}.
-   * @param configuration to iterate on keys
-   * @return a list of keys
-   */
-  @Deprecated
-  public static List<String> getKeys(org.apache.commons.configuration.Configuration configuration) {
-    return getKeysStream(configuration).collect(Collectors.toList());
   }
 
   public static List<String> getKeys(Configuration configuration) {
     return getKeysStream(configuration).collect(Collectors.toList());
   }
 
-  /**
-   * @return a key-value {@link Map} found in the provided {@link Configuration}
-   */
-  @Deprecated
-  public static Map<String, Object> toMap(org.apache.commons.configuration.Configuration configuration) {
-    return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
-  }
-
   public static Map<String, Object> toMap(Configuration configuration) {
     return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
-  }
-
-  @Deprecated
-  private static Object mapValue(String key, org.apache.commons.configuration.Configuration configuration) {
-    // For multi-value config, convert it to a single comma connected string value.
-    // For single-value config, return its raw property, unless it needs interpolation.
-    return Optional.of(configuration.getStringArray(key)).filter(values -> values.length > 1)
-        .<Object>map(values -> Arrays.stream(values).collect(Collectors.joining(","))).orElseGet(() -> {
-          Object rawProperty = configuration.getProperty(key);
-          if (!needInterpolate(rawProperty)) {
-            return rawProperty;
-          }
-          // The string value is converted to the requested type when accessing it via PinotConfiguration.
-          return configuration.getString(key);
-        });
   }
 
   private static Object mapValue(String key, Configuration configuration) {
@@ -227,24 +180,6 @@ public class CommonsConfigurationUtils {
       return StringUtils.isNotEmpty(strProperty) && strProperty.startsWith("${") && strProperty.endsWith("}");
     }
     return false;
-  }
-
-  @SuppressWarnings("unchecked")
-  @Deprecated
-  public static <T> T interpolate(org.apache.commons.configuration.Configuration configuration,
-      String key, T defaultValue, Class<T> returnType) {
-    // Different from the generic getProperty() method, those type specific getters do config interpolation.
-    if (Integer.class.equals(returnType)) {
-      return (T) configuration.getInteger(key, (Integer) defaultValue);
-    } else if (Boolean.class.equals(returnType)) {
-      return (T) configuration.getBoolean(key, (Boolean) defaultValue);
-    } else if (Long.class.equals(returnType)) {
-      return (T) configuration.getLong(key, (Long) defaultValue);
-    } else if (Double.class.equals(returnType)) {
-      return (T) configuration.getDouble(key, (Double) defaultValue);
-    } else {
-      throw new IllegalArgumentException(returnType + " is not a supported type for conversion.");
-    }
   }
 
   @SuppressWarnings("unchecked")
@@ -288,6 +223,7 @@ public class CommonsConfigurationUtils {
    * - Escaping comma with backslash doesn't work when comma is preceded by a backslash
    */
   public static String replaceSpecialCharacterInPropertyValue(String value) {
+    value = StringEscapeUtils.escapeJava(value);
     if (value.isEmpty()) {
       return value;
     }
@@ -305,6 +241,7 @@ public class CommonsConfigurationUtils {
    * {@link #replaceSpecialCharacterInPropertyValue(String)}.
    */
   public static String recoverSpecialCharacterInPropertyValue(String value) {
+    value = StringEscapeUtils.unescapeJava(value);
     if (value.isEmpty()) {
       return value;
     }
@@ -328,8 +265,13 @@ public class CommonsConfigurationUtils {
 
     // setting DEFAULT_LIST_DELIMITER
     if (setDefaultDelimiter) {
-      CommonsConfigurationUtils.setDefaultListDelimiterHandler(config);
+      setListDelimiterHandler(config);
     }
+
     return config;
+  }
+
+  private static void setListDelimiterHandler(PropertiesConfiguration configuration) {
+    configuration.setListDelimiterHandler(new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER));
   }
 }
