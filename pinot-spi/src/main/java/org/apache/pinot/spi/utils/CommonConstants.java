@@ -330,7 +330,6 @@ public class CommonConstants {
     // Broker config indicating the maximum length of the serialized response per server for a query.
     public static final String CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES = "pinot.broker.max.server.response.size.bytes";
 
-
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
@@ -805,7 +804,9 @@ public class CommonConstants {
      * Service token for accessing protected controller APIs.
      * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
      */
-    public static final String CONFIG_TASK_AUTH_NAMESPACE = "task.auth";
+    @Deprecated
+    public static final String DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE = "task.auth";
+    public static final String CONFIG_TASK_AUTH_NAMESPACE = "pinot.task.auth";
     public static final String MINION_TLS_PREFIX = "pinot.minion.tls";
     public static final String CONFIG_OF_MINION_QUERY_REWRITER_CLASS_NAMES = "pinot.minion.query.rewriter.class.names";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.minion.logger.root.dir";
