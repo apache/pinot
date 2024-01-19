@@ -29,8 +29,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[], Sketch<IntegerSummary>> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
-  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE =
-      AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH;
 
   // This changes a lot similar to the Bitmap aggregator
   private int _maxByteSize;
@@ -43,7 +41,7 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AGGREGATION_FUNCTION_TYPE;
+    return AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH;
   }
 
   @Override

@@ -32,8 +32,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<Object, Sketch> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
-  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE =
-      AggregationFunctionType.DISTINCTCOUNTTHETASKETCH;
 
   private final Union _union;
 
@@ -47,7 +45,7 @@ public class DistinctCountThetaSketchValueAggregator implements ValueAggregator<
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AGGREGATION_FUNCTION_TYPE;
+    return AggregationFunctionType.DISTINCTCOUNTTHETASKETCH;
   }
 
   @Override

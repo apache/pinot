@@ -30,8 +30,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Object, CpcSketch> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
-  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE =
-      AggregationFunctionType.DISTINCTCOUNTCPCSKETCH;
 
   private final int _lgK;
 
@@ -48,7 +46,7 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AGGREGATION_FUNCTION_TYPE;
+    return AggregationFunctionType.DISTINCTCOUNTCPCSKETCH;
   }
 
   @Override

@@ -30,7 +30,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 public class DistinctCountULLValueAggregator implements ValueAggregator<Object, UltraLogLog> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
-  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.DISTINCTCOUNTULL;
 
   private final int _p;
 
@@ -45,7 +44,7 @@ public class DistinctCountULLValueAggregator implements ValueAggregator<Object, 
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AGGREGATION_FUNCTION_TYPE;
+    return AggregationFunctionType.DISTINCTCOUNTULL;
   }
 
   @Override

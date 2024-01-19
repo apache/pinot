@@ -29,7 +29,6 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 
 public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigDecimal> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.BYTES;
-  public static final AggregationFunctionType AGGREGATION_FUNCTION_TYPE = AggregationFunctionType.SUMPRECISION;
 
   private final int _fixedSize;
 
@@ -50,7 +49,7 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AGGREGATION_FUNCTION_TYPE;
+    return AggregationFunctionType.SUMPRECISION;
   }
 
   @Override
