@@ -54,12 +54,12 @@ public class StarTreeV2Metadata {
         String columnName = aggregationConfig.getString(MetadataKey.COLUMN_NAME);
         AggregationFunctionColumnPair functionColumnPair = new AggregationFunctionColumnPair(functionType, columnName);
         // Lookup the stored aggregation type
-        AggregationFunctionColumnPair aggregatedFunctionColumnPair =
+        AggregationFunctionColumnPair storedType =
             AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
         ChunkCompressionType compressionType =
             ChunkCompressionType.valueOf(aggregationConfig.getString(MetadataKey.COMPRESSION_CODEC));
         // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
-        _aggregationSpecs.putIfAbsent(aggregatedFunctionColumnPair, new AggregationSpec(compressionType));
+        _aggregationSpecs.putIfAbsent(storedType, new AggregationSpec(compressionType));
       }
     } else {
       // Backward compatibility with columnName format
@@ -67,10 +67,10 @@ public class StarTreeV2Metadata {
         AggregationFunctionColumnPair functionColumnPair =
             AggregationFunctionColumnPair.fromColumnName(functionColumnPairName);
         // Lookup the stored aggregation type
-        AggregationFunctionColumnPair aggregatedFunctionColumnPair =
+        AggregationFunctionColumnPair storedType =
             AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
         // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
-        _aggregationSpecs.putIfAbsent(aggregatedFunctionColumnPair, AggregationSpec.DEFAULT);
+        _aggregationSpecs.putIfAbsent(storedType, AggregationSpec.DEFAULT);
       }
     }
     _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
@@ -97,9 +97,9 @@ public class StarTreeV2Metadata {
   public boolean containsFunctionColumnPair(AggregationFunctionColumnPair functionColumnPair) {
     boolean containsKey = _aggregationSpecs.containsKey(functionColumnPair);
     if (!containsKey) {
-      AggregationFunctionColumnPair aggregatedFunctionColumnPair =
+      AggregationFunctionColumnPair storedType =
           AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
-      containsKey = _aggregationSpecs.containsKey(aggregatedFunctionColumnPair);
+      containsKey = _aggregationSpecs.containsKey(storedType);
     }
     return containsKey;
   }
