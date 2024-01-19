@@ -1052,7 +1052,7 @@ public final class TableConfigUtils {
                   + "in the form <Aggregation function>__<Column name>");
             }
             AggregationFunctionColumnPair aggregatedType =
-                AggregationFunctionColumnPair.resolveToAggregatedType(columnPair);
+                AggregationFunctionColumnPair.resolveToStoredType(columnPair);
             if (aggregatedTypes.contains(aggregatedType)) {
               LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
                   columnPair, aggregatedType);
@@ -1074,7 +1074,7 @@ public final class TableConfigUtils {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
             }
             AggregationFunctionColumnPair aggregatedType =
-                AggregationFunctionColumnPair.resolveToAggregatedType(columnPair);
+                AggregationFunctionColumnPair.resolveToStoredType(columnPair);
             if (aggregatedTypes.contains(aggregatedType)) {
               LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
                   columnPair, aggregatedType);

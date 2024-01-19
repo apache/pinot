@@ -497,35 +497,4 @@ public enum AggregationFunctionType {
       }
     }
   }
-
-  /**
-   * Returns the stored {@code AggregationFunctionType} used to create the underlying value in the segment or index.
-   * Some aggregation function types share the same underlying value but are used for different purposes in queries.
-   * @param aggregationType the aggregation type used in a query
-   * @return the underlying value aggregation type used in storage e.g. StarTree index
-   */
-  public static AggregationFunctionType getAggregatedFunctionType(AggregationFunctionType aggregationType) {
-    switch (aggregationType) {
-      case DISTINCTCOUNTRAWHLL:
-        return DISTINCTCOUNTHLL;
-      case PERCENTILERAWEST:
-        return PERCENTILEEST;
-      case PERCENTILERAWTDIGEST:
-        return PERCENTILETDIGEST;
-      case DISTINCTCOUNTRAWTHETASKETCH:
-        return DISTINCTCOUNTTHETASKETCH;
-      case DISTINCTCOUNTRAWHLLPLUS:
-        return DISTINCTCOUNTHLLPLUS;
-      case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
-      case AVGVALUEINTEGERSUMTUPLESKETCH:
-      case SUMVALUESINTEGERSUMTUPLESKETCH:
-        return DISTINCTCOUNTTUPLESKETCH;
-      case DISTINCTCOUNTRAWCPCSKETCH:
-        return DISTINCTCOUNTCPCSKETCH;
-      case DISTINCTCOUNTRAWULL:
-        return DISTINCTCOUNTULL;
-      default:
-        return aggregationType;
-    }
-  }
 }

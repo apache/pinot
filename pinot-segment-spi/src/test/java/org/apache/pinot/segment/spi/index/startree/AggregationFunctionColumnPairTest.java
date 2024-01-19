@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.spi.index.startree;
 
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair.getStoredType;
 import static org.testng.AssertJUnit.assertEquals;
 
 
@@ -28,13 +30,32 @@ public class AggregationFunctionColumnPairTest {
   @Test
   public void testResolveToAggregatedType() {
     assertEquals(AggregationFunctionColumnPair.fromColumnName("distinctCountThetaSketch__dimX"),
-        AggregationFunctionColumnPair.resolveToAggregatedType(
+        AggregationFunctionColumnPair.resolveToStoredType(
             AggregationFunctionColumnPair.fromColumnName("distinctCountRawThetaSketch__dimX")));
     assertEquals(AggregationFunctionColumnPair.fromColumnName("count__*"),
-        AggregationFunctionColumnPair.resolveToAggregatedType(
+        AggregationFunctionColumnPair.resolveToStoredType(
             AggregationFunctionColumnPair.fromColumnName("count__*")));
     assertEquals(AggregationFunctionColumnPair.fromColumnName("sum__dimY"),
-        AggregationFunctionColumnPair.resolveToAggregatedType(
+        AggregationFunctionColumnPair.resolveToStoredType(
             AggregationFunctionColumnPair.fromColumnName("sum__dimY")));
+  }
+
+  @Test
+  public void testGetValueAggregationType() {
+    assertEquals(getStoredType(AggregationFunctionType.DISTINCTCOUNTRAWHLL), AggregationFunctionType.DISTINCTCOUNTHLL);
+    assertEquals(getStoredType(AggregationFunctionType.PERCENTILERAWTDIGEST),
+        AggregationFunctionType.PERCENTILETDIGEST);
+    assertEquals(getStoredType(AggregationFunctionType.DISTINCTCOUNTRAWTHETASKETCH),
+        AggregationFunctionType.DISTINCTCOUNTTHETASKETCH);
+    assertEquals(getStoredType(AggregationFunctionType.DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH),
+        AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH);
+    assertEquals(getStoredType(AggregationFunctionType.SUMVALUESINTEGERSUMTUPLESKETCH),
+        AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH);
+    assertEquals(getStoredType(AggregationFunctionType.AVGVALUEINTEGERSUMTUPLESKETCH),
+        AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH);
+    assertEquals(getStoredType(AggregationFunctionType.DISTINCTCOUNTHLLPLUS),
+        AggregationFunctionType.DISTINCTCOUNTHLLPLUS);
+    // Default case
+    assertEquals(getStoredType(AggregationFunctionType.COUNT), AggregationFunctionType.COUNT);
   }
 }

@@ -77,7 +77,7 @@ public class StarTreeV2BuilderConfig {
         AggregationFunctionColumnPair aggregationFunctionColumnPair =
             AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
         AggregationFunctionColumnPair aggregatedColumnPair =
-            AggregationFunctionColumnPair.resolveToAggregatedType(aggregationFunctionColumnPair);
+            AggregationFunctionColumnPair.resolveToStoredType(aggregationFunctionColumnPair);
         // If there is already an equivalent functionColumnPair in the map, do not load another.
         // This prevents the duplication of the aggregation when the StarTree is constructed.
         aggregationSpecs.putIfAbsent(aggregatedColumnPair, AggregationSpec.DEFAULT);
@@ -88,7 +88,7 @@ public class StarTreeV2BuilderConfig {
         AggregationFunctionColumnPair aggregationFunctionColumnPair =
             AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
         AggregationFunctionColumnPair aggregatedColumnPair =
-            AggregationFunctionColumnPair.resolveToAggregatedType(aggregationFunctionColumnPair);
+            AggregationFunctionColumnPair.resolveToStoredType(aggregationFunctionColumnPair);
         ChunkCompressionType compressionType =
             ChunkCompressionType.valueOf(aggregationConfig.getCompressionCodec().name());
         // If there is already an equivalent functionColumnPair in the map, do not load another.

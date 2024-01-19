@@ -55,7 +55,7 @@ public class StarTreeV2Metadata {
         AggregationFunctionColumnPair functionColumnPair = new AggregationFunctionColumnPair(functionType, columnName);
         // Lookup the stored aggregation type
         AggregationFunctionColumnPair aggregatedFunctionColumnPair =
-            AggregationFunctionColumnPair.resolveToAggregatedType(functionColumnPair);
+            AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
         ChunkCompressionType compressionType =
             ChunkCompressionType.valueOf(aggregationConfig.getString(MetadataKey.COMPRESSION_CODEC));
         // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
@@ -68,7 +68,7 @@ public class StarTreeV2Metadata {
             AggregationFunctionColumnPair.fromColumnName(functionColumnPairName);
         // Lookup the stored aggregation type
         AggregationFunctionColumnPair aggregatedFunctionColumnPair =
-            AggregationFunctionColumnPair.resolveToAggregatedType(functionColumnPair);
+            AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
         // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
         _aggregationSpecs.putIfAbsent(aggregatedFunctionColumnPair, AggregationSpec.DEFAULT);
       }
@@ -98,7 +98,7 @@ public class StarTreeV2Metadata {
     boolean containsKey = _aggregationSpecs.containsKey(functionColumnPair);
     if (!containsKey) {
       AggregationFunctionColumnPair aggregatedFunctionColumnPair =
-          AggregationFunctionColumnPair.resolveToAggregatedType(functionColumnPair);
+          AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
       containsKey = _aggregationSpecs.containsKey(aggregatedFunctionColumnPair);
     }
     return containsKey;

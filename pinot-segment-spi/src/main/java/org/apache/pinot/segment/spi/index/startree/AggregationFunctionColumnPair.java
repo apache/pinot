@@ -68,15 +68,45 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
 
   /**
    * Return a new {@code AggregationFunctionColumnPair} from an existing functionColumnPair where the new pair
-   * has the {@link AggregationFunctionType} set to the aggregated function type used in the segment or indexes.
+   * has the {@link AggregationFunctionType} set to the underlying stored type used in the segment or indexes.
    * @param functionColumnPair the existing functionColumnPair
    * @return the new functionColumnPair
    */
-  public static AggregationFunctionColumnPair resolveToAggregatedType(
+  public static AggregationFunctionColumnPair resolveToStoredType(
       AggregationFunctionColumnPair functionColumnPair) {
-    AggregationFunctionType valueAggregationFunctionType =
-        AggregationFunctionType.getAggregatedFunctionType(functionColumnPair.getFunctionType());
+    AggregationFunctionType valueAggregationFunctionType = getStoredType(functionColumnPair.getFunctionType());
     return new AggregationFunctionColumnPair(valueAggregationFunctionType, functionColumnPair.getColumn());
+  }
+
+  /**
+   * Returns the stored {@code AggregationFunctionType} used to create the underlying value in the segment or index.
+   * Some aggregation functions share the same stored type but are used for different purposes in queries.
+   * @param aggregationType the aggregation type used in a query
+   * @return the underlying value aggregation type used in storage e.g. StarTree index
+   */
+  public static AggregationFunctionType getStoredType(AggregationFunctionType aggregationType) {
+    switch (aggregationType) {
+      case DISTINCTCOUNTRAWHLL:
+        return AggregationFunctionType.DISTINCTCOUNTHLL;
+      case PERCENTILERAWEST:
+        return AggregationFunctionType.PERCENTILEEST;
+      case PERCENTILERAWTDIGEST:
+        return AggregationFunctionType.PERCENTILETDIGEST;
+      case DISTINCTCOUNTRAWTHETASKETCH:
+        return AggregationFunctionType.DISTINCTCOUNTTHETASKETCH;
+      case DISTINCTCOUNTRAWHLLPLUS:
+        return AggregationFunctionType.DISTINCTCOUNTHLLPLUS;
+      case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
+      case AVGVALUEINTEGERSUMTUPLESKETCH:
+      case SUMVALUESINTEGERSUMTUPLESKETCH:
+        return AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH;
+      case DISTINCTCOUNTRAWCPCSKETCH:
+        return AggregationFunctionType.DISTINCTCOUNTCPCSKETCH;
+      case DISTINCTCOUNTRAWULL:
+        return AggregationFunctionType.DISTINCTCOUNTULL;
+      default:
+        return aggregationType;
+    }
   }
 
   private static AggregationFunctionColumnPair fromFunctionAndColumnName(String functionName, String columnName) {

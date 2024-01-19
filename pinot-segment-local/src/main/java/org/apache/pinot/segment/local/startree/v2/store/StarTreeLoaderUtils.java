@@ -106,7 +106,7 @@ public class StarTreeLoaderUtils {
             AggregationFunctionColumnPair originalColumnPair =
                 AggregationFunctionColumnPair.fromColumnName(columnName);
             AggregationFunctionColumnPair aggregatedTypePair =
-                AggregationFunctionColumnPair.resolveToAggregatedType(originalColumnPair);
+                AggregationFunctionColumnPair.resolveToStoredType(originalColumnPair);
             return dataSourceMap.get(aggregatedTypePair.toColumnName());
           }
           return result;
