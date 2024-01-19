@@ -80,11 +80,11 @@ public class ClpEncodedVarsMatchTransformFunction extends BaseTransformFunction 
     _transformFunctions.add(f);
 
     f = argsIter.next();
-    Preconditions.checkArgument(f instanceof LiteralTransformFunction, "3rd argument must be a literal");
+    Preconditions.checkArgument(f instanceof LiteralTransformFunction, "3rd argument must be a string literal");
     String wildcardQuery = ((LiteralTransformFunction) f).getStringLiteral();
 
     f = argsIter.next();
-    Preconditions.checkArgument(f instanceof LiteralTransformFunction, "4th argument must be a literal");
+    Preconditions.checkArgument(f instanceof LiteralTransformFunction, "4th argument must be a long literal");
     long subqueryIndex = ((LiteralTransformFunction) f).getLongLiteral();
 
     EightByteClpWildcardQueryEncoder queryEncoder =
@@ -141,7 +141,7 @@ public class ClpEncodedVarsMatchTransformFunction extends BaseTransformFunction 
       clpMessageDecoder.batchEncodedVarsWildcardMatch(logtypes, encodedVars, _serializedVarTypes,
           _serializedVarWildcardQueries, _varWildcardQueryEndIndexes, _intValuesSV);
     } catch (IOException ex) {
-      _logger.error("Wildcard match on encoded variables failed.", ex);
+      _logger.error("Failed to perform wildcard match on (CLP) encoded variables field.", ex);
       Arrays.fill(_intValuesSV, 0);
     }
 
