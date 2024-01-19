@@ -141,6 +141,8 @@ public class SegmentProcessorFramework {
     int nextRecordReaderIndexToBeProcessed = 0;
     int iterationCount = 1;
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
+    boolean isMapperOutputSizeThresholdEnabled =
+        _segmentProcessorConfig.getSegmentConfig().getIntermediateFileSizeThreshold() != Long.MAX_VALUE;
 
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
       // Initialise the mapper. Eliminate the record readers that have been processed in the previous iterations.
@@ -149,7 +151,7 @@ public class SegmentProcessorFramework {
               _customRecordTransformers, _segmentProcessorConfig, _mapperOutputDir);
 
       // Log start of iteration details only if intermediate file size threshold is set.
-      if (_segmentProcessorConfig.getSegmentConfig().getIntermediateFileSizeThreshold() != Long.MAX_VALUE) {
+      if (isMapperOutputSizeThresholdEnabled) {
         String logMessage =
             String.format("Starting iteration %d with %d record readers. Starting index = %d, end index = %d",
                 iterationCount,
@@ -186,23 +188,28 @@ public class SegmentProcessorFramework {
       // Update next record reader index to be processed.
       nextRecordReaderIndexToBeProcessed = getNextRecordReaderIndexToBeProcessed(nextRecordReaderIndexToBeProcessed);
 
-      // Take care of logging the proper RecordReader index in case of the last iteration.
-      int boundaryIndexToLog =
-          nextRecordReaderIndexToBeProcessed == numRecordReaders ? nextRecordReaderIndexToBeProcessed
-              : nextRecordReaderIndexToBeProcessed + 1;
+      // Log the details between iteration only if intermediate file size threshold is set.
+      if (isMapperOutputSizeThresholdEnabled) {
+        // Take care of logging the proper RecordReader index in case of the last iteration.
+        int boundaryIndexToLog =
+            nextRecordReaderIndexToBeProcessed == numRecordReaders ? nextRecordReaderIndexToBeProcessed
+                : nextRecordReaderIndexToBeProcessed + 1;
 
-      // We are sure that the last RecordReader is completely processed in the last iteration else it may or may not
-      // have completed processing. Log it accordingly.
-      String checkForLastIterationString = nextRecordReaderIndexToBeProcessed == numRecordReaders ? " "
-          : String.format(" (RecordReader %d might be partially processed) ", boundaryIndexToLog);
+        // We are sure that the last RecordReader is completely processed in the last iteration else it may or may not
+        // have completed processing. Log it accordingly.
+        String logMessage;
+        if (nextRecordReaderIndexToBeProcessed == numRecordReaders) {
+          logMessage = String.format("Finished processing all of %d RecordReaders", numRecordReaders);
+        } else {
+          logMessage = String.format(
+              "Finished processing RecordReaders %d to %d (RecordReader %d might be partially processed) out of %d in "
+                  + "iteration %d", startingProcessedRecordReaderIndex + 1, boundaryIndexToLog,
+              nextRecordReaderIndexToBeProcessed + 1, numRecordReaders, iterationCount);
+        }
 
-      // Log the progress.
-      String logMessage = String.format(
-          "Finished processing RecordReaders %d to %d" + checkForLastIterationString + "out of %d in iteration %d",
-          startingProcessedRecordReaderIndex + 1, boundaryIndexToLog, numRecordReaders, iterationCount);
-
-      observer.accept(logMessage);
-      LOGGER.info(logMessage);
+        observer.accept(logMessage);
+        LOGGER.info(logMessage);
+      }
 
       iterationCount++;
     }
