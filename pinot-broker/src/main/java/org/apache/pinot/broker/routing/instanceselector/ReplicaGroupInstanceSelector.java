@@ -112,7 +112,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
       if (isUseFixedReplica(queryOptions)) {
         // candidates array is always sorted
-        instanceIdx = Math.abs(_tableNameHashForFixedReplicaRouting % numCandidates);
+        instanceIdx = _tableNameHashForFixedReplicaRouting % numCandidates;
       } else {
         instanceIdx = (requestId + replicaOffset) % numCandidates;
       }

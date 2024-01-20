@@ -92,7 +92,7 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         int selectedIdx;
         if (isUseFixedReplica(queryOptions)) {
           // candidates array is always sorted
-          selectedIdx = Math.abs(_tableNameHashForFixedReplicaRouting % candidates.size());
+          selectedIdx = _tableNameHashForFixedReplicaRouting % candidates.size();
         } else {
           selectedIdx = requestId++ % candidates.size();
         }
