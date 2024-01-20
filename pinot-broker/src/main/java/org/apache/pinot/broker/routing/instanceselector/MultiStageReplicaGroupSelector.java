@@ -88,7 +88,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
     int replicaGroupSelected;
-    if (isUseConsistentRouting(queryOptions)) {
+    if (isUseFixedReplica(queryOptions)) {
       // When using sticky routing, we want to iterate over the instancePartitions in order to ensure deterministic
       // selection of replica group across queries i.e. same instance replica group id is picked each time.
       // Since the instances within a selected replica group are iterated in order, the assignment within a selected

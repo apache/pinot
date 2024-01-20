@@ -90,7 +90,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final AdaptiveServerSelector _adaptiveServerSelector;
   final Clock _clock;
   final Boolean _useFixedReplica;
-  final int _tableNameHashForConsistentRouting;
+  final int _tableNameHashForFixedReplicaRouting;
 
   // These 3 variables are the cached states to help accelerate the change processing
   Set<String> _enabledInstances;
@@ -113,7 +113,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _useFixedReplica = useFixedReplica;
     // Using raw table name to ensure queries spanning across REALTIME and OFFLINE tables are routed to the same
     // instance
-    _tableNameHashForConsistentRouting = TableNameBuilder.extractRawTableName(tableNameWithType).hashCode();
+    _tableNameHashForFixedReplicaRouting = TableNameBuilder.extractRawTableName(tableNameWithType).hashCode();
 
     if (_adaptiveServerSelector != null && _useFixedReplica) {
       throw new IllegalArgumentException(
@@ -443,9 +443,9 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     }
   }
 
-  protected boolean isUseConsistentRouting(Map<String, String> queryOptions) {
+  protected boolean isUseFixedReplica(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(
-        queryOptions.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.USE_CONSISTENT_ROUTING,
+        queryOptions.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA,
             _useFixedReplica.toString()));
   }
 

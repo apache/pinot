@@ -90,9 +90,9 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
           continue;
         }
         int selectedIdx;
-        if (isUseConsistentRouting(queryOptions)) {
+        if (isUseFixedReplica(queryOptions)) {
           // candidates array is always sorted
-          selectedIdx = Math.abs(_tableNameHashForConsistentRouting % candidates.size());
+          selectedIdx = Math.abs(_tableNameHashForFixedReplicaRouting % candidates.size());
         } else {
           selectedIdx = requestId++ % candidates.size();
         }

@@ -45,8 +45,8 @@ public class InstanceSelectorFactory {
 
   @VisibleForTesting
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics, PinotConfiguration config) {
-    return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(), config);
+      ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics, PinotConfiguration brokerConfig) {
+    return getInstanceSelector(tableConfig, propertyStore, brokerMetrics, null, Clock.systemUTC(), brokerConfig);
   }
 
   public static InstanceSelector getInstanceSelector(TableConfig tableConfig,
@@ -64,6 +64,10 @@ public class InstanceSelectorFactory {
     boolean useFixedReplica = brokerConfig.getProperty(CommonConstants.Broker.CONFIG_OF_USE_FIXED_REPLICA,
         CommonConstants.Broker.DEFAULT_USE_FIXED_REPLICA);
     if (routingConfig != null) {
+      if (routingConfig.getUseFixedReplica() != null) {
+        // table config overrides broker config
+        useFixedReplica = routingConfig.getUseFixedReplica();
+      }
       if (RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(routingConfig.getInstanceSelectorType())
           || (tableConfig.getTableType() == TableType.OFFLINE && LEGACY_REPLICA_GROUP_OFFLINE_ROUTING.equalsIgnoreCase(
           routingConfig.getRoutingTableBuilderName())) || (tableConfig.getTableType() == TableType.REALTIME
@@ -83,10 +87,6 @@ public class InstanceSelectorFactory {
         LOGGER.info("Using {} for table: {}", routingConfig.getInstanceSelectorType(), tableNameWithType);
         return new MultiStageReplicaGroupSelector(tableNameWithType, propertyStore, brokerMetrics,
             adaptiveServerSelector, clock, useFixedReplica);
-      }
-      if (routingConfig.getUseFixedReplica() != null) {
-        // table config overrides broker config
-        useFixedReplica = routingConfig.getUseFixedReplica();
       }
     }
     return new BalancedInstanceSelector(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock,
