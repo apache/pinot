@@ -157,7 +157,7 @@ public class InstanceSelectorTest {
   }
 
   private InstanceSelector createTestInstanceSelector(String selectorType) {
-    RoutingConfig config = new RoutingConfig(null, null, selectorType);
+    RoutingConfig config = new RoutingConfig(null, null, selectorType, false);
     when(_tableConfig.getRoutingConfig()).thenReturn(config);
     return InstanceSelectorFactory.getInstanceSelector(_tableConfig, _propertyStore, _brokerMetrics, null,
         _mutableClock, new PinotConfiguration());
