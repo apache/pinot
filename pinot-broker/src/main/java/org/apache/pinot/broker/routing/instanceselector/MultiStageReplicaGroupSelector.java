@@ -59,8 +59,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
   public MultiStageReplicaGroupSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      boolean useConsistentRouting) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useConsistentRouting);
+      boolean useFixedReplica) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useFixedReplica);
   }
 
   @Override
@@ -93,6 +93,7 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       // selection of replica group across queries i.e. same instance replica group id is picked each time.
       // Since the instances within a selected replica group are iterated in order, the assignment within a selected
       // replica group is guaranteed to be deterministic.
+      // Note: This can cause major hotspots in the cluster.
       replicaGroupSelected = 0;
     } else {
       replicaGroupSelected = requestId % instancePartitions.getNumReplicaGroups();

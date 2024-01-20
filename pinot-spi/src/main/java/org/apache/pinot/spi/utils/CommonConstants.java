@@ -324,8 +324,8 @@ public class CommonConstants {
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = false;
 
-    public static final String CONFIG_OF_USE_CONSISTENT_ROUTING = "pinot.broker.use.consistent.routing";
-    public static final boolean DEFAULT_USE_CONSISTENT_ROUTING = false;
+    public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
+    public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
 
     // Broker config indicating the maximum serialized response size across all servers for a query. This value is
     // equally divided across all servers processing the query.

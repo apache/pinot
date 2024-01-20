@@ -72,8 +72,8 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
 
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      boolean useStickyRouting) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useStickyRouting);
+      boolean useFixedReplica) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useFixedReplica);
   }
 
   /**

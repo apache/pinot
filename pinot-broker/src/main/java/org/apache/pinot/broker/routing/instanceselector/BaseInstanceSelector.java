@@ -89,7 +89,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final BrokerMetrics _brokerMetrics;
   final AdaptiveServerSelector _adaptiveServerSelector;
   final Clock _clock;
-  final Boolean _useConsistentRouting;
+  final Boolean _useFixedReplica;
   final int _tableNameHashForConsistentRouting;
 
   // These 3 variables are the cached states to help accelerate the change processing
@@ -104,18 +104,18 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      boolean useConsistentRouting) {
+      boolean useFixedReplica) {
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
     _clock = clock;
-    _useConsistentRouting = useConsistentRouting;
+    _useFixedReplica = useFixedReplica;
     // Using raw table name to ensure queries spanning across REALTIME and OFFLINE tables are routed to the same
     // instance
     _tableNameHashForConsistentRouting = TableNameBuilder.extractRawTableName(tableNameWithType).hashCode();
 
-    if (_adaptiveServerSelector != null && _useConsistentRouting) {
+    if (_adaptiveServerSelector != null && _useFixedReplica) {
       throw new IllegalArgumentException(
           "AdaptiveServerSelector and consistent routing cannot be enabled at the same time");
     }
@@ -446,7 +446,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   protected boolean isUseConsistentRouting(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(
         queryOptions.getOrDefault(CommonConstants.Broker.Request.QueryOptionKey.USE_CONSISTENT_ROUTING,
-            _useConsistentRouting.toString()));
+            _useFixedReplica.toString()));
   }
 
   @Override
