@@ -27,6 +27,7 @@ import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.startree.OffHeapStarTree;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -78,8 +79,15 @@ public class StarTreeLoaderUtils {
 
       // Load metric (function-column pair) forward indexes
       for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
-
-        String metric = functionColumnPair.toColumnName();
+        AggregationFunctionColumnPair storedType =
+            AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
+        String metric = storedType.toColumnName();
+        // This metric is already "covered" via an existing stored type
+        if (dataSourceMap.containsKey(metric))
+          continue;
+        else if (!indexReader.hasIndexFor(metric, StandardIndexes.forward())) {
+          metric = functionColumnPair.toColumnName();
+        }
 
         PinotDataBuffer forwardIndexDataBuffer = indexReader.getIndexFor(metric, StandardIndexes.forward());
         DataType dataType = ValueAggregatorFactory.getAggregatedValueType(functionColumnPair.getFunctionType());
