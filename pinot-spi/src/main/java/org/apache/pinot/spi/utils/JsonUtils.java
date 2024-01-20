@@ -727,7 +727,7 @@ public class JsonUtils {
     JsonNode jsonNode;
     try {
       jsonNode = JsonUtils.stringToJsonNode(jsonString);
-    } catch (IOException e) {
+    } catch (JsonProcessingException e) {
       if (jsonIndexConfig.getSkipInvalidJson()) {
         return SKIPPED_FLATTENED_RECORD;
       } else {

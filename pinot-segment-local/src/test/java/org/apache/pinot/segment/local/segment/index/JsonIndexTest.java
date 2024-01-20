@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -69,6 +70,7 @@ public class JsonIndexTest {
       throws IOException {
     FileUtils.deleteDirectory(INDEX_DIR);
   }
+
 
   @Test
   public void testSmallIndex()
@@ -373,7 +375,7 @@ public class JsonIndexTest {
   }
 
   @Test
-  public void testSkipInvalidJson() throws Exception {
+  public void testSkipInvalidJsonEnable() throws Exception {
     JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
     jsonIndexConfig.setSkipInvalidJson(true);
     // the braces don't match and cannot be parsed
@@ -404,6 +406,16 @@ public class JsonIndexTest {
       Assert.assertEquals(expectedRes, offHeapRes);
       Assert.assertEquals(expectedRes, mutableRes);
     }
+  }
+
+  @Test(expectedExceptions = JsonProcessingException.class)
+  public void testSkipInvalidJsonDisable() throws Exception {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    jsonIndexConfig.setSkipInvalidJson(false);
+    // the braces don't match and cannot be parsed
+    String[] records = {"{\"key1\":\"va\""};
+
+    createIndex(true, jsonIndexConfig, records);
   }
 
   public static class ConfTest extends AbstractSerdeIndexContract {
