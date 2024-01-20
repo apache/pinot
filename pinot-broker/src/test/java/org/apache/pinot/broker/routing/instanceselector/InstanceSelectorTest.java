@@ -192,6 +192,7 @@ public class InstanceSelectorTest {
     TableConfig tableConfig = mock(TableConfig.class);
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
+    when(tableConfig.getTableName()).thenReturn("testTable_OFFLINE");
 
     // Routing config is missing
     assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
