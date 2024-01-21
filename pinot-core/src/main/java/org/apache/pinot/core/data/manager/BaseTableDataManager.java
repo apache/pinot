@@ -39,8 +39,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationConverter;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.ConfigurationConverter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -60,8 +60,6 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -73,6 +71,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -90,8 +89,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Semaphore to restrict the maximum number of parallel segment downloads for a table.
   private Semaphore _segmentDownloadSemaphore;
 
-  protected TableDataManagerConfig _tableDataManagerConfig;
+  protected InstanceDataManagerConfig _instanceDataManagerConfig;
   protected String _instanceId;
+  protected TableConfig _tableConfig;
+  protected HelixManager _helixManager;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected ServerMetrics _serverMetrics;
   protected String _tableNameWithType;
@@ -99,9 +100,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected File _indexDir;
   protected File _resourceTmpDir;
   protected Logger _logger;
-  protected HelixManager _helixManager;
   protected ExecutorService _segmentPreloadExecutor;
   protected AuthProvider _authProvider;
+  protected String _peerDownloadScheme;
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
 
@@ -114,25 +115,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected volatile boolean _shutDown;
 
   @Override
-  public void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
-      @Nullable ExecutorService segmentPreloadExecutor,
-      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      TableDataManagerParams tableDataManagerParams) {
-    LOGGER.info("Initializing table data manager for table: {}", tableDataManagerConfig.getTableName());
+  public void init(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig,
+      HelixManager helixManager, @Nullable ExecutorService segmentPreloadExecutor,
+      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache) {
+    LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
-    _tableDataManagerConfig = tableDataManagerConfig;
-    _instanceId = instanceId;
-    _propertyStore = propertyStore;
-    _serverMetrics = serverMetrics;
+    _instanceDataManagerConfig = instanceDataManagerConfig;
+    _instanceId = instanceDataManagerConfig.getInstanceId();
+    _tableConfig = tableConfig;
     _helixManager = helixManager;
+    _propertyStore = helixManager.getHelixPropertyStore();
+    _serverMetrics = ServerMetrics.get();
     _segmentPreloadExecutor = segmentPreloadExecutor;
+    _authProvider = AuthProviderUtils.extractAuthProvider(_instanceDataManagerConfig.getAuthConfig(), null);
 
-    _authProvider =
-        AuthProviderUtils.extractAuthProvider(toPinotConfiguration(_tableDataManagerConfig.getAuthConfig()), null);
-
-    _tableNameWithType = tableDataManagerConfig.getTableName();
-    _tableDataDir = tableDataManagerConfig.getDataDir();
+    _tableNameWithType = tableConfig.getTableName();
+    _tableDataDir = _instanceDataManagerConfig.getInstanceDataDir() + File.separator + _tableNameWithType;
     _indexDir = new File(_tableDataDir);
     if (!_indexDir.exists()) {
       Preconditions.checkState(_indexDir.mkdirs(), "Unable to create index directory at %s. "
@@ -148,18 +146,23 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
     _errorCache = errorCache;
     _recentlyDeletedSegments =
-        CacheBuilder.newBuilder().maximumSize(tableDataManagerConfig.getTableDeletedSegmentsCacheSize())
-            .expireAfterWrite(tableDataManagerConfig.getTableDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
-            .build();
+        CacheBuilder.newBuilder().maximumSize(instanceDataManagerConfig.getDeletedSegmentsCacheSize())
+            .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES).build();
+
+    _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
+    if (_peerDownloadScheme == null) {
+      _peerDownloadScheme = instanceDataManagerConfig.getSegmentPeerDownloadScheme();
+    }
+
     _streamSegmentDownloadUntarRateLimitBytesPerSec =
-        tableDataManagerParams.getStreamSegmentDownloadUntarRateLimitBytesPerSec();
-    _isStreamSegmentDownloadUntar = tableDataManagerParams.isStreamSegmentDownloadUntar();
+        instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit();
+    _isStreamSegmentDownloadUntar = instanceDataManagerConfig.isStreamSegmentDownloadUntar();
     if (_isStreamSegmentDownloadUntar) {
       LOGGER.info("Using streamed download-untar for segment download! "
               + "The rate limit interval for streamed download-untar is {} bytes/s",
           _streamSegmentDownloadUntarRateLimitBytesPerSec);
     }
-    int maxParallelSegmentDownloads = tableDataManagerParams.getMaxParallelSegmentDownloads();
+    int maxParallelSegmentDownloads = instanceDataManagerConfig.getMaxParallelSegmentDownloads();
     if (maxParallelSegmentDownloads > 0) {
       LOGGER.info(
           "Construct segment download semaphore for Table: {}. Maximum number of parallel segment downloads: {}",
@@ -177,6 +180,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   protected abstract void doInit();
+
+  @Override
+  public String getInstanceId() {
+    return _instanceId;
+  }
+
+  @Override
+  public InstanceDataManagerConfig getInstanceDataManagerConfig() {
+    return _instanceDataManagerConfig;
+  }
 
   @Override
   public synchronized void start() {
@@ -255,7 +268,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
         indexDir.getName(), _tableNameWithType);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
+    indexLoadingConfig.setInstanceTierConfigs(_instanceDataManagerConfig.getTierConfigs());
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, indexLoadingConfig.getSchema()));
   }
 
@@ -383,11 +396,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public TableDataManagerConfig getTableDataManagerConfig() {
-    return _tableDataManagerConfig;
-  }
-
-  @Override
   public void addSegmentError(String segmentName, SegmentErrorInfo segmentErrorInfo) {
     _errorCache.put(Pair.of(_tableNameWithType, segmentName), segmentErrorInfo);
   }
@@ -413,7 +421,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentTier = getSegmentCurrentTier(segmentName);
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
+    indexLoadingConfig.setInstanceTierConfigs(_instanceDataManagerConfig.getTierConfigs());
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     try {
       // Download segment from deep store if CRC changes or forced to download;
@@ -507,7 +515,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentTier = zkMetadata.getTier();
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
+    indexLoadingConfig.setInstanceTierConfigs(_instanceDataManagerConfig.getTierConfigs());
     if (localMetadata == null && tryLoadExistingSegment(segmentName, indexLoadingConfig, zkMetadata)) {
       return;
     }
@@ -630,7 +638,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       LOGGER.error("Attempts exceeded when downloading segment: {} for table: {} from: {} to: {}", segmentName,
           _tableNameWithType, uri, tarFile);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, 1L);
-      if (_tableDataManagerConfig.getTablePeerDownloadScheme() == null) {
+      if (_peerDownloadScheme == null) {
         throw e;
       }
       downloadFromPeersWithoutStreaming(segmentName, zkMetadata, tarFile);
@@ -649,11 +657,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // not thread safe. Caller should invoke it with safe concurrency control.
   protected void downloadFromPeersWithoutStreaming(String segmentName, SegmentZKMetadata zkMetadata, File destTarFile)
       throws Exception {
-    Preconditions.checkArgument(_tableDataManagerConfig.getTablePeerDownloadScheme() != null,
-        "Download peers require non null peer download scheme");
+    Preconditions.checkState(_peerDownloadScheme != null, "Download peers require non null peer download scheme");
     List<URI> peerSegmentURIs =
-        PeerServerSegmentFinder.getPeerServerURIs(segmentName, _tableDataManagerConfig.getTablePeerDownloadScheme(),
-            _helixManager, _tableNameWithType);
+        PeerServerSegmentFinder.getPeerServerURIs(segmentName, _peerDownloadScheme, _helixManager, _tableNameWithType);
     if (peerSegmentURIs.isEmpty()) {
       String msg = String.format("segment %s doesn't have any peers", segmentName);
       LOGGER.warn(msg);
@@ -745,7 +751,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return getSegmentDataDir(segmentName);
     }
     String tierDataDir =
-        TierConfigUtils.getDataDirForTier(tableConfig, segmentTier, _tableDataManagerConfig.getInstanceTierConfigs());
+        TierConfigUtils.getDataDirForTier(tableConfig, segmentTier, _instanceDataManagerConfig.getTierConfigs());
     if (StringUtils.isEmpty(tierDataDir)) {
       return getSegmentDataDir(segmentName);
     }

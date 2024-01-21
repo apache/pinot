@@ -84,8 +84,13 @@ public class CompileTimeFunctionsInvoker implements QueryRewriter {
         }
         try {
           FunctionInvoker invoker = new FunctionInvoker(functionInfo);
-          invoker.convertTypes(arguments);
-          Object result = invoker.invoke(arguments);
+          Object result;
+          if (invoker.getMethod().isVarArgs()) {
+            result = invoker.invoke(new Object[] {arguments});
+          } else {
+            invoker.convertTypes(arguments);
+            result = invoker.invoke(arguments);
+          }
           return RequestUtils.getLiteralExpression(result);
         } catch (Exception e) {
           throw new SqlCompilationException(

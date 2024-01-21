@@ -64,8 +64,9 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
   public ReplicaGroupInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
+      boolean useFixedReplica) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useFixedReplica);
   }
 
   @Override
@@ -107,7 +108,15 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       }
       // Round robin selection.
       int numCandidates = candidates.size();
-      int instanceIdx = (requestId + replicaOffset) % numCandidates;
+      int instanceIdx;
+
+      if (isUseFixedReplica(queryOptions)) {
+        // candidates array is always sorted
+        instanceIdx = _tableNameHashForFixedReplicaRouting % numCandidates;
+      } else {
+        instanceIdx = (requestId + replicaOffset) % numCandidates;
+      }
+
       SegmentInstanceCandidate selectedInstance = candidates.get(instanceIdx);
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.

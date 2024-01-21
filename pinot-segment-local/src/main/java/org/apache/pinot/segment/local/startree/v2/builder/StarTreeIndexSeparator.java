@@ -29,8 +29,9 @@ import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -62,7 +63,7 @@ public class StarTreeIndexSeparator implements Closeable {
       int numStarTrees) {
     try (InputStream inputStream = new FileInputStream(indexMapFile)) {
       return StarTreeIndexMapUtils.loadFromInputStream(inputStream, numStarTrees);
-    } catch (IOException e) {
+    } catch (IOException | ConfigurationException e) {
       throw new RuntimeException(e);
     }
   }

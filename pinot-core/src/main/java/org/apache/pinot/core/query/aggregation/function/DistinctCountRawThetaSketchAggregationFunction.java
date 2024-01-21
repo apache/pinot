@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -47,11 +49,17 @@ public class DistinctCountRawThetaSketchAggregationFunction extends DistinctCoun
   }
 
   @Override
-  public String extractFinalResult(List<Sketch> sketches) {
-    Sketch sketch = evaluatePostAggregationExpression(sketches);
+  public String extractFinalResult(List<ThetaSketchAccumulator> accumulators) {
+    int numAccumulators = accumulators.size();
+    List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
 
-    // NOTE: Compact the sketch in unsorted, on-heap fashion for performance concern.
-    //       See https://datasketches.apache.org/docs/Theta/ThetaSize.html for more details.
-    return Base64.getEncoder().encodeToString(sketch.compact(false, null).toByteArray());
+    for (ThetaSketchAccumulator accumulator : accumulators) {
+      accumulator.setThreshold(_accumulatorThreshold);
+      accumulator.setSetOperationBuilder(_setOperationBuilder);
+      mergedSketches.add(accumulator.getResult());
+    }
+
+    Sketch sketch = evaluatePostAggregationExpression(mergedSketches);
+    return Base64.getEncoder().encodeToString(sketch.toByteArray());
   }
 }

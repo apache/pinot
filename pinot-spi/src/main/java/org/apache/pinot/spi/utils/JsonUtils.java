@@ -647,7 +647,7 @@ public class JsonUtils {
             fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
       }
     } else {
-      throw new IllegalArgumentException(String.format("Unsupported json node type", jsonNode.getClass()));
+      throw new IllegalArgumentException(String.format("Unsupported json node type for class %s", jsonNode.getClass()));
     }
   }
 

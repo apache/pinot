@@ -36,6 +36,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -362,6 +363,7 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
+      @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
       FormDataMultiPart metadataFiles) {
     if (instanceId == null || segmentName == null || segmentLocation == null || metadataFiles == null || (offset == -1
         && streamPartitionMsgOffset == null)) {
@@ -375,7 +377,7 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withSegmentLocation(segmentLocation)
         .withSegmentSizeBytes(segmentSizeBytes).withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis)
-        .withNumRows(numRows).withMemoryUsedBytes(memoryUsedBytes);
+        .withNumRows(numRows).withMemoryUsedBytes(memoryUsedBytes).withReason(stopReason);
     extractOffsetFromParams(requestParams, streamPartitionMsgOffset, offset);
     LOGGER.info("Processing segmentCommitEndWithMetadata:{}", requestParams.toString());
 
@@ -458,7 +460,7 @@ public class LLCSegmentCompletionHandlers {
    * temporarily.
    */
   private static SegmentMetadataImpl extractSegmentMetadataFromForm(FormDataMultiPart form, String segmentName)
-      throws IOException {
+      throws IOException, ConfigurationException {
     File tempIndexDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(
         ControllerFilePathProvider.getInstance().getUntarredFileTempDir(), getTempSegmentFileName(segmentName),
         "Invalid segment name: %s", segmentName);

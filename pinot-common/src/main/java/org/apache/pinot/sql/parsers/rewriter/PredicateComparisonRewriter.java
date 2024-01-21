@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -128,6 +129,23 @@ public class PredicateComparisonRewriter implements QueryRewriter {
             break;
           }
           break;
+        case VECTOR_SIMILARITY: {
+          Preconditions.checkArgument(operands.size() >= 2 && operands.size() <= 3,
+              "For %s predicate, the number of operands must be at either 2 or 3, got: %s", filterKind, expression);
+          // Array Literal is a function of type 'ARRAYVALUECONSTRUCTOR' with operands of Float/Double Literals
+          if (operands.get(1).getFunctionCall() == null || !operands.get(1).getFunctionCall().getOperator()
+              .equalsIgnoreCase("arrayvalueconstructor")) {
+            throw new SqlCompilationException(
+                String.format("For %s predicate, the second operand must be a float array literal, got: %s", filterKind,
+                    expression));
+          }
+          if (operands.size() == 3 && operands.get(2).getLiteral() == null) {
+            throw new SqlCompilationException(
+                String.format("For %s predicate, the third operand must be a literal, got: %s", filterKind,
+                    expression));
+          }
+          break;
+        }
         default:
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
@@ -150,18 +168,19 @@ public class PredicateComparisonRewriter implements QueryRewriter {
    *                "select * from table where col1 = true"
    *     Example2: "select * from table where startsWith(col1, 'str')" converts to
    *               "select * from table where startsWith(col1, 'str') = true"
+   *
    * @param expression Expression
    * @return Rewritten expression
    */
   private static Expression convertPredicateToEqualsBooleanExpression(Expression expression) {
-      Expression newExpression;
-      newExpression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
-      List<Expression> operands = new ArrayList<>();
-      operands.add(expression);
-      operands.add(RequestUtils.getLiteralExpression(true));
-      newExpression.getFunctionCall().setOperands(operands);
+    Expression newExpression;
+    newExpression = RequestUtils.getFunctionExpression(FilterKind.EQUALS.name());
+    List<Expression> operands = new ArrayList<>();
+    operands.add(expression);
+    operands.add(RequestUtils.getLiteralExpression(true));
+    newExpression.getFunctionCall().setOperands(operands);
 
-      return newExpression;
+    return newExpression;
   }
 
   /**

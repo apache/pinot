@@ -379,7 +379,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
         return false;
       default:
-        _segmentLogger.error("Illegal state {}" + _state.toString());
+        _segmentLogger.error("Illegal state: {}", _state);
         throw new RuntimeException("Illegal state to consume");
     }
   }
@@ -1060,7 +1060,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
 
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
-        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId)
+        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason)
         .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
         .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
         .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
@@ -1358,7 +1358,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _isReadyToConsumeData = isReadyToConsumeData;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
-    _instanceId = _realtimeTableDataManager.getServerInstance();
+    _instanceId = _realtimeTableDataManager.getInstanceId();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_tableNameWithType);
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverMetrics, _tableNameWithType);
     CompletionConfig completionConfig = _tableConfig.getValidationConfig().getCompletionConfig();

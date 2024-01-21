@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
 
 
@@ -44,31 +45,33 @@ public class SpeedTest {
   private void init()
       throws Exception {
     // write a temp file
-    FileOutputStream fout = new FileOutputStream(FILE_NAME);
-    DataOutputStream out = new DataOutputStream(fout);
-    _heapStorage = new int[SIZE];
-    _directMemory = ByteBuffer.allocateDirect(SIZE * 4);
-    for (int i = 0; i < SIZE; i++) {
-      int data = (int) (Math.random() * Integer.MAX_VALUE);
-      out.writeInt(data);
-      _heapStorage[i] = data;
-      _directMemory.putInt(data);
+    try (FileOutputStream fout = new FileOutputStream(FILE_NAME);
+          DataOutputStream out = new DataOutputStream(fout)) {
+      _heapStorage = new int[SIZE];
+      _directMemory = ByteBuffer.allocateDirect(SIZE * 4);
+      for (int i = 0; i < SIZE; i++) {
+        int data = (int) (Math.random() * Integer.MAX_VALUE);
+        out.writeInt(data);
+        _heapStorage[i] = data;
+        _directMemory.putInt(data);
+      }
     }
-    out.close();
-    RandomAccessFile raf = new RandomAccessFile(FILE_NAME, "rw");
-    _mmappedByteBuffer = raf.getChannel().map(MapMode.READ_WRITE, 0L, raf.length());
-    _mmappedByteBuffer.load();
+    try (RandomAccessFile raf = new RandomAccessFile(FILE_NAME, "rw");
+          FileChannel channel = raf.getChannel()) {
+      _mmappedByteBuffer = channel.map(MapMode.READ_WRITE, 0L, raf.length());
+      _mmappedByteBuffer.load();
 
-    int toSelect = (int) (SIZE * READ_PERCENTAGE);
-    _readIndices = new int[toSelect];
-    int ind = 0;
-    for (int i = 0; i < SIZE && toSelect > 0; i++) {
-      double probOfSelection = toSelect * 1.0 / (SIZE - i);
-      double random = Math.random();
-      if (random < probOfSelection) {
-        _readIndices[ind] = i;
-        toSelect = toSelect - 1;
-        ind = ind + 1;
+      int toSelect = (int) (SIZE * READ_PERCENTAGE);
+      _readIndices = new int[toSelect];
+      int ind = 0;
+      for (int i = 0; i < SIZE && toSelect > 0; i++) {
+        double probOfSelection = toSelect * 1.0 / (SIZE - i);
+        double random = Math.random();
+        if (random < probOfSelection) {
+          _readIndices[ind] = i;
+          toSelect = toSelect - 1;
+          ind = ind + 1;
+        }
       }
     }
   }

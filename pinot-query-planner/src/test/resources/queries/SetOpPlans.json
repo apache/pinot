@@ -106,7 +106,7 @@
       {
         "description": "Incorrect selection list ",
         "sql": "EXPLAIN PLAN FOR SELECT col1, col3 FROM a UNION ALL SELECT col1 FROM b",
-        "expectedException": "Error explain query plan for.*"
+        "expectedException": ".*Column count mismatch in UNION.*"
       }
     ]
   }

@@ -276,12 +276,14 @@ public class PinotByteBuffer extends PinotDataBuffer {
       throws IOException {
     assert offset <= Integer.MAX_VALUE;
     assert size <= Integer.MAX_VALUE;
-    try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r")) {
+    try (RandomAccessFile randomAccessFile = new RandomAccessFile(file, "r");
+        FileChannel channel = randomAccessFile.getChannel()) {
+
       ByteBuffer duplicate = _buffer.duplicate();
       int start = (int) offset;
       int end = start + (int) size;
       ((Buffer) duplicate).position(start).limit(end);
-      randomAccessFile.getChannel().read(duplicate, srcOffset);
+      channel.read(duplicate, srcOffset);
     }
   }
 

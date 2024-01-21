@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.partition;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 
 /**
@@ -28,7 +29,7 @@ import java.util.Map;
 public class PartitionFunctionFactory {
   // Enum for various partition functions to be added.
   public enum PartitionFunctionType {
-    Modulo, Murmur, ByteArray, HashCode, BoundedColumnValue;
+    Modulo, Murmur, Murmur3, ByteArray, HashCode, BoundedColumnValue;
     // Add more functions here.
 
     private static final Map<String, PartitionFunctionType> VALUE_MAP = new HashMap<>();
@@ -68,7 +69,7 @@ public class PartitionFunctionFactory {
   // The PartitionFunctionFactory should be able to support these default implementations, as well as instantiate
   // based on config
   public static PartitionFunction getPartitionFunction(String functionName, int numPartitions,
-      Map<String, String> functionConfig) {
+      @Nullable Map<String, String> functionConfig) {
     PartitionFunctionType function = PartitionFunctionType.fromString(functionName);
     switch (function) {
       case Modulo:
@@ -76,6 +77,9 @@ public class PartitionFunctionFactory {
 
       case Murmur:
         return new MurmurPartitionFunction(numPartitions);
+
+      case Murmur3:
+        return new Murmur3PartitionFunction(numPartitions, functionConfig);
 
       case ByteArray:
         return new ByteArrayPartitionFunction(numPartitions);

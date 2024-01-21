@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class InMemorySendingMailbox implements SendingMailbox {
-  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcSendingMailbox.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(InMemorySendingMailbox.class);
 
   private final String _id;
   private final MailboxService _mailboxService;

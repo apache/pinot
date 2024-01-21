@@ -39,6 +39,10 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.datasketches.cpc.CpcSketch;
+import org.apache.datasketches.theta.SetOperationBuilder;
+import org.apache.datasketches.theta.Sketch;
+import org.apache.datasketches.theta.Sketches;
+import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.segment.local.customobject.AvgPair;
@@ -49,6 +53,7 @@ import org.apache.pinot.segment.local.customobject.LongLongPair;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
+import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.annotations.Test;
@@ -469,6 +474,52 @@ public class ObjectSerDeUtilsTest {
 
       assertEquals(actual.getDistinctCountEstimate(), ull.getDistinctCountEstimate(), ERROR_MESSAGE);
       assertEquals(actual.getState(), ull.getState(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testThetaSketch() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      UpdateSketch input = Sketches.updateSketchBuilder().build();
+      int size = RANDOM.nextInt(100) + 10;
+      boolean shouldOrder = RANDOM.nextBoolean();
+
+      for (int j = 0; j < size; j++) {
+        input.update(j);
+      }
+
+      Sketch sketch = input.compact(shouldOrder, null);
+
+      byte[] bytes = ObjectSerDeUtils.serialize(sketch);
+      Sketch actual = ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.DataSketch);
+
+      assertEquals(actual.getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+      assertEquals(actual.toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
+      assertEquals(actual.isOrdered(), shouldOrder, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testThetaSketchAccumulator() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      UpdateSketch input = Sketches.updateSketchBuilder().build();
+      int size = RANDOM.nextInt(100) + 10;
+
+      for (int j = 0; j < size; j++) {
+        input.update(j);
+      }
+
+      SetOperationBuilder setOperationBuilder = new SetOperationBuilder();
+      ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(setOperationBuilder, 2);
+      Sketch sketch = input.compact(false, null);
+      accumulator.apply(sketch);
+
+      byte[] bytes = ObjectSerDeUtils.serialize(accumulator);
+      ThetaSketchAccumulator actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.ThetaSketchAccumulator);
+
+      assertEquals(actual.getResult().getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+      assertEquals(actual.getResult().toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
     }
   }
 }

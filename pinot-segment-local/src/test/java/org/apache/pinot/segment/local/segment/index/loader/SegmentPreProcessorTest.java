@@ -34,7 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
@@ -1895,18 +1896,23 @@ public class SegmentPreProcessorTest {
     return driver.getOutputDirectory();
   }
 
-  private static void removeMinMaxValuesFromMetadataFile(File indexDir) {
+  private static void removeMinMaxValuesFromMetadataFile(File indexDir)
+      throws ConfigurationException {
     PropertiesConfiguration configuration = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     Iterator<String> keys = configuration.getKeys();
+    List<String> keysToClear = new ArrayList<>();
     while (keys.hasNext()) {
       String key = keys.next();
       if (key.endsWith(V1Constants.MetadataKeys.Column.MIN_VALUE) || key.endsWith(
           V1Constants.MetadataKeys.Column.MAX_VALUE) || key.endsWith(
           V1Constants.MetadataKeys.Column.MIN_MAX_VALUE_INVALID)) {
-        configuration.clearProperty(key);
+        keysToClear.add(key);
       }
     }
-    SegmentMetadataUtils.savePropertiesConfiguration(configuration);
+    for (String key: keysToClear) {
+      configuration.clearProperty(key);
+    }
+    SegmentMetadataUtils.savePropertiesConfiguration(configuration, indexDir);
   }
 
   private static Map<String, Consumer<IndexLoadingConfig>> createConfigPrepFunctions() {

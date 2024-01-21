@@ -43,6 +43,7 @@ import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
+import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
@@ -84,6 +85,7 @@ public class IndexLoadingConfig {
   private FSTType _fstIndexType = FSTType.LUCENE;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
   private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
+  private Map<String, VectorIndexConfig> _vectorIndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private final Map<String, String> _noDictionaryConfig = new HashMap<>();
   private final Set<String> _varLengthDictionaryColumns = new HashSet<>();
@@ -217,6 +219,7 @@ public class IndexLoadingConfig {
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
     extractH3IndexConfigsFromTableConfig(tableConfig);
+    extractVectorIndexConfigsFromTableConfig(tableConfig);
     extractForwardIndexDisabledColumnsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
@@ -401,6 +404,18 @@ public class IndexLoadingConfig {
     }
   }
 
+  private void extractVectorIndexConfigsFromTableConfig(TableConfig tableConfig) {
+    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
+    if (fieldConfigList != null) {
+      for (FieldConfig fieldConfig : fieldConfigList) {
+        if (fieldConfig.getIndexType() == FieldConfig.IndexType.VECTOR) {
+          //noinspection ConstantConditions
+          _vectorIndexConfigs.put(fieldConfig.getName(), new VectorIndexConfig(fieldConfig.getProperties()));
+        }
+      }
+    }
+  }
+
   private void extractFromInstanceConfig(InstanceDataManagerConfig instanceDataManagerConfig) {
     if (instanceDataManagerConfig == null) {
       return;
@@ -529,6 +544,10 @@ public class IndexLoadingConfig {
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
     return unmodifiable(_h3IndexConfigs);
+  }
+
+  public Map<String, VectorIndexConfig> getVectorIndexConfigs() {
+    return unmodifiable(_vectorIndexConfigs);
   }
 
   public Map<String, Map<String, String>> getColumnProperties() {
@@ -700,6 +719,12 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setH3IndexConfigs(Map<String, H3IndexConfig> h3IndexConfigs) {
     _h3IndexConfigs = new HashMap<>(h3IndexConfigs);
+    _dirty = true;
+  }
+
+  @VisibleForTesting
+  public void setVectorIndexConfigs(Map<String, VectorIndexConfig> vectorIndexConfigs) {
+    _vectorIndexConfigs = new HashMap<>(vectorIndexConfigs);
     _dirty = true;
   }
 

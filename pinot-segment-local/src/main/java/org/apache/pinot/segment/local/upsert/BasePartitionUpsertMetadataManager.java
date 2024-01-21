@@ -26,6 +26,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -40,6 +41,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -64,6 +66,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected final String _tableNameWithType;
   protected final int _partitionId;
+  protected final UpsertContext _context;
   protected final List<String> _primaryKeyColumns;
   protected final List<String> _comparisonColumns;
   protected final String _deleteRecordColumn;
@@ -71,6 +74,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected final PartialUpsertHandler _partialUpsertHandler;
   protected final boolean _enableSnapshot;
   protected final double _metadataTTL;
+  protected final double _deletedKeysTTL;
   protected final File _tableIndexDir;
   protected final ServerMetrics _serverMetrics;
   protected final Logger _logger;
@@ -95,26 +99,26 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private int _numPendingOperations = 1;
   private boolean _closed;
 
-  protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId,
-      List<String> primaryKeyColumns, List<String> comparisonColumns, @Nullable String deleteRecordColumn,
-      HashFunction hashFunction, @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot,
-      double metadataTTL, File tableIndexDir, ServerMetrics serverMetrics) {
+  protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
-    _primaryKeyColumns = primaryKeyColumns;
-    _comparisonColumns = comparisonColumns;
-    _deleteRecordColumn = deleteRecordColumn;
-    _hashFunction = hashFunction;
-    _partialUpsertHandler = partialUpsertHandler;
-    _enableSnapshot = enableSnapshot;
-    _metadataTTL = metadataTTL;
-    _tableIndexDir = tableIndexDir;
-    _snapshotLock = enableSnapshot ? new ReentrantReadWriteLock() : null;
-    _serverMetrics = serverMetrics;
+    _context = context;
+    _primaryKeyColumns = context.getPrimaryKeyColumns();
+    _comparisonColumns = context.getComparisonColumns();
+    _deleteRecordColumn = context.getDeleteRecordColumn();
+    _hashFunction = context.getHashFunction();
+    _partialUpsertHandler = context.getPartialUpsertHandler();
+    _enableSnapshot = context.isSnapshotEnabled();
+    _snapshotLock = _enableSnapshot ? new ReentrantReadWriteLock() : null;
+    _metadataTTL = context.getMetadataTTL();
+    _deletedKeysTTL = context.getDeletedKeysTTL();
+    _tableIndexDir = context.getTableIndexDir();
+    _serverMetrics = ServerMetrics.get();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
-    if (metadataTTL > 0) {
+    if (_metadataTTL > 0) {
       _largestSeenComparisonValue = loadWatermark();
     } else {
+      _largestSeenComparisonValue = Double.MIN_VALUE;
       deleteWatermark();
     }
   }
@@ -158,8 +162,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _tableNameWithType);
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
 
+    if (_deletedKeysTTL > 0) {
+      double maxComparisonValue =
+          ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
+              .getMaxValue()).doubleValue();
+      _largestSeenComparisonValue = Math.max(_largestSeenComparisonValue, maxComparisonValue);
+    }
+
     // Skip adding segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
-    if (_largestSeenComparisonValue > 0) {
+    if (_metadataTTL > 0 && _largestSeenComparisonValue > 0) {
       Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");
@@ -281,7 +292,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
-      addSegment(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds), true);
+      doPreloadSegment(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds));
     } catch (Exception e) {
       throw new RuntimeException(
           String.format("Caught exception while preloading segment: %s, table: %s", segmentName, _tableNameWithType),
@@ -297,19 +308,29 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   /**
+   * NOTE: no need to get segmentLock to preload segment as callers ensure the segment is processed by a single thread.
+   * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
+   *       tests. The passed in bitmaps should always be empty.
+   */
+  @VisibleForTesting
+  void doPreloadSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
+    if (validDocIds == null) {
+      validDocIds = new ThreadSafeMutableRoaringBitmap();
+    }
+    if (queryableDocIds == null && _deleteRecordColumn != null) {
+      queryableDocIds = new ThreadSafeMutableRoaringBitmap();
+    }
+    addSegmentWithoutUpsert(segment, validDocIds, queryableDocIds, recordInfoIterator);
+  }
+
+  /**
    * NOTE: We allow passing in validDocIds and queryableDocIds here so that the value can be easily accessed from the
    *       tests. The passed in bitmaps should always be empty.
    */
   @VisibleForTesting
   public void addSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator) {
-    addSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, false);
-  }
-
-  @VisibleForTesting
-  public void addSegment(ImmutableSegmentImpl segment, @Nullable ThreadSafeMutableRoaringBitmap validDocIds,
-      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
-      boolean isPreloading) {
     String segmentName = segment.getSegmentName();
     Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
     segmentLock.lock();
@@ -320,11 +341,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (queryableDocIds == null && _deleteRecordColumn != null) {
         queryableDocIds = new ThreadSafeMutableRoaringBitmap();
       }
-      if (isPreloading) {
-        addSegmentWithoutUpsert(segment, validDocIds, queryableDocIds, recordInfoIterator);
-      } else {
-        addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
-      }
+      addOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, null, null);
     } finally {
       segmentLock.unlock();
     }
@@ -489,7 +506,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     // Skip removing segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
-    if (_largestSeenComparisonValue > 0) {
+    if (_metadataTTL > 0 && _largestSeenComparisonValue > 0) {
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
       if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue - _metadataTTL) {
@@ -611,20 +628,37 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     long startTimeMs = System.currentTimeMillis();
 
     int numImmutableSegments = 0;
+    // The segments without validDocIds snapshots should take their snapshots at last. So that when there is failure
+    // to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of valid docs across
+    // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
+    // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
+    Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     for (IndexSegment segment : _trackedSegments) {
-      if (segment instanceof ImmutableSegmentImpl) {
-        ((ImmutableSegmentImpl) segment).persistValidDocIdsSnapshot();
-        numImmutableSegments++;
-        numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+      if (!(segment instanceof ImmutableSegmentImpl)) {
+        continue;
       }
+      ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+      if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
+        segmentsWithoutSnapshot.add(immutableSegment);
+        continue;
+      }
+      immutableSegment.persistValidDocIdsSnapshot();
+      numImmutableSegments++;
+      numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+    }
+    for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
+      segment.persistValidDocIdsSnapshot();
+      numImmutableSegments++;
+      numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
     }
 
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
-    _logger.info("Finished taking snapshot for {} immutable segments (out of {} total segments) in {}ms",
-        numImmutableSegments, numTrackedSegments, System.currentTimeMillis() - startTimeMs);
+    _logger.info(
+        "Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments) in {}ms",
+        numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments, System.currentTimeMillis() - startTimeMs);
   }
 
   /**
@@ -686,7 +720,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   @Override
   public void removeExpiredPrimaryKeys() {
-    if (_metadataTTL <= 0) {
+    if (_metadataTTL <= 0 && _deletedKeysTTL <= 0) {
       return;
     }
     if (!startOperation()) {
@@ -694,7 +728,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       return;
     }
     try {
+      long startTime = System.currentTimeMillis();
       doRemoveExpiredPrimaryKeys();
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS,
+          duration, TimeUnit.MILLISECONDS);
     } finally {
       finishOperation();
     }
@@ -752,6 +790,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
     doClose();
+    // We don't remove the segment from the metadata manager when
+    // it's closed. This was done to make table deletion faster. Since we don't remove the segment, we never decrease
+    // the primary key count. So, we set the primary key count to 0 here.
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        0L);
     _logger.info("Closed the metadata manager");
   }
 
