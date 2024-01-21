@@ -146,6 +146,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Boolean isUseFixedReplica(Map<String, String> queryOptions) {
+    String useFixedReplica = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA);
+    return useFixedReplica != null ? Boolean.parseBoolean(useFixedReplica) : null;
+  }
+
+  @Nullable
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
     String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
     return numReplicaGroupsToQuery != null ? Integer.parseInt(numReplicaGroupsToQuery) : null;

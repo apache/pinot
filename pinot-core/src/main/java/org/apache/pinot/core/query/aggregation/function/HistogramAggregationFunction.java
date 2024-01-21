@@ -59,17 +59,25 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     if (numArguments == 2) {
       ExpressionContext arrayExpression = arguments.get(1);
       Preconditions.checkArgument(
-          (arrayExpression.getType() == ExpressionContext.Type.FUNCTION) && (arrayExpression.getFunction()
-              .getFunctionName().equals(ARRAY_CONSTRUCTOR)),
+          // ARRAY function
+          ((arrayExpression.getType() == ExpressionContext.Type.FUNCTION)
+              && (arrayExpression.getFunction().getFunctionName().equals(ARRAY_CONSTRUCTOR)))
+              || ((arrayExpression.getType() == ExpressionContext.Type.LITERAL)
+              && (arrayExpression.getLiteral().getValue() instanceof List)),
           "Please use the format of `Histogram(columnName, ARRAY[1,10,100])` to specify the bin edges");
-      _bucketEdges = parseVector(arrayExpression.getFunction().getArguments());
+      if (arrayExpression.getType() == ExpressionContext.Type.FUNCTION) {
+        _bucketEdges = parseVector(arrayExpression.getFunction().getArguments());
+      } else {
+        _bucketEdges = parseVectorLiteral((List) arrayExpression.getLiteral().getValue());
+      }
       _lower = _bucketEdges[0];
       _upper = _bucketEdges[_bucketEdges.length - 1];
     } else {
       _isEqualLength = true;
       _lower = arguments.get(1).getLiteral().getDoubleValue();
       _upper = arguments.get(2).getLiteral().getDoubleValue();
-      int numBins = arguments.get(3).getLiteral().getIntValue();;
+      int numBins = arguments.get(3).getLiteral().getIntValue();
+      ;
       Preconditions.checkArgument(_upper > _lower,
           "The right most edge must be greater than left most edge, given %s and %s", _lower, _upper);
       Preconditions.checkArgument(numBins > 0, "The number of bins must be greater than zero, given %s", numBins);
@@ -109,8 +117,23 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
     return ret;
   }
 
+  private double[] parseVectorLiteral(List arrayStr) {
+    int len = arrayStr.size();
+    Preconditions.checkArgument(len > 1, "The number of bin edges must be greater than 1");
+    double[] ret = new double[len];
+    for (int i = 0; i < len; i++) {
+      // TODO: Represent infinity as literal instead of identifier
+      ret[i] = Double.parseDouble(arrayStr.get(i).toString());
+      if (i > 0) {
+        Preconditions.checkState(ret[i] > ret[i - 1], "The bin edges must be strictly increasing");
+      }
+    }
+    return ret;
+  }
+
   /**
    * Find the bin id for the input value. Use division for equal-length bins, and binary search otherwise.
+   *
    * @param val input value
    * @return bin id
    */
@@ -135,7 +158,7 @@ public class HistogramAggregationFunction extends BaseSingleInputAggregationFunc
           i = mid;
         }
       }
-     id = i;
+      id = i;
     }
     return id;
   }

@@ -207,7 +207,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
       // NOTE: Set _tableUpsertMetadataManager before initializing it because when preloading is enabled, we need to
       //       load segments into it
-      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig);
+      _tableUpsertMetadataManager =
+          TableUpsertMetadataManagerFactory.create(tableConfig, _instanceDataManagerConfig.getUpsertConfig());
       _tableUpsertMetadataManager.init(tableConfig, schema, this, _helixManager, _segmentPreloadExecutor);
     }
 
@@ -327,7 +328,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public String getConsumerDir() {
-    String consumerDirPath = _tableDataManagerConfig.getConsumerDir();
+    String consumerDirPath = _instanceDataManagerConfig.getConsumerDir();
     File consumerDir;
     // If a consumer directory has been configured, use it to create a per-table path under the consumer dir.
     // Otherwise, create a sub-dir under the table-specific data director and use it for consumer mmaps
@@ -390,7 +391,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     // Assign table directory and tier info to not let the segment be moved during loading/preprocessing
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
+    indexLoadingConfig.setInstanceTierConfigs(_instanceDataManagerConfig.getTierConfigs());
     indexLoadingConfig.setSegmentTier(segmentZKMetadata.getTier());
 
     File segmentDir = new File(_indexDir, segmentName);
@@ -695,6 +696,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public String getServerInstance() {
     return _instanceId;
+  }
+
+  @VisibleForTesting
+  public TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return _tableUpsertMetadataManager;
   }
 
   /**
