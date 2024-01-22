@@ -129,7 +129,11 @@ public class PinotEvaluateLiteralRule {
     public RexNode visitCall(RexCall call) {
       RexCall visitedCall = (RexCall) super.visitCall(call);
       // Check if all operands are RexLiteral
-      if (visitedCall.operands.stream().allMatch(operand -> operand instanceof RexLiteral)) {
+      if (visitedCall.operands.stream().allMatch(operand ->
+          operand instanceof RexLiteral
+              || (operand instanceof RexCall && ((RexCall) operand).getOperands().stream()
+                  .allMatch(op -> op instanceof RexLiteral))
+      )) {
         return evaluateLiteralOnlyFunction(visitedCall, _rexBuilder);
       } else {
         return visitedCall;
@@ -144,7 +148,9 @@ public class PinotEvaluateLiteralRule {
   private static RexNode evaluateLiteralOnlyFunction(RexCall rexCall, RexBuilder rexBuilder) {
     String functionName = PinotRuleUtils.extractFunctionName(rexCall);
     List<RexNode> operands = rexCall.getOperands();
-    assert operands.stream().allMatch(operand -> operand instanceof RexLiteral);
+    assert operands.stream().allMatch(operand -> operand instanceof RexLiteral
+        || (operand instanceof RexCall && ((RexCall) operand).getOperands().stream()
+        .allMatch(op -> op instanceof RexLiteral)));
     int numOperands = operands.size();
     FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numOperands);
     if (functionInfo == null) {
@@ -153,14 +159,29 @@ public class PinotEvaluateLiteralRule {
     }
     Object[] arguments = new Object[numOperands];
     for (int i = 0; i < numOperands; i++) {
-      arguments[i] = getLiteralValue((RexLiteral) operands.get(i));
+      RexNode rexNode = operands.get(i);
+      if (rexNode instanceof RexCall
+          && ((RexCall) rexNode).getOperator().getName().equalsIgnoreCase("CAST")) {
+        // this must be a cast function
+        RexCall operand = (RexCall) rexNode;
+        arguments[i] = getLiteralValue((RexLiteral) operand.getOperands().get(0));
+      } else if (rexNode instanceof RexLiteral) {
+        arguments[i] = getLiteralValue((RexLiteral) rexNode);
+      } else {
+        // Function operands cannot be evaluated, skip
+        return rexCall;
+      }
     }
     RelDataType rexNodeType = rexCall.getType();
     Object resultValue;
     try {
       FunctionInvoker invoker = new FunctionInvoker(functionInfo);
-      invoker.convertTypes(arguments);
-      resultValue = invoker.invoke(arguments);
+      if (functionInfo.getMethod().isVarArgs()) {
+        resultValue = invoker.invoke(new Object[] {arguments});
+      } else {
+        invoker.convertTypes(arguments);
+        resultValue = invoker.invoke(arguments);
+      }
       if (rexNodeType.getSqlTypeName() == SqlTypeName.ARRAY) {
         RelDataType componentType = rexNodeType.getComponentType();
         if (componentType != null) {

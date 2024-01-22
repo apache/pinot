@@ -41,7 +41,6 @@ import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
-import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -116,6 +115,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     initCustomVariables();
 
     if (enableSnapshot && enablePreload && segmentPreloadExecutor != null) {
+
       // Preloading the segments with snapshots for fast upsert metadata recovery.
       // Note that there is an implicit waiting logic between the thread doing the segment preloading here and the
       // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).
@@ -213,15 +213,13 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
   @VisibleForTesting
   String getInstanceId() {
-    InstanceDataManagerConfig instanceDataManagerConfig =
-        _tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig();
-    return instanceDataManagerConfig.getInstanceId();
+    return _tableDataManager.getInstanceDataManagerConfig().getInstanceId();
   }
 
   @VisibleForTesting
   IndexLoadingConfig createIndexLoadingConfig() {
-    return new IndexLoadingConfig(_tableDataManager.getTableDataManagerConfig().getInstanceDataManagerConfig(),
-        _context.getTableConfig(), _context.getSchema());
+    return new IndexLoadingConfig(_tableDataManager.getInstanceDataManagerConfig(), _context.getTableConfig(),
+        _context.getSchema());
   }
 
   @VisibleForTesting

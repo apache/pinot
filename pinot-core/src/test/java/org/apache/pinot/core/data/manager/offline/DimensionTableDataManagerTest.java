@@ -32,8 +32,6 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -42,6 +40,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -50,7 +49,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
@@ -79,20 +77,23 @@ public class DimensionTableDataManagerTest {
   @BeforeClass
   public void setUp()
       throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+
     // prepare segment data
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
     assertNotNull(resourceUrl);
     File avroFile = new File(resourceUrl.getFile());
 
     // create segment
+    File tableDataDir = new File(TEMP_DIR, OFFLINE_TABLE_NAME);
     SegmentGeneratorConfig segmentGeneratorConfig =
-        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, RAW_TABLE_NAME);
+        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, tableDataDir, RAW_TABLE_NAME);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(segmentGeneratorConfig);
     driver.build();
 
     String segmentName = driver.getSegmentName();
-    _indexDir = new File(TEMP_DIR, segmentName);
+    _indexDir = new File(tableDataDir, segmentName);
     _indexLoadingConfig = new IndexLoadingConfig();
     _segmentMetadata = new SegmentMetadataImpl(_indexDir);
     _segmentZKMetadata = new SegmentZKMetadata(segmentName);
@@ -124,17 +125,12 @@ public class DimensionTableDataManagerTest {
   }
 
   private DimensionTableDataManager makeTableDataManager(HelixManager helixManager) {
+    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+    TableConfig tableConfig = getTableConfig(false);
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
-    TableDataManagerConfig config;
-    {
-      config = mock(TableDataManagerConfig.class);
-      when(config.getTableName()).thenReturn(OFFLINE_TABLE_NAME);
-      when(config.getDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
-    }
-    tableDataManager.init(config, "dummyInstance", helixManager.getHelixPropertyStore(),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), helixManager, null, null,
-        new TableDataManagerParams(0, false, -1));
+    tableDataManager.init(instanceDataManagerConfig, tableConfig, helixManager, null, null);
     tableDataManager.start();
     return tableDataManager;
   }

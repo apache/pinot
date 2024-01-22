@@ -27,14 +27,12 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -48,11 +46,19 @@ public interface TableDataManager {
   /**
    * Initializes the table data manager. Should be called only once and before calling any other method.
    */
-  void init(TableDataManagerConfig tableDataManagerConfig, String instanceId,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics, HelixManager helixManager,
+  void init(InstanceDataManagerConfig instanceDataManagerConfig, TableConfig tableConfig, HelixManager helixManager,
       @Nullable ExecutorService segmentPreloadExecutor,
-      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      TableDataManagerParams tableDataManagerParams);
+      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache);
+
+  /**
+   * Returns the instance id of the server.
+   */
+  String getInstanceId();
+
+  /**
+   * Returns the config for the instance data manager.
+   */
+  InstanceDataManagerConfig getInstanceDataManagerConfig();
 
   /**
    * Starts the table data manager. Should be called only once after table data manager gets initialized but before
@@ -208,11 +214,6 @@ public interface TableDataManager {
   File getTableDataDir();
 
   /**
-   * Returns the config for the table data manager.
-   */
-  TableDataManagerConfig getTableDataManagerConfig();
-
-  /**
    * Add error related to segment, if any. The implementation
    * is expected to cache last 'N' errors for the table, related to
    * segment transitions.
@@ -233,7 +234,7 @@ public interface TableDataManager {
    * @param segmentNameStr name of segment for which the state change is being handled
    */
   default void onConsumingToDropped(String segmentNameStr) {
-  };
+  }
 
   /**
    * Interface to handle segment state transitions from CONSUMING to ONLINE
@@ -241,5 +242,5 @@ public interface TableDataManager {
    * @param segmentNameStr name of segment for which the state change is being handled
    */
   default void onConsumingToOnline(String segmentNameStr) {
-  };
+  }
 }

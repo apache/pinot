@@ -158,7 +158,7 @@
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.26</jmh.version>
     <audienceannotations.version>0.15.0</audienceannotations.version>
-    <clp-ffi.version>0.4.3</clp-ffi.version>
+    <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.1</stax2-api.version>
     <aws.sdk.version>2.20.137</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
@@ -189,7 +189,7 @@
     <scala.version>2.12.18</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
-    <flink.version>1.12.0</flink.version>
+    <flink.version>1.14.6</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
 
     <proto.google.common.protos.version>2.29.0</proto.google.common.protos.version>
@@ -695,7 +695,7 @@
       <dependency>
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
-        <version>1.15</version>
+        <version>1.16.0</version>
       </dependency>
       <dependency>
         <groupId>com.thoughtworks.paranamer</groupId>
