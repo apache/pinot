@@ -30,7 +30,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 
-public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexReaderContext> {
+public class CLPForwardIndexReaderV1 implements ForwardIndexReader<CLPForwardIndexReaderV1.CLPReaderContext> {
   private final int _version;
   private final int _numDocs;
   private final int _totalDictVarValues;
@@ -41,7 +41,6 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexR
   private final FixedBitSVForwardIndexReader _logTypeFwdIndexReader;
   private final FixedBitMVForwardIndexReader _dictVarsFwdIndexReader;
   private final VarByteChunkForwardIndexReaderV4 _encodedVarFwdIndexReader;
-  private final VarByteChunkForwardIndexReaderV4.ReaderContext _encodedVarContext;
   private final MessageDecoder _clpMessageDecoder;
 
   public CLPForwardIndexReaderV1(PinotDataBuffer pinotDataBuffer, int numDocs) {
@@ -87,7 +86,6 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexR
         new VarByteChunkForwardIndexReaderV4(pinotDataBuffer.view(offset, offset + encodedVarFwdIndexLength),
             FieldSpec.DataType.LONG, false);
     offset += encodedVarFwdIndexLength;
-    _encodedVarContext = _encodedVarFwdIndexReader.createContext();
 
     _clpMessageDecoder = new MessageDecoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
@@ -109,18 +107,18 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexR
   }
 
   @Override
-  public String getString(int docId, ForwardIndexReaderContext context) {
-    int logTypeDictId = _logTypeFwdIndexReader.getDictId(docId, _logTypeFwdIndexReader.createContext());
+  public String getString(int docId, CLPReaderContext context) {
+    int logTypeDictId = _logTypeFwdIndexReader.getDictId(docId, context._logTypeReaderContext);
     String logType = _logTypeDictReader.getUnpaddedString(logTypeDictId, _logTypeDictNumBytesPerValue,
         new byte[_logTypeDictNumBytesPerValue]);
-    int[] dictVarsDictIds = _dictVarsFwdIndexReader.getDictIdMV(docId, _dictVarsFwdIndexReader.createContext());
+    int[] dictVarsDictIds = _dictVarsFwdIndexReader.getDictIdMV(docId, context._dictVarsReaderContext);
 
     String[] dictVars = new String[dictVarsDictIds.length];
     for (int i = 0; i < dictVarsDictIds.length; i++) {
       dictVars[i] = _dictVarsDictReader.getUnpaddedString(dictVarsDictIds[i], _dictVarsDictNumBytesPerValue,
           new byte[_dictVarsDictNumBytesPerValue]);
     }
-    long[] encodedVar = _encodedVarFwdIndexReader.getLongMV(docId, _encodedVarContext);
+    long[] encodedVar = _encodedVarFwdIndexReader.getLongMV(docId, context._encodedVarReaderContext);
 
     try {
       return _clpMessageDecoder.decodeMessage(logType, dictVars, encodedVar);
@@ -136,5 +134,35 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<ForwardIndexR
 
   @Override
   public void close() throws IOException {
+  }
+
+  @Override
+  public CLPReaderContext createContext() {
+    return new CLPReaderContext(_dictVarsFwdIndexReader.createContext(), _logTypeFwdIndexReader.createContext(),
+        _encodedVarFwdIndexReader.createContext());
+  }
+
+
+  public static final class CLPReaderContext implements ForwardIndexReaderContext {
+    private final FixedBitMVForwardIndexReader.Context _dictVarsReaderContext;
+    private final ForwardIndexReaderContext _logTypeReaderContext;
+    private final VarByteChunkForwardIndexReaderV4.ReaderContext _encodedVarReaderContext;
+
+    public CLPReaderContext(
+        FixedBitMVForwardIndexReader.Context dictVarsReaderContext,
+        ForwardIndexReaderContext logTypeReaderContext,
+        VarByteChunkForwardIndexReaderV4.ReaderContext encodedVarReaderContext) {
+      _dictVarsReaderContext = dictVarsReaderContext;
+      _logTypeReaderContext = logTypeReaderContext;
+      _encodedVarReaderContext = encodedVarReaderContext;
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+      _dictVarsReaderContext.close();
+      _logTypeReaderContext.close();
+      _encodedVarReaderContext.close();
+    }
   }
 }
