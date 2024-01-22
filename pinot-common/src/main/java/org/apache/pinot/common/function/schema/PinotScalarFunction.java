@@ -39,16 +39,20 @@ public class PinotScalarFunction extends ReflectiveFunctionBase implements Pinot
   private final Method _method;
   private final SqlOperandTypeChecker _sqlOperandTypeChecker;
   private final SqlReturnTypeInference _sqlReturnTypeInference;
+  private final boolean _isNullableParameter;
+  private final boolean _isVarArgs;
 
-  public PinotScalarFunction(String name, Method method, boolean isNullableParameter) {
-    this(name, method, isNullableParameter, null, null);
+  public PinotScalarFunction(String name, Method method, boolean isNullableParameter, boolean isVarArg) {
+    this(name, method, isNullableParameter, isVarArg, null, null);
   }
 
-  public PinotScalarFunction(String name, Method method, boolean isNullableParameter,
+  public PinotScalarFunction(String name, Method method, boolean isNullableParameter, boolean isVarArgs,
     SqlOperandTypeChecker sqlOperandTypeChecker, SqlReturnTypeInference sqlReturnTypeInference) {
     super(method);
     _name = name;
     _method = method;
+    _isNullableParameter = isNullableParameter;
+    _isVarArgs = isVarArgs;
     _functionInfo = new FunctionInfo(method, method.getDeclaringClass(), isNullableParameter);
     _sqlOperandTypeChecker = sqlOperandTypeChecker;
     _sqlReturnTypeInference = sqlReturnTypeInference;
@@ -79,5 +83,13 @@ public class PinotScalarFunction extends ReflectiveFunctionBase implements Pinot
   @Override
   public SqlReturnTypeInference getReturnTypeInference() {
     return _sqlReturnTypeInference;
+  }
+
+  public boolean isNullableParameter() {
+    return _isNullableParameter;
+  }
+
+  public boolean isVarArgs() {
+    return _isVarArgs;
   }
 }

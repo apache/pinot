@@ -58,8 +58,7 @@ public class FunctionOperand implements TransformOperand {
         return e.getDataType();
       }
     }).collect(Collectors.toList());
-    FunctionInfo functionInfo =
-        FunctionRegistry.getFunctionInfo(sqlOperatorTable, relDataTypeFactory, canonicalName, operandTypes);
+    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(canonicalName, operandTypes.size());
     Preconditions.checkState(functionInfo != null, "Cannot find function with name: %s", canonicalName);
     _functionInvoker = new FunctionInvoker(functionInfo);
     if (!_functionInvoker.getMethod().isVarArgs()) {

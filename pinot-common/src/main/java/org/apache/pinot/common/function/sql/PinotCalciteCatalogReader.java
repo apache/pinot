@@ -76,6 +76,7 @@ import org.apache.calcite.sql.validate.SqlUserDefinedTableMacro;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.util.Optionality;
 import org.apache.calcite.util.Util;
+import org.apache.pinot.common.function.schema.PinotScalarFunction;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 

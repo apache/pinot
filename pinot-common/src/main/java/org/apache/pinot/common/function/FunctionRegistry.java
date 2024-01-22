@@ -89,10 +89,12 @@ public class FunctionRegistry {
           scalarFunctionNames.add(method.getName());
         }
         boolean nullableParameters = scalarFunction.nullableParameters();
-        registerFunction(method, scalarFunctionNames, nullableParameters);
+        boolean varArg = scalarFunction.isVarArg();
+        registerFunction(method, scalarFunctionNames, nullableParameters, varArg);
       }
     }
-    Set<Class<?>> classes = PinotReflectionUtils.getClassesThroughReflection(".*\\.function\\..*", ScalarFunction.class);
+    Set<Class<?>> classes =
+        PinotReflectionUtils.getClassesThroughReflection(".*\\.function\\..*", ScalarFunction.class);
     for (Class<?> clazz : classes) {
       if (!Modifier.isPublic(clazz.getModifiers())) {
         continue;
@@ -105,7 +107,8 @@ public class FunctionRegistry {
           scalarFunctionNames.add(clazz.getName());
         }
         boolean nullableParameters = scalarFunction.nullableParameters();
-        registerFunction(clazz, scalarFunctionNames, nullableParameters);
+        boolean varArg = scalarFunction.isVarArg();
+        registerFunction(clazz, scalarFunctionNames, nullableParameters, varArg);
       }
     }
     LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_MAP.map().size(),
@@ -152,8 +155,8 @@ public class FunctionRegistry {
   }
 
   @VisibleForTesting
-  public static void registerFunction(Method method, boolean nullableParameters) {
-    registerFunction(method, Collections.singleton(method.getName()), nullableParameters);
+  public static void registerFunction(Method method) {
+    registerFunction(method, Collections.singleton(method.getName()), false, false);
   }
 
   @VisibleForTesting
@@ -197,10 +200,10 @@ public class FunctionRegistry {
 
   @Nullable
   private static FunctionInfo getFunctionInfoFromCalciteNamedMap(String functionName, int numParams) {
-    List<PinotScalarFunction> candidates = getFunctionMap()
-        .range(functionName, CASE_SENSITIVITY).stream()
-        .filter(e -> e.getValue() instanceof PinotScalarFunction && e.getValue().getParameters().size() == numParams)
-        .map(e -> (PinotScalarFunction) e.getValue()).collect(Collectors.toList());
+    List<PinotScalarFunction> candidates = getFunctionMap().range(functionName, CASE_SENSITIVITY).stream().filter(
+            e -> e.getValue() instanceof PinotScalarFunction && (e.getValue().getParameters().size() == numParams
+                || ((PinotScalarFunction) e.getValue()).isVarArgs())).map(e -> (PinotScalarFunction) e.getValue())
+        .collect(Collectors.toList());
     if (candidates.size() == 1) {
       return candidates.get(0).getFunctionInfo();
     } else {
@@ -213,9 +216,10 @@ public class FunctionRegistry {
   private static PinotScalarFunction getScalarFunction(SqlOperatorTable operatorTable, RelDataTypeFactory typeFactory,
       String functionName, List<DataSchema.ColumnDataType> argTypes) {
     List<RelDataType> relArgTypes = convertArgumentTypes(typeFactory, argTypes);
-    SqlOperator sqlOperator = SqlUtil.lookupRoutine(operatorTable, typeFactory,
-        new SqlIdentifier(functionName, SqlParserPos.QUOTED_ZERO), relArgTypes, null, null, SqlSyntax.FUNCTION,
-        SqlKind.OTHER_FUNCTION, SqlNameMatchers.withCaseSensitive(false), true);
+    SqlOperator sqlOperator =
+        SqlUtil.lookupRoutine(operatorTable, typeFactory, new SqlIdentifier(functionName, SqlParserPos.QUOTED_ZERO),
+            relArgTypes, null, null, SqlSyntax.FUNCTION, SqlKind.OTHER_FUNCTION,
+            SqlNameMatchers.withCaseSensitive(false), true);
     if (sqlOperator instanceof SqlUserDefinedFunction) {
       Function function = ((SqlUserDefinedFunction) sqlOperator).getFunction();
       if (function instanceof PinotScalarFunction) {
@@ -233,33 +237,38 @@ public class FunctionRegistry {
     return OPERATOR_MAP;
   }
 
-  private static void registerFunction(Method method, Set<String> alias, boolean nullableParameters) {
+  private static void registerFunction(Method method, Set<String> alias, boolean nullableParameters, boolean varArg) {
     if (method.getAnnotation(Deprecated.class) == null) {
       for (String name : alias) {
-        registerCalciteNamedFunctionMap(name, method, nullableParameters);
+        registerCalciteNamedFunctionMap(name, method, nullableParameters, varArg);
       }
     }
   }
 
-  private static void registerFunction(Class<?> clazz, Set<String> alias, boolean nullableParameters) {
+  private static void registerFunction(Class<?> clazz, Set<String> alias, boolean nullableParameters, boolean varArg) {
     if (clazz.getAnnotation(Deprecated.class) == null) {
       for (String name : alias) {
-        registerCalciteNamedFunctionMap(name, clazz, nullableParameters);
+        registerCalciteNamedFunctionMap(name, clazz, nullableParameters, varArg);
       }
     }
   }
 
-  private static void registerCalciteNamedFunctionMap(String name, Method method, boolean nullableParameters) {
-    FUNCTION_MAP.put(name, new PinotScalarFunction(name, method, nullableParameters));
+  private static void registerCalciteNamedFunctionMap(String name, Method method, boolean nullableParameters,
+      boolean varArg) {
+    FUNCTION_MAP.put(name, new PinotScalarFunction(name, method, nullableParameters, varArg));
   }
 
-  private static void registerCalciteNamedFunctionMap(String name, Class<?> clazz, boolean nullableParameters) {
+  private static void registerCalciteNamedFunctionMap(String name, Class<?> clazz, boolean nullableParameters,
+      boolean varArg) {
     try {
-      SqlReturnTypeInference returnTypeInference = (SqlReturnTypeInference) clazz.getField("RETURN_TYPE_INFERENCE").get(null);
-      SqlOperandTypeChecker operandTypeChecker = (SqlOperandTypeChecker) clazz.getField("OPERAND_TYPE_CHECKER").get(null);
+      SqlReturnTypeInference returnTypeInference =
+          (SqlReturnTypeInference) clazz.getField("RETURN_TYPE_INFERENCE").get(null);
+      SqlOperandTypeChecker operandTypeChecker =
+          (SqlOperandTypeChecker) clazz.getField("OPERAND_TYPE_CHECKER").get(null);
       for (Method method : clazz.getMethods()) {
         if (method.getName().equals("eval")) {
-          FUNCTION_MAP.put(name, new PinotScalarFunction(name, method, nullableParameters, operandTypeChecker, returnTypeInference));
+          FUNCTION_MAP.put(name, new PinotScalarFunction(name, method, nullableParameters, varArg, operandTypeChecker,
+              returnTypeInference));
         }
       }
     } catch (Exception e) {
@@ -269,9 +278,10 @@ public class FunctionRegistry {
 
   private static void registerAggregateFunction(String functionName, AggregationFunctionType functionType) {
     if (functionType.getOperandTypeChecker() != null && functionType.getReturnTypeInference() != null) {
-      PinotSqlAggFunction sqlAggFunction = new PinotSqlAggFunction(functionName.toUpperCase(Locale.ROOT), null,
-          functionType.getSqlKind(), functionType.getReturnTypeInference(), null,
-          functionType.getOperandTypeChecker(), functionType.getSqlFunctionCategory());
+      PinotSqlAggFunction sqlAggFunction =
+          new PinotSqlAggFunction(functionName.toUpperCase(Locale.ROOT), null, functionType.getSqlKind(),
+              functionType.getReturnTypeInference(), null, functionType.getOperandTypeChecker(),
+              functionType.getSqlFunctionCategory());
       OPERATOR_MAP.put(functionName.toUpperCase(Locale.ROOT), sqlAggFunction);
     }
   }
@@ -279,9 +289,9 @@ public class FunctionRegistry {
   private static void registerTransformFunction(String functionName, TransformFunctionType functionType) {
     if (functionType.getOperandTypeChecker() != null && functionType.getReturnTypeInference() != null) {
       PinotSqlTransformFunction sqlTransformFunction =
-          new PinotSqlTransformFunction(functionName.toUpperCase(Locale.ROOT),
-              functionType.getSqlKind(), functionType.getReturnTypeInference(), null,
-              functionType.getOperandTypeChecker(), functionType.getSqlFunctionCategory());
+          new PinotSqlTransformFunction(functionName.toUpperCase(Locale.ROOT), functionType.getSqlKind(),
+              functionType.getReturnTypeInference(), null, functionType.getOperandTypeChecker(),
+              functionType.getSqlFunctionCategory());
       OPERATOR_MAP.put(functionName.toUpperCase(Locale.ROOT), sqlTransformFunction);
     }
   }
