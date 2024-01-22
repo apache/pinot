@@ -25,20 +25,20 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 public class DimensionTableConfig extends BaseJsonConfig {
   private final boolean _disablePreload;
-  private final boolean _allowDuplicatePrimaryKey;
+  private final boolean _disallowDuplicatePrimaryKey;
 
   @JsonCreator
   public DimensionTableConfig(@JsonProperty(value = "disablePreload") Boolean disablePreload,
-      @JsonProperty(value = "allowDuplicatePrimaryKey") Boolean allowDuplicatePrimaryKey) {
+      @JsonProperty(value = "disallowDuplicatePrimaryKey") Boolean disallowDuplicatePrimaryKey) {
     _disablePreload = disablePreload != null && disablePreload;
-    _allowDuplicatePrimaryKey = allowDuplicatePrimaryKey == null || allowDuplicatePrimaryKey;
+    _disallowDuplicatePrimaryKey = disallowDuplicatePrimaryKey != null && disallowDuplicatePrimaryKey;
   }
 
   public boolean isDisablePreload() {
     return _disablePreload;
   }
 
-  public boolean isAllowDuplicatePrimaryKey() {
-    return _allowDuplicatePrimaryKey;
+  public boolean disallowDuplicatePrimaryKey() {
+    return _disallowDuplicatePrimaryKey;
   }
 }

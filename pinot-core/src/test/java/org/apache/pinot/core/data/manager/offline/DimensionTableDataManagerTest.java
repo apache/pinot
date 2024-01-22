@@ -19,6 +19,9 @@
 package org.apache.pinot.core.data.manager.offline;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.util.Collections;
 import java.util.List;
@@ -47,10 +50,13 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -60,6 +66,7 @@ import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.fail;
 
 
 @SuppressWarnings("unchecked")
@@ -67,7 +74,9 @@ public class DimensionTableDataManagerTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), LoaderTest.class.getName());
   private static final String RAW_TABLE_NAME = "dimBaseballTeams";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
-  private static final String AVRO_DATA_PATH = "data/dimBaseballTeams.avro";
+  private static final String CSV_DATA_PATH = "data/dimBaseballTeams.csv";
+  private static final String SCHEMA_PATH = "data/dimBaseballTeams_schema.json";
+  private static final String TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
 
   private File _indexDir;
   private IndexLoadingConfig _indexLoadingConfig;
@@ -80,14 +89,22 @@ public class DimensionTableDataManagerTest {
     ServerMetrics.register(mock(ServerMetrics.class));
 
     // prepare segment data
-    URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
-    assertNotNull(resourceUrl);
-    File avroFile = new File(resourceUrl.getFile());
+    URL dataPathUrl = getClass().getClassLoader().getResource(CSV_DATA_PATH);
+    URL schemaPathUrl = getClass().getClassLoader().getResource(SCHEMA_PATH);
+    URL configPathUrl = getClass().getClassLoader().getResource(TABLE_CONFIG_PATH);
+    assertNotNull(dataPathUrl);
+    assertNotNull(schemaPathUrl);
+    assertNotNull(configPathUrl);
+    File csvFile = new File(dataPathUrl.getFile());
+    Schema schema = createSchema(new File(schemaPathUrl.getFile()));
+    TableConfig tableConfig = createTableConfig(new File(configPathUrl.getFile()));
 
     // create segment
     File tableDataDir = new File(TEMP_DIR, OFFLINE_TABLE_NAME);
+
     SegmentGeneratorConfig segmentGeneratorConfig =
-        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, tableDataDir, RAW_TABLE_NAME);
+        SegmentTestUtils.getSegmentGeneratorConfig(csvFile, FileFormat.CSV, tableDataDir, RAW_TABLE_NAME, tableConfig,
+            schema);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(segmentGeneratorConfig);
     driver.build();
@@ -111,8 +128,8 @@ public class DimensionTableDataManagerTest {
         .setPrimaryKeyColumns(Collections.singletonList("teamID")).build();
   }
 
-  private TableConfig getTableConfig(boolean disablePreload, boolean allowDuplicatePrimaryKey) {
-    DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload, allowDuplicatePrimaryKey);
+  private TableConfig getTableConfig(boolean disablePreload, boolean disallowDuplicatePrimaryKey) {
+    DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload, disallowDuplicatePrimaryKey);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("dimBaseballTeams")
         .setDimensionTableConfig(dimensionTableConfig).build();
   }
@@ -127,7 +144,7 @@ public class DimensionTableDataManagerTest {
   private DimensionTableDataManager makeTableDataManager(HelixManager helixManager) {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
-    TableConfig tableConfig = getTableConfig(false, true);
+    TableConfig tableConfig = getTableConfig(false, false);
     DimensionTableDataManager tableDataManager =
         DimensionTableDataManager.createInstanceByTableName(OFFLINE_TABLE_NAME);
     tableDataManager.init(instanceDataManagerConfig, tableConfig, helixManager, null, null);
@@ -257,8 +274,8 @@ public class DimensionTableDataManagerTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
         SchemaUtils.toZNRecord(getSchema()));
-    when(propertyStore.get("/CONFIGS/TABLE/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
-        TableConfigUtils.toZNRecord(getTableConfig(true, true)));
+    when(propertyStore.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
+        TableConfigUtils.toZNRecord(getTableConfig(true, false)));
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
 
@@ -302,8 +319,8 @@ public class DimensionTableDataManagerTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
         SchemaUtils.toZNRecord(getSchema()));
-    when(propertyStore.get("/CONFIGS/TABLE/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
-        TableConfigUtils.toZNRecord(getTableConfig(false, false)));
+    when(propertyStore.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
+        TableConfigUtils.toZNRecord(getTableConfig(false, true)));
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
     DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
 
@@ -311,32 +328,25 @@ public class DimensionTableDataManagerTest {
     GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
     assertNull(resp, "Response should be null if no segment is loaded");
 
-    tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+    try {
+      tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
+      fail();
+    } catch (Exception e) {
+      // expected;
+    }
+  }
 
-    // Confirm table is loaded and available for lookup
-    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertNotNull(resp, "Should return response after segment load");
-    assertEquals(resp.getFieldToValueMap().size(), 2);
-    assertEquals(resp.getValue("teamID"), "SF");
-    assertEquals(resp.getValue("teamName"), "San Francisco Giants");
+  protected static Schema createSchema(File schemaFile)
+      throws IOException {
+    InputStream inputStream = new FileInputStream(schemaFile);
+    Assert.assertNotNull(inputStream);
+    return JsonUtils.inputStreamToObject(inputStream, Schema.class);
+  }
 
-    // Confirm we can get FieldSpec for loaded tables columns.
-    FieldSpec spec = tableDataManager.getColumnFieldSpec("teamName");
-    assertNotNull(spec, "Should return spec for existing column");
-    assertEquals(spec.getDataType(), DataType.STRING, "Should return correct data type for teamName column");
-
-    // Confirm we can read primary column list
-    List<String> pkColumns = tableDataManager.getPrimaryKeyColumns();
-    assertEquals(pkColumns, Collections.singletonList("teamID"), "Should return PK column list");
-
-    // Remove the segment
-    List<SegmentDataManager> segmentManagers = tableDataManager.acquireAllSegments();
-    assertEquals(segmentManagers.size(), 1, "Should have exactly one segment manager");
-    SegmentDataManager segMgr = segmentManagers.get(0);
-    String segmentName = segMgr.getSegmentName();
-    tableDataManager.removeSegment(segmentName);
-    // confirm table is cleaned up
-    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertNull(resp, "Response should be null if no segment is loaded");
+  protected static TableConfig createTableConfig(File tableConfigFile)
+      throws IOException {
+    InputStream inputStream = new FileInputStream(tableConfigFile);
+    Assert.assertNotNull(inputStream);
+    return JsonUtils.inputStreamToObject(inputStream, TableConfig.class);
   }
 }
