@@ -46,7 +46,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public class BasicAuthAccessControlFactory implements AccessControlFactory {
 
-  @Deprecated
   private static final String PREFIX = "controller.admin.access.control.principals";
 
   private static final String HEADER_AUTHORIZATION = "Authorization";

@@ -119,7 +119,7 @@ public class PinotConfiguration {
    * @param baseProperties to provide programmatically through a {@link Map}.
    */
   public PinotConfiguration(Map<String, Object> baseProperties) {
-    this(baseProperties, new EnvironmentConfiguration().getMap());
+    this(baseProperties, new SystemEnvironment().getEnvironmentVariables());
   }
 
   /**
@@ -130,7 +130,7 @@ public class PinotConfiguration {
    * @param baseProperties with highest precedences (e.g. CLI arguments)
    * @param environmentVariables as a {@link Map}.
    */
-  public PinotConfiguration(Map<String, Object> baseProperties, Map<String, Object> environmentVariables) {
+  public PinotConfiguration(Map<String, Object> baseProperties, Map<String, String> environmentVariables) {
     _configuration = new CompositeConfiguration(computeConfigurationsFromSources(baseProperties, environmentVariables));
   }
 
@@ -147,19 +147,19 @@ public class PinotConfiguration {
   }
 
   private static List<Configuration> computeConfigurationsFromSources(Configuration baseConfiguration,
-      Map<String, Object> environmentVariables) {
+      Map<String, String> environmentVariables) {
     return computeConfigurationsFromSources(relaxConfigurationKeys(baseConfiguration), environmentVariables);
   }
 
   private static List<Configuration> computeConfigurationsFromSources(Map<String, Object> baseProperties,
-      Map<String, Object> environmentVariables) {
+      Map<String, String> environmentVariables) {
     Map<String, Object> relaxedBaseProperties = relaxProperties(baseProperties);
-    Map<String, Object> relaxedEnvVariables = relaxEnvironmentVariables(environmentVariables);
+    Map<String, String> relaxedEnvVariables = relaxEnvironmentVariables(environmentVariables);
 
     Stream<Configuration> propertiesFromConfigPaths =
         Stream.of(Optional.ofNullable(relaxedBaseProperties.get(CONFIG_PATHS_KEY)).map(Object::toString),
                 Optional.ofNullable(relaxedEnvVariables.get(CONFIG_PATHS_KEY))).filter(Optional::isPresent)
-            .map(Optional::get).flatMap(configPaths -> Arrays.stream(((String) configPaths).split(",")))
+            .map(Optional::get).flatMap(configPaths -> Arrays.stream(configPaths.split(",")))
             .map(PinotConfiguration::loadProperties);
 
     return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(e -> {
@@ -203,12 +203,12 @@ public class PinotConfiguration {
         .collect(Collectors.toMap(PinotConfiguration::relaxPropertyName, configuration::getProperty));
   }
 
-  private static Map<String, Object> relaxEnvironmentVariables(Map<String, Object> environmentVariables) {
+  private static Map<String, String> relaxEnvironmentVariables(Map<String, String> environmentVariables) {
     return environmentVariables.entrySet().stream().filter(entry -> entry.getKey().startsWith(ENV_PREFIX))
         .collect(Collectors.toMap(PinotConfiguration::relaxEnvVarName, Entry::getValue));
   }
 
-  private static String relaxEnvVarName(Entry<String, Object> envVarEntry) {
+  private static String relaxEnvVarName(Entry<String, String> envVarEntry) {
     return envVarEntry.getKey().substring(ENV_PREFIX.length()).replace("_", ".").toLowerCase();
   }
 
