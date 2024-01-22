@@ -951,6 +951,43 @@ public class PinotTableRestletResource {
   }
 
   @GET
+  @Path("tables/{tableName}/validDocIdMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the aggregate valid doc id metadata of all segments for a table", notes = "Get the "
+      + "aggregate valid doc id metadata of all segments for a table")
+  public String getTableAggregateValidDocIdMetadata(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "A list of segments", allowMultiple = true) @QueryParam("segmentNames")
+      List<String> segmentNames) {
+    LOGGER.info("Received a request to fetch aggregate valid doc id metadata for a table {}", tableName);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == TableType.OFFLINE) {
+      throw new ControllerApplicationException(LOGGER, "Table type : " + tableTypeStr + " not yet supported.",
+          Response.Status.NOT_IMPLEMENTED);
+    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+
+    String validDocIdMetadata;
+    try {
+      TableMetadataReader tableMetadataReader =
+          new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+      JsonNode segmentsMetadataJson =
+          tableMetadataReader.getAggregateValidDocIdMetadata(tableNameWithType, segmentNames,
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      validDocIdMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, ioe);
+    }
+    return validDocIdMetadata;
+  }
+
+  @GET
   @Path("tables/{tableName}/indexes")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
