@@ -128,8 +128,8 @@ public class DimensionTableDataManagerTest {
         .setPrimaryKeyColumns(Collections.singletonList("teamID")).build();
   }
 
-  private TableConfig getTableConfig(boolean disablePreload, boolean disallowDuplicatePrimaryKey) {
-    DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload, disallowDuplicatePrimaryKey);
+  private TableConfig getTableConfig(boolean disablePreload, boolean errorOnDuplicatePrimaryKey) {
+    DimensionTableConfig dimensionTableConfig = new DimensionTableConfig(disablePreload, errorOnDuplicatePrimaryKey);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("dimBaseballTeams")
         .setDimensionTableConfig(dimensionTableConfig).build();
   }
@@ -313,7 +313,7 @@ public class DimensionTableDataManagerTest {
   }
 
   @Test
-  public void testLookupDisallowDuplicatePrimaryKey()
+  public void testLookupErrorOnDuplicatePrimaryKey()
       throws Exception {
     HelixManager helixManager = mock(HelixManager.class);
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
@@ -330,7 +330,7 @@ public class DimensionTableDataManagerTest {
 
     try {
       tableDataManager.addSegment(_indexDir, _indexLoadingConfig);
-      fail();
+      fail("Should error out when ErrorOnDuplicatePrimaryKey is configured to true");
     } catch (Exception e) {
       // expected;
     }

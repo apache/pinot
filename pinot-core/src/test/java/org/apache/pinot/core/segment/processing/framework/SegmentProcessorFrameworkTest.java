@@ -212,7 +212,7 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(outputSegments.size(), 1);
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 51);
+    assertEquals(segmentMetadata.getTotalDocs(), 52);
   }
 
   @Test
