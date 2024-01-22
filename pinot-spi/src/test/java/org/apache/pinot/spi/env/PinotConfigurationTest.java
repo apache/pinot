@@ -126,7 +126,7 @@ public class PinotConfigurationTest {
   public void assertPropertyPriorities()
       throws IOException {
     Map<String, Object> baseProperties = new HashMap<>();
-    Map<String, Object> mockedEnvironmentVariables = new HashMap<>();
+    Map<String, String> mockedEnvironmentVariables = new HashMap<>();
 
     String configFile2 = File.createTempFile("pinot-configuration-test-2", ".properties").getAbsolutePath();
     String configFile3 = File.createTempFile("pinot-configuration-test-3", ".properties").getAbsolutePath();
