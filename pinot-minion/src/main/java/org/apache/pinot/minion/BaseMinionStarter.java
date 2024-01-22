@@ -204,12 +204,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
     // initialize authentication
     LOGGER.info("Initializing AuthProvider");
-    String namespace = CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE;
-    if (_config.subset(namespace).isEmpty()) {
-      namespace = CommonConstants.Minion.DEPRECATED_CONFIG_TASK_AUTH_NAMESPACE;
-    }
     minionContext.setTaskAuthProvider(
-        AuthProviderUtils.extractAuthProvider(_config, namespace));
+        AuthProviderUtils.extractAuthProvider(_config, CommonConstants.Minion.CONFIG_TASK_AUTH_NAMESPACE));
 
     // Start all components
     LOGGER.info("Initializing PinotFSFactory");

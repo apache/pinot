@@ -31,6 +31,7 @@ import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.EnvironmentConfiguration;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
@@ -86,6 +87,7 @@ import org.apache.pinot.spi.utils.Obfuscator;
  */
 public class PinotConfiguration {
   public static final String CONFIG_PATHS_KEY = "config.paths";
+  public static final String ENV_PREFIX = "PINOT_CONF_";
 
   private final CompositeConfiguration _configuration;
 
@@ -108,7 +110,7 @@ public class PinotConfiguration {
    */
   public PinotConfiguration(Configuration baseConfiguration) {
     _configuration = new CompositeConfiguration(
-        computeConfigurationsFromSources(baseConfiguration, new EnvironmentConfiguration().getMap()));
+        computeConfigurationsFromSources(baseConfiguration, new HashMap<>()));
   }
 
   /**
@@ -141,7 +143,7 @@ public class PinotConfiguration {
   public PinotConfiguration(PinotFSSpec pinotFSSpec) {
     this(Optional.ofNullable(pinotFSSpec.getConfigs()).map(configs -> configs.entrySet().stream()
             .collect(Collectors.<Entry<String, String>, String, Object>toMap(Entry::getKey, Entry::getValue)))
-        .orElseGet(() -> new HashMap<>()));
+        .orElseGet(HashMap::new));
   }
 
   private static List<Configuration> computeConfigurationsFromSources(Configuration baseConfiguration,
@@ -202,12 +204,12 @@ public class PinotConfiguration {
   }
 
   private static Map<String, Object> relaxEnvironmentVariables(Map<String, Object> environmentVariables) {
-    return environmentVariables.entrySet().stream().filter(entry -> entry.getKey().startsWith("PINOT_"))
+    return environmentVariables.entrySet().stream().filter(entry -> entry.getKey().startsWith(ENV_PREFIX))
         .collect(Collectors.toMap(PinotConfiguration::relaxEnvVarName, Entry::getValue));
   }
 
   private static String relaxEnvVarName(Entry<String, Object> envVarEntry) {
-    return envVarEntry.getKey().substring(6).replace("_", ".").toLowerCase();
+    return envVarEntry.getKey().substring(ENV_PREFIX.length()).replace("_", ".").toLowerCase();
   }
 
   private static Map<String, Object> relaxProperties(Map<String, Object> properties) {
