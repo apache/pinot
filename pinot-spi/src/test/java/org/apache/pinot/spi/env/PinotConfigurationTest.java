@@ -133,10 +133,10 @@ public class PinotConfigurationTest {
 
     baseProperties.put("controller.host", "cli-argument-controller-host");
     baseProperties.put("config.paths", "classpath:/pinot-configuration-1.properties");
-    mockedEnvironmentVariables.put("PINOT_CONF_CONTROLLER_HOST", "env-var-controller-host");
-    mockedEnvironmentVariables.put("PINOT_CONF_CONTROLLER_PORT", "env-var-controller-port");
-    mockedEnvironmentVariables.put("PINOT_CONF_RELAXEDPROPERTY_TEST", "true");
-    mockedEnvironmentVariables.put("PINOT_CONF_CONFIG_PATHS", configFile2 + "," + configFile3);
+    mockedEnvironmentVariables.put("PINOT_ENV_CONTROLLER_HOST", "env-var-controller-host");
+    mockedEnvironmentVariables.put("PINOT_ENV_CONTROLLER_PORT", "env-var-controller-port");
+    mockedEnvironmentVariables.put("PINOT_ENV_RELAXEDPROPERTY_TEST", "true");
+    mockedEnvironmentVariables.put("PINOT_ENV_CONFIG_PATHS", configFile2 + "," + configFile3);
 
     copyClasspathResource("/pinot-configuration-2.properties", configFile2);
     copyClasspathResource("/pinot-configuration-3.properties", configFile3);
