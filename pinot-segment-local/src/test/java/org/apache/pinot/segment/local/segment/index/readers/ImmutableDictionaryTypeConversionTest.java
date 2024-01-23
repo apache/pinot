@@ -45,6 +45,9 @@ import static org.testng.Assert.assertEquals;
 
 
 public class ImmutableDictionaryTypeConversionTest {
+  private static final FALFInterner<String> STRING_INTERNER = new FALFInterner<>(128);
+  private static final FALFInterner<byte[]> BYTE_INTERNER = new FALFInterner<>(128, Arrays::hashCode);
+
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ImmutableDictionaryTypeConversionTest");
   private static final Random RANDOM = new Random();
   private static final String INT_COLUMN_NAME = "intColumn";
@@ -332,20 +335,17 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapStringDictionaryWithInterner()
       throws Exception {
-    FALFInterner<String> strInterner = new FALFInterner<>(128);
-    FALFInterner<byte[]> byteInterner = new FALFInterner<>(128, Arrays::hashCode);
-
     try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
         PinotDataBuffer.mapReadOnlyBigEndianFile(
             new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, STRING_LENGTH,
-        strInterner, byteInterner)) {
+        STRING_INTERNER, BYTE_INTERNER)) {
       testStringDictionary(onHeapStringDictionary);
     }
 
     try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
         PinotDataBuffer.mapReadOnlyBigEndianFile(
             new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, STRING_LENGTH,
-        strInterner, byteInterner)) {
+        STRING_INTERNER, BYTE_INTERNER)) {
       testStringDictionary(onHeapStringDictionary);
     }
   }
@@ -390,7 +390,18 @@ public class ImmutableDictionaryTypeConversionTest {
       throws Exception {
     try (OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(
         PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH)) {
+            new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH, null)) {
+      testBytesDictionary(onHeapBytesDictionary);
+    }
+  }
+
+  @Test
+  public void testOnHeapBytesDictionaryWithInterning()
+      throws Exception {
+    try (OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(
+            new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH,
+        BYTE_INTERNER)) {
       testBytesDictionary(onHeapBytesDictionary);
     }
   }
