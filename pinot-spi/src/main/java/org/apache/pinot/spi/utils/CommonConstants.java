@@ -331,6 +331,7 @@ public class CommonConstants {
     // Broker config indicating the maximum length of the serialized response per server for a query.
     public static final String CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES = "pinot.broker.max.server.response.size.bytes";
 
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
