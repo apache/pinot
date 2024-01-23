@@ -55,7 +55,12 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertThrows;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -700,7 +705,7 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(outputSegments.size(), 1);
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     segmentMetadata = segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 51);
+    assertEquals(segmentMetadata.getTotalDocs(), 52);
 
     // Verify that the record reader is closed from RecordReaderFileConfig.
     assertTrue(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
@@ -723,7 +728,7 @@ public class SegmentProcessorFrameworkTest {
     assertEquals(outputSegments.size(), 1);
     segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     segmentMetadata = segment.getSegmentMetadata();
-    assertEquals(segmentMetadata.getTotalDocs(), 51);
+    assertEquals(segmentMetadata.getTotalDocs(), 52);
 
     // Verify that the record reader is not closed from RecordReaderFileConfig.
     assertFalse(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
@@ -732,7 +737,7 @@ public class SegmentProcessorFrameworkTest {
     // Test 8: RecordReader should be closed when recordReader is created inside RecordReaderFileConfig (With mapper
     // output size threshold configured).
 
-    expectedTotalDocsCount = 51;
+    expectedTotalDocsCount = 52;
     recordReaderFileConfig = new RecordReaderFileConfig(FileFormat.CSV, new File(resource.toURI()), null, null);
 
     segmentConfig = new SegmentConfig.Builder().setIntermediateFileSizeThreshold(19).setSegmentNamePrefix("testPrefix")
