@@ -75,10 +75,11 @@ import org.apache.pinot.spi.utils.Obfuscator;
  * </tr>
  * <tr>
  * <td>controller.sub_module.alerts.email_address</td>
- * <td>Snake case notation, which is an alternative format for use in .properties and .yml files.</td>
+ * <td>Snake case notation, which is an alternative format for use in .properties and .yml files. Be aware that this
+ * is incompatible with ENV var naming scheme.</td>
  * </tr>
  * <tr>
- * <td>PINOT_MODULE_SUBMODULE_ALERTS_EMAILADDRESS</td>
+ * <td>PINOT_ENV_MODULE_SUBMODULE_ALERTS_EMAILADDRESS</td>
  * <td>Upper case format, which is recommended when using system environment variables.</td>
  * </tr>
  * </table>
@@ -86,7 +87,7 @@ import org.apache.pinot.spi.utils.Obfuscator;
  */
 public class PinotConfiguration {
   public static final String CONFIG_PATHS_KEY = "config.paths";
-  public static final String ENV_PREFIX = "PINOT_CONF_";
+  public static final String ENV_PREFIX = "PINOT_ENV_";
 
   private final CompositeConfiguration _configuration;
 
@@ -160,6 +161,7 @@ public class PinotConfiguration {
             .map(Optional::get).flatMap(configPaths -> Arrays.stream(configPaths.split(",")))
             .map(PinotConfiguration::loadProperties);
 
+    // Priority in CompositeConfiguration is CLI, ENV, ConfigFile(s)
     return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(e -> {
       MapConfiguration mapConfiguration = new MapConfiguration(e);
       mapConfiguration.setListDelimiterHandler(new LegacyListDelimiterHandler(','));
