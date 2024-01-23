@@ -47,18 +47,16 @@ public class ForwardIndexConfig extends IndexConfig {
   @Nullable
   private final CompressionCodec _compressionCodec;
 
-  @JsonCreator
-  public ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
-      @JsonProperty("compressionCodec") @Nullable CompressionCodec compressionCodec,
-      @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
-      @JsonProperty("deriveNumDocsPerChunk") Boolean deriveNumDocsPerChunk,
-      @JsonProperty("rawIndexWriterVersion") Integer rawIndexWriterVersion,
-      @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType) {
+  public ForwardIndexConfig(@Nullable Boolean disabled,
+      @Nullable CompressionCodec compressionCodec,
+      Boolean deriveNumDocsPerChunk,
+      Integer rawIndexWriterVersion) {
     super(disabled);
     _deriveNumDocsPerChunk = deriveNumDocsPerChunk != null && deriveNumDocsPerChunk;
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? DEFAULT_RAW_WRITER_VERSION : rawIndexWriterVersion;
+    _compressionCodec = compressionCodec;
+
     if (compressionCodec != null) {
-      _compressionCodec = compressionCodec;
       switch (compressionCodec) {
         case PASS_THROUGH:
           _chunkCompressionType = ChunkCompressionType.PASS_THROUGH;
@@ -84,41 +82,55 @@ public class ForwardIndexConfig extends IndexConfig {
           throw new IllegalStateException("Unsupported compression codec: " + compressionCodec);
       }
     } else {
-      if (chunkCompressionType != null && dictIdCompressionType != null) {
-        throw new IllegalArgumentException(
-            "chunkCompressionType and dictIdCompressionType should not be used together");
-      }
-      _chunkCompressionType = chunkCompressionType;
-      _dictIdCompressionType = dictIdCompressionType;
-      if (chunkCompressionType != null) {
-        switch (chunkCompressionType) {
+      _dictIdCompressionType = null;
+      _chunkCompressionType = null;
+    }
+  }
 
-          case PASS_THROUGH:
-            _compressionCodec = CompressionCodec.PASS_THROUGH;
-            break;
-          case SNAPPY:
-            _compressionCodec = CompressionCodec.SNAPPY;
-            break;
-          case ZSTANDARD:
-            _compressionCodec = CompressionCodec.ZSTANDARD;
-            break;
-          case LZ4:
-            _compressionCodec = CompressionCodec.LZ4;
-            break;
-          default:
-            throw new IllegalStateException("Unsupported chunk compression type: " + chunkCompressionType);
-        }
-      } else if (_dictIdCompressionType != null) {
-        switch (dictIdCompressionType) {
-          case MV_ENTRY_DICT:
-            _compressionCodec = CompressionCodec.MV_ENTRY_DICT;
-            break;
-          default:
-            throw new IllegalStateException("Unsupported dictionary compression type: " + dictIdCompressionType);
-        }
-      } else {
-        _compressionCodec = null;
+  @JsonCreator
+  public ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
+      @JsonProperty("compressionCodec") @Nullable CompressionCodec compressionCodec,
+      @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
+      @JsonProperty("deriveNumDocsPerChunk") Boolean deriveNumDocsPerChunk,
+      @JsonProperty("rawIndexWriterVersion") Integer rawIndexWriterVersion,
+      @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType) {
+    this(disabled, getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType),
+        deriveNumDocsPerChunk, rawIndexWriterVersion);
+  }
+
+  public static CompressionCodec getActualCompressionCodec(
+      @Nullable CompressionCodec compressionCodec,
+      @Nullable ChunkCompressionType chunkCompressionType,
+      @Nullable DictIdCompressionType dictIdCompressionType) {
+    if (compressionCodec != null) {
+      return compressionCodec;
+    }
+    if (chunkCompressionType != null && dictIdCompressionType != null) {
+      throw new IllegalArgumentException(
+          "chunkCompressionType and dictIdCompressionType should not be used together");
+    }
+    if (chunkCompressionType != null) {
+      switch (chunkCompressionType) {
+        case PASS_THROUGH:
+          return CompressionCodec.PASS_THROUGH;
+        case SNAPPY:
+          return CompressionCodec.SNAPPY;
+        case ZSTANDARD:
+          return CompressionCodec.ZSTANDARD;
+        case LZ4:
+          return CompressionCodec.LZ4;
+        default:
+          throw new IllegalStateException("Unsupported chunk compression type: " + chunkCompressionType);
       }
+    } else if (dictIdCompressionType != null) {
+      switch (dictIdCompressionType) {
+        case MV_ENTRY_DICT:
+          return CompressionCodec.MV_ENTRY_DICT;
+        default:
+          throw new IllegalStateException("Unsupported dictionary compression type: " + dictIdCompressionType);
+      }
+    } else {
+      return null;
     }
   }
 
@@ -173,27 +185,41 @@ public class ForwardIndexConfig extends IndexConfig {
   public static class Builder {
     @Nullable
     private CompressionCodec _compressionCodec;
-    @Nullable
-    private ChunkCompressionType _chunkCompressionType;
     private boolean _deriveNumDocsPerChunk = false;
     private int _rawIndexWriterVersion = DEFAULT_RAW_WRITER_VERSION;
-
-    @Nullable
-    private DictIdCompressionType _dictIdCompressionType;
 
     public Builder() {
     }
 
     public Builder(ForwardIndexConfig other) {
       _compressionCodec = other._compressionCodec;
-      _chunkCompressionType = other.getChunkCompressionType();
       _deriveNumDocsPerChunk = other._deriveNumDocsPerChunk;
       _rawIndexWriterVersion = other._rawIndexWriterVersion;
-      _dictIdCompressionType = other._dictIdCompressionType;
     }
 
     public Builder withCompressionType(ChunkCompressionType chunkCompressionType) {
-      _chunkCompressionType = chunkCompressionType;
+      if (chunkCompressionType == null) {
+        return this;
+      }
+      switch (chunkCompressionType) {
+        case LZ4:
+          _compressionCodec = CompressionCodec.LZ4;
+          break;
+        case LZ4_LENGTH_PREFIXED:
+          _compressionCodec = CompressionCodec.LZ4;
+          break;
+        case PASS_THROUGH:
+          _compressionCodec = CompressionCodec.PASS_THROUGH;
+          break;
+        case SNAPPY:
+          _compressionCodec = CompressionCodec.SNAPPY;
+          break;
+        case ZSTANDARD:
+          _compressionCodec = CompressionCodec.ZSTANDARD;
+          break;
+        default:
+          throw new IllegalArgumentException("Unrecognized chunk compression type " + chunkCompressionType);
+      }
       return this;
     }
 
@@ -208,35 +234,15 @@ public class ForwardIndexConfig extends IndexConfig {
     }
 
     public Builder withDictIdCompressionType(DictIdCompressionType dictIdCompressionType) {
-      _dictIdCompressionType = dictIdCompressionType;
+      if (dictIdCompressionType == null) {
+        return this;
+      }
+      _compressionCodec = CompressionCodec.MV_ENTRY_DICT;
       return this;
     }
 
     public Builder withCompressionCodec(CompressionCodec compressionCodec) {
-      if (compressionCodec == null) {
-        _chunkCompressionType = null;
-        _dictIdCompressionType = null;
-        return this;
-      }
-      switch (compressionCodec) {
-        case PASS_THROUGH:
-          _chunkCompressionType = ChunkCompressionType.PASS_THROUGH;
-          break;
-        case SNAPPY:
-          _chunkCompressionType = ChunkCompressionType.SNAPPY;
-          break;
-        case ZSTANDARD:
-          _chunkCompressionType = ChunkCompressionType.ZSTANDARD;
-          break;
-        case LZ4:
-          _chunkCompressionType = ChunkCompressionType.LZ4;
-          break;
-        case MV_ENTRY_DICT:
-          _dictIdCompressionType = DictIdCompressionType.MV_ENTRY_DICT;
-          break;
-        default:
-          throw new IllegalStateException("Unsupported compression codec: " + compressionCodec);
-      }
+      _compressionCodec = compressionCodec;
       return this;
     }
 
@@ -263,8 +269,7 @@ public class ForwardIndexConfig extends IndexConfig {
     }
 
     public ForwardIndexConfig build() {
-      return new ForwardIndexConfig(false, _compressionCodec, _chunkCompressionType, _deriveNumDocsPerChunk,
-          _rawIndexWriterVersion, _dictIdCompressionType);
+      return new ForwardIndexConfig(false, _compressionCodec, _deriveNumDocsPerChunk, _rawIndexWriterVersion);
     }
   }
 }
