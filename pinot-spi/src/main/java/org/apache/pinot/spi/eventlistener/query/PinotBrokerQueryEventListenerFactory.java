@@ -30,8 +30,8 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_ALLOWLIST_QUERY_REQUEST_HEADERS;
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME;
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS;
 import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME;
 
 
@@ -93,7 +93,7 @@ public class PinotBrokerQueryEventListenerFactory {
   private static void initializeAllowlistQueryRequestHeaders(PinotConfiguration eventListenerConfiguration) {
     List<String> allowlistQueryRequestHeaders =
         Splitter.on(",").omitEmptyStrings().trimResults()
-            .splitToList(eventListenerConfiguration.getProperty(CONFIG_OF_ALLOWLIST_QUERY_REQUEST_HEADERS, ""));
+            .splitToList(eventListenerConfiguration.getProperty(CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS, ""));
 
     LOGGER.info("{}: allowlist headers will be used for PinotBrokerQueryEventListener", allowlistQueryRequestHeaders);
     registerAllowlistQueryRequestHeaders(allowlistQueryRequestHeaders);
