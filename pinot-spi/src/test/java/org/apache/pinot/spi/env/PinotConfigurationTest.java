@@ -83,7 +83,7 @@ public class PinotConfigurationTest {
     properties.put("property.3.key", "val1");
     properties.put("property.4.key", "val1");
 
-    PinotConfiguration pinotConfiguration = new PinotConfiguration(properties);
+    PinotConfiguration pinotConfiguration = new PinotConfiguration(properties, new HashMap<>());
 
     List<String> keys = pinotConfiguration.getKeys();
     Assert.assertTrue(keys.contains("property.1.key"));
@@ -186,8 +186,8 @@ public class PinotConfigurationTest {
   public void assertPropertiesFromBaseConfiguration()
       throws ConfigurationException {
     PropertiesConfiguration propertiesConfiguration = CommonsConfigurationUtils.fromPath(
-        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile(),
-        true, true);
+        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile(), true,
+        true);
 
     PinotConfiguration config = new PinotConfiguration(propertiesConfiguration);
 
