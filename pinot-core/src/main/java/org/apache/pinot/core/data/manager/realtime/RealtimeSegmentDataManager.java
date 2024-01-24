@@ -417,16 +417,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     long idleTimeoutMillis = _streamConfig.getIdleTimeoutMillis();
     _idleTimer.init();
 
-    try {
-      validateStartOffset(_currentOffset);
-    } catch (PermanentConsumerException pce) {
-      _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
-      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
-              1L);
-      _segmentLogger.error(pce.getMessage());
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), pce.getMessage(), pce));
-      throw pce;
-    }
+    validateStartOffset(_currentOffset);
 
     StreamPartitionMsgOffset lastUpdatedOffset = _streamPartitionMsgOffsetFactory
         .create(_currentOffset);  // so that we always update the metric when we enter this method.
@@ -914,23 +905,29 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * retention configuration of the stream which may lead to missed data.
    *
    * @param startOffset The offset of the first message desired, inclusive
-   * @throws TimeoutException, PermanentConsumerException
    */
-  private void validateStartOffset(StreamPartitionMsgOffset startOffset)
-      throws TimeoutException, PermanentConsumerException {
+  private void validateStartOffset(StreamPartitionMsgOffset startOffset) {
     if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("validateStartOffset");
     }
 
-    StreamPartitionMsgOffset streamSmallestOffset = _partitionMetadataProvider.fetchStreamPartitionOffset(
-        OffsetCriteria.SMALLEST_OFFSET_CRITERIA,
-        /*maxWaitTimeMs=*/5000
-    );
-
-    if (streamSmallestOffset.compareTo(startOffset) > 0) {
-      throw new PermanentConsumerException(new Throwable(String.format(
-          "startOffset(%s) is older than topic's beginning offset(%s) ",
-          startOffset, streamSmallestOffset)));
+    try {
+      StreamPartitionMsgOffset streamSmallestOffset = _partitionMetadataProvider.fetchStreamPartitionOffset(
+          OffsetCriteria.SMALLEST_OFFSET_CRITERIA,
+          /*maxWaitTimeMs=*/5000
+      );
+      if (streamSmallestOffset.compareTo(startOffset) > 0) {
+        _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
+        String message = "startOffset(" + startOffset +
+            ") is older than topic's beginning offset(" + streamSmallestOffset + ")";
+        _segmentLogger.error(message);
+        _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+            new SegmentErrorInfo(String.valueOf(now()), message, "")
+        );
+      }
+    } catch (TimeoutException tce) {
+      _segmentLogger.warn("Timed out when waiting to fetch stream begin offset. Table {}, partition {}",
+          _tableStreamName, _partitionGroupId);
     }
   }
 

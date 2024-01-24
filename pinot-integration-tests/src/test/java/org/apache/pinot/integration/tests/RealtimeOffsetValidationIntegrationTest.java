@@ -55,10 +55,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
-import static org.testcontainers.shaded.org.awaitility.Durations.ONE_SECOND;
-import static org.testcontainers.shaded.org.awaitility.Durations.TEN_SECONDS;
-
 
 public class RealtimeOffsetValidationIntegrationTest extends BaseClusterIntegrationTest {
   private static final String PARTITION_COLUMN = "DestState";
@@ -183,7 +179,9 @@ public class RealtimeOffsetValidationIntegrationTest extends BaseClusterIntegrat
     Map<TopicPartition,ListOffsetsResult.ListOffsetsResultInfo> offsetsResultInfoMap = listOffsetsResult.all().get();
     boolean fastForwarded = true;
     for (Map.Entry<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> entry: offsetsResultInfoMap.entrySet()) {
-      fastForwarded &= (entry.getValue().offset() > 2500);
+      // Assume the first avro file was split between 2 partitions.
+      // So the offset has to move beyond the number of messages in the first avro file at least.
+      fastForwarded &= (entry.getValue().offset() > NUM_DOCS_IN_FIRST_AVRO_FILE/2);
     }
 
     return fastForwarded;
@@ -202,12 +200,10 @@ public class RealtimeOffsetValidationIntegrationTest extends BaseClusterIntegrat
     Thread.sleep(60000);
     Reporter.log("Second file has been pushed");
 
-    await()
-        .atLeast(ONE_SECOND)
-        .atMost(TEN_SECONDS)
-        .with()
-        .pollInterval(ONE_SECOND)
-        .until(() -> this.checkTopicOffsetFastForwarded(getKafkaAdminClient(), getKafkaTopic()));
+    TestUtils.waitForCondition(() -> this.checkTopicOffsetFastForwarded(getKafkaAdminClient(), getKafkaTopic()),
+        1000L, // 1 second
+        10 * 1000L, // 10 Seconds,
+        "Kafka did not fast forward offsets within 10 seconds.", true, null);
 
     client.resumeConsumption(getTableName());
     Reporter.log("Consumption has been resumed.");
