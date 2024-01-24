@@ -138,6 +138,9 @@ public class PinotConfigurationTest {
     mockedEnvironmentVariables.put("PINOT_ENV_RELAXEDPROPERTY_TEST", "true");
     mockedEnvironmentVariables.put("PINOT_ENV_CONFIG_PATHS", configFile2 + "," + configFile3);
 
+    // Legacy prefix
+    mockedEnvironmentVariables.put("PINOT_LEGACY_PROP", "legacy");
+
     copyClasspathResource("/pinot-configuration-2.properties", configFile2);
     copyClasspathResource("/pinot-configuration-3.properties", configFile3);
 
@@ -165,6 +168,9 @@ public class PinotConfigurationTest {
 
     // Tests relaxed binding on environment variables
     Assert.assertEquals(configuration.getProperty("relaxed-property.test"), "true");
+
+    // Legacy prefix test
+    Assert.assertEquals(configuration.getProperty("legacy.prop"), "legacy");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
