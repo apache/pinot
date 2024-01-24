@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -25,10 +26,16 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.type.NonNullableAccessors;
+import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SameOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeFamily;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -230,6 +237,38 @@ public class ArrayFunctions {
   @ScalarFunction
   public static String arrayElementAtString(String[] arr, int idx) {
     return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.STRING;
+  }
+
+  @ScalarFunction(names = {"arrayElementAt", "array_element_at"})
+  public static class ArrayElementAt {
+    public static final SqlReturnTypeInference RETURN_TYPE_INFERENCE = (opBinding) -> {
+      final RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
+      final RelDataType operandType = opBinding.getOperandType(0);
+      Preconditions.checkState(operandType.getSqlTypeName() == SqlTypeName.ARRAY);
+      return typeFactory.createTypeWithNullability(NonNullableAccessors.getComponentTypeOrThrow(operandType), true);
+    };
+    public static final SqlOperandTypeChecker OPERAND_TYPE_CHECKER =
+        OperandTypes.family(SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER);
+
+    public static int eval(int[] arr, int idx) {
+      return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.INT;
+    }
+
+    public static long eval(long[] arr, int idx) {
+      return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.LONG;
+    }
+
+    public static float eval(float[] arr, int idx) {
+      return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.FLOAT;
+    }
+
+    public static double eval(double[] arr, int idx) {
+      return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.DOUBLE;
+    }
+
+    public static String eval(String[] arr, int idx) {
+      return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.STRING;
+    }
   }
 
   @ScalarFunction(names = {"array", "arrayValueConstructor"}, isVarArg = true)

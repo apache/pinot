@@ -47,6 +47,7 @@ import org.apache.calcite.util.NameMultimap;
 import org.apache.pinot.common.function.schema.PinotFunction;
 import org.apache.pinot.common.function.schema.PinotScalarFunction;
 import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
+import org.apache.pinot.common.function.sql.PinotSqlScalarFunction;
 import org.apache.pinot.common.function.sql.PinotSqlTransformFunction;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -188,7 +189,7 @@ public class FunctionRegistry {
    */
   @Nullable
   public static FunctionInfo getFunctionInfo(SqlOperatorTable operatorTable, RelDataTypeFactory typeFactory,
-      String functionName, List<DataSchema.ColumnDataType> argTypes) {
+      String functionName, List<RelDataType> argTypes) {
     PinotScalarFunction scalarFunction = getScalarFunction(operatorTable, typeFactory, functionName, argTypes);
     if (scalarFunction != null) {
       return scalarFunction.getFunctionInfo();
@@ -214,17 +215,18 @@ public class FunctionRegistry {
 
   @Nullable
   private static PinotScalarFunction getScalarFunction(SqlOperatorTable operatorTable, RelDataTypeFactory typeFactory,
-      String functionName, List<DataSchema.ColumnDataType> argTypes) {
-    List<RelDataType> relArgTypes = convertArgumentTypes(typeFactory, argTypes);
+      String functionName, List<RelDataType> argTypes) {
     SqlOperator sqlOperator =
         SqlUtil.lookupRoutine(operatorTable, typeFactory, new SqlIdentifier(functionName, SqlParserPos.QUOTED_ZERO),
-            relArgTypes, null, null, SqlSyntax.FUNCTION, SqlKind.OTHER_FUNCTION,
+            argTypes, null, null, SqlSyntax.FUNCTION, SqlKind.OTHER_FUNCTION,
             SqlNameMatchers.withCaseSensitive(false), true);
     if (sqlOperator instanceof SqlUserDefinedFunction) {
       Function function = ((SqlUserDefinedFunction) sqlOperator).getFunction();
       if (function instanceof PinotScalarFunction) {
         return (PinotScalarFunction) function;
       }
+    } else if (sqlOperator instanceof PinotSqlScalarFunction) {
+      return ((PinotSqlScalarFunction) sqlOperator).getFunction();
     }
     return null;
   }
@@ -296,7 +298,7 @@ public class FunctionRegistry {
     }
   }
 
-  private static List<RelDataType> convertArgumentTypes(RelDataTypeFactory typeFactory,
+  public static List<RelDataType> convertArgumentTypes(RelDataTypeFactory typeFactory,
       List<DataSchema.ColumnDataType> argTypes) {
     return argTypes.stream().map(type -> toRelType(typeFactory, type)).collect(Collectors.toList());
   }

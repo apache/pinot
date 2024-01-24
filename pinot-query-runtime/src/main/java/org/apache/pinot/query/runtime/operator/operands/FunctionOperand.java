@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.pinot.common.function.FunctionInfo;
@@ -58,7 +59,10 @@ public class FunctionOperand implements TransformOperand {
         return e.getDataType();
       }
     }).collect(Collectors.toList());
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(canonicalName, operandTypes.size());
+
+    List<RelDataType> argTypes = FunctionRegistry.convertArgumentTypes(relDataTypeFactory, operandTypes);
+    FunctionInfo functionInfo =
+        FunctionRegistry.getFunctionInfo(sqlOperatorTable, relDataTypeFactory, canonicalName, argTypes);
     Preconditions.checkState(functionInfo != null, "Cannot find function with name: %s", canonicalName);
     _functionInvoker = new FunctionInvoker(functionInfo);
     if (!_functionInvoker.getMethod().isVarArgs()) {

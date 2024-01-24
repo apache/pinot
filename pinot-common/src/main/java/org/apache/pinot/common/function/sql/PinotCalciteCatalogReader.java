@@ -59,6 +59,7 @@ import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandMetadata;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlOperandTypeInference;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
@@ -323,6 +324,17 @@ public class PinotCalciteCatalogReader implements Prepare.CatalogReader {
   // ====================================================================
   public static SqlOperator toOp(SqlIdentifier name,
       final org.apache.calcite.schema.Function function) {
+
+    // TODO: support AGG and TABLE function in the future
+    if (function instanceof PinotScalarFunction && ((PinotScalarFunction) function).getOperandTypeChecker() != null) {
+      final SqlOperandTypeChecker operandTypeChecker =
+          ((PinotScalarFunction) function).getOperandTypeChecker();
+      final SqlReturnTypeInference returnTypeInference =
+          ((PinotScalarFunction) function).getReturnTypeInference();
+      final SqlKind kind = kind(function);
+      return new PinotSqlScalarFunction(name.toString(), kind, returnTypeInference, null, operandTypeChecker,
+          SqlFunctionCategory.USER_DEFINED_FUNCTION, ((PinotScalarFunction) function));
+    }
     // ====================================================================
     // LINES CHANGED ABOVE
     // ====================================================================
@@ -353,13 +365,7 @@ public class PinotCalciteCatalogReader implements Prepare.CatalogReader {
     final List<SqlTypeFamily> typeFamilies =
         typeFamiliesFactory.apply(dummyTypeFactory);
 
-    final SqlOperandTypeInference operandTypeInference;
-    if (function instanceof PinotScalarFunction && ((PinotScalarFunction) function).getOperandTypeChecker() != null) {
-      operandTypeInference = ((PinotScalarFunction) function).getOperandTypeChecker().typeInference();
-    } else {
-      operandTypeInference = InferTypes.explicit(argTypes);
-    }
-
+    final SqlOperandTypeInference operandTypeInference = InferTypes.explicit(argTypes);
     final SqlOperandMetadata operandMetadata =
         OperandTypes.operandMetadata(typeFamilies, paramTypesFactory,
             i -> function.getParameters().get(i).getName(),
