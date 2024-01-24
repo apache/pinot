@@ -39,6 +39,7 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -108,7 +109,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
       ZkBasicAuthPrincipal principal = principalOpt.get();
       for (String table : tables) {
-        if (!principal.hasTable(table)) {
+        if (!principal.hasTable(TableNameBuilder.extractRawTableName(table))) {
           return false;
         }
       }
@@ -117,26 +118,23 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {
-      Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity,
-          "HttpRequesterIdentity required");
+      Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity, "HttpRequesterIdentity required");
       HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
 
       Collection<String> tokens = identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
 
-      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig())
-          .stream().collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
+      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllBrokerUserConfig()).stream()
+          .collect(Collectors.toMap(BasicAuthPrincipal::getName, p -> p));
 
-      Map<String, String> name2password = tokens.stream().collect(Collectors
-          .toMap(
-              org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
+      Map<String, String> name2password = tokens.stream().collect(
+          Collectors.toMap(org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
               org.apache.pinot.common.auth.BasicAuthUtils::extractPassword));
-      Map<String, ZkBasicAuthPrincipal> password2principal = name2password.keySet().stream()
-          .collect(Collectors.toMap(name2password::get, _name2principal::get));
+      Map<String, ZkBasicAuthPrincipal> password2principal =
+          name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
 
-      Optional<ZkBasicAuthPrincipal> principalOpt =
-          password2principal.entrySet().stream()
-              .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
-              .map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
+      Optional<ZkBasicAuthPrincipal> principalOpt = password2principal.entrySet().stream().filter(
+          entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
+              _userCache.getUserPasswordAuthCache())).map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
       return principalOpt;
     }
   }

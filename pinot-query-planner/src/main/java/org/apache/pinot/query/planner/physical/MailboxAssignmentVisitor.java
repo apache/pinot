@@ -67,13 +67,14 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
           senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(receiverFragmentId, mailboxMetadata);
           receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderFragmentId, mailboxMetadata);
         }
-      } else if (senderMetadata.isPartitionedTableScan()) {
-        // For partitioned table scan, send the data to the worker with the same worker id (not necessary the same
-        // instance). When partition parallelism is configured, send the data to the corresponding workers.
-        // NOTE: Do not use partitionParallelism from the metadata because it might be configured only in the first
-        //       child. Re-compute it based on the number of receivers.
+      } else if (senderMetadata.isPrePartitioned() && isDirectExchangeCompatible(senderMetadata, receiverMetadata)) {
+        // - direct exchange possible:
+        //   1. send the data to the worker with the same worker id (not necessary the same instance), 1-to-1 mapping
+        //   2. When partition parallelism is configured, fanout based on partition parallelism from each sender
+        //      workerID to sequentially increment receiver workerIDs
         int partitionParallelism = numReceivers / numSenders;
         if (partitionParallelism == 1) {
+          // 1-to-1 mapping
           for (int workerId = 0; workerId < numSenders; workerId++) {
             String mailboxId = MailboxIdUtils.toPlanMailboxId(senderFragmentId, workerId, receiverFragmentId, workerId);
             MailboxMetadata serderMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
@@ -88,6 +89,7 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
                 .put(senderFragmentId, receiverMailboxMetadata);
           }
         } else {
+          // 1-to-<partition_parallelism> mapping
           int receiverWorkerId = 0;
           for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
             VirtualServerAddress senderAddress =
@@ -142,5 +144,24 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       }
     }
     return null;
+  }
+
+  private boolean isDirectExchangeCompatible(DispatchablePlanMetadata sender, DispatchablePlanMetadata receiver) {
+    Map<Integer, QueryServerInstance> senderServerMap = sender.getWorkerIdToServerInstanceMap();
+    Map<Integer, QueryServerInstance> receiverServerMap = receiver.getWorkerIdToServerInstanceMap();
+
+    int numSenders = senderServerMap.size();
+    int numReceivers = receiverServerMap.size();
+    if (sender.getScannedTables().size() > 0 && receiver.getScannedTables().size() == 0) {
+      // leaf-to-intermediate condition
+      return numSenders * sender.getPartitionParallelism() == numReceivers
+          && sender.getPartitionFunction() != null
+          && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
+    } else {
+      // dynamic-broadcast condition || intermediate-to-intermediate
+      return numSenders == numReceivers
+          && sender.getPartitionFunction() != null
+          && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
+    }
   }
 }

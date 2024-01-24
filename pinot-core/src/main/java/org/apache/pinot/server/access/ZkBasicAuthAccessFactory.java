@@ -90,23 +90,19 @@ public class ZkBasicAuthAccessFactory implements AccessControlFactory {
         initUserCache();
       }
       Collection<String> tokens = getTokens(requesterIdentity);
-      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllServerUserConfig())
-          .stream().collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
+      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllServerUserConfig()).stream()
+          .collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
 
-      Map<String, String> name2password = tokens.stream().collect(Collectors
-          .toMap(
-              org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
+      Map<String, String> name2password = tokens.stream().collect(
+          Collectors.toMap(org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
               org.apache.pinot.common.auth.BasicAuthUtils::extractPassword));
-      Map<String, ZkBasicAuthPrincipal> password2principal = name2password.keySet().stream()
-          .collect(Collectors.toMap(name2password::get, _name2principal::get));
-      return password2principal.entrySet().stream()
-          .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
-          .map(u -> u.getValue())
-          .filter(Objects::nonNull)
-          .findFirst()
-          .map(zkprincipal -> StringUtils.isEmpty(tableName) || zkprincipal.hasTable(
-              TableNameBuilder.extractRawTableName(tableName)))
-          .orElse(false);
+      Map<String, ZkBasicAuthPrincipal> password2principal =
+          name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
+      return password2principal.entrySet().stream().filter(
+          entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
+              _userCache.getUserPasswordAuthCache())).map(u -> u.getValue()).filter(Objects::nonNull).findFirst().map(
+          zkprincipal -> StringUtils.isEmpty(tableName) || zkprincipal.hasTable(
+              TableNameBuilder.extractRawTableName(tableName))).orElse(false);
     }
 
     private Collection<String> getTokens(RequesterIdentity requesterIdentity) {

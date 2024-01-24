@@ -31,7 +31,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
@@ -54,7 +53,6 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -69,10 +67,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern TABLE_NAME_REPLACE_PATTERN = Pattern.compile("\\{([\\w\\d]+)\\}");
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
-  private static final Random RANDOM = new Random(42);
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
   private static final String IGNORE_FILTER_PROPERTY = "pinot.runIgnored";
-  private static final int NUM_PARTITIONS = 4;
+  private static final int DEFAULT_NUM_PARTITIONS = 4;
 
   private final Map<String, Set<String>> _tableToSegmentMap = new HashMap<>();
   private boolean _isRunIgnored;
@@ -109,54 +106,59 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       // table will be registered on both servers.
       Map<String, Schema> schemaMap = new HashMap<>();
       for (Map.Entry<String, QueryTestCase.Table> tableEntry : testCase._tables.entrySet()) {
-        boolean allowEmptySegment = !BooleanUtils.toBoolean(extractExtraProps(testCase._extraProps, "noEmptySegment"));
+        boolean allowEmptySegment = !testCase._extraProps.isNoEmptySegment();
         String tableName = testCaseName + "_" + tableEntry.getKey();
         // Testing only OFFLINE table b/c Hybrid table test is a special case to test separately.
         String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
         Schema pinotSchema = constructSchema(tableName, tableEntry.getValue()._schema);
+        pinotSchema.setEnableColumnBasedNullHandling(testCase._extraProps.isEnableColumnBasedNullHandling());
         schemaMap.put(tableName, pinotSchema);
         factory1.registerTable(pinotSchema, offlineTableName);
         factory2.registerTable(pinotSchema, offlineTableName);
         List<QueryTestCase.ColumnAndType> columnAndTypes = tableEntry.getValue()._schema;
         List<GenericRow> genericRows = toRow(columnAndTypes, tableEntry.getValue()._inputs);
-
         // generate segments and dump into server1 and server2
         List<String> partitionColumns = tableEntry.getValue()._partitionColumns;
+        int numPartitions = tableEntry.getValue()._partitionCount == null ? DEFAULT_NUM_PARTITIONS
+            : tableEntry.getValue()._partitionCount;
         String partitionColumn = null;
         List<List<String>> partitionIdToSegmentsMap = null;
         if (partitionColumns != null && partitionColumns.size() == 1) {
           partitionColumn = partitionColumns.get(0);
           partitionIdToSegmentsMap = new ArrayList<>();
-          for (int i = 0; i < NUM_PARTITIONS; i++) {
+          for (int i = 0; i < numPartitions; i++) {
             partitionIdToSegmentsMap.add(new ArrayList<>());
           }
         }
 
         List<List<GenericRow>> partitionIdToRowsMap = new ArrayList<>();
-        for (int i = 0; i < NUM_PARTITIONS; i++) {
+        for (int i = 0; i < numPartitions; i++) {
           partitionIdToRowsMap.add(new ArrayList<>());
         }
 
-        for (GenericRow row : genericRows) {
+        int numRows = genericRows.size();
+        for (int i = 0; i < numRows; i++) {
+          GenericRow row = genericRows.get(i);
           if (row == SEGMENT_BREAKER_ROW) {
             addSegments(factory1, factory2, offlineTableName, allowEmptySegment, partitionIdToRowsMap,
-                partitionIdToSegmentsMap);
+                partitionIdToSegmentsMap, numPartitions);
           } else {
             int partitionId;
             if (partitionColumns == null) {
-              partitionId = RANDOM.nextInt(NUM_PARTITIONS);
+              // Round-robin when there is no partition column
+              partitionId = i % numPartitions;
             } else {
               int hashCode = 0;
               for (String field : partitionColumns) {
                 hashCode += row.getValue(field).hashCode();
               }
-              partitionId = (hashCode & Integer.MAX_VALUE) % NUM_PARTITIONS;
+              partitionId = (hashCode & Integer.MAX_VALUE) % numPartitions;
             }
             partitionIdToRowsMap.get(partitionId).add(row);
           }
         }
         addSegments(factory1, factory2, offlineTableName, allowEmptySegment, partitionIdToRowsMap,
-            partitionIdToSegmentsMap);
+            partitionIdToSegmentsMap, numPartitions);
 
         if (partitionColumn != null) {
           partitionedSegmentsMap.put(offlineTableName, Pair.of(partitionColumn, partitionIdToSegmentsMap));
@@ -223,9 +225,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   private void addSegments(MockInstanceDataManagerFactory factory1, MockInstanceDataManagerFactory factory2,
       String offlineTableName, boolean allowEmptySegment, List<List<GenericRow>> partitionIdToRowsMap,
-      @Nullable List<List<String>> partitionIdToSegmentsMap) {
-    for (int i = 0; i < NUM_PARTITIONS; i++) {
-      MockInstanceDataManagerFactory factory = i < (NUM_PARTITIONS / 2) ? factory1 : factory2;
+      @Nullable List<List<String>> partitionIdToSegmentsMap, int numPartitions) {
+    for (int i = 0; i < numPartitions; i++) {
+      MockInstanceDataManagerFactory factory = i < (numPartitions / 2) ? factory1 : factory2;
       List<GenericRow> rows = partitionIdToRowsMap.get(i);
       if (allowEmptySegment || !rows.isEmpty()) {
         String segmentName = factory.addSegment(offlineTableName, rows);

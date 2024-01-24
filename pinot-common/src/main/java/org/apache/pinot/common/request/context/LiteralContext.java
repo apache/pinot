@@ -102,6 +102,26 @@ public class LiteralContext {
         _type = DataType.BYTES;
         _value = literal.getBinaryValue();
         break;
+      case INT_ARRAY_VALUE:
+        _type = DataType.INT;
+        _value = literal.getIntArrayValue();
+        break;
+      case LONG_ARRAY_VALUE:
+        _type = DataType.LONG;
+        _value = literal.getLongArrayValue();
+        break;
+      case FLOAT_ARRAY_VALUE:
+        _type = DataType.FLOAT;
+        _value = literal.getFloatArrayValue();
+        break;
+      case DOUBLE_ARRAY_VALUE:
+        _type = DataType.DOUBLE;
+        _value = literal.getDoubleArrayValue();
+        break;
+      case STRING_ARRAY_VALUE:
+        _type = DataType.STRING;
+        _value = literal.getStringArrayValue();
+        break;
       case NULL_VALUE:
         _type = DataType.UNKNOWN;
         _value = null;

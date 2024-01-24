@@ -20,12 +20,11 @@ package org.apache.pinot.sql.parsers.rewriter;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.TreeSet;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
@@ -162,15 +161,8 @@ public class ExprMinMaxRewriter implements QueryRewriter {
     int size = exprMinMaxFunctionIDMap.size();
     int id = exprMinMaxFunctionIDMap.computeIfAbsent(exprMinMaxMeasuringExpressions, (k) -> size);
 
-    AtomicBoolean added = new AtomicBoolean(true);
-
-    exprMinMaxFunctionMap.compute(exprMinMaxMeasuringExpressions, (k, v) -> {
-      if (v == null) {
-        v = new HashSet<>();
-      }
-      added.set(v.add(exprMinMaxProjectionExpression));
-      return v;
-    });
+    boolean added = exprMinMaxFunctionMap.computeIfAbsent(exprMinMaxMeasuringExpressions, k -> new TreeSet<>())
+        .add(exprMinMaxProjectionExpression);
 
     String operator = function.getOperator();
     function.setOperator(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + operator);
@@ -179,6 +171,6 @@ public class ExprMinMaxRewriter implements QueryRewriter {
     operands.add(0, exprMinMaxProjectionExpression);
     operands.add(0, RequestUtils.getLiteralExpression(id));
 
-    return added.get();
+    return added;
   }
 }

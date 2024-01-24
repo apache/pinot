@@ -147,7 +147,15 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   FAILED_TO_COPY_SCHEMA_COUNT("failedToCopySchemaCount", true),
 
   // Number of tables that we want to fix but failed to update table config
-  FAILED_TO_UPDATE_TABLE_CONFIG_COUNT("failedToUpdateTableConfigCount", true);
+  FAILED_TO_UPDATE_TABLE_CONFIG_COUNT("failedToUpdateTableConfigCount", true),
+
+  LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE("LLCSegmentDeepStoreUploadRetryQueueSize", false),
+
+  TABLE_CONSUMPTION_PAUSED("tableConsumptionPaused", false),
+
+  TABLE_DISABLED("tableDisabled", false),
+
+  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false);
 
   private final String _gaugeName;
   private final String _unit;

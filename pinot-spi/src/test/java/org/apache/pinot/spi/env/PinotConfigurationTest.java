@@ -28,8 +28,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -179,8 +179,11 @@ public class PinotConfigurationTest {
   @Test
   public void assertPropertiesFromBaseConfiguration()
       throws ConfigurationException {
-    PinotConfiguration config = new PinotConfiguration(new PropertiesConfiguration(
-        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile()));
+    PropertiesConfiguration propertiesConfiguration = CommonsConfigurationUtils.fromPath(
+        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile(),
+        true, true);
+
+    PinotConfiguration config = new PinotConfiguration(propertiesConfiguration);
 
     Assert.assertEquals(config.getProperty("pinot.server.storage.factory.class.s3"),
         "org.apache.pinot.plugin.filesystem.S3PinotFS");

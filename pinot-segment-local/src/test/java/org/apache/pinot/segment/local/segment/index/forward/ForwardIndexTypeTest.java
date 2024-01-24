@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -162,29 +163,17 @@ public class ForwardIndexTypeTest {
     }
 
     @Test
-    public void oldConfEnableDictWithSnappyCompression()
+    public void oldConfEnableDictWithMVEntryDictFormat()
         throws IOException {
       addFieldIndexConfig(""
-          + " {\n"
-          + "    \"name\": \"dimInt\","
-          + "    \"encodingType\": \"DICTIONARY\",\n"
-          + "    \"compressionCodec\": \"SNAPPY\"\n"
-          + " }"
+          + "{"
+          + "  \"name\": \"dimInt\","
+          + "  \"encodingType\": \"DICTIONARY\","
+          + "  \"compressionCodec\": \"MV_ENTRY_DICT\""
+          + "}"
       );
-      assertEquals(ForwardIndexConfig.DEFAULT);
-    }
-
-    @Test
-    public void oldConfEnableDictWithLZ4Compression()
-        throws IOException {
-      addFieldIndexConfig(""
-          + " {\n"
-          + "    \"name\": \"dimInt\","
-          + "    \"encodingType\": \"DICTIONARY\",\n"
-          + "    \"compressionCodec\": \"LZ4\"\n"
-          + " }"
-      );
-      assertEquals(ForwardIndexConfig.DEFAULT);
+      assertEquals(
+          new ForwardIndexConfig.Builder().withDictIdCompressionType(DictIdCompressionType.MV_ENTRY_DICT).build());
     }
 
     @Test
@@ -197,13 +186,7 @@ public class ForwardIndexTypeTest {
                   + " }"
       );
 
-      assertEquals(
-          new ForwardIndexConfig.Builder()
-              .withCompressionType(null)
-              .withDeriveNumDocsPerChunk(false)
-              .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
-              .build()
-      );
+      assertEquals(ForwardIndexConfig.DEFAULT);
     }
 
     @Test(dataProvider = "allChunkCompressionType", dataProviderClass = ForwardIndexTypeTest.class)
@@ -269,7 +252,7 @@ public class ForwardIndexTypeTest {
     }
 
     @Test
-    public void newConfigDisabled2()
+    public void newConfigDisabled()
         throws IOException {
       addFieldIndexConfig("{\n"
               + "    \"name\": \"dimInt\",\n"
@@ -294,6 +277,23 @@ public class ForwardIndexTypeTest {
       );
 
       assertEquals(ForwardIndexConfig.DEFAULT);
+    }
+
+    @Test
+    public void newConfigMVEntryDictFormat()
+        throws IOException {
+      addFieldIndexConfig(""
+          + "{"
+          + "  \"name\": \"dimInt\","
+          + "  \"indexes\" : {"
+          + "    \"forward\": {"
+          + "      \"dictIdCompressionType\": \"MV_ENTRY_DICT\""
+          + "    }"
+          + "  }"
+          + "}"
+      );
+      assertEquals(
+          new ForwardIndexConfig.Builder().withDictIdCompressionType(DictIdCompressionType.MV_ENTRY_DICT).build());
     }
 
     @Test(dataProvider = "allChunkCompressionType", dataProviderClass = ForwardIndexTypeTest.class)

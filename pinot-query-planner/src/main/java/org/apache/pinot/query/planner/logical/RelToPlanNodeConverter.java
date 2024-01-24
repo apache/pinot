@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Exchange;
@@ -125,13 +126,17 @@ public final class RelToPlanNodeConverter {
         exchangeType = ((PinotLogicalExchange) node).getExchangeType();
       }
     }
+    RelDistribution inputDistributionTrait = node.getInputs().get(0).getTraitSet().getDistribution();
+    boolean isPrePartitioned = inputDistributionTrait != null
+        && inputDistributionTrait.getType() == RelDistribution.Type.HASH_DISTRIBUTED
+        && inputDistributionTrait == node.getDistribution();
     List<RelFieldCollation> fieldCollations = (collation == null) ? null : collation.getFieldCollations();
 
     // Compute all the tables involved under this exchange node
     Set<String> tableNames = getTableNamesFromRelRoot(node);
 
     return new ExchangeNode(currentStageId, toDataSchema(node.getRowType()), exchangeType, tableNames,
-        node.getDistribution(), fieldCollations, isSortOnSender, isSortOnReceiver);
+        node.getDistribution(), fieldCollations, isSortOnSender, isSortOnReceiver, isPrePartitioned);
   }
 
   private static PlanNode convertLogicalSetOp(SetOp node, int currentStageId) {

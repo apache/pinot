@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdMetadataInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -55,28 +56,51 @@ public class TableMetadataReader {
   }
 
   /**
-   * This method retrieves the full segment metadata for a given table.
-   * Currently supports only OFFLINE tables.
-   * @return a map of segmentName to its metadata
+   * This api takes in list of segments for which we need the metadata.
    */
-  public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, int timeoutMs)
+  public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, Set<String> segmentsToInclude,
+      int timeoutMs)
       throws InvalidConfigException, IOException {
-    final Map<String, List<String>> serverToSegments =
+    return getSegmentsMetadataInternal(tableNameWithType, columns, segmentsToInclude, timeoutMs);
+  }
+
+  private JsonNode getSegmentsMetadataInternal(String tableNameWithType, List<String> columns,
+      Set<String> segmentsToInclude, int timeoutMs)
+      throws InvalidConfigException, IOException {
+    final Map<String, List<String>> serverToSegmentsMap =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
     BiMap<String, String> endpoints =
-        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
     ServerSegmentMetadataReader serverSegmentMetadataReader =
         new ServerSegmentMetadataReader(_executor, _connectionManager);
 
-    List<String> segmentsMetadata = serverSegmentMetadataReader
-        .getSegmentMetadataFromServer(tableNameWithType, serverToSegments, endpoints, columns, timeoutMs);
+    // Filter segments that we need
+    for (Map.Entry<String, List<String>> serverToSegment : serverToSegmentsMap.entrySet()) {
+      List<String> segments = serverToSegment.getValue();
+      if (segmentsToInclude != null && !segmentsToInclude.isEmpty()) {
+        segments.retainAll(segmentsToInclude);
+      }
+    }
 
+    List<String> segmentsMetadata =
+        serverSegmentMetadataReader.getSegmentMetadataFromServer(tableNameWithType, serverToSegmentsMap, endpoints,
+            columns, timeoutMs);
     Map<String, JsonNode> response = new HashMap<>();
     for (String segmentMetadata : segmentsMetadata) {
       JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
       response.put(responseJson.get("segmentName").asText(), responseJson);
     }
     return JsonUtils.objectToJsonNode(response);
+  }
+
+  /**
+   * This method retrieves the full segment metadata for a given table.
+   * Currently supports only OFFLINE tables.
+   * @return a map of segmentName to its metadata
+   */
+  public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, int timeoutMs)
+      throws InvalidConfigException, IOException {
+    return getSegmentsMetadataInternal(tableNameWithType, columns, null, timeoutMs);
   }
 
   /**
@@ -87,16 +111,16 @@ public class TableMetadataReader {
       throws InvalidConfigException, IOException {
     Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
 
-    Map<String, List<String>> serverToSegments = servers.stream()
-        .collect(Collectors.toMap(s -> s, s -> Collections.singletonList(segmentName)));
+    Map<String, List<String>> serverToSegments =
+        servers.stream().collect(Collectors.toMap(s -> s, s -> Collections.singletonList(segmentName)));
 
-    BiMap<String, String> endpoints =
-        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(servers);
+    BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(servers);
     ServerSegmentMetadataReader serverSegmentMetadataReader =
         new ServerSegmentMetadataReader(_executor, _connectionManager);
 
-    List<String> segmentsMetadata = serverSegmentMetadataReader
-        .getSegmentMetadataFromServer(tableNameWithType, serverToSegments, endpoints, columns, timeoutMs);
+    List<String> segmentsMetadata =
+        serverSegmentMetadataReader.getSegmentMetadataFromServer(tableNameWithType, serverToSegments, endpoints,
+            columns, timeoutMs);
 
     for (String segmentMetadata : segmentsMetadata) {
       JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
@@ -124,8 +148,28 @@ public class TableMetadataReader {
     ServerSegmentMetadataReader serverSegmentMetadataReader =
         new ServerSegmentMetadataReader(_executor, _connectionManager);
 
-    TableMetadataInfo aggregateTableMetadataInfo = serverSegmentMetadataReader
-        .getAggregatedTableMetadataFromServer(tableNameWithType, endpoints, columns, numReplica, timeoutMs);
+    TableMetadataInfo aggregateTableMetadataInfo =
+        serverSegmentMetadataReader.getAggregatedTableMetadataFromServer(tableNameWithType, endpoints, columns,
+            numReplica, timeoutMs);
+    return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
+  }
+
+  /**
+   * This method retrieves the aggregated valid doc id metadata for a given table.
+   * @return a list of ValidDocIdMetadataInfo
+   */
+  public JsonNode getAggregateValidDocIdMetadata(String tableNameWithType, List<String> segmentNames, int timeoutMs)
+      throws InvalidConfigException {
+    final Map<String, List<String>> serverToSegments =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    BiMap<String, String> endpoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        new ServerSegmentMetadataReader(_executor, _connectionManager);
+
+    List<ValidDocIdMetadataInfo> aggregateTableMetadataInfo =
+        serverSegmentMetadataReader.getValidDocIdMetadataFromServer(tableNameWithType, serverToSegments, endpoints,
+            segmentNames, timeoutMs);
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
 }

@@ -29,18 +29,16 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.PeerServerSegmentFinder;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.BaseSegmentFetcher;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
-import org.apache.pinot.common.utils.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -51,6 +49,7 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
@@ -60,23 +59,17 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -93,15 +86,21 @@ public class BaseTableDataManagerTest {
   private static final String LONG_COLUMN = "col2";
   private static final long[] LONG_VALUES = {10000L, 20000L, 50000L, 40000L, 30000L};
 
-  @BeforeMethod
+  @BeforeClass
   public void setUp()
+      throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+  }
+
+  @BeforeMethod
+  public void setUpMethod()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
     TableDataManagerTestUtils.initSegmentFetcher();
   }
 
   @AfterMethod
-  public void tearDown()
+  public void tearDownMethod()
       throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
@@ -623,14 +622,15 @@ public class BaseTableDataManagerTest {
 
   // case 2: if the attempt to download from deep storage exceeds, invoke downloadFromPeers.
   @Test
-  public void testDownloadAndDecryptPeerDownload() throws Exception {
+  public void testDownloadAndDecryptPeerDownload()
+      throws Exception {
     String backupCopyURI = mockRemoteCopy().toString();
     SegmentZKMetadata zkmd = mock(SegmentZKMetadata.class);
     when(zkmd.getDownloadUrl()).thenReturn(backupCopyURI);
 
-    TableDataManagerConfig config = createDefaultTableDataManagerConfig();
-    when(config.getTablePeerDownloadScheme()).thenReturn("http");
-    BaseTableDataManager tmgr = createSpyOfflineTableManager(config);
+    InstanceDataManagerConfig config = createDefaultInstanceDataManagerConfig();
+    when(config.getSegmentPeerDownloadScheme()).thenReturn("http");
+    BaseTableDataManager tmgr = spy(createTableManager(config));
     File tempRootDir = tmgr.getTmpSegmentDataDir("test-download-decrypt-peer");
 
     // As the case 2 description says, we need to mock the static method fetchAndDecryptSegmentToLocal to
@@ -651,17 +651,18 @@ public class BaseTableDataManagerTest {
 
   // happy case: download from peers
   @Test
-  public void testDownloadFromPeersWithoutStreaming() throws Exception {
+  public void testDownloadFromPeersWithoutStreaming()
+      throws Exception {
     URI uri = mockRemoteCopy();
-    TableDataManagerConfig config = createDefaultTableDataManagerConfig();
-    when(config.getTablePeerDownloadScheme()).thenReturn("http");
-    HelixManager mockedHelix = mock(HelixManager.class);
-    BaseTableDataManager tmgr = createTableManager(config, mockedHelix);
+    InstanceDataManagerConfig config = createDefaultInstanceDataManagerConfig();
+    when(config.getSegmentPeerDownloadScheme()).thenReturn("http");
+    HelixManager helixManager = mock(HelixManager.class);
+    BaseTableDataManager tmgr = createTableManager(config, helixManager);
     File tempRootDir = tmgr.getTmpSegmentDataDir("test-download-peer-without-streaming");
     File destFile = new File(tempRootDir, "seg01" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
     try (MockedStatic<PeerServerSegmentFinder> mockPeerSegFinder = mockStatic(PeerServerSegmentFinder.class)) {
-      mockPeerSegFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(
-          "seg01", "http", mockedHelix, TABLE_NAME_WITH_TYPE))
+      mockPeerSegFinder.when(
+              () -> PeerServerSegmentFinder.getPeerServerURIs("seg01", "http", helixManager, TABLE_NAME_WITH_TYPE))
           .thenReturn(Collections.singletonList(uri));
       tmgr.downloadFromPeersWithoutStreaming("seg01", mock(SegmentZKMetadata.class), destFile);
     }
@@ -714,40 +715,26 @@ public class BaseTableDataManagerTest {
     }
   }
 
-  private static BaseTableDataManager createTableManager() {
-    TableDataManagerConfig config = createDefaultTableDataManagerConfig();
+  private static OfflineTableDataManager createTableManager() {
+    return createTableManager(createDefaultInstanceDataManagerConfig());
+  }
 
+  private static OfflineTableDataManager createTableManager(InstanceDataManagerConfig instanceDataManagerConfig) {
+    return createTableManager(instanceDataManagerConfig, mock(HelixManager.class));
+  }
+
+  private static OfflineTableDataManager createTableManager(InstanceDataManagerConfig instanceDataManagerConfig,
+      HelixManager helixManager) {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
-        new TableDataManagerParams(0, false, -1));
+    tableDataManager.init(instanceDataManagerConfig, tableConfig, helixManager, null, null);
     tableDataManager.start();
     return tableDataManager;
   }
 
-  private static BaseTableDataManager createTableManager(TableDataManagerConfig config, HelixManager helixManager) {
-    OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), helixManager, null, null,
-        new TableDataManagerParams(0, false, -1));
-    tableDataManager.start();
-    return tableDataManager;
-  }
-
-  private static OfflineTableDataManager createSpyOfflineTableManager(TableDataManagerConfig tableDataManagerConfig) {
-    OfflineTableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(tableDataManagerConfig, "dummyInstance", mock(ZkHelixPropertyStore.class),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
-        new TableDataManagerParams(0, false, -1));
-    tableDataManager.start();
-    return Mockito.spy(tableDataManager);
-  }
-
-  private static TableDataManagerConfig createDefaultTableDataManagerConfig() {
-    TableDataManagerConfig config = mock(TableDataManagerConfig.class);
-    when(config.getTableName()).thenReturn(TABLE_NAME_WITH_TYPE);
-    when(config.getDataDir()).thenReturn(TABLE_DATA_DIR.getAbsolutePath());
-    when(config.getAuthConfig()).thenReturn(new MapConfiguration(Collections.emptyMap()));
+  private static InstanceDataManagerConfig createDefaultInstanceDataManagerConfig() {
+    InstanceDataManagerConfig config = mock(InstanceDataManagerConfig.class);
+    when(config.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     return config;
   }
 
@@ -797,7 +784,8 @@ public class BaseTableDataManagerTest {
             Collections.singletonMap("dataDir", dataDir.getAbsolutePath())))).build();
   }
 
-  private static URI mockRemoteCopy() throws IOException, URISyntaxException {
+  private static URI mockRemoteCopy()
+      throws IOException, URISyntaxException {
     File tempInput = new File(TEMP_DIR, "tmp.txt");
     FileUtils.write(tempInput, "this is from somewhere remote");
 

@@ -20,13 +20,12 @@ package org.apache.pinot.controller.helix.core.realtime.segment;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
-import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.spi.stream.PartitionGroupMetadata;
+import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
+
 
 class SegmentFlushThresholdComputer {
   public static final int MINIMUM_NUM_ROWS_THRESHOLD = 10_000;
@@ -58,8 +57,7 @@ class SegmentFlushThresholdComputer {
   }
 
   public int computeThreshold(StreamConfig streamConfig, CommittingSegmentDescriptor committingSegmentDescriptor,
-      @Nullable SegmentZKMetadata committingSegmentZKMetadata, List<PartitionGroupMetadata> partitionGroupMetadataList,
-      String newSegmentName) {
+      @Nullable SegmentZKMetadata committingSegmentZKMetadata, String newSegmentName) {
     final long desiredSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
     final long optimalSegmentSizeBytesMin = desiredSegmentSizeBytes / 2;
     final double optimalSegmentSizeBytesMax = desiredSegmentSizeBytes * 1.5;
@@ -82,11 +80,15 @@ class SegmentFlushThresholdComputer {
     }
 
     final long committingSegmentSizeBytes = committingSegmentDescriptor.getSegmentSizeBytes();
-    if (committingSegmentSizeBytes <= 0) { // repair segment case
+    if (committingSegmentSizeBytes <= 0 // repair segment case
+        || SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED.equals(
+        committingSegmentDescriptor.getStopReason())) {
+      String reason = committingSegmentSizeBytes <= 0 //
+          ? "Committing segment size is not available" //
+          : "Committing segment is due to force-commit";
       final int targetNumRows = committingSegmentZKMetadata.getSizeThresholdToFlushSegment();
-      SegmentSizeBasedFlushThresholdUpdater.LOGGER.info(
-          "Committing segment size is not available, setting thresholds from previous segment for {} as {}",
-          newSegmentName, targetNumRows);
+      SegmentSizeBasedFlushThresholdUpdater.LOGGER.info("{}, setting thresholds from previous segment for {} as {}",
+          reason, newSegmentName, targetNumRows);
       return targetNumRows;
     }
 
@@ -99,24 +101,11 @@ class SegmentFlushThresholdComputer {
         committingSegmentSizeBytes);
 
     double currentRatio = (double) numRowsConsumed / committingSegmentSizeBytes;
-    // Compute segment size to rows ratio only from the lowest available partition id.
-    // If we consider all partitions then it is likely that we will assign a much higher weight to the most
-    // recent trend in the table (since it is usually true that all partitions of the same table follow more or
-    // less same characteristics at any one point in time).
-    // However, when we start a new table or change controller mastership, we can have any partition completing first.
-    // It is best to learn the ratio as quickly as we can, so we allow any partition to supply the value.
-    int smallestAvailablePartitionGroupId =
-        partitionGroupMetadataList.stream().mapToInt(PartitionGroupMetadata::getPartitionGroupId).min().orElse(0);
-
-    if (new LLCSegmentName(newSegmentName).getPartitionGroupId() == smallestAvailablePartitionGroupId
-        || _latestSegmentRowsToSizeRatio == 0) {
-      if (_latestSegmentRowsToSizeRatio > 0) {
-        _latestSegmentRowsToSizeRatio =
-            CURRENT_SEGMENT_RATIO_WEIGHT * currentRatio
-                + PREVIOUS_SEGMENT_RATIO_WEIGHT * _latestSegmentRowsToSizeRatio;
-      } else {
-        _latestSegmentRowsToSizeRatio = currentRatio;
-      }
+    if (_latestSegmentRowsToSizeRatio > 0) {
+      _latestSegmentRowsToSizeRatio =
+          CURRENT_SEGMENT_RATIO_WEIGHT * currentRatio + PREVIOUS_SEGMENT_RATIO_WEIGHT * _latestSegmentRowsToSizeRatio;
+    } else {
+      _latestSegmentRowsToSizeRatio = currentRatio;
     }
 
     // If the number of rows consumed is less than what we set as target in metadata, then the segment hit time limit.

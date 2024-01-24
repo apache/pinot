@@ -29,7 +29,8 @@ import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -147,7 +148,8 @@ public class StarTreeIndexMapUtils {
   /**
    * Stores the index maps for multiple star-trees into a file.
    */
-  public static void storeToFile(List<List<Pair<IndexKey, IndexValue>>> indexMaps, File indexMapFile) {
+  public static void storeToFile(List<List<Pair<IndexKey, IndexValue>>> indexMaps, File indexMapFile)
+      throws ConfigurationException {
     Preconditions.checkState(!indexMapFile.exists(), "Star-tree index map file already exists");
 
     PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(indexMapFile);
@@ -167,7 +169,8 @@ public class StarTreeIndexMapUtils {
   /**
    * Loads the index maps for multiple star-trees from an input stream.
    */
-  public static List<Map<IndexKey, IndexValue>> loadFromInputStream(InputStream indexMapInputStream, int numStarTrees) {
+  public static List<Map<IndexKey, IndexValue>> loadFromInputStream(InputStream indexMapInputStream, int numStarTrees)
+      throws ConfigurationException {
     List<Map<IndexKey, IndexValue>> indexMaps = new ArrayList<>(numStarTrees);
     for (int i = 0; i < numStarTrees; i++) {
       indexMaps.add(new HashMap<>());

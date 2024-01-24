@@ -21,19 +21,19 @@ package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class ForwardIndexConfig extends IndexConfig {
   public static final int DEFAULT_RAW_WRITER_VERSION = 2;
-  public static final ForwardIndexConfig DISABLED = new ForwardIndexConfig(true, null, null, null);
+  public static final ForwardIndexConfig DISABLED = new ForwardIndexConfig(true, null, null, null, null);
   public static final ForwardIndexConfig DEFAULT = new Builder().build();
 
   @Nullable
@@ -41,15 +41,20 @@ public class ForwardIndexConfig extends IndexConfig {
   private final boolean _deriveNumDocsPerChunk;
   private final int _rawIndexWriterVersion;
 
+  @Nullable
+  private final DictIdCompressionType _dictIdCompressionType;
+
   @JsonCreator
-  public ForwardIndexConfig(@Nullable @JsonProperty("disabled") Boolean disabled,
-      @Nullable @JsonProperty("chunkCompressionType") ChunkCompressionType chunkCompressionType,
+  public ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
+      @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
       @JsonProperty("deriveNumDocsPerChunk") Boolean deriveNumDocsPerChunk,
-      @JsonProperty("rawIndexWriterVersion") Integer rawIndexWriterVersion) {
+      @JsonProperty("rawIndexWriterVersion") Integer rawIndexWriterVersion,
+      @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType) {
     super(disabled);
     _chunkCompressionType = chunkCompressionType;
     _deriveNumDocsPerChunk = deriveNumDocsPerChunk != null && deriveNumDocsPerChunk;
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? DEFAULT_RAW_WRITER_VERSION : rawIndexWriterVersion;
+    _dictIdCompressionType = dictIdCompressionType;
   }
 
   @Nullable
@@ -65,12 +70,17 @@ public class ForwardIndexConfig extends IndexConfig {
     return _rawIndexWriterVersion;
   }
 
+  @Nullable
+  public DictIdCompressionType getDictIdCompressionType() {
+    return _dictIdCompressionType;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof ForwardIndexConfig)) {
       return false;
     }
     if (!super.equals(o)) {
@@ -78,12 +88,14 @@ public class ForwardIndexConfig extends IndexConfig {
     }
     ForwardIndexConfig that = (ForwardIndexConfig) o;
     return _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
-        && _rawIndexWriterVersion == that._rawIndexWriterVersion && _chunkCompressionType == that._chunkCompressionType;
+        && _rawIndexWriterVersion == that._rawIndexWriterVersion && _chunkCompressionType == that._chunkCompressionType
+        && Objects.equals(_dictIdCompressionType, that._dictIdCompressionType);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _chunkCompressionType, _deriveNumDocsPerChunk, _rawIndexWriterVersion);
+    return Objects.hash(super.hashCode(), _chunkCompressionType, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
+        _dictIdCompressionType);
   }
 
   public static class Builder {
@@ -92,6 +104,9 @@ public class ForwardIndexConfig extends IndexConfig {
     private boolean _deriveNumDocsPerChunk = false;
     private int _rawIndexWriterVersion = DEFAULT_RAW_WRITER_VERSION;
 
+    @Nullable
+    private DictIdCompressionType _dictIdCompressionType;
+
     public Builder() {
     }
 
@@ -99,6 +114,7 @@ public class ForwardIndexConfig extends IndexConfig {
       _chunkCompressionType = other.getChunkCompressionType();
       _deriveNumDocsPerChunk = other._deriveNumDocsPerChunk;
       _rawIndexWriterVersion = other._rawIndexWriterVersion;
+      _dictIdCompressionType = other._dictIdCompressionType;
     }
 
     public Builder withCompressionType(ChunkCompressionType chunkCompressionType) {
@@ -113,6 +129,39 @@ public class ForwardIndexConfig extends IndexConfig {
 
     public Builder withRawIndexWriterVersion(int rawIndexWriterVersion) {
       _rawIndexWriterVersion = rawIndexWriterVersion;
+      return this;
+    }
+
+    public Builder withDictIdCompressionType(DictIdCompressionType dictIdCompressionType) {
+      _dictIdCompressionType = dictIdCompressionType;
+      return this;
+    }
+
+    public Builder withCompressionCodec(CompressionCodec compressionCodec) {
+      if (compressionCodec == null) {
+        _chunkCompressionType = null;
+        _dictIdCompressionType = null;
+        return this;
+      }
+      switch (compressionCodec) {
+        case PASS_THROUGH:
+          _chunkCompressionType = ChunkCompressionType.PASS_THROUGH;
+          break;
+        case SNAPPY:
+          _chunkCompressionType = ChunkCompressionType.SNAPPY;
+          break;
+        case ZSTANDARD:
+          _chunkCompressionType = ChunkCompressionType.ZSTANDARD;
+          break;
+        case LZ4:
+          _chunkCompressionType = ChunkCompressionType.LZ4;
+          break;
+        case MV_ENTRY_DICT:
+          _dictIdCompressionType = DictIdCompressionType.MV_ENTRY_DICT;
+          break;
+        default:
+          throw new IllegalStateException("Unsupported compression codec: " + compressionCodec);
+      }
       return this;
     }
 
@@ -139,18 +188,8 @@ public class ForwardIndexConfig extends IndexConfig {
     }
 
     public ForwardIndexConfig build() {
-      return new ForwardIndexConfig(false, _chunkCompressionType, _deriveNumDocsPerChunk, _rawIndexWriterVersion);
-    }
-  }
-
-  @Override
-  public String toString() {
-    try {
-      return JsonUtils.objectToString(this);
-    } catch (IOException ex) {
-      return "{" + "\"chunkCompressionType\":" + _chunkCompressionType
-          + ", \"deriveNumDocsPerChunk\":" + _deriveNumDocsPerChunk
-          + ", \"rawIndexWriterVersion\":" + _rawIndexWriterVersion + '}';
+      return new ForwardIndexConfig(false, _chunkCompressionType, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
+          _dictIdCompressionType);
     }
   }
 }

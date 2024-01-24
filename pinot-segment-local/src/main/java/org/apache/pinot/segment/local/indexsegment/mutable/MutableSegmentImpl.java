@@ -138,6 +138,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final RealtimeSegmentStatsHistory _statsHistory;
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
+  private final int _mainPartitionId; // partition id designated for this consuming segment
   private final boolean _nullHandlingEnabled;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
@@ -164,6 +165,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final List<String> _upsertComparisonColumns;
   private final String _deleteRecordColumn;
+  private final String _upsertOutOfOrderRecordColumn;
+  private final boolean _upsertDropOutOfOrderRecord;
   // The valid doc ids are maintained locally instead of in the upsert metadata manager because:
   // 1. There is only one consuming segment per partition, the committed segments do not need to modify the valid doc
   //    ids for the consuming segment.
@@ -211,6 +214,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _statsHistory = config.getStatsHistory();
     _partitionColumn = config.getPartitionColumn();
     _partitionFunction = config.getPartitionFunction();
+    _mainPartitionId = config.getPartitionId();
     _nullHandlingEnabled = config.isNullHandlingEnabled();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
@@ -252,8 +256,8 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     Set<IndexType> specialIndexes =
-        Sets.newHashSet(StandardIndexes.dictionary(), // dictionaries implement other contract
-            StandardIndexes.nullValueVector()); // null value vector implement other contract
+        Sets.newHashSet(StandardIndexes.dictionary(), // dictionary implements other contract
+            StandardIndexes.nullValueVector()); // null value vector implements other contract
 
     // Initialize for each column
     for (FieldSpec fieldSpec : _physicalFieldSpecs) {
@@ -290,10 +294,10 @@ public class MutableSegmentImpl implements MutableSegment {
 
         // NOTE: Use a concurrent set because the partitions can be updated when the partition of the ingested record
         //       does not match the stream partition. This could happen when stream partition changes, or the records
-        //       are not properly partitioned from the stream. Log an warning and emit a metric if it happens, then add
+        //       are not properly partitioned from the stream. Log a warning and emit a metric if it happens, then add
         //       the new partition into this set.
         partitions = ConcurrentHashMap.newKeySet();
-        partitions.add(config.getPartitionId());
+        partitions.add(_mainPartitionId);
       }
 
       // TODO (mutable-index-spi): The comment above was here, but no check was done.
@@ -332,7 +336,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Null value vector
-      MutableNullValueVector nullValueVector = _nullHandlingEnabled ? new MutableNullValueVector() : null;
+      MutableNullValueVector nullValueVector = isNullable(fieldSpec) ? new MutableNullValueVector() : null;
 
       Map<IndexType, MutableIndex> mutableIndexes = new HashMap<>();
       for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
@@ -379,6 +383,8 @@ public class MutableSegmentImpl implements MutableSegment {
       _upsertComparisonColumns =
           upsertComparisonColumns != null ? upsertComparisonColumns : Collections.singletonList(_timeColumnName);
       _deleteRecordColumn = config.getUpsertDeleteRecordColumn();
+      _upsertOutOfOrderRecordColumn = config.getUpsertOutOfOrderRecordColumn();
+      _upsertDropOutOfOrderRecord = config.isUpsertDropOutOfOrderRecord();
       _validDocIds = new ThreadSafeMutableRoaringBitmap();
       if (_deleteRecordColumn != null) {
         _queryableDocIds = new ThreadSafeMutableRoaringBitmap();
@@ -390,7 +396,13 @@ public class MutableSegmentImpl implements MutableSegment {
       _deleteRecordColumn = null;
       _validDocIds = null;
       _queryableDocIds = null;
+      _upsertOutOfOrderRecordColumn = null;
+      _upsertDropOutOfOrderRecord = false;
     }
+  }
+
+  private boolean isNullable(FieldSpec fieldSpec) {
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _nullHandlingEnabled;
   }
 
   private <C extends IndexConfig> void addMutableIndex(Map<IndexType, MutableIndex> mutableIndexes,
@@ -494,7 +506,11 @@ public class MutableSegmentImpl implements MutableSegment {
       // segment indexing or addNewRow call errors out in those scenario, there can be metadata inconsistency where
       // a key is pointing to some other key's docID
       // TODO fix this metadata mismatch scenario
-      if (_partitionUpsertMetadataManager.addRecord(this, recordInfo)) {
+      boolean isOutOfOrderRecord = !_partitionUpsertMetadataManager.addRecord(this, recordInfo);
+      if (_upsertOutOfOrderRecordColumn != null) {
+        updatedRow.putValue(_upsertOutOfOrderRecordColumn, BooleanUtils.toInt(isOutOfOrderRecord));
+      }
+      if (!isOutOfOrderRecord || !_upsertDropOutOfOrderRecord) {
         updateDictionary(updatedRow);
         addNewRow(numDocsIndexed, updatedRow);
         // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
@@ -646,7 +662,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Update the null value vector even if a null value is somehow produced
-      if (_nullHandlingEnabled && row.isNullValue(column)) {
+      if (indexContainer._nullValueVector != null && row.isNullValue(column)) {
         indexContainer._nullValueVector.setNull(docId);
       }
 
@@ -664,11 +680,15 @@ public class MutableSegmentImpl implements MutableSegment {
       if (fieldSpec.isSingleValueField()) {
         // Check partitions
         if (column.equals(_partitionColumn)) {
-          Object valueToPartition = (dataType == BYTES) ? new ByteArray((byte[]) value) : value;
-          int partition = _partitionFunction.getPartition(valueToPartition);
-          if (indexContainer._partitions.add(partition)) {
-            _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column,
-                valueToPartition);
+          String stringValue = dataType.toString(value);
+          int partition = _partitionFunction.getPartition(stringValue);
+          if (partition != _mainPartitionId) {
+            if (indexContainer._partitions.add(partition)) {
+              // for every partition other than mainPartitionId, log a warning once
+              _logger.warn("Found new partition: {} from partition column: {}, value: {}", partition, column,
+                  stringValue);
+            }
+            // always emit a metric when a partition other than mainPartitionId is detected
             if (_serverMetrics != null) {
               _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_PARTITION_MISMATCH, 1);
             }

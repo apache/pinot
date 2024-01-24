@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntList;
+import it.unimi.dsi.fastutil.ints.IntListIterator;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,7 +32,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
-import org.apache.pinot.query.planner.PlanFragmentMetadata;
 import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.QueryPlanMetadata;
 import org.apache.pinot.query.planner.SubPlan;
@@ -83,39 +86,37 @@ public class PinotLogicalQueryPlanner {
     for (Map.Entry<Integer, PlanNode> subPlanEntry : subPlanContext._subPlanIdToRootNodeMap.entrySet()) {
       int subPlanId = subPlanEntry.getKey();
       PlanNode subPlanRoot = subPlanEntry.getValue();
-      PlanFragmenter.Context planFragmentContext = new PlanFragmenter.Context();
-      planFragmentContext._planFragmentIdToRootNodeMap.put(1,
-          new PlanFragment(1, subPlanRoot, new PlanFragmentMetadata(), new ArrayList<>()));
-      subPlanRoot = subPlanRoot.visit(PlanFragmenter.INSTANCE, planFragmentContext);
+
+      // Fragment the SubPlan into multiple PlanFragments.
+      PlanFragmenter fragmenter = new PlanFragmenter();
+      PlanFragmenter.Context fragmenterContext = fragmenter.createContext();
+      subPlanRoot = subPlanRoot.visit(fragmenter, fragmenterContext);
+      Int2ObjectOpenHashMap<PlanFragment> planFragmentMap = fragmenter.getPlanFragmentMap();
+      Int2ObjectOpenHashMap<IntList> childPlanFragmentIdsMap = fragmenter.getChildPlanFragmentIdsMap();
 
       // Sub plan root needs to send final results back to the Broker
       // TODO: Should be SINGLETON (currently SINGLETON has to be local, so use BROADCAST_DISTRIBUTED instead)
-      PlanNode subPlanRootSenderNode =
+      MailboxSendNode subPlanRootSenderNode =
           new MailboxSendNode(subPlanRoot.getPlanFragmentId(), subPlanRoot.getDataSchema(), 0,
               RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
-              false);
+              false, false);
       subPlanRootSenderNode.addInput(subPlanRoot);
-      subPlanRoot = new MailboxReceiveNode(0, subPlanRoot.getDataSchema(), subPlanRoot.getPlanFragmentId(),
-          RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null, false,
-          false, subPlanRootSenderNode);
-      PlanFragment planFragment1 = planFragmentContext._planFragmentIdToRootNodeMap.get(1);
-      planFragmentContext._planFragmentIdToRootNodeMap.put(1,
-          new PlanFragment(1, subPlanRootSenderNode, planFragment1.getFragmentMetadata(), planFragment1.getChildren()));
-      PlanFragment rootPlanFragment =
-          new PlanFragment(subPlanRoot.getPlanFragmentId(), subPlanRoot, new PlanFragmentMetadata(),
-              Collections.singletonList(planFragmentContext._planFragmentIdToRootNodeMap.get(1)));
-      planFragmentContext._planFragmentIdToRootNodeMap.put(0, rootPlanFragment);
-      for (Map.Entry<Integer, List<Integer>> planFragmentToChildrenEntry
-          : planFragmentContext._planFragmentIdToChildrenMap.entrySet()) {
-        int planFragmentId = planFragmentToChildrenEntry.getKey();
-        List<Integer> planFragmentChildren = planFragmentToChildrenEntry.getValue();
-        for (int planFragmentChild : planFragmentChildren) {
-          planFragmentContext._planFragmentIdToRootNodeMap.get(planFragmentId).getChildren()
-              .add(planFragmentContext._planFragmentIdToRootNodeMap.get(planFragmentChild));
+      PlanFragment planFragment1 = new PlanFragment(1, subPlanRootSenderNode, new ArrayList<>());
+      planFragmentMap.put(1, planFragment1);
+      for (Int2ObjectMap.Entry<IntList> entry : childPlanFragmentIdsMap.int2ObjectEntrySet()) {
+        PlanFragment planFragment = planFragmentMap.get(entry.getIntKey());
+        List<PlanFragment> childPlanFragments = planFragment.getChildren();
+        IntListIterator childPlanFragmentIdIterator = entry.getValue().iterator();
+        while (childPlanFragmentIdIterator.hasNext()) {
+          childPlanFragments.add(planFragmentMap.get(childPlanFragmentIdIterator.nextInt()));
         }
       }
-      SubPlan subPlan = new SubPlan(planFragmentContext._planFragmentIdToRootNodeMap.get(0),
-          subPlanContext._subPlanIdToMetadataMap.get(0), new ArrayList<>());
+      MailboxReceiveNode rootReceiveNode =
+          new MailboxReceiveNode(0, subPlanRoot.getDataSchema(), subPlanRoot.getPlanFragmentId(),
+              RelDistribution.Type.BROADCAST_DISTRIBUTED, PinotRelExchangeType.getDefaultExchangeType(), null, null,
+              false, false, subPlanRootSenderNode);
+      PlanFragment rootPlanFragment = new PlanFragment(0, rootReceiveNode, Collections.singletonList(planFragment1));
+      SubPlan subPlan = new SubPlan(rootPlanFragment, subPlanContext._subPlanIdToMetadataMap.get(0), new ArrayList<>());
       subPlanMap.put(subPlanId, subPlan);
     }
     for (Map.Entry<Integer, List<Integer>> subPlanToChildrenEntry : subPlanContext._subPlanIdToChildrenMap.entrySet()) {

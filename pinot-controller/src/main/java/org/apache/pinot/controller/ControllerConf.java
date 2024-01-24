@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
@@ -218,6 +218,8 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtime.segment.deepStoreUploadRetryEnabled";
     public static final String DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS =
         "controller.realtime.segment.deepStoreUploadRetry.timeoutMs";
+    public static final String DEEP_STORE_RETRY_UPLOAD_PARALLELISM =
+        "controller.realtime.segment.deepStoreUploadRetry.parallelism";
     public static final String ENABLE_TMP_SEGMENT_ASYNC_DELETION =
         "controller.realtime.segment.tmpFileAsyncDeletionEnabled";
     // temporary segments within expiration won't be deleted so that ongoing split commit won't be impacted.
@@ -935,6 +937,10 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getDeepStoreRetryUploadTimeoutMs() {
     return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_TIMEOUT_MS, -1);
+  }
+
+  public int getDeepStoreRetryUploadParallelism() {
+    return getProperty(ControllerPeriodicTasksConf.DEEP_STORE_RETRY_UPLOAD_PARALLELISM, 1);
   }
 
   public int getTmpSegmentRetentionInSeconds() {

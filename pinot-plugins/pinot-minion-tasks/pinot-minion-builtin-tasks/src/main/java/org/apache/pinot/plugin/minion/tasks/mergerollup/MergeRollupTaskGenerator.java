@@ -859,8 +859,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
       if (v == null) {
         LOGGER.info(
             "Creating the gauge metric for tracking the merge/roll-up number buckets to process for table: {} "
-                + "and mergeLevel: {}.(bufferTimeMs={}, bucketTimeMs={}, numTimeBucketsToProcess={})"
-                + tableNameWithType, mergeLevel, bufferTimeMs, bucketTimeMs, finalCount);
+                + "and mergeLevel: {}.(bufferTimeMs={}, bucketTimeMs={}, numTimeBucketsToProcess={})",
+                tableNameWithType, mergeLevel, bufferTimeMs, bucketTimeMs, finalCount);
         controllerMetrics.setOrUpdateGauge(getMetricNameForNumBucketsToProcess(tableNameWithType, mergeLevel),
             () -> _tableNumberBucketsToProcess.get(tableNameWithType).getOrDefault(mergeLevel, finalCount));
       }

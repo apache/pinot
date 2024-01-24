@@ -22,8 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
-import javax.annotation.Nullable;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -89,26 +88,33 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    *               no need to commit the index from the realtime side. So when the realtime segment
    *               is destroyed (which is after the realtime segment has been committed and converted
    *               to offline), we close this lucene index writer to release resources but don't commit.
-   * @param stopWordsInclude the words to include in addition to the default stop word list
-   * @param stopWordsExclude the words to exclude from the default stop word list
+   * @param config the text index config
    */
-  public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit,
-      @Nullable List<String> stopWordsInclude, @Nullable List<String> stopWordsExclude, boolean useCompoundFile,
-      int maxBufferSizeMB) {
+  public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, TextIndexConfig config) {
     _textColumn = column;
+    String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       File indexFile = getV1TextIndexFile(segmentIndexDir);
       _indexDirectory = FSDirectory.open(indexFile.toPath());
 
-      StandardAnalyzer standardAnalyzer =
-          TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(stopWordsInclude, stopWordsExclude);
-      IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
-      indexWriterConfig.setRAMBufferSizeMB(maxBufferSizeMB);
+      Analyzer luceneAnalyzer;
+      if (luceneAnalyzerClass.isEmpty() || luceneAnalyzerClass.equals(StandardAnalyzer.class.getName())) {
+        luceneAnalyzer = TextIndexUtils.getStandardAnalyzerWithCustomizedStopWords(config.getStopWordsInclude(),
+            config.getStopWordsExclude());
+      } else {
+        luceneAnalyzer = TextIndexUtils.getAnalyzerFromClassName(luceneAnalyzerClass);
+      }
+
+      IndexWriterConfig indexWriterConfig = new IndexWriterConfig(luceneAnalyzer);
+      indexWriterConfig.setRAMBufferSizeMB(config.getLuceneMaxBufferSizeMB());
       indexWriterConfig.setCommitOnClose(commit);
-      indexWriterConfig.setUseCompoundFile(useCompoundFile);
+      indexWriterConfig.setUseCompoundFile(config.isLuceneUseCompoundFile());
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
+    } catch (ReflectiveOperationException e) {
+      throw new RuntimeException(
+          "Failed to instantiate " + luceneAnalyzerClass + " lucene analyzer for column: " + column, e);
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while instantiating the LuceneTextIndexCreator for column: " + column, e);
@@ -116,9 +122,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   public LuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
-    this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(),
-        indexConfig.getStopWordsInclude(), indexConfig.getStopWordsExclude(), indexConfig.isLuceneUseCompoundFile(),
-        indexConfig.getLuceneMaxBufferSizeMB());
+    this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(), indexConfig);
   }
 
   public IndexWriter getIndexWriter() {
@@ -196,7 +200,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   private File getV1TextIndexFile(File indexDir) {
-    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION;
+    String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
     return new File(indexDir, luceneIndexDirectory);
   }
 }

@@ -124,4 +124,15 @@ public class InstanceAssignmentConfigUtils {
 
     return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig);
   }
+
+  public static boolean isMirrorServerSetAssignment(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    // If the instance assignment config is not null and the partition selector is
+    // MIRROR_SERVER_SET_PARTITION_SELECTOR,
+    return tableConfig.getInstanceAssignmentConfigMap() != null
+        && tableConfig.getInstanceAssignmentConfigMap().get(instancePartitionsType.toString()) != null
+        && InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, instancePartitionsType)
+        .getPartitionSelector()
+        == InstanceAssignmentConfig.PartitionSelector.MIRROR_SERVER_SET_PARTITION_SELECTOR;
+  }
 }

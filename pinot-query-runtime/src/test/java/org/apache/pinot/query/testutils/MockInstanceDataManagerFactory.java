@@ -46,6 +46,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -65,7 +66,7 @@ public class MockInstanceDataManagerFactory {
   // Key is registered table (with or without type)
   private final Map<String, Schema> _registeredSchemaMap;
 
-  private String _serverName;
+  private final String _serverName;
 
   public MockInstanceDataManagerFactory(String serverName) {
     _serverName = serverName;
@@ -150,7 +151,8 @@ public class MockInstanceDataManagerFactory {
     Map<String, SegmentDataManager> segmentDataManagerMap =
         segmentList.stream().collect(Collectors.toMap(IndexSegment::getSegmentName, ImmutableSegmentDataManager::new));
     TableDataManager tableDataManager = mock(TableDataManager.class);
-    when(tableDataManager.acquireSegments(anyList(), anyList())).thenAnswer(invocation -> {
+    // TODO: support optional segments for multi-stage engine, but for now, it's always null.
+    when(tableDataManager.acquireSegments(anyList(), eq(null), anyList())).thenAnswer(invocation -> {
       List<String> segments = invocation.getArgument(0);
       return segments.stream().map(segmentDataManagerMap::get).collect(Collectors.toList());
     });
@@ -162,8 +164,8 @@ public class MockInstanceDataManagerFactory {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     // TODO: plugin table config constructor
-    TableConfig tableConfig =
-        new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts").build();
+    TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(rawTableName).setTimeColumnName("ts")
+        .setNullHandlingEnabled(true).build();
     Schema schema = _schemaMap.get(rawTableName);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(indexDir.getPath());
@@ -174,7 +176,7 @@ public class MockInstanceDataManagerFactory {
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
-      return ImmutableSegmentLoader.load(new File(indexDir, segmentName), ReadMode.mmap);
+      return ImmutableSegmentLoader.load(new File(indexDir, segmentName), ReadMode.mmap, tableConfig, schema);
     } catch (Exception e) {
       throw new RuntimeException("Unable to construct immutable segment from records", e);
     }

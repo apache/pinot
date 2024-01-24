@@ -21,9 +21,14 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.net.URLEncoder;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -37,6 +42,10 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -56,6 +65,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Override
   protected String getServerTenant() {
     return TENANT_NAME;
+  }
+
+  protected void overrideBrokerConf(PinotConfiguration configuration) {
+    configuration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_INSTANCE_TAGS,
+        TagNameUtils.getBrokerTagForTenant(TENANT_NAME));
   }
 
   @Override
@@ -116,8 +130,70 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     startServers(2);
 
     // Create tenants
-    createBrokerTenant(TENANT_NAME, 1);
     createServerTenant(TENANT_NAME, 1, 1);
+  }
+
+  @Test
+  public void testUpdateBrokerResource()
+      throws Exception {
+    // Add a new broker to the cluster
+    BaseBrokerStarter brokerStarter = startOneBroker(1);
+
+    // Check if broker is added to all the tables in broker resource
+    String clusterName = getHelixClusterName();
+    String brokerId = brokerStarter.getInstanceId();
+    IdealState brokerResourceIdealState =
+        _helixAdmin.getResourceIdealState(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    for (Map<String, String> brokerAssignment : brokerResourceIdealState.getRecord().getMapFields().values()) {
+      assertEquals(brokerAssignment.get(brokerId), CommonConstants.Helix.StateModel.BrokerResourceStateModel.ONLINE);
+    }
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView brokerResourceExternalView =
+          _helixAdmin.getResourceExternalView(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
+        if (!brokerAssignment.containsKey(brokerId)) {
+          return false;
+        }
+      }
+      return true;
+    }, 60_000L, "Failed to find broker in broker resource ExternalView");
+
+    // Stop the broker
+    brokerStarter.stop();
+
+    // Dropping the broker should fail because it is still in the broker resource
+    try {
+      sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+      fail("Dropping instance should fail because it is still in the broker resource");
+    } catch (Exception e) {
+      // Expected
+    }
+
+    // Untag the broker and update the broker resource so that it is removed from the broker resource
+    sendPutRequest(_controllerRequestURLBuilder.forInstanceUpdateTags(brokerId, Collections.emptyList(), true));
+
+    // Check if broker is removed from all the tables in broker resource
+    brokerResourceIdealState =
+        _helixAdmin.getResourceIdealState(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    for (Map<String, String> brokerAssignment : brokerResourceIdealState.getRecord().getMapFields().values()) {
+      assertFalse(brokerAssignment.containsKey(brokerId));
+    }
+    TestUtils.waitForCondition(aVoid -> {
+      ExternalView brokerResourceExternalView =
+          _helixAdmin.getResourceExternalView(clusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+      for (Map<String, String> brokerAssignment : brokerResourceExternalView.getRecord().getMapFields().values()) {
+        if (brokerAssignment.containsKey(brokerId)) {
+          return false;
+        }
+      }
+      return true;
+    }, 60_000L, "Failed to remove broker from broker resource ExternalView");
+
+    // Dropping the broker should success now
+    sendDeleteRequest(_controllerRequestURLBuilder.forInstance(brokerId));
+
+    // Check if broker is dropped from the cluster
+    assertFalse(_helixAdmin.getInstancesInCluster(clusterName).contains(brokerId));
   }
 
   @Test

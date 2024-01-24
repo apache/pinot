@@ -155,10 +155,12 @@ public class ServerRoutingStatsManagerTest {
 
 
     numInFlightReqList = manager.fetchNumInFlightRequestsForAllServers();
-    assertEquals(numInFlightReqList.get(0).getLeft(), "server2");
-    assertEquals(numInFlightReqList.get(0).getRight().intValue(), 1);
-    assertEquals(numInFlightReqList.get(1).getLeft(), "server1");
-    assertEquals(numInFlightReqList.get(1).getRight().intValue(), 2);
+    int server2Index = numInFlightReqList.get(0).getLeft().equals("server2") ? 0 : 1;
+    int server1Index = 1 - server2Index;
+    assertEquals(numInFlightReqList.get(server2Index).getLeft(), "server2");
+    assertEquals(numInFlightReqList.get(server2Index).getRight().intValue(), 1);
+    assertEquals(numInFlightReqList.get(server1Index).getLeft(), "server1");
+    assertEquals(numInFlightReqList.get(server1Index).getRight().intValue(), 2);
 
     numInFlightReq = manager.fetchNumInFlightRequestsForServer("server2");
     assertEquals(numInFlightReq.intValue(), 1);
@@ -166,10 +168,12 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(numInFlightReq.intValue(), 2);
 
     latencyList = manager.fetchEMALatencyForAllServers();
-    assertEquals(latencyList.get(0).getLeft(), "server2");
-    assertEquals(latencyList.get(0).getRight().doubleValue(), 0.0);
-    assertEquals(latencyList.get(1).getLeft(), "server1");
-    assertEquals(latencyList.get(1).getRight().doubleValue(), 0.0);
+    server2Index = latencyList.get(0).getLeft().equals("server2") ? 0 : 1;
+    server1Index = 1 - server2Index;
+    assertEquals(latencyList.get(server2Index).getLeft(), "server2");
+    assertEquals(latencyList.get(server2Index).getRight().doubleValue(), 0.0);
+    assertEquals(latencyList.get(server1Index).getLeft(), "server1");
+    assertEquals(latencyList.get(server1Index).getRight().doubleValue(), 0.0);
 
     latency = manager.fetchEMALatencyForServer("server2");
     assertEquals(latency, 0.0);
@@ -177,10 +181,12 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(latency, 0.0);
 
     scoreList = manager.fetchHybridScoreForAllServers();
-    assertEquals(scoreList.get(0).getLeft(), "server2");
-    assertEquals(scoreList.get(0).getRight().doubleValue(), 0.0);
-    assertEquals(scoreList.get(1).getLeft(), "server1");
-    assertEquals(scoreList.get(1).getRight().doubleValue(), 0.0);
+    server2Index = scoreList.get(0).getLeft().equals("server2") ? 0 : 1;
+    server1Index = 1 - server2Index;
+    assertEquals(scoreList.get(server2Index).getLeft(), "server2");
+    assertEquals(scoreList.get(server2Index).getRight().doubleValue(), 0.0);
+    assertEquals(scoreList.get(server1Index).getLeft(), "server1");
+    assertEquals(scoreList.get(server1Index).getRight().doubleValue(), 0.0);
 
     score = manager.fetchHybridScoreForServer("server2");
     assertEquals(score, 0.0);
@@ -192,10 +198,12 @@ public class ServerRoutingStatsManagerTest {
     waitForStatsUpdate(manager, requestId);
 
     numInFlightReqList = manager.fetchNumInFlightRequestsForAllServers();
-    assertEquals(numInFlightReqList.get(0).getLeft(), "server2");
-    assertEquals(numInFlightReqList.get(0).getRight().intValue(), 1);
-    assertEquals(numInFlightReqList.get(1).getLeft(), "server1");
-    assertEquals(numInFlightReqList.get(1).getRight().intValue(), 1);
+    server2Index = numInFlightReqList.get(0).getLeft().equals("server2") ? 0 : 1;
+    server1Index = 1 - server2Index;
+    assertEquals(numInFlightReqList.get(server2Index).getLeft(), "server2");
+    assertEquals(numInFlightReqList.get(server2Index).getRight().intValue(), 1);
+    assertEquals(numInFlightReqList.get(server1Index).getLeft(), "server1");
+    assertEquals(numInFlightReqList.get(server1Index).getRight().intValue(), 1);
 
     numInFlightReq = manager.fetchNumInFlightRequestsForServer("server2");
     assertEquals(numInFlightReq.intValue(), 1);
@@ -203,10 +211,12 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(numInFlightReq.intValue(), 1);
 
     latencyList = manager.fetchEMALatencyForAllServers();
-    assertEquals(latencyList.get(0).getLeft(), "server2");
-    assertEquals(latencyList.get(0).getRight().doubleValue(), 0.0);
-    assertEquals(latencyList.get(1).getLeft(), "server1");
-    assertEquals(latencyList.get(1).getRight().doubleValue(), 2.0);
+    server2Index = latencyList.get(0).getLeft().equals("server2") ? 0 : 1;
+    server1Index = 1 - server2Index;
+    assertEquals(latencyList.get(server2Index).getLeft(), "server2");
+    assertEquals(latencyList.get(server2Index).getRight().doubleValue(), 0.0);
+    assertEquals(latencyList.get(server1Index).getLeft(), "server1");
+    assertEquals(latencyList.get(server1Index).getRight().doubleValue(), 2.0);
 
     latency = manager.fetchEMALatencyForServer("server2");
     assertEquals(latency, 0.0);
@@ -214,10 +224,12 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(latency, 2.0);
 
     scoreList = manager.fetchHybridScoreForAllServers();
-    assertEquals(scoreList.get(0).getLeft(), "server2");
-    assertEquals(scoreList.get(0).getRight().doubleValue(), 0.0);
-    assertEquals(scoreList.get(1).getLeft(), "server1");
-    assertEquals(scoreList.get(1).getRight().doubleValue(), 54.0);
+    server2Index = scoreList.get(0).getLeft().equals("server2") ? 0 : 1;
+    server1Index = 1 - server2Index;
+    assertEquals(scoreList.get(server2Index).getLeft(), "server2");
+    assertEquals(scoreList.get(server2Index).getRight().doubleValue(), 0.0);
+    assertEquals(scoreList.get(server1Index).getLeft(), "server1");
+    assertEquals(scoreList.get(server1Index).getRight().doubleValue(), 54.0);
 
     score = manager.fetchHybridScoreForServer("server2");
     assertEquals(score, 0.0);
@@ -229,10 +241,12 @@ public class ServerRoutingStatsManagerTest {
     waitForStatsUpdate(manager, requestId);
 
     numInFlightReqList = manager.fetchNumInFlightRequestsForAllServers();
-    assertEquals(numInFlightReqList.get(0).getLeft(), "server2");
-    assertEquals(numInFlightReqList.get(0).getRight().intValue(), 0);
-    assertEquals(numInFlightReqList.get(1).getLeft(), "server1");
-    assertEquals(numInFlightReqList.get(1).getRight().intValue(), 1);
+    server2Index = numInFlightReqList.get(0).getLeft().equals("server2") ? 0 : 1;
+    server1Index = 1 - server2Index;
+    assertEquals(numInFlightReqList.get(server2Index).getLeft(), "server2");
+    assertEquals(numInFlightReqList.get(server2Index).getRight().intValue(), 0);
+    assertEquals(numInFlightReqList.get(server1Index).getLeft(), "server1");
+    assertEquals(numInFlightReqList.get(server1Index).getRight().intValue(), 1);
 
     numInFlightReq = manager.fetchNumInFlightRequestsForServer("server2");
     assertEquals(numInFlightReq.intValue(), 0);
@@ -240,10 +254,12 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(numInFlightReq.intValue(), 1);
 
     latencyList = manager.fetchEMALatencyForAllServers();
-    assertEquals(latencyList.get(0).getLeft(), "server2");
-    assertEquals(latencyList.get(0).getRight().doubleValue(), 10.0);
-    assertEquals(latencyList.get(1).getLeft(), "server1");
-    assertEquals(latencyList.get(1).getRight().doubleValue(), 2.0);
+    server2Index = latencyList.get(0).getLeft().equals("server2") ? 0 : 1;
+    server1Index = 1 - server2Index;
+    assertEquals(latencyList.get(server2Index).getLeft(), "server2");
+    assertEquals(latencyList.get(server2Index).getRight().doubleValue(), 10.0);
+    assertEquals(latencyList.get(server1Index).getLeft(), "server1");
+    assertEquals(latencyList.get(server1Index).getRight().doubleValue(), 2.0);
 
     latency = manager.fetchEMALatencyForServer("server2");
     assertEquals(latency, 10.0);
@@ -251,10 +267,12 @@ public class ServerRoutingStatsManagerTest {
     assertEquals(latency, 2.0);
 
     scoreList = manager.fetchHybridScoreForAllServers();
-    assertEquals(scoreList.get(0).getLeft(), "server2");
-    assertEquals(scoreList.get(0).getRight().doubleValue(), 10.0, manager.getServerRoutingStatsStr());
-    assertEquals(scoreList.get(1).getLeft(), "server1");
-    assertEquals(scoreList.get(1).getRight().doubleValue(), 54.0, manager.getServerRoutingStatsStr());
+    server2Index = scoreList.get(0).getLeft().equals("server2") ? 0 : 1;
+    server1Index = 1 - server2Index;
+    assertEquals(scoreList.get(server2Index).getLeft(), "server2");
+    assertEquals(scoreList.get(server2Index).getRight().doubleValue(), 10.0, manager.getServerRoutingStatsStr());
+    assertEquals(scoreList.get(server1Index).getLeft(), "server1");
+    assertEquals(scoreList.get(server1Index).getRight().doubleValue(), 54.0, manager.getServerRoutingStatsStr());
 
     score = manager.fetchHybridScoreForServer("server2");
     assertEquals(score, 10.0);

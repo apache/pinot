@@ -25,7 +25,8 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
@@ -54,11 +55,12 @@ public class StarTreeIndexSeparatorTest {
           Lists.newArrayList("AirlineID", "Origin", "Dest"),
           Lists.newArrayList(),
           Lists.newArrayList("count__*", "max__ArrDelay"),
+          null,
           10));
 
   @BeforeClass
   public void setup()
-      throws IOException {
+      throws IOException, ConfigurationException {
     ClassLoader classLoader = getClass().getClassLoader();
     URL segmentUrl = classLoader.getResource(SEGMENT_PATH);
     File segmentDir = new File(segmentUrl.getFile());

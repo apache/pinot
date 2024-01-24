@@ -54,6 +54,8 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -109,6 +111,9 @@ abstract class BaseStarTreeV2Test<R, A> {
   private static final String QUERY_FILTER_OR_MULTIPLE_DIMENSIONS = " WHERE d1 > 10 OR d2 < 50";
   private static final String QUERY_FILTER_OR_ON_AND = " WHERE (d1 > 10 AND d1 < 50) OR d1 < 50";
   private static final String QUERY_FILTER_OR_ON_NOT = " WHERE (NOT d1 > 10) OR d1 < 50";
+  // Always false filters
+  private static final String QUERY_FILTER_ALWAYS_FALSE = " WHERE d1 > 100";
+  private static final String QUERY_FILTER_OR_ALWAYS_FALSE = " WHERE d1 > 100 OR d1 < 0";
 
   private static final String QUERY_GROUP_BY = " GROUP BY d2";
   private static final String FILTER_AGG_CLAUSE = " FILTER(WHERE d1 > 10)";
@@ -163,10 +168,10 @@ abstract class BaseStarTreeV2Test<R, A> {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(segmentRecords));
     driver.build();
 
-    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(Arrays.asList(DIMENSION_D1, DIMENSION_D2), null,
-        Collections.singletonList(
-            new AggregationFunctionColumnPair(_valueAggregator.getAggregationType(), METRIC).toColumnName()),
-        MAX_LEAF_RECORDS);
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(Arrays.asList(DIMENSION_D1, DIMENSION_D2), null, null, Collections.singletonList(
+            new StarTreeAggregationConfig(METRIC, _valueAggregator.getAggregationType().getName(),
+                getCompressionCodec())), MAX_LEAF_RECORDS);
     File indexDir = new File(TEMP_DIR, SEGMENT_NAME);
     // Randomly build star-tree using on-heap or off-heap mode
     MultipleTreesBuilder.BuildMode buildMode =
@@ -186,6 +191,8 @@ abstract class BaseStarTreeV2Test<R, A> {
     testUnsupportedFilter(query + QUERY_FILTER_OR_MULTIPLE_DIMENSIONS);
     testUnsupportedFilter(query + QUERY_FILTER_OR_ON_AND);
     testUnsupportedFilter(query + QUERY_FILTER_OR_ON_NOT);
+    testUnsupportedFilter(query + QUERY_FILTER_ALWAYS_FALSE);
+    testUnsupportedFilter(query + QUERY_FILTER_OR_ALWAYS_FALSE);
   }
 
   @Test
@@ -448,6 +455,19 @@ abstract class BaseStarTreeV2Test<R, A> {
   private Object getNextRawValue(int docId, ForwardIndexReader reader, ForwardIndexReaderContext readerContext,
       Dictionary dictionary) {
     return dictionary.get(reader.getDictId(docId, readerContext));
+  }
+
+  /**
+   * Can be overridden to force the compression codec.
+   */
+  CompressionCodec getCompressionCodec() {
+    CompressionCodec[] compressionCodecs = CompressionCodec.values();
+    while (true) {
+      CompressionCodec compressionCodec = compressionCodecs[RANDOM.nextInt(compressionCodecs.length)];
+      if (compressionCodec.isApplicableToRawIndex()) {
+        return compressionCodec;
+      }
+    }
   }
 
   abstract ValueAggregator<R, A> getValueAggregator();

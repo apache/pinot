@@ -44,7 +44,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.spi.V1Constants.Indexes.FST_INDEX_FILE_EXTENSION;
+import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION;
 
 
 /**
@@ -157,7 +157,7 @@ public class FSTIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     String columnName = columnMetadata.getColumnName();
     File inProgress = new File(indexDir, columnName + ".fst.inprogress");
-    File fstIndexFile = new File(indexDir, columnName + FST_INDEX_FILE_EXTENSION);
+    File fstIndexFile = new File(indexDir, columnName + LUCENE_V9_FST_INDEX_FILE_EXTENSION);
 
     if (!inProgress.exists()) {
       // Create a marker file.

@@ -112,29 +112,26 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
+  protected TransferableBlock getNextBlock()
+      throws InterruptedException, TimeoutException {
     if (_executionFuture == null) {
       _executionFuture = startExecution();
     }
-    try {
-      BaseResultsBlock resultsBlock =
-          _blockingQueue.poll(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-      if (resultsBlock == null) {
-        throw new TimeoutException("Timed out waiting for results block");
-      }
-      // Terminate when receiving exception block
-      Map<Integer, String> exceptions = _exceptions;
-      if (exceptions != null) {
-        return TransferableBlockUtils.getErrorTransferableBlock(exceptions);
-      }
-      if (_isEarlyTerminated || resultsBlock == LAST_RESULTS_BLOCK) {
-        return constructMetadataBlock();
-      } else {
-        // Regular data block
-        return composeTransferableBlock(resultsBlock, _dataSchema);
-      }
-    } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+    BaseResultsBlock resultsBlock =
+        _blockingQueue.poll(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+    if (resultsBlock == null) {
+      throw new TimeoutException("Timed out waiting for results block");
+    }
+    // Terminate when receiving exception block
+    Map<Integer, String> exceptions = _exceptions;
+    if (exceptions != null) {
+      return TransferableBlockUtils.getErrorTransferableBlock(exceptions);
+    }
+    if (_isEarlyTerminated || resultsBlock == LAST_RESULTS_BLOCK) {
+      return constructMetadataBlock();
+    } else {
+      // Regular data block
+      return composeTransferableBlock(resultsBlock, _dataSchema);
     }
   }
 

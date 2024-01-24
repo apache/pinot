@@ -19,6 +19,7 @@
 package org.apache.pinot.tools.admin.command;
 
 import java.util.Collections;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -172,7 +173,7 @@ public class DeleteTableCommand extends AbstractBaseAdminCommand implements Comm
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       fileUploadDownloadClient.getHttpClient().sendDeleteRequest(FileUploadDownloadClient
           .getDeleteTableURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort),
-              _tableName, _type, _retention), Collections.emptyMap(), makeAuthProvider(_authProvider,
+              _tableName, _type, _retention), Collections.emptyMap(), AuthProviderUtils.makeAuthProvider(_authProvider,
           _authTokenUrl, _authToken, _user, _password));
     } catch (Exception e) {
       LOGGER.error("Got Exception while deleting Pinot Table: " + _tableName, e);

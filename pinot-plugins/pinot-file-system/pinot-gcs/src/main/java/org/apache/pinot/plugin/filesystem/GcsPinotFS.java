@@ -39,12 +39,15 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.channels.Channels;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.BasePinotFS;
 import org.apache.pinot.spi.filesystem.FileMetadata;
@@ -57,6 +60,7 @@ import static com.google.common.base.Preconditions.checkState;
 public class GcsPinotFS extends BasePinotFS {
   public static final String PROJECT_ID = "projectId";
   public static final String GCP_KEY = "gcpKey";
+  public static final String JSON_KEY = "jsonKey";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GcsPinotFS.class);
   // See https://cloud.google.com/storage/docs/json_api/v1/how-tos/batch
@@ -65,18 +69,31 @@ public class GcsPinotFS extends BasePinotFS {
 
   @Override
   public void init(PinotConfiguration config) {
-    Credentials credentials;
-
+    Credentials credentials = null;
     try {
       StorageOptions.Builder storageBuilder = StorageOptions.newBuilder();
-      if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID)) && !Strings
-          .isNullOrEmpty(config.getProperty(GCP_KEY))) {
+      if (!Strings.isNullOrEmpty(config.getProperty(PROJECT_ID))) {
         LOGGER.info("Configs are: {}, {}", PROJECT_ID, config.getProperty(PROJECT_ID));
         String projectId = config.getProperty(PROJECT_ID);
-        String gcpKey = config.getProperty(GCP_KEY);
         storageBuilder.setProjectId(projectId);
-        credentials = GoogleCredentials.fromStream(Files.newInputStream(Paths.get(gcpKey)));
-      } else {
+
+        if (!Strings.isNullOrEmpty(config.getProperty(GCP_KEY))) {
+          String gcpKey = config.getProperty(GCP_KEY);
+          credentials = GoogleCredentials.fromStream(Files.newInputStream(Paths.get(gcpKey)));
+        } else if (!Strings.isNullOrEmpty(config.getProperty(JSON_KEY))) {
+          String decodedJsonKey = config.getProperty(JSON_KEY);
+          Base64.Decoder decoder = Base64.getDecoder();
+          try {
+            byte[] decodedBytes = decoder.decode(decodedJsonKey);
+            decodedJsonKey = new String(decodedBytes);
+          } catch (IllegalArgumentException e) {
+            // Ignore. Json key was not Base64 encoded.
+            LOGGER.info("Failed to decode jsonKey, using as is");
+          }
+          credentials = GoogleCredentials.fromStream(IOUtils.toInputStream(decodedJsonKey, StandardCharsets.UTF_8));
+        }
+      }
+      if (credentials == null) {
         LOGGER.info("Configs using default credential");
         credentials = GoogleCredentials.getApplicationDefault();
       }

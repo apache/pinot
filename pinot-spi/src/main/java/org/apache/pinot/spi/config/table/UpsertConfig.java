@@ -57,11 +57,17 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Boolean column to indicate whether a records should be deleted")
   private String _deleteRecordColumn;
 
+  @JsonPropertyDescription("Boolean column to indicate whether a records is out-of-order")
+  private String _outOfOrderRecordColumn;
+
   @JsonPropertyDescription("Whether to use snapshot for fast upsert metadata recovery")
   private boolean _enableSnapshot;
 
   @JsonPropertyDescription("Whether to use TTL for upsert metadata cleanup, it uses the same unit as comparison col")
   private double _metadataTTL;
+
+  @JsonPropertyDescription("TTL for upsert metadata cleanup for deleted keys, it uses the same unit as comparison col")
+  private double _deletedKeysTTL;
 
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
@@ -113,12 +119,21 @@ public class UpsertConfig extends BaseJsonConfig {
     return _deleteRecordColumn;
   }
 
+  @Nullable
+  public String getOutOfOrderRecordColumn() {
+    return _outOfOrderRecordColumn;
+  }
+
   public boolean isEnableSnapshot() {
     return _enableSnapshot;
   }
 
   public double getMetadataTTL() {
     return _metadataTTL;
+  }
+
+  public double getDeletedKeysTTL() {
+    return _deletedKeysTTL;
   }
 
   public boolean isEnablePreload() {
@@ -184,9 +199,11 @@ public class UpsertConfig extends BaseJsonConfig {
   }
 
   public void setDeleteRecordColumn(String deleteRecordColumn) {
-    if (deleteRecordColumn != null) {
-      _deleteRecordColumn = deleteRecordColumn;
-    }
+    _deleteRecordColumn = deleteRecordColumn;
+  }
+
+  public void setOutOfOrderRecordColumn(String outOfOrderRecordColumn) {
+    _outOfOrderRecordColumn = outOfOrderRecordColumn;
   }
 
   public void setEnableSnapshot(boolean enableSnapshot) {
@@ -195,6 +212,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setMetadataTTL(double metadataTTL) {
     _metadataTTL = metadataTTL;
+  }
+
+  public void setDeletedKeysTTL(double deletedKeysTTL) {
+    _deletedKeysTTL = deletedKeysTTL;
   }
 
   public void setEnablePreload(boolean enablePreload) {

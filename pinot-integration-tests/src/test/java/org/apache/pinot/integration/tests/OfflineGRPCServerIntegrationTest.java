@@ -60,7 +60,7 @@ import static org.testng.Assert.*;
 public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest {
   private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
   private static final DataTableReducerContext DATATABLE_REDUCER_CONTEXT = new DataTableReducerContext(
-      EXECUTOR_SERVICE, 2, 10000, 10000);
+      EXECUTOR_SERVICE, 2, 10000, 10000, 5000);
 
   @BeforeClass
   public void setUp()
@@ -97,7 +97,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   }
 
   public GrpcQueryClient getGrpcQueryClient() {
-    return new GrpcQueryClient("localhost", CommonConstants.Server.DEFAULT_GRPC_PORT);
+    return new GrpcQueryClient("localhost", getServerGrpcPort());
   }
 
   @Test

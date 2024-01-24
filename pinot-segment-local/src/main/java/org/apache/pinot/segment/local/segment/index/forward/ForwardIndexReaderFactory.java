@@ -20,6 +20,7 @@
 package org.apache.pinot.segment.local.segment.index.forward;
 
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVEntryDictForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitSVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReader;
@@ -72,8 +73,14 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
           return new FixedBitSVForwardIndexReaderV2(dataBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement());
         }
       } else {
-        return new FixedBitMVForwardIndexReader(dataBuffer, metadata.getTotalDocs(), metadata.getTotalNumberOfEntries(),
-            metadata.getBitsPerElement());
+        if (dataBuffer.size() > Integer.BYTES
+            && dataBuffer.getInt(0) == FixedBitMVEntryDictForwardIndexReader.MAGIC_MARKER) {
+          return new FixedBitMVEntryDictForwardIndexReader(dataBuffer, metadata.getTotalDocs(),
+              metadata.getBitsPerElement());
+        } else {
+          return new FixedBitMVForwardIndexReader(dataBuffer, metadata.getTotalDocs(),
+              metadata.getTotalNumberOfEntries(), metadata.getBitsPerElement());
+        }
       }
     } else {
       return createRawIndexReader(dataBuffer, metadata.getDataType().getStoredType(), metadata.isSingleValue());

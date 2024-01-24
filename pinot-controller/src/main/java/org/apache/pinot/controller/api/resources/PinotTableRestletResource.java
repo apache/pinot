@@ -268,20 +268,28 @@ public class PinotTableRestletResource {
   @Path("/tables")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE)
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
-  public String listTables(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
+  public String listTables(@ApiParam(value = "realtime|offline|dimension") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
       @ApiParam(value = "name|creationTime|lastModifiedTime") @QueryParam("sortType") String sortTypeStr,
       @ApiParam(value = "true|false") @QueryParam("sortAsc") @DefaultValue("true") boolean sortAsc) {
     try {
+      boolean isDimensionTable = "dimension".equalsIgnoreCase(tableTypeStr);
       TableType tableType = null;
-      if (tableTypeStr != null) {
+      if (isDimensionTable) {
+        // Dimension is a property (isDimTable) of an OFFLINE table.
+        tableType = TableType.OFFLINE;
+      } else if (tableTypeStr != null) {
         tableType = TableType.valueOf(tableTypeStr.toUpperCase());
       }
       SortType sortType = sortTypeStr != null ? SortType.valueOf(sortTypeStr.toUpperCase()) : SortType.NAME;
 
-      List<String> tableNamesWithType = tableType == null ? _pinotHelixResourceManager.getAllTables()
-          : (tableType == TableType.REALTIME ? _pinotHelixResourceManager.getAllRealtimeTables()
-              : _pinotHelixResourceManager.getAllOfflineTables());
+      // If tableTypeStr is dimension, then tableType is set to TableType.OFFLINE.
+      // So, checking the isDimensionTable to get the list of dimension tables only.
+      List<String> tableNamesWithType =
+          isDimensionTable ? _pinotHelixResourceManager.getAllDimensionTables()
+              : tableType == null ? _pinotHelixResourceManager.getAllTables()
+                  : (tableType == TableType.REALTIME ? _pinotHelixResourceManager.getAllRealtimeTables()
+                      : _pinotHelixResourceManager.getAllOfflineTables());
 
       if (StringUtils.isNotBlank(taskType)) {
         Set<String> tableNamesForTaskType = new HashSet<>();
@@ -594,6 +602,7 @@ public class PinotTableRestletResource {
   @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
       notes = "Rebalances a table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(
+      //@formatter:off
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun")
@@ -601,19 +610,24 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false")
       @QueryParam("reassignInstances") boolean reassignInstances,
       @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("false")
-      @QueryParam("includeConsuming") boolean includeConsuming, @ApiParam(
-      value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign all "
-          + "segments in a round-robin fashion as if adding new segments to an empty table)") @DefaultValue("false")
-  @QueryParam("bootstrap") boolean bootstrap,
+      @QueryParam("includeConsuming") boolean includeConsuming,
+      @ApiParam(value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, "
+          + "reassign all segments in a round-robin fashion as if adding new segments to an empty table)")
+      @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
       boolean downtime,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or "
           + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
-  @QueryParam("minAvailableReplicas") int minAvailableReplicas, @ApiParam(
-      value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime contract cannot "
-          + "be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts, @ApiParam(
-      value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
-  @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
+      @QueryParam("minAvailableReplicas") int minAvailableReplicas,
+      @ApiParam(value = "For no-downtime rebalance, whether to enable low disk mode during rebalance. When enabled, "
+          + "segments will first be offloaded from servers, then added to servers after offload is done while "
+          + "maintaining the min available replicas. It may increase the total time of the rebalance, but can be "
+          + "useful when servers are low on disk space, and we want to scale up the cluster and rebalance the table to "
+          + "more servers.") @DefaultValue("false") @QueryParam("lowDiskMode") boolean lowDiskMode,
+      @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime "
+          + "contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
+      @ApiParam(value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
+      @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
       @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
       @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs,
       @ApiParam(value = "How often to make a status update (i.e. heartbeat)") @DefaultValue("300000")
@@ -621,10 +635,13 @@ public class PinotTableRestletResource {
       @ApiParam(value = "How long to wait for next status update (i.e. heartbeat) before the job is considered failed")
       @DefaultValue("3600000") @QueryParam("heartbeatTimeoutInMs") long heartbeatTimeoutInMs,
       @ApiParam(value = "Max number of attempts to rebalance") @DefaultValue("3") @QueryParam("maxAttempts")
-      int maxAttempts, @ApiParam(value = "Initial delay to exponentially backoff retry") @DefaultValue("300000")
-  @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
+      int maxAttempts,
+      @ApiParam(value = "Initial delay to exponentially backoff retry") @DefaultValue("300000")
+      @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
-      @QueryParam("updateTargetTier") boolean updateTargetTier) {
+      @QueryParam("updateTargetTier") boolean updateTargetTier
+      //@formatter:on
+  ) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
@@ -633,6 +650,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setBootstrap(bootstrap);
     rebalanceConfig.setDowntime(downtime);
     rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
+    rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
     rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
@@ -930,6 +948,43 @@ public class PinotTableRestletResource {
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
     }
     return segmentsMetadata;
+  }
+
+  @GET
+  @Path("tables/{tableName}/validDocIdMetadata")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the aggregate valid doc id metadata of all segments for a table", notes = "Get the "
+      + "aggregate valid doc id metadata of all segments for a table")
+  public String getTableAggregateValidDocIdMetadata(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "A list of segments", allowMultiple = true) @QueryParam("segmentNames")
+      List<String> segmentNames) {
+    LOGGER.info("Received a request to fetch aggregate valid doc id metadata for a table {}", tableName);
+    TableType tableType = Constants.validateTableType(tableTypeStr);
+    if (tableType == TableType.OFFLINE) {
+      throw new ControllerApplicationException(LOGGER, "Table type : " + tableTypeStr + " not yet supported.",
+          Response.Status.NOT_IMPLEMENTED);
+    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
+
+    String validDocIdMetadata;
+    try {
+      TableMetadataReader tableMetadataReader =
+          new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+      JsonNode segmentsMetadataJson =
+          tableMetadataReader.getAggregateValidDocIdMetadata(tableNameWithType, segmentNames,
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      validDocIdMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR, ioe);
+    }
+    return validDocIdMetadata;
   }
 
   @GET

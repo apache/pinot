@@ -247,10 +247,10 @@ public class BenchmarkQueries extends BaseQueriesTest {
         .setFieldConfigList(fieldConfigs)
         .setNoDictionaryColumns(Arrays.asList(RAW_INT_COL_NAME, RAW_STRING_COL_NAME))
         .setSortedColumn(SORTED_COL_NAME)
-        .setStarTreeIndexConfigs(Collections.singletonList(new StarTreeIndexConfig(
-            Arrays.asList(SORTED_COL_NAME, INT_COL_NAME), null, Collections.singletonList(
-            new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
-            Integer.MAX_VALUE)))
+        .setStarTreeIndexConfigs(Collections.singletonList(
+            new StarTreeIndexConfig(Arrays.asList(SORTED_COL_NAME, INT_COL_NAME), null, Collections.singletonList(
+                new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()), null,
+                Integer.MAX_VALUE)))
         .build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(SORTED_COL_NAME, FieldSpec.DataType.INT)

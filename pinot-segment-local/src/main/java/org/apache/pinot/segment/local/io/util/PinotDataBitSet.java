@@ -102,6 +102,9 @@ public final class PinotDataBitSet implements Closeable {
   }
 
   public void readInt(int startIndex, int numBitsPerValue, int length, int[] buffer) {
+    if (length == 0) {
+      return;
+    }
     long startBitOffset = (long) startIndex * numBitsPerValue;
     int byteOffset = (int) (startBitOffset / Byte.SIZE);
     int bitOffsetInFirstByte = (int) (startBitOffset % Byte.SIZE);
@@ -167,6 +170,9 @@ public final class PinotDataBitSet implements Closeable {
   }
 
   public void writeInt(int startIndex, int numBitsPerValue, int length, int[] values) {
+    if (length == 0) {
+      return;
+    }
     long startBitOffset = (long) startIndex * numBitsPerValue;
     int byteOffset = (int) (startBitOffset / Byte.SIZE);
     int bitOffsetInFirstByte = (int) (startBitOffset % Byte.SIZE);

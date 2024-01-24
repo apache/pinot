@@ -30,6 +30,8 @@
         "comment": "standard sql concat is vararg, while we treat the third input as a separator",
         "sql": "SELECT concat(strCol, strCol, ',') FROM {stringTbl}"
       },
+      { "sql": "SELECT strCol || strCol FROM {stringTbl}" },
+      { "sql": "SELECT strCol || strCol || ',' FROM {stringTbl}"},
       { "sql": "SELECT trim(strCol) FROM {stringTbl}" },
       { "sql": "SELECT lower(strCol), regexp_Replace(strCol, 'e.*o', 'le') FROM {stringTbl}" },
       {

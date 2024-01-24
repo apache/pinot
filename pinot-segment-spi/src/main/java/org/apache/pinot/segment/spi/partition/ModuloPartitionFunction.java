@@ -49,19 +49,8 @@ public class ModuloPartitionFunction implements PartitionFunction {
    * @return Partition id for the given value.
    */
   @Override
-  public int getPartition(Object value) {
-    if (value instanceof Integer) {
-      return toNonNegative((Integer) value % _numPartitions);
-    } else if (value instanceof Long) {
-      // Since _numPartitions is int, the modulo should also be int.
-      return toNonNegative((int) ((Long) value % _numPartitions));
-    } else if (value instanceof String) {
-      // Parse String as Long, to support both Integer and Long.
-      return toNonNegative((int) (Long.parseLong((String) value) % _numPartitions));
-    } else {
-      throw new IllegalArgumentException(
-          "Illegal argument for partitioning, expected Integer, got: " + value.getClass().getSimpleName());
-    }
+  public int getPartition(String value) {
+    return toNonNegative((int) (Long.parseLong(value) % _numPartitions));
   }
 
   @Override

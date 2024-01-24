@@ -153,8 +153,7 @@ public class MultiNodesOfflineClusterIntegrationTest extends OfflineClusterInteg
       testCountStarQuery(NUM_SERVERS - 1, false);
     } finally {
       // Restart the failed server, and it should be included in the routing again
-      serverStarter.stop();
-      serverStarter = startOneServer(NUM_SERVERS - 1);
+      serverStarter = restartServer(serverStarter);
       _serverStarters.set(NUM_SERVERS - 1, serverStarter);
       TestUtils.waitForCondition((aVoid) -> {
         try {

@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -244,7 +244,7 @@ public class StarTreeBuilderUtils {
           .equals(metadata.getSkipStarNodeCreationForDimensions())) {
         return true;
       }
-      if (!builderConfig.getFunctionColumnPairs().equals(metadata.getFunctionColumnPairs())) {
+      if (!builderConfig.getAggregationSpecs().equals(metadata.getAggregationSpecs())) {
         return true;
       }
       if (builderConfig.getMaxLeafRecords() != metadata.getMaxLeafRecords()) {
@@ -262,7 +262,7 @@ public class StarTreeBuilderUtils {
     // Remove the star-tree metadata
     PropertiesConfiguration metadataProperties = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     metadataProperties.subset(StarTreeV2Constants.MetadataKey.STAR_TREE_SUBSET).clear();
-    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties);
+    SegmentMetadataUtils.savePropertiesConfiguration(metadataProperties, indexDir);
 
     // Remove the index file and index map file
     File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);

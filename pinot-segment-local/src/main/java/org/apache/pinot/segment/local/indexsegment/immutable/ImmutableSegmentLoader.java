@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.indexsegment.immutable;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.net.URI;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -45,6 +44,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -69,6 +69,18 @@ public class ImmutableSegmentLoader {
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
     defaultIndexLoadingConfig.setReadMode(readMode);
     return load(indexDir, defaultIndexLoadingConfig, null, false);
+  }
+
+  /**
+   * Loads the segment with specified table config and schema.
+   * This method is used to access the segment without modifying it, i.e. in read-only mode.
+   */
+  public static ImmutableSegment load(File indexDir, ReadMode readMode, TableConfig tableConfig,
+      @Nullable Schema schema)
+      throws Exception {
+    IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    defaultIndexLoadingConfig.setReadMode(readMode);
+    return load(indexDir, defaultIndexLoadingConfig, schema, false);
   }
 
   /**
@@ -167,13 +179,6 @@ public class ImmutableSegmentLoader {
       }
     } else {
       indexLoadingConfig.addKnownColumns(columnMetadataMap.keySet());
-    }
-
-    URI indexDirURI = segmentDirectory.getIndexDir();
-    String scheme = indexDirURI.getScheme();
-    File localIndexDir = null;
-    if (scheme != null && scheme.equalsIgnoreCase("file")) {
-      localIndexDir = new File(indexDirURI);
     }
 
     SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();

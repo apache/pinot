@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.spi.env;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -32,9 +29,12 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
+import org.apache.commons.configuration2.ex.ConfigurationException;
+import org.apache.commons.configuration2.io.FileHandler;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -42,6 +42,7 @@ import org.apache.commons.lang3.StringUtils;
  * Provide utility functions to manipulate Apache Commons {@link Configuration} instances.
  */
 public class CommonsConfigurationUtils {
+  private static final Character DEFAULT_LIST_DELIMITER = ',';
   private CommonsConfigurationUtils() {
   }
 
@@ -50,44 +51,93 @@ public class CommonsConfigurationUtils {
    * @param file containing properties
    * @return a {@link PropertiesConfiguration} instance. Empty if file does not exist.
    */
-  public static PropertiesConfiguration fromFile(File file) {
-    try {
-      PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-
-      // Commons Configuration 1.10 does not support file path containing '%'.
-      // Explicitly providing the input stream on load bypasses the problem.
-      propertiesConfiguration.setFile(file);
-      if (file.exists()) {
-        propertiesConfiguration.load(new FileInputStream(file));
-      }
-
-      return propertiesConfiguration;
-    } catch (ConfigurationException | FileNotFoundException e) {
-      throw new RuntimeException(e);
-    }
+  public static PropertiesConfiguration fromFile(File file)
+      throws ConfigurationException {
+    return fromFile(file, false, true);
   }
 
   /**
-   * Instantiate a {@link PropertiesConfiguration} from an inputstream.
-   * @param inputStream containing properties
+   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
+   * @param stream containing properties
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromInputStream(InputStream inputStream) {
-    try {
-      PropertiesConfiguration propertiesConfiguration = new PropertiesConfiguration();
-      propertiesConfiguration.load(inputStream);
-      return propertiesConfiguration;
-    } catch (ConfigurationException e) {
-      throw new RuntimeException(e);
-    }
+  public static PropertiesConfiguration fromInputStream(InputStream stream)
+      throws ConfigurationException {
+    return fromInputStream(stream, false, true);
   }
 
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
+   * @param path representing the path of file
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromPath(String path)
+      throws ConfigurationException {
+    return fromPath(path, false, true);
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link String}.
+   * @param path representing the path of file
+   * @param setIOFactory representing to set the IOFactory or not
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter)
+      throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
+    FileHandler fileHandler = new FileHandler(config);
+    fileHandler.load(path);
+    return config;
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from an {@link InputStream}.
+   * @param stream containing properties
+   * @param setIOFactory representing to set the IOFactory or not
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromInputStream(InputStream stream, boolean setIOFactory,
+      boolean setDefaultDelimiter) throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
+    FileHandler fileHandler = new FileHandler(config);
+    fileHandler.load(stream);
+    return config;
+  }
+
+  /**
+   * Instantiate a {@link PropertiesConfiguration} from a {@link File}.
+   * @param file containing properties
+   * @param setIOFactory representing to set the IOFactory or not
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
+  public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
+      boolean setDefaultDelimiter) throws ConfigurationException {
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
+    FileHandler fileHandler = new FileHandler(config);
+    // check if file exists, load the properties otherwise set the file.
+    if (file.exists()) {
+      fileHandler.load(file);
+    } else {
+      fileHandler.setFile(file);
+    }
+    return config;
+  }
+
+  /**
+   * Save the propertiesConfiguration content into the provided file.
+   * @param propertiesConfiguration a {@link PropertiesConfiguration} instance.
+   * @param file a {@link File} instance.
+   */
   public static void saveToFile(PropertiesConfiguration propertiesConfiguration, File file) {
-    // Commons Configuration 1.10 does not support file path containing '%'.
-    // Explicitly providing the output stream for save bypasses the problem.
-    try (FileOutputStream fileOutputStream = new FileOutputStream(file)) {
-      propertiesConfiguration.save(fileOutputStream);
-    } catch (ConfigurationException | IOException e) {
+    Preconditions.checkNotNull(file, "File object can not be null for saving configurations");
+    FileHandler fileHandler = new FileHandler(propertiesConfiguration);
+    fileHandler.setFile(file);
+    try {
+      fileHandler.save();
+    } catch (ConfigurationException e) {
       throw new RuntimeException(e);
     }
   }
@@ -96,27 +146,14 @@ public class CommonsConfigurationUtils {
     return () -> keys;
   }
 
-  /**
-   * Provides a stream of all the keys found in a {@link Configuration}.
-   * @param configuration to iterate on keys
-   * @return a stream of keys
-   */
   public static Stream<String> getKeysStream(Configuration configuration) {
     return StreamSupport.stream(getIterable(configuration.getKeys()).spliterator(), false);
   }
 
-  /**
-   * Provides a list of all the keys found in a {@link Configuration}.
-   * @param configuration to iterate on keys
-   * @return a list of keys
-   */
   public static List<String> getKeys(Configuration configuration) {
     return getKeysStream(configuration).collect(Collectors.toList());
   }
 
-  /**
-   * @return a key-value {@link Map} found in the provided {@link Configuration}
-   */
   public static Map<String, Object> toMap(Configuration configuration) {
     return getKeysStream(configuration).collect(Collectors.toMap(key -> key, key -> mapValue(key, configuration)));
   }
@@ -186,6 +223,7 @@ public class CommonsConfigurationUtils {
    * - Escaping comma with backslash doesn't work when comma is preceded by a backslash
    */
   public static String replaceSpecialCharacterInPropertyValue(String value) {
+    value = StringEscapeUtils.escapeJava(value);
     if (value.isEmpty()) {
       return value;
     }
@@ -203,6 +241,7 @@ public class CommonsConfigurationUtils {
    * {@link #replaceSpecialCharacterInPropertyValue(String)}.
    */
   public static String recoverSpecialCharacterInPropertyValue(String value) {
+    value = StringEscapeUtils.unescapeJava(value);
     if (value.isEmpty()) {
       return value;
     }
@@ -213,5 +252,26 @@ public class CommonsConfigurationUtils {
       value = value.substring(0, value.length() - 1);
     }
     return value.replace("\0\0", ",");
+  }
+
+  private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
+      boolean setDefaultDelimiter) {
+    PropertiesConfiguration config = new PropertiesConfiguration();
+
+    // setting IO Reader Factory
+    if (setIOFactory) {
+      config.setIOFactory(new ConfigFilePropertyReaderFactory());
+    }
+
+    // setting DEFAULT_LIST_DELIMITER
+    if (setDefaultDelimiter) {
+      setListDelimiterHandler(config);
+    }
+
+    return config;
+  }
+
+  private static void setListDelimiterHandler(PropertiesConfiguration configuration) {
+    configuration.setListDelimiterHandler(new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER));
   }
 }

@@ -43,6 +43,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
@@ -94,9 +95,11 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
@@ -206,9 +209,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils for
     //       details
     String globalQueryId = getGlobalQueryId(requestId);
-    List<String> serverUrls = new ArrayList<>();
+    List<Pair<String, String>> serverUrls = new ArrayList<>();
     for (ServerInstance serverInstance : queryServers._servers) {
-      serverUrls.add(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId));
+      serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
     CompletionService<MultiHttpRequestResponse> completionService =
@@ -417,14 +420,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       boolean hasTableAccess =
           accessControl.hasAccess(requesterIdentity, serverBrokerRequest) && accessControl.hasAccess(httpHeaders,
               TargetType.TABLE, tableName, Actions.Table.QUERY);
+
+      _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
+          System.nanoTime() - compilationEndTimeNs);
+
       if (!hasTableAccess) {
         _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
         LOGGER.info("Access denied for request {}: {}, table: {}", requestId, query, tableName);
         requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
         throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
       }
-      _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
-          System.nanoTime() - compilationEndTimeNs);
 
       // Get the tables hit by the request
       String offlineTableName = null;
@@ -589,8 +594,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Calculate routing table for the query
       // TODO: Modify RoutingManager interface to directly take PinotQuery
       long routingStartTimeNs = System.nanoTime();
-      Map<ServerInstance, List<String>> offlineRoutingTable = null;
-      Map<ServerInstance, List<String>> realtimeRoutingTable = null;
+      Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable = null;
+      Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable = null;
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
       if (offlineBrokerRequest != null) {
@@ -598,7 +603,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
-          Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+          Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
+              routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             offlineRoutingTable = serverInstanceToSegmentsMap;
           } else {
@@ -614,7 +620,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         RoutingTable routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest, requestId);
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
-          Map<ServerInstance, List<String>> serverInstanceToSegmentsMap = routingTable.getServerInstanceToSegmentsMap();
+          Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
+              routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
             realtimeRoutingTable = serverInstanceToSegmentsMap;
           } else {
@@ -682,7 +689,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(exceptions);
       }
 
-      // Set the maximum serialized response size per server
+      // Set the maximum serialized response size per server, and ask server to directly return final response when only
+      // one server is queried
       int numServers = 0;
       if (offlineRoutingTable != null) {
         numServers += offlineRoutingTable.size();
@@ -690,14 +698,31 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (realtimeRoutingTable != null) {
         numServers += realtimeRoutingTable.size();
       }
-
       if (offlineBrokerRequest != null) {
-        setMaxServerResponseSizeBytes(numServers, offlineBrokerRequest.getPinotQuery().getQueryOptions(),
-            offlineTableConfig);
+        Map<String, String> queryOptions = offlineBrokerRequest.getPinotQuery().getQueryOptions();
+        setMaxServerResponseSizeBytes(numServers, queryOptions, offlineTableConfig);
+        // Set the query option to directly return final result for single server query unless it is explicitly disabled
+        if (numServers == 1) {
+          // Set the same flag in the original server request to be used in the reduce phase for hybrid table
+          if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
+              && offlineBrokerRequest != serverBrokerRequest) {
+            serverBrokerRequest.getPinotQuery().getQueryOptions()
+                .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+          }
+        }
       }
       if (realtimeBrokerRequest != null) {
-        setMaxServerResponseSizeBytes(numServers, realtimeBrokerRequest.getPinotQuery().getQueryOptions(),
-            realtimeTableConfig);
+        Map<String, String> queryOptions = realtimeBrokerRequest.getPinotQuery().getQueryOptions();
+        setMaxServerResponseSizeBytes(numServers, queryOptions, realtimeTableConfig);
+        // Set the query option to directly return final result for single server query unless it is explicitly disabled
+        if (numServers == 1) {
+          // Set the same flag in the original server request to be used in the reduce phase for hybrid table
+          if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
+              && realtimeBrokerRequest != serverBrokerRequest) {
+            serverBrokerRequest.getPinotQuery().getQueryOptions()
+                .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
+          }
+        }
       }
 
       // Execute the query
@@ -754,6 +779,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
             1);
       }
+      brokerResponse.setPartialResult(isPartialResult(brokerResponse));
 
       // Set total query processing time
       long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
@@ -1471,9 +1497,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.LONG);
         row.add(literal.getLongValue());
         break;
+      case FLOAT_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.FLOAT);
+        row.add(Float.intBitsToFloat(literal.getFloatValue()));
+        break;
       case DOUBLE_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.DOUBLE);
         row.add(literal.getDoubleValue());
+        break;
+      case BIG_DECIMAL_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.BIG_DECIMAL);
+        row.add(BigDecimalUtils.deserialize(literal.getBigDecimalValue()));
         break;
       case STRING_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.STRING);
@@ -1487,8 +1521,28 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
         row.add(null);
         break;
-      default:
+      case INT_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.INT_ARRAY);
+        row.add(literal.getIntArrayValue());
         break;
+      case LONG_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.LONG_ARRAY);
+        row.add(literal.getLongArrayValue());
+        break;
+      case FLOAT_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.FLOAT_ARRAY);
+        row.add(literal.getFloatArrayValue().stream().map(Float::intBitsToFloat).collect(Collectors.toList()));
+        break;
+      case DOUBLE_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.DOUBLE_ARRAY);
+        row.add(literal.getDoubleArrayValue());
+        break;
+      case STRING_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.STRING_ARRAY);
+        row.add(literal.getStringArrayValue());
+        break;
+      default:
+        throw new IllegalStateException("Unsupported literal: " + literal);
     }
   }
 
@@ -1668,72 +1722,62 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
               timeSpentMs, queryTimeoutMs, tableNameWithType);
       throw new TimeoutException(errorMessage);
     }
-    queryOptions.put(Broker.Request.QueryOptionKey.TIMEOUT_MS, Long.toString(remainingTimeMs));
+    queryOptions.put(QueryOptionKey.TIMEOUT_MS, Long.toString(remainingTimeMs));
     return remainingTimeMs;
   }
 
   /**
    * Sets a query option indicating the maximum response size that can be sent from a server to the broker. This size
    * is measured for the serialized response.
+   *
+   * The overriding order of priority is:
+   * 1. QueryOption  -> maxServerResponseSizeBytes
+   * 2. QueryOption  -> maxQueryResponseSizeBytes
+   * 3. TableConfig  -> maxServerResponseSizeBytes
+   * 4. TableConfig  -> maxQueryResponseSizeBytes
+   * 5. BrokerConfig -> maxServerResponseSizeBytes
+   * 6. BrokerConfig -> maxServerResponseSizeBytes
    */
   private void setMaxServerResponseSizeBytes(int numServers, Map<String, String> queryOptions,
-      TableConfig tableConfig) {
-    if (numServers == 0) {
-      return;
-    }
-
-    // The overriding order of priority is:
-    // 1. QueryOption  -> maxServerResponseSizeBytes
-    // 2. QueryOption  -> maxQueryResponseSizeBytes
-    // 3. TableConfig  -> maxServerResponseSizeBytes
-    // 4. TableConfig  -> maxQueryResponseSizeBytes
-    // 5. BrokerConfig -> maxServerResponseSizeBytes
-    // 6. BrokerConfig -> maxServerResponseSizeBytes
-
+      @Nullable TableConfig tableConfig) {
     // QueryOption
     if (QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions) != null) {
       return;
     }
-    Long maxQueryResponseSizeQOption = QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions);
-    if (maxQueryResponseSizeQOption != null) {
-      Long maxServerResponseSize = maxQueryResponseSizeQOption / numServers;
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxServerResponseSize));
+    Long maxQueryResponseSizeQueryOption = QueryOptionsUtils.getMaxQueryResponseSizeBytes(queryOptions);
+    if (maxQueryResponseSizeQueryOption != null) {
+      queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxQueryResponseSizeQueryOption / numServers));
       return;
     }
 
     // TableConfig
-    Preconditions.checkState(tableConfig != null);
-    QueryConfig queryConfig = tableConfig.getQueryConfig();
-    if (queryConfig != null && queryConfig.getMaxServerResponseSizeBytes() != null) {
-      Long maxServerResponseSize = queryConfig.getMaxServerResponseSizeBytes();
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxServerResponseSize));
-      return;
-    }
-    if (queryConfig != null && queryConfig.getMaxQueryResponseSizeBytes() != null) {
-      Long maxQueryResponseSize = queryConfig.getMaxQueryResponseSizeBytes();
-      Long maxServerResponseSize = maxQueryResponseSize / numServers;
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxServerResponseSize));
-      return;
+    if (tableConfig != null && tableConfig.getQueryConfig() != null) {
+      QueryConfig queryConfig = tableConfig.getQueryConfig();
+      if (queryConfig.getMaxServerResponseSizeBytes() != null) {
+        queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+            Long.toString(queryConfig.getMaxServerResponseSizeBytes()));
+        return;
+      }
+      if (queryConfig.getMaxQueryResponseSizeBytes() != null) {
+        queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+            Long.toString(queryConfig.getMaxQueryResponseSizeBytes() / numServers));
+        return;
+      }
     }
 
     // BrokerConfig
-    Long maxServerResponseSizeCfg = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES,
-        Broker.DEFAULT_MAX_SERVER_RESPONSE_SIZE_BYTES);
-    Long maxQueryResponseSizeCfg = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES,
-        Broker.DEFAULT_MAX_QUERY_RESPONSE_SIZE_BYTES);
-
-    if (maxServerResponseSizeCfg > 0) {
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxServerResponseSizeCfg));
+    Long maxServerResponseSizeBrokerConfig =
+        _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES, Long.class);
+    if (maxServerResponseSizeBrokerConfig != null) {
+      queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, Long.toString(maxServerResponseSizeBrokerConfig));
       return;
     }
-    if (maxQueryResponseSizeCfg > 0) {
-      Long maxServerResponseSize = maxQueryResponseSizeCfg / numServers;
-      queryOptions.put(Broker.Request.QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
-          Long.toString(maxServerResponseSize));
+    Long maxQueryResponseSizeBrokerConfig =
+        _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES, Long.class);
+    if (maxQueryResponseSizeBrokerConfig != null) {
+      queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+          Long.toString(maxQueryResponseSizeBrokerConfig / numServers));
     }
   }
 
@@ -1765,7 +1809,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
             numReplicaGroupsToQuery);
       }
     } catch (NumberFormatException e) {
-      String numReplicaGroupsToQuery = queryOptions.get(Broker.Request.QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
+      String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
       throw new IllegalStateException(
           String.format("numReplicaGroups must be a positive number, got: %s", numReplicaGroupsToQuery));
     }
@@ -1803,10 +1847,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> offlineRoutingTable, @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable, long timeoutMs, ServerStats serverStats,
-      RequestContext requestContext)
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+      @Nullable BrokerRequest realtimeBrokerRequest,
+      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+      ServerStats serverStats, RequestContext requestContext)
       throws Exception;
+
+  protected static boolean isPartialResult(BrokerResponse brokerResponse) {
+    return brokerResponse.isNumGroupsLimitReached() || brokerResponse.isMaxRowsInJoinReached()
+        || brokerResponse.getExceptionsSize() > 0;
+  }
 
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setTotalDocs(response.getTotalDocs());
@@ -1841,8 +1891,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     statistics.setNumSegmentsPrunedByValue(response.getNumSegmentsPrunedByValue());
     statistics.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
     statistics.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
-    statistics.setProcessingExceptions(response.getProcessingExceptions().stream().map(Object::toString).collect(
-        Collectors.toList()));
+    statistics.setProcessingExceptions(
+        response.getProcessingExceptions().stream().map(Object::toString).collect(Collectors.toList()));
   }
 
   private String getGlobalQueryId(long requestId) {
@@ -1871,8 +1921,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     final String _query;
     final Set<ServerInstance> _servers = new HashSet<>();
 
-    QueryServers(String query, @Nullable Map<ServerInstance, List<String>> offlineRoutingTable,
-        @Nullable Map<ServerInstance, List<String>> realtimeRoutingTable) {
+    QueryServers(String query, @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
+        @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable) {
       _query = query;
       if (offlineRoutingTable != null) {
         _servers.addAll(offlineRoutingTable.keySet());

@@ -146,6 +146,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Boolean isUseFixedReplica(Map<String, String> queryOptions) {
+    String useFixedReplica = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA);
+    return useFixedReplica != null ? Boolean.parseBoolean(useFixedReplica) : null;
+  }
+
+  @Nullable
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
     String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
     return numReplicaGroupsToQuery != null ? Integer.parseInt(numReplicaGroupsToQuery) : null;
@@ -171,6 +177,12 @@ public class QueryOptionsUtils {
   public static Integer getMinServerGroupTrimSize(Map<String, String> queryOptions) {
     String minServerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
     return minServerGroupTrimSizeString != null ? Integer.parseInt(minServerGroupTrimSizeString) : null;
+  }
+
+  @Nullable
+  public static Integer getMinBrokerGroupTrimSize(Map<String, String> queryOptions) {
+    String minBrokerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE);
+    return minBrokerGroupTrimSizeString != null ? Integer.parseInt(minBrokerGroupTrimSizeString) : null;
   }
 
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {

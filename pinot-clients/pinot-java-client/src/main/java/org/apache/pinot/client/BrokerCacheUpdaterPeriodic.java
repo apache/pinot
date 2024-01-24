@@ -31,17 +31,15 @@ import org.slf4j.LoggerFactory;
  */
 public class BrokerCacheUpdaterPeriodic implements UpdatableBrokerCache {
   public static final String BROKER_UPDATE_FREQUENCY_MILLIS = "brokerUpdateFrequencyInMillis";
-  public static final String DEFAULT_BROKER_UPDATE_FREQUENCY_MILLIS = "defaultBrokerUpdateFrequencyInMillis";
+  public static final String DEFAULT_BROKER_UPDATE_FREQUENCY_MILLIS = "300000"; // 5 minutes
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerCacheUpdaterPeriodic.class);
 
   private final BrokerCache _brokerCache;
   private final ScheduledExecutorService _scheduledExecutorService;
   private final long _brokerUpdateFreqInMillis;
-  private final Properties _properties;
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerCacheUpdaterPeriodic.class);
 
   public BrokerCacheUpdaterPeriodic(Properties properties, String controllerUrl) {
-    _properties = properties;
     _brokerCache = new BrokerCache(properties, controllerUrl);
     _scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     _brokerUpdateFreqInMillis = Long.parseLong(

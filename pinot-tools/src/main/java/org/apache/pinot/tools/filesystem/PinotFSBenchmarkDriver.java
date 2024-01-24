@@ -24,10 +24,10 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.URI;
 import java.net.URISyntaxException;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -53,7 +53,8 @@ public class PinotFSBenchmarkDriver {
   public PinotFSBenchmarkDriver(String mode, String configFilePath, String baseDirectoryUri, String localTempDir,
       Integer numSegmentsForListFilesTest, Integer dataSizeInMBsForCopyTest, Integer numOps)
       throws ConfigurationException {
-    Configuration configuration = new PropertiesConfiguration(new File(configFilePath));
+    PropertiesConfiguration configuration =
+        CommonsConfigurationUtils.fromFile(new File(configFilePath));
     PinotFSFactory.init(new PinotConfiguration(configuration));
     _mode = mode;
     _baseDirectoryUri = URI.create(baseDirectoryUri);

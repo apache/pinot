@@ -30,6 +30,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -44,7 +45,9 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +89,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final BrokerMetrics _brokerMetrics;
   final AdaptiveServerSelector _adaptiveServerSelector;
   final Clock _clock;
+  final boolean _useFixedReplica;
+  final int _tableNameHashForFixedReplicaRouting;
 
   // These 3 variables are the cached states to help accelerate the change processing
   Set<String> _enabledInstances;
@@ -98,12 +103,24 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   private volatile SegmentStates _segmentStates;
 
   BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
+      boolean useFixedReplica) {
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
     _clock = clock;
+    _useFixedReplica = useFixedReplica;
+    // Using raw table name to ensure queries spanning across REALTIME and OFFLINE tables are routed to the same
+    // instance
+    // Math.abs(Integer.MIN_VALUE) = Integer.MIN_VALUE, so we use & 0x7FFFFFFF to get a positive value
+    _tableNameHashForFixedReplicaRouting =
+        TableNameBuilder.extractRawTableName(tableNameWithType).hashCode() & 0x7FFFFFFF;
+
+    if (_adaptiveServerSelector != null && _useFixedReplica) {
+      throw new IllegalArgumentException(
+          "AdaptiveServerSelector and consistent routing cannot be enabled at the same time");
+    }
   }
 
   @Override
@@ -270,6 +287,10 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         }
       }
     }
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
+          _oldSegmentCandidatesMap.keySet());
+    }
   }
 
   /**
@@ -408,10 +429,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     // Copy the volatile reference so that segmentToInstanceMap and unavailableSegments can have a consistent view of
     // the state.
     SegmentStates segmentStates = _segmentStates;
-    Map<String, String> segmentToInstanceMap = select(segments, requestIdInt, segmentStates, queryOptions);
+    Pair<Map<String, String>, Map<String, String>> segmentToInstanceMap =
+        select(segments, requestIdInt, segmentStates, queryOptions);
     Set<String> unavailableSegments = segmentStates.getUnavailableSegments();
     if (unavailableSegments.isEmpty()) {
-      return new SelectionResult(segmentToInstanceMap, Collections.emptyList());
+      return new SelectionResult(segmentToInstanceMap, Collections.emptyList(), 0);
     } else {
       List<String> unavailableSegmentsForRequest = new ArrayList<>();
       for (String segment : segments) {
@@ -419,8 +441,13 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           unavailableSegmentsForRequest.add(segment);
         }
       }
-      return new SelectionResult(segmentToInstanceMap, unavailableSegmentsForRequest);
+      return new SelectionResult(segmentToInstanceMap, unavailableSegmentsForRequest, 0);
     }
+  }
+
+  protected boolean isUseFixedReplica(Map<String, String> queryOptions) {
+    Boolean queryOption = QueryOptionsUtils.isUseFixedReplica(queryOptions);
+    return queryOption != null ? queryOption : _useFixedReplica;
   }
 
   @Override
@@ -429,9 +456,11 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   /**
-   * Selects the server instances for the given segments based on the request id and segment states. Returns a map
-   * from segment to selected server instance hosting the segment.
+   * Selects the server instances for the given segments based on the request id and segment states. Returns two maps
+   * from segment to selected server instance hosting the segment. The 2nd map is for optional segments. The optional
+   * segments are used to get the new segments that is not online yet. Instead of simply skipping them by broker at
+   * routing time, we can send them to servers and let servers decide how to handle them.
    */
-  abstract Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
-      Map<String, String> queryOptions);
+  abstract Pair<Map<String, String>, Map<String, String>/*optional segments*/> select(List<String> segments,
+      int requestId, SegmentStates segmentStates, Map<String, String> queryOptions);
 }

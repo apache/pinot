@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.connector.spark.common.reader
 
+import org.apache.commons.lang3.tuple.Pair
 import org.apache.helix.model.InstanceConfig
 import org.apache.pinot.common.datatable.DataTable
 import org.apache.pinot.common.metrics.BrokerMetrics
@@ -31,7 +32,7 @@ import org.apache.pinot.spi.env.PinotConfiguration
 import org.apache.pinot.spi.metrics.PinotMetricUtils
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler
 
-import java.util.{List => JList, Map => JMap}
+import java.util.{Collections, List => JList, Map => JMap}
 import scala.collection.JavaConverters._
 
 /**
@@ -92,7 +93,7 @@ private[reader] class PinotServerDataFetcher(
     dataTables.filter(_.getNumberOfRows > 0)
   }
 
-  private def createRoutingTableForRequest(): JMap[ServerInstance, JList[String]] = {
+  private def createRoutingTableForRequest(): JMap[ServerInstance, Pair[JList[String], JList[String]]] = {
     val nullZkId: String = null
     val instanceConfig = new InstanceConfig(nullZkId)
     instanceConfig.setHostName(pinotSplit.serverAndSegments.serverHost)
@@ -100,15 +101,15 @@ private[reader] class PinotServerDataFetcher(
     // TODO: support netty-sec
     val serverInstance = new ServerInstance(instanceConfig)
     Map(
-      serverInstance -> pinotSplit.serverAndSegments.segments.asJava
+      serverInstance -> Pair.of(pinotSplit.serverAndSegments.segments.asJava, List[String]().asJava)
     ).asJava
   }
 
   private def submitRequestToPinotServer(
       offlineBrokerRequest: BrokerRequest,
-      offlineRoutingTable: JMap[ServerInstance, JList[String]],
+      offlineRoutingTable: JMap[ServerInstance, Pair[JList[String], JList[String]]],
       realtimeBrokerRequest: BrokerRequest,
-      realtimeRoutingTable: JMap[ServerInstance, JList[String]]): AsyncQueryResponse = {
+      realtimeRoutingTable: JMap[ServerInstance, Pair[JList[String], JList[String]]]): AsyncQueryResponse = {
     logInfo(s"Sending request to ${pinotSplit.serverAndSegments.toString}")
     queryRouter.submitQuery(
       partitionId,

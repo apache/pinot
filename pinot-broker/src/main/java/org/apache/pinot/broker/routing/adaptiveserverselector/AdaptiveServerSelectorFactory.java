@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.routing.adaptiveserverselector;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -35,6 +36,7 @@ public class AdaptiveServerSelectorFactory {
   private AdaptiveServerSelectorFactory() {
   }
 
+  @Nullable
   public static AdaptiveServerSelector getAdaptiveServerSelector(ServerRoutingStatsManager serverRoutingStatsManager,
       PinotConfiguration pinotConfig) {
     boolean enableStatsCollection =

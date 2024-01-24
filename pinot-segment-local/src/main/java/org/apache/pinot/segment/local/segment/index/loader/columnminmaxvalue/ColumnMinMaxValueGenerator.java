@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
@@ -82,7 +82,7 @@ public class ColumnMinMaxValueGenerator {
       addColumnMinMaxValueForColumn(column);
     }
     if (_minMaxValueAdded) {
-      SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties);
+      SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties, _segmentMetadata.getIndexDir());
     }
   }
 

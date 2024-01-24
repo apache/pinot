@@ -11,11 +11,34 @@
   },
   "tableIndexConfig": {
     "loadMode": "MMAP",
+    "noDictionaryColumns": ["Text"],
     "invertedIndexColumns": [
     ]
   },
   "metadata": {
     "customConfigs": {
     }
-  }
+  },
+  "fieldConfigList": [
+    {
+      "encodingType": "RAW",
+      "indexType": "VECTOR",
+      "name": "embedding",
+      "properties": {
+        "vectorIndexType": "HNSW",
+        "vectorDimension": 1536,
+        "vectorDistanceFunction": "COSINE",
+        "version": 1
+      }
+    },
+    {
+      "encodingType": "RAW",
+      "indexType": "TEXT",
+      "name": "Text",
+      "properties": {
+        "deriveNumDocsPerChunkForRawIndex": "true",
+        "rawIndexWriterVersion": "3"
+      }
+    }
+  ]
 }

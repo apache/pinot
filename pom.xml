@@ -121,12 +121,12 @@
       See also: the surefire plugin section and the profiles section.-->
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
-    <avro.version>1.10.2</avro.version>
-    <parquet.version>1.12.3</parquet.version>
+    <avro.version>1.11.3</avro.version>
+    <parquet.version>1.13.1</parquet.version>
     <helix.version>1.3.1</helix.version>
     <zkclient.version>0.7</zkclient.version>
     <jackson.version>2.12.7.20221012</jackson.version>
-    <zookeeper.version>3.6.3</zookeeper.version>
+    <zookeeper.version>3.7.2</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
     <jersey.version>2.39</jersey.version>
     <grizzly.version>2.4.4</grizzly.version>
@@ -134,41 +134,41 @@
     <swagger.version>1.6.9</swagger.version>
     <hadoop.version>3.2.4</hadoop.version>
     <antlr.version>4.6</antlr.version>
-    <jsonpath.version>2.7.0</jsonpath.version>
-    <jsonsmart.version>2.4.10</jsonsmart.version>
+    <jsonpath.version>2.8.0</jsonpath.version>
+    <jsonsmart.version>2.5.0</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.30.0</calcite.version>
-    <lucene.version>8.2.0</lucene.version>
+    <lucene.version>9.8.0</lucene.version>
     <reflections.version>0.9.11</reflections.version>
     <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
     <commons-lang.version>2.6</commons-lang.version>
-    <!-- pinot-common, commons-configuration, hadoop-common, hadoop-client use commons-logging -->
-    <commons-logging.version>1.2</commons-logging.version>
     <!-- hadoop-common, spark-core use commons-net -->
-    <commons-net.version>3.1</commons-net.version>
+    <commons-net.version>3.10.0</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.2.2</dropwizard-metrics.version>
+    <dropwizard-metrics.version>4.2.23</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.4</snappy-java.version>
-    <zstd-jni.version>1.5.5-6</zstd-jni.version>
+    <zstd-jni.version>1.5.5-11</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
-    <log4j.version>2.20.0</log4j.version>
-    <netty.version>4.1.94.Final</netty.version>
-    <reactivestreams.version>1.0.3</reactivestreams.version>
+    <log4j.version>2.22.0</log4j.version>
+    <slf4j.version>2.0.9</slf4j.version>
+    <netty.version>4.1.100.Final</netty.version>
+    <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.26</jmh.version>
-    <audienceannotations.version>0.13.0</audienceannotations.version>
-    <clp-ffi.version>0.4.3</clp-ffi.version>
+    <audienceannotations.version>0.15.0</audienceannotations.version>
+    <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.1</stax2-api.version>
     <aws.sdk.version>2.20.137</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
     <testng.version>7.8.0</testng.version>
     <woodstox.version>6.4.0</woodstox.version>
+    <sslcontext.kickstart.version>8.2.0</sslcontext.kickstart.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
     <protobuf.version>3.24.3</protobuf.version>
-    <grpc.version>1.53.0</grpc.version>
+    <grpc.version>1.59.0</grpc.version>
     <confluent.version>7.2.6</confluent.version>
 
     <!-- Checkstyle violation prop.-->
@@ -189,10 +189,10 @@
     <scala.version>2.12.18</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
-    <flink.version>1.12.0</flink.version>
+    <flink.version>1.14.6</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
 
-    <proto.google.common.protos.version>2.9.6</proto.google.common.protos.version>
+    <proto.google.common.protos.version>2.29.0</proto.google.common.protos.version>
 
     <kotlin.stdlib.version>1.7.22</kotlin.stdlib.version>
   </properties>
@@ -260,7 +260,13 @@
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpclient</artifactId>
-        <version>4.5.13</version>
+        <version>4.5.14</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
@@ -405,7 +411,7 @@
       <dependency>
         <groupId>xml-apis</groupId>
         <artifactId>xml-apis</artifactId>
-        <version>1.4.01</version>
+        <version>2.0.2</version>
       </dependency>
       <dependency>
         <groupId>org.testng</groupId>
@@ -435,7 +441,7 @@
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>32.0.1-jre</version>
+        <version>32.1.3-jre</version>
         <exclusions>
           <exclusion>
             <groupId>com.google.errorprone</groupId>
@@ -450,7 +456,7 @@
       <dependency>
         <groupId>com.google.auto.service</groupId>
         <artifactId>auto-service</artifactId>
-        <version>1.0.1</version>
+        <version>1.1.1</version>
         <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
       </dependency>
       <dependency>
@@ -468,17 +474,16 @@
         <artifactId>commons-collections</artifactId>
         <version>3.2.2</version>
       </dependency>
-
-      <!-- commons-configuration1.10, will be deleted after the upgrade. -->
-      <dependency>
-        <groupId>commons-configuration</groupId>
-        <artifactId>commons-configuration</artifactId>
-        <version>1.10</version>
-      </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-configuration2</artifactId>
         <version>${commons-configuration2.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>commons-io</groupId>
@@ -603,8 +608,13 @@
       <!-- log4j2 related dependencies -->
       <dependency>
         <groupId>org.slf4j</groupId>
+        <artifactId>jcl-over-slf4j</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>2.0.9</version>
+        <version>${slf4j.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.logging.log4j</groupId>
@@ -650,7 +660,7 @@
       <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
-        <version>2.0</version>
+        <version>2.2</version>
       </dependency>
       <dependency>
         <groupId>org.xerial.larray</groupId>
@@ -685,7 +695,7 @@
       <dependency>
         <groupId>commons-codec</groupId>
         <artifactId>commons-codec</artifactId>
-        <version>1.15</version>
+        <version>1.16.0</version>
       </dependency>
       <dependency>
         <groupId>com.thoughtworks.paranamer</groupId>
@@ -761,6 +771,10 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-text</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -801,6 +815,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -836,6 +854,10 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -876,6 +898,10 @@
           <exclusion>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-util</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -941,7 +967,7 @@
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>4.1.0</version>
+        <version>5.0.0</version>
       </dependency>
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
@@ -1036,7 +1062,7 @@
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
         <artifactId>jsr305</artifactId>
-        <version>3.0.0</version>
+        <version>3.0.2</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.containers</groupId>
@@ -1147,7 +1173,7 @@
       <dependency>
         <groupId>org.apache.maven.surefire</groupId>
         <artifactId>surefire-testng</artifactId>
-        <version>${surefire.versino}</version>
+        <version>${surefire.version}</version>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
@@ -1189,7 +1215,7 @@
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
         <artifactId>tyrus-standalone-client</artifactId>
-        <version>1.15</version>
+        <version>2.1.4</version>
       </dependency>
       <!-- hadoop-common & jmh-core use common-math3 -->
       <dependency>
@@ -1201,7 +1227,7 @@
       <dependency>
         <groupId>com.google.code.gson</groupId>
         <artifactId>gson</artifactId>
-        <version>2.2.4</version>
+        <version>2.10.1</version>
       </dependency>
       <!-- kafka_2.10 & jmh-core use jopt-simple -->
       <dependency>
@@ -1213,11 +1239,6 @@
         <groupId>commons-lang</groupId>
         <artifactId>commons-lang</artifactId>
         <version>${commons-lang.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-logging</groupId>
-        <artifactId>commons-logging</artifactId>
-        <version>${commons-logging.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-net</groupId>
@@ -1279,7 +1300,7 @@
       <dependency>
         <groupId>com.mercateo</groupId>
         <artifactId>test-clock</artifactId>
-        <version>1.0.2</version>
+        <version>1.0.4</version>
         <scope>test</scope>
         <exclusions>
           <exclusion>
@@ -1370,6 +1391,36 @@
         <artifactId>woodstox-core</artifactId>
         <version>${woodstox.version}</version>
       </dependency>
+
+      <!-- Lucene dependencies -->
+      <dependency>
+        <groupId>org.apache.lucene</groupId>
+        <artifactId>lucene-backward-codecs</artifactId>
+        <version>${lucene.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.lucene</groupId>
+        <artifactId>lucene-core</artifactId>
+        <version>${lucene.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.lucene</groupId>
+        <artifactId>lucene-queryparser</artifactId>
+        <version>${lucene.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.lucene</groupId>
+        <artifactId>lucene-analysis-common</artifactId>
+        <version>${lucene.version}</version>
+      </dependency>
+      <!-- Lucene dependencies end -->
+
+      <dependency>
+        <groupId>io.github.hakky54</groupId>
+        <artifactId>sslcontext-kickstart-for-netty</artifactId>
+        <version>${sslcontext.kickstart.version}</version>
+      </dependency>
+
     </dependencies>
   </dependencyManagement>
   <build>
@@ -1411,7 +1462,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>appassembler-maven-plugin</artifactId>
-          <version>1.10</version>
+          <version>2.1.0</version>
           <configuration>
             <binFileExtensions>
               <unix>.sh</unix>
@@ -1445,7 +1496,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-assembly-plugin</artifactId>
-          <version>3.1.1</version>
+          <version>3.6.0</version>
         </plugin>
         <plugin>
           <artifactId>maven-resources-plugin</artifactId>
@@ -1772,7 +1823,7 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.9</version>
+        <version>0.8.11</version>
         <executions>
           <execution>
             <goals>
@@ -1971,6 +2022,7 @@
             <exclude>**/*.ser</exclude>
             <exclude>**/*.v1</exclude>
             <exclude>**/*.v2</exclude>
+            <exclude>**/Text.lucene.index/**</exclude>
             <exclude>**/appAssemblerScriptTemplate</exclude>
             <exclude>doap_Pinot.rdf</exclude>
 
@@ -2036,6 +2088,9 @@
             <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
             <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
               <mainClass>${mainClass}</mainClass>
+              <manifestEntries>
+                <Multi-Release>true</Multi-Release>
+              </manifestEntries>
             </transformer>
           </transformers>
           <!-- exclude signed Manifests -->
@@ -2043,6 +2098,7 @@
             <filter>
               <artifact>*:*</artifact>
               <excludes>
+                <exclude>module-info.class</exclude>
                 <exclude>META-INF/*.SF</exclude>
                 <exclude>META-INF/*.DSA</exclude>
                 <exclude>META-INF/*.RSA</exclude>
@@ -2085,7 +2141,7 @@
           <dependency>
             <groupId>net.java.dev.javacc</groupId>
             <artifactId>javacc</artifactId>
-            <version>7.0.10</version>
+            <version>7.0.13</version>
           </dependency>
         </dependencies>
       </plugin>

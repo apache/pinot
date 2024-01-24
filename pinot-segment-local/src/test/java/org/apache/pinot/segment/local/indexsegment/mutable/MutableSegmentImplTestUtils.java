@@ -100,6 +100,8 @@ public class MutableSegmentImplTestUtils {
 
     UpsertConfig.Mode upsertMode = upsertConfig == null ? UpsertConfig.Mode.NONE : upsertConfig.getMode();
     List<String> comparisonColumns = upsertConfig == null ? null : upsertConfig.getComparisonColumns();
+    boolean isUpsertDropOutOfOrderRecord = upsertConfig == null ? false : upsertConfig.isDropOutOfOrderRecord();
+    String upsertOutOfOrderRecordColumn = upsertConfig == null ? null : upsertConfig.getOutOfOrderRecordColumn();
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
     RealtimeSegmentConfig.Builder segmentConfBuilder = new RealtimeSegmentConfig.Builder()
         .setTableNameWithType(TABLE_NAME_WITH_TYPE).setSegmentName(SEGMENT_NAME)
@@ -114,7 +116,9 @@ public class MutableSegmentImplTestUtils {
         .setUpsertComparisonColumns(comparisonColumns)
         .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
-        .setIngestionAggregationConfigs(aggregationConfigs);
+        .setIngestionAggregationConfigs(aggregationConfigs)
+        .setUpsertDropOutOfOrderRecord(isUpsertDropOutOfOrderRecord)
+        .setUpsertOutOfOrderRecordColumn(upsertOutOfOrderRecordColumn);
     for (Map.Entry<String, JsonIndexConfig> entry : jsonIndexConfigs.entrySet()) {
       segmentConfBuilder.setIndex(entry.getKey(), StandardIndexes.json(), entry.getValue());
     }

@@ -337,6 +337,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
   }
 
+  public PinotMeter getMeteredValue(final M meter) {
+    final PinotMetricName metricName =
+        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + meter.getMeterName());
+    return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+  }
+
   private String getTableFullMeterName(final String tableName, final M meter) {
     String meterName = meter.getMeterName();
     return _metricPrefix + getTableName(tableName) + "." + meterName;

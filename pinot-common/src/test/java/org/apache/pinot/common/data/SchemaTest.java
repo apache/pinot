@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.common.data;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Timestamp;
@@ -33,6 +35,7 @@ import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -318,6 +321,29 @@ public class SchemaTest {
     schemaToCompare.setSchemaName("newSchema");
     String jsonSchemaToCompare = schemaToCompare.toSingleLineJsonString();
     Assert.assertNotEquals(jsonSchemaToCompare, jsonSchema);
+  }
+
+  @Test
+  public void testSerializeDeserializeOptions()
+      throws IOException {
+    String json = "{\n"
+        + "  \"primaryKeyColumns\" : null,\n"
+        + "  \"timeFieldSpec\" : null,\n"
+        + "  \"schemaName\" : null,\n"
+        + "  \"enableColumnBasedNullHandling\" : true,\n"
+        + "  \"dimensionFieldSpecs\" : [ ],\n"
+        + "  \"metricFieldSpecs\" : [ ],\n"
+        + "  \"dateTimeFieldSpecs\" : [ ]\n"
+        + "}";
+    JsonNode expectedNode = JsonUtils.stringToJsonNode(json);
+
+    Schema schema = JsonUtils.jsonNodeToObject(expectedNode, Schema.class);
+    Assert.assertTrue(schema.isEnableColumnBasedNullHandling(), "Column null handling should be enabled");
+
+    String serialized = JsonUtils.objectToString(schema);
+    Schema deserialized = JsonUtils.stringToObject(serialized, Schema.class);
+
+    Assert.assertEquals(deserialized, schema, "Changes detected while checking serialize/deserialize idempotency");
   }
 
   @Test

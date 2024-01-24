@@ -176,7 +176,7 @@ public class TableConfigSerDeTest {
     {
       // With routing config
       RoutingConfig routingConfig =
-          new RoutingConfig("builder", Arrays.asList("pruner0", "pruner1", "pruner2"), "selector");
+          new RoutingConfig("builder", Arrays.asList("pruner0", "pruner1", "pruner2"), "selector", false);
       TableConfig tableConfig = tableConfigBuilder.setRoutingConfig(routingConfig).build();
 
       checkRoutingConfig(tableConfig);

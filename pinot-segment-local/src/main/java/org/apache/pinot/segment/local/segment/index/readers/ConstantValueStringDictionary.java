@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers;
 
+import it.unimi.dsi.fastutil.ints.IntSet;
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -112,5 +115,19 @@ public class ConstantValueStringDictionary extends BaseImmutableDictionary {
   @Override
   public byte[] getBytesValue(int dictId) {
     return _bytes;
+  }
+
+  @Override
+  public void getDictIds(List<String> values, IntSet dictIds) {
+    if (values.contains(_value)) {
+      dictIds.add(0);
+    }
+  }
+
+  @Override
+  public void getDictIds(List<String> sortedValues, IntSet dictIds, SortedBatchLookupAlgorithm algorithm) {
+    if (Collections.binarySearch(sortedValues, _value) >= 0) {
+      dictIds.add(0);
+    }
   }
 }

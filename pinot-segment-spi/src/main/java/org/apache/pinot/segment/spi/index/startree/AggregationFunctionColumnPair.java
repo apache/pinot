@@ -20,6 +20,7 @@ package org.apache.pinot.segment.spi.index.startree;
 
 import java.util.Comparator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 
 
 public class AggregationFunctionColumnPair implements Comparable<AggregationFunctionColumnPair> {
@@ -58,11 +59,19 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
 
   public static AggregationFunctionColumnPair fromColumnName(String columnName) {
     String[] parts = columnName.split(DELIMITER, 2);
-    AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(parts[0]);
+    return fromFunctionAndColumnName(parts[0], parts[1]);
+  }
+
+  public static AggregationFunctionColumnPair fromAggregationConfig(StarTreeAggregationConfig aggregationConfig) {
+    return fromFunctionAndColumnName(aggregationConfig.getAggregationFunction(), aggregationConfig.getColumnName());
+  }
+
+  private static AggregationFunctionColumnPair fromFunctionAndColumnName(String functionName, String columnName) {
+    AggregationFunctionType functionType = AggregationFunctionType.getAggregationFunctionType(functionName);
     if (functionType == AggregationFunctionType.COUNT) {
       return COUNT_STAR;
     } else {
-      return new AggregationFunctionColumnPair(functionType, parts[1]);
+      return new AggregationFunctionColumnPair(functionType, columnName);
     }
   }
 
@@ -91,7 +100,6 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
   @Override
   public int compareTo(AggregationFunctionColumnPair other) {
     return Comparator.comparing((AggregationFunctionColumnPair o) -> o._column)
-        .thenComparing((AggregationFunctionColumnPair o) -> o._functionType)
-        .compare(this, other);
+        .thenComparing((AggregationFunctionColumnPair o) -> o._functionType).compare(this, other);
   }
 }

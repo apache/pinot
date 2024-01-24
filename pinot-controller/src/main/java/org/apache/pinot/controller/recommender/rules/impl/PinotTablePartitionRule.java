@@ -184,12 +184,13 @@ public class PinotTablePartitionRule extends AbstractRule {
    * See PartitionSegmentPruner
    */
   public FixedLenBitset parseQuery(QueryContext queryContext) {
-    if (queryContext.getFilter() == null) {
+    FilterContext filter = queryContext.getFilter();
+    if (filter == null || filter.isConstant()) {
       return FixedLenBitset.IMMUTABLE_EMPTY_SET;
     }
 
-    LOGGER.trace("Parsing Where Clause: {}", queryContext.getFilter().toString());
-    return parsePredicateList(queryContext.getFilter());
+    LOGGER.trace("Parsing Where Clause: {}", filter);
+    return parsePredicateList(filter);
   }
 
   @Nullable

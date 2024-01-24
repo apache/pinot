@@ -29,10 +29,10 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.query.planner.DispatchablePlanFragment;
-import org.apache.pinot.query.planner.DispatchableSubPlan;
-import org.apache.pinot.query.planner.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.PlannerUtils;
+import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
+import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -49,12 +49,6 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
 
   @Test(dataProvider = "testQueryLogicalPlanDataProvider")
   public void testQueryPlanExplainLogical(String query, String digest)
-      throws Exception {
-    testQueryPlanExplain(query, digest);
-  }
-
-  @Test(dataProvider = "testQueryPhysicalPlanDataProvider")
-  public void testQueryPlanExplainPhysical(String query, String digest)
       throws Exception {
     testQueryPlanExplain(query, digest);
   }
@@ -136,20 +130,20 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
-            tableName.equals("a") ? ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]")
-                : ImmutableList.of("localhost@{1,1}|[0]"));
+            tableName.equals("a") ? ImmutableList.of("localhost:1|[1]", "localhost:2|[0]")
+                : ImmutableList.of("localhost:1|[0]"));
       } else if (!PlannerUtils.isRootPlanFragment(stageId)) {
         // join stage should have both servers used.
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
-            ImmutableSet.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
+            ImmutableSet.of("localhost:1|[1]", "localhost:2|[0]"));
       } else {
         // reduce stage should have the reducer instance.
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
-            ImmutableSet.of("localhost@{3,3}|[0]"));
+            ImmutableSet.of("localhost:3|[0]"));
       }
     }
   }
@@ -259,13 +253,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
-            ImmutableList.of("localhost@{1,1}|[0]"));
+            ImmutableList.of("localhost:1|[0]"));
       } else if (!PlannerUtils.isRootPlanFragment(stageId)) {
         // join stage should have both servers used.
         Assert.assertEquals(dispatchablePlanFragment.getServerInstanceToWorkerIdMap().entrySet().stream()
                 .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
                 .collect(Collectors.toSet()),
-            ImmutableList.of("localhost@{1,1}|[1]", "localhost@{2,2}|[0]"));
+            ImmutableList.of("localhost:1|[1]", "localhost:2|[0]"));
       }
     }
   }
@@ -463,51 +457,6 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "      LogicalProject(col1=[$0], col3=[$2])\n"
             + "        LogicalTableScan(table=[[b]])\n"
         },
-    };
-    //@formatter:on
-  }
-
-  @DataProvider(name = "testQueryPhysicalPlanDataProvider")
-  private Object[][] provideQueriesWithExplainedPhysicalPlan() {
-    //@formatter:off
-    return new Object[][] {
-new Object[]{"EXPLAIN IMPLEMENTATION PLAN INCLUDING ALL ATTRIBUTES FOR SELECT col1, col3 FROM a",
-  "[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
-+ "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-+ "│   └── [1]@localhost:1 PROJECT\n"
-+ "│       └── [1]@localhost:1 TABLE SCAN (a) null\n"
-+ "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-+ "    └── [1]@localhost:2 PROJECT\n"
-+ "        └── [1]@localhost:2 TABLE SCAN (a) null\n"},
-new Object[]{"EXPLAIN IMPLEMENTATION PLAN EXCLUDING ATTRIBUTES FOR SELECT col1, COUNT(*) FROM a GROUP BY col1",
-"[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
-+ "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
-+ "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-+ "    └── [1]@localhost:2 AGGREGATE_FINAL\n"
-+ "        └── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
-+ "            ├── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
-+ "            │   └── [2]@localhost:1 AGGREGATE_LEAF\n"
-+ "            │       └── [2]@localhost:1 TABLE SCAN (a) null\n"
-+ "            └── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
-+ "                └── [2]@localhost:2 AGGREGATE_LEAF\n"
-+ "                    └── [2]@localhost:2 TABLE SCAN (a) null\n"},
-new Object[]{"EXPLAIN IMPLEMENTATION PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
-  "[0]@localhost:3 MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n"
-+ "├── [1]@localhost:1 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]} (Subtree Omitted)\n"
-+ "└── [1]@localhost:2 MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost@{3,3}|[0]}\n"
-+ "    └── [1]@localhost:2 PROJECT\n"
-+ "        └── [1]@localhost:2 JOIN\n"
-+ "            ├── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
-+ "            │   ├── [2]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
-+ "            │   │   └── [2]@localhost:1 PROJECT\n"
-+ "            │   │       └── [2]@localhost:1 TABLE SCAN (a) null\n"
-+ "            │   └── [2]@localhost:2 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
-+ "            │       └── [2]@localhost:2 PROJECT\n"
-+ "            │           └── [2]@localhost:2 TABLE SCAN (a) null\n"
-+ "            └── [1]@localhost:2 MAIL_RECEIVE(HASH_DISTRIBUTED)\n"
-+ "                └── [3]@localhost:1 MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost@{1,1}|[1],[1]@localhost@{2,2}|[0]}\n"
-+ "                    └── [3]@localhost:1 PROJECT\n"
-+ "                        └── [3]@localhost:1 TABLE SCAN (b) null\n"}
     };
     //@formatter:on
   }

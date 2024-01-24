@@ -31,7 +31,6 @@ import java.io.OutputStreamWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -45,6 +44,7 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.apache.pinot.broker.broker.helix.HelixBrokerStarter;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.ControllerStarter;
@@ -102,6 +102,7 @@ public class PerfBenchmarkDriver {
   // updates ZKSegmentMetadata only, is not exposed from controller API so we need to update segments directly via
   // PinotHelixResourceManager.
   private PinotHelixResourceManager _helixResourceManager;
+  private Map<String, String> _headers;
 
   public PerfBenchmarkDriver(PerfBenchmarkDriverConf conf) {
     this(conf, "/tmp/", "HEAP", null, conf.isVerbose());
@@ -120,6 +121,9 @@ public class PerfBenchmarkDriver {
     _loadMode = loadMode;
     _segmentFormatVersion = segmentFormatVersion;
     _verbose = verbose;
+    _headers = AuthProviderUtils.makeAuthHeadersMap(
+        AuthProviderUtils.makeAuthProvider(null, _conf.getAuthTokenUrl(), _conf.getAuthToken(), _conf.getUser(),
+            _conf.getPassword()));
     init();
   }
 
@@ -407,7 +411,7 @@ public class PerfBenchmarkDriver {
 
   public JsonNode postQuery(String query)
       throws Exception {
-    return postQuery(query, Collections.emptyMap());
+    return postQuery(query, _headers);
   }
 
   public JsonNode postQuery(String query, Map<String, String> headers)

@@ -112,6 +112,10 @@
           <groupId>org.apache.hadoop</groupId>
           <artifactId>hadoop-mapreduce-client-core</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -128,7 +132,7 @@
       <plugin>
         <groupId>net.nicoulaj.maven.plugins</groupId>
         <artifactId>checksum-maven-plugin</artifactId>
-        <version>1.8</version>
+        <version>1.11</version>
         <executions>
           <execution>
             <goals>
@@ -160,8 +164,9 @@
               <goal>shade</goal>
             </goals>
             <configuration>
-              <transformers>
+              <transformers combine.self="override">
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
               </transformers>
               <!--
               Usually in hadoop environment, there are multiple jars with different versions.

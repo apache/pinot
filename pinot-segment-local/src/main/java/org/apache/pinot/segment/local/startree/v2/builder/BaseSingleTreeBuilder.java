@@ -29,8 +29,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration2.Configuration;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
@@ -44,13 +45,13 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
 
 
@@ -75,10 +76,10 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
   final int _numMetrics;
   // Name of the function-column pairs
   final String[] _metrics;
-  final AggregationFunctionColumnPair[] _functionColumnPairs;
   final ValueAggregator[] _valueAggregators;
   // Readers and data types for column in function-column pair
   final PinotSegmentColumnReader[] _metricReaders;
+  final ChunkCompressionType[] _compressionType;
 
   final int _maxLeafRecords;
 
@@ -132,21 +133,21 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
           "Dimension: " + dimension + " does not have dictionary");
     }
 
-    Set<AggregationFunctionColumnPair> functionColumnPairs = builderConfig.getFunctionColumnPairs();
-    _numMetrics = functionColumnPairs.size();
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = builderConfig.getAggregationSpecs();
+    _numMetrics = aggregationSpecs.size();
     _metrics = new String[_numMetrics];
-    _functionColumnPairs = new AggregationFunctionColumnPair[_numMetrics];
     _valueAggregators = new ValueAggregator[_numMetrics];
     _metricReaders = new PinotSegmentColumnReader[_numMetrics];
+    _compressionType = new ChunkCompressionType[_numMetrics];
 
     int index = 0;
-    for (AggregationFunctionColumnPair functionColumnPair : functionColumnPairs) {
+    for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
+      AggregationFunctionColumnPair functionColumnPair = entry.getKey();
       _metrics[index] = functionColumnPair.toColumnName();
-      _functionColumnPairs[index] = functionColumnPair;
       // TODO: Allow extra arguments in star-tree (e.g. log2m, precision)
       _valueAggregators[index] =
           ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.emptyList());
-
+      _compressionType[index] = entry.getValue().getCompressionType();
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
         String column = functionColumnPair.getColumn();
@@ -323,7 +324,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     createForwardIndexes();
     StarTreeBuilderUtils.serializeTree(new File(_outputDir, StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME), _rootNode,
         _dimensionsSplitOrder, _numNodes);
-    writeMetadata();
+    _builderConfig.writeMetadata(_metadataProperties, _numDocs);
 
     LOGGER.info("Finished building star-tree in {}ms", System.currentTimeMillis() - startTime);
   }
@@ -473,14 +474,14 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       String metric = _metrics[i];
       ValueAggregator valueAggregator = _valueAggregators[i];
       DataType valueType = valueAggregator.getAggregatedValueType();
+      ChunkCompressionType compressionType = _compressionType[i];
       if (valueType == BYTES) {
         metricIndexCreators[i] =
-            new SingleValueVarByteRawIndexCreator(_outputDir, ChunkCompressionType.PASS_THROUGH, metric, _numDocs,
-                BYTES, valueAggregator.getMaxAggregatedValueByteSize());
+            new SingleValueVarByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, BYTES,
+                valueAggregator.getMaxAggregatedValueByteSize());
       } else {
         metricIndexCreators[i] =
-            new SingleValueFixedByteRawIndexCreator(_outputDir, ChunkCompressionType.PASS_THROUGH, metric, _numDocs,
-                valueType);
+            new SingleValueFixedByteRawIndexCreator(_outputDir, compressionType, metric, _numDocs, valueType);
       }
     }
 
@@ -522,15 +523,6 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
         metricIndexCreator.close();
       }
     }
-  }
-
-  private void writeMetadata() {
-    _metadataProperties.setProperty(MetadataKey.TOTAL_DOCS, _numDocs);
-    _metadataProperties.setProperty(MetadataKey.DIMENSIONS_SPLIT_ORDER, _dimensionsSplitOrder);
-    _metadataProperties.setProperty(MetadataKey.FUNCTION_COLUMN_PAIRS, _metrics);
-    _metadataProperties.setProperty(MetadataKey.MAX_LEAF_RECORDS, _maxLeafRecords);
-    _metadataProperties.setProperty(MetadataKey.SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS,
-        _builderConfig.getSkipStarNodeCreationForDimensions());
   }
 
   @Override

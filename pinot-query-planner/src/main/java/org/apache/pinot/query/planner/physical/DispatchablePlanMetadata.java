@@ -35,18 +35,28 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 /**
  * The {@code DispatchablePlanMetadata} info contains the information for dispatching a particular plan fragment.
  *
- * <p>It contains information aboute:
+ * <p>It contains information
  * <ul>
- *   <li>the tables it is suppose to scan for</li>
- *   <li>the underlying segments a stage requires to execute upon.</li>
- *   <li>the server instances to which this stage should be execute on</li>
+ *   <li>extracted from {@link org.apache.pinot.query.planner.physical.DispatchablePlanVisitor}</li>
+ *   <li>extracted from {@link org.apache.pinot.query.planner.physical.PinotDispatchPlanner}</li>
  * </ul>
  */
 public class DispatchablePlanMetadata implements Serializable {
-  // These 2 fields are extracted from TableScanNode
+
+  // --------------------------------------------------------------------------
+  // Fields extracted with {@link DispatchablePlanVisitor}
+  // --------------------------------------------------------------------------
+  // info from TableNode
   private final List<String> _scannedTables;
   private Map<String, String> _tableOptions;
+  // info from MailboxSendNode - whether a stage is pre-partitioned by the same way the sending exchange desires
+  private boolean _isPrePartitioned;
+  // info from PlanNode that requires singleton (e.g. SortNode/AggregateNode)
+  private boolean _requiresSingletonInstance;
 
+  // --------------------------------------------------------------------------
+  // Fields extracted with {@link PinotDispatchPlanner}
+  // --------------------------------------------------------------------------
   // used for assigning server/worker nodes.
   private Map<Integer, QueryServerInstance> _workerIdToServerInstanceMap;
 
@@ -65,11 +75,8 @@ public class DispatchablePlanMetadata implements Serializable {
   // time boundary info
   private TimeBoundaryInfo _timeBoundaryInfo;
 
-  // whether a stage requires singleton instance to execute, e.g. stage contains global reduce (sort/agg) operator.
-  private boolean _requiresSingletonInstance;
-
-  // whether a stage is partitioned table scan
-  private boolean _isPartitionedTableScan;
+  // physical partition info
+  private String _partitionFunction;
   private int _partitionParallelism;
 
   public DispatchablePlanMetadata() {
@@ -136,12 +143,20 @@ public class DispatchablePlanMetadata implements Serializable {
     _requiresSingletonInstance = _requiresSingletonInstance || newRequireInstance;
   }
 
-  public boolean isPartitionedTableScan() {
-    return _isPartitionedTableScan;
+  public boolean isPrePartitioned() {
+    return _isPrePartitioned;
   }
 
-  public void setPartitionedTableScan(boolean isPartitionedTableScan) {
-    _isPartitionedTableScan = isPartitionedTableScan;
+  public void setPrePartitioned(boolean isPrePartitioned) {
+    _isPrePartitioned = isPrePartitioned;
+  }
+
+  public String getPartitionFunction() {
+    return _partitionFunction;
+  }
+
+  public void setPartitionFunction(String partitionFunction) {
+    _partitionFunction = partitionFunction;
   }
 
   public int getPartitionParallelism() {

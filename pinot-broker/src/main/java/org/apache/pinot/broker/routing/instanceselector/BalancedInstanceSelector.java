@@ -24,12 +24,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
-
 
 /**
  * Instance selector to balance the number of segments served by each selected server instance.
@@ -49,14 +49,17 @@ import org.apache.pinot.common.utils.HashUtil;
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   public BalancedInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
+      boolean useFixedReplica) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useFixedReplica);
   }
 
   @Override
-  Map<String, String> select(List<String> segments, int requestId, SegmentStates segmentStates,
-      Map<String, String> queryOptions) {
+  Pair<Map<String, String>, Map<String, String>> select(List<String> segments, int requestId,
+      SegmentStates segmentStates, Map<String, String> queryOptions) {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
+    // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
+    Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
     if (_adaptiveServerSelector != null) {
       for (String segment : segments) {
         List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
@@ -70,8 +73,12 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
           candidateInstances.add(candidate.getInstance());
         }
         String selectedInstance = _adaptiveServerSelector.select(candidateInstances);
+        // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
+        // broker or server can skip it upon any issue to process it.
         if (candidates.get(candidateInstances.indexOf(selectedInstance)).isOnline()) {
           segmentToSelectedInstanceMap.put(segment, selectedInstance);
+        } else {
+          optionalSegmentToInstanceMap.put(segment, selectedInstance);
         }
       }
     } else {
@@ -82,13 +89,23 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         if (candidates == null) {
           continue;
         }
-        int selectedIdx = requestId++ % candidates.size();
+        int selectedIdx;
+        if (isUseFixedReplica(queryOptions)) {
+          // candidates array is always sorted
+          selectedIdx = _tableNameHashForFixedReplicaRouting % candidates.size();
+        } else {
+          selectedIdx = requestId++ % candidates.size();
+        }
         SegmentInstanceCandidate selectedCandidate = candidates.get(selectedIdx);
+        // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
+        // broker or server can skip it upon any issue to process it.
         if (selectedCandidate.isOnline()) {
           segmentToSelectedInstanceMap.put(segment, selectedCandidate.getInstance());
+        } else {
+          optionalSegmentToInstanceMap.put(segment, selectedCandidate.getInstance());
         }
       }
     }
-    return segmentToSelectedInstanceMap;
+    return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 }

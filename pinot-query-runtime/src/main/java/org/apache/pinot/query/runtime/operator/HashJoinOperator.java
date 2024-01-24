@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -110,7 +111,6 @@ public class HashJoinOperator extends MultiStageOperator {
   private final JoinOverFlowMode _joinOverflowMode;
 
   private int _currentRowsInHashTable = 0;
-  private ProcessingException _resourceLimitExceededException = null;
 
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftTableOperator,
       MultiStageOperator rightTableOperator, DataSchema leftSchema, JoinNode node) {
@@ -188,24 +188,21 @@ public class HashJoinOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
-    try {
-      if (_isTerminated) {
-        return setPartialResultExceptionToBlock(TransferableBlockUtils.getEndOfStreamTransferableBlock());
-      }
-      if (!_isHashTableBuilt) {
-        // Build JOIN hash table
-        buildBroadcastHashTable();
-      }
-      if (_upstreamErrorBlock != null) {
-        return _upstreamErrorBlock;
-      }
-      TransferableBlock leftBlock = _leftTableOperator.nextBlock();
-      // JOIN each left block with the right block.
-      return setPartialResultExceptionToBlock(buildJoinedDataBlock(leftBlock));
-    } catch (Exception e) {
-      return TransferableBlockUtils.getErrorTransferableBlock(e);
+  protected TransferableBlock getNextBlock()
+      throws ProcessingException {
+    if (_isTerminated) {
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
     }
+    if (!_isHashTableBuilt) {
+      // Build JOIN hash table
+      buildBroadcastHashTable();
+    }
+    if (_upstreamErrorBlock != null) {
+      return _upstreamErrorBlock;
+    }
+    TransferableBlock leftBlock = _leftTableOperator.nextBlock();
+    // JOIN each left block with the constructed right hash table.
+    return buildJoinedDataBlock(leftBlock);
   }
 
   private void buildBroadcastHashTable()
@@ -215,16 +212,21 @@ public class HashJoinOperator extends MultiStageOperator {
       List<Object[]> container = rightBlock.getContainer();
       // Row based overflow check.
       if (container.size() + _currentRowsInHashTable > _maxRowsInHashTable) {
-        _resourceLimitExceededException =
-            new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
-        _resourceLimitExceededException.setMessage(
-            "Cannot build in memory hash table for join operator, reach number of rows limit: " + _maxRowsInHashTable);
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          throw _resourceLimitExceededException;
+          ProcessingException resourceLimitExceededException =
+              new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
+          resourceLimitExceededException.setMessage(
+              "Cannot build in memory hash table for join operator, reach number of rows limit: "
+                  + _maxRowsInHashTable);
+          throw resourceLimitExceededException;
         } else {
           // Just fill up the buffer.
           int remainingRows = _maxRowsInHashTable - _currentRowsInHashTable;
           container = container.subList(0, remainingRows);
+          OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
+          operatorStats.recordSingleStat(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_REACHED.getName(), "true");
+          // setting only the rightTableOperator to be early terminated and awaits EOS block next.
+          _rightTableOperator.earlyTerminate();
         }
       }
       // put all the rows into corresponding hash collections keyed by the key selector function.
@@ -238,10 +240,6 @@ public class HashJoinOperator extends MultiStageOperator {
         hashCollection.add(row);
       }
       _currentRowsInHashTable += container.size();
-      if (_currentRowsInHashTable == _maxRowsInHashTable) {
-        // setting only the rightTableOperator to be early terminated and awaits EOS block next.
-        _rightTableOperator.earlyTerminate();
-      }
       rightBlock = _rightTableOperator.nextBlock();
     }
     if (rightBlock.isErrorBlock()) {
@@ -298,13 +296,6 @@ public class HashJoinOperator extends MultiStageOperator {
     }
     // TODO: Rows can be empty here. Consider fetching another left block instead of returning empty block.
     return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
-  }
-
-  private TransferableBlock setPartialResultExceptionToBlock(TransferableBlock block) {
-    if (_resourceLimitExceededException != null) {
-      block.addException(_resourceLimitExceededException);
-    }
-    return block;
   }
 
   private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock) {

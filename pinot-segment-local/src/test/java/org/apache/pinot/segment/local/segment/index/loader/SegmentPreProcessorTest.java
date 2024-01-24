@@ -34,7 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
-import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
@@ -62,6 +63,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
@@ -656,9 +658,8 @@ public class SegmentPreProcessorTest {
   @Test
   public void testForwardIndexHandlerChangeCompression()
       throws Exception {
-    Map<String, ChunkCompressionType> compressionConfigs = new HashMap<>();
-    ChunkCompressionType newCompressionType = ChunkCompressionType.ZSTANDARD;
-    compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    Map<String, CompressionCodec> compressionConfigs = new HashMap<>();
+    compressionConfigs.put(EXISTING_STRING_COL_RAW, CompressionCodec.ZSTANDARD);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     _indexLoadingConfig.addNoDictionaryColumns(EXISTING_STRING_COL_RAW);
 
@@ -672,12 +673,11 @@ public class SegmentPreProcessorTest {
     new SegmentV1V2ToV3FormatConverter().convert(_indexDir);
 
     // Test2: Now forward index will be rewritten with ZSTANDARD compressionType.
-    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, newCompressionType, true,
-        0, DataType.STRING, 100000);
+    checkForwardIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0,
+        ChunkCompressionType.ZSTANDARD, true, 0, DataType.STRING, 100000);
 
     // Test3: Change compression on existing raw index column. Also add text index on same column. Check correctness.
-    newCompressionType = ChunkCompressionType.SNAPPY;
-    compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    compressionConfigs.put(EXISTING_STRING_COL_RAW, CompressionCodec.SNAPPY);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     Set<String> textIndexColumns = new HashSet<>();
     textIndexColumns.add(EXISTING_STRING_COL_RAW);
@@ -688,12 +688,11 @@ public class SegmentPreProcessorTest {
     ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(EXISTING_STRING_COL_RAW);
     assertNotNull(columnMetadata);
     checkTextIndexCreation(EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0);
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
-        0, newCompressionType, false, DataType.STRING, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true, 0,
+        ChunkCompressionType.SNAPPY, false, DataType.STRING, 100000);
 
     // Test4: Change compression on RAW index column. Change another index on another column. Check correctness.
-    newCompressionType = ChunkCompressionType.ZSTANDARD;
-    compressionConfigs.put(EXISTING_STRING_COL_RAW, newCompressionType);
+    compressionConfigs.put(EXISTING_STRING_COL_RAW, CompressionCodec.ZSTANDARD);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     Set<String> fstColumns = new HashSet<>();
     fstColumns.add(EXISTING_STRING_COL_DICT);
@@ -706,12 +705,11 @@ public class SegmentPreProcessorTest {
     // Check FST index
     checkFSTIndexCreation(EXISTING_STRING_COL_DICT, 9, 4, _newColumnsSchemaWithFST, false, false, 26);
     // Check forward index.
-    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true,
-        0, newCompressionType, false, DataType.STRING, 100000);
+    validateIndex(StandardIndexes.forward(), EXISTING_STRING_COL_RAW, 5, 3, _schema, false, false, false, 0, true, 0,
+        ChunkCompressionType.ZSTANDARD, false, DataType.STRING, 100000);
 
     // Test5: Change compressionType for an MV column
-    newCompressionType = ChunkCompressionType.ZSTANDARD;
-    compressionConfigs.put(EXISTING_INT_COL_RAW_MV, newCompressionType);
+    compressionConfigs.put(EXISTING_INT_COL_RAW_MV, CompressionCodec.ZSTANDARD);
     _indexLoadingConfig.setCompressionConfigs(compressionConfigs);
     _indexLoadingConfig.addNoDictionaryColumns(EXISTING_INT_COL_RAW_MV);
 
@@ -1415,8 +1413,8 @@ public class SegmentPreProcessorTest {
     // V1 use separate file for each column index.
     File iiFile = new File(_indexDir, strColumn + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
     File rgFile = new File(_indexDir, strColumn + V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
-    File txtFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION);
-    File fstFile = new File(_indexDir, strColumn + V1Constants.Indexes.FST_INDEX_FILE_EXTENSION);
+    File txtFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION);
+    File fstFile = new File(_indexDir, strColumn + V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION);
     File bfFile = new File(_indexDir, strColumn + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
 
     assertFalse(iiFile.exists());
@@ -1846,7 +1844,7 @@ public class SegmentPreProcessorTest {
 
     // Update table config to convert dict to noDict for longCol and add the Startree index config
     StarTreeIndexConfig starTreeIndexConfig =
-        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), 1000);
+        new StarTreeIndexConfig(List.of("stringCol"), null, List.of("SUM__longCol"), null, 1000);
     tableConfig.getIndexingConfig().setStarTreeIndexConfigs(List.of(starTreeIndexConfig));
     tableConfig.getIndexingConfig().setEnableDynamicStarTreeCreation(true);
     tableConfig.getIndexingConfig().setNoDictionaryColumns(List.of("longCol"));
@@ -1898,18 +1896,23 @@ public class SegmentPreProcessorTest {
     return driver.getOutputDirectory();
   }
 
-  private static void removeMinMaxValuesFromMetadataFile(File indexDir) {
+  private static void removeMinMaxValuesFromMetadataFile(File indexDir)
+      throws ConfigurationException {
     PropertiesConfiguration configuration = SegmentMetadataUtils.getPropertiesConfiguration(indexDir);
     Iterator<String> keys = configuration.getKeys();
+    List<String> keysToClear = new ArrayList<>();
     while (keys.hasNext()) {
       String key = keys.next();
       if (key.endsWith(V1Constants.MetadataKeys.Column.MIN_VALUE) || key.endsWith(
           V1Constants.MetadataKeys.Column.MAX_VALUE) || key.endsWith(
           V1Constants.MetadataKeys.Column.MIN_MAX_VALUE_INVALID)) {
-        configuration.clearProperty(key);
+        keysToClear.add(key);
       }
     }
-    SegmentMetadataUtils.savePropertiesConfiguration(configuration);
+    for (String key: keysToClear) {
+      configuration.clearProperty(key);
+    }
+    SegmentMetadataUtils.savePropertiesConfiguration(configuration, indexDir);
   }
 
   private static Map<String, Consumer<IndexLoadingConfig>> createConfigPrepFunctions() {

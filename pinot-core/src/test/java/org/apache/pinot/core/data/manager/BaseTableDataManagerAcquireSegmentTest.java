@@ -23,7 +23,6 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -31,26 +30,24 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.configuration.MapConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterSuite;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
@@ -58,7 +55,6 @@ import static org.mockito.Mockito.*;
 
 public class BaseTableDataManagerAcquireSegmentTest {
   private static final String RAW_TABLE_NAME = "testTable";
-  private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final String SEGMENT_PREFIX = "segment";
   private static final int DELETED_SEGMENTS_CACHE_SIZE = 100;
   private static final int DELETED_SEGMENTS_TTL_MINUTES = 2;
@@ -86,9 +82,11 @@ public class BaseTableDataManagerAcquireSegmentTest {
   private volatile int _lo;
   private volatile int _hi;
 
-  @BeforeSuite
+  @BeforeClass
   public void setUp()
       throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+
     _tmpDir = new File(FileUtils.getTempDirectory(), "OfflineTableDataManagerTest");
     TestUtils.ensureDirectoriesExistAndEmpty(_tmpDir);
     _tmpDir.deleteOnExit();
@@ -98,7 +96,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     System.out.printf("Record random seed: %d to reproduce test results upon failure\n", seed);
   }
 
-  @AfterSuite
+  @AfterClass
   public void tearDown() {
     if (_tmpDir != null) {
       org.apache.commons.io.FileUtils.deleteQuietly(_tmpDir);
@@ -119,19 +117,13 @@ public class BaseTableDataManagerAcquireSegmentTest {
 
   private TableDataManager makeTestableManager()
       throws Exception {
+    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(_tmpDir.getAbsolutePath());
+    when(instanceDataManagerConfig.getDeletedSegmentsCacheSize()).thenReturn(DELETED_SEGMENTS_CACHE_SIZE);
+    when(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes()).thenReturn(DELETED_SEGMENTS_TTL_MINUTES);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    TableDataManagerConfig config;
-    {
-      config = mock(TableDataManagerConfig.class);
-      when(config.getTableName()).thenReturn(OFFLINE_TABLE_NAME);
-      when(config.getDataDir()).thenReturn(_tmpDir.getAbsolutePath());
-      when(config.getAuthConfig()).thenReturn(new MapConfiguration(new HashMap<>()));
-      when(config.getTableDeletedSegmentsCacheSize()).thenReturn(DELETED_SEGMENTS_CACHE_SIZE);
-      when(config.getTableDeletedSegmentsCacheTtlMinutes()).thenReturn(DELETED_SEGMENTS_TTL_MINUTES);
-    }
-    tableDataManager.init(config, "dummyInstance", mock(ZkHelixPropertyStore.class),
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
-        new TableDataManagerParams(0, false, -1));
+    tableDataManager.init(instanceDataManagerConfig, tableConfig, mock(HelixManager.class), null, null);
     tableDataManager.start();
     Field segsMapField = BaseTableDataManager.class.getDeclaredField("_segmentDataManagerMap");
     segsMapField.setAccessible(true);

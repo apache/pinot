@@ -74,7 +74,8 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   // TODO: Should V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION be added here?
   private static final List<String> EXTENSIONS = Lists.newArrayList(
       V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION,
-      V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION
+      V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION
   );
 
   protected TextIndexType() {
@@ -196,7 +197,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       throw new IllegalArgumentException("A consumer directory is required");
     }
     return new RealtimeLuceneTextIndex(context.getFieldSpec().getName(), context.getConsumerDir(),
-        context.getSegmentName(), config.getStopWordsInclude(), config.getStopWordsExclude(),
-        config.isLuceneUseCompoundFile(), config.getLuceneMaxBufferSizeMB());
+        context.getSegmentName(), config);
   }
 }

@@ -403,4 +403,31 @@ public class StreamConfigTest {
       // expected
     }
   }
+
+  @Test
+  public void testKinesisFetchTimeout() {
+    String streamType = "fakeStream";
+    String topic = "fakeTopic";
+    String tableName = "fakeTable_REALTIME";
+    String consumerFactoryClass = "KinesisConsumerFactory";
+    String decoderClass = FakeStreamMessageDecoder.class.getName();
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
+
+    String consumerType = "simple";
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerType);
+    StreamConfig streamConfig = new StreamConfig(tableName, streamConfigMap);
+
+    assertEquals(streamConfig.getFetchTimeoutMillis(), StreamConfig.DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS_KINESIS);
+  }
 }

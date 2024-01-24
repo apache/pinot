@@ -91,15 +91,12 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
       tableJobMetadataMap.computeIfAbsent(tableNameWithType, k -> new HashMap<>()).put(jobId, jobMetadata);
     });
     int numTablesProcessed = 0;
-    for (String tableNameWithType : tableNamesWithType) {
+    for (Map.Entry<String, Map<String, Map<String, String>>> entry : tableJobMetadataMap.entrySet()) {
+      String tableNameWithType = entry.getKey();
+      Map<String, Map<String, String>> allJobMetadata = entry.getValue();
       try {
-        LOGGER.info("Start to retry rebalance for table: {}", tableNameWithType);
-        // Get all rebalance jobs as tracked in ZK for this table to check if there is any failure to retry.
-        Map<String, Map<String, String>> allJobMetadata = tableJobMetadataMap.get(tableNameWithType);
-        if (allJobMetadata.isEmpty()) {
-          LOGGER.info("No rebalance job has been triggered for table: {}. Skip retry", tableNameWithType);
-          continue;
-        }
+        LOGGER.info("Start to retry rebalance for table: {} with {} rebalance jobs tracked", tableNameWithType,
+            allJobMetadata.size());
         retryRebalanceTable(tableNameWithType, allJobMetadata);
         numTablesProcessed++;
       } catch (Exception e) {

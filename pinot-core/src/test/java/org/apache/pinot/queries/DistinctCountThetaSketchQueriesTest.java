@@ -37,6 +37,7 @@ import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
+import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -172,13 +173,13 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 11);
     for (int i = 0; i < 11; i++) {
-      List<Sketch> sketches = (List<Sketch>) aggregationResult.get(i);
-      assertEquals(sketches.size(), 1);
-      Sketch sketch = sketches.get(0);
+      List<ThetaSketchAccumulator> accumulators = (List<ThetaSketchAccumulator>) aggregationResult.get(i);
+      assertEquals(accumulators.size(), 1);
+      ThetaSketchAccumulator accumulator = accumulators.get(0);
       if (i < 5) {
-        assertEquals(Math.round(sketch.getEstimate()), NUM_RECORDS);
+        assertEquals(Math.round(accumulator.getResult().getEstimate()), NUM_RECORDS);
       } else {
-        assertEquals(Math.round(sketch.getEstimate()), 3 * NUM_RECORDS);
+        assertEquals(Math.round(accumulator.getResult().getEstimate()), 3 * NUM_RECORDS);
       }
     }
 
@@ -220,9 +221,10 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
         numGroups++;
         GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
         for (int i = 0; i < 6; i++) {
-          List<Sketch> sketches = (List<Sketch>) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId);
-          assertEquals(sketches.size(), 1);
-          Sketch sketch = sketches.get(0);
+          List<ThetaSketchAccumulator> accumulators =
+              (List<ThetaSketchAccumulator>) aggregationGroupByResult.getResultForGroupId(i, groupKey._groupId);
+          assertEquals(accumulators.size(), 1);
+          Sketch sketch = accumulators.get(0).getResult();
           if (i < 5) {
             assertEquals(Math.round(sketch.getEstimate()), 1);
           } else {
@@ -279,13 +281,13 @@ public class DistinctCountThetaSketchQueriesTest extends BaseQueriesTest {
     List<Object> aggregationResult = resultsBlock.getResults();
     assertNotNull(aggregationResult);
     assertEquals(aggregationResult.size(), 1);
-    List<Sketch> sketches = (List<Sketch>) aggregationResult.get(0);
-    assertEquals(sketches.size(), 5);
-    assertTrue(sketches.get(0).isEmpty());
-    assertEquals(Math.round(sketches.get(1).getEstimate()), 300);
-    assertEquals(Math.round(sketches.get(2).getEstimate()), 450);
-    assertEquals(Math.round(sketches.get(3).getEstimate()), 175);
-    assertEquals(Math.round(sketches.get(4).getEstimate()), 100);
+    List<ThetaSketchAccumulator> accumulators = (List<ThetaSketchAccumulator>) aggregationResult.get(0);
+    assertEquals(accumulators.size(), 5);
+    assertTrue(accumulators.get(0).getResult().isEmpty());
+    assertEquals(Math.round(accumulators.get(1).getResult().getEstimate()), 300);
+    assertEquals(Math.round(accumulators.get(2).getResult().getEstimate()), 450);
+    assertEquals(Math.round(accumulators.get(3).getResult().getEstimate()), 175);
+    assertEquals(Math.round(accumulators.get(4).getResult().getEstimate()), 100);
 
     // Inter segments
     Object[] expectedResults = new Object[]{225L};

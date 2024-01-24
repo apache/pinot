@@ -32,6 +32,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -52,8 +53,8 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
   public void init(PinotConfiguration pinotConfiguration, PinotHelixResourceManager pinotHelixResourceManager)
       throws IOException {
     pinotHelixResourceManager.initUserACLConfig((ControllerConf) pinotConfiguration);
-    _accessControl = new BasicAuthAccessControl(new AccessControlUserCache(
-        pinotHelixResourceManager.getPropertyStore()));
+    _accessControl =
+        new BasicAuthAccessControl(new AccessControlUserCache(pinotHelixResourceManager.getPropertyStore()));
   }
 
   @Override
@@ -84,8 +85,9 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
 
     @Override
     public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders)
-          .filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
+      return getPrincipal(httpHeaders).filter(
+          p -> p.hasTable(TableNameBuilder.extractRawTableName(tableName))
+              && p.hasPermission(Objects.toString(accessType))).isPresent();
     }
 
     @Override
@@ -98,23 +100,22 @@ public class ZkBasicAuthAccessControlFactory implements AccessControlFactory {
         return Optional.empty();
       }
 
-      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllControllerUserConfig())
-          .stream().collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
+      _name2principal = BasicAuthUtils.extractBasicAuthPrincipals(_userCache.getAllControllerUserConfig()).stream()
+          .collect(Collectors.toMap(ZkBasicAuthPrincipal::getName, p -> p));
 
       List<String> authHeaders = headers.getRequestHeader(HEADER_AUTHORIZATION);
       if (authHeaders == null) {
         return Optional.empty();
       }
-      Map<String, String> name2password = authHeaders.stream().collect(Collectors
-          .toMap(
-              org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
+      Map<String, String> name2password = authHeaders.stream().collect(
+          Collectors.toMap(org.apache.pinot.common.auth.BasicAuthUtils::extractUsername,
               org.apache.pinot.common.auth.BasicAuthUtils::extractPassword));
-      Map<String, ZkBasicAuthPrincipal> password2principal = name2password.keySet().stream()
-          .collect(Collectors.toMap(name2password::get, _name2principal::get));
+      Map<String, ZkBasicAuthPrincipal> password2principal =
+          name2password.keySet().stream().collect(Collectors.toMap(name2password::get, _name2principal::get));
 
-      return password2principal.entrySet().stream()
-          .filter(entry -> BcryptUtils.checkpw(entry.getKey(), entry.getValue().getPassword()))
-          .map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
+      return password2principal.entrySet().stream().filter(
+          entry -> BcryptUtils.checkpwWithCache(entry.getKey(), entry.getValue().getPassword(),
+              _userCache.getUserPasswordAuthCache())).map(u -> u.getValue()).filter(Objects::nonNull).findFirst();
     }
 
     @Override

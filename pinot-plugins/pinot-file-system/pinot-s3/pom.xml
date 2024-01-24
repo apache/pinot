@@ -35,7 +35,7 @@
   <url>https://pinot.apache.org</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <http.client.version>4.5.13</http.client.version>
+    <http.client.version>4.5.14</http.client.version>
     <http.core.version>4.4.13</http.core.version>
     <s3mock.version>2.12.2</s3mock.version>
     <javax.version>3.1.0</javax.version>
@@ -43,10 +43,6 @@
   </properties>
 
   <dependencies>
-    <dependency>
-      <groupId>commons-configuration</groupId>
-      <artifactId>commons-configuration</artifactId>
-    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>

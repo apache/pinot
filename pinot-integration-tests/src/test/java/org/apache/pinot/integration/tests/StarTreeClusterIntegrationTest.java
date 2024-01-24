@@ -39,6 +39,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -152,7 +154,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
         functionColumnPairs.add(new AggregationFunctionColumnPair(functionType, metric).toColumnName());
       }
     }
-    return new StarTreeIndexConfig(dimensions, null, functionColumnPairs, maxLeafRecords);
+    return new StarTreeIndexConfig(dimensions, null, functionColumnPairs, null, maxLeafRecords);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -160,8 +162,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     for (int i = 0; i < NUM_QUERIES_TO_GENERATE; i += 2) {
-      testStarQuery(_starTree1QueryGenerator.nextQuery());
-      testStarQuery(_starTree2QueryGenerator.nextQuery());
+      testStarQuery(_starTree1QueryGenerator.nextQuery(), false);
+      testStarQuery(_starTree2QueryGenerator.nextQuery(), false);
     }
   }
 
@@ -174,14 +176,54 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     String starQuery = "SELECT DepTimeBlk, COUNT(*) FROM mytable "
         + "WHERE CRSDepTime BETWEEN 1137 AND 1849 AND DivArrDelay > 218 AND CRSDepTime NOT IN (35, 1633, 1457, 140) "
         + "AND LongestAddGTime NOT IN (17, 105, 20, 22) GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
-    testStarQuery(starQuery);
+    testStarQuery(starQuery, !useMultiStageQueryEngine);
   }
 
-  private void testStarQuery(String starQuery)
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testHardCodedFilteredAggQueries(boolean useMultiStageQueryEngine)
       throws Exception {
-    String referenceQuery = "SET useStarTree = false; " + starQuery;
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String starQuery = "SELECT DepTimeBlk, COUNT(*), COUNT(*) FILTER (WHERE CRSDepTime = 35) FROM mytable "
+        + "WHERE CRSDepTime != 35"
+        + "GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
+    // Don't verify that the query plan uses StarTree index, as this query results in FILTER_EMPTY in the query plan.
+    // This is still a valuable test, as it caught a bug where only the subFilterContext was being preserved through
+    // AggragationFunctionUtils#buildFilteredAggregateProjectOperators
+    testStarQuery(starQuery, false);
+
+    // Ensure the filtered agg and unfiltered agg can co-exist in one query
+    starQuery = "SELECT DepTimeBlk, COUNT(*), COUNT(*) FILTER (WHERE DivArrDelay > 20) FROM mytable "
+        + "WHERE CRSDepTime != 35"
+        + "GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
+    testStarQuery(starQuery, !useMultiStageQueryEngine);
+
+    starQuery = "SELECT DepTimeBlk, COUNT(*) FILTER (WHERE CRSDepTime != 35) FROM mytable "
+        + "GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
+    testStarQuery(starQuery, !useMultiStageQueryEngine);
+  }
+
+  private void testStarQuery(String starQuery, boolean verifyPlan)
+      throws Exception {
+    String filterStartreeIndex = "FILTER_STARTREE_INDEX";
+    String explain = "EXPLAIN PLAN FOR ";
+    String disableStarTree = "SET useStarTree = false; ";
+
+    if (verifyPlan) {
+      JsonNode starPlan = postQuery(explain + starQuery);
+      JsonNode referencePlan = postQuery(disableStarTree + explain + starQuery);
+      assertTrue(starPlan.toString().contains(filterStartreeIndex)
+              || starPlan.toString().contains("FILTER_EMPTY")
+              || starPlan.toString().contains("ALL_SEGMENTS_PRUNED_ON_SERVER"),
+          "StarTree query did not indicate use of StarTree index in query plan. Plan: " + starPlan);
+      assertFalse(referencePlan.toString().contains(filterStartreeIndex),
+          "Reference query indicated use of StarTree index in query plan. Plan: " + referencePlan);
+    }
+
     JsonNode starResponse = postQuery(starQuery);
+    String referenceQuery = disableStarTree + starQuery;
     JsonNode referenceResponse = postQuery(referenceQuery);
+    assertEquals(starResponse.get("exceptions").size(), 0);
+    assertEquals(referenceResponse.get("exceptions").size(), 0);
     assertEquals(starResponse.get("resultTable"), referenceResponse.get("resultTable"), String.format(
         "Query comparison failed for: \n"
             + "Star Query: %s\nStar Response: %s\nReference Query: %s\nReference Response: %s\nRandom Seed: %d",

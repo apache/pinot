@@ -44,6 +44,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  * <p>- <code>IsSingleValueField</code>: single-value or multi-value field.
  * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
  * <p>- <code>VirtualColumnProvider</code>: the virtual column provider to use for this field.
+ * <p>- <code>NotNull</code>: whether the column accepts nulls or not. Defaults to false.
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
@@ -99,6 +100,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected String _name;
   protected DataType _dataType;
   protected boolean _isSingleValueField = true;
+  protected boolean _notNull = false;
 
   // NOTE: This only applies to STRING column, which is the max number of characters
   private int _maxLength = DEFAULT_MAX_LENGTH;
@@ -205,12 +207,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
    * @param value Value for which String value needs to be returned
    * @return String value for the object.
    */
-  protected static String getStringValue(Object value) {
+  public static String getStringValue(Object value) {
+    if (value instanceof BigDecimal) {
+      return ((BigDecimal) value).toPlainString();
+    }
     if (value instanceof byte[]) {
       return BytesUtils.toHexString((byte[]) value);
-    } else {
-      return value.toString();
     }
+    return value.toString();
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
@@ -301,6 +305,30 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   /**
+   * Returns whether the column is nullable or not.
+   */
+  @JsonIgnore
+  public boolean isNullable() {
+    return !_notNull;
+  }
+
+  /**
+   * @see #isNullable()
+   */
+  @JsonIgnore
+  public void setNullable(Boolean nullable) {
+    _notNull = !nullable;
+  }
+
+  public boolean isNotNull() {
+    return _notNull;
+  }
+
+  public void setNotNull(boolean notNull) {
+    _notNull = notNull;
+  }
+
+  /**
    * Returns the {@link ObjectNode} representing the field spec.
    * <p>Only contains fields with non-default value.
    * <p>NOTE: here we use {@link ObjectNode} to preserve the insertion order.
@@ -317,6 +345,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
     appendDefaultNullValue(jsonObject);
     appendTransformFunction(jsonObject);
+    jsonObject.put("notNull", _notNull);
     return jsonObject;
   }
 
@@ -381,7 +410,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils
         .isEqual(getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils
         .isEqual(_maxLength, that._maxLength) && EqualityUtils.isEqual(_transformFunction, that._transformFunction)
-        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider);
+        && EqualityUtils.isEqual(_virtualColumnProvider, that._virtualColumnProvider)
+        && EqualityUtils.isEqual(_notNull, that._notNull);
   }
 
   @Override
@@ -393,6 +423,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     result = EqualityUtils.hashCodeOf(result, _maxLength);
     result = EqualityUtils.hashCodeOf(result, _transformFunction);
     result = EqualityUtils.hashCodeOf(result, _virtualColumnProvider);
+    result = EqualityUtils.hashCodeOf(result, _notNull);
     return result;
   }
 
@@ -531,6 +562,19 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       } catch (Exception e) {
         throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
       }
+    }
+
+    /**
+     * Converts the given value of the data type to string.The input value for BYTES type should be byte[].
+     */
+    public String toString(Object value) {
+      if (this == BIG_DECIMAL) {
+        return ((BigDecimal) value).toPlainString();
+      }
+      if (this == BYTES) {
+        return BytesUtils.toHexString((byte[]) value);
+      }
+      return value.toString();
     }
 
     /**
