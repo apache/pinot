@@ -43,143 +43,85 @@ import org.testng.annotations.Test;
 public class InstanceAssignmentConfigUtilsTest {
 
   @Test
-  public void testShouldRelocateCompletedSegmentsCompletedInstancePartition() {
+  public void testShouldRelocateCompletedSegmentsWhenInstancePartitionIsCompleted() {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
-
-    InstanceTagPoolConfig instanceTagPoolConfig = new InstanceTagPoolConfig("tag",true,1, null);
-    List<String> constraints = new ArrayList<>();
-    constraints.add("constraints1");
-    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
-    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1,1,1,1,1,true,null);
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,instanceConstraintConfig,
-        instanceReplicaGroupPartitionConfig, InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name());
-
-    //check map key
-    instanceAssignmentConfigMap.put(InstancePartitionsType.COMPLETED.toString(), instanceAssignmentConfig);
+    instanceAssignmentConfigMap.put(InstancePartitionsType.COMPLETED.toString(), getInstanceAssignmentConfig());
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).build();
     Assert.assertTrue(InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig));
   }
 
+
   @Test
-  public void testShouldRelocateCompletedSegmentsConsuming() {
+  public void testShouldRelocateCompletedSegmentsWhenInstancePartitionIsConsuming() {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
-
-    InstanceTagPoolConfig instanceTagPoolConfig = new InstanceTagPoolConfig("tag",true,1, null);
-    List<String> constraints = new ArrayList<>();
-    constraints.add("constraints1");
-    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
-    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1,1,1,1,1,true,null);
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,instanceConstraintConfig,
-        instanceReplicaGroupPartitionConfig, InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name());
-
-    //check map key
-    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig);
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(), getInstanceAssignmentConfig());
     TagOverrideConfig tagOverrideConfig = new TagOverrideConfig("broker", "Server");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).setTagOverrideConfig(tagOverrideConfig).build();
     Assert.assertTrue(InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig));
   }
 
-  //try false for above, and null as well.
+  //try false for above, and null as well, but won't increase line coverage
 
   @Test
   public void testAllowInstanceAssignmentWithPreConfiguredInstancePartitions() {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
-
-    InstanceTagPoolConfig instanceTagPoolConfig = new InstanceTagPoolConfig("tag",true,1, null);
-    List<String> constraints = new ArrayList<>();
-    constraints.add("constraints1");
-    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
-    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1,1,1,1,1,true,null);
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,instanceConstraintConfig,
-        instanceReplicaGroupPartitionConfig, InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name());
-
-    //check map key
-    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig);
-
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(), getInstanceAssignmentConfig());
     Map<InstancePartitionsType, String> instancePartitionsTypeStringMap = new HashMap<>();
     instancePartitionsTypeStringMap.put(InstancePartitionsType.CONSUMING, "testTable");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
         .setInstancePartitionsMap(instancePartitionsTypeStringMap).build();
 
-    Assert.assertTrue(InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.CONSUMING));
+    Assert.assertTrue(InstanceAssignmentConfigUtils
+        .allowInstanceAssignment(tableConfig, InstancePartitionsType.CONSUMING));
   }
 
+
+  //When instancePartitionsType is OFFLINE
   @Test
-  public void testAllowInstanceAssignmentWithoutPreConfiguredInstancePartitionsOFFLINE() {
+  public void testAllowInstanceAssignmentWithoutPreConfiguredInstancePartitionsOffline() {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
-
-    InstanceTagPoolConfig instanceTagPoolConfig = new InstanceTagPoolConfig("tag",true,1, null);
-    List<String> constraints = new ArrayList<>();
-    constraints.add("constraints1");
-    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
-    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1,1,1,1,1,true,null);
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,instanceConstraintConfig,
-        instanceReplicaGroupPartitionConfig, InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name());
-
     //check map key
-    instanceAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.name(), instanceAssignmentConfig);
-
+    instanceAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.name(), getInstanceAssignmentConfig());
     Map<InstancePartitionsType, String> instancePartitionsTypeStringMap = new HashMap<>();
     instancePartitionsTypeStringMap.put(InstancePartitionsType.CONSUMING, "testTable");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
         .setInstancePartitionsMap(instancePartitionsTypeStringMap).build();
-    Assert.assertTrue(InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.CONSUMING));
+    Assert.assertTrue(InstanceAssignmentConfigUtils
+        .allowInstanceAssignment(tableConfig, InstancePartitionsType.CONSUMING));
   }
 
+  //When instancePartitionsType is CONSUMING
   @Test
-  public void testAllowInstanceAssignmentWithoutPreConfiguredInstancePartitionsCONSUMING() {
+  public void testAllowInstanceAssignmentWithoutPreConfiguredInstancePartitionsConsuming() {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
-
-    InstanceTagPoolConfig instanceTagPoolConfig = new InstanceTagPoolConfig("tag",true,1, null);
-    List<String> constraints = new ArrayList<>();
-    constraints.add("constraints1");
-    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
-    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1,1,1,1,1,true,null);
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,instanceConstraintConfig,
-        instanceReplicaGroupPartitionConfig, InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name());
-
     //check map key
-    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig);
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.name(), getInstanceAssignmentConfig());
 
     Map<InstancePartitionsType, String> instancePartitionsTypeStringMap = new HashMap<>();
     instancePartitionsTypeStringMap.put(InstancePartitionsType.CONSUMING, "testTable");
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
         .setInstancePartitionsMap(instancePartitionsTypeStringMap).build();
-    Assert.assertTrue(InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.CONSUMING));
+    Assert.assertTrue(InstanceAssignmentConfigUtils
+        .allowInstanceAssignment(tableConfig, InstancePartitionsType.CONSUMING));
   }
 
+  //When instancePartitionsType is COMPLETED
   @Test
   public void testAllowInstanceAssignmentWithoutPreConfiguredInstancePartitionsCOMPLETED() {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
-
-    InstanceTagPoolConfig instanceTagPoolConfig = new InstanceTagPoolConfig("tag",true,1, null);
-    List<String> constraints = new ArrayList<>();
-    constraints.add("constraints1");
-    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
-    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1,1,1,1,1,true,null);
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,instanceConstraintConfig,
-        instanceReplicaGroupPartitionConfig, InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name());
-
-    //check map key
-    instanceAssignmentConfigMap.put(InstancePartitionsType.COMPLETED.name(), instanceAssignmentConfig);
-
+    instanceAssignmentConfigMap.put(InstancePartitionsType.COMPLETED.name(), getInstanceAssignmentConfig());
     Map<InstancePartitionsType, String> instancePartitionsTypeStringMap = new HashMap<>();
     instancePartitionsTypeStringMap.put(InstancePartitionsType.COMPLETED, "testTable");
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
         .setInstancePartitionsMap(instancePartitionsTypeStringMap).build();
-    Assert.assertTrue(InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, InstancePartitionsType.COMPLETED));
+    Assert.assertTrue(InstanceAssignmentConfigUtils
+        .allowInstanceAssignment(tableConfig, InstancePartitionsType.COMPLETED));
   }
 
   //cant set up exception data/ find a scenario where line 77 will be reached
@@ -211,26 +153,17 @@ public class InstanceAssignmentConfigUtilsTest {
   @Test
   public void testGetInstanceAssignmentConfigWhenInstanceAssignmentConfig() {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
-
-    InstanceTagPoolConfig instanceTagPoolConfig = new InstanceTagPoolConfig("tag",true,1, null);
-    List<String> constraints = new ArrayList<>();
-    constraints.add("constraints1");
-    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
-    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
-        new InstanceReplicaGroupPartitionConfig(true, 1,1,1,1,10,true,null);
-    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,instanceConstraintConfig,
-        instanceReplicaGroupPartitionConfig, InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name());
-
     //check map key
-    instanceAssignmentConfigMap.put(InstancePartitionsType.COMPLETED.name(), instanceAssignmentConfig);
+    instanceAssignmentConfigMap.put(InstancePartitionsType.COMPLETED.name(), getInstanceAssignmentConfig());
 
     Map<InstancePartitionsType, String> instancePartitionsTypeStringMap = new HashMap<>();
     instancePartitionsTypeStringMap.put(InstancePartitionsType.COMPLETED, "testTable");
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
         .setInstancePartitionsMap(instancePartitionsTypeStringMap).build();
-    Assert.assertEquals(InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.COMPLETED)
-            .getConstraintConfig().getConstraints().get(0),
+    Assert.assertEquals(InstanceAssignmentConfigUtils
+            .getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.COMPLETED).getConstraintConfig()
+            .getConstraints().get(0),
         "constraints1");
     //Check if you can assert entire objects with values in line 214
     Assert.assertEquals(InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.COMPLETED)
@@ -298,11 +231,14 @@ public class InstanceAssignmentConfigUtilsTest {
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(columnPartitionConfigMap);
     indexingConfig.setSegmentPartitionConfig(segmentPartitionConfig);
     tableConfig.setIndexingConfig(indexingConfig);
-    Assert.assertEquals(InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE)
+    Assert.assertEquals(InstanceAssignmentConfigUtils
+        .getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE)
         .getReplicaGroupPartitionConfig().isReplicaGroupBased(), Boolean.TRUE);
-    Assert.assertEquals(InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE)
+    Assert.assertEquals(InstanceAssignmentConfigUtils
+        .getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE)
         .getReplicaGroupPartitionConfig().getPartitionColumn(), null);
-    Assert.assertEquals(InstanceAssignmentConfigUtils.getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE)
+    Assert.assertEquals(InstanceAssignmentConfigUtils
+        .getInstanceAssignmentConfig(tableConfig, InstancePartitionsType.OFFLINE)
         .getReplicaGroupPartitionConfig().getNumInstancesPerReplicaGroup(), 2);
     //Check if we want to asset all the objects for getReplicaGroupPartitionConfig()
   }
@@ -326,6 +262,21 @@ public class InstanceAssignmentConfigUtilsTest {
 
     Assert.assertTrue(InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, InstancePartitionsType.OFFLINE));
 
+  }
+
+  //check if you can get False for this method.
+
+  private static InstanceAssignmentConfig getInstanceAssignmentConfig() {
+    InstanceTagPoolConfig instanceTagPoolConfig =
+        new InstanceTagPoolConfig("tag",true,1, null);
+    List<String> constraints = new ArrayList<>();
+    constraints.add("constraints1");
+    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 1,1,1,1,1,true,null);
+    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(instanceTagPoolConfig,instanceConstraintConfig,
+        instanceReplicaGroupPartitionConfig, InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name());
+    return instanceAssignmentConfig;
   }
 
 
