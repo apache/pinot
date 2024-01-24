@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
@@ -417,12 +418,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _idleTimer.init();
 
     try {
-      _partitionGroupConsumer.validateStreamState(_currentOffset);
+      validateStartOffset(_currentOffset);
     } catch (PermanentConsumerException pce) {
       _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
               1L);
       _segmentLogger.error(pce.getMessage());
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), pce.getMessage(), pce));
       throw pce;
     }
 
@@ -903,6 +905,32 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       createPartitionMetadataProvider("Get Partition Lag State");
     }
     return _partitionMetadataProvider.getCurrentPartitionLagState(consumerPartitionStateMap);
+  }
+
+  /**
+   * Checks if the stream partition is in a valid state.
+   *
+   * The type of checks is dependent on the stream type. An example is if the startOffset has expired due to
+   * retention configuration of the stream which may lead to missed data.
+   *
+   * @param startOffset The offset of the first message desired, inclusive
+   * @throws PermanentConsumerException
+   */
+  private void validateStartOffset(StreamPartitionMsgOffset startOffset) throws TimeoutException {
+    if (_partitionMetadataProvider == null) {
+      createPartitionMetadataProvider("validateStartOffset");
+    }
+
+    StreamPartitionMsgOffset streamSmallestOffset = _partitionMetadataProvider.fetchStreamPartitionOffset(
+        OffsetCriteria.SMALLEST_OFFSET_CRITERIA,
+        /*maxWaitTimeMs=*/5000
+    );
+
+    if (streamSmallestOffset.compareTo(startOffset) > 0) {
+      throw new PermanentConsumerException(new Throwable(String.format(
+          "startOffset(%s) is older than topic's beginning offset(%s) ",
+          startOffset, streamSmallestOffset)));
+    }
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {

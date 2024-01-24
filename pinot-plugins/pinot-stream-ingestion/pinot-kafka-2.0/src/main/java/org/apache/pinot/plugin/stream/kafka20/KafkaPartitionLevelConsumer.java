@@ -21,17 +21,13 @@ package org.apache.pinot.plugin.stream.kafka20;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
-import org.apache.pinot.spi.stream.PermanentConsumerException;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -48,20 +44,6 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
 
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
     super(clientId, streamConfig, partition);
-  }
-
-  @Override
-  public void validateStreamState(StreamPartitionMsgOffset startMsgOffset) throws PermanentConsumerException {
-    final long startOffset = ((LongMsgOffset) startMsgOffset).getOffset();
-    Map<TopicPartition, Long> beginningOffsets =
-            _consumer.beginningOffsets(Collections.singletonList(_topicPartition));
-
-    final long beginningOffset = beginningOffsets.getOrDefault(_topicPartition, 0L);
-    if (startOffset < beginningOffset) {
-      throw new PermanentConsumerException(new Throwable(String.format(
-              "startOffset(%s) is older than topic's beginning offset(%s) ",
-              startOffset, beginningOffset)));
-    }
   }
 
   @Override

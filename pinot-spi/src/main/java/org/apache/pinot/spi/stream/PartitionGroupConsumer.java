@@ -74,16 +74,4 @@ public interface PartitionGroupConsumer extends Closeable {
   default StreamPartitionMsgOffset checkpoint(StreamPartitionMsgOffset lastOffset) {
     return lastOffset;
   }
-
-  /**
-   * Checks if the stream partition is in a valid state.
-   *
-   * The type of checks is dependent on the stream type. An example is if the startOffset has expired due to
-   * retention configuration of the stream which may lead to missed data.
-   *
-   * @param startOffset The offset of the first message desired, inclusive
-   * @throws PermanentConsumerException
-   */
-  default void validateStreamState(StreamPartitionMsgOffset startOffset) throws PermanentConsumerException {
-  }
 }
