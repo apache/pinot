@@ -41,13 +41,13 @@ import static org.mockito.Mockito.when;
 
 
 public class HttpSegmentFetcherTest {
-  private MockedStatic<PeerServerSegmentFinder> peerServerSegmentFinder = mockStatic(PeerServerSegmentFinder.class);
-  private PinotConfiguration fetcherConfig;
+  private MockedStatic<PeerServerSegmentFinder> _peerServerSegmentFinder = mockStatic(PeerServerSegmentFinder.class);
+  private PinotConfiguration _fetcherConfig;
 
   @BeforeSuite
   public void initTest() {
-    fetcherConfig = new PinotConfiguration();
-    fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_COUNT_CONFIG_KEY, 3);
+    _fetcherConfig = new PinotConfiguration();
+    _fetcherConfig.setProperty(BaseSegmentFetcher.RETRY_COUNT_CONFIG_KEY, 3);
   }
 
   @Test
@@ -55,19 +55,19 @@ public class HttpSegmentFetcherTest {
       throws URISyntaxException, IOException, HttpErrorStatusException {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
     when(client.downloadFile(any(), any(), any())).thenReturn(200);
-    HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, fetcherConfig);
+    HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, _fetcherConfig);
     HelixManager helixManager = mock(HelixManager.class);
 
     List<URI> uris = new ArrayList<>();
     uris.add(new URI("http://h1:8080"));
     uris.add(new URI("http://h2:8080"));
-    peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).thenReturn(uris);
+    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).thenReturn(uris);
     try {
       Assert.assertTrue(httpSegmentFetcher.fetchSegmentToLocal("seg", new File("/file"), helixManager, "http"));
     } catch (Exception e) {
       Assert.assertTrue(false, "Download segment failed");
     }
-    peerServerSegmentFinder.reset();
+    _peerServerSegmentFinder.reset();
   }
 
   @Test
@@ -76,13 +76,13 @@ public class HttpSegmentFetcherTest {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
     // All three attempts fails.
     when(client.downloadFile(any(), any(), any())).thenReturn(300).thenReturn(300).thenReturn(300);
-    HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, fetcherConfig);
+    HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, _fetcherConfig);
     HelixManager helixManager = mock(HelixManager.class);
     List<URI> uris = new ArrayList<>();
     uris.add(new URI("http://h1:8080"));
     uris.add(new URI("http://h2:8080"));
 
-    peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).thenReturn(uris);
+    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).thenReturn(uris);
     try {
       Assert.assertFalse(httpSegmentFetcher.fetchSegmentToLocal("seg", new File("/file"), helixManager, "http"));
     } catch (Exception e) {
@@ -96,13 +96,13 @@ public class HttpSegmentFetcherTest {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
     // the first two attempts failed until the last attempt succeeds
     when(client.downloadFile(any(), any(), any())).thenReturn(300).thenReturn(300).thenReturn(200);
-    HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, fetcherConfig);
+    HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, _fetcherConfig);
     HelixManager helixManager = mock(HelixManager.class);
     List<URI> uris = new ArrayList<>();
     uris.add(new URI("http://h1:8080"));
     uris.add(new URI("http://h2:8080"));
 
-    peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).thenReturn(uris);
+    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).thenReturn(uris);
     try {
       Assert.assertTrue(httpSegmentFetcher.fetchSegmentToLocal("seg", new File("/file"), helixManager, "http"));
     } catch (Exception e) {
@@ -116,14 +116,14 @@ public class HttpSegmentFetcherTest {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
     //  The download always succeeds.
     when(client.downloadFile(any(), any(), any())).thenReturn(200);
-    HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, fetcherConfig);
+    HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, _fetcherConfig);
     HelixManager helixManager = mock(HelixManager.class);
     List<URI> uris = new ArrayList<>();
     uris.add(new URI("http://h1:8080"));
     uris.add(new URI("http://h2:8080"));
 
     // The first two attempts find NO peers hosting the segment but the last one found two servers.
-    peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).
+    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).
         thenReturn(List.of()).
         thenReturn(List.of()).
         thenReturn(uris);
@@ -140,10 +140,10 @@ public class HttpSegmentFetcherTest {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
     // the download always succeeds.
     when(client.downloadFile(any(), any(), any())).thenReturn(200);
-    HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, fetcherConfig);
+    HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, _fetcherConfig);
     HelixManager helixManager = mock(HelixManager.class);
 
-    peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).
+    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).
         thenReturn(List.of()).
         thenReturn(List.of()).
         thenReturn(List.of());
