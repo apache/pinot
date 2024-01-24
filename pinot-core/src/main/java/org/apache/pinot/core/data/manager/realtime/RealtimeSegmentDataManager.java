@@ -298,7 +298,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final boolean _isOffHeap;
   private final boolean _nullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
-  private final ConsumptionRateLimiter _rateLimiter;
+  private final ConsumptionRateLimiter _partitionRateLimiter;
+  private final ConsumptionRateLimiter _serverRateLimiter;
 
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
@@ -516,7 +517,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private boolean processStreamEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
     int messageCount = messagesAndOffsets.getMessageCount();
-    _rateLimiter.throttle(messageCount);
+    _partitionRateLimiter.throttle(messageCount);
+    _serverRateLimiter.throttle(messageCount);
 
     PinotMeter realtimeRowsConsumedMeter = null;
     PinotMeter realtimeRowsDroppedMeter = null;
@@ -605,6 +607,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             realtimeRowsConsumedMeter =
                 _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
                     realtimeRowsConsumedMeter);
+            _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
           } catch (Exception e) {
             _numRowsErrored++;
             String errorMessage = String.format("Caught exception while indexing the record: %s", transformedRow);
@@ -1395,8 +1398,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _memoryManager = new DirectMemoryManager(_segmentNameStr, _serverMetrics);
     }
 
-    _rateLimiter = RealtimeConsumptionRateManager.getInstance()
+    _partitionRateLimiter = RealtimeConsumptionRateManager.getInstance()
         .createRateLimiter(_streamConfig, _tableNameWithType, _serverMetrics, _clientId);
+    _serverRateLimiter = RealtimeConsumptionRateManager.getInstance().getServerRateLimiter();
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     String sortedColumn;
