@@ -914,9 +914,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * retention configuration of the stream which may lead to missed data.
    *
    * @param startOffset The offset of the first message desired, inclusive
-   * @throws PermanentConsumerException
+   * @throws TimeoutException, PermanentConsumerException
    */
-  private void validateStartOffset(StreamPartitionMsgOffset startOffset) throws TimeoutException {
+  private void validateStartOffset(StreamPartitionMsgOffset startOffset)
+      throws TimeoutException, PermanentConsumerException {
     if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("validateStartOffset");
     }
