@@ -132,7 +132,7 @@ public class SegmentFetcherFactoryTest {
     }
 
     @Override
-    public void fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
+    public boolean fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
         throws Exception {
       throw new UnsupportedOperationException();
     }

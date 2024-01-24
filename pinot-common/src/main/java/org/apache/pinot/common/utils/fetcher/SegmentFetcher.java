@@ -52,8 +52,14 @@ public interface SegmentFetcher {
       throws Exception;
 
   /**
-   * Fetches a given segment to local.
+   *
+   * @param segmentName The segment file name.
+   * @param dest The destination to put the downloaded segment.
+   * @param helixManager The Helix cluster manager to get the location of the segment.
+   * @param downloadScheme http or https
+   * @return true if and only if the segment fetch is successful.
+   * @throws Exception
    */
-  void fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
+  boolean fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
       throws Exception;
 }

@@ -30,11 +30,13 @@ import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.http.message.BasicHeader;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -46,6 +48,19 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   @Override
   protected void doInit(PinotConfiguration config) {
     _httpClient = new FileUploadDownloadClient(HttpClientConfig.newBuilder(config).build());
+  }
+
+  public HttpSegmentFetcher() {
+  }
+
+  public HttpSegmentFetcher(FileUploadDownloadClient httpClient, PinotConfiguration config) {
+    _httpClient = httpClient;
+    _retryCount = config.getProperty(RETRY_COUNT_CONFIG_KEY, DEFAULT_RETRY_COUNT);
+    _retryWaitMs = config.getProperty(RETRY_WAIT_MS_CONFIG_KEY, DEFAULT_RETRY_WAIT_MS);
+    _retryDelayScaleFactor = config.getProperty(RETRY_DELAY_SCALE_FACTOR_CONFIG_KEY, DEFAULT_RETRY_DELAY_SCALE_FACTOR);
+    _logger
+        .info("Initialized with retryCount: {}, retryWaitMs: {}, retryDelayScaleFactor: {}", _retryCount, _retryWaitMs,
+            _retryDelayScaleFactor);
   }
 
   @Override
@@ -174,8 +189,12 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
       throws Exception {
     try {
       int statusCode = _httpClient.downloadFile(uri, dest, _authProvider);
-      _logger.info("Downloaded segment from: {} to: {} of size: {}; Response status code: {}", uri, dest, dest.length(),
-          statusCode);
+      _logger.info("Try to download the segment from: {} to: {} of size: {}; Response status code: {}", uri, dest,
+          dest.length(), statusCode);
+      // In case of download failure, throw exception.
+      if (statusCode >= 300) {
+        throw new HttpErrorStatusException("Failed to download segment", statusCode);
+      }
     } catch (Exception e) {
       _logger.warn("Caught exception while downloading segment from: {} to: {}", uri, dest, e);
       throw e;

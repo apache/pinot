@@ -112,25 +112,40 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     throw new UnsupportedOperationException();
   }
 
+  // Download segment to a local location with retries.
   @Override
-  public void fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
+  public boolean fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
       throws Exception {
-    RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
-      // First find servers hosting the segment in ONLINE state.
-      List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, helixManager);
-      // Shuffle the list of URIs
-      Collections.shuffle(peerSegmentURIs);
-      // Next fetch the segment.
-      for (URI uri: peerSegmentURIs) {
-        try {
-          fetchSegmentToLocalWithoutRetry(uri, dest);
-          return true;
-        } catch (Exception e) {
-        }
+    try {
+      int attempt =
+          RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+            // First find servers hosting the segment in ONLINE state.
+            List<URI> peerSegmentURIs =
+                PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, helixManager);
+            // Shuffle the list of URIs.
+            Collections.shuffle(peerSegmentURIs);
+            // Next get through the list of URIs to fetch the segment until success.
+            for (URI uri : peerSegmentURIs) {
+              try {
+                fetchSegmentToLocalWithoutRetry(uri, dest);
+                return true;
+              } catch (Exception e) {
+                _logger.warn("Download segment {} from peer {} failed.", segmentName, uri, e);
+              }
+            }
+            // None of the URI works. Return false for retry.
+            return false;
+          });
+      if (attempt >= 0) {
+        _logger.info("Download segment {} successfully with {} attempts.", segmentName, attempt + 1);
+        return true;
       }
-      // None of the URI work
+      _logger.error("Download segment {} unsuccessfully with {} attempts.", segmentName, attempt + 1);
       return false;
-    });
+    } catch (Exception e) {
+      _logger.error("Failed to download segment {} after retries.", segmentName, e);
+      return false;
+    }
   }
 
   /**
