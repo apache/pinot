@@ -61,7 +61,8 @@ public class HttpSegmentFetcherTest {
     List<URI> uris = new ArrayList<>();
     uris.add(new URI("http://h1:8080"));
     uris.add(new URI("http://h2:8080"));
-    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).thenReturn(uris);
+    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any()))
+        .thenReturn(uris);
     try {
       Assert.assertTrue(httpSegmentFetcher.fetchSegmentToLocal("seg", new File("/file"), helixManager, "http"));
     } catch (Exception e) {
@@ -82,7 +83,8 @@ public class HttpSegmentFetcherTest {
     uris.add(new URI("http://h1:8080"));
     uris.add(new URI("http://h2:8080"));
 
-    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).thenReturn(uris);
+    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any()))
+        .thenReturn(uris);
     try {
       Assert.assertFalse(httpSegmentFetcher.fetchSegmentToLocal("seg", new File("/file"), helixManager, "http"));
     } catch (Exception e) {
@@ -102,7 +104,8 @@ public class HttpSegmentFetcherTest {
     uris.add(new URI("http://h1:8080"));
     uris.add(new URI("http://h2:8080"));
 
-    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).thenReturn(uris);
+    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any()))
+        .thenReturn(uris);
     try {
       Assert.assertTrue(httpSegmentFetcher.fetchSegmentToLocal("seg", new File("/file"), helixManager, "http"));
     } catch (Exception e) {
@@ -123,10 +126,8 @@ public class HttpSegmentFetcherTest {
     uris.add(new URI("http://h2:8080"));
 
     // The first two attempts find NO peers hosting the segment but the last one found two servers.
-    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).
-        thenReturn(List.of()).
-        thenReturn(List.of()).
-        thenReturn(uris);
+    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any()))
+        .thenReturn(List.of()).thenReturn(List.of()).thenReturn(uris);
     try {
       Assert.assertTrue(httpSegmentFetcher.fetchSegmentToLocal("seg", new File("/file"), helixManager, "http"));
     } catch (Exception e) {
@@ -143,10 +144,8 @@ public class HttpSegmentFetcherTest {
     HttpSegmentFetcher httpSegmentFetcher = new HttpSegmentFetcher(client, _fetcherConfig);
     HelixManager helixManager = mock(HelixManager.class);
 
-    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any())).
-        thenReturn(List.of()).
-        thenReturn(List.of()).
-        thenReturn(List.of());
+    _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any()))
+        .thenReturn(List.of()).thenReturn(List.of()).thenReturn(List.of());
     try {
       Assert.assertFalse(httpSegmentFetcher.fetchSegmentToLocal("seg", new File("/file"), helixManager, "http"));
     } catch (Exception e) {
