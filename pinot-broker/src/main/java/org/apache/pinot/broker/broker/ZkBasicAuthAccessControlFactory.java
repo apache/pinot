@@ -39,6 +39,7 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -108,7 +109,7 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
 
       ZkBasicAuthPrincipal principal = principalOpt.get();
       for (String table : tables) {
-        if (!principal.hasTable(table)) {
+        if (!principal.hasTable(TableNameBuilder.extractRawTableName(table))) {
           return false;
         }
       }

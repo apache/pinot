@@ -164,8 +164,9 @@
               <goal>shade</goal>
             </goals>
             <configuration>
-              <transformers>
+              <transformers combine.self="override">
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
               </transformers>
               <!--
               Usually in hadoop environment, there are multiple jars with different versions.

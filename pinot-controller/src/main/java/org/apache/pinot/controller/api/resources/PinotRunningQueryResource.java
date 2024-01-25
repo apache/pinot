@@ -187,7 +187,7 @@ public class PinotRunningQueryResource {
     }
     LOGGER.debug("Getting running queries via broker urls: {}", brokerUrls);
     CompletionService<MultiHttpRequestResponse> completionService =
-        new MultiHttpRequest(_executor, _httpConnMgr).execute(brokerUrls, requestHeaders, timeoutMs);
+        new MultiHttpRequest(_executor, _httpConnMgr).executeGet(brokerUrls, requestHeaders, timeoutMs);
     Map<String, Map<String, String>> queriesByBroker = new HashMap<>();
     List<String> errMsgs = new ArrayList<>(brokerUrls.size());
     for (int i = 0; i < brokerUrls.size(); i++) {
