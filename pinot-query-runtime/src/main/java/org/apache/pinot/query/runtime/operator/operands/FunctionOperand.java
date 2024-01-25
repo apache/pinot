@@ -50,11 +50,13 @@ public class FunctionOperand implements TransformOperand {
     FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(canonicalName, numOperands);
     Preconditions.checkState(functionInfo != null, "Cannot find function with name: %s", canonicalName);
     _functionInvoker = new FunctionInvoker(functionInfo);
-    Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
-    PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
-    for (int i = 0; i < numOperands; i++) {
-      Preconditions.checkState(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
-          parameterClasses[i], functionInfo.getMethod());
+    if (!_functionInvoker.getMethod().isVarArgs()) {
+      Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();
+      PinotDataType[] parameterTypes = _functionInvoker.getParameterTypes();
+      for (int i = 0; i < numOperands; i++) {
+        Preconditions.checkState(parameterTypes[i] != null, "Unsupported parameter class: %s for method: %s",
+            parameterClasses[i], functionInfo.getMethod());
+      }
     }
     ColumnDataType functionInvokerResultType = FunctionUtils.getColumnDataType(_functionInvoker.getResultClass());
     // Handle unrecognized result class with STRING
@@ -80,8 +82,13 @@ public class FunctionOperand implements TransformOperand {
       _reusableOperandHolder[i] = value != null ? operand.getResultType().toExternal(value) : null;
     }
     // TODO: Optimize per record conversion
-    _functionInvoker.convertTypes(_reusableOperandHolder);
-    Object result = _functionInvoker.invoke(_reusableOperandHolder);
+    Object result;
+    if (_functionInvoker.getMethod().isVarArgs()) {
+      result = _functionInvoker.invoke(new Object[]{_reusableOperandHolder});
+    } else {
+      _functionInvoker.convertTypes(_reusableOperandHolder);
+      result = _functionInvoker.invoke(_reusableOperandHolder);
+    }
     return result != null ? TypeUtils.convert(_functionInvokerResultType.toInternal(result),
         _resultType.getStoredType()) : null;
   }

@@ -19,6 +19,7 @@
 package org.apache.pinot.common.http;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
@@ -26,11 +27,14 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
@@ -66,14 +70,29 @@ public class MultiHttpRequest {
    * @return instance of CompletionService. Completion service will provide
    *   results as they arrive. The order is NOT same as the order of URLs
    */
-  public CompletionService<MultiHttpRequestResponse> execute(List<String> urls,
+  public CompletionService<MultiHttpRequestResponse> executeGet(List<String> urls,
       @Nullable Map<String, String> requestHeaders, int timeoutMs) {
-    return execute(urls, requestHeaders, timeoutMs, "GET", HttpGet::new);
+    List<Pair<String, String>> urlsAndRequestBodies = new ArrayList<>();
+    urls.forEach(url -> urlsAndRequestBodies.add(Pair.of(url, "")));
+    return execute(urlsAndRequestBodies, requestHeaders, timeoutMs, "GET", HttpGet::new);
+  }
+
+  /**
+   * POST urls in parallel using the executor service.
+   * @param urlsAndRequestBodies absolute URLs to POST
+   * @param requestHeaders headers to set when making the request
+   * @param timeoutMs timeout in milliseconds for each POST request
+   * @return instance of CompletionService. Completion service will provide
+   *   results as they arrive. The order is NOT same as the order of URLs
+   */
+  public CompletionService<MultiHttpRequestResponse> executePost(List<Pair<String, String>> urlsAndRequestBodies,
+      @Nullable Map<String, String> requestHeaders, int timeoutMs) {
+    return execute(urlsAndRequestBodies, requestHeaders, timeoutMs, "POST", HttpPost::new);
   }
 
   /**
    * Execute certain http method on the urls in parallel using the executor service.
-   * @param urls absolute URLs to execute the http method
+   * @param urlsAndRequestBodies absolute URLs to execute the http method
    * @param requestHeaders headers to set when making the request
    * @param timeoutMs timeout in milliseconds for each http request
    * @param httpMethodName the name of the http method like GET, DELETE etc.
@@ -81,22 +100,28 @@ public class MultiHttpRequest {
    * @return instance of CompletionService. Completion service will provide
    *   results as they arrive. The order is NOT same as the order of URLs
    */
-  public <T extends HttpRequestBase> CompletionService<MultiHttpRequestResponse> execute(List<String> urls,
-      @Nullable Map<String, String> requestHeaders, int timeoutMs, String httpMethodName,
-      Function<String, T> httpRequestBaseSupplier) {
+  public <T extends HttpRequestBase> CompletionService<MultiHttpRequestResponse> execute(
+      List<Pair<String, String>> urlsAndRequestBodies, @Nullable Map<String, String> requestHeaders, int timeoutMs,
+      String httpMethodName, Function<String, T> httpRequestBaseSupplier) {
     // Create global request configuration
-    RequestConfig defaultRequestConfig = RequestConfig.custom()
-        .setConnectionRequestTimeout(timeoutMs)
-        .setSocketTimeout(timeoutMs).build(); // setting the socket
+    RequestConfig defaultRequestConfig =
+        RequestConfig.custom().setConnectionRequestTimeout(timeoutMs).setSocketTimeout(timeoutMs)
+            .build(); // setting the socket
 
-    HttpClientBuilder httpClientBuilder = HttpClients.custom()
-        .setConnectionManager(_connectionManager).setDefaultRequestConfig(defaultRequestConfig);
+    HttpClientBuilder httpClientBuilder =
+        HttpClients.custom().setConnectionManager(_connectionManager).setDefaultRequestConfig(defaultRequestConfig);
 
     CompletionService<MultiHttpRequestResponse> completionService = new ExecutorCompletionService<>(_executor);
     CloseableHttpClient client = httpClientBuilder.build();
-    for (String url : urls) {
+    for (Pair<String, String> pair : urlsAndRequestBodies) {
       completionService.submit(() -> {
-        T httpMethod = httpRequestBaseSupplier.apply(url);
+        String url = pair.getLeft();
+        String body = pair.getRight();
+        HttpRequestBase httpMethod = httpRequestBaseSupplier.apply(url);
+        // If the http method is POST, set the request body
+        if (httpMethod instanceof HttpPost) {
+          ((HttpPost) httpMethod).setEntity(new StringEntity(body));
+        }
         if (requestHeaders != null) {
           requestHeaders.forEach(((HttpRequestBase) httpMethod)::setHeader);
         }
