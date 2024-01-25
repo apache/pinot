@@ -1019,7 +1019,8 @@ public class QueryGenerator {
       List<String> columnValues = _columnToValueList.get(columnName);
       String value = pickRandom(columnValues);
       // do regex only for string type
-      if (value.startsWith("'") && value.endsWith("'")) {
+      // do not replace when there's single quote in between b/c it will cause escape issues.
+      if (value.startsWith("'") && value.endsWith("'") && !value.substring(1, value.length() - 1).contains("'")) {
         // replace only one character for now with .* ignore the first and last character
         int indexToReplaceWithRegex = 1 + _random.nextInt(value.length() - 2);
         String regex = value.substring(1, indexToReplaceWithRegex) + ".*" + value.substring(indexToReplaceWithRegex + 1,

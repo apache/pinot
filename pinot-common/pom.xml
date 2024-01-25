@@ -401,6 +401,10 @@
       <groupId>com.yscope.clp</groupId>
       <artifactId>clp-ffi</artifactId>
     </dependency>
+    <dependency>
+      <groupId>io.github.hakky54</groupId>
+      <artifactId>sslcontext-kickstart-for-netty</artifactId>
+    </dependency>
   </dependencies>
   <profiles>
     <profile>

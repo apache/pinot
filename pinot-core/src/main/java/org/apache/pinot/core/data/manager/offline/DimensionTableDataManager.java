@@ -87,6 +87,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
   private final AtomicInteger _loadToken = new AtomicInteger();
 
   private boolean _disablePreload = false;
+  private boolean _errorOnDuplicatePrimaryKey = false;
 
   @Override
   protected void doInit() {
@@ -103,6 +104,7 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
       DimensionTableConfig dimensionTableConfig = tableConfig.getDimensionTableConfig();
       if (dimensionTableConfig != null) {
         _disablePreload = dimensionTableConfig.isDisablePreload();
+        _errorOnDuplicatePrimaryKey = dimensionTableConfig.isErrorOnDuplicatePrimaryKey();
       }
     }
 
@@ -211,7 +213,12 @@ public class DimensionTableDataManager extends OfflineTableDataManager {
               }
               GenericRow row = new GenericRow();
               recordReader.getRecord(i, row);
-              lookupTable.put(row.getPrimaryKey(primaryKeyColumns), row);
+              GenericRow previousRow = lookupTable.put(row.getPrimaryKey(primaryKeyColumns), row);
+              if (_errorOnDuplicatePrimaryKey && previousRow != null) {
+                throw new IllegalStateException(
+                    "Caught exception while reading records from segment: " + indexSegment.getSegmentName()
+                        + "primary key already exist for: " + row.getPrimaryKey(primaryKeyColumns));
+              }
             }
           } catch (Exception e) {
             throw new RuntimeException(

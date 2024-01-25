@@ -95,7 +95,7 @@ public class PinotRealtimeTableResource {
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.pauseConsumption(tableNameWithType)).build();
     } catch (Exception e) {
@@ -109,17 +109,26 @@ public class PinotRealtimeTableResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Resume consumption of a realtime table", notes =
       "Resume the consumption for a realtime table. ConsumeFrom parameter indicates from which offsets "
-          + "consumption should resume. If consumeFrom parameter is not provided, consumption continues based on the "
-          + "offsets in segment ZK metadata, and in case the offsets are already gone, the first available offsets are "
-          + "picked to minimize the data loss.")
+          + "consumption should resume. Recommended value is 'lastConsumed', which indicates consumption should "
+          + "continue based on the offsets in segment ZK metadata, and in case the offsets are already gone, the first "
+          + "available offsets are picked to minimize the data loss.")
   public Response resumeConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "smallest | largest") @QueryParam("consumeFrom") String consumeFrom) {
+      @ApiParam(
+          value = "lastConsumed (safer) | smallest (repeat rows) | largest (miss rows)",
+          allowableValues = "lastConsumed, smallest, largest",
+          defaultValue = "lastConsumed"
+      )
+      @QueryParam("consumeFrom") String consumeFrom) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
+    if ("lastConsumed".equalsIgnoreCase(consumeFrom)) {
+      consumeFrom = null;
+    }
     if (consumeFrom != null && !consumeFrom.equalsIgnoreCase("smallest") && !consumeFrom.equalsIgnoreCase("largest")) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("consumeFrom param '%s' is not valid.", consumeFrom), Response.Status.BAD_REQUEST);
+          String.format("consumeFrom param '%s' is not valid. Valid values are 'lastConsumed', 'smallest' and "
+                  + "'largest'.", consumeFrom), Response.Status.BAD_REQUEST);
     }
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom)).build();
@@ -136,15 +145,26 @@ public class PinotRealtimeTableResource {
       notes = "Force commit the current segments in consuming state and restart consumption. "
           + "This should be used after schema/table config changes. "
           + "Please note that this is an asynchronous operation, "
-          + "and 200 response does not mean it has actually been done already")
+          + "and 200 response does not mean it has actually been done already."
+          + "If specific partitions or consuming segments are provided, "
+          + "only those partitions or consuming segments will be force committed.")
   public Map<String, String> forceCommit(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Comma separated list of partition group IDs to be committed") @QueryParam("partitions")
+      String partitionGroupIds,
+      @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
+      String consumingSegments) {
+    if (partitionGroupIds != null && consumingSegments != null) {
+      throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
+          Response.Status.BAD_REQUEST);
+    }
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
     Map<String, String> response = new HashMap<>();
     try {
-      Set<String> consumingSegmentsForceCommitted = _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType);
+      Set<String> consumingSegmentsForceCommitted =
+          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments);
       response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();
@@ -209,7 +229,7 @@ public class PinotRealtimeTableResource {
   public Response getPauseStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    validate(tableNameWithType);
+    validateTable(tableNameWithType);
     try {
       return Response.ok().entity(_pinotLLCRealtimeSegmentManager.getPauseStatus(tableNameWithType)).build();
     } catch (Exception e) {
@@ -249,7 +269,7 @@ public class PinotRealtimeTableResource {
     }
   }
 
-  private void validate(String tableNameWithType) {
+  private void validateTable(String tableNameWithType) {
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
     if (idealState == null) {
       throw new ControllerApplicationException(LOGGER, String.format("Table %s not found!", tableNameWithType),

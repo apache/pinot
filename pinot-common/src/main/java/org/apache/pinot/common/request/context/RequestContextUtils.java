@@ -42,6 +42,8 @@ import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
@@ -259,15 +261,38 @@ public class RequestContextUtils {
     }
   }
 
-  private static String getStringValue(Expression thriftExpression) {
-    if (thriftExpression.getType() != ExpressionType.LITERAL) {
+  public static String getStringValue(Expression thriftExpression) {
+    Literal literal = thriftExpression.getLiteral();
+    if (literal == null) {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
     }
-    if (thriftExpression.getLiteral().getSetField() == Literal._Fields.NULL_VALUE) {
-      return "null";
+    switch (literal.getSetField()) {
+      case BOOL_VALUE:
+        return Boolean.toString(literal.getBoolValue());
+      case BYTE_VALUE:
+        return Byte.toString(literal.getByteValue());
+      case SHORT_VALUE:
+        return Short.toString(literal.getShortValue());
+      case INT_VALUE:
+        return Integer.toString(literal.getIntValue());
+      case LONG_VALUE:
+        return Long.toString(literal.getLongValue());
+      case FLOAT_VALUE:
+        return Float.toString(literal.getFloatValue());
+      case DOUBLE_VALUE:
+        return Double.toString(literal.getDoubleValue());
+      case BIG_DECIMAL_VALUE:
+        return BigDecimalUtils.deserialize(literal.getBigDecimalValue()).toPlainString();
+      case STRING_VALUE:
+        return literal.getStringValue();
+      case BINARY_VALUE:
+        return BytesUtils.toHexString(literal.getBinaryValue());
+      case NULL_VALUE:
+        return "null";
+      default:
+        throw new IllegalStateException("Unsupported literal type: " + literal.getSetField());
     }
-    return thriftExpression.getLiteral().getFieldValue().toString();
   }
 
   /**

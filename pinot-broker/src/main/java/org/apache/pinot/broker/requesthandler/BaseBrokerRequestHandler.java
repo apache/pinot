@@ -95,6 +95,7 @@ import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -208,9 +209,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils for
     //       details
     String globalQueryId = getGlobalQueryId(requestId);
-    List<String> serverUrls = new ArrayList<>();
+    List<Pair<String, String>> serverUrls = new ArrayList<>();
     for (ServerInstance serverInstance : queryServers._servers) {
-      serverUrls.add(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId));
+      serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
     CompletionService<MultiHttpRequestResponse> completionService =
@@ -1496,9 +1497,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.LONG);
         row.add(literal.getLongValue());
         break;
+      case FLOAT_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.FLOAT);
+        row.add(Float.intBitsToFloat(literal.getFloatValue()));
+        break;
       case DOUBLE_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.DOUBLE);
         row.add(literal.getDoubleValue());
+        break;
+      case BIG_DECIMAL_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.BIG_DECIMAL);
+        row.add(BigDecimalUtils.deserialize(literal.getBigDecimalValue()));
         break;
       case STRING_VALUE:
         columnTypes.add(DataSchema.ColumnDataType.STRING);
@@ -1512,8 +1521,28 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
         row.add(null);
         break;
-      default:
+      case INT_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.INT_ARRAY);
+        row.add(literal.getIntArrayValue());
         break;
+      case LONG_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.LONG_ARRAY);
+        row.add(literal.getLongArrayValue());
+        break;
+      case FLOAT_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.FLOAT_ARRAY);
+        row.add(literal.getFloatArrayValue().stream().map(Float::intBitsToFloat).collect(Collectors.toList()));
+        break;
+      case DOUBLE_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.DOUBLE_ARRAY);
+        row.add(literal.getDoubleArrayValue());
+        break;
+      case STRING_ARRAY_VALUE:
+        columnTypes.add(DataSchema.ColumnDataType.STRING_ARRAY);
+        row.add(literal.getStringArrayValue());
+        break;
+      default:
+        throw new IllegalStateException("Unsupported literal: " + literal);
     }
   }
 

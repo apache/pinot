@@ -66,6 +66,14 @@ public class TypeUtils {
         if (value instanceof FloatArrayList) {
           // For ArrayAggregationFunction
           return ((FloatArrayList) value).elements();
+        } else if (value instanceof double[]) {
+          // This is due to for parsing array literal value like [0.1, 0.2, 0.3].
+          // The parsed value is stored as double[] in java, however the calcite type is FLOAT_ARRAY.
+          float[] floatArray = new float[((double[]) value).length];
+          for (int i = 0; i < floatArray.length; i++) {
+            floatArray[i] = (float) ((double[]) value)[i];
+          }
+          return floatArray;
         } else {
           return value;
         }

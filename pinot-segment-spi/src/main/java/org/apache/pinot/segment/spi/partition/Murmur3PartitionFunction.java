@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.hash.Hashing;
 import java.util.Map;
+import org.apache.commons.lang.StringUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -33,10 +34,10 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   public static final byte INVALID_CHAR = (byte) '?';
   private static final String NAME = "Murmur3";
   private static final String SEED_KEY = "seed";
-  private static final String MURMUR3_VARIANT = "variant";
+  private static final String VARIANT_KEY = "variant";
   private final int _numPartitions;
-  private final int _hashSeed;
-  private final String _variant;
+  private final int _seed;
+  private final boolean _useX64;
 
   /**
    * Constructor for the class.
@@ -45,29 +46,33 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    */
   public Murmur3PartitionFunction(int numPartitions, Map<String, String> functionConfig) {
     Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0");
-    Preconditions.checkArgument(
-        functionConfig == null || functionConfig.get(MURMUR3_VARIANT) == null || functionConfig.get(MURMUR3_VARIANT)
-            .isEmpty() || functionConfig.get(MURMUR3_VARIANT).equals("x86_32") || functionConfig.get(MURMUR3_VARIANT)
-            .equals("x64_32"), "Murmur3 variant must be either x86_32 or x64_32");
     _numPartitions = numPartitions;
 
-    // default value of the hash seed is 0.
-    _hashSeed =
-        (functionConfig == null || functionConfig.get(SEED_KEY) == null || functionConfig.get(SEED_KEY).isEmpty()) ? 0
-            : Integer.parseInt(functionConfig.get(SEED_KEY));
-
-    // default value of the murmur3 variant is x86_32.
-    _variant =
-        (functionConfig == null || functionConfig.get(MURMUR3_VARIANT) == null || functionConfig.get(MURMUR3_VARIANT)
-            .isEmpty()) ? "x86_32" : functionConfig.get(MURMUR3_VARIANT);
+    int seed = 0;
+    boolean useX64 = false;
+    if (functionConfig != null) {
+      String seedString = functionConfig.get(SEED_KEY);
+      if (StringUtils.isNotEmpty(seedString)) {
+        seed = Integer.parseInt(seedString);
+      }
+      String variantString = functionConfig.get(VARIANT_KEY);
+      if (StringUtils.isNotEmpty(variantString)) {
+        if (variantString.equals("x64_32")) {
+          useX64 = true;
+        } else {
+          Preconditions.checkArgument(variantString.equals("x86_32"),
+              "Murmur3 variant must be either x86_32 or x64_32");
+        }
+      }
+    }
+    _seed = seed;
+    _useX64 = useX64;
   }
 
   @Override
-  public int getPartition(Object value) {
-    if (_variant.equals("x86_32")) {
-      return (murmur3Hash32BitsX86(value.toString().getBytes(UTF_8), _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
-    }
-    return (murmur3Hash32BitsX64(value, _hashSeed) & Integer.MAX_VALUE) % _numPartitions;
+  public int getPartition(String value) {
+    int hash = _useX64 ? murmur3Hash32BitsX64(value, _seed) : murmur3Hash32BitsX86(value.getBytes(UTF_8), _seed);
+    return (hash & Integer.MAX_VALUE) % _numPartitions;
   }
 
   @Override
@@ -87,8 +92,8 @@ public class Murmur3PartitionFunction implements PartitionFunction {
   }
 
   @VisibleForTesting
-  int murmur3Hash32BitsX86(byte[] data, int hashSeed) {
-    return Hashing.murmur3_32_fixed(hashSeed).hashBytes(data).asInt();
+  static int murmur3Hash32BitsX86(byte[] data, int seed) {
+    return Hashing.murmur3_32_fixed(seed).hashBytes(data).asInt();
   }
 
   /**
@@ -110,14 +115,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
    * @see <a href="http://en.wikipedia.org/wiki/MurmurHash">MurmurHash entry on Wikipedia</a>
    */
 
-  private long getblock(byte[] key, int i) {
-    return ((key[i + 0] & 0x00000000000000FFL)) | ((key[i + 1] & 0x00000000000000FFL) << 8) | (
-        (key[i + 2] & 0x00000000000000FFL) << 16) | ((key[i + 3] & 0x00000000000000FFL) << 24) | (
-        (key[i + 4] & 0x00000000000000FFL) << 32) | ((key[i + 5] & 0x00000000000000FFL) << 40) | (
-        (key[i + 6] & 0x00000000000000FFL) << 48) | ((key[i + 7] & 0x00000000000000FFL) << 56);
-  }
-
-  private void bmix(State state) {
+  private static void bmix(State state) {
     state._k1 *= state._c1;
     state._k1 = (state._k1 << 23) | (state._k1 >>> 64 - 23);
     state._k1 *= state._c2;
@@ -139,7 +137,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
     state._c2 = state._c2 * 5 + 0x6bce6396;
   }
 
-  private long fmix(long k) {
+  private static long fmix(long k) {
     k ^= k >>> 33;
     k *= 0xff51afd7ed558ccdL;
     k ^= k >>> 33;
@@ -149,168 +147,8 @@ public class Murmur3PartitionFunction implements PartitionFunction {
     return k;
   }
 
-  /**
-   * Hash a value using the x64 64 bit variant of MurmurHash3
-   *
-   * @param key value to hash
-   * @param seed random value
-   * @return 64 bit hashed key
-   */
-  private long murmur3Hash64BitsX64(final byte[] key, final int seed) {
-    State state = new State();
-
-    state._h1 = 0x9368e53c2f6af274L ^ seed;
-    state._h2 = 0x586dcd208f7cd3fdL ^ seed;
-
-    state._c1 = 0x87c37b91114253d5L;
-    state._c2 = 0x4cf5ad432745937fL;
-
-    for (int i = 0; i < key.length / 16; i++) {
-      state._k1 = getblock(key, i * 2 * 8);
-      state._k2 = getblock(key, (i * 2 + 1) * 8);
-
-      bmix(state);
-    }
-
-    state._k1 = 0;
-    state._k2 = 0;
-
-    int tail = (key.length >>> 4) << 4;
-
-    // CHECKSTYLE:OFF
-    switch (key.length & 15) {
-      case 15:
-        state._k2 ^= (long) key[tail + 14] << 48;
-      case 14:
-        state._k2 ^= (long) key[tail + 13] << 40;
-      case 13:
-        state._k2 ^= (long) key[tail + 12] << 32;
-      case 12:
-        state._k2 ^= (long) key[tail + 11] << 24;
-      case 11:
-        state._k2 ^= (long) key[tail + 10] << 16;
-      case 10:
-        state._k2 ^= (long) key[tail + 9] << 8;
-      case 9:
-        state._k2 ^= key[tail + 8];
-      case 8:
-        state._k1 ^= (long) key[tail + 7] << 56;
-      case 7:
-        state._k1 ^= (long) key[tail + 6] << 48;
-      case 6:
-        state._k1 ^= (long) key[tail + 5] << 40;
-      case 5:
-        state._k1 ^= (long) key[tail + 4] << 32;
-      case 4:
-        state._k1 ^= (long) key[tail + 3] << 24;
-      case 3:
-        state._k1 ^= (long) key[tail + 2] << 16;
-      case 2:
-        state._k1 ^= (long) key[tail + 1] << 8;
-      case 1:
-        state._k1 ^= key[tail + 0];
-        bmix(state);
-    }
-
-    // CHECKSTYLE:ON
-    state._h2 ^= key.length;
-
-    state._h1 += state._h2;
-    state._h2 += state._h1;
-
-    state._h1 = fmix(state._h1);
-    state._h2 = fmix(state._h2);
-
-    state._h1 += state._h2;
-    state._h2 += state._h1;
-
-    return state._h1;
-  }
-
-  /**
-   * Hash a value using the x64 32 bit variant of MurmurHash3
-   *
-   * @param key value to hash
-   * @param seed random value
-   * @return 32 bit hashed key
-   */
-  private int murmur3Hash32BitsX64(final byte[] key, final int seed) {
-    return (int) (murmur3Hash64BitsX64(key, seed) >>> 32);
-  }
-
-  private long murmur3Hash64BitsX64(final long[] key, final int seed) {
-    // Exactly the same as MurmurHash3_x64_128, except it only returns state.h1
-    State state = new State();
-
-    state._h1 = 0x9368e53c2f6af274L ^ seed;
-    state._h2 = 0x586dcd208f7cd3fdL ^ seed;
-
-    state._c1 = 0x87c37b91114253d5L;
-    state._c2 = 0x4cf5ad432745937fL;
-
-    for (int i = 0; i < key.length / 2; i++) {
-      state._k1 = key[i * 2];
-      state._k2 = key[i * 2 + 1];
-
-      bmix(state);
-    }
-
-    long tail = key[key.length - 1];
-
-    if (key.length % 2 != 0) {
-      state._k1 ^= tail;
-      bmix(state);
-    }
-
-    state._h2 ^= key.length * 8;
-
-    state._h1 += state._h2;
-    state._h2 += state._h1;
-
-    state._h1 = fmix(state._h1);
-    state._h2 = fmix(state._h2);
-
-    state._h1 += state._h2;
-    state._h2 += state._h1;
-
-    return state._h1;
-  }
-
-  /**
-   * Hash a value using the x64 32 bit variant of MurmurHash3
-   *
-   * @param key value to hash
-   * @param seed random value
-   * @return 32 bit hashed key
-   */
-  private int murmur3Hash32BitsX64(final long[] key, final int seed) {
-    return (int) (murmur3Hash64BitsX64(key, seed) >>> 32);
-  }
-
   @VisibleForTesting
-  int murmur3Hash32BitsX64(Object o, int seed) {
-    if (o instanceof byte[]) {
-      return murmur3Hash32BitsX64((byte[]) o, seed);
-    } else if (o instanceof long[]) {
-      return murmur3Hash32BitsX64((long[]) o, seed);
-    } else if (o instanceof String) {
-      return murmur3Hash32BitsX64((String) o, seed);
-    } else {
-      // Differing from the source implementation here. The default case in the source implementation is to apply the
-      // hash on the hashcode of the object. The hashcode of an object is not guaranteed to be consistent across JVMs
-      // (except for String values), so we cannot guarantee the same value as the data source. Since we cannot
-      // guarantee similar values, we will instead apply the hash on the string representation of the object, which
-      // aligns with the rest of our code base.
-      return murmur3Hash32BitsX64(o.toString(), seed);
-    }
-  }
-
-  private int murmur3Hash32BitsX64(String s, int seed) {
-    return (int) (murmur3Hash32BitsX64String(s, seed) >> 32);
-  }
-
-  private long murmur3Hash32BitsX64String(String s, long seed) {
-    // Exactly the same as MurmurHash3_x64_64, except it works directly on a String's chars
+  static int murmur3Hash32BitsX64(String s, int seed) {
     State state = new State();
 
     state._h1 = 0x9368e53c2f6af274L ^ seed;
@@ -370,13 +208,10 @@ public class Murmur3PartitionFunction implements PartitionFunction {
       }
     }
 
-    // CHECKSTYLE:ON
     long savedK1 = state._k1;
     long savedK2 = state._k2;
     state._k1 = 0;
     state._k2 = 0;
-
-    // CHECKSTYLE:OFF
     switch (byteLen & 15) {
       case 15:
         state._k2 ^= (long) ((byte) (savedK2 >> 48)) << 48;
@@ -411,6 +246,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
         bmix(state);
     }
     // CHECKSTYLE:ON
+
     state._h2 ^= byteLen;
 
     state._h1 += state._h2;
@@ -422,10 +258,10 @@ public class Murmur3PartitionFunction implements PartitionFunction {
     state._h1 += state._h2;
     state._h2 += state._h1;
 
-    return state._h1;
+    return (int) (state._h1 >> 32);
   }
 
-  private void addByte(State state, byte b, int len) {
+  private static void addByte(State state, byte b, int len) {
     int shift = (len & 0x7) * 8;
     long bb = (b & 0xffL) << shift;
     if ((len & 0x8) == 0) {
@@ -440,7 +276,7 @@ public class Murmur3PartitionFunction implements PartitionFunction {
     }
   }
 
-  static class State {
+  private static class State {
     long _h1;
     long _h2;
 

@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.HelixDataAccessor;
@@ -439,17 +440,26 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
     boolean shouldUpdateBrokerResource = false;
-    String brokerTag = null;
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags.isEmpty()) {
       // This is a new broker (first time joining the cluster)
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
-        brokerTag = TagNameUtils.getBrokerTagForTenant(null);
+        instanceConfig.addTag(TagNameUtils.getBrokerTagForTenant(null));
         shouldUpdateBrokerResource = true;
       } else {
-        brokerTag = Helix.UNTAGGED_BROKER_INSTANCE;
+        String instanceTagsConfig = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_INSTANCE_TAGS);
+        if (StringUtils.isNotEmpty(instanceTagsConfig)) {
+          for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
+            Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
+                instanceTag);
+            instanceConfig.addTag(instanceTag);
+          }
+          shouldUpdateBrokerResource = true;
+        } else {
+          instanceConfig.addTag(Helix.UNTAGGED_BROKER_INSTANCE);
+        }
       }
-      instanceConfig.addTag(brokerTag);
+      instanceTags = instanceConfig.getTags();
       updated = true;
     }
     if (updated) {
@@ -459,10 +469,9 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       // Update broker resource to include the new broker
       long startTimeMs = System.currentTimeMillis();
       List<String> tablesAdded = new ArrayList<>();
-      HelixHelper.updateBrokerResource(_participantHelixManager, _instanceId, Collections.singletonList(brokerTag),
-          tablesAdded, null);
-      LOGGER.info("Updated broker resource for new joining broker: {} in {}ms, tables added: {}", _instanceId,
-          System.currentTimeMillis() - startTimeMs, tablesAdded);
+      HelixHelper.updateBrokerResource(_participantHelixManager, _instanceId, instanceTags, tablesAdded, null);
+      LOGGER.info("Updated broker resource for new joining broker: {} with instance tags: {} in {}ms, tables added: {}",
+          _instanceId, instanceTags, System.currentTimeMillis() - startTimeMs, tablesAdded);
     }
   }
 

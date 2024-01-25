@@ -51,7 +51,9 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
       float value = (float) entry;
       addressSorted(value);
       if (_values.add(value)) {
-        updatePartition(value);
+        if (isPartitionEnabled()) {
+          updatePartition(Float.toString(value));
+        }
       }
 
       _totalNumberOfEntries++;

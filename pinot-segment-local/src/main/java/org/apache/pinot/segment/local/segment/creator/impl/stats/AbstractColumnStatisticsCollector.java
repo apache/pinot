@@ -110,6 +110,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    * Returns the {@link PartitionFunction} for the column.
    * @return Partition function for the column.
    */
+  @Nullable
   public PartitionFunction getPartitionFunction() {
     return _partitionFunction;
   }
@@ -143,18 +144,20 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     return _partitions;
   }
 
+  protected boolean isPartitionEnabled() {
+    return _partitionFunction != null;
+  }
+
   /**
    * Updates the partition range based on the partition of the given value.
    *
    * @param value Column value.
    */
-  protected void updatePartition(Object value) {
-    if (_partitionFunction != null) {
-      _partitions.add(_partitionFunction.getPartition(value));
-    }
+  protected void updatePartition(String value) {
+    _partitions.add(_partitionFunction.getPartition(value));
   }
 
-  void updateTotalNumberOfEntries(Object[] entries) {
+  protected void updateTotalNumberOfEntries(Object[] entries) {
     _totalNumberOfEntries += entries.length;
   }
 

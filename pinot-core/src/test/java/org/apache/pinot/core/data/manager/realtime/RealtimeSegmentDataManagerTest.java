@@ -46,13 +46,11 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -78,8 +76,7 @@ import static org.mockito.Mockito.when;
 
 // TODO Re-write this test using the stream abstraction
 public class RealtimeSegmentDataManagerTest {
-  private static final String SEGMENT_DIR = "/tmp/" + RealtimeSegmentDataManagerTest.class.getSimpleName();
-  private static final File SEGMENT_DIR_FILE = new File(SEGMENT_DIR);
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "RealtimeSegmentDataManagerTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
   private static final int PARTITION_GROUP_ID = 0;
@@ -104,7 +101,7 @@ public class RealtimeSegmentDataManagerTest {
     SegmentBuildTimeLeaseExtender.getOrCreate(instanceId, new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()),
         tableConfig.getTableName());
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
-    when(tableDataManager.getServerInstance()).thenReturn(instanceId);
+    when(tableDataManager.getInstanceId()).thenReturn(instanceId);
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
     when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
@@ -148,19 +145,22 @@ public class RealtimeSegmentDataManagerTest {
     _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));
     Schema schema = Fixtures.createSchema();
     ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-    return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager, SEGMENT_DIR, schema,
-        llcSegmentName, _partitionGroupIdToSemaphoreMap, serverMetrics, timeSupplier);
+    return new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, tableDataManager,
+        new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
+        _partitionGroupIdToSemaphoreMap, serverMetrics, timeSupplier);
   }
 
   @BeforeClass
   public void setUp() {
-    SEGMENT_DIR_FILE.deleteOnExit();
+    ServerMetrics.register(mock(ServerMetrics.class));
+
+    FileUtils.deleteQuietly(TEMP_DIR);
     SegmentBuildTimeLeaseExtender.initExecutor();
   }
 
   @AfterClass
   public void tearDown() {
-    FileUtils.deleteQuietly(SEGMENT_DIR_FILE);
+    FileUtils.deleteQuietly(TEMP_DIR);
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
   }
 
@@ -222,8 +222,7 @@ public class RealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
-        RealtimeSegmentDataManager.State.COMMITTED);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.COMMITTED);
     segmentDataManager.destroy();
   }
 
@@ -286,17 +285,17 @@ public class RealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
-        RealtimeSegmentDataManager.State.COMMITTED);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.COMMITTED);
     segmentDataManager.destroy();
   }
 
   @Test
-  public void testCommitAfterCatchupWithPeriodOffset() throws Exception {
+  public void testCommitAfterCatchupWithPeriodOffset()
+      throws Exception {
     TableConfig tableConfig = createTableConfig();
-    tableConfig.getIndexingConfig().getStreamConfigs()
-        .put(StreamConfigProperties.constructStreamProperty(
-            StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA, "fakeStream"), "2d");
+    tableConfig.getIndexingConfig().getStreamConfigs().put(
+        StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
+            "fakeStream"), "2d");
     FakeRealtimeSegmentDataManager segmentDataManager =
         createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
     RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
@@ -333,17 +332,17 @@ public class RealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
-        RealtimeSegmentDataManager.State.COMMITTED);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.COMMITTED);
     segmentDataManager.destroy();
   }
 
   @Test
-  public void testCommitAfterCatchupWithTimestampOffset() throws Exception {
+  public void testCommitAfterCatchupWithTimestampOffset()
+      throws Exception {
     TableConfig tableConfig = createTableConfig();
-    tableConfig.getIndexingConfig().getStreamConfigs()
-        .put(StreamConfigProperties.constructStreamProperty(
-            StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA, "fakeStream"), Instant.now().toString());
+    tableConfig.getIndexingConfig().getStreamConfigs().put(
+        StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
+            "fakeStream"), Instant.now().toString());
     FakeRealtimeSegmentDataManager segmentDataManager =
         createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
     RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
@@ -380,8 +379,7 @@ public class RealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertTrue(segmentDataManager._commitSegmentCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
-        RealtimeSegmentDataManager.State.COMMITTED);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.COMMITTED);
     segmentDataManager.destroy();
   }
 
@@ -405,8 +403,7 @@ public class RealtimeSegmentDataManagerTest {
     Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
     Assert.assertFalse(segmentDataManager._commitSegmentCalled);
-    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
-        RealtimeSegmentDataManager.State.DISCARDED);
+    Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), RealtimeSegmentDataManager.State.DISCARDED);
     segmentDataManager.destroy();
   }
 
@@ -800,22 +797,13 @@ public class RealtimeSegmentDataManagerTest {
     tableConfig.setUpsertConfig(null);
     ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
     when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-    TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
-    when(tableDataManagerConfig.getTableName()).thenReturn(REALTIME_TABLE_NAME);
-    when(tableDataManagerConfig.getTableType()).thenReturn(TableType.REALTIME);
-    when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
-    when(tableDataManagerConfig.getTableConfig()).thenReturn(tableConfig);
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
-    when(instanceDataManagerConfig.getMaxParallelSegmentBuilds()).thenReturn(4);
-    when(instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit()).thenReturn(-1L);
-    when(instanceDataManagerConfig.getMaxParallelSegmentDownloads()).thenReturn(-1);
-    when(instanceDataManagerConfig.isStreamSegmentDownloadUntar()).thenReturn(false);
-    TableDataManagerProvider.init(instanceDataManagerConfig);
-
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     TableDataManager tableDataManager =
-        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance", propertyStore,
-            mock(ServerMetrics.class), mock(HelixManager.class), null);
+        new TableDataManagerProvider(instanceDataManagerConfig).getTableDataManager(tableConfig, helixManager);
     tableDataManager.start();
     tableDataManager.shutDown();
     Assert.assertFalse(SegmentBuildTimeLeaseExtender.isExecutorShutdown());
@@ -838,8 +826,7 @@ public class RealtimeSegmentDataManagerTest {
       }
     };
     FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
-        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2),
-        segmentTimeThresholdMins + "m", null);
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), segmentTimeThresholdMins + "m", null);
     segmentDataManager._stubConsumeLoop = false;
     segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
@@ -1081,7 +1068,7 @@ public class RealtimeSegmentDataManagerTest {
       if (!forCommit) {
         return new SegmentBuildDescriptor(null, null, getCurrentOffset(), 0, 0, -1);
       }
-      File segmentTarFile = new File(SEGMENT_DIR, "segmentFile");
+      File segmentTarFile = new File(new File(TEMP_DIR, REALTIME_TABLE_NAME), "segmentFile");
       try {
         segmentTarFile.createNewFile();
       } catch (IOException e) {

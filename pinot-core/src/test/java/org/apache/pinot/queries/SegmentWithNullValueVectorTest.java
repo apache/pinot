@@ -31,10 +31,8 @@ import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -45,7 +43,6 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -63,12 +60,10 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
-import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -85,11 +80,9 @@ import static org.testng.Assert.assertTrue;
  * Class for testing segment generation with byte[] data type.
  */
 public class SegmentWithNullValueVectorTest {
-  private static final int NUM_ROWS = 10001;
-
-  private static final String SEGMENT_DIR_NAME =
-      System.getProperty("java.io.tmpdir") + File.separator + "nullValueVectorTest";
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentWithNullValueVectorTest");
   private static final String SEGMENT_NAME = "testSegment";
+  private static final int NUM_ROWS = 10001;
   private static final long LONG_VALUE_THRESHOLD = 100;
 
   private Random _random;
@@ -107,7 +100,6 @@ public class SegmentWithNullValueVectorTest {
   // Required for subsequent queries
   private final List<String> _segmentNames = new ArrayList<>();
   private InstanceDataManager _instanceDataManager;
-  private ServerMetrics _serverMetrics;
   private QueryExecutor _queryExecutor;
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
@@ -124,6 +116,7 @@ public class SegmentWithNullValueVectorTest {
   @BeforeClass
   public void setup()
       throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
 
     _schema = new Schema();
     _schema.addField(new DimensionFieldSpec(INT_COLUMN, FieldSpec.DataType.INT, true));
@@ -136,44 +129,28 @@ public class SegmentWithNullValueVectorTest {
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNullHandlingEnabled(true).build();
     _random = new Random(System.nanoTime());
     buildIndex(tableConfig, _schema);
-    _segment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), ReadMode.heap);
 
-    setupQueryServer();
-  }
-
-  // Registers the segment and initializes Query Executor
-  private void setupQueryServer()
-      throws ConfigurationException {
+    _segment =
+        ImmutableSegmentLoader.load(new File(new File(TEMP_DIR, OFFLINE_TABLE_NAME), SEGMENT_NAME), ReadMode.heap);
     _segmentNames.add(_segment.getSegmentName());
+
     // Mock the instance data manager
-    _serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-    TableDataManagerConfig tableDataManagerConfig = Mockito.mock(TableDataManagerConfig.class);
-    Mockito.when(tableDataManagerConfig.getTableName()).thenReturn(OFFLINE_TABLE_NAME);
-    Mockito.when(tableDataManagerConfig.getTableType()).thenReturn(TableType.OFFLINE);
-    Mockito.when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
-    when(instanceDataManagerConfig.getMaxParallelSegmentBuilds()).thenReturn(4);
-    when(instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit()).thenReturn(-1L);
-    when(instanceDataManagerConfig.getMaxParallelSegmentDownloads()).thenReturn(-1);
-    when(instanceDataManagerConfig.isStreamSegmentDownloadUntar()).thenReturn(false);
-    TableDataManagerProvider.init(instanceDataManagerConfig);
-    @SuppressWarnings("unchecked")
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     TableDataManager tableDataManager =
-        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance",
-            Mockito.mock(ZkHelixPropertyStore.class), Mockito.mock(ServerMetrics.class),
-            Mockito.mock(HelixManager.class), null);
+        new TableDataManagerProvider(instanceDataManagerConfig).getTableDataManager(tableConfig,
+            mock(HelixManager.class));
     tableDataManager.start();
     tableDataManager.addSegment(_segment);
-    _instanceDataManager = Mockito.mock(InstanceDataManager.class);
-    Mockito.when(_instanceDataManager.getTableDataManager(OFFLINE_TABLE_NAME)).thenReturn(tableDataManager);
+    _instanceDataManager = mock(InstanceDataManager.class);
+    when(_instanceDataManager.getTableDataManager(OFFLINE_TABLE_NAME)).thenReturn(tableDataManager);
 
     // Set up the query executor
     URL resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
     Assert.assertNotNull(resourceUrl);
-    PropertiesConfiguration queryExecutorConfig =
-        CommonsConfigurationUtils.fromFile(new File(resourceUrl.getFile()));
+    PropertiesConfiguration queryExecutorConfig = CommonsConfigurationUtils.fromFile(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
-    _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), _instanceDataManager, _serverMetrics);
+    _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), _instanceDataManager, ServerMetrics.get());
   }
 
   /**
@@ -186,9 +163,8 @@ public class SegmentWithNullValueVectorTest {
   private void buildIndex(TableConfig tableConfig, Schema schema)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
-
-    config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
+    config.setOutDir(new File(TEMP_DIR, OFFLINE_TABLE_NAME).getAbsolutePath());
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
@@ -295,7 +271,7 @@ public class SegmentWithNullValueVectorTest {
   }
 
   private ServerQueryRequest getQueryRequest(InstanceRequest instanceRequest) {
-    return new ServerQueryRequest(instanceRequest, _serverMetrics, System.currentTimeMillis());
+    return new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
   }
 
   /**
@@ -305,6 +281,6 @@ public class SegmentWithNullValueVectorTest {
   public void cleanup()
       throws IOException {
     _segment.destroy();
-    FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 }
