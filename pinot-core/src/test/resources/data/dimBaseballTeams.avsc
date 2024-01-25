@@ -1,8 +1,0 @@
-{"namespace": "baseballTeams.avro",
- "type": "record",
- "name": "baseballTeam",
- "fields": [
-     {"name": "teamID", "type": "string"},
-     {"name": "teamName", "type": "string"}
- ]
-}

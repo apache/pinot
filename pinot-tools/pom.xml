@@ -33,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <spark.version>3.2.1</spark.version>
+    <spark.version>3.5.0</spark.version>
     <airlift.version>0.21</airlift.version>
   </properties>
   <dependencies>
