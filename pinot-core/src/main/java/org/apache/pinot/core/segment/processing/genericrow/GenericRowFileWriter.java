@@ -38,7 +38,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *
  * TODO: Consider using ByteBuffer instead of OutputStream.
  */
-public class GenericRowFileWriter implements Closeable {
+public class GenericRowFileWriter implements Closeable, FileWriter<GenericRow> {
   private final DataOutputStream _offsetStream;
   private final BufferedOutputStream _dataStream;
   private final GenericRowSerializer _serializer;
@@ -61,6 +61,15 @@ public class GenericRowFileWriter implements Closeable {
     byte[] bytes = _serializer.serialize(genericRow);
     _dataStream.write(bytes);
     _nextOffset += bytes.length;
+  }
+
+  public long writeData(GenericRow genericRow)
+      throws IOException {
+    _offsetStream.writeLong(_nextOffset);
+    byte[] bytes = _serializer.serialize(genericRow);
+    _dataStream.write(bytes);
+    _nextOffset += bytes.length;
+    return bytes.length;
   }
 
   @Override

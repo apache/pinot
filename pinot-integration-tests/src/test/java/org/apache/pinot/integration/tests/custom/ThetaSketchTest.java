@@ -442,6 +442,17 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
       runAndAssert(query, expected);
     }
 
+    // group by sketch with filter
+    {
+      String query = "select dimValue, GET_THETA_SKETCH_ESTIMATE(THETA_SKETCH_INTERSECT( "
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName = 'gender'),"
+          + "    DISTINCT_COUNT_RAW_THETA_SKETCH(thetaSketchCol, '') FILTER (WHERE dimName != 'gender'))) "
+          + "  FROM " + getTableName() + " GROUP BY dimValue";
+      ImmutableMap<String, Integer> expected =
+          ImmutableMap.of("Female", 0, "Male", 0, "Math", 0, "History", 0, "Biology", 0);
+      runAndAssert(query, expected);
+    }
+
     // group by gender
     {
       String query = "select dimValue, distinctCountThetaSketch(thetaSketchCol) from " + getTableName()

@@ -59,4 +59,9 @@ public @interface ScalarFunction {
   boolean nullableParameters() default false;
 
   boolean isPlaceholder() default false;
+
+  /**
+   * Whether the scalar function takes various number of arguments.
+   */
+  boolean isVarArg() default false;
 }

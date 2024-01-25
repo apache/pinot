@@ -16,6 +16,10 @@
       {
         "description": "basic test case example",
         "sql": "SELECT * FROM {tbl}"
+      },
+      {
+        "description": "basic test with literal",
+        "sql": "SELECT 1 AS int, CAST(2 AS DOUBLE) AS double"
       }
     ]
   },

@@ -18,24 +18,34 @@
  */
 
 import React from 'react';
-import get from 'lodash/get';
-import has from 'lodash/has';
-import InstanceTable from './InstanceTable';
+import { startCase } from 'lodash';
+import { AsyncInstanceTable } from '../AsyncInstanceTable';
+import { InstanceType } from 'Models';
 
-const Instances = ({ instances, clusterName }) => {
-  const order = ['Controller', 'Broker', 'Server', 'Minion'];
+type Props = {
+  clusterName: string;
+  instanceType?: InstanceType;
+};
+
+
+const Instances = ({ clusterName, instanceType }: Props) => {
+  const order = [
+    InstanceType.CONTROLLER,
+    InstanceType.BROKER,
+    InstanceType.SERVER,
+    InstanceType.MINION,
+  ];
   return (
     <>
       {order
-        .filter((key) => has(instances, key))
+        .filter((key) => !instanceType || instanceType === key)
         .map((key) => {
-          const value = get(instances, key, []);
           return (
-            <InstanceTable
-              key={key}
-              name={`${key}s`}
-              instances={value}
-              clusterName={clusterName}
+            <AsyncInstanceTable
+              key={startCase(key)}
+              cluster={clusterName}
+              instanceType={key}
+              showInstanceDetails
             />
           );
         })}
