@@ -56,6 +56,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
+  private static final String DUMMY_DOWNLOAD_URL = "testable/testSegment";
   private final Map<String, String> _streamConfigs = new HashMap<>();
 
   @BeforeClass
@@ -139,7 +140,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         .thenReturn(new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, 100_000L).toZNRecord());
     SegmentZKMetadata segmentZKMetadata =
         getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 80_000_000, 90_000_000, TimeUnit.MILLISECONDS,
-            null);
+            DUMMY_DOWNLOAD_URL);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(segmentZKMetadata));
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME))
@@ -402,7 +403,8 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     assertTrue(pinotTaskConfigs.isEmpty());
 
     segmentZKMetadata1 =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 100_000, 200_000, TimeUnit.MILLISECONDS, null);
+        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 100_000, 200_000, TimeUnit.MILLISECONDS,
+            DUMMY_DOWNLOAD_URL);
     segmentZKMetadata2 =
         getSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
@@ -414,9 +416,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
 
     // last completed segment endtime ends at window end, allow
     segmentZKMetadata1 =
-        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 200_000, 86_500_000, TimeUnit.MILLISECONDS, null);
+        getSegmentZKMetadata("testTable__0__0__12345", Status.DONE, 200_000, 86_500_000, TimeUnit.MILLISECONDS,
+            DUMMY_DOWNLOAD_URL);
     segmentZKMetadata2 =
-        getSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS, null);
+        getSegmentZKMetadata("testTable__0__1__12345", Status.IN_PROGRESS, -1, -1, TimeUnit.MILLISECONDS,
+            DUMMY_DOWNLOAD_URL);
     when(mockClusterInfoProvide.getSegmentsZKMetadata(REALTIME_TABLE_NAME))
         .thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME)).thenReturn(getIdealState(REALTIME_TABLE_NAME,
