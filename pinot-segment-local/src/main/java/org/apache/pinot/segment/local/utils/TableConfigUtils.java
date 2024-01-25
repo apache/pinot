@@ -29,7 +29,6 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -706,10 +705,10 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
-    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (Objects.equals(
-            tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming(),
-            tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted())),
-        "Invalid tenant tag override used for Upsert/Dedup table");
+    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
+        tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
+            && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted()
+            == null), "Invalid tenant tag override used for Upsert/Dedup table");
 
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();

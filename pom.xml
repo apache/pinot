@@ -163,6 +163,7 @@
     <joda-time.version>2.12.5</joda-time.version>
     <testng.version>7.8.0</testng.version>
     <woodstox.version>6.4.0</woodstox.version>
+    <sslcontext.kickstart.version>8.2.0</sslcontext.kickstart.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
@@ -1413,6 +1414,12 @@
         <version>${lucene.version}</version>
       </dependency>
       <!-- Lucene dependencies end -->
+
+      <dependency>
+        <groupId>io.github.hakky54</groupId>
+        <artifactId>sslcontext-kickstart-for-netty</artifactId>
+        <version>${sslcontext.kickstart.version}</version>
+      </dependency>
 
     </dependencies>
   </dependencyManagement>

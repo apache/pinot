@@ -71,8 +71,9 @@ public class StrictReplicaGroupInstanceSelector extends ReplicaGroupInstanceSele
   private static final Logger LOGGER = LoggerFactory.getLogger(StrictReplicaGroupInstanceSelector.class);
 
   public StrictReplicaGroupInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
+      boolean useFixedReplica) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useFixedReplica);
   }
 
   /**

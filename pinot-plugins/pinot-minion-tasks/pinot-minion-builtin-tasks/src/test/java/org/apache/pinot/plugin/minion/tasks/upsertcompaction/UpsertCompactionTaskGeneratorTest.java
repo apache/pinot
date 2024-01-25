@@ -18,20 +18,17 @@
  */
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
-import java.net.URISyntaxException;
-import java.util.AbstractMap;
+import com.fasterxml.jackson.core.type.TypeReference;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.restlet.resources.ValidDocIdMetadataInfo;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
@@ -41,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.BeforeClass;
@@ -172,57 +170,6 @@ public class UpsertCompactionTaskGeneratorTest {
   }
 
   @Test
-  public void testGetValidDocIdMetadataUrls()
-      throws URISyntaxException {
-    Map<String, List<String>> serverToSegments = new HashMap<>();
-    serverToSegments.put("server1",
-        Lists.newArrayList(_completedSegment.getSegmentName(), _completedSegment2.getSegmentName()));
-    serverToSegments.put("server2", Lists.newArrayList("consumingSegment"));
-    BiMap<String, String> serverToEndpoints = HashBiMap.create(1);
-    serverToEndpoints.put("server1", "http://endpoint1");
-    serverToEndpoints.put("server2", "http://endpoint2");
-    Set<String> completedSegments = new HashSet<>();
-    completedSegments.add(_completedSegment.getSegmentName());
-    completedSegments.add(_completedSegment2.getSegmentName());
-
-    List<String> validDocIdUrls =
-        UpsertCompactionTaskGenerator.getValidDocIdMetadataUrls(serverToSegments, serverToEndpoints,
-            REALTIME_TABLE_NAME, completedSegments);
-
-    String expectedUrl =
-        String.format("%s/tables/%s/validDocIdMetadata?segmentNames=%s&segmentNames=%s", "http://endpoint1",
-            REALTIME_TABLE_NAME, _completedSegment.getSegmentName(), _completedSegment2.getSegmentName());
-    assertEquals(validDocIdUrls.get(0), expectedUrl);
-    assertEquals(validDocIdUrls.size(), 1);
-  }
-
-  @Test
-  public void testGetValidDocIdMetadataUrlsWithReplicatedSegments()
-      throws URISyntaxException {
-    Map<String, List<String>> serverToSegments = new LinkedHashMap<>();
-    serverToSegments.put("server1",
-        Lists.newArrayList(_completedSegment.getSegmentName(), _completedSegment2.getSegmentName()));
-    serverToSegments.put("server2",
-        Lists.newArrayList(_completedSegment.getSegmentName(), _completedSegment2.getSegmentName()));
-    BiMap<String, String> serverToEndpoints = HashBiMap.create(1);
-    serverToEndpoints.put("server1", "http://endpoint1");
-    serverToEndpoints.put("server2", "http://endpoint2");
-    Set<String> completedSegments = new HashSet<>();
-    completedSegments.add(_completedSegment.getSegmentName());
-    completedSegments.add(_completedSegment2.getSegmentName());
-
-    List<String> validDocIdUrls =
-        UpsertCompactionTaskGenerator.getValidDocIdMetadataUrls(serverToSegments, serverToEndpoints,
-            REALTIME_TABLE_NAME, completedSegments);
-
-    String expectedUrl =
-        String.format("%s/tables/%s/validDocIdMetadata?segmentNames=%s&segmentNames=%s", "http://endpoint1",
-            REALTIME_TABLE_NAME, _completedSegment.getSegmentName(), _completedSegment2.getSegmentName());
-    assertEquals(validDocIdUrls.get(0), expectedUrl);
-    assertEquals(validDocIdUrls.size(), 1);
-  }
-
-  @Test
   public void testGetMaxTasks() {
     Map<String, String> taskConfigs = new HashMap<>();
     taskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "10");
@@ -234,16 +181,20 @@ public class UpsertCompactionTaskGeneratorTest {
   }
 
   @Test
-  public void testProcessValidDocIdMetadata() {
+  public void testProcessValidDocIdMetadata()
+      throws IOException {
     Map<String, String> compactionConfigs = getCompactionConfigs("1", "10");
-    Set<Map.Entry<String, String>> responseSet = new HashSet<>();
+    List<ValidDocIdMetadataInfo> validDocIdMetadataInfoList = new ArrayList<>();
     String json = "[{" + "\"totalValidDocs\" : 50," + "\"totalInvalidDocs\" : 50," + "\"segmentName\" : \""
         + _completedSegment.getSegmentName() + "\"," + "\"totalDocs\" : 100" + "}," + "{" + "\"totalValidDocs\" : 0,"
         + "\"totalInvalidDocs\" : 10," + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\","
         + "\"totalDocs\" : 10" + "}]";
-    responseSet.add(new AbstractMap.SimpleEntry<>("", json));
+    List<ValidDocIdMetadataInfo> validDocIdMetadataInfo =
+        JsonUtils.stringToObject(json, new TypeReference<ArrayList<ValidDocIdMetadataInfo>>() {
+        });
     UpsertCompactionTaskGenerator.SegmentSelectionResult segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap, responseSet);
+        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap,
+            validDocIdMetadataInfo);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
         _completedSegment.getSegmentName());
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0), _completedSegment2.getSegmentName());
@@ -251,20 +202,23 @@ public class UpsertCompactionTaskGeneratorTest {
     // test with a higher invalidRecordsThresholdPercent
     compactionConfigs = getCompactionConfigs("60", "10");
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap, responseSet);
+        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap,
+            validDocIdMetadataInfo);
     assertTrue(segmentSelectionResult.getSegmentsForCompaction().isEmpty());
 
     // test without an invalidRecordsThresholdPercent
     compactionConfigs = getCompactionConfigs("0", "10");
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap, responseSet);
+        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap,
+            validDocIdMetadataInfo);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
         _completedSegment.getSegmentName());
 
     // test without a invalidRecordsThresholdCount
     compactionConfigs = getCompactionConfigs("30", "0");
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap, responseSet);
+        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap,
+            validDocIdMetadataInfo);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
         _completedSegment.getSegmentName());
   }
@@ -284,7 +238,7 @@ public class UpsertCompactionTaskGeneratorTest {
   private IdealState getIdealState(String tableName, List<String> segmentNames) {
     IdealState idealState = new IdealState(tableName);
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
-    for (String segmentName: segmentNames) {
+    for (String segmentName : segmentNames) {
       idealState.setPartitionState(segmentName, "Server_0", "ONLINE");
     }
     return idealState;
