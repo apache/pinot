@@ -30,7 +30,6 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
@@ -39,7 +38,6 @@ import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -55,7 +53,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -86,12 +83,13 @@ public class QueryExecutorExceptionsTest {
   private final List<ImmutableSegment> _indexSegments = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
   private final List<String> _segmentNames = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
 
-  private ServerMetrics _serverMetrics;
   private QueryExecutor _queryExecutor;
 
   @BeforeClass
   public void setUp()
       throws Exception {
+    ServerMetrics.register(mock(ServerMetrics.class));
+
     // Set up the segments
     FileUtils.deleteQuietly(INDEX_DIR);
     assertTrue(INDEX_DIR.mkdirs());
@@ -132,21 +130,11 @@ public class QueryExecutorExceptionsTest {
     }
 
     // Mock the instance data manager
-    _serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-    TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
-    when(tableDataManagerConfig.getTableName()).thenReturn(OFFLINE_TABLE_NAME);
-    when(tableDataManagerConfig.getTableType()).thenReturn(TableType.OFFLINE);
-    when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
-    when(instanceDataManagerConfig.getMaxParallelSegmentBuilds()).thenReturn(4);
-    when(instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit()).thenReturn(-1L);
-    when(instanceDataManagerConfig.getMaxParallelSegmentDownloads()).thenReturn(-1);
-    when(instanceDataManagerConfig.isStreamSegmentDownloadUntar()).thenReturn(false);
-    TableDataManagerProvider.init(instanceDataManagerConfig);
-    @SuppressWarnings("unchecked")
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
     TableDataManager tableDataManager =
-        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance",
-            mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class), mock(HelixManager.class), null);
+        new TableDataManagerProvider(instanceDataManagerConfig).getTableDataManager(tableConfig,
+            mock(HelixManager.class));
     tableDataManager.start();
     //we don't add index segments to the data manager to simulate numSegmentsAcquired < numSegmentsQueried
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
@@ -158,7 +146,7 @@ public class QueryExecutorExceptionsTest {
     PropertiesConfiguration queryExecutorConfig =
         CommonsConfigurationUtils.fromFile(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
-    _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, _serverMetrics);
+    _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, ServerMetrics.get());
   }
 
   /**
@@ -190,6 +178,6 @@ public class QueryExecutorExceptionsTest {
   }
 
   private ServerQueryRequest getQueryRequest(InstanceRequest instanceRequest) {
-    return new ServerQueryRequest(instanceRequest, _serverMetrics, System.currentTimeMillis());
+    return new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
   }
 }

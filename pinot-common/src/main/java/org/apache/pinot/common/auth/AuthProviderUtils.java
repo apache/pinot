@@ -63,6 +63,9 @@ public final class AuthProviderUtils {
    * @return auth provider
    */
   public static AuthProvider extractAuthProvider(PinotConfiguration pinotConfig, String namespace) {
+    if (pinotConfig == null) {
+      return new NullAuthProvider();
+    }
     return makeAuthProvider(extractAuthConfig(pinotConfig, namespace));
   }
 

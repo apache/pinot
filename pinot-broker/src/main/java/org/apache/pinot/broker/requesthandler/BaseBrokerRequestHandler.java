@@ -209,9 +209,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils for
     //       details
     String globalQueryId = getGlobalQueryId(requestId);
-    List<String> serverUrls = new ArrayList<>();
+    List<Pair<String, String>> serverUrls = new ArrayList<>();
     for (ServerInstance serverInstance : queryServers._servers) {
-      serverUrls.add(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId));
+      serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
     CompletionService<MultiHttpRequestResponse> completionService =

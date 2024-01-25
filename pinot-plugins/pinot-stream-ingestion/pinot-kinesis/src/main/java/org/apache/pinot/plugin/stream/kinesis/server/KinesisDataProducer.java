@@ -87,7 +87,7 @@ public class KinesisDataProducer implements StreamDataProducer {
               .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
         } else {
           kinesisClientBuilder = KinesisClient.builder().region(Region.of(props.getProperty(REGION)))
-              .credentialsProvider(DefaultCredentialsProvider.create())
+              .credentialsProvider(DefaultCredentialsProvider.builder().build())
               .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
         }
 

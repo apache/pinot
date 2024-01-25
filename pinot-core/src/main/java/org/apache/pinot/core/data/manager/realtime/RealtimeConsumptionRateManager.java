@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -31,25 +30,36 @@ import java.time.Instant;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * This class is responsible for creating realtime consumption rate limiters. The rate limit, specified in
- * StreamConfig of table config, is for the entire topic. The effective rate limit for each partition is simply the
- * specified rate limit divided by the partition count.
+ * This class is responsible for creating realtime consumption rate limiters.
+ * It contains one rate limiter for the entire server and multiple table partition level rate limiters.
+ * Server rate limiter is used to throttle the overall consumption rate of the server and configured via
+ * cluster or server config.
+ * For table partition level rate limiter, the rate limit value specified in StreamConfig of table config, is for the
+ * entire topic. The effective rate limit for each partition is simply the specified rate limit divided by the
+ * partition count.
  * This class leverages a cache for storing partition count for different topics as retrieving partition count from
  * stream is a bit expensive and also the same count will be used of all partition consumers of the same topic.
  */
 public class RealtimeConsumptionRateManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeConsumptionRateManager.class);
   private static final int CACHE_ENTRY_EXPIRATION_TIME_IN_MINUTES = 10;
+
+  private static final String SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME =
+      ServerMeter.REALTIME_ROWS_CONSUMED.getMeterName();
+  private ConsumptionRateLimiter _serverRateLimiter = NOOP_RATE_LIMITER;
 
   // stream config object is required for fetching the partition count from the stream
   private final LoadingCache<StreamConfig, Integer> _streamConfigToTopicPartitionCountMap;
@@ -73,9 +83,28 @@ public class RealtimeConsumptionRateManager {
     _isThrottlingAllowed = true;
   }
 
+  public ConsumptionRateLimiter createServerRateLimiter(PinotConfiguration serverConfig, ServerMetrics serverMetrics) {
+    double serverRateLimit =
+        serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+            CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
+    if (serverRateLimit <= 0) {
+      LOGGER.warn("Invalid server consumption rate limit: {}, throttling is disabled", serverRateLimit);
+      _serverRateLimiter = NOOP_RATE_LIMITER;
+    } else {
+      LOGGER.info("A server consumption rate limiter is set up with rate limit: {}", serverRateLimit);
+      MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
+      _serverRateLimiter = new RateLimiterImpl(serverRateLimit, metricEmitter);
+    }
+    return _serverRateLimiter;
+  }
+
+  public ConsumptionRateLimiter getServerRateLimiter() {
+    return _serverRateLimiter;
+  }
+
   public ConsumptionRateLimiter createRateLimiter(StreamConfig streamConfig, String tableName,
       ServerMetrics serverMetrics, String metricKeyName) {
-    if (!streamConfig.getTopicConsumptionRateLimit().isPresent()) {
+    if (streamConfig.getTopicConsumptionRateLimit().isEmpty()) {
       return NOOP_RATE_LIMITER;
     }
     int partitionCount;

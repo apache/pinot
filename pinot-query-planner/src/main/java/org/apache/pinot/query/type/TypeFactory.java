@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.type;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.function.Predicate;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
@@ -39,9 +41,15 @@ import org.apache.pinot.spi.data.Schema;
  * upgrading Calcite versions.
  */
 public class TypeFactory extends JavaTypeFactoryImpl {
+  private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
 
   public TypeFactory(RelDataTypeSystem typeSystem) {
     super(typeSystem);
+  }
+
+  @Override
+  public Charset getDefaultCharset() {
+    return DEFAULT_CHARSET;
   }
 
   public RelDataType createRelDataTypeFromSchema(Schema schema) {
