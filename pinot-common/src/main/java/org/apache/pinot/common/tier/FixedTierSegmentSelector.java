@@ -61,7 +61,7 @@ public class FixedTierSegmentSelector implements TierSegmentSelector {
       SegmentZKMetadata segmentZKMetadata =
           ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType,
               segmentName);
-      Preconditions.checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}",
+      Preconditions.checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: %s of table: %s",
           segmentName, tableNameWithType);
       return segmentZKMetadata.getStatus().isCompleted();
     }
