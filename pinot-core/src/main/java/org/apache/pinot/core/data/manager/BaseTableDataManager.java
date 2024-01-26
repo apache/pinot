@@ -937,11 +937,4 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
   }
-
-  private static PinotConfiguration toPinotConfiguration(Configuration configuration) {
-    if (configuration == null) {
-      return new PinotConfiguration();
-    }
-    return new PinotConfiguration((Map<String, Object>) (Map) ConfigurationConverter.getMap(configuration));
-  }
 }
