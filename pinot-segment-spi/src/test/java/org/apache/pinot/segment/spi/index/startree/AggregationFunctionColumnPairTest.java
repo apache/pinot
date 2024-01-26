@@ -28,20 +28,18 @@ import static org.testng.AssertJUnit.assertEquals;
 public class AggregationFunctionColumnPairTest {
 
   @Test
-  public void testResolveToAggregatedType() {
+  public void testResolveToStoredType() {
     assertEquals(AggregationFunctionColumnPair.fromColumnName("distinctCountThetaSketch__dimX"),
         AggregationFunctionColumnPair.resolveToStoredType(
             AggregationFunctionColumnPair.fromColumnName("distinctCountRawThetaSketch__dimX")));
     assertEquals(AggregationFunctionColumnPair.fromColumnName("count__*"),
-        AggregationFunctionColumnPair.resolveToStoredType(
-            AggregationFunctionColumnPair.fromColumnName("count__*")));
+        AggregationFunctionColumnPair.resolveToStoredType(AggregationFunctionColumnPair.fromColumnName("count__*")));
     assertEquals(AggregationFunctionColumnPair.fromColumnName("sum__dimY"),
-        AggregationFunctionColumnPair.resolveToStoredType(
-            AggregationFunctionColumnPair.fromColumnName("sum__dimY")));
+        AggregationFunctionColumnPair.resolveToStoredType(AggregationFunctionColumnPair.fromColumnName("sum__dimY")));
   }
 
   @Test
-  public void testGetValueAggregationType() {
+  public void testGetStoredType() {
     assertEquals(getStoredType(AggregationFunctionType.DISTINCTCOUNTRAWHLL), AggregationFunctionType.DISTINCTCOUNTHLL);
     assertEquals(getStoredType(AggregationFunctionType.PERCENTILERAWTDIGEST),
         AggregationFunctionType.PERCENTILETDIGEST);

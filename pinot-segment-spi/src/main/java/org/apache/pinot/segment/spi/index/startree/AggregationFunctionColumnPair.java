@@ -72,10 +72,9 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
    * @param functionColumnPair the existing functionColumnPair
    * @return the new functionColumnPair
    */
-  public static AggregationFunctionColumnPair resolveToStoredType(
-      AggregationFunctionColumnPair functionColumnPair) {
-    AggregationFunctionType valueAggregationFunctionType = getStoredType(functionColumnPair.getFunctionType());
-    return new AggregationFunctionColumnPair(valueAggregationFunctionType, functionColumnPair.getColumn());
+  public static AggregationFunctionColumnPair resolveToStoredType(AggregationFunctionColumnPair functionColumnPair) {
+    AggregationFunctionType storedType = getStoredType(functionColumnPair.getFunctionType());
+    return new AggregationFunctionColumnPair(storedType, functionColumnPair.getColumn());
   }
 
   /**

@@ -63,7 +63,6 @@ public class StarTreeV2MetadataTest {
     expected.remove(rawThetaColumnPair);
     assertEquals(expected, actual);
     assertTrue(starTreeV2Metadata.containsFunctionColumnPair(thetaColumnPair));
-    assertTrue(starTreeV2Metadata.containsFunctionColumnPair(rawThetaColumnPair));
   }
 
   @Test
@@ -96,7 +95,6 @@ public class StarTreeV2MetadataTest {
     expected.remove(rawThetaColumnPair);
     assertEquals(expected, actual);
     assertTrue(starTreeV2Metadata.containsFunctionColumnPair(thetaColumnPair));
-    assertTrue(starTreeV2Metadata.containsFunctionColumnPair(rawThetaColumnPair));
   }
 
   private static Configuration createConfiguration(List<String> dimensionsSplitOrder,

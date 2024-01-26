@@ -1033,7 +1033,7 @@ public final class TableConfigUtils {
     }
 
     List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
-    HashSet<AggregationFunctionColumnPair> aggregatedTypes = new HashSet<>();
+    Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
     if (starTreeIndexConfigList != null) {
       for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
         // Dimension split order cannot be null
@@ -1050,11 +1050,10 @@ public final class TableConfigUtils {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                   + "in the form <Aggregation function>__<Column name>");
             }
-            AggregationFunctionColumnPair aggregatedType =
-                AggregationFunctionColumnPair.resolveToStoredType(columnPair);
-            if (!aggregatedTypes.add(aggregatedType)) {
+            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+            if (!storedTypes.add(storedType)) {
               LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
-                  columnPair, aggregatedType);
+                  columnPair, storedType);
             }
             String columnName = columnPair.getColumn();
             if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
@@ -1071,13 +1070,11 @@ public final class TableConfigUtils {
             } catch (Exception e) {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
             }
-            AggregationFunctionColumnPair aggregatedType =
-                AggregationFunctionColumnPair.resolveToStoredType(columnPair);
-            if (aggregatedTypes.contains(aggregatedType)) {
+            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+            if (!storedTypes.add(storedType)) {
               LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
-                  columnPair, aggregatedType);
+                  columnPair, storedType);
             }
-            aggregatedTypes.add(aggregatedType);
             String columnName = columnPair.getColumn();
             if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
               columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
