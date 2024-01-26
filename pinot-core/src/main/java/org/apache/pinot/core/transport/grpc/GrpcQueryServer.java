@@ -91,6 +91,10 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       throw new IllegalArgumentException("Must provide key store path for secured gRpc server");
     }
     SSLFactory sslFactory = TlsUtils.createSSLFactory(tlsConfig);
+    if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
+        && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
+      TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
+    }
     SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
         .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
     sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
