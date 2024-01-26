@@ -60,22 +60,23 @@ public class AggregationFunctionUtils {
   }
 
   /**
-   * (For Star-Tree) Creates an {@link AggregationFunctionColumnPair} from the {@link AggregationFunction}. Returns
-   * {@code null} if the {@link AggregationFunction} cannot be represented as an {@link AggregationFunctionColumnPair}
-   * (e.g. has multiple arguments, argument is not column etc.).
+   * (For Star-Tree) Creates an {@link AggregationFunctionColumnPair} in stored type from the
+   * {@link AggregationFunction}. Returns {@code null} if the {@link AggregationFunction} cannot be represented as an
+   * {@link AggregationFunctionColumnPair} (e.g. has multiple arguments, argument is not column etc.).
+   * TODO: Allow multiple arguments for aggregation functions, e.g. percentileEst
    */
   @Nullable
-  public static AggregationFunctionColumnPair getAggregationFunctionColumnPair(
-      AggregationFunction aggregationFunction) {
-    AggregationFunctionType aggregationFunctionType = aggregationFunction.getType();
-    if (aggregationFunctionType == AggregationFunctionType.COUNT) {
+  public static AggregationFunctionColumnPair getStoredFunctionColumnPair(AggregationFunction aggregationFunction) {
+    AggregationFunctionType functionType = aggregationFunction.getType();
+    if (functionType == AggregationFunctionType.COUNT) {
       return AggregationFunctionColumnPair.COUNT_STAR;
     }
     List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
     if (inputExpressions.size() == 1) {
       ExpressionContext inputExpression = inputExpressions.get(0);
       if (inputExpression.getType() == ExpressionContext.Type.IDENTIFIER) {
-        return new AggregationFunctionColumnPair(aggregationFunctionType, inputExpression.getIdentifier());
+        return new AggregationFunctionColumnPair(AggregationFunctionColumnPair.getStoredType(functionType),
+            inputExpression.getIdentifier());
       }
     }
     return null;
