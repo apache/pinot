@@ -53,17 +53,21 @@ import org.slf4j.LoggerFactory;
 public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
-  public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
   public static final String SERVER_INSTANCE_ID = "serverInstanceId";
 
   private final AtomicBoolean _shutDownInProgress = new AtomicBoolean();
   private final ServerInstance _serverInstance;
   private HttpServer _httpServer;
+  private final String _adminApiResourcePackages;
+
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
       PinotConfiguration serverConf) {
     _serverInstance = instance;
-    packages(RESOURCE_PACKAGE);
+
+    _adminApiResourcePackages = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_RESOURCE_PACKAGES,
+        CommonConstants.Server.DEFAULT_ADMIN_API_RESOURCE_PACKAGES);
+    packages(_adminApiResourcePackages);
     property(PINOT_CONFIGURATION, serverConf);
 
     register(new AbstractBinder() {
@@ -132,7 +136,7 @@ public class AdminApiApplication extends ResourceConfig {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
     }
     beanConfig.setBasePath("/");
-    beanConfig.setResourcePackage(RESOURCE_PACKAGE);
+    beanConfig.setResourcePackage(_adminApiResourcePackages);
     beanConfig.setScan(true);
     try {
       beanConfig.setHost(InetAddress.getLocalHost().getHostName());
