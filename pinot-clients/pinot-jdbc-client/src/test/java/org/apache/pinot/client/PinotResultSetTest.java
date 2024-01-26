@@ -21,6 +21,7 @@ package org.apache.pinot.client;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -147,6 +148,13 @@ public class PinotResultSetTest {
     while (pinotResultSet.next()) {
       Assert.assertEquals(pinotResultSet.getBigDecimal(7), new BigDecimal(resultSet.getString(currentRow, 6)));
       currentRow++;
+    }
+
+    // test bad values and make sure exception is thrown
+    try {
+      pinotResultSet.getBigDecimal(6);
+    } catch (SQLException e) {
+      Assert.assertTrue(e.getMessage().contains("Unable to fetch BigDecimal value"));
     }
   }
 
