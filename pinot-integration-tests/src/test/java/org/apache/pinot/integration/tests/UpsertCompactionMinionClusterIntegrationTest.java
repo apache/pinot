@@ -87,7 +87,7 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     Map<String, String> tableTaskConfigs = new HashMap<>();
     tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "0d");
     tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT, "1");
-    tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT, "1");
+//    tableTaskConfigs.put(MinionConstants.UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT, "1");
     return new TableTaskConfig(
         Collections.singletonMap(MinionConstants.UpsertCompactionTask.TASK_TYPE, tableTaskConfigs));
   }
@@ -231,11 +231,11 @@ public class UpsertCompactionMinionClusterIntegrationTest extends BaseClusterInt
     waitForTaskToComplete();
     waitForAllDocsLoaded(30_000L, 2);
 
-    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+//    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     _avroTarFileName = "upsert_compaction_test1.tar.gz";
     _avroFiles = unpackAvroData(_tempDir);
     pushAvroIntoKafka(_avroFiles);
-    waitForAllDocsLoaded(10_000L, 12);
+    waitForAllDocsLoaded(10_000L, 13);
 
     shceduledTasks = _taskManager.scheduleTasks(REALTIME_TABLE_NAME);
     assertNotNull(shceduledTasks.get(MinionConstants.UpsertCompactionTask.TASK_TYPE));

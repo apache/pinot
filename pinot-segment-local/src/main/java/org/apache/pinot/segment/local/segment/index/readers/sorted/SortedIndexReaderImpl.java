@@ -79,6 +79,11 @@ public class SortedIndexReaderImpl implements SortedIndexReader<SortedIndexReade
     } else {
       dictId = binarySearch(docId, contextDictId + 2, _cardinality - 1);
     }
+    // TODO: remove after debugging
+    if (dictId < 0) {
+      dictId = binarySearch(docId, contextDictId + 2, _cardinality - 1);
+    }
+
     context._dictId = dictId;
     context._startOffset = _reader.getInt(2 * dictId);
     context._endOffset = _reader.getInt(2 * dictId + 1);
