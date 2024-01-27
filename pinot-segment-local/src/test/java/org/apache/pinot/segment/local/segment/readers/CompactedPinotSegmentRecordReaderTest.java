@@ -85,21 +85,19 @@ public class CompactedPinotSegmentRecordReaderTest {
       validDocIds.add(i);
     }
     List<GenericRow> outputRows = new ArrayList<>();
-    List<GenericRow> rewindedOutputRows = new ArrayList<>();
+    List<GenericRow> rewoundOuputRows = new ArrayList<>();
 
-    try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(_segmentIndexDir)) {
-      CompactedPinotSegmentRecordReader compactedReader =
-          new CompactedPinotSegmentRecordReader(_segmentIndexDir, validDocIds);
-      while (compactedReader.hasNext()) {
-        outputRows.add(compactedReader.next());
-      }
-      compactedReader.rewind();
-
-      while (compactedReader.hasNext()) {
-        rewindedOutputRows.add(compactedReader.next());
-      }
-      compactedReader.close();
+    CompactedPinotSegmentRecordReader compactedReader =
+        new CompactedPinotSegmentRecordReader(_segmentIndexDir, validDocIds);
+    while (compactedReader.hasNext()) {
+      outputRows.add(compactedReader.next());
     }
+    compactedReader.rewind();
+
+    while (compactedReader.hasNext()) {
+      rewoundOuputRows.add(compactedReader.next());
+    }
+    compactedReader.close();
 
     Assert.assertEquals(outputRows.size(), NUM_ROWS / 2,
         "Number of _rows returned by CompactedPinotSegmentRecordReader is incorrect");
@@ -113,10 +111,10 @@ public class CompactedPinotSegmentRecordReaderTest {
       Assert.assertEquals(outputRow.getValue(TIME), row.getValue(TIME));
     }
 
-    Assert.assertEquals(rewindedOutputRows.size(), NUM_ROWS / 2,
+    Assert.assertEquals(rewoundOuputRows.size(), NUM_ROWS / 2,
         "Number of _rows returned by CompactedPinotSegmentRecordReader is incorrect");
-    for (int i = 0; i < rewindedOutputRows.size(); i++) {
-      GenericRow outputRow = rewindedOutputRows.get(i);
+    for (int i = 0; i < rewoundOuputRows.size(); i++) {
+      GenericRow outputRow = rewoundOuputRows.get(i);
       GenericRow row = _rows.get(i * 2);
       Assert.assertEquals(outputRow.getValue(D_SV_1), row.getValue(D_SV_1));
       Assert.assertTrue(PinotSegmentUtil.compareMultiValueColumn(outputRow.getValue(D_MV_1), row.getValue(D_MV_1)));

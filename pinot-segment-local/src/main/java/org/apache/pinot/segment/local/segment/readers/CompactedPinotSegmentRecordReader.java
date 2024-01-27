@@ -35,12 +35,14 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class CompactedPinotSegmentRecordReader implements RecordReader {
   private final PinotSegmentRecordReader _pinotSegmentRecordReader;
+  private final RoaringBitmap _validDocIdsBitmap;
+
+  // Valid doc ids iterator
   private PeekableIntIterator _validDocIdsIterator;
   // Reusable generic row to store the next row to return
   private GenericRow _nextRow = new GenericRow();
   // Flag to mark whether we need to fetch another row
   private boolean _nextRowReturned = true;
-  private RoaringBitmap _validDocIdsBitmap;
 
   public CompactedPinotSegmentRecordReader(File indexDir, RoaringBitmap validDocIds) {
     _pinotSegmentRecordReader = new PinotSegmentRecordReader();
