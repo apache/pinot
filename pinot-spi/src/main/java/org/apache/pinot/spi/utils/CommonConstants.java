@@ -569,7 +569,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String CONFIG_OF_SERVER_RESOURCE_PACKAGES = "server.restlet.api.resource.packages";
-    public static final String DEFAULT_ADMIN_API_RESOURCE_PACKAGES = "org.apache.pinot.server.api.resources";
+    public static final String DEFAULT_SERVER_RESOURCE_PACKAGES = "org.apache.pinot.server.api.resources";
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";

@@ -65,8 +65,8 @@ public class AdminApiApplication extends ResourceConfig {
       PinotConfiguration serverConf) {
     _serverInstance = instance;
 
-    _adminApiResourcePackages = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_RESOURCE_PACKAGES,
-        CommonConstants.Server.DEFAULT_ADMIN_API_RESOURCE_PACKAGES);
+    _adminApiResourcePackages = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_RESOURCE_PACKAGES,
+        CommonConstants.Server.DEFAULT_SERVER_RESOURCE_PACKAGES);
     packages(_adminApiResourcePackages);
     property(PINOT_CONFIGURATION, serverConf);
 
