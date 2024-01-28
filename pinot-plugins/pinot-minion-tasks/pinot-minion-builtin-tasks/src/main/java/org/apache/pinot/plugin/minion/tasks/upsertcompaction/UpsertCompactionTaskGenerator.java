@@ -103,8 +103,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       Map<String, TaskState> incompleteTasks =
           TaskGeneratorUtils.getIncompleteTasks(taskType, tableNameWithType, _clusterInfoAccessor);
       if (!incompleteTasks.isEmpty()) {
-        LOGGER.warn("Found incomplete tasks: {} for same table: {}. Skipping task generation.",
-            incompleteTasks.keySet(), tableNameWithType);
+        LOGGER.warn("Found incomplete tasks: {} for same table: {} and task type: {}. Skipping task generation.",
+            incompleteTasks.keySet(), tableNameWithType, taskType);
         continue;
       }
 

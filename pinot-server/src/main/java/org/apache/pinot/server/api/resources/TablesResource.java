@@ -504,14 +504,12 @@ public class TablesResource {
       // Adopt the same logic as the query execution to get the valid doc ids. 'FilterPlanNode.run()'
       // If the queryableDocId is available (upsert delete is enabled), we read the valid doc ids from it.
       // Otherwise, we read the valid doc ids.
-      MutableRoaringBitmap validDocIdSnapshot = null;
+      final MutableRoaringBitmap validDocIdSnapshot;
       if (indexSegment.getQueryableDocIds() != null) {
         validDocIdSnapshot = indexSegment.getQueryableDocIds().getMutableRoaringBitmap();
       } else if (indexSegment.getValidDocIds() != null) {
         validDocIdSnapshot = indexSegment.getValidDocIds().getMutableRoaringBitmap();
-      }
-
-      if (validDocIdSnapshot == null) {
+      } else {
         throw new WebApplicationException(
             String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
             Response.Status.NOT_FOUND);
@@ -593,19 +591,18 @@ public class TablesResource {
         // Adopt the same logic as the query execution to get the valid doc ids. 'FilterPlanNode.run()'
         // If the queryableDocId is available (upsert delete is enabled), we read the valid doc ids from it.
         // Otherwise, we read the valid doc ids.
-        MutableRoaringBitmap validDocIdSnapshot = null;
+        final MutableRoaringBitmap validDocIdSnapshot;
         if (indexSegment.getQueryableDocIds() != null) {
           validDocIdSnapshot = indexSegment.getQueryableDocIds().getMutableRoaringBitmap();
         } else if (indexSegment.getValidDocIds() != null) {
           validDocIdSnapshot = indexSegment.getValidDocIds().getMutableRoaringBitmap();
-        }
-
-        if (validDocIdSnapshot == null) {
+        } else {
           String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
               segmentDataManager.getSegmentName());
           LOGGER.warn(msg);
           throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
         }
+
         Map<String, Object> validDocIdMetadata = new HashMap<>();
         int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
         int totalValidDocs = validDocIdSnapshot.getCardinality();
