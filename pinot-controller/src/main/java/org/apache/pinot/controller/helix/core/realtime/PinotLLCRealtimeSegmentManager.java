@@ -20,6 +20,9 @@ package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -41,12 +44,14 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -59,9 +64,11 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
@@ -141,6 +148,8 @@ public class PinotLLCRealtimeSegmentManager {
   // Max time to wait for all LLC segments to complete committing their metadata while stopping the controller.
   private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
 
+  private Map<Pair<String, String>, SegmentErrorInfo> _errorCache;
+
   // TODO: make this configurable with default set to 10
   /**
    * After step 1 of segment completion is done,
@@ -207,6 +216,8 @@ public class PinotLLCRealtimeSegmentManager {
         controllerConf.getDeepStoreRetryUploadParallelism()) : null;
     _deepStoreUploadExecutorPendingSegments =
         _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
+
+    _errorCache = new HashMap<>();
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -1209,7 +1220,7 @@ public class PinotLLCRealtimeSegmentManager {
             }
             StreamPartitionMsgOffset startOffset =
                 selectStartOffset(offsetCriteria, partitionGroupId, partitionGroupIdToStartOffset,
-                    partitionGroupIdToSmallestStreamOffset, tableConfig.getTableName(), offsetFactory,
+                    partitionGroupIdToSmallestStreamOffset, tableConfig.getTableName(), latestSegmentName, offsetFactory,
                     latestSegmentZKMetadata.getStartOffset()); // segments are OFFLINE; start from beginning
             createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
                 newPartitionGroupMetadataList, instancePartitions, instanceStatesMap, segmentAssignment,
@@ -1228,8 +1239,8 @@ public class PinotLLCRealtimeSegmentManager {
                 }
                 StreamPartitionMsgOffset startOffset =
                     selectStartOffset(offsetCriteria, partitionGroupId, partitionGroupIdToStartOffset,
-                        partitionGroupIdToSmallestStreamOffset, tableConfig.getTableName(), offsetFactory,
-                        latestSegmentZKMetadata.getEndOffset());
+                        partitionGroupIdToSmallestStreamOffset, tableConfig.getTableName(), latestSegmentName,
+                        offsetFactory, latestSegmentZKMetadata.getEndOffset());
                 createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
                     newPartitionGroupMetadataList, instancePartitions, instanceStatesMap, segmentAssignment,
                     instancePartitionsMap, startOffset);
@@ -1327,7 +1338,7 @@ public class PinotLLCRealtimeSegmentManager {
   private StreamPartitionMsgOffset selectStartOffset(OffsetCriteria offsetCriteria, int partitionGroupId,
       Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToStartOffset,
       Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToSmallestStreamOffset, String tableName,
-      StreamPartitionMsgOffsetFactory offsetFactory, String startOffsetInSegmentZkMetadataStr) {
+      String segmentName, StreamPartitionMsgOffsetFactory offsetFactory, String startOffsetInSegmentZkMetadataStr) {
     if (offsetCriteria != null) {
       // use the fetched offset according to offset criteria
       return partitionGroupIdToStartOffset.get(partitionGroupId);
@@ -1340,7 +1351,14 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffsetInSegmentZkMetadata,
             streamSmallestOffset, partitionGroupId, tableName);
         _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
-        return streamSmallestOffset;
+        String message = "Data lost from offset: " + startOffsetInSegmentZkMetadata +
+                        " to: " + streamSmallestOffset +
+                        " for partition: " + partitionGroupId +
+                        " of table: " + tableName;
+
+        _errorCache.put(Pair.of(tableName, segmentName),
+            new SegmentErrorInfo(String.valueOf(System.currentTimeMillis()), message, ""));
+        return startOffsetInSegmentZkMetadata;
       }
       return startOffsetInSegmentZkMetadata;
     }
@@ -1754,4 +1772,15 @@ public class PinotLLCRealtimeSegmentManager {
   URI createSegmentPath(String rawTableName, String segmentName) {
     return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
   }
+
+  public Map<String, SegmentErrorInfo> getSegmentErrors(String tableNameWithType) {
+    if (_errorCache == null) {
+      return Collections.emptyMap();
+    } else {
+      // Filter out entries that match the table name.
+      return _errorCache.entrySet().stream().filter(map -> map.getKey().getLeft().equals(tableNameWithType))
+          .collect(Collectors.toMap(map -> map.getKey().getRight(), Map.Entry::getValue));
+    }
+  }
+
 }

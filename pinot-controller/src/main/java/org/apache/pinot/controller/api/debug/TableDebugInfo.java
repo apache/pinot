@@ -125,17 +125,21 @@ public class TableDebugInfo {
     return _brokerDebugInfos;
   }
 
-  @JsonPropertyOrder({"segmentName", "serverState"})
+  @JsonPropertyOrder({"segmentName", "serverState", "validationError"})
   public static class SegmentDebugInfo {
     private final String _segmentName;
 
     private final Map<String, SegmentState> _serverStateMap;
 
+    private final SegmentErrorInfo _validationError;
+
     @JsonCreator
     public SegmentDebugInfo(@JsonProperty("segmentName") String segmentName,
-        @JsonProperty("serverState") Map<String, SegmentState> segmentServerState) {
+        @JsonProperty("serverState") Map<String, SegmentState> segmentServerState,
+        @JsonProperty("validationError") SegmentErrorInfo validationError) {
       _segmentName = segmentName;
       _serverStateMap = segmentServerState;
+      _validationError = validationError;
     }
 
     public String getSegmentName() {
@@ -144,6 +148,10 @@ public class TableDebugInfo {
 
     public Map<String, SegmentState> getServerState() {
       return _serverStateMap;
+    }
+
+    public SegmentErrorInfo getValidationError() {
+      return _validationError;
     }
   }
 

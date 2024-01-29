@@ -295,7 +295,9 @@ public class DebugResource {
       }
     }
 
-    return new TableDebugInfo.SegmentDebugInfo(segmentName, segmentServerState);
+    Map<String, SegmentErrorInfo> segmentErrors = _pinotHelixResourceManager.getSegmentErrors(tableNameWithType);
+
+    return new TableDebugInfo.SegmentDebugInfo(segmentName, segmentServerState, segmentErrors.get(segmentName));
   }
 
   /**
@@ -329,6 +331,8 @@ public class DebugResource {
           "Caught exception when getting segment debug info for table: " + tableNameWithType);
     }
 
+    Map<String, SegmentErrorInfo> segmentErrors = pinotHelixResourceManager.getSegmentErrors(tableNameWithType);
+
     Map<String, Map<String, SegmentServerDebugInfo>> segmentsDebugInfoFromServers =
         getSegmentsDebugInfoFromServers(tableNameWithType, serverToEndpoints, serverRequestTimeoutMs);
 
@@ -359,8 +363,8 @@ public class DebugResource {
         }
       }
 
-      if (!segmentServerState.isEmpty()) {
-        result.add(new TableDebugInfo.SegmentDebugInfo(segmentName, segmentServerState));
+      if (!segmentServerState.isEmpty() || segmentErrors.containsKey(segmentName)) {
+        result.add(new TableDebugInfo.SegmentDebugInfo(segmentName, segmentServerState, segmentErrors.get(segmentName)));
       }
     }
 

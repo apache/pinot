@@ -116,6 +116,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
+import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
@@ -4095,6 +4096,9 @@ public class PinotHelixResourceManager {
     return tagMinInstanceMap;
   }
 
+  public Map<String, SegmentErrorInfo> getSegmentErrors(String tableNameWithType) {
+    return _pinotLLCRealtimeSegmentManager.getSegmentErrors(tableNameWithType);
+  }
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
