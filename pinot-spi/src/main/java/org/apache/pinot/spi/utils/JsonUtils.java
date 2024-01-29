@@ -99,6 +99,12 @@ public class JsonUtils {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
   }
 
+  public static <T> List<T> stringToList(String jsonString, Class<T> valueType)
+      throws JsonProcessingException {
+    return DEFAULT_READER.forType(DEFAULT_MAPPER.getTypeFactory().constructCollectionType(List.class, valueType))
+        .readValue(jsonString);
+  }
+
   public static <T> Pair<T, Map<String, Object>> inputStreamToObjectAndUnrecognizedProperties(
       InputStream jsonInputStream, Class<T> valueType)
       throws IOException {

@@ -574,4 +574,13 @@ public class ControllerRequestURLBuilder {
   public String forSegmentUpload() {
     return StringUtil.join("/", _baseUrl, "v2/segments");
   }
+
+  public String forTableDebugInfo(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "debug", "tables", tableName,
+        "?type=" + tableType + "&verbosity=0");
+  }
+
+  public String forSegmentDebugInfo(String tableNameWithType, String segmentName) {
+    return StringUtil.join("/", _baseUrl, "debug", tableNameWithType, segmentName);
+  }
 }

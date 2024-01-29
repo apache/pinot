@@ -72,10 +72,15 @@ public class TableDebugInfo {
   private final List<BrokerDebugInfo> _brokerDebugInfos;
 
   @JsonCreator
-  public TableDebugInfo(String tableName, TableStatus.IngestionStatus ingestionStatus,
-      TableSizeSummary tableSizeSummary, int numBrokers, int numServers, int numSegments,
-      List<SegmentDebugInfo> segmentDebugInfos, List<ServerDebugInfo> serverDebugInfos,
-      List<BrokerDebugInfo> brokerDebugInfos) {
+  public TableDebugInfo(@JsonProperty("tableName") String tableName,
+      @JsonProperty("ingestionStatus") TableStatus.IngestionStatus ingestionStatus,
+      @JsonProperty("tableSize") TableSizeSummary tableSizeSummary,
+      @JsonProperty("numBrokers") int numBrokers,
+      @JsonProperty("numServers") int numServers,
+      @JsonProperty("numSegments") int numSegments,
+      @JsonProperty("segmentDebugInfos") List<SegmentDebugInfo> segmentDebugInfos,
+      @JsonProperty("serverDebugInfos") List<ServerDebugInfo> serverDebugInfos,
+      @JsonProperty("brokerDebugInfos") List<BrokerDebugInfo> brokerDebugInfos) {
     _tableName = tableName;
     _ingestionStatus = ingestionStatus;
     _tableSizeSummary = tableSizeSummary;
@@ -271,11 +276,23 @@ public class TableDebugInfo {
   /**
    * Summary of table size - reported and estimated size.
    */
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  @JsonPropertyOrder({"reportedSize", "estimatedSize"})
   public static class TableSizeSummary {
     private final String _reportedSize;
     private final String _estimatedSize;
 
-    public TableSizeSummary(long reportedSize, long estimatedSize) {
+    @JsonCreator
+    public TableSizeSummary(@JsonProperty("reportedSize") String reportedSize,
+        @JsonProperty("estimatedSize") String estimatedSize) {
+
+      _reportedSize = reportedSize;
+      _estimatedSize = estimatedSize;
+    }
+
+    public TableSizeSummary(@JsonProperty("reportedSize") long reportedSize,
+        @JsonProperty("estimatedSize") long estimatedSize) {
 
       _reportedSize = FileUtils.byteCountToDisplaySize(reportedSize);
       _estimatedSize = FileUtils.byteCountToDisplaySize(estimatedSize);

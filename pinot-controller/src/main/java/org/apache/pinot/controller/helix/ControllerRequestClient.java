@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.api.debug.TableDebugInfo;
 import org.apache.pinot.controller.api.resources.PauseStatus;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -343,5 +344,26 @@ public class ControllerRequestClient {
       int numRealtimeServers) {
     return new Tenant(TenantRole.SERVER, tenantName, numOfflineServers + numRealtimeServers, numOfflineServers,
         numRealtimeServers).toJsonString();
+  }
+
+  public List<TableDebugInfo> getTableDebugInfo(String tableName, String tableType) throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(
+          _controllerRequestURLBuilder.forTableDebugInfo(tableName, tableType)).toURI()));
+      return JsonUtils.stringToList(response.getResponse(), TableDebugInfo.class);
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public TableDebugInfo.SegmentDebugInfo getSegmentDebugInfo(String tableNameWithType, String segmentName)
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URL(
+          _controllerRequestURLBuilder.forSegmentDebugInfo(tableNameWithType, segmentName)).toURI()));
+      return JsonUtils.stringToObject(response.getResponse(), TableDebugInfo.SegmentDebugInfo.class);
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
   }
 }

@@ -20,6 +20,7 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +39,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionInfo;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.debug.TableDebugInfo;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -187,6 +189,19 @@ public class RealtimeOffsetValidationIntegrationTest extends BaseClusterIntegrat
     return fastForwarded;
   }
 
+  private Boolean checkForValidationError(ControllerRequestClient client) throws IOException {
+    List<TableDebugInfo> debugInfos = client.getTableDebugInfo(getTableName(), "REALTIME" /*how to get this?*/);
+    assert debugInfos.size() == 1;
+
+    for (TableDebugInfo.SegmentDebugInfo segmentDebugInfo : debugInfos.get(0).getSegmentDebugInfos()) {
+      if (segmentDebugInfo.getValidationError() != null) {
+        // Do more validation
+        return true;
+      }
+    }
+    return false;
+  }
+
   @Test
   public void testProduceSecondBatch() throws Exception {
 
@@ -207,7 +222,11 @@ public class RealtimeOffsetValidationIntegrationTest extends BaseClusterIntegrat
 
     client.resumeConsumption(getTableName());
     Reporter.log("Consumption has been resumed.");
-    Thread.sleep(5000);
+
+    TestUtils.waitForCondition(() -> this.checkForValidationError(client),
+        1000L, // 1 second
+        10 * 1000L, // 10 Seconds,
+        "Validation Error was not reported in TableDebugInfo within 10 seconds.", true, null);
   }
 
   @AfterClass
