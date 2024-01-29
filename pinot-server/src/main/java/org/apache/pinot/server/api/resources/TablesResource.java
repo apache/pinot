@@ -500,15 +500,22 @@ public class TablesResource {
             String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
             Response.Status.BAD_REQUEST);
       }
-      MutableRoaringBitmap validDocIds =
-          indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
-      if (validDocIds == null) {
+
+      // Adopt the same logic as the query execution to get the valid doc ids. 'FilterPlanNode.run()'
+      // If the queryableDocId is available (upsert delete is enabled), we read the valid doc ids from it.
+      // Otherwise, we read the valid doc ids.
+      final MutableRoaringBitmap validDocIdSnapshot;
+      if (indexSegment.getQueryableDocIds() != null) {
+        validDocIdSnapshot = indexSegment.getQueryableDocIds().getMutableRoaringBitmap();
+      } else if (indexSegment.getValidDocIds() != null) {
+        validDocIdSnapshot = indexSegment.getValidDocIds().getMutableRoaringBitmap();
+      } else {
         throw new WebApplicationException(
             String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
             Response.Status.NOT_FOUND);
       }
 
-      byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIds);
+      byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       Response.ResponseBuilder builder = Response.ok(validDocIdsBytes);
       builder.header(HttpHeaders.CONTENT_LENGTH, validDocIdsBytes.length);
       return builder.build();
@@ -580,17 +587,25 @@ public class TablesResource {
           LOGGER.warn(msg);
           continue;
         }
-        MutableRoaringBitmap validDocIds =
-            indexSegment.getValidDocIds() != null ? indexSegment.getValidDocIds().getMutableRoaringBitmap() : null;
-        if (validDocIds == null) {
+
+        // Adopt the same logic as the query execution to get the valid doc ids. 'FilterPlanNode.run()'
+        // If the queryableDocId is available (upsert delete is enabled), we read the valid doc ids from it.
+        // Otherwise, we read the valid doc ids.
+        final MutableRoaringBitmap validDocIdSnapshot;
+        if (indexSegment.getQueryableDocIds() != null) {
+          validDocIdSnapshot = indexSegment.getQueryableDocIds().getMutableRoaringBitmap();
+        } else if (indexSegment.getValidDocIds() != null) {
+          validDocIdSnapshot = indexSegment.getValidDocIds().getMutableRoaringBitmap();
+        } else {
           String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
               segmentDataManager.getSegmentName());
           LOGGER.warn(msg);
           throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
         }
+
         Map<String, Object> validDocIdMetadata = new HashMap<>();
         int totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
-        int totalValidDocs = validDocIds.getCardinality();
+        int totalValidDocs = validDocIdSnapshot.getCardinality();
         int totalInvalidDocs = totalDocs - totalValidDocs;
         validDocIdMetadata.put("segmentName", segmentDataManager.getSegmentName());
         validDocIdMetadata.put("totalDocs", totalDocs);

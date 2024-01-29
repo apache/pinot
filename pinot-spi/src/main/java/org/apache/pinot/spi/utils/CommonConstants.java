@@ -44,6 +44,7 @@ public class CommonConstants {
   public static final String UNKNOWN = "unknown";
   public static final String CONFIG_OF_METRICS_FACTORY_CLASS_NAME = "factory.className";
   public static final String CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME = "factory.className";
+  public static final String CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS = "request.context.tracked.header.keys";
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
   public static final String DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME =
@@ -568,6 +569,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.server.swagger.use.https";
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
+    public static final String CONFIG_OF_SERVER_RESOURCE_PACKAGES = "server.restlet.api.resource.packages";
+    public static final String DEFAULT_SERVER_RESOURCE_PACKAGES = "org.apache.pinot.server.api.resources";
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";

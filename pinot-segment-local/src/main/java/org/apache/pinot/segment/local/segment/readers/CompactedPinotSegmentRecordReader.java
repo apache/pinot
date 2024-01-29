@@ -35,15 +35,19 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class CompactedPinotSegmentRecordReader implements RecordReader {
   private final PinotSegmentRecordReader _pinotSegmentRecordReader;
-  private final PeekableIntIterator _validDocIdsIterator;
+  private final RoaringBitmap _validDocIdsBitmap;
+
+  // Valid doc ids iterator
+  private PeekableIntIterator _validDocIdsIterator;
   // Reusable generic row to store the next row to return
-  GenericRow _nextRow = new GenericRow();
+  private GenericRow _nextRow = new GenericRow();
   // Flag to mark whether we need to fetch another row
-  boolean _nextRowReturned = true;
+  private boolean _nextRowReturned = true;
 
   public CompactedPinotSegmentRecordReader(File indexDir, RoaringBitmap validDocIds) {
     _pinotSegmentRecordReader = new PinotSegmentRecordReader();
     _pinotSegmentRecordReader.init(indexDir, null, null);
+    _validDocIdsBitmap = validDocIds;
     _validDocIdsIterator = validDocIds.getIntIterator();
   }
 
@@ -96,6 +100,7 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
       throws IOException {
     _pinotSegmentRecordReader.rewind();
     _nextRowReturned = true;
+    _validDocIdsIterator = _validDocIdsBitmap.getIntIterator();
   }
 
   @Override
