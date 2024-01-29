@@ -199,17 +199,18 @@ public class TlsUtilsTest {
     TlsUtils.registerFile(watchService, watchKeyPathMap, TLS_KEYSTORE_FILE_PATH);
     TlsUtils.registerFile(watchService, watchKeyPathMap, TLS_TRUSTSTORE_FILE_PATH);
 
-    // wait for the thread to start
-    Thread.sleep(1000);
+    // wait for the new thread to start
+    Thread.sleep(100);
 
     // update tls files
     copyResourceFilesToTempFolder(
         ImmutableMap.of(TLS_KEYSTORE_UPDATED_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_UPDATED_FILE,
             TLS_TRUSTSTORE_FILE));
 
-    // wait for the thread to reload the ssl factory
+    // wait for the file change event to be detected
     watchService.take();
-    Thread.sleep(1000);
+    // it will take some time for the thread to be notified and reload the ssl factory
+    Thread.sleep(500);
     executorService.shutdown();
 
     // after tls file update, the returned values should be the same, since the wrapper is the same
