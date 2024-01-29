@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -70,6 +71,11 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
   @Override
   public void stop() {
+  }
+
+  @Override
+  public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
+    return null;
   }
 
   @Override

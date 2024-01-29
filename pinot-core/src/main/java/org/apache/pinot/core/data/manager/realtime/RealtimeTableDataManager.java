@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -701,6 +702,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @VisibleForTesting
   public TableUpsertMetadataManager getTableUpsertMetadataManager() {
     return _tableUpsertMetadataManager;
+  }
+
+  /**
+   * Retrieves a mapping of partition id to the primary key count for the partition.
+   *
+   * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition.
+   */
+  public Map<Integer, Long> getUpsertPartitionToPrimaryKeyCount() {
+    if (isUpsertEnabled()) {
+      return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
+    }
+    return new HashMap<>();
   }
 
   /**

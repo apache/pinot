@@ -110,6 +110,7 @@ public class ServerSegmentMetadataReader {
     final Map<String, Double> columnCardinalityMap = new HashMap<>();
     final Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     final Map<String, Map<String, Double>> columnIndexSizeMap = new HashMap<>();
+    final Map<Integer, Long> upsertPartitionToPrimaryKeyCountMap = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         TableMetadataInfo tableMetadataInfo =
@@ -126,6 +127,8 @@ public class ServerSegmentMetadataReader {
           }
           return l;
         }));
+        tableMetadataInfo.getUpsertPartitionToPrimaryKeyCountMap()
+            .forEach((k, v) -> upsertPartitionToPrimaryKeyCountMap.merge(k, v, Long::sum));
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
@@ -140,16 +143,17 @@ public class ServerSegmentMetadataReader {
       return v;
     });
 
-    // Since table segments may have multiple replicas, divide diskSizeInBytes, numRows and numSegments by numReplica
-    // to avoid double counting, for columnAvgLengthMap, columnAvgCardinalityMap and maxNumMultiValuesMap, dividing by
-    // numReplica is not needed since totalNumSegments already contains replicas.
+    // Since table segments may have multiple replicas, divide diskSizeInBytes, numRows, numSegments and primary key
+    // count by numReplica to avoid double counting, for columnAvgLengthMap, columnAvgCardinalityMap and
+    // maxNumMultiValuesMap, dividing by numReplica is not needed since totalNumSegments already contains replicas.
     totalDiskSizeInBytes /= numReplica;
     totalNumSegments /= numReplica;
     totalNumRows /= numReplica;
+    upsertPartitionToPrimaryKeyCountMap.replaceAll((k, v) -> v / numReplica);
 
     TableMetadataInfo aggregateTableMetadataInfo =
         new TableMetadataInfo(tableNameWithType, totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
-            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap);
+            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap, upsertPartitionToPrimaryKeyCountMap);
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
           serverUrls.size());

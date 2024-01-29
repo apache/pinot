@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.Closeable;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -46,6 +47,13 @@ public interface TableUpsertMetadataManager extends Closeable {
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
    */
   void stop();
+
+  /**
+   * Retrieves a mapping of partition id to the primary key count for the partition.
+   *
+   * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition
+   */
+  Map<Integer, Long> getPartitionToPrimaryKeyCount();
 
   boolean isPreloading();
 }
