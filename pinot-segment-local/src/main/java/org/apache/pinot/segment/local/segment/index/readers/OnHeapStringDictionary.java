@@ -21,9 +21,11 @@ package org.apache.pinot.segment.local.segment.index.readers;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.FALFInterner;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -42,7 +44,8 @@ public class OnHeapStringDictionary extends BaseImmutableDictionary {
   private final byte[][] _unpaddedBytes;
   private final Object2IntOpenHashMap<String> _unPaddedStringToIdMap;
 
-  public OnHeapStringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
+  public OnHeapStringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue,
+      @Nullable FALFInterner<String> strInterner, @Nullable FALFInterner<byte[]> byteInterner) {
     super(dataBuffer, length, numBytesPerValue);
 
     _unpaddedBytes = new byte[length][];
@@ -51,9 +54,17 @@ public class OnHeapStringDictionary extends BaseImmutableDictionary {
     _unPaddedStringToIdMap.defaultReturnValue(Dictionary.NULL_VALUE_INDEX);
 
     byte[] buffer = new byte[numBytesPerValue];
+    boolean enableInterning = strInterner != null && byteInterner != null;
+
     for (int i = 0; i < length; i++) {
-      _unpaddedBytes[i] = getUnpaddedBytes(i, buffer);
-      _unpaddedStrings[i] = new String(_unpaddedBytes[i], UTF_8);
+      if (enableInterning) {
+        _unpaddedBytes[i] = byteInterner.intern(getUnpaddedBytes(i, buffer));
+        _unpaddedStrings[i] = strInterner.intern(new String(_unpaddedBytes[i], UTF_8));
+      } else {
+        _unpaddedBytes[i] = getUnpaddedBytes(i, buffer);
+        _unpaddedStrings[i] = new String(_unpaddedBytes[i], UTF_8);
+      }
+
       _unPaddedStringToIdMap.put(_unpaddedStrings[i], i);
     }
   }

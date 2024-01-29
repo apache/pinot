@@ -2765,7 +2765,7 @@ public class PinotHelixResourceManager {
       throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
     }
     Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentName);
-    Preconditions.checkState(instanceStateMap != null, "Segment: {} does not exist in the ideal state of table: {}",
+    Preconditions.checkState(instanceStateMap != null, "Segment: %s does not exist in the ideal state of table: %s",
         segmentName, tableNameWithType);
     Set<String> servers = new TreeSet<>();
     for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {

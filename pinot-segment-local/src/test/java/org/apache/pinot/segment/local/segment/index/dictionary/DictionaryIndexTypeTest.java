@@ -21,12 +21,14 @@ package org.apache.pinot.segment.local.segment.index.dictionary;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.Intern;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -38,7 +40,8 @@ public class DictionaryIndexTypeTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(DictionaryIndexConfig expected) {
-      Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.dictionary()), expected);
+      DictionaryIndexConfig actualConfig = getActualConfig("dimInt", StandardIndexes.dictionary());
+      Assert.assertEquals(actualConfig, expected);
     }
 
     @Test
@@ -132,7 +135,7 @@ public class DictionaryIndexTypeTest {
         throws IOException {
       _tableConfig.getIndexingConfig()
           .setOnHeapDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
-      assertEquals(new DictionaryIndexConfig(true, null));
+      assertEquals(new DictionaryIndexConfig(true, null, null));
     }
 
     @Test
@@ -140,7 +143,7 @@ public class DictionaryIndexTypeTest {
         throws IOException {
       _tableConfig.getIndexingConfig()
           .setVarLengthDictionaryColumns(JsonUtils.stringToObject("[\"dimInt\"]", _stringListTypeRef));
-      assertEquals(new DictionaryIndexConfig(false, true));
+      assertEquals(new DictionaryIndexConfig(false, true, null));
     }
 
     @Test
@@ -176,7 +179,7 @@ public class DictionaryIndexTypeTest {
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(true, true));
+      assertEquals(new DictionaryIndexConfig(true, true, null));
     }
 
     @Test
@@ -191,7 +194,60 @@ public class DictionaryIndexTypeTest {
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(true, false));
+      assertEquals(new DictionaryIndexConfig(true, false, null));
+    }
+
+    @Test
+    public void newOnHeapWithInternConfig()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"indexes\" : {\n"
+          + "      \"dictionary\": {\n"
+          + "        \"onHeap\": true,\n"
+          + "        \"intern\": {\n"
+          + "          \"capacity\":1000\n"
+          + "        }"
+          + "      }"
+          + "    }\n"
+          + " }");
+      assertEquals(new DictionaryIndexConfig(true, false, new Intern(1000)));
+    }
+
+    @Test
+    public void newDisabledOnHeapWithInternConfig()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"indexes\" : {\n"
+          + "      \"dictionary\": {\n"
+          + "        \"onHeap\": false,\n"
+          + "        \"intern\": {\n"
+          + "          \"capacity\":1000\n"
+          + "        }"
+          + "      }"
+          + "    }\n"
+          + " }");
+      assertThrows(UncheckedIOException.class, () -> getActualConfig("dimInt", StandardIndexes.dictionary()));
+    }
+
+    @Test
+    public void newOnHeapWithEmptyConfig()
+        throws IOException {
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"indexes\" : {\n"
+          + "      \"dictionary\": {\n"
+          + "        \"onHeap\": true,\n"
+          + "        \"intern\": {\n"
+          + "        }"
+          + "      }"
+          + "    }\n"
+          + " }");
+      assertThrows(UncheckedIOException.class, () -> getActualConfig("dimInt", StandardIndexes.dictionary()));
     }
 
     @Test
@@ -205,7 +261,7 @@ public class DictionaryIndexTypeTest {
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(false, false));
+      assertEquals(new DictionaryIndexConfig(false, false, null));
     }
 
     @Test
@@ -220,7 +276,7 @@ public class DictionaryIndexTypeTest {
           + "      }"
           + "    }\n"
           + " }");
-      assertEquals(new DictionaryIndexConfig(false, true));
+      assertEquals(new DictionaryIndexConfig(false, true, null));
     }
 
     @Test
