@@ -268,7 +268,10 @@ public class ClpRewriterTest {
     // Flatten any AND expressions in the rewritten query.
     // NOTE: The rewritten query may have nested AND conditions of the form (A AND (B AND C)). If we don't flatten them,
     // comparison with the expected query will fail.
-    flattenAllAndExpressions(originalQuery.getFilterExpression());
+    Expression origQueryFilterExpr = originalQuery.getFilterExpression();
+    if (null != origQueryFilterExpr) {
+      flattenAllAndExpressions(origQueryFilterExpr);
+    }
     assertEquals(originalQuery, expectedQuery);
   }
 
