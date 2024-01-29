@@ -64,7 +64,7 @@ public class StarTreeUtils {
         new AggregationFunctionColumnPair[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunctionColumnPair aggregationFunctionColumnPair =
-          AggregationFunctionUtils.getAggregationFunctionColumnPair(aggregationFunctions[i]);
+          AggregationFunctionUtils.getStoredFunctionColumnPair(aggregationFunctions[i]);
       if (aggregationFunctionColumnPair != null) {
         aggregationFunctionColumnPairs[i] = aggregationFunctionColumnPair;
       } else {

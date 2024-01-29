@@ -265,7 +265,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   @Override
   public void preloadSegment(ImmutableSegment segment) {
     String segmentName = segment.getSegmentName();
-    Preconditions.checkArgument(_enableSnapshot, "Snapshot must be enabled to preload segment: {}, table: {}",
+    Preconditions.checkArgument(_enableSnapshot, "Snapshot must be enabled to preload segment: %s, table: %s",
         segmentName, _tableNameWithType);
     // Note that EmptyIndexSegment should not reach here either, as it doesn't have validDocIds snapshot.
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
@@ -292,7 +292,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
     MutableRoaringBitmap validDocIds = segment.loadValidDocIdsFromSnapshot();
     Preconditions.checkState(validDocIds != null,
-        "Snapshot of validDocIds is required to preload segment: {}, table: {}", segmentName, _tableNameWithType);
+        "Snapshot of validDocIds is required to preload segment: %s, table: %s", segmentName, _tableNameWithType);
     if (validDocIds.isEmpty()) {
       _logger.info("Skip preloading segment: {} without valid doc, current primary key count: {}",
           segment.getSegmentName(), getNumPrimaryKeys());

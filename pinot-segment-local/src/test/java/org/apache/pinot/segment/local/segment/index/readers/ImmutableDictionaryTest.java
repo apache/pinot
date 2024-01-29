@@ -372,7 +372,7 @@ public class ImmutableDictionaryTest {
     try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
         PinotDataBuffer.mapReadOnlyBigEndianFile(
             new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        _numBytesPerStringValue)) {
+        _numBytesPerStringValue, null, null)) {
       testStringDictionary(onHeapStringDictionary);
     }
   }

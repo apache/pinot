@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
@@ -77,9 +78,11 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.Intern;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.FALFInterner;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,6 +114,7 @@ public class DictionaryIndexType
       if (noDictionaryCols.contains(column)) {
         result.put(column, DictionaryIndexConfig.disabled());
       } else {
+        // Intern configs can only be used if dictionary is enabled through FieldConfigLists.
         result.put(column, new DictionaryIndexConfig(onHeapCols.contains(column), varLengthCols.contains(column)));
       }
     }
@@ -162,6 +166,8 @@ public class DictionaryIndexType
       Set<String> varLength = new HashSet<>(
           ic.getVarLengthDictionaryColumns() == null ? Collections.emptyList() : ic.getVarLengthDictionaryColumns()
       );
+
+      // Intern configs can only be used if dictionary is enabled through FieldConfigLists.
       Function<String, DictionaryIndexConfig> valueCalculator =
           column -> new DictionaryIndexConfig(onHeap.contains(column), varLength.contains(column));
       return Sets.union(onHeap, varLength).stream()
@@ -281,11 +287,18 @@ public class DictionaryIndexType
 
   public static Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata, DictionaryIndexConfig indexConfig)
       throws IOException {
+    return read(dataBuffer, metadata, indexConfig, null);
+  }
+
+  public static Dictionary read(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+      DictionaryIndexConfig indexConfig, String internIdentifierStr)
+      throws IOException {
+
     FieldSpec.DataType dataType = metadata.getDataType();
     boolean loadOnHeap = indexConfig.isOnHeap();
+    String columnName = metadata.getColumnName();
     if (loadOnHeap) {
-      String columnName = metadata.getColumnName();
-      LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
+      LOGGER.info("Loading on-heap dictionary for column: {}, intern={}", columnName, internIdentifierStr != null);
     }
 
     int length = metadata.getCardinality();
@@ -308,7 +321,20 @@ public class DictionaryIndexType
             : new BigDecimalDictionary(dataBuffer, length, numBytesPerValue);
       case STRING:
         numBytesPerValue = metadata.getColumnMaxLength();
-        return loadOnHeap ? new OnHeapStringDictionary(dataBuffer, length, numBytesPerValue)
+
+        // If interning is enabled, get the required interners.
+        FALFInterner<String> strInterner = null;
+        FALFInterner<byte[]> byteInterner = null;
+        Intern internConfig = indexConfig.getIntern();
+        if (internConfig != null && !internConfig.isDisabled()) {
+          Preconditions.checkState(loadOnHeap, "Interning is only supported for on-heap dictionaries.");
+          DictionaryInternerHolder internerHolder = DictionaryInternerHolder.getInstance();
+          strInterner = internerHolder.getStrInterner(internIdentifierStr, internConfig.getCapacity());
+          byteInterner = internerHolder.getByteInterner(internIdentifierStr, internConfig.getCapacity());
+          LOGGER.info("Enabling interning for dictionary column: {}", columnName);
+        }
+
+        return loadOnHeap ? new OnHeapStringDictionary(dataBuffer, length, numBytesPerValue, strInterner, byteInterner)
             : new StringDictionary(dataBuffer, length, numBytesPerValue);
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();
@@ -352,8 +378,29 @@ public class DictionaryIndexType
     @Override
     protected Dictionary createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
         DictionaryIndexConfig indexConfig)
-          throws IOException, IndexReaderConstraintException {
+        throws IOException, IndexReaderConstraintException {
       return DictionaryIndexType.read(dataBuffer, metadata, indexConfig);
+    }
+
+    @Override
+    public Dictionary createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+        ColumnMetadata metadata) throws IOException, IndexReaderConstraintException {
+      String colName = metadata.getColumnName();
+
+      if (!segmentReader.hasIndexFor(colName, StandardIndexes.dictionary())) {
+        return null;
+      }
+
+      PinotDataBuffer buffer = segmentReader.getIndexFor(colName, StandardIndexes.dictionary());
+      DictionaryIndexConfig config = fieldIndexConfigs.getConfig(StandardIndexes.dictionary());
+      String tableName = segmentReader.toSegmentDirectory().getSegmentMetadata().getTableName();
+      String internIdentifierStr = DictionaryInternerHolder.getInstance().createIdentifier(tableName, colName);
+
+      try {
+        return DictionaryIndexType.read(buffer, metadata, config, internIdentifierStr);
+      } catch (RuntimeException ex) {
+        throw new RuntimeException("Cannot read index " + StandardIndexes.dictionary() + " for column " + colName, ex);
+      }
     }
   }
 

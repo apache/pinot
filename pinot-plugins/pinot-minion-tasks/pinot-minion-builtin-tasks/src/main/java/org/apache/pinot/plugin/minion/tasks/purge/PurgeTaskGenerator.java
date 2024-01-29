@@ -67,7 +67,7 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
         continue;
       }
       taskConfigs = tableTaskConfig.getConfigsForTaskType(MinionConstants.PurgeTask.TASK_TYPE);
-      Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: {}", tableName);
+      Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: %s", tableName);
 
       String deltaTimePeriod =
           taskConfigs.getOrDefault(MinionConstants.PurgeTask.LAST_PURGE_TIME_THREESOLD_PERIOD,
