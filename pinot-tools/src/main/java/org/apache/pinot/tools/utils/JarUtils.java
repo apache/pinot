@@ -45,36 +45,27 @@ public class JarUtils {
     if (fromJarFilePath.startsWith(FILE_PREFIX)) {
       fromJarFilePath = fromJarFilePath.substring(FILE_PREFIX.length());
     }
-    JarFile fromJar = new JarFile(fromJarFilePath);
-    for (Enumeration<JarEntry> entries = fromJar.entries(); entries.hasMoreElements(); ) {
-      JarEntry entry = entries.nextElement();
-      if (entry.getName().startsWith(jarDir + "/") && !entry.isDirectory()) {
-        File dest = new File(destDir + "/" + entry.getName().substring(jarDir.length() + 1));
-        File parent = dest.getParentFile();
-        if (parent != null) {
-          parent.mkdirs();
-        }
-
-        FileOutputStream out = new FileOutputStream(dest);
-        InputStream in = fromJar.getInputStream(entry);
-
-        try {
-          byte[] buffer = new byte[8 * 1024];
-
-          int s = 0;
-          while ((s = in.read(buffer)) > 0) {
-            out.write(buffer, 0, s);
+    String folderPath = jarDir.endsWith("/") ? jarDir : jarDir + "/";
+    String finalDestDir = destDir.endsWith("/") ? destDir : destDir + "/";
+    try (JarFile fromJar = new JarFile(fromJarFilePath)) {
+      for (Enumeration<JarEntry> entries = fromJar.entries(); entries.hasMoreElements(); ) {
+        JarEntry entry = entries.nextElement();
+        if (entry.getName().startsWith(folderPath) && !entry.isDirectory()) {
+          File dest = new File(finalDestDir + entry.getName().substring(folderPath.length()));
+          File parent = dest.getParentFile();
+          if (parent != null) {
+            parent.mkdirs();
           }
-        } catch (IOException e) {
-          throw new IOException("Could not copy asset from jar file", e);
-        } finally {
-          try {
-            in.close();
-          } catch (IOException ignored) {
-          }
-          try {
-            out.close();
-          } catch (IOException ignored) {
+
+          try (FileOutputStream out = new FileOutputStream(dest); InputStream in = fromJar.getInputStream(entry)) {
+            byte[] buffer = new byte[8 * 1024];
+
+            int s = 0;
+            while ((s = in.read(buffer)) > 0) {
+              out.write(buffer, 0, s);
+            }
+          } catch (IOException e) {
+            throw new IOException("Could not copy asset from jar file", e);
           }
         }
       }

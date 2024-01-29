@@ -52,17 +52,25 @@ public class StarTreeV2Metadata {
         AggregationFunctionType functionType =
             AggregationFunctionType.getAggregationFunctionType(aggregationConfig.getString(MetadataKey.FUNCTION_TYPE));
         String columnName = aggregationConfig.getString(MetadataKey.COLUMN_NAME);
+        AggregationFunctionColumnPair functionColumnPair = new AggregationFunctionColumnPair(functionType, columnName);
+        // Lookup the stored aggregation type
+        AggregationFunctionColumnPair storedType =
+            AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
         ChunkCompressionType compressionType =
             ChunkCompressionType.valueOf(aggregationConfig.getString(MetadataKey.COMPRESSION_CODEC));
-        _aggregationSpecs.put(new AggregationFunctionColumnPair(functionType, columnName),
-            new AggregationSpec(compressionType));
+        // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
+        _aggregationSpecs.putIfAbsent(storedType, new AggregationSpec(compressionType));
       }
     } else {
       // Backward compatibility with columnName format
       for (String functionColumnPairName : metadataProperties.getStringArray(MetadataKey.FUNCTION_COLUMN_PAIRS)) {
         AggregationFunctionColumnPair functionColumnPair =
             AggregationFunctionColumnPair.fromColumnName(functionColumnPairName);
-        _aggregationSpecs.put(functionColumnPair, AggregationSpec.DEFAULT);
+        // Lookup the stored aggregation type
+        AggregationFunctionColumnPair storedType =
+            AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
+        // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
+        _aggregationSpecs.putIfAbsent(storedType, AggregationSpec.DEFAULT);
       }
     }
     _maxLeafRecords = metadataProperties.getInt(MetadataKey.MAX_LEAF_RECORDS);
