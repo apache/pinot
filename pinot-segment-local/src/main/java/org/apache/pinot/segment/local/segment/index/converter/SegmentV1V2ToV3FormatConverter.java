@@ -76,11 +76,11 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     // check existing segment version
     SegmentMetadataImpl v2Metadata = new SegmentMetadataImpl(v2SegmentDirectory);
     SegmentVersion oldVersion = v2Metadata.getVersion();
-    Preconditions.checkState(oldVersion != SegmentVersion.v3, "Segment {} is already in v3 format but at wrong path",
+    Preconditions.checkState(oldVersion != SegmentVersion.v3, "Segment %s is already in v3 format but at wrong path",
         v2Metadata.getName());
 
     Preconditions.checkArgument(oldVersion == SegmentVersion.v1 || oldVersion == SegmentVersion.v2,
-        "Can not convert segment version: {} at path: {} ", oldVersion, v2SegmentDirectory);
+        "Can not convert segment version: %s at path: %s ", oldVersion, v2SegmentDirectory);
 
     deleteStaleConversionDirectories(v2SegmentDirectory);
 
@@ -303,8 +303,8 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       System.exit(1);
     }
     File tableDirectory = new File(args[0]);
-    Preconditions.checkState(tableDirectory.exists(), "Directory: {} does not exist", tableDirectory);
-    Preconditions.checkState(tableDirectory.isDirectory(), "Path: {} is not a directory", tableDirectory);
+    Preconditions.checkState(tableDirectory.exists(), "Directory: %s does not exist", tableDirectory);
+    Preconditions.checkState(tableDirectory.isDirectory(), "Path: %s is not a directory", tableDirectory);
     File[] files = tableDirectory.listFiles();
     SegmentFormatConverter converter = new SegmentV1V2ToV3FormatConverter();
 

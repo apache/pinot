@@ -50,7 +50,7 @@ public class AggregateNode extends AbstractPlanNode {
   public AggregateNode(int planFragmentId, DataSchema dataSchema, List<AggregateCall> aggCalls,
       List<RexExpression> groupSet, List<RelHint> relHints) {
     super(planFragmentId, dataSchema);
-    Preconditions.checkState(areHintsValid(relHints), "invalid sql hint for agg node: {}", relHints);
+    Preconditions.checkState(areHintsValid(relHints), "invalid sql hint for agg node: %s", relHints);
     _aggCalls = aggCalls.stream().map(RexExpressionUtils::fromAggregateCall).collect(Collectors.toList());
     _filterArgIndices = aggCalls.stream().map(c -> c.filterArg).collect(Collectors.toList());
     _groupSet = groupSet;
