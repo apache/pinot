@@ -409,9 +409,9 @@ public class JsonIndexTest {
   }
 
   @Test(expectedExceptions = JsonProcessingException.class)
-  public void testSkipInvalidJsonDisable() throws Exception {
+  public void testSkipInvalidJsonDisabled() throws Exception {
+    // by default, skipInvalidJson is disabled
     JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
-    jsonIndexConfig.setSkipInvalidJson(false);
     // the braces don't match and cannot be parsed
     String[] records = {"{\"key1\":\"va\""};
 
