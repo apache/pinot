@@ -65,7 +65,7 @@ public class StarTreeGroupByExecutor extends DefaultGroupByExecutor {
     _aggregationFunctionColumnPairs = new AggregationFunctionColumnPair[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       _aggregationFunctionColumnPairs[i] =
-          AggregationFunctionUtils.getAggregationFunctionColumnPair(aggregationFunctions[i]);
+          AggregationFunctionUtils.getStoredFunctionColumnPair(aggregationFunctions[i]);
     }
   }
 

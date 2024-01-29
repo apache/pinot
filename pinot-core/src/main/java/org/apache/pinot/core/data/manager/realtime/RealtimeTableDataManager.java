@@ -170,7 +170,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     File consumerDir = new File(consumerDirPath);
     if (consumerDir.exists()) {
       File[] segmentFiles = consumerDir.listFiles((dir, name) -> !name.equals(STATS_FILE_NAME));
-      Preconditions.checkState(segmentFiles != null, "Failed to list segment files from consumer dir: {} for table: {}",
+      Preconditions.checkState(segmentFiles != null, "Failed to list segment files from consumer dir: %s for table: %s",
           consumerDirPath, _tableNameWithType);
       for (File file : segmentFiles) {
         if (file.delete()) {
@@ -680,7 +680,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     File indexDir = new File(_indexDir, segmentName);
     // Use the latest table config and schema to load the segment
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to get table config for table: {}", _tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to get table config for table: %s", _tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
 
     // Construct a new indexLoadingConfig with the updated tableConfig and schema.
