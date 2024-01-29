@@ -105,8 +105,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       Map<String, TaskState> incompleteTasks =
           TaskGeneratorUtils.getIncompleteTasks(taskType, realtimeTableName, _clusterInfoAccessor);
       if (!incompleteTasks.isEmpty()) {
-        LOGGER.warn("Found incomplete tasks: {} for same table: {}. Skipping task generation.",
-            incompleteTasks.keySet(), realtimeTableName);
+        LOGGER.warn("Found incomplete tasks: {} for same table: {} and task type: {}. Skipping task generation.",
+            incompleteTasks.keySet(), realtimeTableName, taskType);
         continue;
       }
 
