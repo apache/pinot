@@ -291,8 +291,7 @@ public class TableDebugInfo {
       _estimatedSize = estimatedSize;
     }
 
-    public TableSizeSummary(@JsonProperty("reportedSize") long reportedSize,
-        @JsonProperty("estimatedSize") long estimatedSize) {
+    public TableSizeSummary(long reportedSize, long estimatedSize) {
 
       _reportedSize = FileUtils.byteCountToDisplaySize(reportedSize);
       _estimatedSize = FileUtils.byteCountToDisplaySize(estimatedSize);
