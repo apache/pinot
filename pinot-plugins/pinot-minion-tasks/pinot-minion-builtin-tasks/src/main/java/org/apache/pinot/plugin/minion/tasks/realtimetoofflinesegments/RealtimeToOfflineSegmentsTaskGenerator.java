@@ -179,10 +179,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               skipGenerate = true;
               break;
             }
-            if (StringUtils.isBlank(segmentZKMetadata.getDownloadUrl())) {
-              LOGGER.warn("Skipping segment {} for task {} as download url is empty", segmentName, taskType);
-              continue;
-            }
             segmentNames.add(segmentName);
             downloadURLs.add(segmentZKMetadata.getDownloadUrl());
           }
