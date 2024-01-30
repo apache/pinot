@@ -136,12 +136,8 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
             // None of the URI works. Return false for retry.
             return false;
           });
-      if (attempt >= 0) {
-        _logger.info("Download segment {} successfully with {} attempts.", segmentName, attempt + 1);
-        return true;
-      }
-      _logger.error("Download segment {} unsuccessfully with {} attempts.", segmentName, attempt + 1);
-      return false;
+      _logger.info("Download segment {} successfully with {} attempts.", segmentName, attempt + 1);
+      return true;
     } catch (Exception e) {
       _logger.error("Failed to download segment {} after retries.", segmentName, e);
       return false;

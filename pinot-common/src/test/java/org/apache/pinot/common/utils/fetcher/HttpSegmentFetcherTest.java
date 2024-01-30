@@ -136,7 +136,7 @@ public class HttpSegmentFetcherTest {
   }
 
   @Test
-  public void testFetchSegmentToLocalFailureAfterNoPeerServers()
+  public void testFetchSegmentToLocalFailureWithNoPeerServers()
       throws IOException, HttpErrorStatusException {
     FileUploadDownloadClient client = mock(FileUploadDownloadClient.class);
     // the download always succeeds.
