@@ -75,7 +75,7 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
   @Override
   public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
-    return null;
+    return Collections.emptyMap();
   }
 
   @Override

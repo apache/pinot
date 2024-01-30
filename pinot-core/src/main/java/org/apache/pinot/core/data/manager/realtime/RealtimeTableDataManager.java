@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -713,7 +713,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     if (isUpsertEnabled()) {
       return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
     }
-    return new HashMap<>();
+    return Collections.emptyMap();
   }
 
   /**

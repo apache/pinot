@@ -49,9 +49,9 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   @Override
   public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
     Map<Integer, Long> partitionToPrimaryKeyCount = new HashMap<>();
-    for (Integer partitionID : _partitionMetadataManagerMap.keySet()) {
-      partitionToPrimaryKeyCount.put(partitionID, _partitionMetadataManagerMap.get(partitionID).getNumPrimaryKeys());
-    }
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, upsertMetadataManager) -> partitionToPrimaryKeyCount.put(partitionID,
+            upsertMetadataManager.getNumPrimaryKeys()));
     return partitionToPrimaryKeyCount;
   }
 
