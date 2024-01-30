@@ -27,7 +27,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter;
+import org.apache.pinot.sql.parsers.rewriter.ClpRewriter;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractorConfig.FIELDS_FOR_CLP_ENCODING_CONFIG_KEY;
@@ -136,9 +136,9 @@ public class CLPLogRecordExtractorTest {
   }
 
   private void addCLPEncodedField(String fieldName, Set<String> fields) {
-    fields.add(fieldName + CLPDecodeRewriter.LOGTYPE_COLUMN_SUFFIX);
-    fields.add(fieldName + CLPDecodeRewriter.DICTIONARY_VARS_COLUMN_SUFFIX);
-    fields.add(fieldName + CLPDecodeRewriter.ENCODED_VARS_COLUMN_SUFFIX);
+    fields.add(fieldName + ClpRewriter.LOGTYPE_COLUMN_SUFFIX);
+    fields.add(fieldName + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX);
+    fields.add(fieldName + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX);
   }
 
   private GenericRow extract(Map<String, String> props, Set<String> fieldsToRead) {
@@ -163,12 +163,12 @@ public class CLPLogRecordExtractorTest {
     try {
       // Decode and validate field
       assertNull(row.getValue(fieldName));
-      String logtype = (String) row.getValue(fieldName + CLPDecodeRewriter.LOGTYPE_COLUMN_SUFFIX);
+      String logtype = (String) row.getValue(fieldName + ClpRewriter.LOGTYPE_COLUMN_SUFFIX);
       assertNotEquals(logtype, null);
       String[] dictionaryVars =
-          (String[]) row.getValue(fieldName + CLPDecodeRewriter.DICTIONARY_VARS_COLUMN_SUFFIX);
+          (String[]) row.getValue(fieldName + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX);
       assertNotEquals(dictionaryVars, null);
-      Long[] encodedVars = (Long[]) row.getValue(fieldName + CLPDecodeRewriter.ENCODED_VARS_COLUMN_SUFFIX);
+      Long[] encodedVars = (Long[]) row.getValue(fieldName + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX);
       assertNotEquals(encodedVars, null);
       long[] encodedVarsAsPrimitives = Arrays.stream(encodedVars).mapToLong(Long::longValue).toArray();
 
