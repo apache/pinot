@@ -918,8 +918,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       );
       if (streamSmallestOffset.compareTo(startOffset) > 0) {
         _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
-        String message = "startOffset(" + startOffset +
-            ") is older than topic's beginning offset(" + streamSmallestOffset + ")";
+        String message = "startOffset(" + startOffset
+            + ") is older than topic's beginning offset(" + streamSmallestOffset + ")";
         _segmentLogger.error(message);
         _realtimeTableDataManager.addSegmentError(_segmentNameStr,
             new SegmentErrorInfo(String.valueOf(now()), message, "")

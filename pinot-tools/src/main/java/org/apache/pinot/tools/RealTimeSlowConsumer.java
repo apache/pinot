@@ -1,9 +1,27 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -11,13 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.LineIterator;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.stream.StreamDataProducer;
-import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
@@ -26,13 +39,8 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 
 
-public class RealTimeSlowConsumer extends RealtimeQuickStart {
+public class RealTimeSlowConsumer extends QuickStartBase {
     private static final String DEFAULT_CONTROLLER_URL = "http://localhost:9000";
-
-    @Override
-    public List<String> types() {
-        return Arrays.asList("REALTIME_JSON_INDEX", "REALTIME-JSON-INDEX", "STREAM_JSON_INDEX", "STREAM-JSON-INDEX");
-    }
 
     @Override
     protected Map<String, String> getDefaultStreamTableDirectories() {
@@ -62,6 +70,11 @@ public class RealTimeSlowConsumer extends RealtimeQuickStart {
         printStatus(Quickstart.Color.CYAN, "***** Starting githubEvents data stream and publishing to Kafka *****");
         publishLineSplitFileToKafka("githubEvents",
                 new File(new File(quickstartTmpDir, "githubEvents"), "/rawdata/2021-07-21-few-hours.json"));
+    }
+
+    @Override
+    public List<String> types() {
+        return Arrays.asList("REALTIME", "STREAM");
     }
 
     @Override
@@ -115,7 +128,8 @@ public class RealTimeSlowConsumer extends RealtimeQuickStart {
 
         client.resumeConsumption("githubEvents");
 
-        printStatus(Quickstart.Color.GREEN, "You can always go to http://localhost:9000 to play around in the query console");
+        printStatus(Quickstart.Color.GREEN,
+            "You can always go to http://localhost:9000 to play around in the query console");
     }
 
     public static void main(String[] args)

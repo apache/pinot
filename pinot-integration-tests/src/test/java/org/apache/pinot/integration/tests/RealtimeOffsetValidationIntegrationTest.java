@@ -178,12 +178,12 @@ public class RealtimeOffsetValidationIntegrationTest extends BaseClusterIntegrat
 
     ListOffsetsResult listOffsetsResult = admin.listOffsets(topicPartitionOffsetSpec, new ListOffsetsOptions());
 
-    Map<TopicPartition,ListOffsetsResult.ListOffsetsResultInfo> offsetsResultInfoMap = listOffsetsResult.all().get();
+    Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> offsetsResultInfoMap = listOffsetsResult.all().get();
     boolean fastForwarded = true;
     for (Map.Entry<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> entry: offsetsResultInfoMap.entrySet()) {
       // Assume the first avro file was split between 2 partitions.
       // So the offset has to move beyond the number of messages in the first avro file at least.
-      fastForwarded &= (entry.getValue().offset() > NUM_DOCS_IN_FIRST_AVRO_FILE/2);
+      fastForwarded &= (entry.getValue().offset() > NUM_DOCS_IN_FIRST_AVRO_FILE / 2);
     }
 
     return fastForwarded;

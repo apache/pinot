@@ -37,7 +37,6 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
@@ -671,7 +670,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected AdminClient getKafkaAdminClient() {
-    return ((KafkaDataServerStartable)_kafkaStarters.get(0)).getAdminClient();
+    return ((KafkaDataServerStartable) _kafkaStarters.get(0)).getAdminClient();
   }
 
   /**

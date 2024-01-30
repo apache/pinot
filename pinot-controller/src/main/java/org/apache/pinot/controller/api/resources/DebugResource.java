@@ -364,7 +364,8 @@ public class DebugResource {
       }
 
       if (!segmentServerState.isEmpty() || segmentErrors.containsKey(segmentName)) {
-        result.add(new TableDebugInfo.SegmentDebugInfo(segmentName, segmentServerState, segmentErrors.get(segmentName)));
+        result.add(new TableDebugInfo.SegmentDebugInfo(segmentName, segmentServerState,
+            segmentErrors.get(segmentName)));
       }
     }
 

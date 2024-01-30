@@ -20,9 +20,6 @@ package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -51,7 +48,6 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -68,7 +64,6 @@ import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
-import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
@@ -1220,7 +1215,8 @@ public class PinotLLCRealtimeSegmentManager {
             }
             StreamPartitionMsgOffset startOffset =
                 selectStartOffset(offsetCriteria, partitionGroupId, partitionGroupIdToStartOffset,
-                    partitionGroupIdToSmallestStreamOffset, tableConfig.getTableName(), latestSegmentName, offsetFactory,
+                    partitionGroupIdToSmallestStreamOffset, tableConfig.getTableName(), latestSegmentName,
+                    offsetFactory,
                     latestSegmentZKMetadata.getStartOffset()); // segments are OFFLINE; start from beginning
             createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
                 newPartitionGroupMetadataList, instancePartitions, instanceStatesMap, segmentAssignment,
@@ -1351,10 +1347,10 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Data lost from offset: {} to: {} for partition: {} of table: {}", startOffsetInSegmentZkMetadata,
             streamSmallestOffset, partitionGroupId, tableName);
         _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
-        String message = "Data lost from offset: " + startOffsetInSegmentZkMetadata +
-                        " to: " + streamSmallestOffset +
-                        " for partition: " + partitionGroupId +
-                        " of table: " + tableName;
+        String message = "Data lost from offset: " + startOffsetInSegmentZkMetadata
+                        + " to: " + streamSmallestOffset
+                        + " for partition: " + partitionGroupId
+                        + " of table: " + tableName;
 
         _errorCache.put(Pair.of(tableName, segmentName),
             new SegmentErrorInfo(String.valueOf(System.currentTimeMillis()), message, ""));
@@ -1782,5 +1778,4 @@ public class PinotLLCRealtimeSegmentManager {
           .collect(Collectors.toMap(map -> map.getKey().getRight(), Map.Entry::getValue));
     }
   }
-
 }
