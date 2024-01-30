@@ -350,14 +350,22 @@ public class PinotClientRequest {
     return identity;
   }
 
+  /**
+   * Generate Response object from the BrokerResponse object with 'X-Pinot-Error-Code' header value
+   * @param brokerResponse
+   * @return Response
+   * @throws Exception
+   */
   private static Response getPinotQueryResponse(BrokerResponse brokerResponse)
       throws Exception {
-    int headerValue = -1;
+    int headerValue = -1; // default value of the header.
 
     if (brokerResponse.getExceptionsSize() != 0) {
+      // set the header value as first exception error code value.
       headerValue = brokerResponse.getProcessingExceptions().get(0).getErrorCode();
     }
 
+    // returning the Response with OK status and header value.
     return Response.ok()
         .header(PINOT_QUERY_ERROR_CODE_HEADER, headerValue)
         .entity(brokerResponse.toJsonString()).build();
