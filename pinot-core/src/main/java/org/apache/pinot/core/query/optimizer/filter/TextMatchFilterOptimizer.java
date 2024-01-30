@@ -150,7 +150,17 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
       }
 
       // build the merged TEXT_MATCH expression
-      String mergedTextMatchFilter = String.join(SPACE + operator + SPACE, literals);
+      String mergedTextMatchFilter;
+      if (allNot) {
+        assert operator.equals(FilterKind.AND.name()) || operator.equals(FilterKind.OR.name());
+        if (operator.equals(FilterKind.AND.name())) {
+          mergedTextMatchFilter = String.join(SPACE + FilterKind.OR.name() + SPACE, literals);
+        } else {
+          mergedTextMatchFilter = String.join(SPACE + FilterKind.AND.name() + SPACE, literals);
+        }
+      } else {
+        mergedTextMatchFilter = String.join(SPACE + operator + SPACE, literals);
+      }
       Expression mergedTextMatchExpression = RequestUtils.getFunctionExpression(FilterKind.TEXT_MATCH.name());
       Expression mergedTextMatchFilterExpression = RequestUtils.getLiteralExpression(mergedTextMatchFilter);
       mergedTextMatchExpression.getFunctionCall()

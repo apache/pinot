@@ -282,6 +282,8 @@ public class QueryOptimizerTest {
     testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
         "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'NOT foo AND bar')");
     testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') AND NOT TEXT_MATCH(string, 'bar')",
+        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo OR bar')");
+    testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') OR NOT TEXT_MATCH(string, 'bar')",
         "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo AND bar')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar') OR "
         + "TEXT_MATCH(string, 'baz')", "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo AND bar OR baz')");
