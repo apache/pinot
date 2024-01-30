@@ -75,6 +75,7 @@ import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Controller.PINOT_QUERY_ERROR_CODE_HEADER;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -125,7 +126,7 @@ public class PinotClientRequest {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
-      asyncResponse.resume(brokerResponse.toJsonString());
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -155,7 +156,7 @@ public class PinotClientRequest {
       }
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders);
-      asyncResponse.resume(brokerResponse.toJsonString());
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -189,7 +190,7 @@ public class PinotClientRequest {
       requestJson.put(Request.SQL, query);
       BrokerResponse brokerResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
-      asyncResponse.resume(brokerResponse.toJsonString());
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -219,7 +220,7 @@ public class PinotClientRequest {
       }
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true);
-      asyncResponse.resume(brokerResponse.toJsonString());
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -347,5 +348,18 @@ public class PinotClientRequest {
     identity.setEndpointUrl(context.getRequestURL().toString());
 
     return identity;
+  }
+
+  private static Response getPinotQueryResponse(BrokerResponse brokerResponse)
+      throws Exception {
+    int headerValue = -1;
+
+    if (brokerResponse.getExceptionsSize() != 0) {
+      headerValue = brokerResponse.getProcessingExceptions().get(0).getErrorCode();
+    }
+
+    return Response.ok()
+        .header(PINOT_QUERY_ERROR_CODE_HEADER, headerValue)
+        .entity(brokerResponse.toJsonString()).build();
   }
 }
