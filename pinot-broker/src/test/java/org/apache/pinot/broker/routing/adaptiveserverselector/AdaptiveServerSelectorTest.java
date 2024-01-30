@@ -25,11 +25,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ExponentialMovingAverage;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.Mock;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -39,6 +41,9 @@ import static org.testng.Assert.assertTrue;
 
 
 public class AdaptiveServerSelectorTest {
+  @Mock
+  private BrokerMetrics _brokerMetrics;
+
   List<String> _servers = Arrays.asList("server1", "server2", "server3", "server4");
   Map<String, Object> _properties = new HashMap<>();
 
@@ -48,7 +53,7 @@ public class AdaptiveServerSelectorTest {
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_TYPE,
         CommonConstants.Broker.AdaptiveServerSelector.Type.NO_OP.name());
     PinotConfiguration cfg = new PinotConfiguration(_properties);
-    ServerRoutingStatsManager serverRoutingStatsManager = new ServerRoutingStatsManager(cfg);
+    ServerRoutingStatsManager serverRoutingStatsManager = new ServerRoutingStatsManager(cfg, _brokerMetrics);
     assertNull(AdaptiveServerSelectorFactory.getAdaptiveServerSelector(serverRoutingStatsManager, cfg));
 
     // Enable stats collection. Without this, AdaptiveServerSelectors cannot be used.
@@ -58,7 +63,7 @@ public class AdaptiveServerSelectorTest {
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_TYPE,
         CommonConstants.Broker.AdaptiveServerSelector.Type.NUM_INFLIGHT_REQ.name());
     cfg = new PinotConfiguration(_properties);
-    serverRoutingStatsManager = new ServerRoutingStatsManager(cfg);
+    serverRoutingStatsManager = new ServerRoutingStatsManager(cfg, _brokerMetrics);
     assertTrue(AdaptiveServerSelectorFactory.getAdaptiveServerSelector(serverRoutingStatsManager,
         cfg) instanceof NumInFlightReqSelector);
 
@@ -66,7 +71,7 @@ public class AdaptiveServerSelectorTest {
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_TYPE,
         CommonConstants.Broker.AdaptiveServerSelector.Type.LATENCY.name());
     cfg = new PinotConfiguration(_properties);
-    serverRoutingStatsManager = new ServerRoutingStatsManager(cfg);
+    serverRoutingStatsManager = new ServerRoutingStatsManager(cfg, _brokerMetrics);
     assertTrue(AdaptiveServerSelectorFactory.getAdaptiveServerSelector(serverRoutingStatsManager,
         cfg) instanceof LatencySelector);
 
@@ -74,7 +79,7 @@ public class AdaptiveServerSelectorTest {
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_TYPE,
         CommonConstants.Broker.AdaptiveServerSelector.Type.HYBRID.name());
     cfg = new PinotConfiguration(_properties);
-    serverRoutingStatsManager = new ServerRoutingStatsManager(cfg);
+    serverRoutingStatsManager = new ServerRoutingStatsManager(cfg, _brokerMetrics);
     assertTrue(AdaptiveServerSelectorFactory.getAdaptiveServerSelector(serverRoutingStatsManager,
         cfg) instanceof HybridSelector);
 
@@ -82,7 +87,7 @@ public class AdaptiveServerSelectorTest {
     assertThrows(IllegalArgumentException.class, () -> {
       _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_TYPE, "Dummy");
       PinotConfiguration config = new PinotConfiguration(_properties);
-      ServerRoutingStatsManager manager = new ServerRoutingStatsManager(config);
+      ServerRoutingStatsManager manager = new ServerRoutingStatsManager(config, _brokerMetrics);
       AdaptiveServerSelectorFactory.getAdaptiveServerSelector(manager, config);
     });
   }
@@ -91,7 +96,7 @@ public class AdaptiveServerSelectorTest {
   public void testNumInFlightReqSelector() {
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
     PinotConfiguration cfg = new PinotConfiguration(_properties);
-    ServerRoutingStatsManager serverRoutingStatsManager = new ServerRoutingStatsManager(cfg);
+    ServerRoutingStatsManager serverRoutingStatsManager = new ServerRoutingStatsManager(cfg, _brokerMetrics);
     serverRoutingStatsManager.init();
     assertTrue(serverRoutingStatsManager.isEnabled());
     long taskCount = 0;
@@ -290,7 +295,7 @@ public class AdaptiveServerSelectorTest {
     _properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL,
         avgInitializationVal);
     PinotConfiguration cfg = new PinotConfiguration(_properties);
-    ServerRoutingStatsManager serverRoutingStatsManager = new ServerRoutingStatsManager(cfg);
+    ServerRoutingStatsManager serverRoutingStatsManager = new ServerRoutingStatsManager(cfg, _brokerMetrics);
     serverRoutingStatsManager.init();
     assertTrue(serverRoutingStatsManager.isEnabled());
     long taskCount = 0;
@@ -430,7 +435,7 @@ public class AdaptiveServerSelectorTest {
         hybridSelectorExponent);
 
     PinotConfiguration cfg = new PinotConfiguration(_properties);
-    ServerRoutingStatsManager serverRoutingStatsManager = new ServerRoutingStatsManager(cfg);
+    ServerRoutingStatsManager serverRoutingStatsManager = new ServerRoutingStatsManager(cfg, _brokerMetrics);
     serverRoutingStatsManager.init();
     assertTrue(serverRoutingStatsManager.isEnabled());
 

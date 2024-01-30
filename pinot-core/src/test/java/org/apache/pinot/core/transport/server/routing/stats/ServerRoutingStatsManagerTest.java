@@ -22,9 +22,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.mockito.Mock;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -34,20 +36,24 @@ import static org.testng.Assert.assertTrue;
 
 
 public class ServerRoutingStatsManagerTest {
+  @Mock
+  private BrokerMetrics _brokerMetrics;
+
   @Test
   public void testInitAndShutDown() {
     Map<String, Object> properties = new HashMap<>();
 
     // Test 1: Test disabled.
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, false);
-    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties));
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
     assertFalse(manager.isEnabled());
     manager.init();
     assertFalse(manager.isEnabled());
 
     // Test 2: Test enabled.
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
-    manager = new ServerRoutingStatsManager(new PinotConfiguration(properties));
+    manager = new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
     assertFalse(manager.isEnabled());
     manager.init();
     assertTrue(manager.isEnabled());
@@ -64,7 +70,8 @@ public class ServerRoutingStatsManagerTest {
   public void testEmptyStats() {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
-    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties));
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
     manager.init();
 
     List<Pair<String, Integer>> numInFlightReqList = manager.fetchNumInFlightRequestsForAllServers();
@@ -94,7 +101,8 @@ public class ServerRoutingStatsManagerTest {
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
-    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties));
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
     manager.init();
 
     int requestId = 0;

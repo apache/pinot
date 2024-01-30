@@ -102,7 +102,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
 
   PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true),
-  DIRECT_MEMORY_OOM("directMemoryOOMCount", true);
+  DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
+  STATS_MANAGER_DELAY_UPDATE("statsManagerDelayUpdate", true);
 
   private final String _brokerMeterName;
   private final String _unit;

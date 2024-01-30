@@ -30,6 +30,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector;
 import org.slf4j.Logger;
@@ -46,6 +49,7 @@ public class ServerRoutingStatsManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerRoutingStatsManager.class);
 
   private final PinotConfiguration _config;
+  private final BrokerMetrics _brokerMetrics;
   private volatile boolean _isEnabled;
   private ConcurrentHashMap<String, ServerRoutingStatsEntry> _serverQueryStatsMap;
 
@@ -55,14 +59,18 @@ public class ServerRoutingStatsManager {
   // ScheduledExecutorServer for processing periodic tasks like decay.
   private ScheduledExecutorService _periodicTaskExecutor;
 
+  // Warn threshold for Main executor service queue size
+  private int _executorQueueSizeWarnThreshold;
+
   private double _alpha;
   private long _autoDecayWindowMs;
   private long _warmupDurationMs;
   private double _avgInitializationVal;
   private int _hybridScoreExponent;
 
-  public ServerRoutingStatsManager(PinotConfiguration pinotConfig) {
+  public ServerRoutingStatsManager(PinotConfiguration pinotConfig, BrokerMetrics brokerMetrics) {
     _config = pinotConfig;
+    _brokerMetrics = brokerMetrics;
   }
 
   public void init() {
@@ -89,6 +97,10 @@ public class ServerRoutingStatsManager {
     int threadPoolSize = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE,
         AdaptiveServerSelector.DEFAULT_STATS_MANAGER_THREADPOOL_SIZE);
     _executorService = Executors.newFixedThreadPool(threadPoolSize);
+
+    _executorQueueSizeWarnThreshold = _config.getProperty(
+        AdaptiveServerSelector.CONFIG_OF_STATS_MANAGER_QUEUE_SIZE_WARN_THRESHOLD,
+        AdaptiveServerSelector.DEFAULT_STATS_MANAGER_QUEUE_SIZE_WARN_THRESHOLD);
 
     _periodicTaskExecutor = Executors.newSingleThreadScheduledExecutor();
 
@@ -138,9 +150,9 @@ public class ServerRoutingStatsManager {
       return;
     }
 
-    // TODO: Track Executor qSize and alert if it crosses a threshold.
     _executorService.execute(() -> {
       try {
+        alertIfQueueSizeIsAboveWarnThreshold();
         updateStatsAfterQuerySubmission(serverInstanceId);
       } catch (Exception e) {
         LOGGER.error("Exception caught while updating stats. requestId={}, exception={}", requestId, e);
@@ -171,6 +183,7 @@ public class ServerRoutingStatsManager {
 
     _executorService.execute(() -> {
       try {
+        alertIfQueueSizeIsAboveWarnThreshold();
         updateStatsUponResponseArrival(serverInstanceId, latency);
       } catch (Exception e) {
         LOGGER.error("Exception caught while updating stats. requestId={}, exception={}", requestId, e);
@@ -375,6 +388,17 @@ public class ServerRoutingStatsManager {
       return stats.computeHybridScore();
     } finally {
       stats.getServerReadLock().unlock();
+    }
+  }
+
+  private void alertIfQueueSizeIsAboveWarnThreshold() {
+    int queueSize = getQueueSize();
+    _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.STATS_MANAGER_QUEUE_SIZE, queueSize);
+    if (queueSize > _executorQueueSizeWarnThreshold) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.STATS_MANAGER_DELAY_UPDATE, 1L);
+      LOGGER.warn(String.format("Stats Manager queue size exceeds warn threshold = %d. "
+              + "Current queue size = %d, completed task count = %d.",
+          _executorQueueSizeWarnThreshold, queueSize, getCompletedTaskCount()));
     }
   }
 }
