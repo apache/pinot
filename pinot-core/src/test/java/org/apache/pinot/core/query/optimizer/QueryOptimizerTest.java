@@ -166,6 +166,21 @@ public class QueryOptimizerTest {
     assertEquals(fourthChildChildren.get(1).getFunctionCall().getOperator(), FilterKind.LESS_THAN.name());
   }
 
+  @Test
+  public void testMergeTextMatchFilter() {
+    String query =
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar') OR TEXT_MATCH(string, "
+            + "'baz')";
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    OPTIMIZER.optimize(pinotQuery, SCHEMA);
+    Function filterFunction = pinotQuery.getFilterExpression().getFunctionCall();
+    assertEquals(filterFunction.getOperator(), FilterKind.TEXT_MATCH.name());
+    List<Expression> operands = filterFunction.getOperands();
+    assertEquals(operands.size(), 2);
+    assertEquals(operands.get(0), RequestUtils.getIdentifierExpression("string"));
+    assertEquals(operands.get(1), RequestUtils.getLiteralExpression("foo AND bar OR baz"));
+  }
+
   private static Expression getRangeFilterExpression(String column, String rangeString) {
     Expression rangeFilterExpression = RequestUtils.getFunctionExpression(FilterKind.RANGE.name());
     rangeFilterExpression.getFunctionCall().setOperands(
@@ -250,6 +265,37 @@ public class QueryOptimizerTest {
 
     testQuery("SELECT * FROM testTable WHERE 1=1 AND true", "SELECT * FROM testTable WHERE true");
     testQuery("SELECT * FROM testTable WHERE \"a\"=\"a\" AND true", "SELECT * FROM testTable WHERE true");
+
+    // TextMatchFilterOptimizer
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo AND bar')");
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, '\"foo bar\"') AND TEXT_MATCH(string, 'baz')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '\"foo bar\" AND baz')");
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, '\"foo bar\"') AND TEXT_MATCH(string, '/.*ooba.*/')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '\"foo bar\" AND /.*ooba.*/')");
+    testQuery("SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
+        "SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, 'foo AND bar')");
+    testQuery("SELECT * FROM testTable WHERE int = 1 OR TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
+        "SELECT * FROM testTable WHERE int = 1 OR TEXT_MATCH(string, 'foo AND bar')");
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND NOT TEXT_MATCH(string, 'bar')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo AND NOT bar')");
+    testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'NOT foo AND bar')");
+    testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') AND NOT TEXT_MATCH(string, 'bar')",
+        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo AND bar')");
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar') OR "
+        + "TEXT_MATCH(string, 'baz')", "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo AND bar OR baz')");
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo1') AND TEXT_MATCH(string1, 'bar1') OR "
+            + "TEXT_MATCH(string1, 'baz1') AND TEXT_MATCH(string2, 'foo')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo1 AND bar1') OR TEXT_MATCH(string1, 'baz1') AND "
+            + "TEXT_MATCH(string2, 'foo')");
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo1') AND TEXT_MATCH(string1, 'bar1')"
+            + "AND TEXT_MATCH(string2, 'foo2') AND TEXT_MATCH(string2, 'bar2')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo1 AND bar1') AND TEXT_MATCH(string2, 'foo2 AND bar2')");
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo') OR TEXT_MATCH(string2, 'bar')");
+    testCannotOptimizeQuery(
+        "SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, 'foo') OR TEXT_MATCH(string, 'bar')");
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo')");
   }
 
   private static void testQuery(String actual, String expected) {
@@ -259,6 +305,13 @@ public class QueryOptimizerTest {
     // Also optimize the expected query because the expected range can only be generate via optimizer
     PinotQuery expectedPinotQuery = CalciteSqlParser.compileToPinotQuery(expected);
     OPTIMIZER.optimize(expectedPinotQuery, SCHEMA);
+    comparePinotQuery(actualPinotQuery, expectedPinotQuery);
+  }
+
+  private static void testCannotOptimizeQuery(String query) {
+    PinotQuery actualPinotQuery = CalciteSqlParser.compileToPinotQuery(query);
+    OPTIMIZER.optimize(actualPinotQuery, SCHEMA);
+    PinotQuery expectedPinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     comparePinotQuery(actualPinotQuery, expectedPinotQuery);
   }
 
