@@ -43,7 +43,7 @@ public class TableMetadataInfo {
   private final Map<String, Double> _columnCardinalityMap;
   private final Map<String, Double> _maxNumMultiValuesMap;
   private final Map<String, Map<String, Double>> _columnIndexSizeMap;
-  private final Map<Integer, Long> _upsertPartitionToPrimaryKeyCountMap;
+  private final Map<Integer, Map<String, Long>> _upsertPartitionToServerPrimaryKeyCountMap;
 
   @JsonCreator
   public TableMetadataInfo(@JsonProperty("tableName") String tableName,
@@ -52,7 +52,8 @@ public class TableMetadataInfo {
       @JsonProperty("columnCardinalityMap") Map<String, Double> columnCardinalityMap,
       @JsonProperty("maxNumMultiValuesMap") Map<String, Double> maxNumMultiValuesMap,
       @JsonProperty("columnIndexSizeMap") Map<String, Map<String, Double>> columnIndexSizeMap,
-      @JsonProperty("upsertPartitionToPrimaryKeyCountMap") Map<Integer, Long> upsertPartitionToPrimaryKeyCountMap) {
+      @JsonProperty("upsertPartitionToServerPrimaryKeyCountMap")
+      Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap) {
     _tableName = tableName;
     _diskSizeInBytes = sizeInBytes;
     _numSegments = numSegments;
@@ -61,7 +62,7 @@ public class TableMetadataInfo {
     _columnCardinalityMap = columnCardinalityMap;
     _maxNumMultiValuesMap = maxNumMultiValuesMap;
     _columnIndexSizeMap = columnIndexSizeMap;
-    _upsertPartitionToPrimaryKeyCountMap = upsertPartitionToPrimaryKeyCountMap;
+    _upsertPartitionToServerPrimaryKeyCountMap = upsertPartitionToServerPrimaryKeyCountMap;
   }
 
   public String getTableName() {
@@ -96,7 +97,7 @@ public class TableMetadataInfo {
     return _columnIndexSizeMap;
   }
 
-  public Map<Integer, Long> getUpsertPartitionToPrimaryKeyCountMap() {
-    return _upsertPartitionToPrimaryKeyCountMap;
+  public Map<Integer, Map<String, Long>> getUpsertPartitionToServerPrimaryKeyCountMap() {
+    return _upsertPartitionToServerPrimaryKeyCountMap;
   }
 }

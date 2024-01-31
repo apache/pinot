@@ -291,10 +291,16 @@ public class TablesResource {
       upsertPartitionToPrimaryKeyCountMap = realtimeTableDataManager.getUpsertPartitionToPrimaryKeyCount();
     }
 
+    // construct upsertPartitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
+    Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap = new HashMap<>();
+    upsertPartitionToPrimaryKeyCountMap.forEach(
+        (partition, primaryKeyCount) -> upsertPartitionToServerPrimaryKeyCountMap.put(partition,
+            Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
+
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
             totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
-            upsertPartitionToPrimaryKeyCountMap);
+            upsertPartitionToServerPrimaryKeyCountMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
