@@ -26,7 +26,6 @@ import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -37,7 +36,7 @@ public class FstIndexTypeTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(FstIndexConfig expected) {
-      Assert.assertEquals(getActualConfig("dimStr", StandardIndexes.fst()), expected);
+      checkConfigsMatch(StandardIndexes.fst(), "dimStr", expected);
     }
 
     @Test

@@ -35,6 +35,7 @@ import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 
 
@@ -105,7 +106,7 @@ public class AbstractSerdeIndexContract {
     return confMap.get(column).getConfig(type);
   }
 
-  protected <C extends IndexConfig> C getActualConfig2(String column, IndexType<C, ?, ?> type) {
+  protected <C extends IndexConfig> C getActualFromIndexLoadingConfig(String column, IndexType<C, ?, ?> type) {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, _schema);
     Map<String, FieldIndexConfigs> confMap =
         FieldIndexConfigsUtil.createIndexConfigsByColName(_tableConfig, _schema, indexLoadingConfig::getDeserializer);
@@ -148,5 +149,12 @@ public class AbstractSerdeIndexContract {
 
   protected void convertToUpdatedFormat() {
     _tableConfig = TableConfigUtils.createTableConfigFromOldFormat(_tableConfig, _schema);
+  }
+
+  protected void checkConfigsMatch(IndexType<?, ?, ?> indexType, String colName, IndexConfig expected) {
+    Assert.assertEquals(getActualConfig(colName, indexType), expected);
+    if (_tableConfig.getIndexingConfig() != null) {
+      Assert.assertEquals(getActualFromIndexLoadingConfig(colName, indexType), expected);
+    }
   }
 }
