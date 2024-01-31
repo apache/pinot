@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.controller.helix.core.periodictask;
 
+import com.google.common.collect.Sets;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -46,6 +51,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
   protected final LeadControllerManager _leadControllerManager;
   protected final ControllerMetrics _controllerMetrics;
+  protected Set<String> _prevLeaderOfTables = new HashSet<>();
 
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
       PinotHelixResourceManager pinotHelixResourceManager, LeadControllerManager leadControllerManager,
@@ -63,29 +69,25 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
       // Check if we have a specific table against which this task needs to be run.
       String propTableNameWithType = (String) periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
       // Process the tables that are managed by this controller
-      List<String> tablesToProcess = new ArrayList<>();
-      List<String> nonLeaderForTables = new ArrayList<>();
-      if (propTableNameWithType == null) {
-        // Table name is not available, so task should run on all tables for which this controller is the lead.
-        for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
-          if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
-            tablesToProcess.add(tableNameWithType);
-          } else {
-            nonLeaderForTables.add(tableNameWithType);
-          }
-        }
-      } else {
-        // Table name is available, so task should run only on the specified table.
-        if (_leadControllerManager.isLeaderForTable(propTableNameWithType)) {
-          tablesToProcess.add(propTableNameWithType);
-        }
+      Set<String> allTables = propTableNameWithType == null
+          ? new HashSet<>(_pinotHelixResourceManager.getAllTables())
+          : Collections.singleton(propTableNameWithType);
+
+      Set<String> currentLeaderOfTables = allTables.stream()
+          .filter(_leadControllerManager::isLeaderForTable)
+          .collect(Collectors.toSet());
+
+      if (!currentLeaderOfTables.isEmpty()) {
+        processTables(new ArrayList<>(currentLeaderOfTables), periodicTaskProperties);
       }
 
-      if (!tablesToProcess.isEmpty()) {
-        processTables(tablesToProcess, periodicTaskProperties);
-      }
+      Sets.SetView<String> allKnownTables = Sets.union(_prevLeaderOfTables, allTables);
+      Set<String> nonLeaderForTables = Sets.difference(allKnownTables, currentLeaderOfTables);
       if (!nonLeaderForTables.isEmpty()) {
-        nonLeaderCleanup(nonLeaderForTables);
+        nonLeaderCleanup(new ArrayList<>(nonLeaderForTables));
+      }
+      if (!_prevLeaderOfTables.equals(currentLeaderOfTables)) {
+        _prevLeaderOfTables = new HashSet<>(currentLeaderOfTables);
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
