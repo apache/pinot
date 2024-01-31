@@ -149,9 +149,9 @@ public class ServerSegmentMetadataReader {
       return v;
     });
 
-    // Since table segments may have multiple replicas, divide diskSizeInBytes, numRows, numSegments and primary key
-    // count by numReplica to avoid double counting, for columnAvgLengthMap, columnAvgCardinalityMap and
-    // maxNumMultiValuesMap, dividing by numReplica is not needed since totalNumSegments already contains replicas.
+    // Since table segments may have multiple replicas, divide diskSizeInBytes, numRows and numSegments by numReplica
+    // to avoid double counting, for columnAvgLengthMap, columnAvgCardinalityMap and maxNumMultiValuesMap, dividing by
+    // numReplica is not needed since totalNumSegments already contains replicas.
     totalDiskSizeInBytes /= numReplica;
     totalNumSegments /= numReplica;
     totalNumRows /= numReplica;
