@@ -152,7 +152,7 @@ public class ServerRoutingStatsManager {
 
     _executorService.execute(() -> {
       try {
-        alertIfQueueSizeIsAboveWarnThreshold();
+        recordQueueSizeMetrics();
         updateStatsAfterQuerySubmission(serverInstanceId);
       } catch (Exception e) {
         LOGGER.error("Exception caught while updating stats. requestId={}, exception={}", requestId, e);
@@ -183,7 +183,6 @@ public class ServerRoutingStatsManager {
 
     _executorService.execute(() -> {
       try {
-        alertIfQueueSizeIsAboveWarnThreshold();
         updateStatsUponResponseArrival(serverInstanceId, latency);
       } catch (Exception e) {
         LOGGER.error("Exception caught while updating stats. requestId={}, exception={}", requestId, e);
@@ -391,11 +390,11 @@ public class ServerRoutingStatsManager {
     }
   }
 
-  private void alertIfQueueSizeIsAboveWarnThreshold() {
+  private void recordQueueSizeMetrics() {
     int queueSize = getQueueSize();
-    _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.STATS_MANAGER_QUEUE_SIZE, queueSize);
+    _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ROUTING_STATS_MANAGER_QUEUE_SIZE, queueSize);
     if (queueSize > _executorQueueSizeWarnThreshold) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.STATS_MANAGER_DELAY_UPDATE, 1L);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.ROUTING_STATS_MANAGER_Q_LIMIT_REACHED, 1L);
       LOGGER.warn(String.format("Stats Manager queue size exceeds warn threshold = %d. "
               + "Current queue size = %d, completed task count = %d.",
           _executorQueueSizeWarnThreshold, queueSize, getCompletedTaskCount()));

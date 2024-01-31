@@ -45,7 +45,7 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   /**
    * The queue size of ServerRoutingStatsManager main executor service.
    */
-  STATS_MANAGER_QUEUE_SIZE("statsManagerQueueSize", true),
+  ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true),
 
   /**
    * The size of the small cache.

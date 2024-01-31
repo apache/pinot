@@ -103,7 +103,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
 
   PROACTIVE_CLUSTER_CHANGE_CHECK("proactiveClusterChangeCheck", true),
   DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
-  STATS_MANAGER_DELAY_UPDATE("statsManagerDelayUpdate", true);
+  ROUTING_STATS_MANAGER_Q_LIMIT_REACHED("routingStatsManagerQLimitReached", true);
 
   private final String _brokerMeterName;
   private final String _unit;
