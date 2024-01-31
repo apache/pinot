@@ -410,7 +410,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
             ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
-        ControllerGauge.SEGMENTS_WITHOUT_HIGH_AVAILABILITY), 1);
+        ControllerGauge.SEGMENTS_WITHOUT_HIGH_AVAILABILITY), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
             ControllerGauge.NUMBER_OF_REPLICAS), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
