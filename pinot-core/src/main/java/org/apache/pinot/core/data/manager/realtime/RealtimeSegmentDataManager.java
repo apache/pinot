@@ -1127,6 +1127,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void cleanupMetrics() {
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
+    _realtimeTableDataManager.onConsumingToDropped(_segmentNameStr);
   }
 
   protected void hold() {
