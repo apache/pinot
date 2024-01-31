@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLException;
 import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.GrpcConfig;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.utils.TlsUtils;
@@ -55,13 +56,18 @@ public class GrpcQueryClient {
               .usePlaintext().build();
     } else {
       try {
-        SSLFactory sslFactory = TlsUtils.createSSLFactory(config.getTlsConfig());
+        TlsConfig tlsConfig = config.getTlsConfig();
+        SSLFactory sslFactory = TlsUtils.createSSLFactory(tlsConfig);
+        if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
+            && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
+          TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
+        }
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
         sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
         sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
-        if (config.getTlsConfig().getSslProvider() != null) {
+        if (tlsConfig.getSslProvider() != null) {
           sslContextBuilder =
-              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(config.getTlsConfig().getSslProvider()));
+              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(tlsConfig.getSslProvider()));
         } else {
           sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
         }
