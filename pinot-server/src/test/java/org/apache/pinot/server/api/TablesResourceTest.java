@@ -33,6 +33,7 @@ import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -280,6 +281,8 @@ public class TablesResourceTest extends BaseResourceTest {
     // Verify the content of the downloaded snapshot from a realtime table.
     downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
         (ImmutableSegmentImpl) _realtimeIndexSegments.get(0));
+    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) _realtimeIndexSegments.get(0));
 
     // Verify non-existent table and segment download return NOT_FOUND status.
     Response response =
@@ -299,6 +302,8 @@ public class TablesResourceTest extends BaseResourceTest {
     // Verify the content of the downloaded snapshot from a realtime table.
     downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
         (ImmutableSegmentImpl) segment);
+    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) segment);
 
     String validDocIdMetadataPath =
         "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/validDocIdMetadata";
@@ -310,6 +315,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("totalDocs").asInt(), 100000);
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
+    Assert.assertEquals(validDocIdMetadata.get("crc").asText(), "1265679343");
   }
 
   @Test
@@ -319,6 +325,9 @@ public class TablesResourceTest extends BaseResourceTest {
     // Verify the content of the downloaded snapshot from a realtime table.
     downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
         (ImmutableSegmentImpl) segment);
+    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) segment);
+
     List<String> segments = List.of(segment.getSegmentName());
     TableSegments tableSegments = new TableSegments(segments);
     String validDocIdMetadataPath =
@@ -331,6 +340,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("totalDocs").asInt(), 100000);
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
+    Assert.assertEquals(validDocIdMetadata.get("crc").asText(), "1265679343");
   }
 
   // Verify metadata file from segments.
@@ -364,7 +374,6 @@ public class TablesResourceTest extends BaseResourceTest {
   // Verify metadata file from segments.
   private void downLoadAndVerifyValidDocIdsSnapshot(String tableNameWithType, ImmutableSegmentImpl segment)
       throws IOException {
-
     String snapshotPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName() + "/validDocIds";
 
     PartitionUpsertMetadataManager upsertMetadataManager = mock(PartitionUpsertMetadataManager.class);
@@ -379,6 +388,31 @@ public class TablesResourceTest extends BaseResourceTest {
     Response response = _webTarget.path(snapshotPath).request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     byte[] snapshot = response.readEntity(byte[].class);
+
+    // Load the snapshot file.
+    Assert.assertNotNull(snapshot);
+    Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(snapshot)).toMutableRoaringBitmap(),
+        validDocIds.getMutableRoaringBitmap());
+  }
+
+  private void downLoadAndVerifyValidDocIdsSnapshotBitmap(String tableNameWithType, ImmutableSegmentImpl segment) {
+    String snapshotPath = "/segments/" + tableNameWithType + "/" + segment.getSegmentName() + "/validDocIdsBitmap";
+
+    PartitionUpsertMetadataManager upsertMetadataManager = mock(PartitionUpsertMetadataManager.class);
+    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+    int[] docIds = new int[]{1, 4, 6, 10, 15, 17, 18, 20};
+    for (int docId : docIds) {
+      validDocIds.add(docId);
+    }
+    segment.enableUpsert(upsertMetadataManager, validDocIds, null);
+
+    // Download the snapshot in byte[] format.
+    ValidDocIdsBitmapResponse response = _webTarget.path(snapshotPath).request().get(ValidDocIdsBitmapResponse.class);
+    Assert.assertNotNull(response);
+    Assert.assertEquals(response.getCrc(), "1265679343");
+    Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
+
+    byte[] snapshot = response.getBitmap();
 
     // Load the snapshot file.
     Assert.assertNotNull(snapshot);

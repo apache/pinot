@@ -18,45 +18,30 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class ValidDocIdMetadataInfo {
+public class ValidDocIdsBitmapResponse {
   private final String _segmentName;
-  private final long _totalValidDocs;
-  private final long _totalInvalidDocs;
-  private final long _totalDocs;
   private final String _crc;
+  private final byte[] _bitmap;
 
-  public ValidDocIdMetadataInfo(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("totalValidDocs") long totalValidDocs, @JsonProperty("totalInvalidDocs") long totalInvalidDocs,
-      @JsonProperty("totalDocs") long totalDocs, @JsonProperty("crc") String crc) {
+  public ValidDocIdsBitmapResponse(@JsonProperty("segmentName") String segmentName, @JsonProperty("crc") String crc,
+      @JsonProperty("bitmap") byte[] bitmap) {
     _segmentName = segmentName;
-    _totalValidDocs = totalValidDocs;
-    _totalInvalidDocs = totalInvalidDocs;
-    _totalDocs = totalDocs;
     _crc = crc;
+    _bitmap = bitmap;
   }
 
   public String getSegmentName() {
     return _segmentName;
   }
 
-  public long getTotalValidDocs() {
-    return _totalValidDocs;
-  }
-
-  public long getTotalInvalidDocs() {
-    return _totalInvalidDocs;
-  }
-
-  public long getTotalDocs() {
-    return _totalDocs;
-  }
-
   public String getCrc() {
     return _crc;
+  }
+
+  public byte[] getBitmap() {
+    return _bitmap;
   }
 }

@@ -137,7 +137,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
             "0d");
-        LOGGER.info("Deleted segments containing only invalid records for table: {}", tableNameWithType);
+        LOGGER.info(
+            "Deleted segments containing only invalid records for table: {}, number of segments to be deleted: {}",
+            tableNameWithType, segmentSelectionResult.getSegmentsForDeletion());
       }
 
       int numTasks = 0;
@@ -174,7 +176,13 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     for (ValidDocIdMetadataInfo validDocIdMetadata : validDocIdMetadataInfoList) {
       long totalInvalidDocs = validDocIdMetadata.getTotalInvalidDocs();
       String segmentName = validDocIdMetadata.getSegmentName();
+
+      // Skip segments if the crc from zk metadata and server does not match. They may be being reloaded.
       SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
+      if (segment.getCrc() != Long.parseLong(validDocIdMetadata.getCrc())) {
+        LOGGER.warn("CRC mismatch for segment: {}, skipping it for compaction", segmentName);
+        continue;
+      }
       long totalDocs = validDocIdMetadata.getTotalDocs();
       double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
       if (totalInvalidDocs == totalDocs) {

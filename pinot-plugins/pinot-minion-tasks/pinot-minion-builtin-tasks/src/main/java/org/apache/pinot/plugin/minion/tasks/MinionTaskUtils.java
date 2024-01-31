@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
@@ -37,7 +38,6 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,8 +139,8 @@ public class MinionTaskUtils {
     return dirInStr;
   }
 
-  public static RoaringBitmap getValidDocIds(String tableNameWithType, String segmentName, Map<String, String> configs,
-      MinionContext minionContext) {
+  public static ValidDocIdsBitmapResponse getValidDocIdsBitmap(String tableNameWithType, String segmentName,
+      Map<String, String> configs, MinionContext minionContext) {
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     String clusterName = minionContext.getHelixManager().getClusterName();
 
@@ -151,7 +151,7 @@ public class MinionTaskUtils {
     // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
     // passing an empty list.
     ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
-    return serverSegmentMetadataReader.getValidDocIdsFromServer(tableNameWithType, segmentName, endpoint, 60_000);
+    return serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint, 60_000);
   }
 
   public static String getServer(String segmentName, String tableNameWithType, HelixAdmin helixAdmin,

@@ -23,6 +23,8 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
@@ -53,7 +55,28 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     TableConfig tableConfig = getTableConfig(tableNameWithType);
-    RoaringBitmap validDocIds = MinionTaskUtils.getValidDocIds(tableNameWithType, segmentName, configs, MINION_CONTEXT);
+    ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
+        MinionTaskUtils.getValidDocIdsBitmap(tableNameWithType, segmentName, configs, MINION_CONTEXT);
+
+    // Check crc from the downloaded segment against the crc returned from the server along with the valid doc id
+    // bitmap. If this doesn't match, this means that we are hitting the race condition where the segment has been
+    // uploaded successfully while the server is still reloading the segment. Reloading can take a while when the
+    // offheap upsert is used because we will need to delete & add all primary keys.
+    // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
+    // against the crc from the current segment zk metadata, so we don't need to check that here.
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    String originalSegmentCrcFromTaskGenerator = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
+    String crcFromDeepStorageSegment = segmentMetadata.getCrc();
+    String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getCrc();
+    if (!originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)
+        || !originalSegmentCrcFromTaskGenerator.equals(crcFromValidDocIdsBitmap)) {
+      LOGGER.warn("CRC mismatch for segment: {}, expected: {}, actual crc from server: {}", segmentName,
+          crcFromDeepStorageSegment, validDocIdsBitmapResponse.getCrc());
+      return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
+          .build();
+    }
+
+    RoaringBitmap validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
 
     if (validDocIds.isEmpty()) {
       // prevents empty segment generation
@@ -68,7 +91,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
           .build();
     }
 
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(indexDir,
         validDocIds)) {
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName);

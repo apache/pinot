@@ -69,6 +69,7 @@ import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -465,10 +466,64 @@ public class TablesResource {
     }
   }
 
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableNameWithType}/{segmentName}/validDocIdsBitmap")
+  @ApiOperation(value = "Download validDocIds bitmap for an REALTIME immutable segment", notes =
+      "Download validDocIds for " + "an immutable segment in bitmap format.")
+  public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
+      @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @Context HttpHeaders httpHeaders) {
+    segmentName = URIUtils.decode(segmentName);
+    LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
+    // Validate data access
+    ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
+
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+
+    try {
+      IndexSegment indexSegment = segmentDataManager.getSegment();
+      if (!(indexSegment instanceof ImmutableSegmentImpl)) {
+        throw new WebApplicationException(
+            String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
+            Response.Status.BAD_REQUEST);
+      }
+
+      // Adopt the same logic as the query execution to get the valid doc ids. 'FilterPlanNode.run()'
+      // If the queryableDocId is available (upsert delete is enabled), we read the valid doc ids from it.
+      // Otherwise, we read the valid doc ids.
+      final MutableRoaringBitmap validDocIdSnapshot;
+      if (indexSegment.getQueryableDocIds() != null) {
+        validDocIdSnapshot = indexSegment.getQueryableDocIds().getMutableRoaringBitmap();
+      } else if (indexSegment.getValidDocIds() != null) {
+        validDocIdSnapshot = indexSegment.getValidDocIds().getMutableRoaringBitmap();
+      } else {
+        throw new WebApplicationException(
+            String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
+            Response.Status.NOT_FOUND);
+      }
+
+      byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
+      return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(), validDocIdsBytes);
+    } finally {
+      tableDataManager.releaseSegment(segmentDataManager);
+    }
+  }
+
   /**
    * Download snapshot for the given immutable segment for upsert table. This endpoint is used when get snapshot from
    * peer to avoid recompute when reload segments.
    */
+  @Deprecated
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}/validDocIds")
@@ -611,6 +666,7 @@ public class TablesResource {
         validDocIdMetadata.put("totalDocs", totalDocs);
         validDocIdMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdMetadata.put("totalInvalidDocs", totalInvalidDocs);
+        validDocIdMetadata.put("crc", indexSegment.getSegmentMetadata().getCrc());
         allValidDocIdMetadata.add(validDocIdMetadata);
       } finally {
         tableDataManager.releaseSegment(segmentDataManager);
