@@ -139,6 +139,11 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       String segmentName = message.getPartitionName();
       try {
         _instanceDataManager.offloadSegment(realtimeTableName, segmentName);
+        // At this point ingestion thread should be stopped, we notify tableManager so it can remove its resources
+        // safely
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(realtimeTableName);
+        Preconditions.checkState(tableDataManager != null, "Failed to find table: %s", realtimeTableName);
+        tableDataManager.onConsumingToDropped(segmentName);
       } catch (Exception e) {
         _logger.error("Caught exception in state transition CONSUMING -> OFFLINE for table: {}, segment: {}",
             realtimeTableName, segmentName, e);
