@@ -46,12 +46,6 @@ public class TransformOperandFactory {
     int numOperands = operands.size();
     String canonicalName = OperatorUtils.canonicalizeFunctionName(functionCall.getFunctionName());
     switch (canonicalName) {
-      case "IN":
-        Preconditions.checkState(numOperands >= 2, "IN takes >=2 arguments, got: %s", numOperands);
-        return new FilterOperand.In(operands, dataSchema, false);
-      case "NOT_IN":
-        Preconditions.checkState(numOperands >= 2, "NOT_IN takes >=2 arguments, got: %s", numOperands);
-        return new FilterOperand.In(operands, dataSchema, true);
       case "AND":
         Preconditions.checkState(numOperands >= 2, "AND takes >=2 arguments, got: %s", numOperands);
         return new FilterOperand.And(operands, dataSchema);
@@ -61,6 +55,12 @@ public class TransformOperandFactory {
       case "NOT":
         Preconditions.checkState(numOperands == 1, "NOT takes one argument, got: %s", numOperands);
         return new FilterOperand.Not(operands.get(0), dataSchema);
+      case "IN":
+        Preconditions.checkState(numOperands >= 2, "IN takes >=2 arguments, got: %s", numOperands);
+        return new FilterOperand.In(operands, dataSchema, false);
+      case "NOT_IN":
+        Preconditions.checkState(numOperands >= 2, "NOT_IN takes >=2 arguments, got: %s", numOperands);
+        return new FilterOperand.In(operands, dataSchema, true);
       case "ISTRUE":
         Preconditions.checkState(numOperands == 1, "IS_TRUE takes one argument, got: %s", numOperands);
         return new FilterOperand.IsTrue(operands.get(0), dataSchema);
