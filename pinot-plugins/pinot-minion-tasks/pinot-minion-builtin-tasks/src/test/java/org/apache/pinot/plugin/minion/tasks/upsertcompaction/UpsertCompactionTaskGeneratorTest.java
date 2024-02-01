@@ -186,9 +186,9 @@ public class UpsertCompactionTaskGeneratorTest {
       throws IOException {
     Map<String, String> compactionConfigs = getCompactionConfigs("1", "10");
     String json = "[{" + "\"totalValidDocs\" : 50," + "\"totalInvalidDocs\" : 50," + "\"segmentName\" : \""
-        + _completedSegment.getSegmentName() + "\"," + "\"totalDocs\" : 100" + ", \"crc\": \""
+        + _completedSegment.getSegmentName() + "\"," + "\"totalDocs\" : 100" + ", \"segmentCrc\": \""
         + _completedSegment.getCrc() + "\"}," + "{" + "\"totalValidDocs\" : 0," + "\"totalInvalidDocs\" : 10,"
-        + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\", " + "\"crc\" : \""
+        + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\", " + "\"segmentCrc\" : \""
         + _completedSegment2.getCrc() + "\"," + "\"totalDocs\" : 10" + "}]";
     List<ValidDocIdMetadataInfo> validDocIdMetadataInfo =
         JsonUtils.stringToObject(json, new TypeReference<ArrayList<ValidDocIdMetadataInfo>>() {
@@ -225,9 +225,9 @@ public class UpsertCompactionTaskGeneratorTest {
 
     // Test the case where the completedSegment from api has different crc than segment from zk metadata.
     json = "[{" + "\"totalValidDocs\" : 50," + "\"totalInvalidDocs\" : 50," + "\"segmentName\" : \""
-        + _completedSegment.getSegmentName() + "\"," + "\"totalDocs\" : 100" + ", \"crc\": \""
+        + _completedSegment.getSegmentName() + "\"," + "\"totalDocs\" : 100" + ", \"segmentCrc\": \""
         + "1234567890" + "\"}," + "{" + "\"totalValidDocs\" : 0," + "\"totalInvalidDocs\" : 10,"
-        + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\", " + "\"crc\" : \""
+        + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\", " + "\"segmentCrc\" : \""
         + _completedSegment2.getCrc() + "\","
         + "\"totalDocs\" : 10" + "}]";
     validDocIdMetadataInfo = JsonUtils.stringToObject(json, new TypeReference<ArrayList<ValidDocIdMetadataInfo>>() {

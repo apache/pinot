@@ -23,13 +23,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class ValidDocIdsBitmapResponse {
   private final String _segmentName;
-  private final String _crc;
+  private final String _segmentCrc;
+  private final String _validDocIdType;
   private final byte[] _bitmap;
 
-  public ValidDocIdsBitmapResponse(@JsonProperty("segmentName") String segmentName, @JsonProperty("crc") String crc,
+  public ValidDocIdsBitmapResponse(@JsonProperty("segmentName") String segmentName,
+      @JsonProperty("segmentCrc") String crc, @JsonProperty("validDocIdType") String validDocIdType,
       @JsonProperty("bitmap") byte[] bitmap) {
     _segmentName = segmentName;
-    _crc = crc;
+    _segmentCrc = crc;
+    _validDocIdType = validDocIdType;
     _bitmap = bitmap;
   }
 
@@ -37,8 +40,12 @@ public class ValidDocIdsBitmapResponse {
     return _segmentName;
   }
 
-  public String getCrc() {
-    return _crc;
+  public String getSegmentCrc() {
+    return _segmentCrc;
+  }
+
+  public String getValidDocIdType() {
+    return _validDocIdType;
   }
 
   public byte[] getBitmap() {

@@ -140,7 +140,7 @@ public class MinionTaskUtils {
   }
 
   public static ValidDocIdsBitmapResponse getValidDocIdsBitmap(String tableNameWithType, String segmentName,
-      Map<String, String> configs, MinionContext minionContext) {
+      String validDocIdType, MinionContext minionContext) {
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     String clusterName = minionContext.getHelixManager().getClusterName();
 
@@ -151,7 +151,8 @@ public class MinionTaskUtils {
     // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
     // passing an empty list.
     ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
-    return serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint, 60_000);
+    return serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
+        validDocIdType, 60_000);
   }
 
   public static String getServer(String segmentName, String tableNameWithType, HelixAdmin helixAdmin,

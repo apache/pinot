@@ -164,5 +164,11 @@ public class MinionConstants {
      * e.g. if the count surpasses 100k, then the segment may be compacted
      */
     public static final String INVALID_RECORDS_THRESHOLD_COUNT = "invalidRecordsThresholdCount";
+
+    /**
+     * Valid doc id type ('validDocIdsSnapshot', `validDocIds`, `queryableDocIds`). If not set, 'validDocIdsSnapshot'
+     * is used.
+     */
+    public static final String VALID_DOC_ID_TYPE = "validDocIdType";
   }
 }

@@ -669,6 +669,20 @@ public final class TableConfigUtils {
               taskTypeConfig.containsKey("invalidRecordsThresholdPercent") || taskTypeConfig.containsKey(
                   "invalidRecordsThresholdCount"),
               "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
+          String validDocIdType = taskTypeConfig.getOrDefault("validDocIdType", "validDocIdsSnapshot");
+          if (validDocIdType.equals("validDocIdsSnapshot")) {
+            UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+            Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+            Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
+                "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdType = "
+                    + "%s", validDocIdType));
+          } else if (validDocIdType.equals("queryableDocIds")) {
+            UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+            Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+            Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(), String.format(
+                "deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdType = %s",
+                validDocIdType));
+          }
         }
       }
     }
