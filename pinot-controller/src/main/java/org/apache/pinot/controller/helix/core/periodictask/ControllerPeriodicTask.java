@@ -69,9 +69,9 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
       // Check if we have a specific table against which this task needs to be run.
       String propTableNameWithType = (String) periodicTaskProperties.get(PeriodicTask.PROPERTY_KEY_TABLE_NAME);
       // Process the tables that are managed by this controller
-      Set<String> allTables = propTableNameWithType == null
-          ? new HashSet<>(_pinotHelixResourceManager.getAllTables())
-          : Collections.singleton(propTableNameWithType);
+      List<String> allTables = propTableNameWithType == null
+          ? _pinotHelixResourceManager.getAllTables()
+          : Collections.singletonList(propTableNameWithType);
 
       Set<String> currentLeaderOfTables = allTables.stream()
           .filter(_leadControllerManager::isLeaderForTable)
@@ -81,14 +81,11 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
         processTables(new ArrayList<>(currentLeaderOfTables), periodicTaskProperties);
       }
 
-      Sets.SetView<String> allKnownTables = Sets.union(_prevLeaderOfTables, allTables);
-      Set<String> nonLeaderForTables = Sets.difference(allKnownTables, currentLeaderOfTables);
+      Set<String> nonLeaderForTables = Sets.difference(_prevLeaderOfTables, currentLeaderOfTables);
       if (!nonLeaderForTables.isEmpty()) {
         nonLeaderCleanup(new ArrayList<>(nonLeaderForTables));
       }
-      if (!_prevLeaderOfTables.equals(currentLeaderOfTables)) {
-        _prevLeaderOfTables = new HashSet<>(currentLeaderOfTables);
-      }
+      _prevLeaderOfTables = currentLeaderOfTables;
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
       _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);
