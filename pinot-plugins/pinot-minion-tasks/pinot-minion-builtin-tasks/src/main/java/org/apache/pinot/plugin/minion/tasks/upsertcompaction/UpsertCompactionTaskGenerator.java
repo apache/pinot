@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -145,6 +146,10 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       for (SegmentZKMetadata segment : segmentSelectionResult.getSegmentsForCompaction()) {
         if (numTasks == maxTasks) {
           break;
+        }
+        if (StringUtils.isBlank(segment.getDownloadUrl())) {
+          LOGGER.warn("Skipping segment {} for task {} as download url is empty", segment.getSegmentName(), taskType);
+          continue;
         }
         Map<String, String> configs = new HashMap<>();
         configs.put(MinionConstants.TABLE_NAME_KEY, tableNameWithType);
