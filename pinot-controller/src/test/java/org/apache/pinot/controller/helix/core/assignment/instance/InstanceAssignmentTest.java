@@ -50,7 +50,9 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.fail;
 
 
 public class InstanceAssignmentTest {
@@ -198,8 +200,8 @@ public class InstanceAssignmentTest {
     // r0: [i8, i1, i4]
     //      p0, p0, p1
     //      p1
-    // r1: [i9, i10, i5]
-    //      p0, p0, p1
+    // r1: [i9, i5, i10]
+    //      p0, p1, p0
     //      p1
     // r2: [i0, i3, i11]
     //      p0, p0, p1
@@ -217,7 +219,7 @@ public class InstanceAssignmentTest {
     assertEquals(instancePartitions.getInstances(1, 2),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 0));
 
-    // Add 2 more instances to the ZK and increase the number of instances per replica group from 2 to 3.
+    // Add 2 more instances to the ZK and increase the number of instances per partition from 2 to 3.
     for (int i = numInstances + 2; i < numInstances + 4; i++) {
       InstanceConfig instanceConfig = new InstanceConfig(SERVER_INSTANCE_ID_PREFIX + i);
       instanceConfig.addTag(OFFLINE_TAG);
@@ -233,34 +235,29 @@ public class InstanceAssignmentTest {
 
     // Math.abs("myTable_OFFLINE".hashCode()) % 12 = 2
     // [i10, i11, i12, i13, i3, i4, i5, i11, i7, i8, i9, i0, i1]
-    // For r0, the candidate instances are [i12, i13, i4, i7, i8, i1].
-    //   For p0, since the existing assignment is [i8, i1], the next available instance from the candidates is i12.
-    //   For p1, the existing assignment is [i4, i8], the next available instance is also i12.
-    // r0: [i12, i4, i8, i1]
-    // For r1, the candidate instances become [i10, i13, i5, i7, i9].
-    //   For p0, since the existing assignment is [i9, i10], the next available instance is i13 (new instance).
-    //   For p1, the existing assignment is [i5, i9], the next available one from the candidates is i10, but since
-    //   i10 is already used in the former partition, it got added to the tail, so the next available one is i13.
-    // r1: [i10, i13, i5, i9]
-    // For r2, the candidate instances become [i11, i3, i7, i0].
-    //   For p0, the existing assignment is [i0, i3], the next available instance from the candidates is i11.
-    //   For p1, the existing assignment is [i11, i0], the next available instance from the candidates is i3, but
-    //   since i3 is already used in the former partition, it got appended to the tail, so the next available one is i7.
-    // r2: [i11, i3, i7, i0]
+    // r0: [i8, i1, i4, i12]
+    //      p0, p0, p1, p0
+    //      p1, p1
+    // r1: [i9, i5, i10, i13]
+    //      p0, p1, p0,  p0
+    //      p1,     p1
+    // r2: [i0, i3, i11, i7]
+    //      p0, p0, p1,  p0
+    //      p1, p1
     assertEquals(instancePartitions.getInstances(0, 0),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 1, SERVER_INSTANCE_ID_PREFIX + 12));
     assertEquals(instancePartitions.getInstances(1, 0),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 4, SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 12));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 4, SERVER_INSTANCE_ID_PREFIX + 8, SERVER_INSTANCE_ID_PREFIX + 1));
     assertEquals(instancePartitions.getInstances(0, 1),
         Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 9, SERVER_INSTANCE_ID_PREFIX + 10, SERVER_INSTANCE_ID_PREFIX + 13));
     assertEquals(instancePartitions.getInstances(1, 1),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 9, SERVER_INSTANCE_ID_PREFIX + 13));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 5, SERVER_INSTANCE_ID_PREFIX + 9, SERVER_INSTANCE_ID_PREFIX + 10));
     assertEquals(instancePartitions.getInstances(0, 2),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 11));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 3, SERVER_INSTANCE_ID_PREFIX + 7));
     assertEquals(instancePartitions.getInstances(1, 2),
-        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 7));
+        Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 11, SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 3));
 
-    // Reduce the number of instances per replica group from 3 to 2.
+    // Reduce the number of instances per partition from 3 to 2.
     numInstancesPerPartition = 2;
     tableConfig.getValidationConfig()
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(partitionColumnName, numInstancesPerPartition));

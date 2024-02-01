@@ -109,10 +109,7 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
     return new ImmutablePair<>(numReplicaGroups, numInstancesPerReplicaGroup);
   }
 
-  /**
-   * Selects instances based on the replica-group/partition config, and stores the result into the given instance
-   * partitions.
-   */
+  @Override
   public void selectInstances(Map<Integer, List<InstanceConfig>> faultDomainToInstanceConfigsMap,
       InstancePartitions instancePartitions) {
 
@@ -152,7 +149,7 @@ public class FDAwareInstancePartitionSelector extends InstancePartitionSelector 
        * initialize the new replicaGroupBasedAssignmentState for assignment,
        * place existing instances in their corresponding positions
        */
-      if (_minimizeDataMovement && _existingInstancePartitions != null) {
+      if (_minimizeDataMovement) {
         int numExistingReplicaGroups = _existingInstancePartitions.getNumReplicaGroups();
         int numExistingPartitions = _existingInstancePartitions.getNumPartitions();
         /*

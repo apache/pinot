@@ -22,18 +22,17 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
-import org.apache.pinot.spi.utils.Pairs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,16 +45,14 @@ public class InstanceTagPoolSelector {
 
   private final InstanceTagPoolConfig _tagPoolConfig;
   private final String _tableNameWithType;
-
   private final boolean _minimizeDataMovement;
-
   private final InstancePartitions _existingInstancePartitions;
 
   public InstanceTagPoolSelector(InstanceTagPoolConfig tagPoolConfig, String tableNameWithType,
       boolean minimizeDataMovement, @Nullable InstancePartitions existingInstancePartitions) {
     _tagPoolConfig = tagPoolConfig;
     _tableNameWithType = tableNameWithType;
-    _minimizeDataMovement = minimizeDataMovement;
+    _minimizeDataMovement = minimizeDataMovement && existingInstancePartitions != null;
     _existingInstancePartitions = existingInstancePartitions;
   }
 
@@ -104,7 +101,7 @@ public class InstanceTagPoolSelector {
       // Calculate the pools to select based on the selection config
       Set<Integer> pools = poolToInstanceConfigsMap.keySet();
       List<Integer> poolsToSelect = _tagPoolConfig.getPools();
-      if (poolsToSelect != null && !poolsToSelect.isEmpty()) {
+      if (!CollectionUtils.isEmpty(poolsToSelect)) {
         Preconditions.checkState(pools.containsAll(poolsToSelect), "Cannot find all instance pools configured: %s",
             poolsToSelect);
       } else {
@@ -123,45 +120,44 @@ public class InstanceTagPoolSelector {
           return poolToInstanceConfigsMap;
         }
 
+        // Select pools based on the table name hash to evenly distribute the tables
+        List<Integer> poolsInCluster = new ArrayList<>(pools);
+        int startIndex = Math.abs(tableNameHash % numPools);
         poolsToSelect = new ArrayList<>(numPoolsToSelect);
-        if (_minimizeDataMovement && _existingInstancePartitions != null) {
-          Map<Integer, Set<String>> existingPoolsToExistingInstancesMap = new TreeMap<>();
-          // Keep the same pool if it's already been used for the table.
+        if (_minimizeDataMovement) {
+          assert _existingInstancePartitions != null;
+          Map<Integer, Integer> poolToNumExistingInstancesMap = new TreeMap<>();
           int existingNumPartitions = _existingInstancePartitions.getNumPartitions();
           int existingNumReplicaGroups = _existingInstancePartitions.getNumReplicaGroups();
-          for (int replicaGroupId = 0; replicaGroupId < existingNumReplicaGroups; replicaGroupId++) {
-            for (int partitionId = 0; partitionId < existingNumPartitions; partitionId++) {
+          for (int partitionId = 0; partitionId < existingNumPartitions; partitionId++) {
+            for (int replicaGroupId = 0; replicaGroupId < existingNumReplicaGroups; replicaGroupId++) {
               List<String> existingInstances = _existingInstancePartitions.getInstances(partitionId, replicaGroupId);
               for (String existingInstance : existingInstances) {
                 Integer existingPool = instanceToPoolMap.get(existingInstance);
                 if (existingPool != null) {
-                  if (!existingPoolsToExistingInstancesMap.containsKey(existingPool)) {
-                    existingPoolsToExistingInstancesMap.put(existingPool, new HashSet<>());
-                  }
-                  existingPoolsToExistingInstancesMap.computeIfAbsent(existingPool, k -> new HashSet<>())
-                      .add(existingInstance);
+                  poolToNumExistingInstancesMap.merge(existingPool, 1, Integer::sum);
                 }
               }
             }
           }
-
-          // Use a max heap to track the number of servers used for all the pools.
-          PriorityQueue<Pairs.IntPair> maxHeap = new PriorityQueue<>(pools.size(), Pairs.intPairComparator(false));
-          for (int pool : pools) {
-            maxHeap.add(new Pairs.IntPair(existingPoolsToExistingInstancesMap.get(pool).size(), pool));
+          // Sort the pools based on the number of existing instances in the pool in descending order, then use the
+          // table name hash to break even
+          // Triple stores (pool, numExistingInstances, poolIndex) for sorting
+          List<Triple<Integer, Integer, Integer>> triples = new ArrayList<>(numPools);
+          for (int i = 0; i < numPools; i++) {
+            int pool = poolsInCluster.get((startIndex + i) % numPools);
+            triples.add(Triple.of(pool, poolToNumExistingInstancesMap.getOrDefault(pool, 0), i));
           }
-
-          // Pick the pools from the max heap, so that data movement be minimized.
+          triples.sort((o1, o2) -> {
+            int result = Integer.compare(o2.getMiddle(), o1.getMiddle());
+            return result != 0 ? result : Integer.compare(o1.getRight(), o2.getRight());
+          });
           for (int i = 0; i < numPoolsToSelect; i++) {
-            Pairs.IntPair pair = maxHeap.remove();
-            poolsToSelect.add(pair.getRight());
+            poolsToSelect.add(triples.get(i).getLeft());
           }
-          LOGGER.info("The selected pools: " + poolsToSelect);
         } else {
-          // Select pools based on the table name hash to evenly distribute the tables
-          List<Integer> poolsInCluster = new ArrayList<>(pools);
           for (int i = 0; i < numPoolsToSelect; i++) {
-            poolsToSelect.add(poolsInCluster.get((tableNameHash + i) % numPools));
+            poolsToSelect.add(poolsInCluster.get((startIndex + i) % numPools));
           }
         }
       }
