@@ -151,12 +151,14 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       _logger.info("SegmentOnlineOfflineStateModel.onBecomeDroppedFromConsuming() : " + message);
       String realtimeTableName = message.getResourceName();
       String segmentName = message.getPartitionName();
-      TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(realtimeTableName);
-      Preconditions.checkState(tableDataManager != null, "Failed to find table: %s", realtimeTableName);
-      tableDataManager.onConsumingToDropped(segmentName);
       try {
         _instanceDataManager.offloadSegment(realtimeTableName, segmentName);
         _instanceDataManager.deleteSegment(realtimeTableName, segmentName);
+        // At this point ingestion thread should be stopped, we notify tableManager so it can remove its resources
+        // safely
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(realtimeTableName);
+        Preconditions.checkState(tableDataManager != null, "Failed to find table: %s", realtimeTableName);
+        tableDataManager.onConsumingToDropped(segmentName);
       } catch (Exception e) {
         _logger.error("Caught exception in state transition CONSUMING -> DROPPED for table: {}, segment: {}",
             realtimeTableName, segmentName, e);
