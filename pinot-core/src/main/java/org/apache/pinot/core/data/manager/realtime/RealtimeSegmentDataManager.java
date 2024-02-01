@@ -899,10 +899,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   /**
-   * Checks if the stream partition is in a valid state.
-   *
-   * The type of checks is dependent on the stream type. An example is if the startOffset has expired due to
-   * retention configuration of the stream which may lead to missed data.
+   * Checks if the begin offset of the stream partition has been fast-forwarded.
    *
    * @param startOffset The offset of the first message desired, inclusive
    */
@@ -911,23 +908,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       createPartitionMetadataProvider("validateStartOffset");
     }
 
-    try {
-      StreamPartitionMsgOffset streamSmallestOffset = _partitionMetadataProvider.fetchStreamPartitionOffset(
-          OffsetCriteria.SMALLEST_OFFSET_CRITERIA,
-          /*maxWaitTimeMs=*/5000
+    StreamPartitionMsgOffset streamSmallestOffset = fetchEarliestStreamOffset(5000);
+    if (streamSmallestOffset != null && streamSmallestOffset.compareTo(startOffset) > 0) {
+      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
+      String message = "startOffset(" + startOffset
+          + ") is older than topic's beginning offset(" + streamSmallestOffset + ")";
+      _segmentLogger.error(message);
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+          new SegmentErrorInfo(now(), message, null)
       );
-      if (streamSmallestOffset.compareTo(startOffset) > 0) {
-        _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
-        String message = "startOffset(" + startOffset
-            + ") is older than topic's beginning offset(" + streamSmallestOffset + ")";
-        _segmentLogger.error(message);
-        _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-            new SegmentErrorInfo(String.valueOf(now()), message, "")
-        );
-      }
-    } catch (TimeoutException tce) {
-      _segmentLogger.warn("Timed out when waiting to fetch stream begin offset. Table {}, partition {}",
-          _tableStreamName, _partitionGroupId);
     }
   }
 

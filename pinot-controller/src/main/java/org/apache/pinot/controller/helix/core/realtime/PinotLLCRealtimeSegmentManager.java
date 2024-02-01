@@ -1353,7 +1353,7 @@ public class PinotLLCRealtimeSegmentManager {
                         + " of table: " + tableName;
 
         _errorCache.put(Pair.of(tableName, segmentName),
-            new SegmentErrorInfo(String.valueOf(System.currentTimeMillis()), message, ""));
+            new SegmentErrorInfo(System.currentTimeMillis(), message, null));
         return startOffsetInSegmentZkMetadata;
       }
       return startOffsetInSegmentZkMetadata;
@@ -1769,13 +1769,12 @@ public class PinotLLCRealtimeSegmentManager {
     return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
   }
 
-  public Map<String, SegmentErrorInfo> getSegmentErrors(String tableNameWithType) {
+  public SegmentErrorInfo getSegmentErrors(String tableNameWithType, String segmentName) {
     if (_errorCache == null) {
-      return Collections.emptyMap();
+      return null;
     } else {
       // Filter out entries that match the table name.
-      return _errorCache.entrySet().stream().filter(map -> map.getKey().getLeft().equals(tableNameWithType))
-          .collect(Collectors.toMap(map -> map.getKey().getRight(), Map.Entry::getValue));
+      return _errorCache.get(Pair.of(tableNameWithType, segmentName));
     }
   }
 }

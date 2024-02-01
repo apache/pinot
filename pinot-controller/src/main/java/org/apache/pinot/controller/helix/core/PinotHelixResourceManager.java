@@ -4096,8 +4096,8 @@ public class PinotHelixResourceManager {
     return tagMinInstanceMap;
   }
 
-  public Map<String, SegmentErrorInfo> getSegmentErrors(String tableNameWithType) {
-    return _pinotLLCRealtimeSegmentManager.getSegmentErrors(tableNameWithType);
+  public SegmentErrorInfo getSegmentErrors(String tableNameWithType, String segmentName) {
+    return _pinotLLCRealtimeSegmentManager.getSegmentErrors(tableNameWithType, segmentName);
   }
   /*
    * Uncomment and use for testing on a real cluster
