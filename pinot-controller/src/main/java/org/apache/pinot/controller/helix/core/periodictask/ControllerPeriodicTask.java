@@ -97,9 +97,12 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   }
 
   /**
-   * Processes the given list of tables, and returns the number of tables processed.
+   * Processes the given list of tables lead by the current controller, and returns the number of tables processed.
    * <p>
    * Override one of this method, {@link #processTable(String)} or {@link #processTable(String, C)}.
+   * <p/>
+   * Note: This method is called each time the task is executed <b>if and only if</b> the current controller is the
+   * leader of at least one table. A corollary is that it won't be called every time the task is executed.
    */
   protected void processTables(List<String> tableNamesWithType, Properties periodicTaskProperties) {
     int numTables = tableNamesWithType.size();
@@ -127,14 +130,14 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   }
 
   /**
-   * Can be overridden to provide context before processing the tables.
+   * Can be overridden to provide context before processing the tables lead by the current controller.
    */
   protected C preprocess(Properties periodicTaskProperties) {
     return null;
   }
 
   /**
-   * Processes the given table.
+   * Processes the given table lead by the current controller.
    * <p>
    * Override one of this method, {@link #processTable(String)} or {@link #processTables(List, Properties)}.
    */
@@ -143,7 +146,7 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   }
 
   /**
-   * Processes the given table.
+   * Processes the given table lead by the current controller.
    * <p>
    * Override one of this method, {@link #processTable(String, C)} or {@link #processTables(List, Properties)}.
    */
@@ -151,20 +154,23 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   }
 
   /**
-   * Can be overridden to perform cleanups after processing the tables.
+   * Can be overridden to perform cleanups after processing the tables lead by the current controller.
    */
   protected void postprocess(C context) {
     postprocess();
   }
 
   /**
-   * Can be overridden to perform cleanups after processing the tables.
+   * Can be overridden to perform cleanups after processing the tables lead by the current controller.
    */
   protected void postprocess() {
   }
 
   /**
-   * Can be overridden to perform cleanups for tables that the current controller isn't the leader.
+   * Can be overridden to perform cleanups for tables the current controller lost the leadership.
+   * <p/>
+   * Note: This method is only being called when there is at least one table in the given list. A corollary is that it
+   * won't be called every time the task is executed.
    *
    * @param tableNamesWithType the table names that the current controller isn't the leader for
    */
