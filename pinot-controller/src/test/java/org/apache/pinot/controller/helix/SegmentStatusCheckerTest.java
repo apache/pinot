@@ -164,7 +164,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
             ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
-        ControllerGauge.SEGMENTS_WITHOUT_HIGH_AVAILABILITY), 0);
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 2);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
             ControllerGauge.NUMBER_OF_REPLICAS), 2);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
@@ -251,7 +251,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
             ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
-        ControllerGauge.SEGMENTS_WITHOUT_HIGH_AVAILABILITY), 0);
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
             ControllerGauge.NUMBER_OF_REPLICAS), 3);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
@@ -351,7 +351,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
             ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
-        ControllerGauge.SEGMENTS_WITHOUT_HIGH_AVAILABILITY), 1);
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 2);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
             ControllerGauge.NUMBER_OF_REPLICAS), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
@@ -410,7 +410,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
             ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
-        ControllerGauge.SEGMENTS_WITHOUT_HIGH_AVAILABILITY), 0);
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
             ControllerGauge.NUMBER_OF_REPLICAS), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
@@ -455,7 +455,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
             ControllerGauge.SEGMENTS_IN_ERROR_STATE), Long.MIN_VALUE);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
-        ControllerGauge.SEGMENTS_WITHOUT_HIGH_AVAILABILITY), Long.MIN_VALUE);
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), Long.MIN_VALUE);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
             ControllerGauge.NUMBER_OF_REPLICAS), Long.MIN_VALUE);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
@@ -549,7 +549,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
             ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
-        ControllerGauge.SEGMENTS_WITHOUT_HIGH_AVAILABILITY), 0);
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
             ControllerGauge.NUMBER_OF_REPLICAS), 2);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, externalView.getId(),
@@ -606,7 +606,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
-        ControllerGauge.SEGMENTS_WITHOUT_HIGH_AVAILABILITY), 0);
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), 0);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
             ControllerGauge.NUMBER_OF_REPLICAS), 1);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
