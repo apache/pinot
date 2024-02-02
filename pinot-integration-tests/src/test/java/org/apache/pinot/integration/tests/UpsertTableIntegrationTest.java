@@ -84,8 +84,8 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String PRIMARY_KEY_COL = "playerId";
   private static final String DELETE_COL = "deleted";
 
-  private PinotTaskManager _taskManager;
-  private PinotHelixTaskResourceManager _helixTaskResourceManager;
+  protected PinotTaskManager _taskManager;
+  protected PinotHelixTaskResourceManager _helixTaskResourceManager;
 
   @BeforeClass
   public void setUp()

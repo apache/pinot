@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.assignment.instance;
 
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
@@ -31,25 +32,18 @@ public class InstancePartitionSelectorFactory {
 
   public static InstancePartitionSelector getInstance(InstanceAssignmentConfig.PartitionSelector partitionSelector,
       InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig, String tableNameWithType,
-      InstancePartitions existingInstancePartitions) {
-    return getInstance(partitionSelector, instanceReplicaGroupPartitionConfig, tableNameWithType,
-        existingInstancePartitions, null);
-  }
-
-  public static InstancePartitionSelector getInstance(InstanceAssignmentConfig.PartitionSelector partitionSelector,
-      InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig, String tableNameWithType,
-      InstancePartitions existingInstancePartitions, InstancePartitions preConfiguredInstancePartitions
-  ) {
+      InstancePartitions existingInstancePartitions, @Nullable InstancePartitions preConfiguredInstancePartitions,
+      boolean minimizeDataMovement) {
     switch (partitionSelector) {
       case FD_AWARE_INSTANCE_PARTITION_SELECTOR:
         return new FDAwareInstancePartitionSelector(instanceReplicaGroupPartitionConfig, tableNameWithType,
-            existingInstancePartitions);
+            existingInstancePartitions, minimizeDataMovement);
       case INSTANCE_REPLICA_GROUP_PARTITION_SELECTOR:
         return new InstanceReplicaGroupPartitionSelector(instanceReplicaGroupPartitionConfig, tableNameWithType,
-            existingInstancePartitions);
+            existingInstancePartitions, minimizeDataMovement);
       case MIRROR_SERVER_SET_PARTITION_SELECTOR:
         return new MirrorServerSetInstancePartitionSelector(instanceReplicaGroupPartitionConfig, tableNameWithType,
-            existingInstancePartitions, preConfiguredInstancePartitions);
+            existingInstancePartitions, preConfiguredInstancePartitions, minimizeDataMovement);
       default:
         throw new IllegalStateException("Unexpected PartitionSelector: " + partitionSelector + ", should be from"
             + Arrays.toString(InstanceAssignmentConfig.PartitionSelector.values()));
