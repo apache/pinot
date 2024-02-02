@@ -59,7 +59,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
     String validDocIdsTypeStr =
         configs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
-    ValidDocIdsType validDocIdsType = ValidDocIdsType.fromString(validDocIdsTypeStr);
+    ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
     ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
         MinionTaskUtils.getValidDocIdsBitmap(tableNameWithType, segmentName, validDocIdsType.toString(),
             MINION_CONTEXT);

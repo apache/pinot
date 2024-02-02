@@ -319,7 +319,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
     Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "1265679343");
-    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "snapshot");
+    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
   }
 
   @Test
@@ -345,7 +345,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
     Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "1265679343");
-    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "snapshot");
+    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
   }
 
   // Verify metadata file from segments.
@@ -418,7 +418,7 @@ public class TablesResourceTest extends BaseResourceTest {
         validDocIdsSnapshot.getMutableRoaringBitmap());
 
     // Check onHeap type
-    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.ON_HEAP).request()
+    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY).request()
         .get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
@@ -428,7 +428,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
     // Check onHeapWithDelete type
     response =
-        _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.ON_HEAP_WITH_DELETE.toString())
+        _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())
             .request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
@@ -482,8 +482,9 @@ public class TablesResourceTest extends BaseResourceTest {
         validDocIdsSnapshot.getMutableRoaringBitmap());
 
     // Check onHeap type
-    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.ON_HEAP.toString()).request()
-        .get(ValidDocIdsBitmapResponse.class);
+    response =
+        _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY.toString()).request()
+            .get(ValidDocIdsBitmapResponse.class);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getSegmentCrc(), "1265679343");
     Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
@@ -494,7 +495,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
     // Check onHeapWithDelete type
     response =
-        _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.ON_HEAP_WITH_DELETE.toString())
+        _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())
             .request().get(ValidDocIdsBitmapResponse.class);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getSegmentCrc(), "1265679343");

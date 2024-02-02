@@ -521,7 +521,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     TableTaskConfig taskConfig = getCompactionTaskConfig();
     Map<String, String> compactionTaskConfig =
         taskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE);
-    compactionTaskConfig.put("validDocIdsType", ValidDocIdsType.ON_HEAP_WITH_DELETE.toString());
+    compactionTaskConfig.put("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString());
     taskConfig = new TableTaskConfig(
         Collections.singletonMap(MinionConstants.UpsertCompactionTask.TASK_TYPE, compactionTaskConfig));
     tableConfig.setTaskConfig(taskConfig);

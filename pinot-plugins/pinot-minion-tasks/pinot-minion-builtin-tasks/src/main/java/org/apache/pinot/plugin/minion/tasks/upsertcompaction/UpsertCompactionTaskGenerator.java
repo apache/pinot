@@ -132,8 +132,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       // By default, we use 'snapshot' for validDocIdsType. This means that we will use the validDocIds bitmap from
       // the snapshot from Pinot segment. This will require 'enableSnapshot' from UpsertConfig to be set to true.
       String validDocIdsTypeStr =
-          taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
-      ValidDocIdsType validDocIdsType = ValidDocIdsType.fromString(validDocIdsTypeStr);
+          taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.toString());
+      ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
 
       // Validate that the snapshot is enabled if validDocIdsType is validDocIdsSnapshot
       if (validDocIdsType == ValidDocIdsType.SNAPSHOT) {
@@ -142,7 +142,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
             "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdsType = %s",
             validDocIdsType));
-      } else if (validDocIdsType == ValidDocIdsType.ON_HEAP_WITH_DELETE) {
+      } else if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE) {
         UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
         Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
         Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(),

@@ -29,12 +29,12 @@ public class ValidDocIdMetadataInfo {
   private final long _totalInvalidDocs;
   private final long _totalDocs;
   private final String _segmentCrc;
-  private final String _validDocIdsType;
+  private final ValidDocIdsType _validDocIdsType;
 
   public ValidDocIdMetadataInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("totalValidDocs") long totalValidDocs, @JsonProperty("totalInvalidDocs") long totalInvalidDocs,
       @JsonProperty("totalDocs") long totalDocs, @JsonProperty("segmentCrc") String segmentCrc,
-      @JsonProperty("validDocIdsType") String validDocIdsType) {
+      @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType) {
     _segmentName = segmentName;
     _totalValidDocs = totalValidDocs;
     _totalInvalidDocs = totalInvalidDocs;
@@ -63,7 +63,7 @@ public class ValidDocIdMetadataInfo {
     return _segmentCrc;
   }
 
-  public String getValidDocIdsType() {
+  public ValidDocIdsType getValidDocIdsType() {
     return _validDocIdsType;
   }
 }

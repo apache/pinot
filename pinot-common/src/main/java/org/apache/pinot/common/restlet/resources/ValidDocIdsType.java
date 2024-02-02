@@ -21,30 +21,19 @@ package org.apache.pinot.common.restlet.resources;
 public enum ValidDocIdsType {
   // Default validDocIds type. This indicates that the validDocIds bitmap is loaded from the snapshot from the
   // Pinot segment. UpsertConfig's 'enableSnapshot' must be enabled for this type.
-  SNAPSHOT("snapshot"),
-  // This indicates that the validDocIds bitmap is loaded from the real-time server.
-  ON_HEAP("onHeap"),
-  // This indicates that the validDocIds bitmap is read from the real-time server. The valid document ids here does
-  // take account into the deleted records. UpsertConfig's 'deleteRecordColumn' must be provided for this type.
-  ON_HEAP_WITH_DELETE("onHeapWithDelete");
+  SNAPSHOT,
 
-  private final String _type;
+  // This indicates that the validDocIds bitmap is loaded from the real-time server's in-memory.
+  //
+  // NOTE: Using in-memory based validDocids bitmap is a bit dangerous as it will not give us the consistency in some
+  // cases (e.g. fetching validDocIds bitmap while the server is restarting & updating validDocIds).
+  IN_MEMORY,
 
-  ValidDocIdsType(String type) {
-    _type = type;
-  }
-
-  @Override
-  public String toString() {
-    return _type;
-  }
-
-  public static ValidDocIdsType fromString(String type) {
-    for (ValidDocIdsType validDocIdsType : ValidDocIdsType.values()) {
-      if (validDocIdsType.toString().equalsIgnoreCase(type)) {
-        return validDocIdsType;
-      }
-    }
-    throw new IllegalArgumentException("Invalid validDocIds type: " + type);
-  }
+  // This indicates that the validDocIds bitmap is read from the real-time server's in-memory. The valid document ids
+  // here does take account into the deleted records. UpsertConfig's 'deleteRecordColumn' must be provided for this
+  // type.
+  //
+  // NOTE: Using in-memory based validDocids bitmap is a bit dangerous as it will not give us the consistency in some
+  // cases (e.g. fetching validDocIds bitmap while the server is restarting & updating validDocIds).
+  IN_MEMORY_WITH_DELETE;
 }

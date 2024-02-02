@@ -476,7 +476,7 @@ public class TablesResource {
   public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc id type", example = "snapshot|onHeap|onHeapWithDelete")
+      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
       @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders) {
@@ -504,7 +504,7 @@ public class TablesResource {
 
       final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
-      String finalValidDocIdsType = validDocIdsSnapshotPair.getLeft().toString();
+      ValidDocIdsType finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
       MutableRoaringBitmap validDocIdSnapshot = validDocIdsSnapshotPair.getRight();
 
       if (validDocIdSnapshot == null) {
@@ -536,7 +536,7 @@ public class TablesResource {
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Valid doc id type", example = "snapshot|onHeap|onHeapWithDelete")
+      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
       @QueryParam("validDocIdsType") String validDocIdsType, @Context HttpHeaders httpHeaders) {
     segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
@@ -591,7 +591,7 @@ public class TablesResource {
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc id type", example = "snapshot|onHeap|onHeapWithDelete")
+      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
       @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames) {
     return ResourceUtils.convertToJsonString(
@@ -610,7 +610,7 @@ public class TablesResource {
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc id type", example = "snapshot|onHeap|onHeapWithDelete")
+      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
       @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments) {
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
@@ -684,13 +684,13 @@ public class TablesResource {
       // By default, we read the valid doc ids from snapshot.
       return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
     }
-    ValidDocIdsType validDocIdsType = ValidDocIdsType.fromString(validDocIdsTypeStr);
+    ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
     switch (validDocIdsType) {
       case SNAPSHOT:
         return Pair.of(validDocIdsType, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
-      case ON_HEAP:
+      case IN_MEMORY:
         return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
-      case ON_HEAP_WITH_DELETE:
+      case IN_MEMORY_WITH_DELETE:
         return Pair.of(validDocIdsType, indexSegment.getQueryableDocIds().getMutableRoaringBitmap());
       default:
         // By default, we read the valid doc ids from snapshot.
