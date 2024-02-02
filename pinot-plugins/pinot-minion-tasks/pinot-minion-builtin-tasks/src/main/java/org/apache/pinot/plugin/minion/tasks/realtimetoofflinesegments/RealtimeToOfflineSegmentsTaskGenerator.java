@@ -105,8 +105,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       Map<String, TaskState> incompleteTasks =
           TaskGeneratorUtils.getIncompleteTasks(taskType, realtimeTableName, _clusterInfoAccessor);
       if (!incompleteTasks.isEmpty()) {
-        LOGGER.warn("Found incomplete tasks: {} for same table: {}. Skipping task generation.",
-            incompleteTasks.keySet(), realtimeTableName);
+        LOGGER.warn("Found incomplete tasks: {} for same table: {} and task type: {}. Skipping task generation.",
+            incompleteTasks.keySet(), realtimeTableName, taskType);
         continue;
       }
 
@@ -132,7 +132,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
       Preconditions.checkState(tableTaskConfig != null);
       Map<String, String> taskConfigs = tableTaskConfig.getConfigsForTaskType(taskType);
-      Preconditions.checkState(taskConfigs != null, "Task config shouldn't be null for table: {}", realtimeTableName);
+      Preconditions.checkState(taskConfigs != null, "Task config shouldn't be null for table: %s", realtimeTableName);
 
       // Get the bucket size and buffer
       String bucketTimePeriod =

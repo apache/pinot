@@ -146,7 +146,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
 
   private void rebalanceTable(String tableNameWithType) {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
     boolean relocate = false;
     if (TierConfigUtils.shouldRelocateToTiers(tableConfig)) {
