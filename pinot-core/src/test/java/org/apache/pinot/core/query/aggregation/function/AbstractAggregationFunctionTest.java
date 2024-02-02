@@ -41,7 +41,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
 
-public abstract class AbstractAggregationFunctionTest {
+public class AbstractAggregationFunctionTest {
 
   protected File _baseDir;
 
@@ -57,14 +57,23 @@ public abstract class AbstractAggregationFunctionTest {
       FieldSpec.DataType.BOOLEAN
   };
 
-  protected static final Map<FieldSpec.DataType, Schema> SINGLE_FIELD_NULLABLE_SCHEMAS = Arrays.stream(VALID_DATA_TYPES)
+  protected static final Map<FieldSpec.DataType, Schema> SINGLE_NULLABLE_FIELD_SCHEMAS = Arrays.stream(VALID_DATA_TYPES)
           .collect(Collectors.toMap(dt -> dt, dt -> new Schema.SchemaBuilder()
               .setSchemaName("testTable")
               .setEnableColumnBasedNullHandling(true)
               .addDimensionField("myField", dt, f -> f.setNullable(true))
               .build()));
 
-  protected static final TableConfig SINGLE_FIELD_TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
+  protected static final Map<FieldSpec.DataType, Schema> SINGLE_NULLABLE_FIELD_AND_MULTI_FIELD_SCHEMAS =
+      Arrays.stream(VALID_DATA_TYPES)
+          .collect(Collectors.toMap(dt -> dt, dt -> new Schema.SchemaBuilder()
+              .setSchemaName("testTable")
+              .setEnableColumnBasedNullHandling(true)
+              .addDimensionField("myField", dt, f -> f.setNullable(true))
+              .addMultiValueDimension("multiField", FieldSpec.DataType.STRING)
+              .build()));
+
+  protected static final TableConfig EMPTY_TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
       .setTableName("testTable")
       .build();
 
@@ -77,7 +86,7 @@ public abstract class AbstractAggregationFunctionTest {
       boolean nullHandlingEnabled, @Nullable Consumer<FieldConfig.Builder> customize) {
     TableConfig tableConfig;
     if (customize == null) {
-      tableConfig = SINGLE_FIELD_TABLE_CONFIG;
+      tableConfig = EMPTY_TABLE_CONFIG;
     } else {
       TableConfigBuilder builder = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable");
       FieldConfig.Builder fieldConfigBuilder = new FieldConfig.Builder("myField");
@@ -90,7 +99,7 @@ public abstract class AbstractAggregationFunctionTest {
 
     return FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(nullHandlingEnabled)
-        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(dataType), tableConfig);
+        .givenTable(SINGLE_NULLABLE_FIELD_SCHEMAS.get(dataType), tableConfig);
   }
 
   protected FluentQueryTest.DeclaringTable givenSingleNullableIntFieldTable(boolean nullHandling) {

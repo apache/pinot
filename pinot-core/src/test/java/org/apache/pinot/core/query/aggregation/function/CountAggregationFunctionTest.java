@@ -19,18 +19,44 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class CountAggregationFunctionTest extends AbstractAggregationFunctionTest {
 
+  private File _baseDir;
+
+  @BeforeClass
+  void createBaseDir() {
+    try {
+      _baseDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  @AfterClass
+  void destroyBaseDir()
+      throws IOException {
+    if (_baseDir != null) {
+      FileUtils.deleteDirectory(_baseDir);
+    }
+  }
+
   @Test
   public void list() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .givenTable(SINGLE_NULLABLE_FIELD_SCHEMAS.get(FieldSpec.DataType.INT), EMPTY_TABLE_CONFIG)
         .onFirstInstance(
             new Object[] {1}
         )
@@ -50,7 +76,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
   public void listNullHandlingEnabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(true)
-        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .givenTable(SINGLE_NULLABLE_FIELD_SCHEMAS.get(FieldSpec.DataType.INT), EMPTY_TABLE_CONFIG)
         .onFirstInstance(
             new Object[] {1}
         )
@@ -70,7 +96,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
   public void countNullWhenHandlingDisabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .givenTable(SINGLE_NULLABLE_FIELD_SCHEMAS.get(FieldSpec.DataType.INT), EMPTY_TABLE_CONFIG)
         .onFirstInstance(
             "myField",
             "1"
@@ -93,7 +119,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
   public void countNullWhenHandlingEnabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(true)
-        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .givenTable(SINGLE_NULLABLE_FIELD_SCHEMAS.get(FieldSpec.DataType.INT), EMPTY_TABLE_CONFIG)
         .onFirstInstance(
             "myField",
             "1"
@@ -116,7 +142,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
   public void countStarNullWhenHandlingDisabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
-        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .givenTable(SINGLE_NULLABLE_FIELD_SCHEMAS.get(FieldSpec.DataType.INT), EMPTY_TABLE_CONFIG)
         .onFirstInstance(
             "myField",
             "1"
@@ -138,7 +164,7 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
   public void countStarNullWhenHandlingEnabled() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(true)
-        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .givenTable(SINGLE_NULLABLE_FIELD_SCHEMAS.get(FieldSpec.DataType.INT), EMPTY_TABLE_CONFIG)
         .onFirstInstance(
             "myField",
             "1"
