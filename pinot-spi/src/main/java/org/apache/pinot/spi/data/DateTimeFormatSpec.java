@@ -215,7 +215,7 @@ public class DateTimeFormatSpec {
   }
 
   public static DateTimeFormatSpec forEpoch(int size, String timeUnit) {
-    Preconditions.checkArgument(size > 0, "Invalid size: {}, must be positive", size);
+    Preconditions.checkArgument(size > 0, "Invalid size: %s, must be positive", size);
     Preconditions.checkArgument(timeUnit != null, "Must provide time unit");
     return new DateTimeFormatSpec(size, new DateTimeFormatUnitSpec(timeUnit), DateTimeFormatPatternSpec.EPOCH);
   }

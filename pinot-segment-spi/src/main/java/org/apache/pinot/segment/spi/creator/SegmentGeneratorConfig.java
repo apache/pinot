@@ -373,7 +373,7 @@ public class SegmentGeneratorConfig implements Serializable {
   public void setInputFilePath(String inputFilePath) {
     Preconditions.checkNotNull(inputFilePath);
     File inputFile = new File(inputFilePath);
-    Preconditions.checkState(inputFile.exists(), "Input path {} does not exist.", inputFilePath);
+    Preconditions.checkState(inputFile.exists(), "Input path %s does not exist.", inputFilePath);
     _inputFilePath = inputFile.getAbsolutePath();
   }
 

@@ -39,14 +39,17 @@ public class RoutingConfig extends BaseJsonConfig {
 
   private final List<String> _segmentPrunerTypes;
   private final String _instanceSelectorType;
+  private final Boolean _useFixedReplica;
 
   @JsonCreator
   public RoutingConfig(@JsonProperty("routingTableBuilderName") @Nullable String routingTableBuilderName,
       @JsonProperty("segmentPrunerTypes") @Nullable List<String> segmentPrunerTypes,
-      @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType) {
+      @JsonProperty("instanceSelectorType") @Nullable String instanceSelectorType,
+      @JsonProperty("useFixedReplica") @Nullable Boolean useFixedReplica) {
     _routingTableBuilderName = routingTableBuilderName;
     _segmentPrunerTypes = segmentPrunerTypes;
     _instanceSelectorType = instanceSelectorType;
+    _useFixedReplica = useFixedReplica;
   }
 
   @Nullable
@@ -62,5 +65,10 @@ public class RoutingConfig extends BaseJsonConfig {
   @Nullable
   public String getInstanceSelectorType() {
     return _instanceSelectorType;
+  }
+
+  @Nullable
+  public Boolean getUseFixedReplica() {
+    return _useFixedReplica;
   }
 }

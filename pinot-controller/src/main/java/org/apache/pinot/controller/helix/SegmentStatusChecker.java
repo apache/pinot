@@ -77,8 +77,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private TableSizeReader _tableSizeReader;
 
-  private Set<String> _cachedTableNamesWithType = new HashSet<>();
-
   /**
    * Constructs the segment status checker.
    * @param pinotHelixResourceManager The resource checker used to interact with Helix
@@ -152,12 +150,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED, 0);
       }
     });
-
-    // Remove metrics for tables that are no longer in the cluster
-    _cachedTableNamesWithType.removeAll(context._processedTables);
-    _cachedTableNamesWithType.forEach(this::removeMetricsForTable);
-    _cachedTableNamesWithType.clear();
-    _cachedTableNamesWithType.addAll(context._processedTables);
   }
 
   /**
@@ -350,6 +342,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   }
 
   private void removeMetricsForTable(String tableNameWithType) {
+    LOGGER.info("Removing metrics from {} given it is not a table known by Helix", tableNameWithType);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE);
@@ -363,6 +356,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_CONSUMPTION_PAUSED);
+    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_REBALANCE_IN_PROGRESS);
   }
 
   private void setStatusToDefault() {

@@ -18,19 +18,17 @@
  */
 package org.apache.pinot.controller.recommender.data.generator;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.math.IntRange;
+import org.apache.pinot.controller.recommender.data.DataGenerationHelpers;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -39,7 +37,6 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeFieldSpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.data.readers.FileFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +47,6 @@ import org.slf4j.LoggerFactory;
 // TODO: add DATE_TIME to the data generator
 public class DataGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataGenerator.class);
-  private File _outDir;
 
   DataGeneratorSpec _genSpec;
 
@@ -63,23 +59,16 @@ public class DataGenerator {
   public void init(DataGeneratorSpec spec)
       throws IOException {
     _genSpec = spec;
-    _outDir = new File(_genSpec.getOutputDir());
-    if (_outDir.exists() && !_genSpec.isOverrideOutDir()) {
-      LOGGER.error("output directory already exists, and override is set to false");
-      throw new RuntimeException("output directory exists");
-    }
-
-    if (_outDir.exists()) {
-      FileUtils.deleteDirectory(_outDir);
-    }
-
-    _outDir.mkdir();
 
     for (final String column : _genSpec.getColumns()) {
       DataType dataType = _genSpec.getDataTypeMap().get(column);
 
       Generator generator;
-      if (_genSpec.getPatternMap().containsKey(column)) {
+      if (_genSpec.getDateTimeFormatMap().containsKey(column)
+          && _genSpec.getDateTimeGranularityMap().containsKey(column)) {
+        generator = new DateTimeGenerator(_genSpec.getDateTimeFormatMap().get(column),
+            _genSpec.getDateTimeGranularityMap().get(column));
+      } else if (_genSpec.getPatternMap().containsKey(column)) {
         generator = GeneratorFactory
             .getGeneratorFor(PatternType.valueOf(_genSpec.getPatternMap().get(column).get("type").toString()),
                 _genSpec.getPatternMap().get(column));
@@ -99,59 +88,17 @@ public class DataGenerator {
     }
   }
 
-  public void generateAvro(long totalDocs, int numFiles)
-      throws IOException {
-    final int numPerFiles = (int) (totalDocs / numFiles);
-    for (int i = 0; i < numFiles; i++) {
-      try (AvroWriter writer = new AvroWriter(_outDir, i, _generators, fetchSchema())) {
-        for (int j = 0; j < numPerFiles; j++) {
-          writer.writeNext();
-        }
-      }
+  /*
+   * Returns a LinkedHashMap of columns and their respective generated values.
+   * This ensures that the entries are ordered as per the column list
+   *
+   * */
+  public Map<String, Object> nextRow() {
+    Map<String, Object> row = new LinkedHashMap<>();
+    for (String key : _genSpec.getColumns()) {
+      row.put(key, _generators.get(key).next());
     }
-  }
-
-  public void generateCsv(long totalDocs, int numFiles)
-      throws IOException {
-    final int numPerFiles = (int) (totalDocs / numFiles);
-    for (int i = 0; i < numFiles; i++) {
-      try (FileWriter writer = new FileWriter(new File(_outDir, String.format("output_%d.csv", i)))) {
-        writer.append(StringUtils.join(_genSpec.getColumns(), ",")).append('\n');
-        for (int j = 0; j < numPerFiles; j++) {
-          Object[] values = new Object[_genSpec.getColumns().size()];
-          for (int k = 0; k < _genSpec.getColumns().size(); k++) {
-            Object next = _generators.get(_genSpec.getColumns().get(k)).next();
-            values[k] = serializeIfMultiValue(next);
-          }
-          writer.append(StringUtils.join(values, ",")).append('\n');
-        }
-      }
-    }
-  }
-
-  public void generateJson(long totalDocs, int numFiles)
-      throws IOException {
-    final int numPerFiles = (int) (totalDocs / numFiles);
-    final ObjectMapper mapper = new ObjectMapper();
-    for (int i = 0; i < numFiles; i++) {
-      try (FileWriter writer = new FileWriter(new File(_outDir, String.format("output_%d.json", i)))) {
-        for (int j = 0; j < numPerFiles; j++) {
-          Map<String, Object> row = new HashMap<>();
-          for (int k = 0; k < _genSpec.getColumns().size(); k++) {
-            String key = _genSpec.getColumns().get(k);
-            row.put(key, _generators.get(key).next());
-          }
-          writer.append(mapper.writeValueAsString(row)).append('\n');
-        }
-      }
-    }
-  }
-
-  private Object serializeIfMultiValue(Object obj) {
-    if (obj instanceof List) {
-      return StringUtils.join((List) obj, ";");
-    }
-    return obj;
+    return row;
   }
 
   public Schema fetchSchema() {
@@ -181,6 +128,12 @@ public class DataGenerator {
         spec = new TimeFieldSpec(new TimeGranularitySpec(dataType, genSpec.getTimeUnitMap().get(column), column));
         break;
 
+      case DATE_TIME:
+        String format = genSpec.getDateTimeFormatMap().get(column);
+        String granularity = genSpec.getDateTimeGranularityMap().get(column);
+        spec = new DateTimeFieldSpec(column, dataType, format, granularity);
+        break;
+
       default:
         throw new RuntimeException("Invalid Field type.");
     }
@@ -193,7 +146,7 @@ public class DataGenerator {
   }
 
   public static void main(String[] args)
-      throws IOException {
+      throws Exception {
 
     final Map<String, DataType> dataTypes = new HashMap<>();
     final Map<String, FieldType> fieldTypes = new HashMap<>();
@@ -205,6 +158,9 @@ public class DataGenerator {
     Map<String, Double> mvCountMap = new HashMap<>();
     Map<String, Integer> lengthMap = new HashMap<>();
     List<String> columnNames = new ArrayList<>();
+
+    final Map<String, String> dateTimeFormatMap = new HashMap<>();
+    final Map<String, String> dateTimeGranularityMap = new HashMap<>();
 
     int cardinalityValue = 5;
     int strLength = 5;
@@ -257,11 +213,11 @@ public class DataGenerator {
     String outputDir = Paths.get(System.getProperty("java.io.tmpdir"), "csv-data").toString();
     final DataGeneratorSpec spec =
         new DataGeneratorSpec(columnNames, cardinality, range, template, mvCountMap, lengthMap, dataTypes, fieldTypes,
-            timeUnits, FileFormat.CSV, outputDir, true);
+            timeUnits, dateTimeFormatMap, dateTimeGranularityMap);
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
-    gen.generateCsv(100, 1);
+    DataGenerationHelpers.generateCsv(gen, 100, 1, outputDir, true);
     System.out.println("CSV data is generated under: " + outputDir);
   }
 }

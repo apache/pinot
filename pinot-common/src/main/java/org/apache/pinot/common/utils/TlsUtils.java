@@ -18,25 +18,41 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.security.GeneralSecurityException;
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
 import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
+import nl.altindag.ssl.SSLFactory;
+import nl.altindag.ssl.exception.GenericSSLContextException;
+import nl.altindag.ssl.keymanager.HotSwappableX509ExtendedKeyManager;
+import nl.altindag.ssl.trustmanager.HotSwappableX509ExtendedTrustManager;
+import nl.altindag.ssl.util.SSLFactoryUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.pinot.common.config.TlsConfig;
@@ -59,6 +75,10 @@ public final class TlsUtils {
   private static final String TRUSTSTORE_PATH = "truststore.path";
   private static final String TRUSTSTORE_PASSWORD = "truststore.password";
   private static final String SSL_PROVIDER = "ssl.provider";
+
+  private static final String FILE_SCHEME = "file";
+  private static final String FILE_SCHEME_PREFIX = FILE_SCHEME + "://";
+  private static final String FILE_SCHEME_PREFIX_WITHOUT_SLASH = FILE_SCHEME + ":";
 
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
 
@@ -136,7 +156,7 @@ public final class TlsUtils {
 
     try {
       KeyStore keyStore = KeyStore.getInstance(keyStoreType);
-      try (InputStream is = makeKeyStoreUrl(keyStorePath).openStream()) {
+      try (InputStream is = makeKeyOrTrustStoreUrl(keyStorePath).openStream()) {
         keyStore.load(is, keyStorePassword.toCharArray());
       }
 
@@ -176,7 +196,7 @@ public final class TlsUtils {
 
     try {
       KeyStore keyStore = KeyStore.getInstance(trustStoreType);
-      try (InputStream is = makeKeyStoreUrl(trustStorePath).openStream()) {
+      try (InputStream is = makeKeyOrTrustStoreUrl(trustStorePath).openStream()) {
         keyStore.load(is, trustStorePassword.toCharArray());
       }
 
@@ -213,25 +233,20 @@ public final class TlsUtils {
    */
   public static void installDefaultSSLSocketFactory(String keyStoreType, String keyStorePath, String keyStorePassword,
       String trustStoreType, String trustStorePath, String trustStorePassword) {
-    KeyManager[] keyManagers = null;
-    if (keyStorePath != null) {
-      keyManagers = createKeyManagerFactory(keyStorePath, keyStorePassword, keyStoreType).getKeyManagers();
-    }
-
-    TrustManager[] trustManagers = null;
-    if (trustStorePath != null) {
-      trustManagers = createTrustManagerFactory(trustStorePath, trustStorePassword, trustStoreType).getTrustManagers();
-    }
-
     try {
-      SSLContext sc = SSLContext.getInstance("SSL");
-      sc.init(keyManagers, trustManagers, new java.security.SecureRandom());
-
+      SecureRandom secureRandom = new SecureRandom();
+      SSLFactory sslFactory = createSSLFactory(keyStoreType, keyStorePath, keyStorePassword,
+          trustStoreType, trustStorePath, trustStorePassword,
+          "SSL", secureRandom, true);
+      if (isKeyOrTrustStorePathNullOrHasFileScheme(keyStorePath)
+          && isKeyOrTrustStorePathNullOrHasFileScheme(trustStorePath)) {
+        enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, keyStoreType, keyStorePath, keyStorePassword,
+            trustStoreType, trustStorePath, trustStorePassword, "SSL", secureRandom);
+      }
       // HttpsURLConnection
-      HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-
-      setSslContext(sc);
-    } catch (GeneralSecurityException e) {
+      HttpsURLConnection.setDefaultSSLSocketFactory(sslFactory.getSslSocketFactory());
+      setSslContext(sslFactory.getSslContext());
+    } catch (GenericSSLContextException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
   }
@@ -240,14 +255,14 @@ public final class TlsUtils {
     return namespace + "." + suffix;
   }
 
-  public static URL makeKeyStoreUrl(String storePath)
+  public static URL makeKeyOrTrustStoreUrl(String storePath)
       throws URISyntaxException, MalformedURLException {
     URI inputUri = new URI(storePath);
     if (StringUtils.isBlank(inputUri.getScheme())) {
       if (storePath.startsWith("/")) {
-        return new URL("file://" + storePath);
+        return new URL(FILE_SCHEME_PREFIX + storePath);
       }
-      return new URL("file://./" + storePath);
+      return new URL(FILE_SCHEME_PREFIX + "./" + storePath);
     }
     return inputUri.toURL();
   }
@@ -293,14 +308,15 @@ public final class TlsUtils {
    * @param tlsConfig TLS config
    */
   public static SslContext buildClientContext(TlsConfig tlsConfig) {
+    SSLFactory sslFactory = createSSLFactory(tlsConfig);
+    if (isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
+        && isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
+      enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
+    }
     SslContextBuilder sslContextBuilder =
         SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
-    if (tlsConfig.getKeyStorePath() != null) {
-      sslContextBuilder.keyManager(createKeyManagerFactory(tlsConfig));
-    }
-    if (tlsConfig.getTrustStorePath() != null) {
-      sslContextBuilder.trustManager(createTrustManagerFactory(tlsConfig));
-    }
+    sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
+    sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
     try {
       return sslContextBuilder.build();
     } catch (Exception e) {
@@ -317,11 +333,14 @@ public final class TlsUtils {
     if (tlsConfig.getKeyStorePath() == null) {
       throw new IllegalArgumentException("Must provide key store path for secured server");
     }
-    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(createKeyManagerFactory(tlsConfig))
-        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
-    if (tlsConfig.getTrustStorePath() != null) {
-      sslContextBuilder.trustManager(createTrustManagerFactory(tlsConfig));
+    SSLFactory sslFactory = createSSLFactory(tlsConfig);
+    if (isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
+        && isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
+      enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
     }
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
+        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
+    sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
     if (tlsConfig.isClientAuthEnabled()) {
       sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
     }
@@ -329,6 +348,175 @@ public final class TlsUtils {
       return sslContextBuilder.build();
     } catch (Exception e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * check if the key store or trust store path is null or has file scheme.
+   *
+   * @param keyOrTrustStorePath key store or trust store path in String format.
+   */
+  public static boolean isKeyOrTrustStorePathNullOrHasFileScheme(String keyOrTrustStorePath) {
+    try {
+      return keyOrTrustStorePath == null
+          || makeKeyOrTrustStoreUrl(keyOrTrustStorePath).toURI().getScheme().startsWith(FILE_SCHEME);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Enables auto renewal of SSLFactory when
+   * 1. the {@link SSLFactory} is created with a key manager and trust manager swappable
+   * 2. the key store is null or a local file
+   * 3. the trust store is null or a local file
+   * 4. the key store or trust store file changes.
+   * @param sslFactory the {@link SSLFactory} to enable key manager and trust manager auto renewal
+   * @param tlsConfig the {@link TlsConfig} to get the key store and trust store information
+   */
+  public static void enableAutoRenewalFromFileStoreForSSLFactory(SSLFactory sslFactory, TlsConfig tlsConfig) {
+    enableAutoRenewalFromFileStoreForSSLFactory(sslFactory,
+        tlsConfig.getKeyStoreType(), tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword(),
+        tlsConfig.getTrustStoreType(), tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword(),
+        null, null);
+  }
+
+  private static void enableAutoRenewalFromFileStoreForSSLFactory(
+      SSLFactory sslFactory,
+      String keyStoreType, String keyStorePath, String keyStorePassword,
+      String trustStoreType, String trustStorePath, String trustStorePassword,
+      String sslContextProtocol, SecureRandom secureRandom) {
+    try {
+      URL keyStoreURL = keyStorePath == null ? null : makeKeyOrTrustStoreUrl(keyStorePath);
+      URL trustStoreURL = trustStorePath == null ? null : makeKeyOrTrustStoreUrl(trustStorePath);
+      if (keyStoreURL != null) {
+        Preconditions.checkArgument(
+            keyStoreURL.toURI().getScheme().startsWith(FILE_SCHEME),
+            "key store path must be a local file path or null when SSL auto renew is enabled");
+        Preconditions.checkArgument(
+            sslFactory.getKeyManager().isPresent()
+                && sslFactory.getKeyManager().get() instanceof HotSwappableX509ExtendedKeyManager,
+            "key manager of the existing SSLFactory must be swappable"
+        );
+      }
+      if (trustStoreURL != null) {
+        Preconditions.checkArgument(
+            trustStoreURL.toURI().getScheme().startsWith(FILE_SCHEME),
+            "trust store path must be a local file path or null when SSL auto renew is enabled");
+        Preconditions.checkArgument(
+            sslFactory.getTrustManager().isPresent()
+                && sslFactory.getTrustManager().get() instanceof HotSwappableX509ExtendedTrustManager,
+            "trust manager of the existing SSLFactory must be swappable"
+        );
+      }
+      // The reloadSslFactoryWhenFileStoreChanges is a blocking call, so we need to create a new thread to run it.
+      // Creating a new thread to run the reloadSslFactoryWhenFileStoreChanges is costly; however, unless we
+      // invoke the createAutoRenewedSSLFactoryFromFileStore method crazily, this should not be a problem.
+      Executors.newSingleThreadExecutor().execute(() -> {
+        try {
+          reloadSslFactoryWhenFileStoreChanges(sslFactory,
+              keyStoreType, keyStorePath, keyStorePassword,
+              trustStoreType, trustStorePath, trustStorePassword,
+              sslContextProtocol, secureRandom);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      });
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @VisibleForTesting
+  static void reloadSslFactoryWhenFileStoreChanges(SSLFactory baseSslFactory,
+      String keyStoreType, String keyStorePath, String keyStorePassword,
+      String trustStoreType, String trustStorePath, String trustStorePassword,
+      String sslContextProtocol, SecureRandom secureRandom)
+      throws IOException, URISyntaxException, InterruptedException {
+    WatchService watchService = FileSystems.getDefault().newWatchService();
+    Map<WatchKey, Set<Path>> watchKeyPathMap = new HashMap<>();
+    registerFile(watchService, watchKeyPathMap, keyStorePath);
+    registerFile(watchService, watchKeyPathMap, trustStorePath);
+    WatchKey key;
+    while ((key = watchService.take()) != null) {
+      for (WatchEvent<?> event : key.pollEvents()) {
+        Path changedFile = (Path) event.context();
+        if (watchKeyPathMap.get(key).contains(changedFile)) {
+          SSLFactory updatedSslFactory = createSSLFactory(
+              keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath, trustStorePassword,
+              sslContextProtocol, secureRandom, false);
+          SSLFactoryUtils.reload(baseSslFactory, updatedSslFactory);
+        }
+      }
+      key.reset();
+    }
+  }
+
+  @VisibleForTesting
+  static void registerFile(WatchService watchService, Map<WatchKey, Set<Path>> keyPathMap, String filePath)
+      throws IOException, URISyntaxException {
+    if (filePath == null) {
+      return;
+    }
+    Path path = Path.of(makeKeyOrTrustStoreUrl(filePath).getPath());
+    WatchKey key = path.getParent().register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
+    keyPathMap.computeIfAbsent(key, k -> new HashSet<>());
+    keyPathMap.get(key).add(path.getFileName());
+  }
+
+  /**
+   * Create a {@link SSLFactory} instance with identity material and trust material swappable for a given TlsConfig
+   * @param tlsConfig {@link TlsConfig}
+   * @return a {@link SSLFactory} instance with identity material and trust material swappable
+   */
+  public static SSLFactory createSSLFactory(TlsConfig tlsConfig) {
+    return createSSLFactory(
+        tlsConfig.getKeyStoreType(), tlsConfig.getKeyStorePath(), tlsConfig.getKeyStorePassword(),
+        tlsConfig.getTrustStoreType(), tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword(),
+        null, null, true);
+  }
+
+  @VisibleForTesting
+  static SSLFactory createSSLFactory(
+      String keyStoreType, String keyStorePath, String keyStorePassword,
+      String trustStoreType, String trustStorePath, String trustStorePassword,
+      String sslContextProtocol, SecureRandom secureRandom, boolean keyAndTrustMaterialSwappable) {
+    try {
+      SSLFactory.Builder sslFactoryBuilder = SSLFactory.builder();
+      InputStream keyStoreStream = null;
+      InputStream trustStoreStream = null;
+      if (keyStorePath != null) {
+        Preconditions.checkNotNull(keyStorePassword, "key store password must not be null");
+        keyStoreStream = makeKeyOrTrustStoreUrl(keyStorePath).openStream();
+        if (keyAndTrustMaterialSwappable) {
+          sslFactoryBuilder.withSwappableIdentityMaterial();
+        }
+        sslFactoryBuilder.withIdentityMaterial(keyStoreStream, keyStorePassword.toCharArray(), keyStoreType);
+      }
+      if (trustStorePath != null) {
+        Preconditions.checkNotNull(trustStorePassword, "trust store password must not be null");
+        trustStoreStream = makeKeyOrTrustStoreUrl(trustStorePath).openStream();
+        if (keyAndTrustMaterialSwappable) {
+          sslFactoryBuilder.withSwappableTrustMaterial();
+        }
+        sslFactoryBuilder.withTrustMaterial(trustStoreStream, trustStorePassword.toCharArray(), trustStoreType);
+      }
+      if (sslContextProtocol != null) {
+        sslFactoryBuilder.withSslContextAlgorithm(sslContextProtocol);
+      }
+      if (secureRandom != null) {
+        sslFactoryBuilder.withSecureRandom(secureRandom);
+      }
+      SSLFactory sslFactory = sslFactoryBuilder.build();
+      if (keyStoreStream != null) {
+        keyStoreStream.close();
+      }
+      if (trustStoreStream != null) {
+        trustStoreStream.close();
+      }
+      return sslFactory;
+    } catch (Exception e) {
+      throw new IllegalStateException(e);
     }
   }
 }

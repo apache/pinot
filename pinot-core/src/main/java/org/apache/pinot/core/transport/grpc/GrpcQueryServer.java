@@ -31,6 +31,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.DataTable;
@@ -89,11 +90,14 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     if (tlsConfig.getKeyStorePath() == null) {
       throw new IllegalArgumentException("Must provide key store path for secured gRpc server");
     }
-    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(TlsUtils.createKeyManagerFactory(tlsConfig))
-        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
-    if (tlsConfig.getTrustStorePath() != null) {
-      sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(tlsConfig));
+    SSLFactory sslFactory = TlsUtils.createSSLFactory(tlsConfig);
+    if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
+        && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
+      TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
     }
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
+        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
+    sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
     if (tlsConfig.isClientAuthEnabled()) {
       sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
     }

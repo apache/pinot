@@ -33,7 +33,6 @@ import java.util.concurrent.Executors;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -52,7 +51,6 @@ import org.apache.pinot.core.query.reduce.BrokerReduceService;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -69,7 +67,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -85,7 +82,7 @@ import static org.mockito.Mockito.when;
 
 
 public class ExplainPlanQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ExplainPlanQueriesTest");
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ExplainPlanQueriesTest");
   private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
   private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
 
@@ -144,7 +141,6 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   private List<IndexSegment> _indexSegments;
   private List<String> _segmentNames;
 
-  private ServerMetrics _serverMetrics;
   private QueryExecutor _queryExecutor;
   private QueryExecutor _queryExecutorWithPrefetchEnabled;
   private BrokerReduceService _brokerReduceService;
@@ -214,9 +210,10 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     List<String> textIndexColumns = Arrays.asList(COL1_TEXT_INDEX);
 
+    File tableDataDir = new File(TEMP_DIR, OFFLINE_TABLE_NAME);
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setSegmentName(segmentName);
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
+    segmentGeneratorConfig.setOutDir(tableDataDir.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
@@ -232,13 +229,15 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     _segmentNames.add(segmentName);
 
-    return ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), indexLoadingConfig);
+    return ImmutableSegmentLoader.load(new File(tableDataDir, segmentName), indexLoadingConfig);
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    FileUtils.deleteDirectory(INDEX_DIR);
+    ServerMetrics.register(mock(ServerMetrics.class));
+
+    FileUtils.deleteDirectory(TEMP_DIR);
     _segmentNames = new ArrayList<>();
 
     List<GenericRow> records = new ArrayList<>(NUM_RECORDS);
@@ -290,21 +289,11 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2, immutableSegment3, immutableSegment4);
 
     // Mock the instance data manager
-    _serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
-    TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
-    when(tableDataManagerConfig.getTableName()).thenReturn(OFFLINE_TABLE_NAME);
-    when(tableDataManagerConfig.getTableType()).thenReturn(TableType.OFFLINE);
-    when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
-    when(instanceDataManagerConfig.getMaxParallelSegmentBuilds()).thenReturn(4);
-    when(instanceDataManagerConfig.getStreamSegmentDownloadUntarRateLimit()).thenReturn(-1L);
-    when(instanceDataManagerConfig.getMaxParallelSegmentDownloads()).thenReturn(-1);
-    when(instanceDataManagerConfig.isStreamSegmentDownloadUntar()).thenReturn(false);
-    TableDataManagerProvider.init(instanceDataManagerConfig);
-    @SuppressWarnings("unchecked")
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     TableDataManager tableDataManager =
-        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance",
-            mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class), mock(HelixManager.class), null);
+        new TableDataManagerProvider(instanceDataManagerConfig).getTableDataManager(TABLE_CONFIG,
+            mock(HelixManager.class));
     tableDataManager.start();
     for (IndexSegment indexSegment : _indexSegments) {
       tableDataManager.addSegment((ImmutableSegment) indexSegment);
@@ -318,12 +307,12 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     PropertiesConfiguration queryExecutorConfig =
         CommonsConfigurationUtils.fromFile(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
-    _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, _serverMetrics);
+    _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, ServerMetrics.get());
 
     PinotConfiguration prefetchEnabledConf = new PinotConfiguration(queryExecutorConfig);
     prefetchEnabledConf.setProperty(ServerQueryExecutorV1Impl.ENABLE_PREFETCH, "true");
     _queryExecutorWithPrefetchEnabled = new ServerQueryExecutorV1Impl();
-    _queryExecutorWithPrefetchEnabled.init(prefetchEnabledConf, instanceDataManager, _serverMetrics);
+    _queryExecutorWithPrefetchEnabled.init(prefetchEnabledConf, instanceDataManager, ServerMetrics.get());
 
     // Create the BrokerReduceService
     _brokerReduceService = new BrokerReduceService(new PinotConfiguration(
@@ -420,7 +409,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
   }
 
   private ServerQueryRequest getQueryRequest(InstanceRequest instanceRequest) {
-    return new ServerQueryRequest(instanceRequest, _serverMetrics, System.currentTimeMillis());
+    return new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
   }
 
   @Test
@@ -2547,6 +2536,6 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     for (IndexSegment segment : _indexSegments) {
       segment.destroy();
     }
-    FileUtils.deleteQuietly(INDEX_DIR);
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 }

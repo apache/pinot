@@ -34,8 +34,13 @@ public class RecordReaderFileConfig {
   public final File _dataFile;
   public final Set<String> _fieldsToRead;
   public final RecordReaderConfig _recordReaderConfig;
+  private final boolean _isDelegateReader;
   // Record Readers created/passed from clients.
-  public final RecordReader _recordReader;
+  public RecordReader _recordReader;
+  // Track if RecordReaderFileConfig initialized the RecordReader for to aid in closing the RecordReader.
+  private boolean _isRecordReaderInitialized;
+  // Track if RecordReaderFileConfig closed the RecordReader for testing purposes.
+  private boolean _isRecordReaderClosed;
 
   // Pass in the info needed to initialize the reader
   public RecordReaderFileConfig(FileFormat fileFormat, File dataFile, Set<String> fieldsToRead,
@@ -45,6 +50,11 @@ public class RecordReaderFileConfig {
     _fieldsToRead = fieldsToRead;
     _recordReaderConfig = recordReaderConfig;
     _recordReader = null;
+    // This is not a delegate RecordReader i.e. RecordReaderFileConfig owns the RecordReader, so it should be closed
+    // by RecordReaderFileConfig as well.
+    _isDelegateReader = false;
+    _isRecordReaderInitialized = false;
+    _isRecordReaderClosed = false;
   }
 
   // Pass in the reader instance directly
@@ -54,5 +64,44 @@ public class RecordReaderFileConfig {
     _dataFile = null;
     _fieldsToRead = null;
     _recordReaderConfig = null;
+    // This is a delegate RecordReader i.e. RecordReader instance has been passed to RecordReaderFileConfig instead
+    // of the configs. It means RecordReaderFileConfig does not own the RecordReader, so it should not be closed by
+    // RecordReaderFileConfig as well. The responsibility of closing the RecordReader lies with the caller.
+    _isDelegateReader = true;
+    _isRecordReaderInitialized = true;
+    _isRecordReaderClosed = false;
+  }
+
+  // Return the RecordReader instance. Initialize the RecordReader if not already initialized.
+  public RecordReader getRecordReader()
+      throws Exception {
+    if (!_isRecordReaderInitialized) {
+      _recordReader = RecordReaderFactory.getRecordReader(_fileFormat, _dataFile, _fieldsToRead, _recordReaderConfig);
+      _isRecordReaderInitialized = true;
+    }
+    return _recordReader;
+  }
+
+  // Close the RecordReader instance if RecordReaderFileConfig initialized it.
+  public void closeRecordReader()
+      throws Exception {
+    // If RecordReaderFileConfig did not create the RecordReader, then it should not close it.
+    if (_isRecordReaderInitialized && !_isDelegateReader) {
+      _recordReader.close();
+      _isRecordReaderClosed = true;
+    }
+  }
+
+  // Return true if RecordReader is done processing.
+  public boolean isRecordReaderDone() {
+    if (_isRecordReaderInitialized) {
+      return !_recordReader.hasNext();
+    }
+    return false;
+  }
+
+  // For testing purposes only.
+  public boolean isRecordReaderClosedFromRecordReaderFileConfig() {
+    return _isRecordReaderClosed;
   }
 }

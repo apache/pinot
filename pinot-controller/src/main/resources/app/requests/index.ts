@@ -18,10 +18,34 @@
  */
 
 import { AxiosResponse } from 'axios';
-import { TableData, Instances, Instance, Tenants, ClusterConfig, TableName, TableSize,
-  IdealState, QueryTables, TableSchema, SQLResult, ClusterName, ZKGetList, ZKConfig, OperationResponse,
-  BrokerList, ServerList, UserList, TableList, UserObject, TaskProgressResponse, TableSegmentJobs, TaskRuntimeConfig,
-  SegmentDebugDetails, QuerySchemas, TableType, InstanceState
+import {
+  TableData,
+  Instances,
+  Instance,
+  Tenants,
+  ClusterConfig,
+  TableName,
+  TableSize,
+  IdealState,
+  QueryTables,
+  TableSchema,
+  SQLResult,
+  ClusterName,
+  ZKGetList,
+  ZKConfig,
+  OperationResponse,
+  BrokerList,
+  ServerList,
+  UserList,
+  TableList,
+  UserObject,
+  TaskProgressResponse,
+  TableSegmentJobs,
+  TaskRuntimeConfig,
+  SegmentDebugDetails,
+  QuerySchemas,
+  TableType,
+  InstanceState, SegmentMetadata,
 } from 'Models';
 
 const headers = {
@@ -62,7 +86,7 @@ export const putSchema = (name: string, params: string, reload?: boolean): Promi
   return baseApi.put(`/schemas/${name}`, params, { headers, params: queryParams });
 }
 
-export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<IdealState>> =>
+export const getSegmentMetadata = (tableName: string, segmentName: string): Promise<AxiosResponse<SegmentMetadata>> =>
   baseApi.get(`/segments/${tableName}/${segmentName}/metadata?columns=*`);
 
 export const getTableSize = (name: string): Promise<AxiosResponse<TableSize>> =>

@@ -705,8 +705,10 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
-    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null,
-        "Upsert/Dedup table cannot use tenant tag override");
+    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
+        tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
+            && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted()
+            == null), "Invalid tenant tag override used for Upsert/Dedup table");
 
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -728,9 +730,15 @@ public final class TableConfigUtils {
       String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
       if (deleteRecordColumn != null) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
+        Preconditions.checkState(fieldSpec != null,
+            String.format("Column %s specified in deleteRecordColumn does not exist", deleteRecordColumn));
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
+        DataType dataType = fieldSpec.getDataType();
         Preconditions.checkState(
-            fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
-            "The delete record column must be a single-valued BOOLEAN column");
+            dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
+            String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric",
+                deleteRecordColumn));
       }
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
@@ -1025,6 +1033,7 @@ public final class TableConfigUtils {
     }
 
     List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
+    Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
     if (starTreeIndexConfigList != null) {
       for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
         // Dimension split order cannot be null
@@ -1041,6 +1050,11 @@ public final class TableConfigUtils {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                   + "in the form <Aggregation function>__<Column name>");
             }
+            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+            if (!storedTypes.add(storedType)) {
+              LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
+                  columnPair, storedType);
+            }
             String columnName = columnPair.getColumn();
             if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
               columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
@@ -1055,6 +1069,11 @@ public final class TableConfigUtils {
               columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
             } catch (Exception e) {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
+            }
+            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+            if (!storedTypes.add(storedType)) {
+              LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
+                  columnPair, storedType);
             }
             String columnName = columnPair.getColumn();
             if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {

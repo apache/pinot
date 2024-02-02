@@ -122,7 +122,7 @@ public class InstanceAssignmentConfigUtils {
           replicaGroupStrategyConfig.getNumInstancesPerPartition(), 0, 0, minimizeDataMovement, null);
     }
 
-    return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig);
+    return new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, minimizeDataMovement);
   }
 
   public static boolean isMirrorServerSetAssignment(TableConfig tableConfig,

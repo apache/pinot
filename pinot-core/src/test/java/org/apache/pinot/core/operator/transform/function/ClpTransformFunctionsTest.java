@@ -63,7 +63,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.fail;
 
 
-public class CLPDecodeTransformFunctionTest {
+public class ClpTransformFunctionsTest {
   private static final String SEGMENT_NAME = "testSegmentForClpDecode";
   private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
   private static final String TIMESTAMP_COLUMN = "timestampColumn";
@@ -119,9 +119,10 @@ public class CLPDecodeTransformFunctionTest {
     _logtypeValues[NUM_ROWS - 1] = clpEncodedMessage.getLogTypeAsString();
     _dictVarValues[NUM_ROWS - 1] = clpEncodedMessage.getDictionaryVarsAsStrings();
     _encodedVarValues[NUM_ROWS - 1] = clpEncodedMessage.getEncodedVarsAsBoxedLongs();
-    // Corrupt the previous two rows, so we can test the default value
+    // Corrupt a row, so we can test the default value
+    // NOTE: We don't corrupt the encoded variables column since that would cause clpEncodedVarsMatch to detect an
+    // error and abandon the batch, rendering the test useless.
     _dictVarValues[NUM_ROWS - 2] = null;
-    _encodedVarValues[NUM_ROWS - 3] = null;
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -159,7 +160,7 @@ public class CLPDecodeTransformFunctionTest {
   }
 
   @Test
-  public void testTransform() {
+  public void testClpDecode() {
     ExpressionContext expression = RequestContextUtils.getExpression(
         String.format("%s(%s,%s,%s)", TransformFunctionType.CLP_DECODE.getName(), LOGTYPE_COLUMN, DICT_VARS_COLUMN,
             ENCODED_VARS_COLUMN));
@@ -168,14 +169,13 @@ public class CLPDecodeTransformFunctionTest {
 
     String[] expectedValues = new String[NUM_ROWS];
     Arrays.fill(expectedValues, TEST_MESSAGE);
-    expectedValues[NUM_ROWS - 3] = DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
     expectedValues[NUM_ROWS - 2] = DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
     expectedValues[NUM_ROWS - 1] = DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
-    testTransformFunction(transformFunction, expectedValues);
+    testStringTransformFunc(transformFunction, expectedValues);
   }
 
   @Test
-  public void testTransformWithDefaultValue() {
+  public void testClpDecodeWithDefaultValue() {
     String defaultValue = "default";
     ExpressionContext expression = RequestContextUtils.getExpression(
         String.format("%s(%s,%s,%s,'%s')", TransformFunctionType.CLP_DECODE.getName(), LOGTYPE_COLUMN, DICT_VARS_COLUMN,
@@ -185,14 +185,13 @@ public class CLPDecodeTransformFunctionTest {
 
     String[] expectedValues = new String[NUM_ROWS];
     Arrays.fill(expectedValues, TEST_MESSAGE);
-    expectedValues[NUM_ROWS - 3] = defaultValue;
     expectedValues[NUM_ROWS - 2] = defaultValue;
     expectedValues[NUM_ROWS - 1] = DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
-    testTransformFunction(transformFunction, expectedValues);
+    testStringTransformFunc(transformFunction, expectedValues);
   }
 
   @Test
-  public void testInvalidArgs() {
+  public void testClpDecodeWithInvalidArg() {
     String defaultValue = "default";
 
     // 1st parameter literal
@@ -235,8 +234,98 @@ public class CLPDecodeTransformFunctionTest {
     });
   }
 
-  private void testTransformFunction(TransformFunction transformFunction, String[] expectedValues) {
+  @Test
+  public void testClpEncodedVarsMatch() {
+    String wildcardQuery;
+
+    // Test query which will match
+    wildcardQuery = "*51*";
+    // The query should generate three subqueries: One for an encoded integer var, one for an encoded float var, and one
+    // for a dictionary var, in that order.
+    testClpEncodedVarsMatch(wildcardQuery, 0, false);
+    testClpEncodedVarsMatch(wildcardQuery, 1, true);
+  }
+
+  @Test
+  public void testClpEncodedVarsMatchWithInvalidArg() {
+    String wildcardQuery = "*123*";
+    long subqueryIdx = 0;
+
+    // 1st parameter literal
+    assertThrows(BadQueryRequestException.class, () -> {
+      ExpressionContext expression = RequestContextUtils.getExpression(
+          String.format("%s('%s',%s,'%s',%s)", TransformFunctionType.CLP_ENCODED_VARS_MATCH.getName(), LOGTYPE_COLUMN,
+              ENCODED_VARS_COLUMN, wildcardQuery, subqueryIdx));
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+    });
+
+    // 2nd parameter literal
+    assertThrows(BadQueryRequestException.class, () -> {
+      ExpressionContext expression = RequestContextUtils.getExpression(
+          String.format("%s(%s,'%s','%s',%s)", TransformFunctionType.CLP_ENCODED_VARS_MATCH.getName(), LOGTYPE_COLUMN,
+              ENCODED_VARS_COLUMN, wildcardQuery, subqueryIdx));
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+    });
+
+    // 3rd parameter identifier
+    assertThrows(BadQueryRequestException.class, () -> {
+      ExpressionContext expression = RequestContextUtils.getExpression(
+          String.format("%s(%s,%s,%s,%s)", TransformFunctionType.CLP_ENCODED_VARS_MATCH.getName(), LOGTYPE_COLUMN,
+              ENCODED_VARS_COLUMN, ENCODED_VARS_COLUMN, subqueryIdx));
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+    });
+
+    // 4th parameter identifier
+    assertThrows(BadQueryRequestException.class, () -> {
+      ExpressionContext expression = RequestContextUtils.getExpression(
+          String.format("%s('%s',%s,'%s',%s)", TransformFunctionType.CLP_ENCODED_VARS_MATCH.getName(),
+              LOGTYPE_COLUMN, ENCODED_VARS_COLUMN, wildcardQuery, ENCODED_VARS_COLUMN));
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+    });
+
+    // Missing args
+    assertThrows(BadQueryRequestException.class, () -> {
+      ExpressionContext expression = RequestContextUtils.getExpression(
+          String.format("%s(%s)", TransformFunctionType.CLP_ENCODED_VARS_MATCH.getName(), LOGTYPE_COLUMN));
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+    });
+    assertThrows(BadQueryRequestException.class, () -> {
+      ExpressionContext expression = RequestContextUtils.getExpression(
+          String.format("%s(%s,%s)", TransformFunctionType.CLP_ENCODED_VARS_MATCH.getName(), LOGTYPE_COLUMN,
+              ENCODED_VARS_COLUMN));
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+    });
+    assertThrows(BadQueryRequestException.class, () -> {
+      ExpressionContext expression = RequestContextUtils.getExpression(
+          String.format("%s(%s,%s,'%s')", TransformFunctionType.CLP_ENCODED_VARS_MATCH.getName(), LOGTYPE_COLUMN,
+              ENCODED_VARS_COLUMN, wildcardQuery));
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+    });
+  }
+
+  private void testClpEncodedVarsMatch(String wildcardQuery, int subqueryIdx, boolean shouldMatch) {
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("%s(%s,%s,'%s',%s)", TransformFunctionType.CLP_ENCODED_VARS_MATCH.getName(), LOGTYPE_COLUMN,
+            ENCODED_VARS_COLUMN, wildcardQuery, subqueryIdx));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof ClpEncodedVarsMatchTransformFunction);
+
+    int[] expectedValues = new int[NUM_ROWS];
+    Arrays.fill(expectedValues, shouldMatch ? 1 : 0);
+    // The last row won't match since it's a null
+    expectedValues[NUM_ROWS - 1] = 0;
+    testIntTransformFunc(transformFunction, expectedValues);
+  }
+
+  private void testStringTransformFunc(TransformFunction transformFunction, String[] expectedValues) {
     String[] values = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      assertEquals(values[i], expectedValues[i]);
+    }
+  }
+
+  private void testIntTransformFunc(TransformFunction transformFunction, int[] expectedValues) {
+    int[] values = transformFunction.transformToIntValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
       assertEquals(values[i], expectedValues[i]);
     }

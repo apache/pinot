@@ -19,13 +19,21 @@
 package org.apache.pinot.segment.local.startree.v2.builder;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
+import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeGranularitySpec;
@@ -83,10 +91,55 @@ public class StarTreeV2BuilderConfigTest {
     // No column should be skipped for star-node creation
     assertTrue(defaultConfig.getSkipStarNodeCreationForDimensions().isEmpty());
     // Should have COUNT(*) and SUM(m1) as the function column pairs
-    assertEquals(defaultConfig.getFunctionColumnPairs(), new HashSet<>(Arrays
-        .asList(AggregationFunctionColumnPair.COUNT_STAR,
+    assertEquals(defaultConfig.getFunctionColumnPairs(), new HashSet<>(
+        Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR,
             new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1"))));
     assertEquals(defaultConfig.getMaxLeafRecords(), StarTreeV2BuilderConfig.DEFAULT_MAX_LEAF_RECORDS);
+  }
+
+  @Test
+  public void testBuildFromIndexConfig() {
+    List<StarTreeAggregationConfig> aggregationConfigs =
+        List.of(new StarTreeAggregationConfig("m1", "SUM", CompressionCodec.LZ4));
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("d1"), null, null, aggregationConfigs, 1);
+    StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig);
+    assertEquals(builderConfig.getMaxLeafRecords(), 1);
+    assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
+    assertEquals(builderConfig.getFunctionColumnPairs(),
+        Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1")));
+    assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
+    assertEquals(builderConfig.getAggregationSpecs().values(),
+        Collections.singleton(new AggregationSpec(ChunkCompressionType.LZ4)));
+  }
+
+  @Test
+  public void testAggregationSpecUniqueness() {
+    List<StarTreeAggregationConfig> aggregationConfigs =
+        List.of(new StarTreeAggregationConfig("m1", "distinctCountThetaSketch", CompressionCodec.LZ4),
+            new StarTreeAggregationConfig("m1", "distinctCountRawThetaSketch", CompressionCodec.LZ4));
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("d1"), null, null, aggregationConfigs, 1);
+    StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig);
+    assertEquals(builderConfig.getMaxLeafRecords(), 1);
+    assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
+    assertEquals(builderConfig.getFunctionColumnPairs(),
+        Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1")));
+    assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
+    assertEquals(builderConfig.getAggregationSpecs().values(),
+        Collections.singleton(new AggregationSpec(ChunkCompressionType.LZ4)));
+  }
+
+  @Test
+  public void testFunctionColumnPairUniqueness() {
+    List<String> functionColumnPairs = List.of("distinctCountThetaSketch__m1", "distinctCountRawThetaSketch__m1");
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("d1"), null, functionColumnPairs, null, 1);
+    StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig);
+    assertEquals(builderConfig.getMaxLeafRecords(), 1);
+    assertEquals(builderConfig.getDimensionsSplitOrder(), List.of("d1"));
+    assertEquals(builderConfig.getFunctionColumnPairs(),
+        Set.of(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, "m1")));
+    assertTrue(builderConfig.getSkipStarNodeCreationForDimensions().isEmpty());
+    assertEquals(builderConfig.getAggregationSpecs().values(), Collections.singleton(AggregationSpec.DEFAULT));
   }
 
   private ColumnMetadata getColumnMetadata(String column, boolean hasDictionary, int cardinality) {

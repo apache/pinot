@@ -19,9 +19,7 @@
 package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.ScalingThreadPoolExecutor;
 
 
 /**
@@ -35,7 +33,7 @@ public class RealtimeLuceneTextIndexSearcherPool {
   private static ExecutorService _executorService;
 
   private RealtimeLuceneTextIndexSearcherPool(int size) {
-    _executorService = new ThreadPoolExecutor(0, size, 500, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+    _executorService = ScalingThreadPoolExecutor.newScalingThreadPool(0, size, 500);
   }
 
   public static RealtimeLuceneTextIndexSearcherPool getInstance() {

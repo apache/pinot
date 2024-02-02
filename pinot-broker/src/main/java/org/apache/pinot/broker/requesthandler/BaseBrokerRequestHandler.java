@@ -92,6 +92,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
+import org.apache.pinot.spi.eventlistener.query.PinotBrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
@@ -209,9 +210,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // TODO: Use different global query id for OFFLINE and REALTIME table after releasing 0.12.0. See QueryIdUtils for
     //       details
     String globalQueryId = getGlobalQueryId(requestId);
-    List<String> serverUrls = new ArrayList<>();
+    List<Pair<String, String>> serverUrls = new ArrayList<>();
     for (ServerInstance serverInstance : queryServers._servers) {
-      serverUrls.add(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId));
+      serverUrls.add(Pair.of(String.format("%s/query/%s", serverInstance.getAdminEndpoint(), globalQueryId), null));
     }
     LOGGER.debug("Cancelling the query: {} via server urls: {}", queryServers._query, serverUrls);
     CompletionService<MultiHttpRequestResponse> completionService =
@@ -259,6 +260,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     long requestId = _brokerIdGenerator.get();
     requestContext.setRequestId(requestId);
+    if (httpHeaders != null) {
+      requestContext.setRequestHttpHeaders(httpHeaders.getRequestHeaders().entrySet().stream()
+          .filter(entry -> PinotBrokerQueryEventListenerFactory.getAllowlistQueryRequestHeaders()
+              .contains(entry.getKey())).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    }
 
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
     // check comes later.
