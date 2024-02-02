@@ -33,6 +33,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
@@ -203,8 +204,22 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     if (_segmentPreloadExecutor != null) {
       _segmentPreloadExecutor.shutdownNow();
     }
-    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
-      tableDataManager.shutDown();
+    if (!_tableDataManagerMap.isEmpty()) {
+      int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), _tableDataManagerMap.size());
+      ExecutorService stopExecutorService = Executors.newFixedThreadPool(numThreads);
+      for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+        stopExecutorService.submit(tableDataManager::shutDown);
+      }
+      stopExecutorService.shutdown();
+      try {
+        // Wait at most 10 minutes before exiting this method.
+        if (!stopExecutorService.awaitTermination(10, TimeUnit.MINUTES)) {
+          stopExecutorService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        stopExecutorService.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
     }
     SegmentBuildTimeLeaseExtender.shutdownExecutor();
     LOGGER.info("Helix instance data manager shut down");
