@@ -18,45 +18,26 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class ValidDocIdMetadataInfo {
+public class ValidDocIdsBitmapResponse {
   private final String _segmentName;
-  private final long _totalValidDocs;
-  private final long _totalInvalidDocs;
-  private final long _totalDocs;
   private final String _segmentCrc;
   private final ValidDocIdsType _validDocIdsType;
+  private final byte[] _bitmap;
 
-  public ValidDocIdMetadataInfo(@JsonProperty("segmentName") String segmentName,
-      @JsonProperty("totalValidDocs") long totalValidDocs, @JsonProperty("totalInvalidDocs") long totalInvalidDocs,
-      @JsonProperty("totalDocs") long totalDocs, @JsonProperty("segmentCrc") String segmentCrc,
-      @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType) {
+  public ValidDocIdsBitmapResponse(@JsonProperty("segmentName") String segmentName,
+      @JsonProperty("segmentCrc") String crc, @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType,
+      @JsonProperty("bitmap") byte[] bitmap) {
     _segmentName = segmentName;
-    _totalValidDocs = totalValidDocs;
-    _totalInvalidDocs = totalInvalidDocs;
-    _totalDocs = totalDocs;
-    _segmentCrc = segmentCrc;
+    _segmentCrc = crc;
     _validDocIdsType = validDocIdsType;
+    _bitmap = bitmap;
   }
 
   public String getSegmentName() {
     return _segmentName;
-  }
-
-  public long getTotalValidDocs() {
-    return _totalValidDocs;
-  }
-
-  public long getTotalInvalidDocs() {
-    return _totalInvalidDocs;
-  }
-
-  public long getTotalDocs() {
-    return _totalDocs;
   }
 
   public String getSegmentCrc() {
@@ -65,5 +46,9 @@ public class ValidDocIdMetadataInfo {
 
   public ValidDocIdsType getValidDocIdsType() {
     return _validDocIdsType;
+  }
+
+  public byte[] getBitmap() {
+    return _bitmap;
   }
 }

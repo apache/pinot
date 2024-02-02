@@ -59,6 +59,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -69,6 +70,8 @@ import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -465,18 +468,16 @@ public class TablesResource {
     }
   }
 
-  /**
-   * Download snapshot for the given immutable segment for upsert table. This endpoint is used when get snapshot from
-   * peer to avoid recompute when reload segments.
-   */
   @GET
-  @Produces(MediaType.APPLICATION_OCTET_STREAM)
-  @Path("/segments/{tableNameWithType}/{segmentName}/validDocIds")
-  @ApiOperation(value = "Download validDocIds for an REALTIME immutable segment", notes = "Download validDocIds for "
-      + "an immutable segment in bitmap format.")
-  public Response downloadValidDocIds(
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableNameWithType}/{segmentName}/validDocIdsBitmap")
+  @ApiOperation(value = "Download validDocIds bitmap for an REALTIME immutable segment", notes =
+      "Download validDocIds for " + "an immutable segment in bitmap format.")
+  public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
+      @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders) {
     segmentName = URIUtils.decode(segmentName);
@@ -501,18 +502,72 @@ public class TablesResource {
             Response.Status.BAD_REQUEST);
       }
 
-      // Adopt the same logic as the query execution to get the valid doc ids. 'FilterPlanNode.run()'
-      // If the queryableDocId is available (upsert delete is enabled), we read the valid doc ids from it.
-      // Otherwise, we read the valid doc ids.
-      final MutableRoaringBitmap validDocIdSnapshot;
-      if (indexSegment.getQueryableDocIds() != null) {
-        validDocIdSnapshot = indexSegment.getQueryableDocIds().getMutableRoaringBitmap();
-      } else if (indexSegment.getValidDocIds() != null) {
-        validDocIdSnapshot = indexSegment.getValidDocIds().getMutableRoaringBitmap();
-      } else {
+      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
+          getValidDocIds(indexSegment, validDocIdsType);
+      ValidDocIdsType finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
+      MutableRoaringBitmap validDocIdSnapshot = validDocIdsSnapshotPair.getRight();
+
+      if (validDocIdSnapshot == null) {
+        String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
+            segmentDataManager.getSegmentName());
+        LOGGER.warn(msg);
+        throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
+      }
+
+      byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
+      return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
+          finalValidDocIdsType, validDocIdsBytes);
+    } finally {
+      tableDataManager.releaseSegment(segmentDataManager);
+    }
+  }
+
+  /**
+   * Download snapshot for the given immutable segment for upsert table. This endpoint is used when get snapshot from
+   * peer to avoid recompute when reload segments.
+   */
+  @Deprecated
+  @GET
+  @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  @Path("/segments/{tableNameWithType}/{segmentName}/validDocIds")
+  @ApiOperation(value = "Download validDocIds for an REALTIME immutable segment", notes = "Download validDocIds for "
+      + "an immutable segment in bitmap format.")
+  public Response downloadValidDocIds(
+      @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
+      @QueryParam("validDocIdsType") String validDocIdsType, @Context HttpHeaders httpHeaders) {
+    segmentName = URIUtils.decode(segmentName);
+    LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
+    // Validate data access
+    ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
+
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+
+    try {
+      IndexSegment indexSegment = segmentDataManager.getSegment();
+      if (!(indexSegment instanceof ImmutableSegmentImpl)) {
         throw new WebApplicationException(
-            String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType, segmentName),
-            Response.Status.NOT_FOUND);
+            String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
+            Response.Status.BAD_REQUEST);
+      }
+
+      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
+          getValidDocIds(indexSegment, validDocIdsType);
+      MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
+      if (validDocIdSnapshot == null) {
+        String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
+            segmentDataManager.getSegmentName());
+        LOGGER.warn(msg);
+        throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
       }
 
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
@@ -529,16 +584,18 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provides segment validDocId metadata", notes = "Provides segment validDocId metadata")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
-      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
+      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
+      ErrorInfo.class)
   })
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames")
-      List<String> segmentNames) {
-    return ResourceUtils.convertToJsonString(processValidDocIdMetadata(tableNameWithType, segmentNames));
+      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
+      @QueryParam("validDocIdsType") String validDocIdsType,
+      @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames) {
+    return ResourceUtils.convertToJsonString(
+        processValidDocIdMetadata(tableNameWithType, segmentNames, validDocIdsType));
   }
 
   @POST
@@ -546,18 +603,22 @@ public class TablesResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provides segment validDocId metadata", notes = "Provides segment validDocId metadata")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
-      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
+      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
+      ErrorInfo.class)
   })
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
-      @PathParam("tableNameWithType") String tableNameWithType, TableSegments tableSegments) {
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
+      @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments) {
     List<String> segmentNames = tableSegments.getSegments();
-    return ResourceUtils.convertToJsonString(processValidDocIdMetadata(tableNameWithType, segmentNames));
+    return ResourceUtils.convertToJsonString(
+        processValidDocIdMetadata(tableNameWithType, segmentNames, validDocIdsType));
   }
 
-  private List<Map<String, Object>> processValidDocIdMetadata(String tableNameWithType, List<String> segments) {
+  private List<Map<String, Object>> processValidDocIdMetadata(String tableNameWithType, List<String> segments,
+      String validDocIdsType) {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
@@ -588,15 +649,11 @@ public class TablesResource {
           continue;
         }
 
-        // Adopt the same logic as the query execution to get the valid doc ids. 'FilterPlanNode.run()'
-        // If the queryableDocId is available (upsert delete is enabled), we read the valid doc ids from it.
-        // Otherwise, we read the valid doc ids.
-        final MutableRoaringBitmap validDocIdSnapshot;
-        if (indexSegment.getQueryableDocIds() != null) {
-          validDocIdSnapshot = indexSegment.getQueryableDocIds().getMutableRoaringBitmap();
-        } else if (indexSegment.getValidDocIds() != null) {
-          validDocIdSnapshot = indexSegment.getValidDocIds().getMutableRoaringBitmap();
-        } else {
+        final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
+            getValidDocIds(indexSegment, validDocIdsType);
+        String finalValidDocIdsType = validDocIdSnapshotPair.getLeft().toString();
+        MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
+        if (validDocIdSnapshot == null) {
           String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
               segmentDataManager.getSegmentName());
           LOGGER.warn(msg);
@@ -611,12 +668,36 @@ public class TablesResource {
         validDocIdMetadata.put("totalDocs", totalDocs);
         validDocIdMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdMetadata.put("totalInvalidDocs", totalInvalidDocs);
+        validDocIdMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
+        validDocIdMetadata.put("validDocIdsType", finalValidDocIdsType);
         allValidDocIdMetadata.add(validDocIdMetadata);
       } finally {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
     return allValidDocIdMetadata;
+  }
+
+  private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
+      String validDocIdsTypeStr) {
+    if (validDocIdsTypeStr == null) {
+      // By default, we read the valid doc ids from snapshot.
+      return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+    }
+    ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
+    switch (validDocIdsType) {
+      case SNAPSHOT:
+        return Pair.of(validDocIdsType, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+      case IN_MEMORY:
+        return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
+      case IN_MEMORY_WITH_DELETE:
+        return Pair.of(validDocIdsType, indexSegment.getQueryableDocIds().getMutableRoaringBitmap());
+      default:
+        // By default, we read the valid doc ids from snapshot.
+        LOGGER.warn("Invalid validDocIdsType: {}. Using default validDocIdsType: {}", validDocIdsType,
+            ValidDocIdsType.SNAPSHOT);
+        return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+    }
   }
 
   /**
