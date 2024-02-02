@@ -19,38 +19,12 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 public class CountAggregationFunctionTest extends AbstractAggregationFunctionTest {
-
-  private File _baseDir;
-
-  @BeforeClass
-  void createBaseDir() {
-    try {
-      _baseDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
-    }
-  }
-
-  @AfterClass
-  void destroyBaseDir()
-      throws IOException {
-    if (_baseDir != null) {
-      FileUtils.deleteDirectory(_baseDir);
-    }
-  }
 
   @Test
   public void list() {
