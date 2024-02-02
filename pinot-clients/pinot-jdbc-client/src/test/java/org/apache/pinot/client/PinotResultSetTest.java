@@ -19,7 +19,9 @@
 package org.apache.pinot.client;
 
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -136,6 +138,27 @@ public class PinotResultSetTest {
   }
 
   @Test
+  public void testFetchBigDecimals()
+    throws Exception {
+    ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
+    ResultSet resultSet = resultSetGroup.getResultSet(0);
+    PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
+
+    int currentRow = 0;
+    while (pinotResultSet.next()) {
+      Assert.assertEquals(pinotResultSet.getBigDecimal(7), new BigDecimal(resultSet.getString(currentRow, 6)));
+      currentRow++;
+    }
+
+    // test bad values and make sure exception is thrown
+    try {
+      pinotResultSet.getBigDecimal(6);
+    } catch (SQLException e) {
+      Assert.assertTrue(e.getMessage().contains("Unable to fetch BigDecimal value"));
+    }
+  }
+
+  @Test
   public void testFindColumn()
       throws Exception {
     ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
@@ -158,6 +181,30 @@ public class PinotResultSetTest {
     for (int i = 0; i < resultSet.getColumnCount(); i++) {
       Assert.assertEquals(pinotResultSetMetadata.getColumnTypeName(i + 1), resultSet.getColumnDataType(i));
     }
+  }
+
+  @Test
+  public void testGetCalculatedScale() {
+    PinotResultSet pinotResultSet = new PinotResultSet();
+    int calculatedResult;
+
+    calculatedResult = pinotResultSet.getCalculatedScale("1");
+    Assert.assertEquals(calculatedResult, 0);
+
+    calculatedResult = pinotResultSet.getCalculatedScale("1.0");
+    Assert.assertEquals(calculatedResult, 1);
+
+    calculatedResult = pinotResultSet.getCalculatedScale("1.2");
+    Assert.assertEquals(calculatedResult, 1);
+
+    calculatedResult = pinotResultSet.getCalculatedScale("1.23");
+    Assert.assertEquals(calculatedResult, 2);
+
+    calculatedResult = pinotResultSet.getCalculatedScale("1.234");
+    Assert.assertEquals(calculatedResult, 3);
+
+    calculatedResult = pinotResultSet.getCalculatedScale("-1.234");
+    Assert.assertEquals(calculatedResult, 3);
   }
 
   private ResultSetGroup getResultSet(String resourceName) {

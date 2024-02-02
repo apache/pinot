@@ -110,6 +110,10 @@ public class FluentQueryTest {
       return new OnFirstInstance(_tableConfig, _schema, _baseDir, false, _baseQueriesTest, _extraQueryOptions)
           .andSegment(content);
     }
+
+    public void tearDown() {
+      _baseQueriesTest.shutdownExecutor();
+    }
   }
 
   static class TableWithSegments {
@@ -198,8 +202,18 @@ public class FluentQueryTest {
       return new QueryExecuted(_baseQueriesTest, brokerResponse, _extraQueryOptions);
     }
 
+    public TableWithSegments withNullHandling(boolean enabled) {
+      _extraQueryOptions.put("enableNullHandling", Boolean.toString(enabled));
+      return this;
+    }
+
     public DeclaringTable givenTable(Schema schema, TableConfig tableConfig) {
+      processSegments();
       return new DeclaringTable(_baseQueriesTest, tableConfig, schema, _indexDir.getParentFile(), _extraQueryOptions);
+    }
+
+    public void tearDown() {
+      _baseQueriesTest.shutdownExecutor();
     }
   }
 
@@ -232,6 +246,11 @@ public class FluentQueryTest {
           _tableConfig, _schema, _indexDir.getParentFile(), !_onSecondInstance, _baseQueriesTest, _extraQueryOptions)
           .andSegment(content);
     }
+
+    public OnFirstInstance prepareToQuery() {
+      processSegments();
+      return this;
+    }
   }
 
   public static class OnSecondInstance extends TableWithSegments {
@@ -247,6 +266,11 @@ public class FluentQueryTest {
 
     public OnSecondInstance andSegment(String... tableText) {
       super.andSegment(tableText);
+      return this;
+    }
+
+    public OnSecondInstance prepareToQuery() {
+      processSegments();
       return this;
     }
   }
@@ -322,6 +346,10 @@ public class FluentQueryTest {
     public QueryExecuted whenQuery(String query) {
       BrokerResponseNative brokerResponse = _baseQueriesTest.getBrokerResponse(query);
       return new QueryExecuted(_baseQueriesTest, brokerResponse, _extraQueryOptions);
+    }
+
+    public void tearDown() {
+      _baseQueriesTest.shutdownExecutor();
     }
   }
 
