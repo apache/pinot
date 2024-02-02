@@ -79,9 +79,4 @@ public class PinotDriverTest {
       Assert.assertTrue(e.getMessage().contains("Failed to connect to url"));
     }
   }
-
-  @Test
-  public void testResourcesClosingSafely() {
-
-  }
 }
