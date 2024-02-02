@@ -140,7 +140,7 @@ public class MinionTaskUtils {
   }
 
   public static ValidDocIdsBitmapResponse getValidDocIdsBitmap(String tableNameWithType, String segmentName,
-      String validDocIdType, MinionContext minionContext) {
+      String validDocIdsType, MinionContext minionContext) {
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     String clusterName = minionContext.getHelixManager().getClusterName();
 
@@ -152,7 +152,7 @@ public class MinionTaskUtils {
     // passing an empty list.
     ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
     return serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
-        validDocIdType, 60_000);
+        validDocIdsType, 60_000);
   }
 
   public static String getServer(String segmentName, String tableNameWithType, HelixAdmin helixAdmin,

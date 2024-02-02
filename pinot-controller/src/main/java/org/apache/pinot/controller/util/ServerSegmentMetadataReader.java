@@ -211,7 +211,7 @@ public class ServerSegmentMetadataReader {
    */
   public List<ValidDocIdMetadataInfo> getValidDocIdMetadataFromServer(String tableNameWithType,
       Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
-      @Nullable List<String> segmentNames, int timeoutMs, String validDocIdType) {
+      @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType) {
     List<Pair<String, String>> serverURLsAndBodies = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegments : serverToSegmentsMap.entrySet()) {
       List<String> segmentsForServer = serverToSegments.getValue();
@@ -226,7 +226,7 @@ public class ServerSegmentMetadataReader {
           }
         }
       }
-      serverURLsAndBodies.add(generateValidDocIdMetadataURL(tableNameWithType, segmentsToQuery, validDocIdType,
+      serverURLsAndBodies.add(generateValidDocIdMetadataURL(tableNameWithType, segmentsToQuery, validDocIdsType,
           serverToEndpoints.get(serverToSegments.getKey())));
     }
 
@@ -276,10 +276,10 @@ public class ServerSegmentMetadataReader {
    * @return a bitmap of validDocIds
    */
   @Deprecated
-  public RoaringBitmap getValidDocIdsFromServer(String tableNameWithType, String segmentName, String validDocIdType,
+  public RoaringBitmap getValidDocIdsFromServer(String tableNameWithType, String segmentName, String validDocIdsType,
       String endpoint, int timeoutMs) {
     // Build the endpoint url
-    String url = generateValidDocIdsURL(tableNameWithType, segmentName, validDocIdType, endpoint);
+    String url = generateValidDocIdsURL(tableNameWithType, segmentName, validDocIdsType, endpoint);
 
     // Set timeout
     ClientConfig clientConfig = new ClientConfig();
@@ -300,9 +300,9 @@ public class ServerSegmentMetadataReader {
    * @return a bitmap of validDocIds
    */
   public ValidDocIdsBitmapResponse getValidDocIdsBitmapFromServer(String tableNameWithType, String segmentName,
-      String endpoint, String validDocIdType, int timeoutMs) {
+      String endpoint, String validDocIdsType, int timeoutMs) {
     // Build the endpoint url
-    String url = generateValidDocIdsBitmapURL(tableNameWithType, segmentName, validDocIdType, endpoint);
+    String url = generateValidDocIdsBitmapURL(tableNameWithType, segmentName, validDocIdsType, endpoint);
 
     // Set timeout
     ClientConfig clientConfig = new ClientConfig();
@@ -332,30 +332,30 @@ public class ServerSegmentMetadataReader {
   }
 
   @Deprecated
-  private String generateValidDocIdsURL(String tableNameWithType, String segmentName, String validDocIdType,
+  private String generateValidDocIdsURL(String tableNameWithType, String segmentName, String validDocIdsType,
       String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
     String url = String.format("%s/segments/%s/%s/validDocIds", endpoint, tableNameWithType, segmentName);
-    if (validDocIdType != null) {
-      url = url + "?validDocIdType=" + validDocIdType;
+    if (validDocIdsType != null) {
+      url = url + "?validDocIdsType=" + validDocIdsType;
     }
     return url;
   }
 
-  private String generateValidDocIdsBitmapURL(String tableNameWithType, String segmentName, String validDocIdType,
+  private String generateValidDocIdsBitmapURL(String tableNameWithType, String segmentName, String validDocIdsType,
       String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
     String url = String.format("%s/segments/%s/%s/validDocIdsBitmap", endpoint, tableNameWithType, segmentName);
-    if (validDocIdType != null) {
-      url = url + "?validDocIdType=" + validDocIdType;
+    if (validDocIdsType != null) {
+      url = url + "?validDocIdsType=" + validDocIdsType;
     }
     return url;
   }
 
   private Pair<String, String> generateValidDocIdMetadataURL(String tableNameWithType, List<String> segmentNames,
-      String validDocIdType, String endpoint) {
+      String validDocIdsType, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     TableSegments tableSegments = new TableSegments(segmentNames);
     String jsonTableSegments;
@@ -366,8 +366,8 @@ public class ServerSegmentMetadataReader {
       throw new RuntimeException(e);
     }
     String url = String.format("%s/tables/%s/validDocIdMetadata", endpoint, tableNameWithType);
-    if (validDocIdType != null) {
-      url = url + "?validDocIdType=" + validDocIdType;
+    if (validDocIdsType != null) {
+      url = url + "?validDocIdsType=" + validDocIdsType;
     }
     return Pair.of(url, jsonTableSegments);
   }

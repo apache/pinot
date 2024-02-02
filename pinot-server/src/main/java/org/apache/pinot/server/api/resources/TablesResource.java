@@ -476,7 +476,7 @@ public class TablesResource {
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc id type", example = "validDocIdsSnapshot|validDocIds|queryableDocIds")
-      @QueryParam("validDocIdType") String validDocIdType,
+      @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders) {
     segmentName = URIUtils.decode(segmentName);
@@ -501,9 +501,9 @@ public class TablesResource {
             Response.Status.BAD_REQUEST);
       }
 
-      final Pair<String, MutableRoaringBitmap> validDocIdSnapshotPair = getValidDocIds(indexSegment, validDocIdType);
-      String finalValidDocIdType = validDocIdSnapshotPair.getLeft();
-      MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
+      final Pair<String, MutableRoaringBitmap> validDocIdsSnapshotPair = getValidDocIds(indexSegment, validDocIdsType);
+      String finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
+      MutableRoaringBitmap validDocIdSnapshot = validDocIdsSnapshotPair.getRight();
 
       if (validDocIdSnapshot == null) {
         String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
@@ -513,7 +513,7 @@ public class TablesResource {
       }
 
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
-      return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(), finalValidDocIdType,
+      return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(), finalValidDocIdsType,
           validDocIdsBytes);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
@@ -535,7 +535,7 @@ public class TablesResource {
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Valid doc id type", example = "validDocIdsSnapshot|validDocIds|queryableDocIds")
-      @QueryParam("validDocIdType") String validDocIdType, @Context HttpHeaders httpHeaders) {
+      @QueryParam("validDocIdsType") String validDocIdsType, @Context HttpHeaders httpHeaders) {
     segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
     // Validate data access
@@ -558,7 +558,7 @@ public class TablesResource {
             Response.Status.BAD_REQUEST);
       }
 
-      final Pair<String, MutableRoaringBitmap> validDocIdSnapshotPair = getValidDocIds(indexSegment, validDocIdType);
+      final Pair<String, MutableRoaringBitmap> validDocIdSnapshotPair = getValidDocIds(indexSegment, validDocIdsType);
       MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
       if (validDocIdSnapshot == null) {
         String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
@@ -589,10 +589,10 @@ public class TablesResource {
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc id type", example = "validDocIdsSnapshot|validDocIds|queryableDocIds")
-      @QueryParam("validDocIdType") String validDocIdType,
+      @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames) {
     return ResourceUtils.convertToJsonString(
-        processValidDocIdMetadata(tableNameWithType, segmentNames, validDocIdType));
+        processValidDocIdMetadata(tableNameWithType, segmentNames, validDocIdsType));
   }
 
   @POST
@@ -608,14 +608,14 @@ public class TablesResource {
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc id type", example = "validDocIdsSnapshot|validDocIds|queryableDocIds")
-      @QueryParam("validDocIdType") String validDocIdType, TableSegments tableSegments) {
+      @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments) {
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
-        processValidDocIdMetadata(tableNameWithType, segmentNames, validDocIdType));
+        processValidDocIdMetadata(tableNameWithType, segmentNames, validDocIdsType));
   }
 
   private List<Map<String, Object>> processValidDocIdMetadata(String tableNameWithType, List<String> segments,
-      String validDocIdType) {
+      String validDocIdsType) {
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
@@ -646,8 +646,8 @@ public class TablesResource {
           continue;
         }
 
-        final Pair<String, MutableRoaringBitmap> validDocIdSnapshotPair = getValidDocIds(indexSegment, validDocIdType);
-        String finalValidDocIdType = validDocIdSnapshotPair.getLeft();
+        final Pair<String, MutableRoaringBitmap> validDocIdSnapshotPair = getValidDocIds(indexSegment, validDocIdsType);
+        String finalValidDocIdsType = validDocIdSnapshotPair.getLeft();
         MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
         if (validDocIdSnapshot == null) {
           String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
@@ -665,7 +665,7 @@ public class TablesResource {
         validDocIdMetadata.put("totalValidDocs", totalValidDocs);
         validDocIdMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
-        validDocIdMetadata.put("validDocIdType", finalValidDocIdType);
+        validDocIdMetadata.put("validDocIdsType", finalValidDocIdsType);
         allValidDocIdMetadata.add(validDocIdMetadata);
       } finally {
         tableDataManager.releaseSegment(segmentDataManager);
@@ -674,12 +674,12 @@ public class TablesResource {
     return allValidDocIdMetadata;
   }
 
-  private Pair<String, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment, String validDocIdType) {
-    if (validDocIdType == null) {
+  private Pair<String, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment, String validDocIdsType) {
+    if (validDocIdsType == null) {
       // By default, we read the valid doc ids from snapshot.
       return Pair.of("validDocIdsSnapshot", ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
     }
-    switch (validDocIdType) {
+    switch (validDocIdsType) {
       case "validDocIdsSnapshot":
         return Pair.of("validDocIdsSnapshot", ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
       case "queryableDocIds":
@@ -688,7 +688,7 @@ public class TablesResource {
         return Pair.of("validDocIds", indexSegment.getValidDocIds().getMutableRoaringBitmap());
       default:
         // By default, we read the valid doc ids from snapshot.
-        LOGGER.warn("Invalid validDocIdType: {}. Using 'validDocIdsSnapshot' for validDocIdType", validDocIdType);
+        LOGGER.warn("Invalid validDocIdsType: {}. Using 'validDocIdsSnapshot' for validDocIdsType", validDocIdsType);
         return Pair.of("validDocIdsSnapshot", ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
     }
   }

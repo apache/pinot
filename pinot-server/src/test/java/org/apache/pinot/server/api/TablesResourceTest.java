@@ -318,7 +318,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
     Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "1265679343");
-    Assert.assertEquals(validDocIdMetadata.get("validDocIdType").asText(), "validDocIdsSnapshot");
+    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "validDocIdsSnapshot");
   }
 
   @Test
@@ -344,7 +344,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
     Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "1265679343");
-    Assert.assertEquals(validDocIdMetadata.get("validDocIdType").asText(), "validDocIdsSnapshot");
+    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "validDocIdsSnapshot");
   }
 
   // Verify metadata file from segments.
@@ -408,7 +408,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
     // Check validDocIdsSnapshot type
     response =
-        _webTarget.path(snapshotPath).queryParam("validDocIdType", "validDocIdsSnapshot").request().get(Response.class);
+        _webTarget.path(snapshotPath).queryParam("validDocIdsType", "validDocIdsSnapshot").request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
     Assert.assertNotNull(validDocIdsSnapshotBitmap);
@@ -416,7 +416,7 @@ public class TablesResourceTest extends BaseResourceTest {
         validDocIdsSnapshot.getMutableRoaringBitmap());
 
     // Check validDocIds type
-    response = _webTarget.path(snapshotPath).queryParam("validDocIdType", "validDocIds").request().get(Response.class);
+    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", "validDocIds").request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
     Assert.assertNotNull(validDocIdsSnapshotBitmap);
@@ -425,7 +425,7 @@ public class TablesResourceTest extends BaseResourceTest {
 
     // Check queryableDocIds type
     response =
-        _webTarget.path(snapshotPath).queryParam("validDocIdType", "queryableDocIds").request().get(Response.class);
+        _webTarget.path(snapshotPath).queryParam("validDocIdsType", "queryableDocIds").request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
     Assert.assertNotNull(validDocIdsSnapshotBitmap);
@@ -466,7 +466,7 @@ public class TablesResourceTest extends BaseResourceTest {
         validDocIdsSnapshot.getMutableRoaringBitmap());
 
     // Check validDocIdsSnapshot type
-    response = _webTarget.path(snapshotPath).queryParam("validDocIdType", "validDocIdsSnapshot").request()
+    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", "validDocIdsSnapshot").request()
         .get(ValidDocIdsBitmapResponse.class);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getSegmentCrc(), "1265679343");
@@ -477,7 +477,7 @@ public class TablesResourceTest extends BaseResourceTest {
         validDocIdsSnapshot.getMutableRoaringBitmap());
 
     // Check validDocIds type
-    response = _webTarget.path(snapshotPath).queryParam("validDocIdType", "validDocIds").request()
+    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", "validDocIds").request()
         .get(ValidDocIdsBitmapResponse.class);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getSegmentCrc(), "1265679343");
@@ -488,7 +488,7 @@ public class TablesResourceTest extends BaseResourceTest {
         validDocIds.getMutableRoaringBitmap());
 
     // Check queryableDocIds type
-    response = _webTarget.path(snapshotPath).queryParam("validDocIdType", "queryableDocIds").request()
+    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", "queryableDocIds").request()
         .get(ValidDocIdsBitmapResponse.class);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getSegmentCrc(), "1265679343");

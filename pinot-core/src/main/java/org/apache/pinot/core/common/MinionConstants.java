@@ -169,6 +169,6 @@ public class MinionConstants {
      * Valid doc id type ('validDocIdsSnapshot', `validDocIds`, `queryableDocIds`). If not set, 'validDocIdsSnapshot'
      * is used.
      */
-    public static final String VALID_DOC_ID_TYPE = "validDocIdType";
+    public static final String VALID_DOC_IDS_TYPE = "validDocIdsType";
   }
 }

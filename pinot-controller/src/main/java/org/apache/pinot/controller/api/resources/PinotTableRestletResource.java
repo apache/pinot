@@ -962,7 +962,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "A list of segments", allowMultiple = true) @QueryParam("segmentNames")
       List<String> segmentNames,
       @ApiParam(value = "Valid doc id type", example = "validDocIdsSnapshot|validDocIds|queryableDocIds")
-      @QueryParam("validDocIdType") String validDocIdType) {
+      @QueryParam("validDocIdsType") String validDocIdsType) {
     LOGGER.info("Received a request to fetch aggregate valid doc id metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.OFFLINE) {
@@ -977,7 +977,7 @@ public class PinotTableRestletResource {
       TableMetadataReader tableMetadataReader =
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
       JsonNode segmentsMetadataJson =
-          tableMetadataReader.getAggregateValidDocIdMetadata(tableNameWithType, segmentNames, validDocIdType,
+          tableMetadataReader.getAggregateValidDocIdMetadata(tableNameWithType, segmentNames, validDocIdsType,
               _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
       validDocIdMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
