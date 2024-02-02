@@ -25,7 +25,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.infra.Blackhole;
-import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
@@ -43,7 +42,7 @@ public class BenchmarkModeAggregation extends BaseQueryBenchmark {
   public static void main(String[] args) throws RunnerException {
     Options opt = new OptionsBuilder()
         .include(BenchmarkModeAggregation.class.getSimpleName())
-        .addProfiler(GCProfiler.class)
+//        .addProfiler(GCProfiler.class)
         .build();
 
     new Runner(opt).run();
@@ -51,11 +50,14 @@ public class BenchmarkModeAggregation extends BaseQueryBenchmark {
 
   @Param({ "true", "false" })
   public boolean _nullHandling;
+  @Param({"0", "1", "2", "3", "4", "5"})
+  public int _impl;
   @Param({
-      "select mode(value) from benchmark",
-      "select mode(valueDict) from benchmark"
+      "select mode(value, 'MIN', %s) from benchmark",
+      "select mode(valueDict, 'MIN', %s) from benchmark"
   })
-  public String _query;
+  public String _aQueryTemplate;
+  private String _query;
 
   @Override
   protected int getRowsPerSegment() {
@@ -102,6 +104,7 @@ public class BenchmarkModeAggregation extends BaseQueryBenchmark {
       throws IOException {
     init();
     _scenarioBuilder.setup(_nullHandling);
+    _query = String.format(_aQueryTemplate, Integer.toString(_impl));
   }
 
   @TearDown(Level.Trial)

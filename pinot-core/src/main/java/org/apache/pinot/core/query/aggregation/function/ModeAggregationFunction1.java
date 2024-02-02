@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.doubles.Double2LongMap;
 import it.unimi.dsi.fastutil.doubles.Double2LongOpenHashMap;
 import it.unimi.dsi.fastutil.floats.Float2LongMap;
@@ -56,14 +55,17 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * </ul>
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<Map<? extends Number, Long>, Double> {
+public class ModeAggregationFunction1 extends BaseSingleInputAggregationFunction<Map<? extends Number, Long>, Double> {
 
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   private final MultiModeReducerType _multiModeReducerType;
 
-  public ModeAggregationFunction(List<ExpressionContext> arguments) {
+  private final boolean _nullHandlingEnabled;
+
+  public ModeAggregationFunction1(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     super(arguments.get(0));
+    _nullHandlingEnabled = nullHandlingEnabled;
 
     int numArguments = arguments.size();
 //    Preconditions.checkArgument(numArguments <= 2, "Mode expects at most 2 arguments, got: %s", numArguments);
@@ -158,9 +160,9 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
    */
   protected static Int2IntOpenHashMap getDictIdCountMap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
-    ModeAggregationFunction.DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
+    ModeAggregationFunction1.DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
     if (dictIdsWrapper == null) {
-      dictIdsWrapper = new ModeAggregationFunction.DictIdsWrapper(dictionary);
+      dictIdsWrapper = new ModeAggregationFunction1.DictIdsWrapper(dictionary);
       aggregationResultHolder.setValue(dictIdsWrapper);
     }
     return dictIdsWrapper._dictIdCountMap;
@@ -171,9 +173,9 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
    */
   protected static Int2IntOpenHashMap getDictIdCountMap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
-    ModeAggregationFunction.DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
+    ModeAggregationFunction1.DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
     if (dictIdsWrapper == null) {
-      dictIdsWrapper = new ModeAggregationFunction.DictIdsWrapper(dictionary);
+      dictIdsWrapper = new ModeAggregationFunction1.DictIdsWrapper(dictionary);
       groupByResultHolder.setValueForKey(groupKey, dictIdsWrapper);
     }
     return dictIdsWrapper._dictIdCountMap;
@@ -263,10 +265,14 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     // For dictionary-encoded expression, store dictionary ids into the dictId map
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      int[] dictIds = blockValSet.getDictionaryIdsSV();
       Int2IntOpenHashMap dictIdValueMap = getDictIdCountMap(aggregationResultHolder, dictionary);
-      for (int i = 0; i < length; i++) {
-        dictIdValueMap.merge(dictIds[i], 1, Integer::sum);
+      int[] dictIds = blockValSet.getDictionaryIdsSV();
+      if (_nullHandlingEnabled) {
+        throw new IllegalStateException("Null handling not supported");
+      } else {
+        for (int i = 0; i < length; i++) {
+          dictIdValueMap.merge(dictIds[i], 1, Integer::sum);
+        }
       }
       return;
     }
@@ -285,8 +291,12 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
       case LONG:
         Long2LongOpenHashMap longMap = (Long2LongOpenHashMap) valueMap;
         long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          longMap.merge(longValues[i], 1, Long::sum);
+        if (_nullHandlingEnabled) {
+          throw new IllegalStateException("Null handling not supported");
+        } else {
+          for (int i = 0; i < length; i++) {
+            longMap.merge(longValues[i], 1, Long::sum);
+          }
         }
         break;
       case FLOAT:

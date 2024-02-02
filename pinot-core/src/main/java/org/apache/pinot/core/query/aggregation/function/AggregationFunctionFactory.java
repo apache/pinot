@@ -208,7 +208,27 @@ public class AggregationFunctionFactory {
           case AVG:
             return new AvgAggregationFunction(arguments, nullHandlingEnabled);
           case MODE:
-            return new ModeAggregationFunction(arguments, nullHandlingEnabled);
+            if (numArguments < 3) {
+              return new ModeAggregationFunction(arguments);
+            } else {
+              int intValue = arguments.get(2).getLiteral().getIntValue();
+              switch (intValue) {
+                case 0:
+                  return new ModeAggregationFunction(arguments);
+                case 1:
+                  return new ModeAggregationFunction1(arguments, nullHandlingEnabled);
+                case 2:
+                  return new ModeAggregationFunction2(arguments, nullHandlingEnabled);
+                case 3:
+                  return new ModeAggregationFunction3(arguments, nullHandlingEnabled);
+                case 4:
+                  return new ModeAggregationFunction4(arguments, nullHandlingEnabled);
+                case 5:
+                  return new ModeAggregationFunction5(arguments, nullHandlingEnabled);
+                default:
+                  throw new IllegalArgumentException("Unsupported third argument for MODE: " + intValue);
+              }
+            }
           case FIRSTWITHTIME: {
             Preconditions.checkArgument(numArguments == 3,
                 "FIRST_WITH_TIME expects 3 arguments, got: %s. The function can be used as "
@@ -439,7 +459,8 @@ public class AggregationFunctionFactory {
         }
       }
     } catch (Exception e) {
-      throw new BadQueryRequestException("Invalid aggregation function: " + function + "; Reason: " + e.getMessage());
+      throw new BadQueryRequestException(
+          "Invalid aggregation function: " + function + "; Reason: " + e.getMessage(), e);
     }
   }
 

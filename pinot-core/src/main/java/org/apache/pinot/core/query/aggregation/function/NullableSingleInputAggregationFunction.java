@@ -54,12 +54,16 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
   }
 
   public void forEachNotNull(int length, BlockValSet blockValSet, BatchConsumer consumer) {
-    RoaringBitmap roaringBitmap = blockValSet.getNullBitmap();
-    IntIterator intIterator = roaringBitmap == null ? null : roaringBitmap.getIntIterator();
-    foldNotNull(length, intIterator, null, (nothing, from, to) -> {
-      consumer.consume(from, to);
-      return null;
-    });
+    if (!_nullHandlingEnabled) {
+      consumer.consume(0, length);
+    } else {
+      RoaringBitmap roaringBitmap = blockValSet.getNullBitmap();
+      IntIterator intIterator = roaringBitmap == null ? null : roaringBitmap.getIntIterator();
+      foldNotNull(length, intIterator, null, (nothing, from, to) -> {
+        consumer.consume(from, to);
+        return null;
+      });
+    }
   }
 
   /**
@@ -221,6 +225,41 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
 
   void forEachNotNullDictId(int length, BlockValSet blockValSet, IntConsumer consumer) {
     forEachNotNullDictId(length, blockValSet, (i, value) -> consumer.accept(value));
+  }
+
+  public static abstract class ForEachNotNullDict {
+
+    protected abstract void apply(int fromInclusive, int toExclusive);
+
+    public void forEachNotNull(boolean nullHandlingEnabled, int length, BlockValSet blockValSet) {
+      if (!nullHandlingEnabled) {
+        apply(0, length);
+      } else {
+        RoaringBitmap roaringBitmap = blockValSet.getNullBitmap();
+
+        if (roaringBitmap == null || roaringBitmap.isEmpty()) {
+          apply(0, length);
+        } else {
+          IntIterator nullIndexIterator = roaringBitmap.getIntIterator();
+          int next;
+          int firstNullIdx = nullIndexIterator.next();
+          if (firstNullIdx > 0) {
+            apply(0, firstNullIdx);
+          }
+          next = firstNullIdx + 1;
+          while (nullIndexIterator.hasNext()) {
+            int newNullIdx = nullIndexIterator.next();
+            if (newNullIdx > next) {
+              apply(next, newNullIdx);
+            }
+            next = newNullIdx + 1;
+          }
+          if (next < length) {
+            apply(next, length);
+          }
+        }
+      }
+    }
   }
 
   void forEachNotNullDictId(int length, BlockValSet blockValSet, IntValueConsumer consumer) {
