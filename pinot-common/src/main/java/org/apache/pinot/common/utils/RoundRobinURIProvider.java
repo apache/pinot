@@ -23,6 +23,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
+import java.util.List;
 import java.util.Random;
 import org.apache.http.client.utils.URIBuilder;
 
@@ -50,6 +51,14 @@ public class RoundRobinURIProvider {
         String ip = addresses[i].getHostAddress();
         _uris[i] = uriBuilder.setHost(ip).build();
       }
+    }
+    _index = new Random().nextInt(_uris.length);
+  }
+
+  public RoundRobinURIProvider(List<URI> uris) {
+    _uris = new URI[uris.size()];
+    for (int i = 0; i < uris.size(); i++) {
+      _uris[i] = uris.get(i);
     }
     _index = new Random().nextInt(_uris.length);
   }
