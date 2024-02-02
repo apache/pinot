@@ -961,7 +961,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "A list of segments", allowMultiple = true) @QueryParam("segmentNames")
       List<String> segmentNames,
-      @ApiParam(value = "Valid doc id type", example = "validDocIdsSnapshot|validDocIds|queryableDocIds")
+      @ApiParam(value = "Valid doc id type", example = "snapshot|onHeap|onHeapWithDelete")
       @QueryParam("validDocIdsType") String validDocIdsType) {
     LOGGER.info("Received a request to fetch aggregate valid doc id metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);

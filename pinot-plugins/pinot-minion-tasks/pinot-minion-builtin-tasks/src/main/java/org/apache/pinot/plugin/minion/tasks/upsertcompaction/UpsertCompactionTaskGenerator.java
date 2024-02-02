@@ -31,6 +31,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -50,11 +51,11 @@ import org.slf4j.LoggerFactory;
 
 @TaskGenerator
 public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
   private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 0.0;
   private static final long DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT = 0;
-  private static final String DEFAULT_VALID_DOC_IDS_TYPE = "validDocIdsSnapshot";
 
   public static class SegmentSelectionResult {
 
@@ -127,17 +128,21 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       // TODO: currently, we put segmentNames=null to get metadata for all segments. We can change this to get
       // valid doc id metadata in batches with the loop.
-      String validDocIdsType =
-          taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, DEFAULT_VALID_DOC_IDS_TYPE);
+
+      // By default, we use 'snapshot' for validDocIdsType. This means that we will use the validDocIds bitmap from
+      // the snapshot from Pinot segment. This will require 'enableSnapshot' from UpsertConfig to be set to true.
+      String validDocIdsTypeStr =
+          taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
+      ValidDocIdsType validDocIdsType = ValidDocIdsType.fromString(validDocIdsTypeStr);
 
       // Validate that the snapshot is enabled if validDocIdsType is validDocIdsSnapshot
-      if (validDocIdsType.equals(DEFAULT_VALID_DOC_IDS_TYPE)) {
+      if (validDocIdsType == ValidDocIdsType.SNAPSHOT) {
         UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
         Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
         Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
             "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdsType = %s",
             validDocIdsType));
-      } else if (validDocIdsType.equals("queryableDocIds")) {
+      } else if (validDocIdsType == ValidDocIdsType.ON_HEAP_WITH_DELETE) {
         UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
         Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
         Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(),
@@ -147,7 +152,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       List<ValidDocIdMetadataInfo> validDocIdMetadataList =
           serverSegmentMetadataReader.getValidDocIdMetadataFromServer(tableNameWithType, serverToSegments,
-              serverToEndpoints, null, 60_000, validDocIdsType);
+              serverToEndpoints, null, 60_000, validDocIdsType.toString());
 
       Map<String, SegmentZKMetadata> completedSegmentsMap =
           completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
@@ -175,7 +180,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, segment.getDownloadUrl());
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));
-        configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType);
+        configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType.toString());
         pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
         numTasks++;
       }

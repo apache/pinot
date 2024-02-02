@@ -34,6 +34,7 @@ import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -318,7 +319,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
     Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "1265679343");
-    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "validDocIdsSnapshot");
+    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "snapshot");
   }
 
   @Test
@@ -344,7 +345,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
     Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
     Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "1265679343");
-    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "validDocIdsSnapshot");
+    Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "snapshot");
   }
 
   // Verify metadata file from segments.
@@ -406,26 +407,29 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
         validDocIdsSnapshot.getMutableRoaringBitmap());
 
-    // Check validDocIdsSnapshot type
+    // Check snapshot type
     response =
-        _webTarget.path(snapshotPath).queryParam("validDocIdsType", "validDocIdsSnapshot").request().get(Response.class);
+        _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.SNAPSHOT.toString()).request()
+            .get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
     Assert.assertNotNull(validDocIdsSnapshotBitmap);
     Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
         validDocIdsSnapshot.getMutableRoaringBitmap());
 
-    // Check validDocIds type
-    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", "validDocIds").request().get(Response.class);
+    // Check onHeap type
+    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.ON_HEAP).request()
+        .get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
     Assert.assertNotNull(validDocIdsSnapshotBitmap);
     Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
         validDocIds.getMutableRoaringBitmap());
 
-    // Check queryableDocIds type
+    // Check onHeapWithDelete type
     response =
-        _webTarget.path(snapshotPath).queryParam("validDocIdsType", "queryableDocIds").request().get(Response.class);
+        _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.ON_HEAP_WITH_DELETE.toString())
+            .request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
     validDocIdsSnapshotBitmap = response.readEntity(byte[].class);
     Assert.assertNotNull(validDocIdsSnapshotBitmap);
@@ -465,9 +469,10 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
         validDocIdsSnapshot.getMutableRoaringBitmap());
 
-    // Check validDocIdsSnapshot type
-    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", "validDocIdsSnapshot").request()
-        .get(ValidDocIdsBitmapResponse.class);
+    // Check snapshot type
+    response =
+        _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.SNAPSHOT.toString()).request()
+            .get(ValidDocIdsBitmapResponse.class);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getSegmentCrc(), "1265679343");
     Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
@@ -476,8 +481,8 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
         validDocIdsSnapshot.getMutableRoaringBitmap());
 
-    // Check validDocIds type
-    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", "validDocIds").request()
+    // Check onHeap type
+    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.ON_HEAP.toString()).request()
         .get(ValidDocIdsBitmapResponse.class);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getSegmentCrc(), "1265679343");
@@ -487,9 +492,10 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
         validDocIds.getMutableRoaringBitmap());
 
-    // Check queryableDocIds type
-    response = _webTarget.path(snapshotPath).queryParam("validDocIdsType", "queryableDocIds").request()
-        .get(ValidDocIdsBitmapResponse.class);
+    // Check onHeapWithDelete type
+    response =
+        _webTarget.path(snapshotPath).queryParam("validDocIdsType", ValidDocIdsType.ON_HEAP_WITH_DELETE.toString())
+            .request().get(ValidDocIdsBitmapResponse.class);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getSegmentCrc(), "1265679343");
     Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());

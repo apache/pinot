@@ -35,6 +35,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -520,7 +521,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     TableTaskConfig taskConfig = getCompactionTaskConfig();
     Map<String, String> compactionTaskConfig =
         taskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE);
-    compactionTaskConfig.put("validDocIdsType", "queryableDocIds");
+    compactionTaskConfig.put("validDocIdsType", ValidDocIdsType.ON_HEAP_WITH_DELETE.toString());
     taskConfig = new TableTaskConfig(
         Collections.singletonMap(MinionConstants.UpsertCompactionTask.TASK_TYPE, compactionTaskConfig));
     tableConfig.setTaskConfig(taskConfig);

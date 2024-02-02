@@ -166,8 +166,7 @@ public class MinionConstants {
     public static final String INVALID_RECORDS_THRESHOLD_COUNT = "invalidRecordsThresholdCount";
 
     /**
-     * Valid doc id type ('validDocIdsSnapshot', `validDocIds`, `queryableDocIds`). If not set, 'validDocIdsSnapshot'
-     * is used.
+     * Valid doc id type
      */
     public static final String VALID_DOC_IDS_TYPE = "validDocIdsType";
   }

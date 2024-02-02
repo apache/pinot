@@ -71,6 +71,7 @@ import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -475,7 +476,7 @@ public class TablesResource {
   public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc id type", example = "validDocIdsSnapshot|validDocIds|queryableDocIds")
+      @ApiParam(value = "Valid doc id type", example = "snapshot|onHeap|onHeapWithDelete")
       @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders) {
@@ -501,8 +502,9 @@ public class TablesResource {
             Response.Status.BAD_REQUEST);
       }
 
-      final Pair<String, MutableRoaringBitmap> validDocIdsSnapshotPair = getValidDocIds(indexSegment, validDocIdsType);
-      String finalValidDocIdsType = validDocIdsSnapshotPair.getLeft();
+      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
+          getValidDocIds(indexSegment, validDocIdsType);
+      String finalValidDocIdsType = validDocIdsSnapshotPair.getLeft().toString();
       MutableRoaringBitmap validDocIdSnapshot = validDocIdsSnapshotPair.getRight();
 
       if (validDocIdSnapshot == null) {
@@ -513,8 +515,8 @@ public class TablesResource {
       }
 
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
-      return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(), finalValidDocIdsType,
-          validDocIdsBytes);
+      return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
+          finalValidDocIdsType, validDocIdsBytes);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
@@ -534,7 +536,7 @@ public class TablesResource {
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Valid doc id type", example = "validDocIdsSnapshot|validDocIds|queryableDocIds")
+      @ApiParam(value = "Valid doc id type", example = "snapshot|onHeap|onHeapWithDelete")
       @QueryParam("validDocIdsType") String validDocIdsType, @Context HttpHeaders httpHeaders) {
     segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
@@ -558,7 +560,8 @@ public class TablesResource {
             Response.Status.BAD_REQUEST);
       }
 
-      final Pair<String, MutableRoaringBitmap> validDocIdSnapshotPair = getValidDocIds(indexSegment, validDocIdsType);
+      final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
+          getValidDocIds(indexSegment, validDocIdsType);
       MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
       if (validDocIdSnapshot == null) {
         String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
@@ -588,7 +591,7 @@ public class TablesResource {
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc id type", example = "validDocIdsSnapshot|validDocIds|queryableDocIds")
+      @ApiParam(value = "Valid doc id type", example = "snapshot|onHeap|onHeapWithDelete")
       @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames) {
     return ResourceUtils.convertToJsonString(
@@ -607,7 +610,7 @@ public class TablesResource {
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc id type", example = "validDocIdsSnapshot|validDocIds|queryableDocIds")
+      @ApiParam(value = "Valid doc id type", example = "snapshot|onHeap|onHeapWithDelete")
       @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments) {
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
@@ -646,8 +649,9 @@ public class TablesResource {
           continue;
         }
 
-        final Pair<String, MutableRoaringBitmap> validDocIdSnapshotPair = getValidDocIds(indexSegment, validDocIdsType);
-        String finalValidDocIdsType = validDocIdSnapshotPair.getLeft();
+        final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdSnapshotPair =
+            getValidDocIds(indexSegment, validDocIdsType);
+        String finalValidDocIdsType = validDocIdSnapshotPair.getLeft().toString();
         MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
         if (validDocIdSnapshot == null) {
           String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
@@ -674,22 +678,25 @@ public class TablesResource {
     return allValidDocIdMetadata;
   }
 
-  private Pair<String, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment, String validDocIdsType) {
-    if (validDocIdsType == null) {
+  private Pair<ValidDocIdsType, MutableRoaringBitmap> getValidDocIds(IndexSegment indexSegment,
+      String validDocIdsTypeStr) {
+    if (validDocIdsTypeStr == null) {
       // By default, we read the valid doc ids from snapshot.
-      return Pair.of("validDocIdsSnapshot", ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+      return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
     }
+    ValidDocIdsType validDocIdsType = ValidDocIdsType.fromString(validDocIdsTypeStr);
     switch (validDocIdsType) {
-      case "validDocIdsSnapshot":
-        return Pair.of("validDocIdsSnapshot", ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
-      case "queryableDocIds":
-        return Pair.of("queryableDocIds", indexSegment.getQueryableDocIds().getMutableRoaringBitmap());
-      case "validDocIds":
-        return Pair.of("validDocIds", indexSegment.getValidDocIds().getMutableRoaringBitmap());
+      case SNAPSHOT:
+        return Pair.of(validDocIdsType, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+      case ON_HEAP:
+        return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
+      case ON_HEAP_WITH_DELETE:
+        return Pair.of(validDocIdsType, indexSegment.getQueryableDocIds().getMutableRoaringBitmap());
       default:
         // By default, we read the valid doc ids from snapshot.
-        LOGGER.warn("Invalid validDocIdsType: {}. Using 'validDocIdsSnapshot' for validDocIdsType", validDocIdsType);
-        return Pair.of("validDocIdsSnapshot", ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+        LOGGER.warn("Invalid validDocIdsType: {}. Using default validDocIdsType: {}", validDocIdsType,
+            ValidDocIdsType.SNAPSHOT);
+        return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
     }
   }
 

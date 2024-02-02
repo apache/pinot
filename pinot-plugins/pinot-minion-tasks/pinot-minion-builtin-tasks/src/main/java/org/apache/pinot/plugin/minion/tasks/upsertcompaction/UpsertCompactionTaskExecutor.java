@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -42,7 +43,6 @@ import org.slf4j.LoggerFactory;
 
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
-  private static final String DEFAULT_VALID_DOC_IDS_TYPE = "validDocIdsSnapshot";
 
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
@@ -57,10 +57,12 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     TableConfig tableConfig = getTableConfig(tableNameWithType);
 
-    String validDocIdsType =
-        configs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_TYPE, DEFAULT_VALID_DOC_IDS_TYPE);
+    String validDocIdsTypeStr =
+        configs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
+    ValidDocIdsType validDocIdsType = ValidDocIdsType.fromString(validDocIdsTypeStr);
     ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
-        MinionTaskUtils.getValidDocIdsBitmap(tableNameWithType, segmentName, validDocIdsType, MINION_CONTEXT);
+        MinionTaskUtils.getValidDocIdsBitmap(tableNameWithType, segmentName, validDocIdsType.toString(),
+            MINION_CONTEXT);
 
     // Check crc from the downloaded segment against the crc returned from the server along with the valid doc id
     // bitmap. If this doesn't match, this means that we are hitting the race condition where the segment has been
