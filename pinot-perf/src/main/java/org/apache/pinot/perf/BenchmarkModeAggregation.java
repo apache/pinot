@@ -35,14 +35,14 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Fork
 //@BenchmarkMode(Mode.SampleTime)
 @BenchmarkMode(Mode.Throughput)
-@Warmup(iterations = 2, time = 5)
-@Measurement(iterations = 5, time = 5)
+@Warmup(iterations = 2, time = 1)
+@Measurement(iterations = 5, time = 1)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @State(Scope.Benchmark)
-public class BenchmarkCountTest extends BaseQueryBenchmark {
+public class BenchmarkModeAggregation extends BaseQueryBenchmark {
   public static void main(String[] args) throws RunnerException {
     Options opt = new OptionsBuilder()
-        .include(BenchmarkCountTest.class.getSimpleName())
+        .include(BenchmarkModeAggregation.class.getSimpleName())
         .addProfiler(GCProfiler.class)
         .build();
 
@@ -52,8 +52,8 @@ public class BenchmarkCountTest extends BaseQueryBenchmark {
   @Param({ "true", "false" })
   public boolean _nullHandling;
   @Param({
-      "select count(value) from benchmark",
-      "select count(valueDict) from benchmark"
+      "select mode(value) from benchmark",
+      "select mode(valueDict) from benchmark"
   })
   public String _query;
 
