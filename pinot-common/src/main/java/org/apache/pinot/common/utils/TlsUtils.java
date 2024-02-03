@@ -409,6 +409,8 @@ public final class TlsUtils {
             "trust manager of the existing SSLFactory must be swappable"
         );
       }
+      LOGGER.info("Enabling auto renewal of SSLFactory {} when key store {} or trust store {} changes",
+          sslFactory, keyStorePath, trustStorePath);
       // The reloadSslFactoryWhenFileStoreChanges is a blocking call, so we need to create a new thread to run it.
       // Creating a new thread to run the reloadSslFactoryWhenFileStoreChanges is costly; however, unless we
       // invoke the createAutoRenewedSSLFactoryFromFileStore method crazily, this should not be a problem.
@@ -442,10 +444,15 @@ public final class TlsUtils {
       for (WatchEvent<?> event : key.pollEvents()) {
         Path changedFile = (Path) event.context();
         if (watchKeyPathMap.get(key).contains(changedFile)) {
+          LOGGER.info("Detected change in file: {}, try to renew SSLFactory {} "
+              + "(built from key store {} and truststore {})",
+              changedFile, baseSslFactory, keyStorePath, trustStorePath);
           SSLFactory updatedSslFactory = createSSLFactory(
               keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath, trustStorePassword,
               sslContextProtocol, secureRandom, false);
           SSLFactoryUtils.reload(baseSslFactory, updatedSslFactory);
+          LOGGER.info("Successfully renewed SSLFactory {} (built from key store {} and truststore {}) "
+                  + "on file {} changes", baseSslFactory, keyStorePath, trustStorePath, changedFile);
         }
       }
       key.reset();
@@ -514,6 +521,9 @@ public final class TlsUtils {
       if (trustStoreStream != null) {
         trustStoreStream.close();
       }
+      LOGGER.info("Successfully created SSLFactory {} with key store {} and trust store {}. "
+              + "Key and trust material swappable: {}",
+          sslFactory, keyStorePath, trustStorePath, keyAndTrustMaterialSwappable);
       return sslFactory;
     } catch (Exception e) {
       throw new IllegalStateException(e);
