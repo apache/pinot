@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.service.server;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
@@ -30,6 +29,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.query.QueryEnvironment;
@@ -37,7 +37,9 @@ import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryTestSet;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
@@ -228,15 +230,24 @@ public class QueryServerTest extends QueryTestSet {
   }
 
   private Worker.QueryRequest getQueryRequest(DispatchableSubPlan dispatchableSubPlan, int stageId) {
-    Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
-        dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap();
+    DispatchablePlanFragment planFragment = dispatchableSubPlan.getQueryStageList().get(stageId);
+    Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap = planFragment.getServerInstanceToWorkerIdMap();
     // this particular test set requires the request to have a single QueryServerInstance to dispatch to
     // as it is not testing the multi-tenancy dispatch (which is in the QueryDispatcherTest)
-    QueryServerInstance serverInstance = serverInstanceToWorkerIdMap.keySet().iterator().next();
-    int workerId = serverInstanceToWorkerIdMap.get(serverInstance).get(0);
+    Map.Entry<QueryServerInstance, List<Integer>> entry = serverInstanceToWorkerIdMap.entrySet().iterator().next();
+    QueryServerInstance serverInstance = entry.getKey();
+    List<Integer> workerIds = entry.getValue();
+    Plan.StageNode stageRoot =
+        StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) planFragment.getPlanFragment().getFragmentRoot());
+    List<Worker.WorkerMetadata> protoWorkerMetadataList = QueryPlanSerDeUtils.toProtoWorkerMetadataList(planFragment);
+    Worker.StageMetadata stageMetadata =
+        QueryPlanSerDeUtils.toProtoStageMetadata(protoWorkerMetadataList, planFragment.getCustomProperties(),
+            serverInstance, workerIds);
+    Worker.StagePlan stagePlan =
+        Worker.StagePlan.newBuilder().setStageId(stageId).setStageRoot(stageRoot).setStageMetadata(stageMetadata)
+            .build();
 
-    return Worker.QueryRequest.newBuilder().addStagePlan(
-            QueryPlanSerDeUtils.serialize(dispatchableSubPlan, stageId, serverInstance, ImmutableList.of(workerId)))
+    return Worker.QueryRequest.newBuilder().addStagePlan(stagePlan)
         // the default configurations that must exist.
         .putMetadata(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID,
             String.valueOf(RANDOM_REQUEST_ID_GEN.nextLong()))

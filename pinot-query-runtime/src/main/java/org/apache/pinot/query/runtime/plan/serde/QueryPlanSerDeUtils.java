@@ -27,7 +27,6 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
-import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
@@ -42,8 +41,8 @@ import org.apache.pinot.query.runtime.plan.StageMetadata;
  * This utility class serialize/deserialize between {@link Worker.StagePlan} elements to Planner elements.
  */
 public class QueryPlanSerDeUtils {
-  private static final Pattern VIRTUAL_SERVER_PATTERN = Pattern.compile(
-      "(?<virtualid>[0-9]+)@(?<host>[^:]+):(?<port>[0-9]+)");
+  private static final Pattern VIRTUAL_SERVER_PATTERN =
+      Pattern.compile("(?<virtualid>[0-9]+)@(?<host>[^:]+):(?<port>[0-9]+)");
 
   private QueryPlanSerDeUtils() {
     // do not instantiate.
@@ -57,18 +56,6 @@ public class QueryPlanSerDeUtils {
     return distributedStagePlans;
   }
 
-  public static Worker.StagePlan serialize(DispatchableSubPlan dispatchableSubPlan, int stageId,
-      QueryServerInstance queryServerInstance, List<Integer> workerIds) {
-    return Worker.StagePlan.newBuilder()
-        .setStageId(stageId)
-        .setStageRoot(StageNodeSerDeUtils.serializeStageNode(
-            (AbstractPlanNode) dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment()
-                .getFragmentRoot()))
-        .setStageMetadata(
-            toProtoStageMetadata(dispatchableSubPlan.getQueryStageList().get(stageId), queryServerInstance, workerIds))
-        .build();
-  }
-
   public static VirtualServerAddress protoToAddress(String virtualAddressStr) {
     Matcher matcher = VIRTUAL_SERVER_PATTERN.matcher(virtualAddressStr);
     if (!matcher.matches()) {
@@ -78,8 +65,8 @@ public class QueryPlanSerDeUtils {
     }
 
     // Skipped netty and grpc port as they are not used in worker instance.
-    return new VirtualServerAddress(matcher.group("host"),
-        Integer.parseInt(matcher.group("port")), Integer.parseInt(matcher.group("virtualid")));
+    return new VirtualServerAddress(matcher.group("host"), Integer.parseInt(matcher.group("port")),
+        Integer.parseInt(matcher.group("virtualid")));
   }
 
   public static String addressToProto(VirtualServerAddress serverAddress) {
@@ -145,17 +132,21 @@ public class QueryPlanSerDeUtils {
     return mailboxMetadata;
   }
 
-  private static Worker.StageMetadata toProtoStageMetadata(DispatchablePlanFragment planFragment,
-      QueryServerInstance queryServerInstance, List<Integer> workerIds) {
-    Worker.StageMetadata.Builder builder = Worker.StageMetadata.newBuilder();
-    for (WorkerMetadata workerMetadata : planFragment.getWorkerMetadataList()) {
-      builder.addWorkerMetadata(toProtoWorkerMetadata(workerMetadata));
+  public static Worker.StageMetadata toProtoStageMetadata(List<Worker.WorkerMetadata> workerMetadataList,
+      Map<String, String> customProperties, QueryServerInstance serverInstance, List<Integer> workerIds) {
+    return Worker.StageMetadata.newBuilder().addAllWorkerMetadata(workerMetadataList)
+        .putAllCustomProperty(customProperties)
+        .setServerAddress(String.format("%s:%d", serverInstance.getHostname(), serverInstance.getQueryMailboxPort()))
+        .addAllWorkerIds(workerIds).build();
+  }
+
+  public static List<Worker.WorkerMetadata> toProtoWorkerMetadataList(DispatchablePlanFragment planFragment) {
+    List<WorkerMetadata> workerMetadataList = planFragment.getWorkerMetadataList();
+    List<Worker.WorkerMetadata> protoWorkerMetadataList = new ArrayList<>(workerMetadataList.size());
+    for (WorkerMetadata workerMetadata : workerMetadataList) {
+      protoWorkerMetadataList.add(toProtoWorkerMetadata(workerMetadata));
     }
-    builder.putAllCustomProperty(planFragment.getCustomProperties());
-    builder.setServerAddress(String.format("%s:%d", queryServerInstance.getHostname(),
-        queryServerInstance.getQueryMailboxPort()));
-    builder.addAllWorkerIds(workerIds);
-    return builder.build();
+    return protoWorkerMetadataList;
   }
 
   private static Worker.WorkerMetadata toProtoWorkerMetadata(WorkerMetadata workerMetadata) {
@@ -166,8 +157,7 @@ public class QueryPlanSerDeUtils {
     return builder.build();
   }
 
-  private static Map<Integer, Worker.MailboxMetadata> toProtoMailboxMap(
-      Map<Integer, MailboxMetadata> mailBoxInfosMap) {
+  private static Map<Integer, Worker.MailboxMetadata> toProtoMailboxMap(Map<Integer, MailboxMetadata> mailBoxInfosMap) {
     Map<Integer, Worker.MailboxMetadata> mailboxMetadataMap = new HashMap<>();
     for (Map.Entry<Integer, MailboxMetadata> entry : mailBoxInfosMap.entrySet()) {
       mailboxMetadataMap.put(entry.getKey(), toProtoMailbox(entry.getValue()));
