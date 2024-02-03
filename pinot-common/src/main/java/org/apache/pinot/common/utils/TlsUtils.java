@@ -409,8 +409,6 @@ public final class TlsUtils {
             "trust manager of the existing SSLFactory must be swappable"
         );
       }
-      LOGGER.info("Enabling auto renewal of SSLFactory {} when key store {} or trust store {} changes",
-          sslFactory, keyStorePath, trustStorePath);
       // The reloadSslFactoryWhenFileStoreChanges is a blocking call, so we need to create a new thread to run it.
       // Creating a new thread to run the reloadSslFactoryWhenFileStoreChanges is costly; however, unless we
       // invoke the createAutoRenewedSSLFactoryFromFileStore method crazily, this should not be a problem.
@@ -435,6 +433,8 @@ public final class TlsUtils {
       String trustStoreType, String trustStorePath, String trustStorePassword,
       String sslContextProtocol, SecureRandom secureRandom)
       throws IOException, URISyntaxException, InterruptedException {
+    LOGGER.info("Enabling auto renewal of SSLFactory {} when key store {} or trust store {} changes",
+        baseSslFactory, keyStorePath, trustStorePath);
     WatchService watchService = FileSystems.getDefault().newWatchService();
     Map<WatchKey, Set<Path>> watchKeyPathMap = new HashMap<>();
     registerFile(watchService, watchKeyPathMap, keyStorePath);
