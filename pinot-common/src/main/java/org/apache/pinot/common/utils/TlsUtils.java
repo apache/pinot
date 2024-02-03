@@ -433,7 +433,7 @@ public final class TlsUtils {
       String trustStoreType, String trustStorePath, String trustStorePassword,
       String sslContextProtocol, SecureRandom secureRandom)
       throws IOException, URISyntaxException, InterruptedException {
-    LOGGER.info("Enabling auto renewal of SSLFactory {} when key store {} or trust store {} changes",
+    LOGGER.info("Enable auto renewal of SSLFactory {} when key store {} or trust store {} changes",
         baseSslFactory, keyStorePath, trustStorePath);
     WatchService watchService = FileSystems.getDefault().newWatchService();
     Map<WatchKey, Set<Path>> watchKeyPathMap = new HashMap<>();
