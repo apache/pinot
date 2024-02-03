@@ -27,16 +27,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -48,8 +49,10 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -107,55 +110,94 @@ public class QueryDispatcher {
   void submit(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
-    BlockingQueue<AsyncQueryDispatchResponse> dispatchCallbacks = new LinkedBlockingQueue<>();
     List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
     int numStages = stagePlans.size();
-    int numDispatchCalls = 0;
-    // Do not submit the reduce stage (stage 0)
+    Set<QueryServerInstance> serverInstances = new HashSet<>();
+    // TODO: If serialization is slow, consider serializing each stage in parallel
+    StageInfo[] stageInfoMap = new StageInfo[numStages];
+    // Ignore the reduce stage (stage 0)
     for (int stageId = 1; stageId < numStages; stageId++) {
-      for (Map.Entry<QueryServerInstance, List<Integer>> entry : stagePlans.get(stageId)
-          .getServerInstanceToWorkerIdMap().entrySet()) {
-        QueryServerInstance queryServerInstance = entry.getKey();
-        Worker.QueryRequest.Builder queryRequestBuilder = Worker.QueryRequest.newBuilder();
-        queryRequestBuilder.addStagePlan(
-            QueryPlanSerDeUtils.serialize(dispatchableSubPlan, stageId, queryServerInstance, entry.getValue()));
-        Worker.QueryRequest queryRequest =
-            queryRequestBuilder.putMetadata(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID,
-                    String.valueOf(requestId))
-                .putMetadata(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, String.valueOf(timeoutMs))
-                .putAllMetadata(queryOptions).build();
-        DispatchClient client = getOrCreateDispatchClient(queryServerInstance);
-        int finalStageId = stageId;
-        _executorService.submit(
-            () -> client.submit(queryRequest, finalStageId, queryServerInstance, deadline, dispatchCallbacks::offer));
-        numDispatchCalls++;
-      }
+      DispatchablePlanFragment stagePlan = stagePlans.get(stageId);
+      serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
+      Plan.StageNode rootNode =
+          StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot());
+      List<Worker.WorkerMetadata> workerMetadataList = QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan);
+      stageInfoMap[stageId] = new StageInfo(rootNode, workerMetadataList, stagePlan.getCustomProperties());
     }
-    int successfulDispatchCalls = 0;
+    Map<String, String> requestMetadata = new HashMap<>();
+    requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId));
+    requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, Long.toString(timeoutMs));
+    requestMetadata.putAll(queryOptions);
+
+    // Submit the query plan to all servers in parallel
+    int numServers = serverInstances.size();
+    BlockingQueue<AsyncQueryDispatchResponse> dispatchCallbacks = new ArrayBlockingQueue<>(numServers);
+    for (QueryServerInstance serverInstance : serverInstances) {
+      _executorService.submit(() -> {
+        try {
+          Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
+          for (int stageId = 1; stageId < numStages; stageId++) {
+            List<Integer> workerIds = stagePlans.get(stageId).getServerInstanceToWorkerIdMap().get(serverInstance);
+            if (workerIds != null) {
+              StageInfo stageInfo = stageInfoMap[stageId];
+              Worker.StageMetadata stageMetadata =
+                  QueryPlanSerDeUtils.toProtoStageMetadata(stageInfo._workerMetadataList, stageInfo._customProperties,
+                      serverInstance, workerIds);
+              Worker.StagePlan stagePlan =
+                  Worker.StagePlan.newBuilder().setStageId(stageId).setStageRoot(stageInfo._rootNode)
+                      .setStageMetadata(stageMetadata).build();
+              requestBuilder.addStagePlan(stagePlan);
+            }
+          }
+          requestBuilder.putAllMetadata(requestMetadata);
+          getOrCreateDispatchClient(serverInstance).submit(requestBuilder.build(), serverInstance, deadline,
+              dispatchCallbacks::offer);
+        } catch (Throwable t) {
+          LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
+          dispatchCallbacks.offer(new AsyncQueryDispatchResponse(serverInstance, null, t));
+        }
+      });
+    }
+
+    int numSuccessCalls = 0;
     // TODO: Cancel all dispatched requests if one of the dispatch errors out or deadline is breached.
-    while (!deadline.isExpired() && successfulDispatchCalls < numDispatchCalls) {
+    while (!deadline.isExpired() && numSuccessCalls < numServers) {
       AsyncQueryDispatchResponse resp =
           dispatchCallbacks.poll(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
       if (resp != null) {
         if (resp.getThrowable() != null) {
           throw new RuntimeException(
-              String.format("Error dispatching query to server=%s stage=%s", resp.getVirtualServer(),
-                  resp.getStageId()), resp.getThrowable());
+              String.format("Error dispatching query: %d to server: %s", requestId, resp.getServerInstance()),
+              resp.getThrowable());
         } else {
           Worker.QueryResponse response = resp.getQueryResponse();
+          assert response != null;
           if (response.containsMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR)) {
             throw new RuntimeException(
-                String.format("Unable to execute query plan at stage %s on server %s: ERROR: %s", resp.getStageId(),
-                    resp.getVirtualServer(),
+                String.format("Unable to execute query plan for request: %d on server: %s, ERROR: %s", requestId,
+                    resp.getServerInstance(),
                     response.getMetadataOrDefault(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
                         "null")));
           }
-          successfulDispatchCalls++;
+          numSuccessCalls++;
         }
       }
     }
     if (deadline.isExpired()) {
       throw new TimeoutException("Timed out waiting for response of async query-dispatch");
+    }
+  }
+
+  private static class StageInfo {
+    final Plan.StageNode _rootNode;
+    final List<Worker.WorkerMetadata> _workerMetadataList;
+    final Map<String, String> _customProperties;
+
+    StageInfo(Plan.StageNode rootNode, List<Worker.WorkerMetadata> workerMetadataList,
+        Map<String, String> customProperties) {
+      _rootNode = rootNode;
+      _workerMetadataList = workerMetadataList;
+      _customProperties = customProperties;
     }
   }
 
@@ -168,7 +210,11 @@ public class QueryDispatcher {
       serversToCancel.addAll(stagePlans.get(stageId).getServerInstanceToWorkerIdMap().keySet());
     }
     for (QueryServerInstance queryServerInstance : serversToCancel) {
-      getOrCreateDispatchClient(queryServerInstance).cancel(requestId);
+      try {
+        getOrCreateDispatchClient(queryServerInstance).cancel(requestId);
+      } catch (Throwable t) {
+        LOGGER.warn("Caught exception while cancelling query: {} on server: {}", requestId, queryServerInstance, t);
+      }
     }
   }
 
