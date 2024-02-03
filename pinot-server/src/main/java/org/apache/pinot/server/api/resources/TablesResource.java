@@ -476,7 +476,7 @@ public class TablesResource {
   public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
+      @ApiParam(value = "Valid doc id type (SNAPSHOT | IN_MEMORY | IN_MEMORY_WITH_DELETE)")
       @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders) {
@@ -508,8 +508,10 @@ public class TablesResource {
       MutableRoaringBitmap validDocIdSnapshot = validDocIdsSnapshotPair.getRight();
 
       if (validDocIdSnapshot == null) {
-        String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
-            segmentDataManager.getSegmentName());
+        String msg = String.format(
+            "Found that validDocIds is missing while fetching validDocIds for table %s segment %s while "
+                + "reading the validDocIds with validDocIdType %s",
+            tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
         LOGGER.warn(msg);
         throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
       }
@@ -536,7 +538,7 @@ public class TablesResource {
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
+      @ApiParam(value = "Valid doc id type (SNAPSHOT | IN_MEMORY | IN_MEMORY_WITH_DELETE)")
       @QueryParam("validDocIdsType") String validDocIdsType, @Context HttpHeaders httpHeaders) {
     segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
@@ -564,8 +566,10 @@ public class TablesResource {
           getValidDocIds(indexSegment, validDocIdsType);
       MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
       if (validDocIdSnapshot == null) {
-        String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
-            segmentDataManager.getSegmentName());
+        String msg = String.format(
+            "Found that validDocIds is missing while fetching validDocIds for table %s segment %s while "
+                + "reading the validDocIds with validDocIdType %s",
+            tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
         LOGGER.warn(msg);
         throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
       }
@@ -591,7 +595,7 @@ public class TablesResource {
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
+      @ApiParam(value = "Valid doc id type (SNAPSHOT | IN_MEMORY | IN_MEMORY_WITH_DELETE)")
       @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames) {
     return ResourceUtils.convertToJsonString(
@@ -610,7 +614,7 @@ public class TablesResource {
   public String getValidDocIdMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
+      @ApiParam(value = "Valid doc id type (SNAPSHOT | IN_MEMORY | IN_MEMORY_WITH_DELETE)")
       @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments) {
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
@@ -654,10 +658,12 @@ public class TablesResource {
         String finalValidDocIdsType = validDocIdSnapshotPair.getLeft().toString();
         MutableRoaringBitmap validDocIdSnapshot = validDocIdSnapshotPair.getRight();
         if (validDocIdSnapshot == null) {
-          String msg = String.format("Missing validDocIds for table %s segment %s does not exist", tableNameWithType,
-              segmentDataManager.getSegmentName());
+          String msg = String.format(
+              "Found that validDocIds is missing while processing validDocIdMetadata for table %s segment %s while "
+                  + "reading the validDocIds with validDocIdType %s",
+              tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
           LOGGER.warn(msg);
-          throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
+          continue;
         }
 
         Map<String, Object> validDocIdMetadata = new HashMap<>();
