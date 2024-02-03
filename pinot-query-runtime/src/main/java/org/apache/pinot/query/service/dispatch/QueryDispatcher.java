@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -111,22 +112,39 @@ public class QueryDispatcher {
       throws Exception {
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
     List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
-    int numStages = stagePlans.size();
-    Set<QueryServerInstance> serverInstances = new HashSet<>();
-    // TODO: If serialization is slow, consider serializing each stage in parallel
-    StageInfo[] stageInfoMap = new StageInfo[numStages];
     // Ignore the reduce stage (stage 0)
-    for (int stageId = 1; stageId < numStages; stageId++) {
-      DispatchablePlanFragment stagePlan = stagePlans.get(stageId);
+    int numStages = stagePlans.size() - 1;
+    Set<QueryServerInstance> serverInstances = new HashSet<>();
+    // Serialize the stage plans in parallel
+    Plan.StageNode[] stageRootNodes = new Plan.StageNode[numStages];
+    //noinspection unchecked
+    List<Worker.WorkerMetadata>[] stageWorkerMetadataLists = new List[numStages];
+    CompletableFuture<?>[] stagePlanSerializationStubs = new CompletableFuture[2 * numStages];
+    for (int i = 0; i < numStages; i++) {
+      DispatchablePlanFragment stagePlan = stagePlans.get(i + 1);
       serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
-      Plan.StageNode rootNode =
-          StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot());
-      List<Worker.WorkerMetadata> workerMetadataList = QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan);
-      stageInfoMap[stageId] = new StageInfo(rootNode, workerMetadataList, stagePlan.getCustomProperties());
+      int finalI = i;
+      stagePlanSerializationStubs[2 * i] = CompletableFuture.runAsync(() -> stageRootNodes[finalI] =
+              StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot()),
+          _executorService);
+      stagePlanSerializationStubs[2 * i + 1] = CompletableFuture.runAsync(
+          () -> stageWorkerMetadataLists[finalI] = QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan),
+          _executorService);
+    }
+    try {
+      CompletableFuture.allOf(stagePlanSerializationStubs)
+          .get(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+    } finally {
+      for (CompletableFuture<?> future : stagePlanSerializationStubs) {
+        if (!future.isDone()) {
+          future.cancel(true);
+        }
+      }
     }
     Map<String, String> requestMetadata = new HashMap<>();
     requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId));
-    requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, Long.toString(timeoutMs));
+    requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
+        Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
     requestMetadata.putAll(queryOptions);
 
     // Submit the query plan to all servers in parallel
@@ -136,17 +154,13 @@ public class QueryDispatcher {
       _executorService.submit(() -> {
         try {
           Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
-          for (int stageId = 1; stageId < numStages; stageId++) {
-            List<Integer> workerIds = stagePlans.get(stageId).getServerInstanceToWorkerIdMap().get(serverInstance);
+          for (int i = 0; i < numStages; i++) {
+            DispatchablePlanFragment stagePlan = stagePlans.get(i + 1);
+            List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(serverInstance);
             if (workerIds != null) {
-              StageInfo stageInfo = stageInfoMap[stageId];
-              Worker.StageMetadata stageMetadata =
-                  QueryPlanSerDeUtils.toProtoStageMetadata(stageInfo._workerMetadataList, stageInfo._customProperties,
-                      serverInstance, workerIds);
-              Worker.StagePlan stagePlan =
-                  Worker.StagePlan.newBuilder().setStageId(stageId).setStageRoot(stageInfo._rootNode)
-                      .setStageMetadata(stageMetadata).build();
-              requestBuilder.addStagePlan(stagePlan);
+              requestBuilder.addStagePlan(Worker.StagePlan.newBuilder().setStageId(i).setStageRoot(stageRootNodes[i])
+                  .setStageMetadata(QueryPlanSerDeUtils.toProtoStageMetadata(stageWorkerMetadataLists[i],
+                      stagePlan.getCustomProperties(), serverInstance, workerIds)).build());
             }
           }
           requestBuilder.putAllMetadata(requestMetadata);
@@ -185,19 +199,6 @@ public class QueryDispatcher {
     }
     if (deadline.isExpired()) {
       throw new TimeoutException("Timed out waiting for response of async query-dispatch");
-    }
-  }
-
-  private static class StageInfo {
-    final Plan.StageNode _rootNode;
-    final List<Worker.WorkerMetadata> _workerMetadataList;
-    final Map<String, String> _customProperties;
-
-    StageInfo(Plan.StageNode rootNode, List<Worker.WorkerMetadata> workerMetadataList,
-        Map<String, String> customProperties) {
-      _rootNode = rootNode;
-      _workerMetadataList = workerMetadataList;
-      _customProperties = customProperties;
     }
   }
 

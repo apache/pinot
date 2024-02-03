@@ -32,14 +32,10 @@ import org.apache.pinot.query.routing.WorkerMetadata;
  * <p>It is also the extended version of the {@link org.apache.pinot.core.query.request.ServerQueryRequest}.
  */
 public class DistributedStagePlan {
-  private int _stageId;
-  private VirtualServerAddress _server;
-  private PlanNode _stageRoot;
-  private StageMetadata _stageMetadata;
-
-  public DistributedStagePlan(int stageId) {
-    _stageId = stageId;
-  }
+  private final int _stageId;
+  private final VirtualServerAddress _server;
+  private final PlanNode _stageRoot;
+  private final StageMetadata _stageMetadata;
 
   public DistributedStagePlan(int stageId, VirtualServerAddress server, PlanNode stageRoot,
       StageMetadata stageMetadata) {
@@ -63,18 +59,6 @@ public class DistributedStagePlan {
 
   public StageMetadata getStageMetadata() {
     return _stageMetadata;
-  }
-
-  public void setServer(VirtualServerAddress serverAddress) {
-    _server = serverAddress;
-  }
-
-  public void setStageRoot(PlanNode stageRoot) {
-    _stageRoot = stageRoot;
-  }
-
-  public void setStageMetadata(StageMetadata stageMetadata) {
-    _stageMetadata = stageMetadata;
   }
 
   public WorkerMetadata getCurrentWorkerMetadata() {
