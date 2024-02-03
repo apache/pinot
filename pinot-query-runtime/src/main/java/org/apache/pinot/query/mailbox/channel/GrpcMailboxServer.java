@@ -19,15 +19,24 @@
 package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.ClientAuth;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+
+import static org.apache.log4j.builders.appender.SocketAppenderBuilder.LOGGER;
 
 
 /**
@@ -45,9 +54,20 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config) {
     _mailboxService = mailboxService;
     int port = mailboxService.getPort();
-    _server = ServerBuilder.forPort(port).addService(this).maxInboundMessageSize(
-        config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-            CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(config, CommonConstants.Server.SERVER_GRPCTLS_PREFIX);
+    if(tlsConfig != null) {
+      try {
+        _server = NettyServerBuilder.forPort(port).addService(this).sslContext(buildGRpcSslContext(tlsConfig)).maxInboundMessageSize(
+            config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+                CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to start secure grpcMailboxServer", e);
+      }
+    }else {
+      _server = NettyServerBuilder.forPort(port).addService(this).maxInboundMessageSize(
+          config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+              CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
+    }
   }
 
   public void start() {
@@ -69,5 +89,21 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   @Override
   public StreamObserver<Mailbox.MailboxContent> open(StreamObserver<Mailbox.MailboxStatus> responseObserver) {
     return new MailboxContentObserver(_mailboxService, responseObserver);
+  }
+  private SslContext buildGRpcSslContext(TlsConfig tlsConfig)
+      throws Exception {
+    LOGGER.info("Building gRPC SSL context");
+    if (tlsConfig.getKeyStorePath() == null) {
+      throw new IllegalArgumentException("Must provide key store path for secured gRpc server");
+    }
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(TlsUtils.createKeyManagerFactory(tlsConfig))
+        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
+    if (tlsConfig.getTrustStorePath() != null) {
+      sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(tlsConfig));
+    }
+    if (tlsConfig.isClientAuthEnabled()) {
+      sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+    }
+    return GrpcSslContexts.configure(sslContextBuilder).build();
   }
 }

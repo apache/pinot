@@ -21,6 +21,12 @@ package org.apache.pinot.query.service.server;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
+import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.ClientAuth;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
 import io.grpc.stub.StreamObserver;
 import java.util.Collections;
 import java.util.List;
@@ -29,17 +35,22 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.log4j.builders.appender.SocketAppenderBuilder.LOGGER;
 
 
 /**
@@ -52,6 +63,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
 
   private final int _port;
+  private final PinotConfiguration _configuration;
   private final QueryRunner _queryRunner;
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
@@ -60,24 +72,31 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   private Server _server = null;
 
-  public QueryServer(int port, QueryRunner queryRunner) {
+  public QueryServer(int port, QueryRunner queryRunner, PinotConfiguration configuration) {
     _port = port;
     _queryRunner = queryRunner;
+    _configuration = configuration;
     _querySubmissionExecutorService =
         Executors.newCachedThreadPool(new NamedThreadFactory("query_submission_executor_on_" + _port + "_port"));
   }
 
   public void start() {
     LOGGER.info("Starting QueryServer");
-    try {
-      if (_server == null) {
-        _server = ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
-        LOGGER.info("Initialized QueryServer on port: {}", _port);
+    TlsConfig tlsConfig = TlsUtils.extractTlsConfig(_configuration, CommonConstants.Server.SERVER_GRPCTLS_PREFIX);
+    if (tlsConfig != null) {
+      try {
+        _server = NettyServerBuilder.forPort(_port).addService(this).sslContext(buildGRpcSslContext(tlsConfig))
+            .maxInboundMessageSize(_configuration.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+                CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
+        _queryRunner.start();
+        _server.start();
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to start secure grpcMailboxServer", e);
       }
-      _queryRunner.start();
-      _server.start();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+    }else {
+      _server = NettyServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(
+          _configuration.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+              CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
     }
   }
 
@@ -153,5 +172,21 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
     responseObserver.onCompleted();
+  }
+  private SslContext buildGRpcSslContext(TlsConfig tlsConfig)
+      throws Exception {
+    LOGGER.info("Building gRPC SSL context");
+    if (tlsConfig.getKeyStorePath() == null) {
+      throw new IllegalArgumentException("Must provide key store path for secured gRpc server");
+    }
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(TlsUtils.createKeyManagerFactory(tlsConfig))
+        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
+    if (tlsConfig.getTrustStorePath() != null) {
+      sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(tlsConfig));
+    }
+    if (tlsConfig.isClientAuthEnabled()) {
+      sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+    }
+    return GrpcSslContexts.configure(sslContextBuilder).build();
   }
 }
