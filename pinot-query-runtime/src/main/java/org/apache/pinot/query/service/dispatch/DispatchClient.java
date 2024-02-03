@@ -36,8 +36,6 @@ import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.config.GrpcConfig;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
@@ -77,11 +75,13 @@ class DispatchClient {
         }
         if (config.getTlsConfig().getSslProvider() != null) {
           sslContextBuilder =
-                  GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(config.getTlsConfig().getSslProvider()));
+                  GrpcSslContexts.configure(sslContextBuilder,
+                      SslProvider.valueOf(config.getTlsConfig().getSslProvider()));
         } else {
           sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
         }
-        _channel = NettyChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
+        _channel = NettyChannelBuilder.forAddress(host, port)
+                .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
                 .sslContext(sslContextBuilder.build()).build();
         ;
       } catch (SSLException e) {
