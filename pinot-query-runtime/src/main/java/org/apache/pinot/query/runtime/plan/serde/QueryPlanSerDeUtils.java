@@ -48,14 +48,6 @@ public class QueryPlanSerDeUtils {
     // do not instantiate.
   }
 
-  public static List<DistributedStagePlan> deserializeStagePlan(Worker.QueryRequest request) {
-    List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
-    for (Worker.StagePlan stagePlan : request.getStagePlanList()) {
-      distributedStagePlans.addAll(deserializeStagePlan(stagePlan));
-    }
-    return distributedStagePlans;
-  }
-
   public static VirtualServerAddress protoToAddress(String virtualAddressStr) {
     Matcher matcher = VIRTUAL_SERVER_PATTERN.matcher(virtualAddressStr);
     if (!matcher.matches()) {
@@ -73,21 +65,21 @@ public class QueryPlanSerDeUtils {
     return String.format("%s@%s:%s", serverAddress.workerId(), serverAddress.hostname(), serverAddress.port());
   }
 
-  private static List<DistributedStagePlan> deserializeStagePlan(Worker.StagePlan stagePlan) {
-    List<DistributedStagePlan> distributedStagePlans = new ArrayList<>();
-    String serverAddress = stagePlan.getStageMetadata().getServerAddress();
+  public static List<DistributedStagePlan> deserializeStagePlan(Worker.StagePlan stagePlan) {
+    int stageId = stagePlan.getStageId();
+    Worker.StageMetadata protoStageMetadata = stagePlan.getStageMetadata();
+    String serverAddress = protoStageMetadata.getServerAddress();
     String[] hostPort = StringUtils.split(serverAddress, ':');
     String hostname = hostPort[0];
     int port = Integer.parseInt(hostPort[1]);
     AbstractPlanNode stageRoot = StageNodeSerDeUtils.deserializeStageNode(stagePlan.getStageRoot());
-    StageMetadata stageMetadata = fromProtoStageMetadata(stagePlan.getStageMetadata());
-    for (int workerId : stagePlan.getStageMetadata().getWorkerIdsList()) {
-      DistributedStagePlan distributedStagePlan = new DistributedStagePlan(stagePlan.getStageId());
-      VirtualServerAddress virtualServerAddress = new VirtualServerAddress(hostname, port, workerId);
-      distributedStagePlan.setServer(virtualServerAddress);
-      distributedStagePlan.setStageRoot(stageRoot);
-      distributedStagePlan.setStageMetadata(stageMetadata);
-      distributedStagePlans.add(distributedStagePlan);
+    StageMetadata stageMetadata = fromProtoStageMetadata(protoStageMetadata);
+    List<Integer> workerIds = protoStageMetadata.getWorkerIdsList();
+    List<DistributedStagePlan> distributedStagePlans = new ArrayList<>(workerIds.size());
+    for (int workerId : workerIds) {
+      distributedStagePlans.add(
+          new DistributedStagePlan(stageId, new VirtualServerAddress(hostname, port, workerId), stageRoot,
+              stageMetadata));
     }
     return distributedStagePlans;
   }
