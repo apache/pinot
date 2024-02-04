@@ -80,6 +80,7 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -951,18 +952,18 @@ public class PinotTableRestletResource {
   }
 
   @GET
-  @Path("tables/{tableName}/validDocIdMetadata")
+  @Path("tables/{tableName}/validDocIdsMetadata")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the aggregate valid doc id metadata of all segments for a table", notes = "Get the "
       + "aggregate valid doc id metadata of all segments for a table")
-  public String getTableAggregateValidDocIdMetadata(
+  public String getTableAggregateValidDocIdsMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "A list of segments", allowMultiple = true) @QueryParam("segmentNames")
       List<String> segmentNames,
-      @ApiParam(value = "Valid doc id type", example = "SNAPSHOT|IN_MEMORY|IN_MEMORY_WITH_DELETE")
-      @QueryParam("validDocIdsType") String validDocIdsType) {
+      @ApiParam(value = "Valid doc ids type")
+      @QueryParam("validDocIdsType") ValidDocIdsType validDocIdsType) {
     LOGGER.info("Received a request to fetch aggregate valid doc id metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.OFFLINE) {
@@ -972,21 +973,21 @@ public class PinotTableRestletResource {
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
 
-    String validDocIdMetadata;
+    String validDocIdsMetadata;
     try {
       TableMetadataReader tableMetadataReader =
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
       JsonNode segmentsMetadataJson =
-          tableMetadataReader.getAggregateValidDocIdMetadata(tableNameWithType, segmentNames, validDocIdsType,
-              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
-      validDocIdMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
+          tableMetadataReader.getAggregateValidDocIdsMetadata(tableNameWithType, segmentNames,
+              validDocIdsType.toString(), _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      validDocIdsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     } catch (IOException ioe) {
       throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR, ioe);
     }
-    return validDocIdMetadata;
+    return validDocIdsMetadata;
   }
 
   @GET

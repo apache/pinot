@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
-import org.apache.pinot.common.restlet.resources.ValidDocIdMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -156,9 +156,9 @@ public class TableMetadataReader {
 
   /**
    * This method retrieves the aggregated valid doc id metadata for a given table.
-   * @return a list of ValidDocIdMetadataInfo
+   * @return a list of ValidDocIdsMetadataInfo
    */
-  public JsonNode getAggregateValidDocIdMetadata(String tableNameWithType, List<String> segmentNames,
+  public JsonNode getAggregateValidDocIdsMetadata(String tableNameWithType, List<String> segmentNames,
       String validDocIdsType, int timeoutMs)
       throws InvalidConfigException {
     final Map<String, List<String>> serverToSegments =
@@ -168,8 +168,8 @@ public class TableMetadataReader {
     ServerSegmentMetadataReader serverSegmentMetadataReader =
         new ServerSegmentMetadataReader(_executor, _connectionManager);
 
-    List<ValidDocIdMetadataInfo> aggregateTableMetadataInfo =
-        serverSegmentMetadataReader.getValidDocIdMetadataFromServer(tableNameWithType, serverToSegments, endpoints,
+    List<ValidDocIdsMetadataInfo> aggregateTableMetadataInfo =
+        serverSegmentMetadataReader.getValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments, endpoints,
             segmentNames, timeoutMs, validDocIdsType);
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
