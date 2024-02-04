@@ -134,19 +134,6 @@ public class StarTreeV2BuilderConfigTest {
     assertEquals(defaultConfig.getMaxLeafRecords(), StarTreeV2BuilderConfig.DEFAULT_MAX_LEAF_RECORDS);
   }
 
-  private JsonNode convertStringListToJsonNode(List<List<String>> columnList) {
-    // Create arrayNode from the list of string
-    ArrayNode arrayNode = new ArrayNode(JsonNodeFactory.instance);
-    for (List<String> column : columnList) {
-      ObjectNode objectNode = new ObjectNode(JsonNodeFactory.instance);
-      objectNode.put("columnName", column.get(0));
-      objectNode.put("hasDictionary", column.get(1));
-      objectNode.put("cardinality", column.get(2));
-      arrayNode.add(objectNode);
-    }
-    return arrayNode;
-  }
-
   @Test
   public void testBuildFromIndexConfig() {
     List<StarTreeAggregationConfig> aggregationConfigs =
@@ -198,5 +185,18 @@ public class StarTreeV2BuilderConfigTest {
     when(columnMetadata.hasDictionary()).thenReturn(hasDictionary);
     when(columnMetadata.getCardinality()).thenReturn(cardinality);
     return columnMetadata;
+  }
+
+  private JsonNode convertStringListToJsonNode(List<List<String>> columnList) {
+    // Create arrayNode from the list of string
+    ArrayNode arrayNode = new ArrayNode(JsonNodeFactory.instance);
+    for (List<String> column : columnList) {
+      ObjectNode objectNode = new ObjectNode(JsonNodeFactory.instance);
+      objectNode.put("columnName", column.get(0));
+      objectNode.put("hasDictionary", column.get(1));
+      objectNode.put("cardinality", column.get(2));
+      arrayNode.add(objectNode);
+    }
+    return arrayNode;
   }
 }

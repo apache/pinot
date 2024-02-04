@@ -195,6 +195,10 @@ public class StarTreeV2BuilderConfig {
     List<JsonNode> dimensionColumnMetadataList = new ArrayList<>();
     List<JsonNode> timeColumnMetadataList = new ArrayList<>();
     List<String> numericMetrics = new ArrayList<>();
+    Preconditions.checkState(!columnsMetadata.isNull(), "columnsMetadata should not be null.");
+    Preconditions.checkState(!columnsMetadata.isEmpty(), "columnsMetadata should not be empty.");
+
+    // Convert columnsMetadata to a map for easy lookup.
     Map<String, JsonNode> columnMetadataMap = convertJsonNodeToMap(columnsMetadata);
 
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
