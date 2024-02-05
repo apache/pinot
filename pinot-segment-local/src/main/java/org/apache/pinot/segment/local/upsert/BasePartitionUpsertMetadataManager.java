@@ -27,6 +27,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -34,19 +35,30 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
@@ -55,9 +67,12 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -102,6 +117,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // Initialize with 1 pending operation to indicate the metadata manager can take more operations
   private int _numPendingOperations = 1;
   private boolean _closed;
+  // The lock and flag below ensures only one thread can start preloading and preloading happens only once.
+  private final Lock _preloadLock = new ReentrantLock();
+  private volatile boolean _isPreloaded = false;
+  // We need this flag separately to set manager in preloading phase as segments may be added differently to be more
+  // efficient. We can not reuse the flag above, as when preloaded is false, it's not necessarily in preloading phase.
+  private volatile boolean _isPreloading = false;
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
@@ -152,6 +173,154 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           segment.getSegmentName(), e);
     }
     return queryableDocIds;
+  }
+
+  @Override
+  public boolean isPreloading() {
+    return _isPreloading;
+  }
+
+  @Override
+  public void startPreloading(IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager,
+      HelixManager helixManager, ExecutorService segmentPreloadExecutor) {
+    if (_isPreloaded) {
+      return;
+    }
+    // Preloading the segments with validDocIds snapshots for fast upsert metadata recovery.
+    // Note that there is a waiting logic between the thread pool doing the segment preloading here and the
+    // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).
+    // The thread doing the segment preloading here must complete before the other helix threads start to handle
+    // segment state transitions. This is ensured by the lock here.
+    _preloadLock.lock();
+    try {
+      // This flag ensures preloading happens only once when the first segment of the table partition is to be loaded.
+      if (_isPreloaded) {
+        return;
+      }
+      // Mark manager as in preloading phase, so that segments can be added differently to be more efficient.
+      _isPreloading = true;
+      doPreloadSegments(indexLoadingConfig, tableDataManager, helixManager, segmentPreloadExecutor);
+    } catch (Exception e) {
+      // Even if preloading fails, we should continue to complete the initialization, so that TableDataManager can be
+      // created. Once TableDataManager is created, no more segment preloading would happen, and the normal segment
+      // loading logic would be used. The segments not being preloaded successfully here would be loaded via the
+      // normal segment loading logic, the one doing more costly checks on the upsert metadata.
+      _logger.warn("Failed to preload segments from partition: {} for table: {}, skipping", _partitionId,
+          _tableNameWithType, e);
+      if (e instanceof InterruptedException) {
+        // Restore the interrupted status in case the upper callers want to check.
+        Thread.currentThread().interrupt();
+      }
+    } finally {
+      _isPreloading = false;
+      _isPreloaded = true;
+      _preloadLock.unlock();
+    }
+  }
+
+  protected void doPreloadSegments(IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager,
+      HelixManager helixManager, ExecutorService segmentPreloadExecutor)
+      throws Exception {
+    _logger.info("Preload segments from partition: {} of table: {} for fast upsert metadata recovery", _partitionId,
+        _tableNameWithType);
+    String instanceId = getInstanceId(tableDataManager);
+    Map<String, Map<String, String>> segmentAssignment = getSegmentAssignment(helixManager);
+    Map<String, SegmentZKMetadata> segmentMetadataMap = getSegmentsZKMetadata(helixManager);
+    List<Future<?>> futures = new ArrayList<>();
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> instanceStateMap = entry.getValue();
+      String state = instanceStateMap.get(instanceId);
+      if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)) {
+        _logger.info("Skip segment: {} as its ideal state: {} is not ONLINE", segmentName, state);
+        continue;
+      }
+      SegmentZKMetadata segmentZKMetadata = segmentMetadataMap.get(segmentName);
+      Preconditions.checkState(segmentZKMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s",
+          segmentName, _tableNameWithType);
+      Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, segmentZKMetadata, null);
+      Preconditions.checkNotNull(partitionId,
+          String.format("Failed to get partition id for segment: %s (upsert-enabled table: %s)", segmentName,
+              _tableNameWithType));
+      if (partitionId != _partitionId) {
+        _logger.debug("Skip segment: {} from partition: {} different from the requested: {}", segmentName, partitionId,
+            _partitionId);
+        continue;
+      }
+      if (!hasValidDocIdsSnapshot(tableDataManager, indexLoadingConfig.getTableConfig(), segmentName,
+          segmentZKMetadata.getTier())) {
+        _logger.info("Skip segment: {} from partition: {} as no validDocIds snapshot exists", segmentName,
+            _partitionId);
+        continue;
+      }
+      futures.add(segmentPreloadExecutor.submit(
+          () -> preloadSegmentWithSnapshot(tableDataManager, segmentName, indexLoadingConfig, segmentZKMetadata)));
+    }
+    try {
+      for (Future<?> f : futures) {
+        f.get();
+      }
+    } finally {
+      for (Future<?> f : futures) {
+        if (!f.isDone()) {
+          f.cancel(true);
+        }
+      }
+    }
+    _logger.info("Preloaded segments from table: {} for fast upsert metadata recovery", _tableNameWithType);
+  }
+
+  private String getInstanceId(TableDataManager tableDataManager) {
+    return tableDataManager.getInstanceDataManagerConfig().getInstanceId();
+  }
+
+  private static boolean hasValidDocIdsSnapshot(TableDataManager tableDataManager, TableConfig tableConfig,
+      String segmentName, String segmentTier) {
+    try {
+      File indexDir = tableDataManager.getSegmentDataDir(segmentName, segmentTier, tableConfig);
+      File snapshotFile =
+          new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+      return snapshotFile.exists();
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  @VisibleForTesting
+  Map<String, Map<String, String>> getSegmentAssignment(HelixManager helixManager) {
+    IdealState idealState = HelixHelper.getTableIdealState(helixManager, _tableNameWithType);
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", _tableNameWithType);
+    return idealState.getRecord().getMapFields();
+  }
+
+  @VisibleForTesting
+  Map<String, SegmentZKMetadata> getSegmentsZKMetadata(HelixManager helixManager) {
+    Map<String, SegmentZKMetadata> segmentMetadataMap = new HashMap<>();
+    ZKMetadataProvider.getSegmentsZKMetadata(helixManager.getHelixPropertyStore(), _tableNameWithType)
+        .forEach(m -> segmentMetadataMap.put(m.getSegmentName(), m));
+    return segmentMetadataMap;
+  }
+
+  @VisibleForTesting
+  void preloadSegmentWithSnapshot(TableDataManager tableDataManager, String segmentName,
+      IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata segmentZKMetadata) {
+    try {
+      _logger.info("Preload segment: {} from partition: {} of table: {}", segmentName, _partitionId,
+          _tableNameWithType);
+      // This method checks segment crc and if it has changed, the segment is not loaded. It might modify the
+      // file on disk, but we don't need to take the segmentLock, because every segment from the current table is
+      // processed by at most one thread from the preloading thread pool. HelixTaskExecutor task threads about to
+      // process segments from the same table are blocked on _preloadingLock.
+      // In fact, taking segmentLock during segment preloading phase could cause deadlock when HelixTaskExecutor
+      // threads processing other tables have taken the same segmentLock as decided by the hash of table name and
+      // segment name, i.e. due to hash collision.
+      tableDataManager.tryLoadExistingSegment(segmentName, indexLoadingConfig, segmentZKMetadata);
+      _logger.info("Preloaded segment: {} from partition: {} of table: {}", segmentName, _partitionId,
+          _tableNameWithType);
+    } catch (Exception e) {
+      _logger.warn("Failed to preload segment: {} from partition: {} of table: {}, skipping", segmentName, _partitionId,
+          _tableNameWithType, e);
+    }
   }
 
   @Override

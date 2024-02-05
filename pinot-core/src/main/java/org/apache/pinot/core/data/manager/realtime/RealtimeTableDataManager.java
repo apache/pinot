@@ -203,8 +203,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           _tableUpsertMetadataManager);
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-      // NOTE: Set _tableUpsertMetadataManager before initializing it because when preloading is enabled, we need to
-      //       load segments into it
       _tableUpsertMetadataManager =
           TableUpsertMetadataManagerFactory.create(_tableConfig, _instanceDataManagerConfig.getUpsertConfig());
       _tableUpsertMetadataManager.init(_tableConfig, schema, this, _helixManager, _segmentPreloadExecutor);
@@ -380,6 +378,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
         segmentName, _tableNameWithType);
+    if (isUpsertEnabled() && isPreloadingReady()) {
+      Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, segmentZKMetadata, null);
+      Preconditions.checkNotNull(partitionId,
+          String.format("Failed to get partition id for segment: %s (upsert-enabled table: %s)", segmentName,
+              _tableNameWithType));
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+          _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
+      partitionUpsertMetadataManager.startPreloading(indexLoadingConfig, this, _helixManager, _segmentPreloadExecutor);
+      // Continue to add segment after preloading, as the segment might not be added by preloading.
+    }
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
       _logger.warn("Skipping adding existing segment: {} for table: {} with data manager class: {}", segmentName,
@@ -447,6 +455,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Initialized RealtimeSegmentDataManager - " + segmentName);
     registerSegment(segmentName, segmentDataManager);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
+  }
+
+  private boolean isPreloadingReady() {
+    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
+    return upsertConfig != null && upsertConfig.isEnableSnapshot() && upsertConfig.isEnablePreload()
+        && _segmentPreloadExecutor != null;
   }
 
   /**
@@ -529,9 +543,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     // Register the new segment after it is fully initialized by partitionUpsertMetadataManager, e.g. to fill up its
     // validDocId bitmap. Otherwise, the query can return wrong results, if accessing the premature segment.
-    if (_tableUpsertMetadataManager.isPreloading()) {
-      // Preloading segment happens when creating table manager when server restarts, and segment is ensured to be
-      // preloaded by a single thread, so no need to take a lock.
+    if (partitionUpsertMetadataManager.isPreloading()) {
+      // Preloading segment happens is ensured to be handled by a single thread, so no need to take a lock.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
       registerSegment(segmentName, newSegmentManager);
       _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);

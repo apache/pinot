@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.Schema;
 @ThreadSafe
 public interface TableUpsertMetadataManager extends Closeable {
 
+  // TODO: simplify this param list
   void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, HelixManager helixManager,
       @Nullable ExecutorService segmentPreloadExecutor);
 
@@ -55,5 +56,8 @@ public interface TableUpsertMetadataManager extends Closeable {
    */
   Map<Integer, Long> getPartitionToPrimaryKeyCount();
 
-  boolean isPreloading();
+  // TODO: remove this
+  default boolean isPreloading() {
+    return false;
+  }
 }
