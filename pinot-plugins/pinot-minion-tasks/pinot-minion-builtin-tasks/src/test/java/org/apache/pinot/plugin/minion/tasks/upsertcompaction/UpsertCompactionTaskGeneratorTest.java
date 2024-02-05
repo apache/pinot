@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.restlet.resources.ValidDocIdMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
@@ -41,6 +41,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
@@ -181,20 +182,20 @@ public class UpsertCompactionTaskGeneratorTest {
   }
 
   @Test
-  public void testProcessValidDocIdMetadata()
+  public void testProcessValidDocIdsMetadata()
       throws IOException {
     Map<String, String> compactionConfigs = getCompactionConfigs("1", "10");
-    List<ValidDocIdMetadataInfo> validDocIdMetadataInfoList = new ArrayList<>();
     String json = "[{" + "\"totalValidDocs\" : 50," + "\"totalInvalidDocs\" : 50," + "\"segmentName\" : \""
-        + _completedSegment.getSegmentName() + "\"," + "\"totalDocs\" : 100" + "}," + "{" + "\"totalValidDocs\" : 0,"
-        + "\"totalInvalidDocs\" : 10," + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\","
-        + "\"totalDocs\" : 10" + "}]";
-    List<ValidDocIdMetadataInfo> validDocIdMetadataInfo =
-        JsonUtils.stringToObject(json, new TypeReference<ArrayList<ValidDocIdMetadataInfo>>() {
+        + _completedSegment.getSegmentName() + "\"," + "\"totalDocs\" : 100" + ", \"segmentCrc\": \""
+        + _completedSegment.getCrc() + "\"}," + "{" + "\"totalValidDocs\" : 0," + "\"totalInvalidDocs\" : 10,"
+        + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\", " + "\"segmentCrc\" : \""
+        + _completedSegment2.getCrc() + "\"," + "\"totalDocs\" : 10" + "}]";
+    List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfo =
+        JsonUtils.stringToObject(json, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
         });
     UpsertCompactionTaskGenerator.SegmentSelectionResult segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdMetadataInfo);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+            validDocIdsMetadataInfo);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
         _completedSegment.getSegmentName());
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0), _completedSegment2.getSegmentName());
@@ -202,25 +203,46 @@ public class UpsertCompactionTaskGeneratorTest {
     // test with a higher invalidRecordsThresholdPercent
     compactionConfigs = getCompactionConfigs("60", "10");
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdMetadataInfo);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+            validDocIdsMetadataInfo);
     assertTrue(segmentSelectionResult.getSegmentsForCompaction().isEmpty());
 
     // test without an invalidRecordsThresholdPercent
     compactionConfigs = getCompactionConfigs("0", "10");
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdMetadataInfo);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+            validDocIdsMetadataInfo);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
         _completedSegment.getSegmentName());
 
     // test without a invalidRecordsThresholdCount
     compactionConfigs = getCompactionConfigs("30", "0");
     segmentSelectionResult =
-        UpsertCompactionTaskGenerator.processValidDocIdMetadata(compactionConfigs, _completedSegmentsMap,
-            validDocIdMetadataInfo);
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+            validDocIdsMetadataInfo);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
         _completedSegment.getSegmentName());
+
+    // Test the case where the completedSegment from api has different crc than segment from zk metadata.
+    json = "[{" + "\"totalValidDocs\" : 50," + "\"totalInvalidDocs\" : 50," + "\"segmentName\" : \""
+        + _completedSegment.getSegmentName() + "\"," + "\"totalDocs\" : 100" + ", \"segmentCrc\": \""
+        + "1234567890" + "\"}," + "{" + "\"totalValidDocs\" : 0," + "\"totalInvalidDocs\" : 10,"
+        + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\", " + "\"segmentCrc\" : \""
+        + _completedSegment2.getCrc() + "\","
+        + "\"totalDocs\" : 10" + "}]";
+    validDocIdsMetadataInfo = JsonUtils.stringToObject(json, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
+    });
+    segmentSelectionResult =
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+            validDocIdsMetadataInfo);
+
+    // completedSegment is supposed to be filtered out
+    Assert.assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 0);
+
+    // completedSegment2 is still supposed to be deleted
+    Assert.assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
+    assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0),
+        _completedSegment2.getSegmentName());
   }
 
   private Map<String, String> getCompactionConfigs(String invalidRecordsThresholdPercent,

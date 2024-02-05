@@ -405,6 +405,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
     if (upsertConfig == null) {
       upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+      upsertConfig.setEnableSnapshot(true);
     }
     if (kafkaTopicName == null) {
       kafkaTopicName = getKafkaTopic();

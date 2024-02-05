@@ -217,6 +217,10 @@ public interface RequestContext {
 
   void setProcessingExceptions(List<String> processingExceptions);
 
+  Map<String, List<String>> getRequestHttpHeaders();
+
+  void setRequestHttpHeaders(Map<String, List<String>> requestHttpHeaders);
+
   enum FanoutType {
     OFFLINE, REALTIME, HYBRID
   }

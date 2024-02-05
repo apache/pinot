@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -223,8 +224,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
       segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
       _segmentDataManagerMap.clear();
     }
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      releaseSegment(segmentDataManager);
+    if (!segmentDataManagers.isEmpty()) {
+      int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), segmentDataManagers.size());
+      ExecutorService stopExecutorService = Executors.newFixedThreadPool(numThreads);
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        stopExecutorService.submit(() -> releaseSegment(segmentDataManager));
+      }
+      stopExecutorService.shutdown();
+      try {
+        // Wait at most 10 minutes before exiting this method.
+        if (!stopExecutorService.awaitTermination(10, TimeUnit.MINUTES)) {
+          stopExecutorService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        stopExecutorService.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
     }
   }
 

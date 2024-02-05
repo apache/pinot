@@ -31,45 +31,79 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.assertEquals;
+
 
 public class InstanceReplicaGroupPartitionSelectorTest {
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  //@formatter:off
   private static final String INSTANCE_CONFIG_TEMPLATE =
-      "{\n" + "  \"id\": \"Server_pinot-server-${serverName}.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
-          + "  \"simpleFields\": {\n" + "    \"HELIX_ENABLED\": \"true\",\n"
-          + "    \"HELIX_ENABLED_TIMESTAMP\": \"1688959934305\",\n"
-          + "    \"HELIX_HOST\": \"pinot-server-${serverName}.pinot-server-headless.pinot.svc.cluster.local\",\n"
-          + "    \"HELIX_PORT\": \"8098\",\n" + "    \"adminPort\": \"8097\",\n" + "    \"grpcPort\": \"8090\",\n"
-          + "    \"queryMailboxPort\": \"46347\",\n" + "    \"queryServerPort\": \"45031\",\n"
-          + "    \"shutdownInProgress\": \"false\"\n" + "  },\n" + "  \"mapFields\": {\n"
-          + "    \"SYSTEM_RESOURCE_INFO\": {\n" + "      \"numCores\": \"16\",\n"
-          + "      \"totalMemoryMB\": \"126976\",\n" + "      \"maxHeapSizeMB\": \"65536\"\n" + "    },\n"
-          + "    \"pool\": {\n" + "      \"DefaultTenant_OFFLINE\": \"${pool}\",\n"
-          + "      \"${poolName}\": \"${pool}\",\n" + "      \"AllReplicationGroups\": \"1\"\n" + "    }\n" + "  },\n"
-          + "  \"listFields\": {\n" + "    \"TAG_LIST\": [\n" + "      \"DefaultTenant_OFFLINE\",\n"
-          + "      \"DefaultTenant_REALTIME\",\n" + "      \"${poolName}\",\n" + "      \"AllReplicationGroups\"\n"
-          + "    ]\n" + "  }\n" + "}";
+      "{\n"
+    + "  \"id\": \"Server_pinot-server-${serverName}.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
+    + "  \"simpleFields\": {\n"
+    + "    \"HELIX_ENABLED\": \"true\",\n"
+    + "    \"HELIX_ENABLED_TIMESTAMP\": \"1688959934305\",\n"
+    + "    \"HELIX_HOST\": \"pinot-server-${serverName}.pinot-server-headless.pinot.svc.cluster.local\",\n"
+    + "    \"HELIX_PORT\": \"8098\",\n"
+    + "    \"adminPort\": \"8097\",\n"
+    + "    \"grpcPort\": \"8090\",\n"
+    + "    \"queryMailboxPort\": \"46347\",\n"
+    + "    \"queryServerPort\": \"45031\",\n"
+    + "    \"shutdownInProgress\": \"false\"\n"
+    + "  },\n"
+    + "  \"mapFields\": {\n"
+    + "    \"SYSTEM_RESOURCE_INFO\": {\n"
+    + "      \"numCores\": \"16\",\n"
+    + "      \"totalMemoryMB\": \"126976\",\n"
+    + "      \"maxHeapSizeMB\": \"65536\"\n"
+    + "    },\n"
+    + "    \"pool\": {\n"
+    + "      \"DefaultTenant_OFFLINE\": \"${pool}\",\n"
+    + "      \"${poolName}\": \"${pool}\",\n"
+    + "      \"AllReplicationGroups\": \"1\"\n"
+    + "    }\n"
+    + "  },\n"
+    + "  \"listFields\": {\n"
+    + "    \"TAG_LIST\": [\n"
+    + "      \"DefaultTenant_OFFLINE\",\n"
+    + "      \"DefaultTenant_REALTIME\",\n"
+    + "      \"${poolName}\",\n"
+    + "      \"AllReplicationGroups\"\n"
+    + "    ]\n"
+    + "  }\n"
+    + "}";
+  //@formatter:on
 
   @Test
-  public void testSelectInstances() throws JsonProcessingException {
-    ObjectMapper objectMapper = new ObjectMapper();
+  public void testPoolsWhenOneMorePoolAddedAndOneMoreReplicaGroupsNeeded()
+      throws JsonProcessingException {
+    //@formatter:off
     String existingPartitionsJson =
-        "    {\n" + "      \"instancePartitionsName\": \"0f97dac8-4123-47c6-9a4d-b8ce039c5ea5_OFFLINE\",\n"
-            + "      \"partitionToInstancesMap\": {\n" + "        \"0_0\": [\n"
-            + "          \"Server_pinot-server-rg0-0.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
-            + "          \"Server_pinot-server-rg0-1.pinot-server-headless.pinot.svc.cluster.local_8098\"\n"
-            + "        ]\n" + "      }\n" + "    }\n";
-    InstancePartitions existing = objectMapper.readValue(existingPartitionsJson, InstancePartitions.class);
+        "{\n"
+      + "  \"instancePartitionsName\": \"0f97dac8-4123-47c6-9a4d-b8ce039c5ea5_OFFLINE\",\n"
+      + "  \"partitionToInstancesMap\": {\n"
+      + "    \"0_0\": [\n"
+      + "      \"Server_pinot-server-rg0-0.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
+      + "      \"Server_pinot-server-rg0-1.pinot-server-headless.pinot.svc.cluster.local_8098\"\n"
+      + "    ]\n"
+      + "  }\n"
+      + "}";
+    //@formatter:on
+    InstancePartitions existing = OBJECT_MAPPER.readValue(existingPartitionsJson, InstancePartitions.class);
     InstanceReplicaGroupPartitionConfig config =
         new InstanceReplicaGroupPartitionConfig(true, 0, 2, 2, 1, 2, true, null);
 
     InstanceReplicaGroupPartitionSelector selector =
-        new InstanceReplicaGroupPartitionSelector(config, "tableNameBlah", existing);
+        new InstanceReplicaGroupPartitionSelector(config, "tableNameBlah", existing, true);
 
     String[] serverNames = {"rg0-0", "rg0-1", "rg1-0", "rg1-1"};
     String[] poolNumbers = {"0", "0", "1", "1"};
-    String[] poolNames = {"FirstHalfReplicationGroups", "FirstHalfReplicationGroups", "SecondHalfReplicationGroups",
-        "SecondHalfReplicationGroups"};
+    String[] poolNames = {
+        "FirstHalfReplicationGroups", "FirstHalfReplicationGroups", "SecondHalfReplicationGroups",
+        "SecondHalfReplicationGroups"
+    };
     Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = new HashMap<>();
 
     for (int i = 0; i < serverNames.length; i++) {
@@ -81,24 +115,103 @@ public class InstanceReplicaGroupPartitionSelectorTest {
       StringSubstitutor substitutor = new StringSubstitutor(valuesMap);
       String resolvedString = substitutor.replace(INSTANCE_CONFIG_TEMPLATE);
 
-      ZNRecord znRecord = objectMapper.readValue(resolvedString, ZNRecord.class);
+      ZNRecord znRecord = OBJECT_MAPPER.readValue(resolvedString, ZNRecord.class);
       int poolNumber = Integer.parseInt(poolNumbers[i]);
       poolToInstanceConfigsMap.computeIfAbsent(poolNumber, k -> new ArrayList<>()).add(new InstanceConfig(znRecord));
     }
     InstancePartitions assignedPartitions = new InstancePartitions("0f97dac8-4123-47c6-9a4d-b8ce039c5ea5_OFFLINE");
     selector.selectInstances(poolToInstanceConfigsMap, assignedPartitions);
 
+    // Now that 1 more pool is added and 1 more RG is needed, a new set called "0_1" is generated,
+    // and the instances from Pool 1 are assigned to this new replica.
+    //@formatter:off
     String expectedInstancePartitions =
-        "    {\n" + "      \"instancePartitionsName\": \"0f97dac8-4123-47c6-9a4d-b8ce039c5ea5_OFFLINE\",\n"
-            + "      \"partitionToInstancesMap\": {\n" + "        \"0_0\": [\n"
-            + "          \"Server_pinot-server-rg0-0.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
-            + "          \"Server_pinot-server-rg0-1.pinot-server-headless.pinot.svc.cluster.local_8098\"\n"
-            + "        ],\n" + "        \"0_1\": [\n"
-            + "          \"Server_pinot-server-rg1-0.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
-            + "          \"Server_pinot-server-rg1-1.pinot-server-headless.pinot.svc.cluster.local_8098\"\n"
-            + "        ]\n" + "      }\n" + "  }\n";
+        "{\n"
+      + "  \"instancePartitionsName\": \"0f97dac8-4123-47c6-9a4d-b8ce039c5ea5_OFFLINE\",\n"
+      + "  \"partitionToInstancesMap\": {\n"
+      + "    \"0_0\": [\n"
+      + "      \"Server_pinot-server-rg0-0.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
+      + "      \"Server_pinot-server-rg0-1.pinot-server-headless.pinot.svc.cluster.local_8098\"\n"
+      + "    ],\n"
+      + "    \"0_1\": [\n"
+      + "      \"Server_pinot-server-rg1-0.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
+      + "      \"Server_pinot-server-rg1-1.pinot-server-headless.pinot.svc.cluster.local_8098\"\n"
+      + "    ]\n"
+      + "  }\n"
+      + "}";
+    //@formatter:on
     InstancePartitions expectedPartitions =
-        objectMapper.readValue(expectedInstancePartitions, InstancePartitions.class);
-    assert assignedPartitions.equals(expectedPartitions);
+        OBJECT_MAPPER.readValue(expectedInstancePartitions, InstancePartitions.class);
+    assertEquals(assignedPartitions, expectedPartitions);
+  }
+
+  @Test
+  public void testSelectPoolsWhenExistingReplicaGroupMapsToMultiplePools()
+      throws JsonProcessingException {
+    // The "rg0-2" instance used to belong to Pool 1, but now it belongs to Pool 0.
+    //@formatter:off
+    String existingPartitionsJson =
+        "{\n"
+      + "  \"instancePartitionsName\": \"0f97dac8-4123-47c6-9a4d-b8ce039c5ea5_OFFLINE\",\n"
+      + "  \"partitionToInstancesMap\": {\n"
+      + "    \"0_0\": [\n"
+      + "      \"Server_pinot-server-rg0-0.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
+      + "      \"Server_pinot-server-rg0-1.pinot-server-headless.pinot.svc.cluster.local_8098\"\n"
+      + "    ],\n"
+      + "    \"0_1\": [\n"
+      + "      \"Server_pinot-server-rg0-2.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
+      + "      \"Server_pinot-server-rg1-0.pinot-server-headless.pinot.svc.cluster.local_8098\"\n"
+      + "    ]\n"
+      + "  }\n"
+      + "}";
+    //@formatter:on
+    InstancePartitions existing = OBJECT_MAPPER.readValue(existingPartitionsJson, InstancePartitions.class);
+    InstanceReplicaGroupPartitionConfig config =
+        new InstanceReplicaGroupPartitionConfig(true, 0, 2, 2, 1, 2, true, null);
+
+    InstanceReplicaGroupPartitionSelector selector =
+        new InstanceReplicaGroupPartitionSelector(config, "tableNameBlah", existing, true);
+
+    String[] serverNames = {"rg0-0", "rg0-1", "rg0-2", "rg1-0", "rg1-1", "rg1-2"};
+    String[] poolNumbers = {"0", "0", "0", "1", "1", "1"};
+    Map<Integer, List<InstanceConfig>> poolToInstanceConfigsMap = new HashMap<>();
+
+    for (int i = 0; i < serverNames.length; i++) {
+      Map<String, String> valuesMap = new HashMap<>();
+      valuesMap.put("serverName", serverNames[i]);
+      valuesMap.put("pool", poolNumbers[i]);
+
+      StringSubstitutor substitutor = new StringSubstitutor(valuesMap);
+      String resolvedString = substitutor.replace(INSTANCE_CONFIG_TEMPLATE);
+
+      ZNRecord znRecord = OBJECT_MAPPER.readValue(resolvedString, ZNRecord.class);
+      int poolNumber = Integer.parseInt(poolNumbers[i]);
+      poolToInstanceConfigsMap.computeIfAbsent(poolNumber, k -> new ArrayList<>()).add(new InstanceConfig(znRecord));
+    }
+
+    InstancePartitions assignedPartitions = new InstancePartitions("0f97dac8-4123-47c6-9a4d-b8ce039c5ea5_OFFLINE");
+    selector.selectInstances(poolToInstanceConfigsMap, assignedPartitions);
+
+    // The "rg0-2" instance is replaced by "rg1-0" (which belongs to Pool 1), as "rg0-2" no longer belongs to Pool 1.
+    // And "rg1-0" remains the same position as it's always under Pool 1.
+    //@formatter:off
+    String expectedInstancePartitions =
+        "{\n"
+      + "  \"instancePartitionsName\": \"0f97dac8-4123-47c6-9a4d-b8ce039c5ea5_OFFLINE\",\n"
+      + "  \"partitionToInstancesMap\": {\n"
+      + "    \"0_0\": [\n"
+      + "      \"Server_pinot-server-rg0-0.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
+      + "      \"Server_pinot-server-rg0-1.pinot-server-headless.pinot.svc.cluster.local_8098\"\n"
+      + "    ],\n"
+      + "    \"0_1\": [\n"
+      + "      \"Server_pinot-server-rg1-1.pinot-server-headless.pinot.svc.cluster.local_8098\",\n"
+      + "      \"Server_pinot-server-rg1-0.pinot-server-headless.pinot.svc.cluster.local_8098\"\n"
+      + "    ]\n"
+      + "  }\n"
+      + "}";
+    //@formatter:on
+    InstancePartitions expectedPartitions =
+        OBJECT_MAPPER.readValue(expectedInstancePartitions, InstancePartitions.class);
+    assertEquals(assignedPartitions, expectedPartitions);
   }
 }
