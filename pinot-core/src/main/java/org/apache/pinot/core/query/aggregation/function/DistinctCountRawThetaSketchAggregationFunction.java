@@ -53,7 +53,8 @@ public class DistinctCountRawThetaSketchAggregationFunction extends DistinctCoun
     int numAccumulators = accumulators.size();
     List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
 
-    for (ThetaSketchAccumulator accumulator : accumulators) {
+    for (Object object : accumulators) {
+      ThetaSketchAccumulator accumulator = convertSketchAccumulator(object);
       accumulator.setThreshold(_accumulatorThreshold);
       accumulator.setSetOperationBuilder(_setOperationBuilder);
       mergedSketches.add(accumulator.getResult());
