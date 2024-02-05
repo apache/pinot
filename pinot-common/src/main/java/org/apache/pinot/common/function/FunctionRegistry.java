@@ -195,7 +195,7 @@ public class FunctionRegistry {
     }
 
     @ScalarFunction(names = {"vectorSimilarity", "vector_similarity"}, isPlaceholder = true)
-    public static double vectorSimilarity(float[] vector1, float[] vector2) {
+    public static boolean vectorSimilarity(float[] vector1, float[] vector2, int topk) {
       throw new UnsupportedOperationException("Placeholder scalar function, should not reach here");
     }
   }

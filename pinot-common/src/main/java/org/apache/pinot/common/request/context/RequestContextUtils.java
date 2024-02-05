@@ -470,6 +470,37 @@ public class RequestContextUtils {
   }
 
   private static float[] getVectorValue(Expression thriftExpression) {
+    if (thriftExpression.getType() == ExpressionType.LITERAL) {
+      Literal literalExpression = thriftExpression.getLiteral();
+      if (literalExpression.isSetIntArrayValue()) {
+        float[] vector = new float[literalExpression.getIntArrayValue().size()];
+        for (int i = 0; i < literalExpression.getIntArrayValue().size(); i++) {
+          vector[i] = literalExpression.getIntArrayValue().get(i).floatValue();
+        }
+        return vector;
+      }
+      if (literalExpression.isSetLongArrayValue()) {
+        float[] vector = new float[literalExpression.getLongArrayValue().size()];
+        for (int i = 0; i < literalExpression.getLongArrayValue().size(); i++) {
+          vector[i] = literalExpression.getLongArrayValue().get(i).floatValue();
+        }
+        return vector;
+      }
+      if (literalExpression.isSetFloatArrayValue()) {
+        float[] vector = new float[literalExpression.getFloatArrayValue().size()];
+        for (int i = 0; i < literalExpression.getFloatArrayValue().size(); i++) {
+          vector[i] = literalExpression.getFloatArrayValue().get(i);
+        }
+        return vector;
+      }
+      if (literalExpression.isSetDoubleArrayValue()) {
+        float[] vector = new float[literalExpression.getDoubleArrayValue().size()];
+        for (int i = 0; i < literalExpression.getDoubleArrayValue().size(); i++) {
+          vector[i] = literalExpression.getDoubleArrayValue().get(i).floatValue();
+        }
+        return vector;
+      }
+    }
     if (thriftExpression.getType() != ExpressionType.FUNCTION) {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");
