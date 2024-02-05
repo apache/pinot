@@ -22,7 +22,7 @@ import java.io.File;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.helix.HelixManager;
+import java.util.function.Supplier;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -52,14 +52,12 @@ public interface SegmentFetcher {
       throws Exception;
 
   /**
-   *
-   * @param segmentName The segment file name.
-   * @param dest The destination to put the downloaded segment.
-   * @param helixManager The Helix cluster manager to get the location of the segment.
-   * @param downloadScheme http or https
+   * @param segmentName the segment name to download.
+   * @param uriSupplier the supplier to the list of segment download uris.
+   * @param dest        The destination to put the downloaded segment.
    * @return true if and only if the segment fetch is successful.
    * @throws Exception
    */
-  boolean fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
+  boolean fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest)
       throws Exception;
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.fetcher;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.io.IOException;
@@ -51,7 +52,8 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
   public HttpSegmentFetcher() {
   }
 
-  public HttpSegmentFetcher(FileUploadDownloadClient httpClient, PinotConfiguration config) {
+  @VisibleForTesting
+  protected HttpSegmentFetcher(FileUploadDownloadClient httpClient, PinotConfiguration config) {
     _httpClient = httpClient;
     _retryCount = config.getProperty(RETRY_COUNT_CONFIG_KEY, DEFAULT_RETRY_COUNT);
     _retryWaitMs = config.getProperty(RETRY_WAIT_MS_CONFIG_KEY, DEFAULT_RETRY_WAIT_MS);

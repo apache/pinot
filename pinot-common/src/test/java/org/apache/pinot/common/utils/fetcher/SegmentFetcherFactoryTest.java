@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.crypt.PinotCrypter;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
@@ -126,15 +127,13 @@ public class SegmentFetcherFactoryTest {
     }
 
     @Override
-    public void fetchSegmentToLocal(List<URI> uri, File dest)
-        throws Exception {
+    public void fetchSegmentToLocal(List<URI> uri, File dest) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
-        throws Exception {
-      throw new UnsupportedOperationException();
+    public boolean fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest) {
+      return false;
     }
   }
 

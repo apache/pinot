@@ -24,9 +24,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.helix.HelixManager;
+import java.util.function.Supplier;
 import org.apache.pinot.common.auth.AuthProviderUtils;
-import org.apache.pinot.common.utils.PeerServerSegmentFinder;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -112,19 +111,27 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     throw new UnsupportedOperationException();
   }
 
-  // Download segment to a local location with retries.
+  /**
+   * @param segmentName
+   * @param uriSupplier the supplier to the list of segment download uris.
+   * @param dest        The destination to put the downloaded segment.
+   * @return true if and only if the segment fetch is successful. This method keeps retrying (with exponential backoff)
+   * of the following steps until segment download is successful or the retry limit is reached whichever comes first 1)
+   * Find servers hosting the segment in ONLINE state from the External View of the table. 2) Shuffle the list of
+   * servers. 3) Go through the list of server http download URIs to fetch the segment until success.
+   * @throws Exception
+   */
   @Override
-  public boolean fetchSegmentToLocal(String segmentName, File dest, HelixManager helixManager, String downloadScheme)
+  public boolean fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest)
       throws Exception {
     try {
       int attempt =
           RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
             // First find servers hosting the segment in ONLINE state.
-            List<URI> peerSegmentURIs =
-                PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, helixManager);
+            List<URI> peerSegmentURIs = uriSupplier.get();
             // Shuffle the list of URIs.
             Collections.shuffle(peerSegmentURIs);
-            // Next get through the list of URIs to fetch the segment until success.
+            // Next go through the list of URIs to fetch the segment until success.
             for (URI uri : peerSegmentURIs) {
               try {
                 fetchSegmentToLocalWithoutRetry(uri, dest);
