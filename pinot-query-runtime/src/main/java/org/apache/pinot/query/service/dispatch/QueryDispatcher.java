@@ -155,12 +155,14 @@ public class QueryDispatcher {
         try {
           Worker.QueryRequest.Builder requestBuilder = Worker.QueryRequest.newBuilder();
           for (int i = 0; i < numStages; i++) {
-            DispatchablePlanFragment stagePlan = stagePlans.get(i + 1);
+            int stageId = i + 1;
+            DispatchablePlanFragment stagePlan = stagePlans.get(stageId);
             List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(serverInstance);
             if (workerIds != null) {
-              requestBuilder.addStagePlan(Worker.StagePlan.newBuilder().setStageId(i).setStageRoot(stageRootNodes[i])
-                  .setStageMetadata(QueryPlanSerDeUtils.toProtoStageMetadata(stageWorkerMetadataLists[i],
-                      stagePlan.getCustomProperties(), serverInstance, workerIds)).build());
+              requestBuilder.addStagePlan(
+                  Worker.StagePlan.newBuilder().setStageId(stageId).setStageRoot(stageRootNodes[i]).setStageMetadata(
+                      QueryPlanSerDeUtils.toProtoStageMetadata(stageWorkerMetadataLists[i],
+                          stagePlan.getCustomProperties(), serverInstance, workerIds)).build());
             }
           }
           requestBuilder.putAllMetadata(requestMetadata);
