@@ -48,17 +48,17 @@ import static org.testng.AssertJUnit.assertTrue;
 
 public class StarTreeBuilderUtilsTest {
   @Test
-  public void testAreStarTreeBuilderConfigsEqual() {
+  public void testAreStarTreeBuilderConfigListsEqual() {
     // Create StartTreeIndexConfigs to test for unequal starTree configs.
     StarTreeIndexConfig starTreeIndexConfig1 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
-    // Different dimension split order.
+    // Different skip star node creation.
     StarTreeIndexConfig starTreeIndexConfig2 =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Collections.singletonList("Distance"),
             Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
-    // Different skip star node creation.
+    // Different dimension split order.
     StarTreeIndexConfig starTreeIndexConfig3 = new StarTreeIndexConfig(Arrays.asList("Distance", "Carrier"), null,
         Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
@@ -86,37 +86,37 @@ public class StarTreeBuilderUtilsTest {
     config1.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig2));
 
     config2.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig3));
-    assertFalse(StarTreeBuilderUtils.areStarTreeBuilderConfigsEqual(config1, config2));
+    assertFalse(StarTreeBuilderUtils.areStarTreeBuilderConfigListsEqual(config1, config2));
 
     // Test different dimension split order in StartTreeV2BuilderConfig.
     config1.clear();
     config1.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig1));
 
-    assertFalse(StarTreeBuilderUtils.areStarTreeBuilderConfigsEqual(config1, config2));
+    assertFalse(StarTreeBuilderUtils.areStarTreeBuilderConfigListsEqual(config1, config2));
 
     // Test different skip star node creation in StartTreeV2BuilderConfig.
     config2.clear();
     config2.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig2));
 
-    assertFalse(StarTreeBuilderUtils.areStarTreeBuilderConfigsEqual(config1, config2));
+    assertFalse(StarTreeBuilderUtils.areStarTreeBuilderConfigListsEqual(config1, config2));
 
     // Test different max leaf records in StartTreeV2BuilderConfig.
     config2.clear();
     config2.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig4));
 
-    assertFalse(StarTreeBuilderUtils.areStarTreeBuilderConfigsEqual(config1, config2));
+    assertFalse(StarTreeBuilderUtils.areStarTreeBuilderConfigListsEqual(config1, config2));
 
     // Test different aggregation configs in StartTreeV2BuilderConfig.
     config2.clear();
     config2.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig5));
 
-    assertFalse(StarTreeBuilderUtils.areStarTreeBuilderConfigsEqual(config1, config2));
+    assertFalse(StarTreeBuilderUtils.areStarTreeBuilderConfigListsEqual(config1, config2));
 
     // Test equal StartTreeV2BuilderConfigs.
     config2.clear();
     config2.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig6));
 
-    assertTrue(StarTreeBuilderUtils.areStarTreeBuilderConfigsEqual(config1, config2));
+    assertTrue(StarTreeBuilderUtils.areStarTreeBuilderConfigListsEqual(config1, config2));
   }
 
   @Test

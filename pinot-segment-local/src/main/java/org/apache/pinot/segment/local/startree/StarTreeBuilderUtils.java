@@ -280,7 +280,7 @@ public class StarTreeBuilderUtils {
   /**
    * Returns {@code true} if the given star-tree builder configs are equal, {@code false} otherwise.
    */
-  public static boolean areStarTreeBuilderConfigsEqual(List<StarTreeV2BuilderConfig> builderConfig1,
+  public static boolean areStarTreeBuilderConfigListsEqual(List<StarTreeV2BuilderConfig> builderConfig1,
       List<StarTreeV2BuilderConfig> builderConfig2) {
     int numStarTrees = builderConfig1.size();
     if (builderConfig2.size() != numStarTrees) {
@@ -289,18 +289,7 @@ public class StarTreeBuilderUtils {
     for (int i = 0; i < numStarTrees; i++) {
       StarTreeV2BuilderConfig builderConfigToCompare1 = builderConfig1.get(i);
       StarTreeV2BuilderConfig builderConfigToCompare2 = builderConfig2.get(i);
-      if (!builderConfigToCompare1.getDimensionsSplitOrder()
-          .equals(builderConfigToCompare2.getDimensionsSplitOrder())) {
-        return false;
-      }
-      if (!builderConfigToCompare1.getSkipStarNodeCreationForDimensions()
-          .equals(builderConfigToCompare2.getSkipStarNodeCreationForDimensions())) {
-        return false;
-      }
-      if (!builderConfigToCompare1.getAggregationSpecs().equals(builderConfigToCompare2.getAggregationSpecs())) {
-        return false;
-      }
-      if (builderConfigToCompare1.getMaxLeafRecords() != builderConfigToCompare2.getMaxLeafRecords()) {
+      if (!builderConfigToCompare1.equals(builderConfigToCompare2)) {
         return false;
       }
     }
