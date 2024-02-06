@@ -166,7 +166,7 @@ public class MinionConstants {
     public static final String INVALID_RECORDS_THRESHOLD_COUNT = "invalidRecordsThresholdCount";
 
     /**
-     * Valid doc id type
+     * Valid doc ids type
      */
     public static final String VALID_DOC_IDS_TYPE = "validDocIdsType";
   }

@@ -31,7 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.restlet.resources.ValidDocIdMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
@@ -151,15 +151,15 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
                 validDocIdsType));
       }
 
-      List<ValidDocIdMetadataInfo> validDocIdMetadataList =
-          serverSegmentMetadataReader.getValidDocIdMetadataFromServer(tableNameWithType, serverToSegments,
+      List<ValidDocIdsMetadataInfo> validDocIdsMetadataList =
+          serverSegmentMetadataReader.getValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
               serverToEndpoints, null, 60_000, validDocIdsType.toString());
 
       Map<String, SegmentZKMetadata> completedSegmentsMap =
           completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
 
       SegmentSelectionResult segmentSelectionResult =
-          processValidDocIdMetadata(taskConfigs, completedSegmentsMap, validDocIdMetadataList);
+          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList);
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
@@ -195,8 +195,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  public static SegmentSelectionResult processValidDocIdMetadata(Map<String, String> taskConfigs,
-      Map<String, SegmentZKMetadata> completedSegmentsMap, List<ValidDocIdMetadataInfo> validDocIdMetadataInfoList) {
+  public static SegmentSelectionResult processValidDocIdsMetadata(Map<String, String> taskConfigs,
+      Map<String, SegmentZKMetadata> completedSegmentsMap, List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfoList) {
     double invalidRecordsThresholdPercent = Double.parseDouble(
         taskConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
@@ -205,19 +205,19 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT)));
     List<SegmentZKMetadata> segmentsForCompaction = new ArrayList<>();
     List<String> segmentsForDeletion = new ArrayList<>();
-    for (ValidDocIdMetadataInfo validDocIdMetadata : validDocIdMetadataInfoList) {
-      long totalInvalidDocs = validDocIdMetadata.getTotalInvalidDocs();
-      String segmentName = validDocIdMetadata.getSegmentName();
+    for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoList) {
+      long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
+      String segmentName = validDocIdsMetadata.getSegmentName();
 
       // Skip segments if the crc from zk metadata and server does not match. They may be being reloaded.
       SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
-      if (segment.getCrc() != Long.parseLong(validDocIdMetadata.getSegmentCrc())) {
+      if (segment.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
         LOGGER.warn(
-            "CRC mismatch for segment: {}, skipping it for compaction (segmentZKMetadata={}, validDocIdMetadata={})",
-            segmentName, segment.getCrc(), validDocIdMetadata.getSegmentCrc());
+            "CRC mismatch for segment: {}, skipping it for compaction (segmentZKMetadata={}, validDocIdsMetadata={})",
+            segmentName, segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
         continue;
       }
-      long totalDocs = validDocIdMetadata.getTotalDocs();
+      long totalDocs = validDocIdsMetadata.getTotalDocs();
       double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
       if (totalInvalidDocs == totalDocs) {
         segmentsForDeletion.add(segment.getSegmentName());
