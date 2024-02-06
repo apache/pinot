@@ -24,7 +24,7 @@ FROM ${JDK_IMAGE}:${JAVA_VERSION}-jdk-slim
 LABEL MAINTAINER=dev@pinot.apache.org
 
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends vim less wget curl git python-is-python3 sysstat procps linux-perf libtasn1-6 && \
+  apt-get install -y --no-install-recommends vim less wget curl git python-is-python3 sysstat procps linux-perf libtasn1-6 zstd && \
   rm -rf /var/lib/apt/lists/*
 
 RUN case `uname -m` in \
