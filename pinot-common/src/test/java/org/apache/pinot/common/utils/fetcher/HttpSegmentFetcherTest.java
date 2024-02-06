@@ -97,7 +97,6 @@ public class HttpSegmentFetcherTest {
     } catch (Exception e) {
       // If we reach here, the download fails.
       Assert.assertTrue(true, "Download segment failed");
-
     }
   }
 

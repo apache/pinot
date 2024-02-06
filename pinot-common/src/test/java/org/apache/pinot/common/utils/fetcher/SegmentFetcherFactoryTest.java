@@ -131,7 +131,8 @@ public class SegmentFetcherFactoryTest {
     }
 
     @Override
-    public void fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest) throws Exception{
+    public void fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest)
+        throws Exception {
       throw new UnsupportedOperationException();
     }
   }
