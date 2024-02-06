@@ -1338,7 +1338,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   public void testTextSearchWithInverse()
       throws Exception {
 
-    // all skills except the first 28 in createTestData contain 'software engineering' or 'software' or 'engineering'
+    // all skills except the first 28 in createTestData contain 'software engineering' or ('software' and 'engineering')
     List<Object[]> expected = new ArrayList<>();
     for (int i = 0; i < 28; i++) {
       expected.add(new Object[]{1000 + i});
