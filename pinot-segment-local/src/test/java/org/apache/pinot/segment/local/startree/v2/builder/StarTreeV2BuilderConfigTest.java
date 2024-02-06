@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.segment.local.startree.v2.builder;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -98,6 +102,39 @@ public class StarTreeV2BuilderConfigTest {
   }
 
   @Test
+  public void testDefaultConfigFromJsonNodeSegmentMetadata() {
+    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.INT)
+        .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.FLOAT)
+        .addSingleValueDimension("d4", DataType.DOUBLE).addMultiValueDimension("d5", DataType.INT)
+        .addMetric("m1", DataType.DOUBLE).addMetric("m2", DataType.BYTES)
+        .addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "t"), null)
+        .addDateTime("dt", DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS").build();
+
+    // Create a list of string with column name, hasDictionary and cardinality.
+    List<List<String>> columnList =
+        Arrays.asList(Arrays.asList("d1", "true", "200"), Arrays.asList("d2", "true", "400"),
+            Arrays.asList("d3", "true", "20000"), Arrays.asList("d4", "false", "100"),
+            Arrays.asList("d5", "true", "100"), Arrays.asList("m1", "false", "-1"), Arrays.asList("m2", "true", "100"),
+            Arrays.asList("t", "true", "20000"), Arrays.asList("dt", "true", "30000"));
+
+    // Convert the list of string to JsonNode with appropriate key names.
+    JsonNode segmentMetadataAsJsonNode = convertStringListToJsonNode(columnList);
+
+    // Generate default config from the schema and segment metadata as JsonNode.
+    StarTreeV2BuilderConfig defaultConfig =
+        StarTreeV2BuilderConfig.generateDefaultConfig(schema, segmentMetadataAsJsonNode);
+    // Sorted by cardinality in descending order, followed by the time column
+    assertEquals(defaultConfig.getDimensionsSplitOrder(), Arrays.asList("d2", "d1", "dt", "t"));
+    // No column should be skipped for star-node creation
+    assertTrue(defaultConfig.getSkipStarNodeCreationForDimensions().isEmpty());
+    // Should have COUNT(*) and SUM(m1) as the function column pairs
+    assertEquals(defaultConfig.getFunctionColumnPairs(), new HashSet<>(
+        Arrays.asList(AggregationFunctionColumnPair.COUNT_STAR,
+            new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "m1"))));
+    assertEquals(defaultConfig.getMaxLeafRecords(), StarTreeV2BuilderConfig.DEFAULT_MAX_LEAF_RECORDS);
+  }
+
+  @Test
   public void testBuildFromIndexConfig() {
     List<StarTreeAggregationConfig> aggregationConfigs =
         List.of(new StarTreeAggregationConfig("m1", "SUM", CompressionCodec.LZ4));
@@ -148,5 +185,18 @@ public class StarTreeV2BuilderConfigTest {
     when(columnMetadata.hasDictionary()).thenReturn(hasDictionary);
     when(columnMetadata.getCardinality()).thenReturn(cardinality);
     return columnMetadata;
+  }
+
+  private JsonNode convertStringListToJsonNode(List<List<String>> columnList) {
+    // Create arrayNode from the list of string
+    ArrayNode arrayNode = new ArrayNode(JsonNodeFactory.instance);
+    for (List<String> column : columnList) {
+      ObjectNode objectNode = new ObjectNode(JsonNodeFactory.instance);
+      objectNode.put("columnName", column.get(0));
+      objectNode.put("hasDictionary", column.get(1));
+      objectNode.put("cardinality", column.get(2));
+      arrayNode.add(objectNode);
+    }
+    return arrayNode;
   }
 }
