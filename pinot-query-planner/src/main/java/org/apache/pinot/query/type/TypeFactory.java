@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.type;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -66,7 +67,8 @@ public class TypeFactory extends JavaTypeFactoryImpl {
     return builder.build();
   }
 
-  private RelDataType toRelDataType(FieldSpec fieldSpec, Predicate<FieldSpec> isNullable) {
+  @VisibleForTesting
+  public RelDataType toRelDataType(FieldSpec fieldSpec, Predicate<FieldSpec> isNullable) {
     RelDataType type = createSqlType(getSqlTypeName(fieldSpec));
     boolean isArray = !fieldSpec.isSingleValueField();
     if (isArray) {
