@@ -1331,6 +1331,24 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   }
 
   /**
+   * Test NotFilterOperator with index based doc id iterator (text_match)
+   * @throws Exception
+   */
+  @Test
+  public void testTextSearchWithInverse()
+      throws Exception {
+
+    // all skills except the first 28 in createTestData contain 'software engineering' or 'software' or 'engineering'
+    List<Object[]> expected = new ArrayList<>();
+    for (int i = 0; i < 28; i++) {
+      expected.add(new Object[]{1000 + i});
+    }
+
+    String query = "SELECT INT_COL FROM MyTable WHERE NOT TEXT_MATCH(SKILLS_TEXT_COL, 'software') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, 28, false, expected);
+  }
+
+  /**
    * Test the reference counting mechanism of {@link SearcherManager}
    * used by {@link RealtimeLuceneTextIndex}
    * for near realtime text search.
