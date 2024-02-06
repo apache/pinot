@@ -87,7 +87,7 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testStartPreloading()
+  public void testPreloadSegments()
       throws Exception {
     String realtimeTableName = "testTable_REALTIME";
     String instanceId = "server01";
@@ -109,7 +109,7 @@ public class BasePartitionUpsertMetadataManagerTest {
           }
 
           @Override
-          void preloadSegmentWithSnapshot(TableDataManager tableDataManager, String segmentName,
+          void doPreloadSegmentWithSnapshot(TableDataManager tableDataManager, String segmentName,
               IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata segmentZKMetadata) {
             wasPreloading.set(isPreloading());
             preloadedSegments.add(segmentName);
@@ -172,7 +172,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     ExecutorService segmentPreloadExecutor = Executors.newFixedThreadPool(1);
     try {
       assertFalse(upsertMetadataManager.isPreloading());
-      upsertMetadataManager.startPreloading(indexLoadingConfig, tableDataManager, helixManager, segmentPreloadExecutor);
+      upsertMetadataManager.preloadSegments(indexLoadingConfig, tableDataManager, helixManager, segmentPreloadExecutor);
       assertEquals(preloadedSegments.size(), 1);
       assertTrue(preloadedSegments.contains(seg02Name));
       assertTrue(wasPreloading.get());

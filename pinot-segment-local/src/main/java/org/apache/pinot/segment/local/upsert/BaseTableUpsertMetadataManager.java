@@ -23,11 +23,8 @@ import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -42,18 +39,11 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableUpsertMetadataManager.class);
 
   protected String _tableNameWithType;
-  protected TableDataManager _tableDataManager;
-  protected HelixManager _helixManager;
-  protected ExecutorService _segmentPreloadExecutor;
   protected UpsertContext _context;
 
   @Override
-  public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, HelixManager helixManager,
-      @Nullable ExecutorService segmentPreloadExecutor) {
+  public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager) {
     _tableNameWithType = tableConfig.getTableName();
-    _tableDataManager = tableDataManager;
-    _helixManager = helixManager;
-    _segmentPreloadExecutor = segmentPreloadExecutor;
 
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     Preconditions.checkArgument(upsertConfig != null && upsertConfig.getMode() != UpsertConfig.Mode.NONE,

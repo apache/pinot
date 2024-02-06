@@ -20,10 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.io.Closeable;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -36,9 +33,7 @@ import org.apache.pinot.spi.data.Schema;
 @ThreadSafe
 public interface TableUpsertMetadataManager extends Closeable {
 
-  // TODO: simplify this param list
-  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, HelixManager helixManager,
-      @Nullable ExecutorService segmentPreloadExecutor);
+  void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager);
 
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 
@@ -55,9 +50,4 @@ public interface TableUpsertMetadataManager extends Closeable {
    * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition
    */
   Map<Integer, Long> getPartitionToPrimaryKeyCount();
-
-  // TODO: remove this
-  default boolean isPreloading() {
-    return false;
-  }
 }

@@ -205,7 +205,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
       _tableUpsertMetadataManager =
           TableUpsertMetadataManagerFactory.create(_tableConfig, _instanceDataManagerConfig.getUpsertConfig());
-      _tableUpsertMetadataManager.init(_tableConfig, schema, this, _helixManager, _segmentPreloadExecutor);
+      _tableUpsertMetadataManager.init(_tableConfig, schema, this);
     }
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
@@ -378,14 +378,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
         segmentName, _tableNameWithType);
-    if (isUpsertEnabled() && isPreloadingReady()) {
+    if (isUpsertEnabled() && isReadyToPreload()) {
       Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, segmentZKMetadata, null);
       Preconditions.checkNotNull(partitionId,
           String.format("Failed to get partition id for segment: %s (upsert-enabled table: %s)", segmentName,
               _tableNameWithType));
       PartitionUpsertMetadataManager partitionUpsertMetadataManager =
           _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
-      partitionUpsertMetadataManager.startPreloading(indexLoadingConfig, this, _helixManager, _segmentPreloadExecutor);
+      partitionUpsertMetadataManager.preloadSegments(indexLoadingConfig, this, _helixManager, _segmentPreloadExecutor);
       // Continue to add segment after preloading, as the segment might not be added by preloading.
     }
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
@@ -457,7 +457,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
   }
 
-  private boolean isPreloadingReady() {
+  private boolean isReadyToPreload() {
     UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
     return upsertConfig != null && upsertConfig.isEnableSnapshot() && upsertConfig.isEnablePreload()
         && _segmentPreloadExecutor != null;
@@ -544,7 +544,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Register the new segment after it is fully initialized by partitionUpsertMetadataManager, e.g. to fill up its
     // validDocId bitmap. Otherwise, the query can return wrong results, if accessing the premature segment.
     if (partitionUpsertMetadataManager.isPreloading()) {
-      // Preloading segment happens is ensured to be handled by a single thread, so no need to take a lock.
+      // Preloading segment is ensured to be handled by a single thread, so no need to take a lock.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
       registerSegment(segmentName, newSegmentManager);
       _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
@@ -670,13 +670,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "." + System.currentTimeMillis());
       File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
       // Next download the segment from a randomly chosen server using configured download scheme (http or https).
-      SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(segmentName,
-          () -> {
-            List<URI> peerServerURIs =
-                PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
-            Collections.shuffle(peerServerURIs);
-            return peerServerURIs;
-          }, segmentTarFile);
+      SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(segmentName, () -> {
+        List<URI> peerServerURIs =
+            PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
+        Collections.shuffle(peerServerURIs);
+        return peerServerURIs;
+      }, segmentTarFile);
       _logger.info("Fetched segment {} successfully to {} of size {}", segmentName, segmentTarFile,
           segmentTarFile.length());
       untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile, tempRootDir);
