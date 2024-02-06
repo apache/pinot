@@ -17,24 +17,26 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-
-set -e
-
-if [ -z "${BUILD_PLATFORM}" ]; then
-  exit 1
+if [ -z "${PRESTO_GIT_URL}" ]; then
+  PRESTO_GIT_URL="https://github.com/prestodb/presto.git"
+fi
+if [ -z "${PRESTO_BRANCH}" ]; then
+  PRESTO_BRANCH="master"
 fi
 
-if [ -z "${BASE_IMAGE_TYPE}" ]; then
-  exit 1
+# Get presto commit id
+ROOT_DIR=`pwd`
+rm -rf /tmp/presto
+git clone -b ${PRESTO_BRANCH} --single-branch ${PRESTO_GIT_URL} /tmp/presto
+cd /tmp/presto
+COMMIT_ID=`git rev-parse --short HEAD`
+./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout
+VERSION=`./mvnw help:evaluate -Dexpression=project.version -q -DforceStdout`
+rm -rf /tmp/presto
+DATE=`date +%Y%m%d`
+
+if [ -z "${TAGS}" ]; then
+  TAGS="${VERSION}-${COMMIT_ID}-${DATE},latest"
 fi
-
-cd docker/images/pinot-base/pinot-base-${BASE_IMAGE_TYPE}
-
-docker buildx build \
-  --no-cache \
-  --platform=${BUILD_PLATFORM} \
-  --file ${OPEN_JDK_DIST}.dockerfile \
-  --tag apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG} \
-  --build-arg JAVA_VERSION=${JDK_VERSION:-11} \
-  --push \
-  .
+echo "commit-id=${COMMIT_ID}" >> "$GITHUB_OUTPUT"
+echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"

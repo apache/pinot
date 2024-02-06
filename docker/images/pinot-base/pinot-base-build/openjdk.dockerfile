@@ -34,7 +34,7 @@ RUN apt-get update && \
 
 # install maven
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
-  && wget https://dlcdn.apache.org/maven/maven-3/3.9.2/binaries/apache-maven-3.9.2-bin.tar.gz -P /tmp \
+  && wget https://dlcdn.apache.org/maven/maven-3/3.9.4/binaries/apache-maven-3.9.4-bin.tar.gz -P /tmp \
   && tar -xzf /tmp/apache-maven-*.tar.gz -C /usr/share/maven --strip-components=1 \
   && rm -f /tmp/apache-maven-*.tar.gz \
   && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn \
