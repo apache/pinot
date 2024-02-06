@@ -90,7 +90,7 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     if (uris == null || uris.isEmpty()) {
       throw new IllegalArgumentException("The input uri list is null or empty");
     }
-    RoundRobinURIProvider roundRobinURIProvider = new RoundRobinURIProvider(uris);
+    RoundRobinURIProvider roundRobinURIProvider = new RoundRobinURIProvider(uris, false);
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
       URI uri = roundRobinURIProvider.next();
       try {
