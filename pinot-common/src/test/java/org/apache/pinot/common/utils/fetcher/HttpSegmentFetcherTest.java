@@ -29,6 +29,7 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.mockito.MockedStatic;
 import org.testng.Assert;
 import org.testng.annotations.BeforeSuite;
@@ -64,10 +65,12 @@ public class HttpSegmentFetcherTest {
     _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any()))
         .thenReturn(uris);
     try {
-      Assert.assertTrue(httpSegmentFetcher.fetchSegmentToLocal("seg",
-          () -> PeerServerSegmentFinder.getPeerServerURIs("seg", "http", helixManager), new File("/file")));
+      httpSegmentFetcher.fetchSegmentToLocal("seg",
+          () -> PeerServerSegmentFinder.getPeerServerURIs("seg", "http", helixManager), new File("/file"));
     } catch (Exception e) {
+      // If we reach here, the download fails.
       Assert.assertTrue(false, "Download segment failed");
+      Assert.assertTrue(e instanceof AttemptsExceededException);
     }
     _peerServerSegmentFinder.reset();
   }
@@ -87,10 +90,14 @@ public class HttpSegmentFetcherTest {
     _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any()))
         .thenReturn(uris);
     try {
-      Assert.assertFalse(httpSegmentFetcher.fetchSegmentToLocal("seg",
-          () -> PeerServerSegmentFinder.getPeerServerURIs("seg", "http", helixManager), new File("/file")));
-    } catch (Exception e) {
+      httpSegmentFetcher.fetchSegmentToLocal("seg",
+          () -> PeerServerSegmentFinder.getPeerServerURIs("seg", "http", helixManager), new File("/file"));
+      // The test should not reach here because the fetch will throw exception.
       Assert.assertTrue(false, "Download segment failed");
+    } catch (Exception e) {
+      // If we reach here, the download fails.
+      Assert.assertTrue(true, "Download segment failed");
+
     }
   }
 
@@ -109,9 +116,10 @@ public class HttpSegmentFetcherTest {
     _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any()))
         .thenReturn(uris);
     try {
-      Assert.assertTrue(httpSegmentFetcher.fetchSegmentToLocal("seg",
-          () -> PeerServerSegmentFinder.getPeerServerURIs("seg", "http", helixManager), new File("/file")));
+      httpSegmentFetcher.fetchSegmentToLocal("seg",
+          () -> PeerServerSegmentFinder.getPeerServerURIs("seg", "http", helixManager), new File("/file"));
     } catch (Exception e) {
+      // If we reach here, the download fails.
       Assert.assertTrue(false, "Download segment failed");
     }
   }
@@ -132,9 +140,10 @@ public class HttpSegmentFetcherTest {
     _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any()))
         .thenReturn(List.of()).thenReturn(List.of()).thenReturn(uris);
     try {
-      Assert.assertTrue(httpSegmentFetcher.fetchSegmentToLocal("seg",
-          () -> PeerServerSegmentFinder.getPeerServerURIs("seg", "http", helixManager), new File("/file")));
+      httpSegmentFetcher.fetchSegmentToLocal("seg",
+          () -> PeerServerSegmentFinder.getPeerServerURIs("seg", "http", helixManager), new File("/file"));
     } catch (Exception e) {
+      // If we reach here, the download fails.
       Assert.assertTrue(false, "Download segment failed");
     }
   }
@@ -151,10 +160,13 @@ public class HttpSegmentFetcherTest {
     _peerServerSegmentFinder.when(() -> PeerServerSegmentFinder.getPeerServerURIs(any(), any(), any()))
         .thenReturn(List.of()).thenReturn(List.of()).thenReturn(List.of());
     try {
-      Assert.assertFalse(httpSegmentFetcher.fetchSegmentToLocal("seg",
-          () -> PeerServerSegmentFinder.getPeerServerURIs("seg", "http", helixManager), new File("/file")));
-    } catch (Exception e) {
+      httpSegmentFetcher.fetchSegmentToLocal("seg",
+          () -> PeerServerSegmentFinder.getPeerServerURIs("seg", "http", helixManager), new File("/file"));
+      // The test should not reach here because the fetch will throw exception.
       Assert.assertTrue(false, "Download segment failed");
+    } catch (Exception e) {
+      Assert.assertTrue(true, "Download segment failed");
+      Assert.assertTrue(e instanceof AttemptsExceededException);
     }
   }
 }

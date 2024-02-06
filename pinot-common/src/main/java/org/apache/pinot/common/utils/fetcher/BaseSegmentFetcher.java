@@ -112,27 +112,22 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   }
 
   /**
-   * @param segmentName
+   * @param segmentName the name of the segment to fetch.
    * @param uriSupplier the supplier to the list of segment download uris.
    * @param dest        The destination to put the downloaded segment.
-   * @return true if and only if the segment fetch is successful. This method keeps retrying (with exponential backoff)
-   * of the following steps until segment download is successful or the retry limit is reached whichever comes first 1)
-   * Find servers hosting the segment in ONLINE state from the External View of the table. 2) Shuffle the list of
-   * servers. 3) Go through the list of server http download URIs to fetch the segment until success.
-   * @throws Exception
+   * throws exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
+   * This method keeps retrying (with exponential backoff) to go through the list download uris to fetch the segment
+   * until the retry limit is reached.
+   *
    */
   @Override
-  public boolean fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest)
-      throws Exception {
+  public void fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest) throws Exception {
     try {
       int attempt =
           RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
-            // First find servers hosting the segment in ONLINE state.
-            List<URI> peerSegmentURIs = uriSupplier.get();
-            // Shuffle the list of URIs.
-            Collections.shuffle(peerSegmentURIs);
-            // Next go through the list of URIs to fetch the segment until success.
-            for (URI uri : peerSegmentURIs) {
+            List<URI> suppliedURIs = uriSupplier.get();
+            // Go through the list of URIs to fetch the segment until success.
+            for (URI uri : suppliedURIs) {
               try {
                 fetchSegmentToLocalWithoutRetry(uri, dest);
                 return true;
@@ -144,10 +139,9 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
             return false;
           });
       _logger.info("Download segment {} successfully with {} attempts.", segmentName, attempt + 1);
-      return true;
     } catch (Exception e) {
       _logger.error("Failed to download segment {} after retries.", segmentName, e);
-      return false;
+      throw e;
     }
   }
 

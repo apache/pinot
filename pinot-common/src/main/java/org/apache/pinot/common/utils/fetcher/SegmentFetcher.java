@@ -52,12 +52,10 @@ public interface SegmentFetcher {
       throws Exception;
 
   /**
-   * @param segmentName the segment name to download.
+   * @param segmentName the segment name to fetch.
    * @param uriSupplier the supplier to the list of segment download uris.
    * @param dest        The destination to put the downloaded segment.
-   * @return true if and only if the segment fetch is successful.
-   * @throws Exception
+   * @throws Exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
    */
-  boolean fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest)
-      throws Exception;
+  void fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest) throws Exception;
 }
