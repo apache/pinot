@@ -23,7 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class ValidDocIdMetadataInfo {
+public class ValidDocIdsMetadataInfo {
   private final String _segmentName;
   private final long _totalValidDocs;
   private final long _totalInvalidDocs;
@@ -31,7 +31,7 @@ public class ValidDocIdMetadataInfo {
   private final String _segmentCrc;
   private final ValidDocIdsType _validDocIdsType;
 
-  public ValidDocIdMetadataInfo(@JsonProperty("segmentName") String segmentName,
+  public ValidDocIdsMetadataInfo(@JsonProperty("segmentName") String segmentName,
       @JsonProperty("totalValidDocs") long totalValidDocs, @JsonProperty("totalInvalidDocs") long totalInvalidDocs,
       @JsonProperty("totalDocs") long totalDocs, @JsonProperty("segmentCrc") String segmentCrc,
       @JsonProperty("validDocIdsType") ValidDocIdsType validDocIdsType) {

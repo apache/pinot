@@ -42,8 +42,8 @@ import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
-import org.apache.pinot.common.restlet.resources.ValidDocIdMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.jersey.client.ClientConfig;
@@ -209,7 +209,7 @@ public class ServerSegmentMetadataReader {
    *
    * @return segment metadata as a JSON string
    */
-  public List<ValidDocIdMetadataInfo> getValidDocIdMetadataFromServer(String tableNameWithType,
+  public List<ValidDocIdsMetadataInfo> getValidDocIdsMetadataFromServer(String tableNameWithType,
       Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
       @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType) {
     List<Pair<String, String>> serverURLsAndBodies = new ArrayList<>();
@@ -226,7 +226,7 @@ public class ServerSegmentMetadataReader {
           }
         }
       }
-      serverURLsAndBodies.add(generateValidDocIdMetadataURL(tableNameWithType, segmentsToQuery, validDocIdsType,
+      serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQuery, validDocIdsType,
           serverToEndpoints.get(serverToSegments.getKey())));
     }
 
@@ -239,16 +239,16 @@ public class ServerSegmentMetadataReader {
         completionServiceHelper.doMultiPostRequest(serverURLsAndBodies, tableNameWithType, false, requestHeaders,
             timeoutMs, null);
 
-    List<ValidDocIdMetadataInfo> validDocIdMetadataInfos = new ArrayList<>();
+    List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfos = new ArrayList<>();
     int failedParses = 0;
     int returnedSegmentsCount = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        String validDocIdMetadataList = streamResponse.getValue();
-        List<ValidDocIdMetadataInfo> validDocIdMetadataInfo =
-            JsonUtils.stringToObject(validDocIdMetadataList, new TypeReference<ArrayList<ValidDocIdMetadataInfo>>() {
+        String validDocIdsMetadataList = streamResponse.getValue();
+        List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfo =
+            JsonUtils.stringToObject(validDocIdsMetadataList, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
             });
-        validDocIdMetadataInfos.addAll(validDocIdMetadataInfo);
+        validDocIdsMetadataInfos.addAll(validDocIdsMetadataInfo);
         returnedSegmentsCount++;
       } catch (Exception e) {
         failedParses++;
@@ -261,12 +261,12 @@ public class ServerSegmentMetadataReader {
     }
 
     if (segmentNames != null && returnedSegmentsCount != segmentNames.size()) {
-      LOGGER.error("Unable to get validDocIdMetadata from all servers. Expected: {}, Actual: {}", segmentNames.size(),
+      LOGGER.error("Unable to get validDocIdsMetadata from all servers. Expected: {}, Actual: {}", segmentNames.size(),
           returnedSegmentsCount);
     }
     LOGGER.info("Retrieved valid doc id metadata for {} segments from {} servers.", returnedSegmentsCount,
         serverURLsAndBodies.size());
-    return validDocIdMetadataInfos;
+    return validDocIdsMetadataInfos;
   }
 
   /**
@@ -354,7 +354,7 @@ public class ServerSegmentMetadataReader {
     return url;
   }
 
-  private Pair<String, String> generateValidDocIdMetadataURL(String tableNameWithType, List<String> segmentNames,
+  private Pair<String, String> generateValidDocIdsMetadataURL(String tableNameWithType, List<String> segmentNames,
       String validDocIdsType, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     TableSegments tableSegments = new TableSegments(segmentNames);
@@ -365,7 +365,7 @@ public class ServerSegmentMetadataReader {
       LOGGER.error("Failed to convert segment names to json request body: segmentNames={}", segmentNames);
       throw new RuntimeException(e);
     }
-    String url = String.format("%s/tables/%s/validDocIdMetadata", endpoint, tableNameWithType);
+    String url = String.format("%s/tables/%s/validDocIdsMetadata", endpoint, tableNameWithType);
     if (validDocIdsType != null) {
       url = url + "?validDocIdsType=" + validDocIdsType;
     }

@@ -27,7 +27,8 @@
       "batchConfigMaps": [
         {
           "inputDirURI": "examples/minions/batch/baseballStats/rawdata",
-          "inputFormat": "csv"
+          "inputFormat": "csv",
+          "overwriteOutput": "true"
         }
       ],
       "segmentNameSpec": {},
