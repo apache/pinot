@@ -358,7 +358,7 @@ public class JsonUtils {
    * ]
    * </pre>
    */
-  public static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig) {
+  protected static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig) {
     try {
       return flatten(node, jsonIndexConfig, 0, "$", false);
     } catch (OutOfMemoryError oom) {
