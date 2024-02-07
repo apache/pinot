@@ -60,9 +60,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
   public static class SegmentSelectionResult {
 
-    private List<SegmentZKMetadata> _segmentsForCompaction;
+    private final List<SegmentZKMetadata> _segmentsForCompaction;
 
-    private List<String> _segmentsForDeletion;
+    private final List<String> _segmentsForDeletion;
 
     SegmentSelectionResult(List<SegmentZKMetadata> segmentsForCompaction, List<String> segmentsForDeletion) {
       _segmentsForCompaction = segmentsForCompaction;
@@ -96,8 +96,17 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       String tableNameWithType = tableConfig.getTableName();
       LOGGER.info("Start generating task configs for table: {}", tableNameWithType);
 
+      if (tableConfig.getTaskConfig() == null) {
+        LOGGER.warn("Task config is null for table: {}", tableNameWithType);
+        continue;
+      }
+
       Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
-      List<SegmentZKMetadata> completedSegments = getCompletedSegments(tableNameWithType, taskConfigs);
+      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+
+      // Get completed segments and filter out the segments based on the buffer time configuration
+      List<SegmentZKMetadata> completedSegments =
+          getCompletedSegments(taskConfigs, allSegments, System.currentTimeMillis());
 
       if (completedSegments.isEmpty()) {
         LOGGER.info("No completed segments were eligible for compaction for table: {}", tableNameWithType);
@@ -211,6 +220,11 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       // Skip segments if the crc from zk metadata and server does not match. They may be being reloaded.
       SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
+      if (segment == null) {
+        LOGGER.warn("Segment {} is not found in the completed segments list, skipping it for compaction", segmentName);
+        continue;
+      }
+
       if (segment.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
         LOGGER.warn(
             "CRC mismatch for segment: {}, skipping it for compaction (segmentZKMetadata={}, validDocIdsMetadata={})",
@@ -229,15 +243,16 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     return new SegmentSelectionResult(segmentsForCompaction, segmentsForDeletion);
   }
 
-  private List<SegmentZKMetadata> getCompletedSegments(String tableNameWithType, Map<String, String> taskConfigs) {
+  @VisibleForTesting
+  public static List<SegmentZKMetadata> getCompletedSegments(Map<String, String> taskConfigs,
+      List<SegmentZKMetadata> allSegments, long currentTimeInMillis) {
     List<SegmentZKMetadata> completedSegments = new ArrayList<>();
     String bufferPeriod = taskConfigs.getOrDefault(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
     long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
-    List<SegmentZKMetadata> allSegments = getSegmentsZKMetadataForTable(tableNameWithType);
     for (SegmentZKMetadata segment : allSegments) {
       CommonConstants.Segment.Realtime.Status status = segment.getStatus();
       // initial segments selection based on status and age
-      if (status.isCompleted() && (segment.getEndTimeMs() <= (System.currentTimeMillis() - bufferMs))) {
+      if (status.isCompleted() && (segment.getEndTimeMs() <= (currentTimeInMillis - bufferMs))) {
         completedSegments.add(segment);
       }
     }
