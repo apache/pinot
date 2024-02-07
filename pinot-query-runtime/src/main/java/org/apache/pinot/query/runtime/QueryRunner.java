@@ -31,17 +31,20 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
+import org.apache.pinot.query.runtime.plan.StagePlan;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
@@ -54,7 +57,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * {@link QueryRunner} accepts a {@link DistributedStagePlan} and runs it.
+ * {@link QueryRunner} accepts a {@link StagePlan} and runs it.
  */
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
@@ -139,42 +142,46 @@ public class QueryRunner {
   }
 
   /**
-   * Execute a {@link DistributedStagePlan}.
+   * Execute a {@link StagePlan}.
    *
    * <p>This execution entry point should be asynchronously called by the request handler and caller should not wait
    * for results/exceptions.</p>
    */
-  public void processQuery(DistributedStagePlan distributedStagePlan, Map<String, String> requestMetadata) {
+  public void processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan, Map<String, String> requestMetadata) {
     long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
-    Map<String, String> opChainMetadata = consolidateMetadata(
-        distributedStagePlan.getStageMetadata().getCustomProperties(), requestMetadata);
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
+
+    StageMetadata stageMetadata = stagePlan.getStageMetadata();
+    Map<String, String> opChainMetadata = consolidateMetadata(stageMetadata.getCustomProperties(), requestMetadata);
 
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
-        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, distributedStagePlan,
+        PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, workerMetadata, stagePlan,
             opChainMetadata, requestId, deadlineMs);
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
       TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
       LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
-          distributedStagePlan.getStageId(), errorBlock.getExceptions());
-      int receiverStageId = ((MailboxSendNode) distributedStagePlan.getStageRoot()).getReceiverStageId();
-      MailboxMetadata mailboxMetadata = distributedStagePlan.getStageMetadata().getWorkerMetadataList()
-          .get(distributedStagePlan.getServer().workerId()).getMailBoxInfosMap().get(receiverStageId);
+          stagePlan.getStageId(), errorBlock.getExceptions());
+      int receiverStageId = ((MailboxSendNode) stagePlan.getRootNode()).getReceiverStageId();
+      MailboxMetadata mailboxMetadata = workerMetadata.getMailboxMetadataMap().get(receiverStageId);
       List<String> mailboxIds = MailboxIdUtils.toMailboxIds(requestId, mailboxMetadata);
-      for (int i = 0; i < mailboxIds.size(); i++) {
+      List<VirtualServerAddress> virtualAddresses = mailboxMetadata.getVirtualAddresses();
+      int numMailboxes = mailboxIds.size();
+      for (int i = 0; i < numMailboxes; i++) {
+        String mailboxId = mailboxIds.get(i);
+        VirtualServerAddress virtualAddress = virtualAddresses.get(i);
         try {
-          _mailboxService.getSendingMailbox(mailboxMetadata.getVirtualAddress(i).hostname(),
-              mailboxMetadata.getVirtualAddress(i).port(), mailboxIds.get(i), deadlineMs).send(errorBlock);
+          _mailboxService.getSendingMailbox(virtualAddress.hostname(), virtualAddress.port(), mailboxId, deadlineMs)
+              .send(errorBlock);
         } catch (TimeoutException e) {
-          LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}", mailboxIds.get(i),
-              requestId, distributedStagePlan.getStageId(), e);
+          LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}", mailboxId, requestId,
+              stagePlan.getStageId(), e);
         } catch (Exception e) {
-          LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
-              mailboxIds.get(i), requestId, distributedStagePlan.getStageId(), e);
+          LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}", mailboxId,
+              requestId, stagePlan.getStageId(), e);
         }
       }
       return;
@@ -182,15 +189,14 @@ public class QueryRunner {
 
     // run OpChain
     OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(_mailboxService, requestId, distributedStagePlan.getStageId(),
-            distributedStagePlan.getServer(), deadlineMs, opChainMetadata, distributedStagePlan.getStageMetadata(),
-            pipelineBreakerResult);
+        new OpChainExecutionContext(_mailboxService, requestId, stagePlan.getStageId(), deadlineMs, opChainMetadata,
+            stageMetadata, workerMetadata, pipelineBreakerResult);
     OpChain opChain;
-    if (DistributedStagePlan.isLeafStage(distributedStagePlan)) {
-      opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, distributedStagePlan, _helixManager,
-          _serverMetrics, _leafQueryExecutor, _executorService);
+    if (workerMetadata.isLeafStageWorker()) {
+      opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager, _serverMetrics,
+          _leafQueryExecutor, _executorService);
     } else {
-      opChain = PhysicalPlanVisitor.walkPlanNode(distributedStagePlan.getStageRoot(), executionContext);
+      opChain = PhysicalPlanVisitor.walkPlanNode(stagePlan.getRootNode(), executionContext);
     }
     _opChainScheduler.register(opChain);
   }

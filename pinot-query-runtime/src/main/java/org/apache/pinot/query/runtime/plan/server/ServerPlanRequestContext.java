@@ -24,19 +24,19 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.StagePlan;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 
 
 /**
- * Context class for converting a {@link org.apache.pinot.query.runtime.plan.DistributedStagePlan} into
+ * Context class for converting a {@link StagePlan} into
  * {@link PinotQuery} to execute on server.
  *
  * On leaf-stage server node, {@link PlanNode} are split into {@link PinotQuery} part and
  *     {@link org.apache.pinot.query.runtime.operator.OpChain} part.
  */
 public class ServerPlanRequestContext {
-  private final DistributedStagePlan _stagePlan;
+  private final StagePlan _stagePlan;
   private final QueryExecutor _leafQueryExecutor;
   private final ExecutorService _executorService;
   private final PipelineBreakerResult _pipelineBreakerResult;
@@ -45,7 +45,7 @@ public class ServerPlanRequestContext {
   private PlanNode _leafStageBoundaryNode;
   private List<ServerQueryRequest> _serverQueryRequests;
 
-  public ServerPlanRequestContext(DistributedStagePlan stagePlan, QueryExecutor leafQueryExecutor,
+  public ServerPlanRequestContext(StagePlan stagePlan, QueryExecutor leafQueryExecutor,
       ExecutorService executorService, PipelineBreakerResult pipelineBreakerResult) {
     _stagePlan = stagePlan;
     _leafQueryExecutor = leafQueryExecutor;
@@ -54,7 +54,7 @@ public class ServerPlanRequestContext {
     _pinotQuery = new PinotQuery();
   }
 
-  public DistributedStagePlan getStagePlan() {
+  public StagePlan getStagePlan() {
     return _stagePlan;
   }
 

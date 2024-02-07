@@ -17,29 +17,9 @@
 // under the License.
 //
 
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
 syntax = "proto3";
 
 package org.apache.pinot.common.proto;
-
-import "plan.proto";
 
 service PinotQueryWorker {
   // Dispatch a QueryRequest to a PinotQueryWorker
@@ -59,7 +39,7 @@ message CancelResponse {
 // QueryRequest is the dispatched content for all query stages to a physical worker.
 message QueryRequest {
   repeated StagePlan stagePlan = 1;
-  map<string, string> metadata = 2;
+  bytes metadata = 2; // Serialized Properties
 }
 
 // QueryResponse is the dispatched response from worker, it doesn't contain actual data, only dispatch status.
@@ -70,15 +50,13 @@ message QueryResponse {
 
 message StagePlan {
   int32 stageId = 1;
-  StageNode stageRoot = 2;
+  bytes rootNode = 2; // Serialized StageNode
   StageMetadata stageMetadata = 3;
 }
 
 message StageMetadata {
   repeated WorkerMetadata workerMetadata = 1;
-  map<string, string> customProperty = 2;
-  string serverAddress = 3;
-  repeated int32 workerIds = 4;
+  bytes customProperty = 2; // Serialized Properties
 }
 
 message WorkerMetadata {
@@ -90,5 +68,8 @@ message WorkerMetadata {
 message MailboxMetadata {
   repeated string mailboxId = 1;
   repeated string virtualAddress = 2;
-  map<string, string> customProperty = 3;
+}
+
+message Properties {
+  map<string, string> property = 1;
 }

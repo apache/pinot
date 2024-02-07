@@ -18,152 +18,86 @@
  */
 package org.apache.pinot.query.runtime.plan.serde;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import org.apache.commons.lang.StringUtils;
+import java.util.stream.Collectors;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
+import org.apache.pinot.query.runtime.plan.StagePlan;
 
 
 /**
  * This utility class serialize/deserialize between {@link Worker.StagePlan} elements to Planner elements.
  */
 public class QueryPlanSerDeUtils {
-  private static final Pattern VIRTUAL_SERVER_PATTERN =
-      Pattern.compile("(?<virtualid>[0-9]+)@(?<host>[^:]+):(?<port>[0-9]+)");
-
   private QueryPlanSerDeUtils() {
-    // do not instantiate.
   }
 
-  public static VirtualServerAddress protoToAddress(String virtualAddressStr) {
-    Matcher matcher = VIRTUAL_SERVER_PATTERN.matcher(virtualAddressStr);
-    if (!matcher.matches()) {
-      throw new IllegalArgumentException("Unexpected virtualAddressStr '" + virtualAddressStr + "'. This might "
-          + "happen if you are upgrading from an old version of the multistage engine to the current one in a rolling "
-          + "fashion.");
-    }
-
-    // Skipped netty and grpc port as they are not used in worker instance.
-    return new VirtualServerAddress(matcher.group("host"), Integer.parseInt(matcher.group("port")),
-        Integer.parseInt(matcher.group("virtualid")));
+  public static StagePlan fromProtoStagePlan(Worker.StagePlan protoStagePlan)
+      throws InvalidProtocolBufferException {
+    AbstractPlanNode rootNode =
+        StageNodeSerDeUtils.deserializeStageNode(Plan.StageNode.parseFrom(protoStagePlan.getRootNode()));
+    StageMetadata stageMetadata = fromProtoStageMetadata(protoStagePlan.getStageMetadata());
+    return new StagePlan(protoStagePlan.getStageId(), rootNode, stageMetadata);
   }
 
-  public static String addressToProto(VirtualServerAddress serverAddress) {
-    return String.format("%s@%s:%s", serverAddress.workerId(), serverAddress.hostname(), serverAddress.port());
-  }
-
-  public static List<DistributedStagePlan> deserializeStagePlan(Worker.StagePlan stagePlan) {
-    int stageId = stagePlan.getStageId();
-    Worker.StageMetadata protoStageMetadata = stagePlan.getStageMetadata();
-    String serverAddress = protoStageMetadata.getServerAddress();
-    String[] hostPort = StringUtils.split(serverAddress, ':');
-    String hostname = hostPort[0];
-    int port = Integer.parseInt(hostPort[1]);
-    AbstractPlanNode stageRoot = StageNodeSerDeUtils.deserializeStageNode(stagePlan.getStageRoot());
-    StageMetadata stageMetadata = fromProtoStageMetadata(protoStageMetadata);
-    List<Integer> workerIds = protoStageMetadata.getWorkerIdsList();
-    List<DistributedStagePlan> distributedStagePlans = new ArrayList<>(workerIds.size());
-    for (int workerId : workerIds) {
-      distributedStagePlans.add(
-          new DistributedStagePlan(stageId, new VirtualServerAddress(hostname, port, workerId), stageRoot,
-              stageMetadata));
-    }
-    return distributedStagePlans;
-  }
-
-  private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata) {
-    StageMetadata.Builder builder = new StageMetadata.Builder();
-    List<WorkerMetadata> workerMetadataList = new ArrayList<>();
-    for (Worker.WorkerMetadata protoWorkerMetadata : protoStageMetadata.getWorkerMetadataList()) {
-      workerMetadataList.add(fromProtoWorkerMetadata(protoWorkerMetadata));
-    }
-    builder.setWorkerMetadataList(workerMetadataList);
-    builder.putAllCustomProperties(protoStageMetadata.getCustomPropertyMap());
-    return builder.build();
+  private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata)
+      throws InvalidProtocolBufferException {
+    List<WorkerMetadata> workerMetadataList =
+        protoStageMetadata.getWorkerMetadataList().stream().map(QueryPlanSerDeUtils::fromProtoWorkerMetadata)
+            .collect(Collectors.toList());
+    Map<String, String> customProperties = fromProtoProperties(protoStageMetadata.getCustomProperty());
+    return new StageMetadata(workerMetadataList, customProperties);
   }
 
   private static WorkerMetadata fromProtoWorkerMetadata(Worker.WorkerMetadata protoWorkerMetadata) {
-    WorkerMetadata.Builder builder = new WorkerMetadata.Builder();
-    builder.setVirtualServerAddress(protoToAddress(protoWorkerMetadata.getVirtualAddress()));
-    builder.putAllMailBoxInfosMap(fromProtoMailboxMetadataMap(protoWorkerMetadata.getMailboxMetadataMap()));
-    builder.putAllCustomProperties(protoWorkerMetadata.getCustomPropertyMap());
-    return builder.build();
-  }
-
-  private static Map<Integer, MailboxMetadata> fromProtoMailboxMetadataMap(
-      Map<Integer, Worker.MailboxMetadata> mailboxMetadataMap) {
-    Map<Integer, MailboxMetadata> mailboxMap = new HashMap<>();
-    for (Map.Entry<Integer, Worker.MailboxMetadata> entry : mailboxMetadataMap.entrySet()) {
-      mailboxMap.put(entry.getKey(), fromProtoMailbox(entry.getValue()));
-    }
-    return mailboxMap;
+    VirtualServerAddress virtualAddress = VirtualServerAddress.parse(protoWorkerMetadata.getVirtualAddress());
+    Map<Integer, MailboxMetadata> mailboxMetadataMap = protoWorkerMetadata.getMailboxMetadataMap().entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> fromProtoMailbox(e.getValue())));
+    return new WorkerMetadata(virtualAddress, mailboxMetadataMap, protoWorkerMetadata.getCustomPropertyMap());
   }
 
   private static MailboxMetadata fromProtoMailbox(Worker.MailboxMetadata protoMailboxMetadata) {
-    List<String> mailboxIds = new ArrayList<>();
-    List<VirtualServerAddress> virtualAddresses = new ArrayList<>();
-    for (int i = 0; i < protoMailboxMetadata.getMailboxIdCount(); i++) {
-      mailboxIds.add(protoMailboxMetadata.getMailboxId(i));
-      virtualAddresses.add(protoToAddress(protoMailboxMetadata.getVirtualAddress(i)));
-    }
-    MailboxMetadata mailboxMetadata =
-        new MailboxMetadata(mailboxIds, virtualAddresses, protoMailboxMetadata.getCustomPropertyMap());
-    return mailboxMetadata;
+    List<VirtualServerAddress> virtualAddresses =
+        protoMailboxMetadata.getVirtualAddressList().stream().map(VirtualServerAddress::parse)
+            .collect(Collectors.toList());
+    return new MailboxMetadata(protoMailboxMetadata.getMailboxIdList(), virtualAddresses);
   }
 
-  public static Worker.StageMetadata toProtoStageMetadata(List<Worker.WorkerMetadata> workerMetadataList,
-      Map<String, String> customProperties, QueryServerInstance serverInstance, List<Integer> workerIds) {
-    return Worker.StageMetadata.newBuilder().addAllWorkerMetadata(workerMetadataList)
-        .putAllCustomProperty(customProperties)
-        .setServerAddress(String.format("%s:%d", serverInstance.getHostname(), serverInstance.getQueryMailboxPort()))
-        .addAllWorkerIds(workerIds).build();
+  public static Map<String, String> fromProtoProperties(ByteString protoProperties)
+      throws InvalidProtocolBufferException {
+    return Worker.Properties.parseFrom(protoProperties).getPropertyMap();
   }
 
-  public static List<Worker.WorkerMetadata> toProtoWorkerMetadataList(DispatchablePlanFragment planFragment) {
-    List<WorkerMetadata> workerMetadataList = planFragment.getWorkerMetadataList();
-    List<Worker.WorkerMetadata> protoWorkerMetadataList = new ArrayList<>(workerMetadataList.size());
-    for (WorkerMetadata workerMetadata : workerMetadataList) {
-      protoWorkerMetadataList.add(toProtoWorkerMetadata(workerMetadata));
-    }
-    return protoWorkerMetadataList;
+  public static List<Worker.WorkerMetadata> toProtoWorkerMetadataList(List<WorkerMetadata> workerMetadataList) {
+    return workerMetadataList.stream().map(QueryPlanSerDeUtils::toProtoWorkerMetadata).collect(Collectors.toList());
   }
 
   private static Worker.WorkerMetadata toProtoWorkerMetadata(WorkerMetadata workerMetadata) {
-    Worker.WorkerMetadata.Builder builder = Worker.WorkerMetadata.newBuilder();
-    builder.setVirtualAddress(addressToProto(workerMetadata.getVirtualServerAddress()));
-    builder.putAllMailboxMetadata(toProtoMailboxMap(workerMetadata.getMailBoxInfosMap()));
-    builder.putAllCustomProperty(workerMetadata.getCustomProperties());
-    return builder.build();
+    Map<Integer, Worker.MailboxMetadata> protoMailboxMetadataMap =
+        workerMetadata.getMailboxMetadataMap().entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> toProtoMailboxMetadata(e.getValue())));
+    return Worker.WorkerMetadata.newBuilder().setVirtualAddress(workerMetadata.getVirtualAddress().toString())
+        .putAllMailboxMetadata(protoMailboxMetadataMap).putAllCustomProperty(workerMetadata.getCustomProperties())
+        .build();
   }
 
-  private static Map<Integer, Worker.MailboxMetadata> toProtoMailboxMap(Map<Integer, MailboxMetadata> mailBoxInfosMap) {
-    Map<Integer, Worker.MailboxMetadata> mailboxMetadataMap = new HashMap<>();
-    for (Map.Entry<Integer, MailboxMetadata> entry : mailBoxInfosMap.entrySet()) {
-      mailboxMetadataMap.put(entry.getKey(), toProtoMailbox(entry.getValue()));
-    }
-    return mailboxMetadataMap;
+  private static Worker.MailboxMetadata toProtoMailboxMetadata(MailboxMetadata mailboxMetadata) {
+    List<String> virtualAddresses =
+        mailboxMetadata.getVirtualAddresses().stream().map(VirtualServerAddress::toString).collect(Collectors.toList());
+    return Worker.MailboxMetadata.newBuilder().addAllMailboxId(mailboxMetadata.getMailboxIds())
+        .addAllVirtualAddress(virtualAddresses).build();
   }
 
-  private static Worker.MailboxMetadata toProtoMailbox(MailboxMetadata mailboxMetadata) {
-    Worker.MailboxMetadata.Builder builder = Worker.MailboxMetadata.newBuilder();
-    for (int i = 0; i < mailboxMetadata.getMailBoxIdList().size(); i++) {
-      builder.addMailboxId(mailboxMetadata.getMailBoxId(i));
-      builder.addVirtualAddress(mailboxMetadata.getVirtualAddress(i).toString());
-    }
-    builder.putAllCustomProperty(mailboxMetadata.getCustomProperties());
-    return builder.build();
+  public static ByteString toProtoProperties(Map<String, String> properties) {
+    return Worker.Properties.newBuilder().putAllProperty(properties).build().toByteString();
   }
 }
