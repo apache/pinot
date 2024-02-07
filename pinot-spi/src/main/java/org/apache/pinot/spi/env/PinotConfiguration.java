@@ -64,7 +64,7 @@ import org.apache.pinot.spi.utils.Obfuscator;
  * <p>
  * In order to enable loading configurations through environment variables you can specify
  * {@value ENV_DYNAMIC_CONFIG_KEY} as a list of property keys to dynamically template.
- * {@link PinotConfiguration#applyDynamicEnvConfig(CompositeConfiguration, Map)}. This enables loading secrets safely
+ * {@link PinotConfiguration#applyDynamicEnvConfig(List, Map)}}. This enables loading secrets safely
  * into the configuration.
  * <p/>
  * <table>
@@ -89,7 +89,7 @@ import org.apache.pinot.spi.utils.Obfuscator;
  */
 public class PinotConfiguration {
   public static final String CONFIG_PATHS_KEY = "config.paths";
-  public static final String ENV_DYNAMIC_CONFIG_KEY = "env.dynamic.config";
+  public static final String ENV_DYNAMIC_CONFIG_KEY = "dynamic.env.config";
 
   private final CompositeConfiguration _configuration;
 

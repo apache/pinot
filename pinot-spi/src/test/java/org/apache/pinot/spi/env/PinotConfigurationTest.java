@@ -168,7 +168,7 @@ public class PinotConfigurationTest {
 
     baseProperties.put("server.host", "ENV_SERVER_HOST");
     baseProperties.put("not.templated.cli", "static-value");
-    baseProperties.put("env.dynamic.config", "server.host");
+    baseProperties.put("dynamic.env.config", "server.host");
 
     mockedEnvironmentVariables.put("ENV_VAR_HOST", "test-host");
     mockedEnvironmentVariables.put("TEST_PROPERTY", "test-property");
