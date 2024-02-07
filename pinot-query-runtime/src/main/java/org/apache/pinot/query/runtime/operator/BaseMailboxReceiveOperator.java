@@ -24,9 +24,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
+import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.routing.MailboxMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
@@ -58,10 +58,8 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _exchangeType = exchangeType;
 
     long requestId = context.getRequestId();
-    int workerId = context.getServer().workerId();
-    MailboxMetadata mailboxMetadata =
-        context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(senderStageId);
-    if (mailboxMetadata != null && !mailboxMetadata.getMailBoxIdList().isEmpty()) {
+    MailboxMetadata mailboxMetadata = context.getWorkerMetadata().getMailboxMetadataMap().get(senderStageId);
+    if (mailboxMetadata != null && !mailboxMetadata.getMailboxIds().isEmpty()) {
       _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, mailboxMetadata);
     } else {
       _mailboxIds = Collections.emptyList();

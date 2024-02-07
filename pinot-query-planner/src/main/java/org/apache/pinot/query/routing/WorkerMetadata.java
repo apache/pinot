@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -41,85 +42,63 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * MailboxSendNode and MailboxReceiveNode to derive the info during runtime. this should changed to plan time soon.
  */
 public class WorkerMetadata {
-  private final VirtualServerAddress _virtualServerAddress;
-  private final Map<Integer, MailboxMetadata> _mailBoxInfosMap;
+  public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
+
+  private final VirtualServerAddress _virtualAddress;
+  private final Map<Integer, MailboxMetadata> _mailboxMetadataMap;
   private final Map<String, String> _customProperties;
 
-  private WorkerMetadata(VirtualServerAddress virtualServerAddress, Map<Integer, MailboxMetadata> mailBoxInfosMap,
+  public WorkerMetadata(VirtualServerAddress virtualAddress, Map<Integer, MailboxMetadata> mailboxMetadataMap) {
+    _virtualAddress = virtualAddress;
+    _mailboxMetadataMap = mailboxMetadataMap;
+    _customProperties = new HashMap<>();
+  }
+
+  public WorkerMetadata(VirtualServerAddress virtualAddress, Map<Integer, MailboxMetadata> mailboxMetadataMap,
       Map<String, String> customProperties) {
-    _virtualServerAddress = virtualServerAddress;
-    _mailBoxInfosMap = mailBoxInfosMap;
+    _virtualAddress = virtualAddress;
+    _mailboxMetadataMap = mailboxMetadataMap;
     _customProperties = customProperties;
   }
 
-  public VirtualServerAddress getVirtualServerAddress() {
-    return _virtualServerAddress;
+  public VirtualServerAddress getVirtualAddress() {
+    return _virtualAddress;
   }
 
-  public Map<Integer, MailboxMetadata> getMailBoxInfosMap() {
-    return _mailBoxInfosMap;
+  public Map<Integer, MailboxMetadata> getMailboxMetadataMap() {
+    return _mailboxMetadataMap;
   }
 
   public Map<String, String> getCustomProperties() {
     return _customProperties;
   }
 
-  public static class Builder {
-    public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
-    private VirtualServerAddress _virtualServerAddress;
-    private Map<Integer, MailboxMetadata> _mailBoxInfosMap;
-    private Map<String, String> _customProperties;
-
-    public Builder() {
-      _mailBoxInfosMap = new HashMap<>();
-      _customProperties = new HashMap<>();
-    }
-
-    public Builder setVirtualServerAddress(VirtualServerAddress virtualServerAddress) {
-      _virtualServerAddress = virtualServerAddress;
-      return this;
-    }
-
-    public Builder putAllMailBoxInfosMap(Map<Integer, MailboxMetadata> mailBoxInfosMap) {
-      _mailBoxInfosMap.putAll(mailBoxInfosMap);
-      return this;
-    }
-
-    public Builder addMailBoxInfoMap(Integer planFragmentId, MailboxMetadata mailBoxMetadata) {
-      _mailBoxInfosMap.put(planFragmentId, mailBoxMetadata);
-      return this;
-    }
-
-    public Builder addTableSegmentsMap(Map<String, List<String>> tableSegmentsMap) {
+  @Nullable
+  public Map<String, List<String>> getTableSegmentsMap() {
+    String tableSegmentsMapStr = _customProperties.get(TABLE_SEGMENTS_MAP_KEY);
+    if (tableSegmentsMapStr != null) {
       try {
-        String tableSegmentsMapStr = JsonUtils.objectToString(tableSegmentsMap);
-        _customProperties.put(TABLE_SEGMENTS_MAP_KEY, tableSegmentsMapStr);
-      } catch (JsonProcessingException e) {
-        throw new RuntimeException("Unable to serialize table segments map", e);
-      }
-      return this;
-    }
-
-    public WorkerMetadata build() {
-      return new WorkerMetadata(_virtualServerAddress, _mailBoxInfosMap, _customProperties);
-    }
-
-    public void putAllCustomProperties(Map<String, String> customPropertyMap) {
-      _customProperties.putAll(customPropertyMap);
-    }
-  }
-
-  public static Map<String, List<String>> getTableSegmentsMap(WorkerMetadata workerMetadata) {
-    String tableSegmentKeyStr = workerMetadata.getCustomProperties().get(Builder.TABLE_SEGMENTS_MAP_KEY);
-    if (tableSegmentKeyStr != null) {
-      try {
-        return JsonUtils.stringToObject(tableSegmentKeyStr, new TypeReference<Map<String, List<String>>>() {
+        return JsonUtils.stringToObject(tableSegmentsMapStr, new TypeReference<Map<String, List<String>>>() {
         });
       } catch (IOException e) {
-        throw new RuntimeException("Unable to deserialize table segments map", e);
+        throw new RuntimeException("Unable to deserialize table segments map: " + tableSegmentsMapStr, e);
       }
     } else {
       return null;
     }
+  }
+
+  public boolean isLeafStageWorker() {
+    return _customProperties.containsKey(TABLE_SEGMENTS_MAP_KEY);
+  }
+
+  public void setTableSegmentsMap(Map<String, List<String>> tableSegmentsMap) {
+    String tableSegmentsMapStr;
+    try {
+      tableSegmentsMapStr = JsonUtils.objectToString(tableSegmentsMap);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Unable to serialize table segments map: " + tableSegmentsMap, e);
+    }
+    _customProperties.put(TABLE_SEGMENTS_MAP_KEY, tableSegmentsMapStr);
   }
 }

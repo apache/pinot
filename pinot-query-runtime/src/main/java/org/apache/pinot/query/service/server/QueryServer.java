@@ -31,8 +31,10 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.runtime.plan.StageMetadata;
+import org.apache.pinot.query.runtime.plan.StagePlan;
 import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -95,31 +97,43 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
-    Map<String, String> requestMetadata = request.getMetadataMap();
+    Map<String, String> requestMetadata;
+    try {
+      requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while deserializing request metadata", e);
+      responseObserver.onNext(Worker.QueryResponse.newBuilder()
+          .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
+              QueryException.getTruncatedStackTrace(e)).build());
+      responseObserver.onCompleted();
+      return;
+    }
     long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
-    List<Worker.StagePlan> stagePlans = request.getStagePlanList();
-    int numStages = stagePlans.size();
+    List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
+    int numStages = protoStagePlans.size();
     CompletableFuture<?>[] stageSubmissionStubs = new CompletableFuture[numStages];
     for (int i = 0; i < numStages; i++) {
-      Worker.StagePlan stagePlan = stagePlans.get(i);
+      Worker.StagePlan protoStagePlan = protoStagePlans.get(i);
       stageSubmissionStubs[i] = CompletableFuture.runAsync(() -> {
-        List<DistributedStagePlan> workerPlans;
+        StagePlan stagePlan;
         try {
-          workerPlans = QueryPlanSerDeUtils.deserializeStagePlan(stagePlan);
+          stagePlan = QueryPlanSerDeUtils.fromProtoStagePlan(protoStagePlan);
         } catch (Exception e) {
           throw new RuntimeException(
-              String.format("Caught exception while deserializing stage plan for request: %d, stage id: %d", requestId,
-                  stagePlan.getStageId()), e);
+              String.format("Caught exception while deserializing stage plan for request: %d, stage: %d", requestId,
+                  protoStagePlan.getStageId()), e);
         }
-        int numWorkers = workerPlans.size();
+        StageMetadata stageMetadata = stagePlan.getStageMetadata();
+        List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
+        int numWorkers = workerMetadataList.size();
         CompletableFuture<?>[] workerSubmissionStubs = new CompletableFuture[numWorkers];
         for (int j = 0; j < numWorkers; j++) {
-          DistributedStagePlan workerPlan = workerPlans.get(j);
+          WorkerMetadata workerMetadata = workerMetadataList.get(j);
           workerSubmissionStubs[j] =
-              CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerPlan, requestMetadata),
+              CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata),
                   _querySubmissionExecutorService);
         }
         try {
@@ -127,8 +141,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
               .get(deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
         } catch (Exception e) {
           throw new RuntimeException(
-              String.format("Caught exception while submitting request: %d, stage id: %d", requestId,
-                  stagePlan.getStageId()), e);
+              String.format("Caught exception while submitting request: %d, stage: %d", requestId,
+                  protoStagePlan.getStageId()), e);
         } finally {
           for (CompletableFuture<?> future : workerSubmissionStubs) {
             if (!future.isDone()) {
