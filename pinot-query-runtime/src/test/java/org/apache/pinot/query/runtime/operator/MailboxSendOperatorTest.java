@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import java.util.Collections;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
@@ -50,7 +51,6 @@ public class MailboxSendOperatorTest {
   private static final int SENDER_STAGE_ID = 1;
 
   private AutoCloseable _mocks;
-
   @Mock
   private VirtualServerAddress _server;
   @Mock
@@ -61,8 +61,7 @@ public class MailboxSendOperatorTest {
   private BlockExchange _exchange;
 
   @BeforeMethod
-  public void setUp()
-      throws Exception {
+  public void setUpMethod() {
     _mocks = openMocks(this);
     when(_server.hostname()).thenReturn("mock");
     when(_server.port()).thenReturn(0);
@@ -70,7 +69,7 @@ public class MailboxSendOperatorTest {
   }
 
   @AfterMethod
-  public void tearDown()
+  public void tearDownMethod()
       throws Exception {
     _mocks.close();
   }
@@ -199,11 +198,11 @@ public class MailboxSendOperatorTest {
   }
 
   private MailboxSendOperator getMailboxSendOperator() {
-    StageMetadata stageMetadata = new StageMetadata.Builder().setWorkerMetadataList(
-        Collections.singletonList(new WorkerMetadata.Builder().setVirtualServerAddress(_server).build())).build();
+    WorkerMetadata workerMetadata = new WorkerMetadata(_server, ImmutableMap.of(), ImmutableMap.of());
+    StageMetadata stageMetadata = new StageMetadata(ImmutableList.of(workerMetadata), ImmutableMap.of());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, _server, Long.MAX_VALUE,
-            Collections.emptyMap(), stageMetadata, null);
+        new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, Long.MAX_VALUE, ImmutableMap.of(),
+            stageMetadata, workerMetadata, null);
     return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }

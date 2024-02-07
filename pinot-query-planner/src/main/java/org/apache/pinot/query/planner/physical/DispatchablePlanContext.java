@@ -108,13 +108,12 @@ public class DispatchablePlanContext {
         int workerId = serverEntry.getKey();
         QueryServerInstance queryServerInstance = serverEntry.getValue();
         serverInstanceToWorkerIdsMap.computeIfAbsent(queryServerInstance, k -> new ArrayList<>()).add(workerId);
-        WorkerMetadata.Builder workerMetadataBuilder = new WorkerMetadata.Builder().setVirtualServerAddress(
-            new VirtualServerAddress(queryServerInstance, workerId));
+        WorkerMetadata workerMetadata = new WorkerMetadata(new VirtualServerAddress(queryServerInstance, workerId),
+            workerIdToMailboxesMap.get(workerId));
         if (workerIdToSegmentsMap != null) {
-          workerMetadataBuilder.addTableSegmentsMap(workerIdToSegmentsMap.get(workerId));
+          workerMetadata.setTableSegmentsMap(workerIdToSegmentsMap.get(workerId));
         }
-        workerMetadataBuilder.putAllMailBoxInfosMap(workerIdToMailboxesMap.get(workerId));
-        workerMetadataArray[workerId] = workerMetadataBuilder.build();
+        workerMetadataArray[workerId] = workerMetadata;
       }
 
       // set the stageMetadata

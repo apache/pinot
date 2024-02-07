@@ -19,8 +19,10 @@
 package org.apache.pinot.query.planner.physical;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.plannode.DefaultPostOrderTraversalVisitor;
@@ -63,7 +65,7 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
               workerId, senderServer, receiverServer);
           MailboxMetadata mailboxMetadata = new MailboxMetadata(Collections.singletonList(
               MailboxIdUtils.toPlanMailboxId(senderFragmentId, workerId, receiverFragmentId, workerId)),
-              Collections.singletonList(new VirtualServerAddress(senderServer, workerId)), Collections.emptyMap());
+              Collections.singletonList(new VirtualServerAddress(senderServer, workerId)));
           senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(receiverFragmentId, mailboxMetadata);
           receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderFragmentId, mailboxMetadata);
         }
@@ -78,11 +80,9 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
           for (int workerId = 0; workerId < numSenders; workerId++) {
             String mailboxId = MailboxIdUtils.toPlanMailboxId(senderFragmentId, workerId, receiverFragmentId, workerId);
             MailboxMetadata serderMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
-                Collections.singletonList(new VirtualServerAddress(receiverServerMap.get(workerId), workerId)),
-                Collections.emptyMap());
+                Collections.singletonList(new VirtualServerAddress(receiverServerMap.get(workerId), workerId)));
             MailboxMetadata receiverMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
-                Collections.singletonList(new VirtualServerAddress(senderServerMap.get(workerId), workerId)),
-                Collections.emptyMap());
+                Collections.singletonList(new VirtualServerAddress(senderServerMap.get(workerId), workerId)));
             senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
                 .put(receiverFragmentId, serderMailboxMetadata);
             receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
@@ -94,22 +94,23 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
           for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
             VirtualServerAddress senderAddress =
                 new VirtualServerAddress(senderServerMap.get(senderWorkerId), senderWorkerId);
-            MailboxMetadata senderMailboxMetadata = new MailboxMetadata();
+            List<String> receivingMailboxIds = new ArrayList<>(partitionParallelism);
+            List<VirtualServerAddress> receivingAddresses = new ArrayList<>(partitionParallelism);
+            MailboxMetadata senderMailboxMetadata = new MailboxMetadata(receivingMailboxIds, receivingAddresses);
             senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>())
                 .put(receiverFragmentId, senderMailboxMetadata);
             for (int i = 0; i < partitionParallelism; i++) {
-              VirtualServerAddress receiverAddress =
-                  new VirtualServerAddress(receiverServerMap.get(receiverWorkerId), receiverWorkerId);
               String mailboxId = MailboxIdUtils.toPlanMailboxId(senderFragmentId, senderWorkerId, receiverFragmentId,
                   receiverWorkerId);
-              senderMailboxMetadata.getMailBoxIdList().add(mailboxId);
-              senderMailboxMetadata.getVirtualAddressList().add(receiverAddress);
+              receivingMailboxIds.add(mailboxId);
+              receivingAddresses.add(
+                  new VirtualServerAddress(receiverServerMap.get(receiverWorkerId), receiverWorkerId));
 
               MailboxMetadata receiverMailboxMetadata =
                   receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
                       .computeIfAbsent(senderFragmentId, k -> new MailboxMetadata());
-              receiverMailboxMetadata.getMailBoxIdList().add(mailboxId);
-              receiverMailboxMetadata.getVirtualAddressList().add(senderAddress);
+              receiverMailboxMetadata.getMailboxIds().add(mailboxId);
+              receiverMailboxMetadata.getVirtualAddresses().add(senderAddress);
 
               receiverWorkerId++;
             }
@@ -123,22 +124,22 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
         for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
           VirtualServerAddress senderAddress =
               new VirtualServerAddress(senderServerMap.get(senderWorkerId), senderWorkerId);
-          MailboxMetadata senderMailboxMetadata = new MailboxMetadata();
+          List<String> receivingMailboxIds = new ArrayList<>(numReceivers);
+          List<VirtualServerAddress> receivingAddresses = new ArrayList<>(numReceivers);
+          MailboxMetadata senderMailboxMetadata = new MailboxMetadata(receivingMailboxIds, receivingAddresses);
           senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>())
               .put(receiverFragmentId, senderMailboxMetadata);
           for (int receiverWorkerId = 0; receiverWorkerId < numReceivers; receiverWorkerId++) {
-            VirtualServerAddress receiverAddress =
-                new VirtualServerAddress(receiverServerMap.get(receiverWorkerId), receiverWorkerId);
             String mailboxId =
                 MailboxIdUtils.toPlanMailboxId(senderFragmentId, senderWorkerId, receiverFragmentId, receiverWorkerId);
-            senderMailboxMetadata.getMailBoxIdList().add(mailboxId);
-            senderMailboxMetadata.getVirtualAddressList().add(receiverAddress);
+            receivingMailboxIds.add(mailboxId);
+            receivingAddresses.add(new VirtualServerAddress(receiverServerMap.get(receiverWorkerId), receiverWorkerId));
 
             MailboxMetadata receiverMailboxMetadata =
                 receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
                     .computeIfAbsent(senderFragmentId, k -> new MailboxMetadata());
-            receiverMailboxMetadata.getMailBoxIdList().add(mailboxId);
-            receiverMailboxMetadata.getVirtualAddressList().add(senderAddress);
+            receiverMailboxMetadata.getMailboxIds().add(mailboxId);
+            receiverMailboxMetadata.getVirtualAddresses().add(senderAddress);
           }
         }
       }
@@ -154,14 +155,12 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
     int numReceivers = receiverServerMap.size();
     if (sender.getScannedTables().size() > 0 && receiver.getScannedTables().size() == 0) {
       // leaf-to-intermediate condition
-      return numSenders * sender.getPartitionParallelism() == numReceivers
-          && sender.getPartitionFunction() != null
+      return numSenders * sender.getPartitionParallelism() == numReceivers && sender.getPartitionFunction() != null
           && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
     } else {
       // dynamic-broadcast condition || intermediate-to-intermediate
-      return numSenders == numReceivers
-          && sender.getPartitionFunction() != null
-          && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
+      return numSenders == numReceivers && sender.getPartitionFunction() != null && sender.getPartitionFunction()
+          .equalsIgnoreCase(receiver.getPartitionFunction());
     }
   }
 }

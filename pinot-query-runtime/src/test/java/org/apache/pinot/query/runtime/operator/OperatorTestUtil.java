@@ -18,15 +18,16 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -38,8 +39,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class OperatorTestUtil {
   // simple key-value collision schema/data test set: "Aa" and "BB" have same hash code in java.
   private static final List<List<Object[]>> SIMPLE_KV_DATA_ROWS =
-      Arrays.asList(Arrays.asList(new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}),
-          Arrays.asList(new Object[]{1, "AA"}, new Object[]{2, "Aa"}));
+      ImmutableList.of(ImmutableList.of(new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}),
+          ImmutableList.of(new Object[]{1, "AA"}, new Object[]{2, "Aa"}));
   private static final MockDataBlockOperatorFactory MOCK_OPERATOR_FACTORY;
 
   public static final DataSchema SIMPLE_KV_DATA_SCHEMA = new DataSchema(new String[]{"foo", "bar"},
@@ -75,21 +76,24 @@ public class OperatorTestUtil {
     return new TransferableBlock(Arrays.asList(rows), schema, DataBlock.Type.ROW);
   }
 
-  public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService,
-      VirtualServerAddress receiverAddress, long deadlineMs, StageMetadata stageMetadata) {
-    return new OpChainExecutionContext(mailboxService, 0, 0, receiverAddress, deadlineMs, Collections.emptyMap(),
-        stageMetadata, null);
+  public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, long deadlineMs,
+      StageMetadata stageMetadata) {
+    return new OpChainExecutionContext(mailboxService, 0, 0, deadlineMs, ImmutableMap.of(), stageMetadata,
+        stageMetadata.getWorkerMetadataList().get(0), null);
   }
 
   public static OpChainExecutionContext getDefaultContext() {
-    VirtualServerAddress virtualServerAddress = new VirtualServerAddress("mock", 80, 0);
-    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE,
-        Collections.singletonMap(CommonConstants.Broker.Request.TRACE, "true"), null, null);
+    return getDefaultContext(ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"));
   }
 
   public static OpChainExecutionContext getDefaultContextWithTracingDisabled() {
-    VirtualServerAddress virtualServerAddress = new VirtualServerAddress("mock", 80, 0);
-    return new OpChainExecutionContext(null, 1, 2, virtualServerAddress, Long.MAX_VALUE, Collections.emptyMap(), null,
-        null);
+    return getDefaultContext(ImmutableMap.of());
+  }
+
+  private static OpChainExecutionContext getDefaultContext(Map<String, String> opChainMetadata) {
+    WorkerMetadata workerMetadata =
+        new WorkerMetadata(new VirtualServerAddress("mock", 80, 0), ImmutableMap.of(), ImmutableMap.of());
+    return new OpChainExecutionContext(null, 1, 2, Long.MAX_VALUE, opChainMetadata,
+        new StageMetadata(ImmutableList.of(workerMetadata), ImmutableMap.of()), workerMetadata, null);
   }
 }

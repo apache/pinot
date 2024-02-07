@@ -61,7 +61,6 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
   /**
    * Explains the query plan.
    *
-   * @see DispatchableSubPlan#explain()
    * @param dispatchableSubPlan the queryPlan to explain
    * @return a String representation of the query plan tree
    */
@@ -216,9 +215,8 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
 
     int receiverStageId = node.getReceiverStageId();
     List<VirtualServerAddress> serverAddressList =
-        _dispatchableSubPlan.getQueryStageList().get(node.getPlanFragmentId())
-            .getWorkerMetadataList().get(context._workerId)
-            .getMailBoxInfosMap().get(receiverStageId).getVirtualAddressList();
+        _dispatchableSubPlan.getQueryStageList().get(node.getPlanFragmentId()).getWorkerMetadataList()
+            .get(context._workerId).getMailboxMetadataMap().get(receiverStageId).getVirtualAddresses();
     List<String> serverInstanceToWorkerIdList = stringifyVirtualServerAddresses(serverAddressList);
     context._builder.append("->");
     String receivers = serverInstanceToWorkerIdList.stream()

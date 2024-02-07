@@ -18,15 +18,35 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.pinot.query.routing.MailboxMetadata;
+
+
 public class MailboxIdUtils {
   private MailboxIdUtils() {
   }
 
-  private static final char SEPARATOR = '|';
+  public static final char SEPARATOR = '|';
 
   public static String toPlanMailboxId(int senderStageId, int senderWorkerId, int receiverStageId,
       int receiverWorkerId) {
-    return Integer.toString(senderStageId) + SEPARATOR + senderWorkerId + SEPARATOR
-        + receiverStageId + SEPARATOR + receiverWorkerId;
+    return Integer.toString(senderStageId) + SEPARATOR + senderWorkerId + SEPARATOR + receiverStageId + SEPARATOR
+        + receiverWorkerId;
+  }
+
+  public static String toMailboxId(long requestId, String planMailboxId) {
+    return Long.toString(requestId) + SEPARATOR + planMailboxId;
+  }
+
+  public static List<String> toMailboxIds(long requestId, MailboxMetadata mailboxMetadata) {
+    return mailboxMetadata.getMailboxIds().stream().map(v -> toMailboxId(requestId, v)).collect(Collectors.toList());
+  }
+
+  @VisibleForTesting
+  public static String toMailboxId(long requestId, int senderStageId, int senderWorkerId, int receiverStageId,
+      int receiverWorkerId) {
+    return toMailboxId(requestId, toPlanMailboxId(senderStageId, senderWorkerId, receiverStageId, receiverWorkerId));
   }
 }

@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.WorkerMetadata;
 
 
@@ -33,9 +32,9 @@ public class StageMetadata {
   private final List<WorkerMetadata> _workerMetadataList;
   private final Map<String, String> _customProperties;
 
-  StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
+  public StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
     _workerMetadataList = workerMetadataList;
-    _customProperties = Collections.unmodifiableMap(customProperties);
+    _customProperties = customProperties;
   }
 
   public List<WorkerMetadata> getWorkerMetadataList() {
@@ -46,54 +45,13 @@ public class StageMetadata {
     return _customProperties;
   }
 
-  public static class Builder {
-    public static final String TABLE_NAME_KEY = "tableName";
-    public static final String TIME_BOUNDARY_COLUMN_KEY = "timeBoundaryInfo.timeColumn";
-    public static final String TIME_BOUNDARY_VALUE_KEY = "timeBoundaryInfo.timeValue";
-    private List<WorkerMetadata> _workerMetadataList;
-    private Map<String, String> _customProperties;
-
-    public Builder() {
-      _customProperties = new HashMap<>();
-    }
-
-    public Builder setWorkerMetadataList(List<WorkerMetadata> workerMetadataList) {
-      _workerMetadataList = workerMetadataList;
-      return this;
-    }
-
-    public Builder addTableName(String tableName) {
-      _customProperties.put(TABLE_NAME_KEY, tableName);
-      return this;
-    }
-
-    public Builder addTimeBoundaryInfo(TimeBoundaryInfo timeBoundaryInfo) {
-      _customProperties.put(TIME_BOUNDARY_COLUMN_KEY, timeBoundaryInfo.getTimeColumn());
-      _customProperties.put(TIME_BOUNDARY_VALUE_KEY, timeBoundaryInfo.getTimeValue());
-      return this;
-    }
-
-    public Builder addCustomProperties(Map<String, String> customPropertyMap) {
-      _customProperties.putAll(customPropertyMap);
-      return this;
-    }
-
-    public StageMetadata build() {
-      return new StageMetadata(_workerMetadataList, _customProperties);
-    }
-
-    public void putAllCustomProperties(Map<String, String> customPropertyMap) {
-      _customProperties.putAll(customPropertyMap);
-    }
+  public String getTableName() {
+    return _customProperties.get(DispatchablePlanFragment.TABLE_NAME_KEY);
   }
 
-  public static String getTableName(StageMetadata metadata) {
-    return metadata.getCustomProperties().get(Builder.TABLE_NAME_KEY);
-  }
-
-  public static TimeBoundaryInfo getTimeBoundary(StageMetadata metadata) {
-    String timeColumn = metadata.getCustomProperties().get(Builder.TIME_BOUNDARY_COLUMN_KEY);
-    String timeValue = metadata.getCustomProperties().get(Builder.TIME_BOUNDARY_VALUE_KEY);
+  public TimeBoundaryInfo getTimeBoundary() {
+    String timeColumn = _customProperties.get(DispatchablePlanFragment.TIME_BOUNDARY_COLUMN_KEY);
+    String timeValue = _customProperties.get(DispatchablePlanFragment.TIME_BOUNDARY_VALUE_KEY);
     return timeColumn != null && timeValue != null ? new TimeBoundaryInfo(timeColumn, timeValue) : null;
   }
 }

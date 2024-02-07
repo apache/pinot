@@ -19,10 +19,7 @@
 package org.apache.pinot.query.routing;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 
 
 /**
@@ -31,68 +28,32 @@ import java.util.Objects;
  *  <ul>
  *    <li>MailboxId: the unique id of the mailbox</li>
  *    <li>VirtualAddress: the virtual address of the mailbox</li>
- *    <li>CustomProperties: the custom properties of the mailbox</li>
  *  </ul>
  */
 public class MailboxMetadata {
-  private final List<String> _mailBoxIdList;
-  private final List<VirtualServerAddress> _virtualAddressList;
-  private final Map<String, String> _customProperties;
+  private final List<String> _mailboxIds;
+  private final List<VirtualServerAddress> _virtualAddresses;
 
   public MailboxMetadata() {
-    _mailBoxIdList = new ArrayList<>();
-    _virtualAddressList = new ArrayList<>();
-    _customProperties = new HashMap<>();
+    _mailboxIds = new ArrayList<>();
+    _virtualAddresses = new ArrayList<>();
   }
 
-  public MailboxMetadata(List<String> mailBoxIdList, List<VirtualServerAddress> virtualAddressList,
-      Map<String, String> customProperties) {
-    _mailBoxIdList = mailBoxIdList;
-    _virtualAddressList = virtualAddressList;
-    _customProperties = customProperties;
+  public MailboxMetadata(List<String> mailboxIds, List<VirtualServerAddress> virtualAddresses) {
+    _mailboxIds = mailboxIds;
+    _virtualAddresses = virtualAddresses;
   }
 
-  public List<String> getMailBoxIdList() {
-    return _mailBoxIdList;
+  public List<String> getMailboxIds() {
+    return _mailboxIds;
   }
 
-  public String getMailBoxId(int index) {
-    return _mailBoxIdList.get(index);
-  }
-
-  public List<VirtualServerAddress> getVirtualAddressList() {
-    return _virtualAddressList;
-  }
-
-  public VirtualServerAddress getVirtualAddress(int index) {
-    return _virtualAddressList.get(index);
-  }
-
-  public Map<String, String> getCustomProperties() {
-    return _customProperties;
+  public List<VirtualServerAddress> getVirtualAddresses() {
+    return _virtualAddresses;
   }
 
   @Override
   public String toString() {
-    return _mailBoxIdList + "@" + _virtualAddressList.toString() + "#" + _customProperties.toString();
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(_mailBoxIdList, _virtualAddressList, _customProperties);
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
-    }
-    MailboxMetadata that = (MailboxMetadata) o;
-    return Objects.equals(_mailBoxIdList, that._mailBoxIdList)
-        && Objects.equals(_virtualAddressList, that._virtualAddressList)
-        && _customProperties.equals(that._customProperties);
+    return _mailboxIds + "@" + _virtualAddresses;
   }
 }

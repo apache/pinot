@@ -58,9 +58,9 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
+import org.apache.pinot.query.runtime.plan.StagePlan;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -154,27 +154,22 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
 
   protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,
       int stageId, Map<String, String> requestMetadataMap) {
-    Map<QueryServerInstance, List<Integer>> serverInstanceToWorkerIdMap =
-        dispatchableSubPlan.getQueryStageList().get(stageId).getServerInstanceToWorkerIdMap();
+    DispatchablePlanFragment dispatchableStagePlan = dispatchableSubPlan.getQueryStageList().get(stageId);
+    List<WorkerMetadata> stageWorkerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
     List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
-    for (Map.Entry<QueryServerInstance, List<Integer>> entry : serverInstanceToWorkerIdMap.entrySet()) {
-      QueryServerInstance server = entry.getKey();
-      for (int workerId : entry.getValue()) {
-        DistributedStagePlan distributedStagePlan =
-            constructDistributedStagePlan(dispatchableSubPlan, stageId, new VirtualServerAddress(server, workerId));
-        submissionStubs.add(_servers.get(server).processQuery(distributedStagePlan, requestMetadataMap));
+    for (Map.Entry<QueryServerInstance, List<Integer>> entry : dispatchableStagePlan.getServerInstanceToWorkerIdMap()
+        .entrySet()) {
+      QueryServerEnclosure serverEnclosure = _servers.get(entry.getKey());
+      List<WorkerMetadata> workerMetadataList =
+          entry.getValue().stream().map(stageWorkerMetadataList::get).collect(Collectors.toList());
+      StageMetadata stageMetadata = new StageMetadata(workerMetadataList, dispatchableStagePlan.getCustomProperties());
+      StagePlan stagePlan =
+          new StagePlan(stageId, dispatchableStagePlan.getPlanFragment().getFragmentRoot(), stageMetadata);
+      for (WorkerMetadata workerMetadata : workerMetadataList) {
+        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap));
       }
     }
     return submissionStubs;
-  }
-
-  protected static DistributedStagePlan constructDistributedStagePlan(DispatchableSubPlan dispatchableSubPlan,
-      int stageId, VirtualServerAddress serverAddress) {
-    return new DistributedStagePlan(stageId, serverAddress,
-        dispatchableSubPlan.getQueryStageList().get(stageId).getPlanFragment().getFragmentRoot(),
-        new StageMetadata.Builder().setWorkerMetadataList(
-                dispatchableSubPlan.getQueryStageList().get(stageId).getWorkerMetadataList())
-            .addCustomProperties(dispatchableSubPlan.getQueryStageList().get(stageId).getCustomProperties()).build());
   }
 
   protected List<Object[]> queryH2(String sql)

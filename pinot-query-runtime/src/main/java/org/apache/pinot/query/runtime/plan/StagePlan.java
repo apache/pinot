@@ -18,30 +18,22 @@
  */
 package org.apache.pinot.query.runtime.plan;
 
-import java.util.List;
-import java.util.Map;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.routing.WorkerMetadata;
 
 
 /**
- * {@code DistributedStagePlan} is the deserialized version of the
- * {@link org.apache.pinot.common.proto.Worker.StagePlan}.
+ * {@code StagePlan} is the deserialized version of the {@link org.apache.pinot.common.proto.Worker.StagePlan}.
  *
  * <p>It is also the extended version of the {@link org.apache.pinot.core.query.request.ServerQueryRequest}.
  */
-public class DistributedStagePlan {
+public class StagePlan {
   private final int _stageId;
-  private final VirtualServerAddress _server;
-  private final PlanNode _stageRoot;
+  private final PlanNode _rootNode;
   private final StageMetadata _stageMetadata;
 
-  public DistributedStagePlan(int stageId, VirtualServerAddress server, PlanNode stageRoot,
-      StageMetadata stageMetadata) {
+  public StagePlan(int stageId, PlanNode rootNode, StageMetadata stageMetadata) {
     _stageId = stageId;
-    _server = server;
-    _stageRoot = stageRoot;
+    _rootNode = rootNode;
     _stageMetadata = stageMetadata;
   }
 
@@ -49,25 +41,11 @@ public class DistributedStagePlan {
     return _stageId;
   }
 
-  public VirtualServerAddress getServer() {
-    return _server;
-  }
-
-  public PlanNode getStageRoot() {
-    return _stageRoot;
+  public PlanNode getRootNode() {
+    return _rootNode;
   }
 
   public StageMetadata getStageMetadata() {
     return _stageMetadata;
-  }
-
-  public WorkerMetadata getCurrentWorkerMetadata() {
-    return _stageMetadata.getWorkerMetadataList().get(_server.workerId());
-  }
-
-  public static boolean isLeafStage(DistributedStagePlan distributedStagePlan) {
-    WorkerMetadata workerMetadata = distributedStagePlan.getCurrentWorkerMetadata();
-    Map<String, List<String>> segments = WorkerMetadata.getTableSegmentsMap(workerMetadata);
-    return segments != null && segments.size() > 0;
   }
 }

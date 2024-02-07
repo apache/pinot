@@ -20,6 +20,7 @@ package org.apache.pinot.query.service.dispatch;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,7 +39,6 @@ import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.calcite.util.Pair;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -111,41 +111,43 @@ public class QueryDispatcher {
   void submit(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs, Map<String, String> queryOptions)
       throws Exception {
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
+
+    // Serialize the stage plans in parallel
     List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+    Set<QueryServerInstance> serverInstances = new HashSet<>();
     // Ignore the reduce stage (stage 0)
     int numStages = stagePlans.size() - 1;
-    Set<QueryServerInstance> serverInstances = new HashSet<>();
-    // Serialize the stage plans in parallel
-    Plan.StageNode[] stageRootNodes = new Plan.StageNode[numStages];
-    //noinspection unchecked
-    List<Worker.WorkerMetadata>[] stageWorkerMetadataLists = new List[numStages];
-    CompletableFuture<?>[] stagePlanSerializationStubs = new CompletableFuture[2 * numStages];
+    List<CompletableFuture<StageInfo>> stageInfoFutures = new ArrayList<>(numStages);
     for (int i = 0; i < numStages; i++) {
       DispatchablePlanFragment stagePlan = stagePlans.get(i + 1);
       serverInstances.addAll(stagePlan.getServerInstanceToWorkerIdMap().keySet());
-      int finalI = i;
-      stagePlanSerializationStubs[2 * i] = CompletableFuture.runAsync(() -> stageRootNodes[finalI] =
-              StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot()),
-          _executorService);
-      stagePlanSerializationStubs[2 * i + 1] = CompletableFuture.runAsync(
-          () -> stageWorkerMetadataLists[finalI] = QueryPlanSerDeUtils.toProtoWorkerMetadataList(stagePlan),
-          _executorService);
+      stageInfoFutures.add(CompletableFuture.supplyAsync(() -> {
+        ByteString rootNode =
+            StageNodeSerDeUtils.serializeStageNode((AbstractPlanNode) stagePlan.getPlanFragment().getFragmentRoot())
+                .toByteString();
+        ByteString customProperty = QueryPlanSerDeUtils.toProtoProperties(stagePlan.getCustomProperties());
+        return new StageInfo(rootNode, customProperty);
+      }, _executorService));
     }
+    List<StageInfo> stageInfos = new ArrayList<>(numStages);
     try {
-      CompletableFuture.allOf(stagePlanSerializationStubs)
-          .get(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+      for (CompletableFuture<StageInfo> future : stageInfoFutures) {
+        stageInfos.add(future.get(deadline.timeRemaining(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS));
+      }
     } finally {
-      for (CompletableFuture<?> future : stagePlanSerializationStubs) {
+      for (CompletableFuture<?> future : stageInfoFutures) {
         if (!future.isDone()) {
           future.cancel(true);
         }
       }
     }
+
     Map<String, String> requestMetadata = new HashMap<>();
     requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId));
     requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
     requestMetadata.putAll(queryOptions);
+    ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
     int numServers = serverInstances.size();
@@ -159,13 +161,23 @@ public class QueryDispatcher {
             DispatchablePlanFragment stagePlan = stagePlans.get(stageId);
             List<Integer> workerIds = stagePlan.getServerInstanceToWorkerIdMap().get(serverInstance);
             if (workerIds != null) {
+              List<WorkerMetadata> stageWorkerMetadataList = stagePlan.getWorkerMetadataList();
+              List<WorkerMetadata> workerMetadataList = new ArrayList<>(workerIds.size());
+              for (int workerId : workerIds) {
+                workerMetadataList.add(stageWorkerMetadataList.get(workerId));
+              }
+              List<Worker.WorkerMetadata> protoWorkerMetadataList =
+                  QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList);
+              StageInfo stageInfo = stageInfos.get(i);
+              Worker.StageMetadata stageMetadata =
+                  Worker.StageMetadata.newBuilder().addAllWorkerMetadata(protoWorkerMetadataList)
+                      .setCustomProperty(stageInfo._customProperty).build();
               requestBuilder.addStagePlan(
-                  Worker.StagePlan.newBuilder().setStageId(stageId).setStageRoot(stageRootNodes[i]).setStageMetadata(
-                      QueryPlanSerDeUtils.toProtoStageMetadata(stageWorkerMetadataLists[i],
-                          stagePlan.getCustomProperties(), serverInstance, workerIds)).build());
+                  Worker.StagePlan.newBuilder().setStageId(stageId).setRootNode(stageInfo._rootNode)
+                      .setStageMetadata(stageMetadata).build());
             }
           }
-          requestBuilder.putAllMetadata(requestMetadata);
+          requestBuilder.setMetadata(protoRequestMetadata);
           getOrCreateDispatchClient(serverInstance).submit(requestBuilder.build(), serverInstance, deadline,
               dispatchCallbacks::offer);
         } catch (Throwable t) {
@@ -204,6 +216,16 @@ public class QueryDispatcher {
     }
   }
 
+  private static class StageInfo {
+    final ByteString _rootNode;
+    final ByteString _customProperty;
+
+    private StageInfo(ByteString rootNode, ByteString customProperty) {
+      _rootNode = rootNode;
+      _customProperty = customProperty;
+    }
+  }
+
   private void cancel(long requestId, DispatchableSubPlan dispatchableSubPlan) {
     List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
     int numStages = stagePlans.size();
@@ -233,21 +255,19 @@ public class QueryDispatcher {
       Map<String, String> queryOptions, @Nullable Map<Integer, ExecutionStatsAggregator> statsAggregatorMap,
       MailboxService mailboxService) {
     // NOTE: Reduce stage is always stage 0
-    DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(0);
-    PlanFragment planFragment = dispatchablePlanFragment.getPlanFragment();
+    DispatchablePlanFragment dispatchableStagePlan = dispatchableSubPlan.getQueryStageList().get(0);
+    PlanFragment planFragment = dispatchableStagePlan.getPlanFragment();
     PlanNode rootNode = planFragment.getFragmentRoot();
     Preconditions.checkState(rootNode instanceof MailboxReceiveNode,
         "Expecting mailbox receive node as root of reduce stage, got: %s", rootNode.getClass().getSimpleName());
     MailboxReceiveNode receiveNode = (MailboxReceiveNode) rootNode;
-    List<WorkerMetadata> workerMetadataList = dispatchablePlanFragment.getWorkerMetadataList();
+    List<WorkerMetadata> workerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
     Preconditions.checkState(workerMetadataList.size() == 1, "Expecting single worker for reduce stage, got: %s",
         workerMetadataList.size());
-    StageMetadata stageMetadata = new StageMetadata.Builder().setWorkerMetadataList(workerMetadataList)
-        .addCustomProperties(dispatchablePlanFragment.getCustomProperties()).build();
+    StageMetadata stageMetadata = new StageMetadata(workerMetadataList, dispatchableStagePlan.getCustomProperties());
     OpChainExecutionContext opChainExecutionContext =
         new OpChainExecutionContext(mailboxService, requestId, planFragment.getFragmentId(),
-            workerMetadataList.get(0).getVirtualServerAddress(), System.currentTimeMillis() + timeoutMs, queryOptions,
-            stageMetadata, null);
+            System.currentTimeMillis() + timeoutMs, queryOptions, stageMetadata, workerMetadataList.get(0), null);
     MailboxReceiveOperator receiveOperator =
         new MailboxReceiveOperator(opChainExecutionContext, receiveNode.getDistributionType(),
             receiveNode.getSenderStageId());
