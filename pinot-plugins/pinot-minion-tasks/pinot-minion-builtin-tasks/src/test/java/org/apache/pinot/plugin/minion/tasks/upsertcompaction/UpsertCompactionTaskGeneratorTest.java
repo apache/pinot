@@ -182,6 +182,52 @@ public class UpsertCompactionTaskGeneratorTest {
   }
 
   @Test
+  public void testGetCompletedSegments() {
+    long currentTimeInMillis = System.currentTimeMillis();
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "1d");
+
+    SegmentZKMetadata metadata1 = new SegmentZKMetadata("testTable");
+    metadata1.setEndTime(1694198844776L);
+    metadata1.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    metadata1.setTimeUnit(TimeUnit.MILLISECONDS);
+    SegmentZKMetadata metadata2 = new SegmentZKMetadata("testTable");
+    metadata2.setEndTime(1699639830678L);
+    metadata2.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    metadata2.setTimeUnit(TimeUnit.MILLISECONDS);
+
+    SegmentZKMetadata metadata3 = new SegmentZKMetadata("testTable");
+    metadata3.setEndTime(currentTimeInMillis);
+    metadata3.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    metadata3.setTimeUnit(TimeUnit.MILLISECONDS);
+
+    List<SegmentZKMetadata> segmentZKMetadataList = new ArrayList<>();
+    segmentZKMetadataList.add(metadata1);
+    segmentZKMetadataList.add(metadata2);
+    segmentZKMetadataList.add(metadata3);
+
+    List<SegmentZKMetadata> result =
+        UpsertCompactionTaskGenerator.getCompletedSegments(taskConfigs, segmentZKMetadataList, currentTimeInMillis);
+    Assert.assertEquals(result.size(), 2);
+
+    SegmentZKMetadata metadata4 = new SegmentZKMetadata("testTable");
+    metadata4.setEndTime(currentTimeInMillis - TimeUtils.convertPeriodToMillis("2d") + 1);
+    metadata4.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    metadata4.setTimeUnit(TimeUnit.MILLISECONDS);
+    segmentZKMetadataList.add(metadata4);
+
+    result =
+        UpsertCompactionTaskGenerator.getCompletedSegments(taskConfigs, segmentZKMetadataList, currentTimeInMillis);
+    Assert.assertEquals(result.size(), 3);
+
+    // Check the boundary condition for buffer time period based filtering
+    taskConfigs.put(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, "2d");
+    result =
+        UpsertCompactionTaskGenerator.getCompletedSegments(taskConfigs, segmentZKMetadataList, currentTimeInMillis);
+    Assert.assertEquals(result.size(), 2);
+  }
+
+  @Test
   public void testProcessValidDocIdsMetadata()
       throws IOException {
     Map<String, String> compactionConfigs = getCompactionConfigs("1", "10");
@@ -190,10 +236,17 @@ public class UpsertCompactionTaskGeneratorTest {
         + _completedSegment.getCrc() + "\"}," + "{" + "\"totalValidDocs\" : 0," + "\"totalInvalidDocs\" : 10,"
         + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\", " + "\"segmentCrc\" : \""
         + _completedSegment2.getCrc() + "\"," + "\"totalDocs\" : 10" + "}]";
+
     List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfo =
         JsonUtils.stringToObject(json, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
         });
+
     UpsertCompactionTaskGenerator.SegmentSelectionResult segmentSelectionResult =
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, new HashMap<>(),
+            validDocIdsMetadataInfo);
+    assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 0);
+
+    segmentSelectionResult =
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
             validDocIdsMetadataInfo);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
