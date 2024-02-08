@@ -36,6 +36,8 @@ import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.RoutingInfo;
+import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
@@ -43,8 +45,6 @@ import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.query.runtime.plan.StagePlan;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
@@ -170,7 +170,8 @@ public class QueryRunner {
       LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
           stageId, errorBlock.getExceptions());
       int receiverStageId = ((MailboxSendNode) stagePlan.getRootNode()).getReceiverStageId();
-      List<MailboxInfo> receiverMailboxInfos = workerMetadata.getMailboxInfosMap().get(receiverStageId);
+      List<MailboxInfo> receiverMailboxInfos =
+          workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
       List<RoutingInfo> routingInfos =
           MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
               receiverMailboxInfos);

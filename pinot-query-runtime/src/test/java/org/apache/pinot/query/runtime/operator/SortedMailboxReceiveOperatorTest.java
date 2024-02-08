@@ -35,11 +35,13 @@ import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.MailboxInfos;
+import org.apache.pinot.query.routing.SharedMailboxInfos;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -77,11 +79,11 @@ public class SortedMailboxReceiveOperatorTest {
 
   @BeforeClass
   public void setUp() {
-    List<MailboxInfo> mailboxInfosBoth = ImmutableList.of(new MailboxInfo("localhost", 1234, ImmutableList.of(0, 1)));
+    MailboxInfos mailboxInfosBoth = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, ImmutableList.of(0, 1)));
     _stageMetadataBoth = new StageMetadata(0, Stream.of(0, 1)
         .map(workerId -> new WorkerMetadata(workerId, ImmutableMap.of(1, mailboxInfosBoth), ImmutableMap.of()))
         .collect(Collectors.toList()), ImmutableMap.of());
-    List<MailboxInfo> mailboxInfos1 = ImmutableList.of(new MailboxInfo("localhost", 1234, ImmutableList.of(0)));
+    MailboxInfos mailboxInfos1 = new SharedMailboxInfos(new MailboxInfo("localhost", 1234, ImmutableList.of(0)));
     _stageMetadata1 = new StageMetadata(0,
         ImmutableList.of(new WorkerMetadata(0, ImmutableMap.of(1, mailboxInfos1), ImmutableMap.of())),
         ImmutableMap.of());

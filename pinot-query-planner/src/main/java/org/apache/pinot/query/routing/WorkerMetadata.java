@@ -45,16 +45,16 @@ public class WorkerMetadata {
   public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
 
   private final int _workerId;
-  private final Map<Integer, List<MailboxInfo>> _mailboxInfosMap;
+  private final Map<Integer, MailboxInfos> _mailboxInfosMap;
   private final Map<String, String> _customProperties;
 
-  public WorkerMetadata(int workerId, Map<Integer, List<MailboxInfo>> mailboxInfosMap) {
+  public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap) {
     _workerId = workerId;
     _mailboxInfosMap = mailboxInfosMap;
     _customProperties = new HashMap<>();
   }
 
-  public WorkerMetadata(int workerId, Map<Integer, List<MailboxInfo>> mailboxInfosMap,
+  public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap,
       Map<String, String> customProperties) {
     _workerId = workerId;
     _mailboxInfosMap = mailboxInfosMap;
@@ -65,7 +65,7 @@ public class WorkerMetadata {
     return _workerId;
   }
 
-  public Map<Integer, List<MailboxInfo>> getMailboxInfosMap() {
+  public Map<Integer, MailboxInfos> getMailboxInfosMap() {
     return _mailboxInfosMap;
   }
 

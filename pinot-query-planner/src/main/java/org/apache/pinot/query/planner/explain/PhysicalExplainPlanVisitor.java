@@ -214,7 +214,7 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     int receiverStageId = node.getReceiverStageId();
     List<MailboxInfo> receiverMailboxInfos =
         _dispatchableSubPlan.getQueryStageList().get(node.getPlanFragmentId()).getWorkerMetadataList()
-            .get(context._workerId).getMailboxInfosMap().get(receiverStageId);
+            .get(context._workerId).getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
     context._builder.append("->");
     // Sort to ensure print order
     String receivers = receiverMailboxInfos.stream().sorted(Comparator.comparingInt(MailboxInfo::getPort))

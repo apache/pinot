@@ -35,6 +35,10 @@ import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.MailboxInfos;
+import org.apache.pinot.query.routing.SharedMailboxInfos;
+import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -42,8 +46,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.query.runtime.plan.StagePlan;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
@@ -65,8 +67,8 @@ public class PipelineBreakerExecutorTest {
   private final VirtualServerAddress _server = new VirtualServerAddress("localhost", 123, 0);
   private final ExecutorService _executor = Executors.newCachedThreadPool();
   private final OpChainSchedulerService _scheduler = new OpChainSchedulerService(_executor);
-  private final List<MailboxInfo> _mailboxInfos =
-      ImmutableList.of(new MailboxInfo("localhost", 123, ImmutableList.of(0)));
+  private final MailboxInfos _mailboxInfos =
+      new SharedMailboxInfos(new MailboxInfo("localhost", 123, ImmutableList.of(0)));
   private final WorkerMetadata _workerMetadata =
       new WorkerMetadata(0, ImmutableMap.of(1, _mailboxInfos, 2, _mailboxInfos), ImmutableMap.of());
   private final StageMetadata _stageMetadata =

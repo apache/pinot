@@ -91,7 +91,8 @@ public class MailboxSendOperator extends MultiStageOperator {
     long requestId = context.getRequestId();
     long deadlineMs = context.getDeadlineMs();
 
-    List<MailboxInfo> mailboxInfos = context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId);
+    List<MailboxInfo> mailboxInfos =
+        context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
     List<RoutingInfo> routingInfos =
         MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
             mailboxInfos);

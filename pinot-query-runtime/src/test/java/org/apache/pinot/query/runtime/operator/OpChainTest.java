@@ -45,12 +45,14 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.MailboxInfos;
+import org.apache.pinot.query.routing.SharedMailboxInfos;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -74,8 +76,8 @@ public class OpChainTest {
   private final List<TransferableBlock> _blockList = new ArrayList<>();
   private final ExecutorService _executor = Executors.newCachedThreadPool();
   private final AtomicReference<LeafStageTransferableBlockOperator> _leafOpRef = new AtomicReference<>();
-  private final List<MailboxInfo> _mailboxInfos =
-      ImmutableList.of(new MailboxInfo("localhost", 1234, ImmutableList.of(0)));
+  private final MailboxInfos _mailboxInfos =
+      new SharedMailboxInfos(new MailboxInfo("localhost", 1234, ImmutableList.of(0)));
   private final WorkerMetadata _workerMetadata =
       new WorkerMetadata(0, ImmutableMap.of(0, _mailboxInfos, 1, _mailboxInfos, 2, _mailboxInfos), ImmutableMap.of());
   private final StageMetadata _stageMetadata =

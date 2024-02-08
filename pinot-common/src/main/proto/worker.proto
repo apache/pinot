@@ -61,7 +61,7 @@ message StageMetadata {
 
 message WorkerMetadata {
   int32 workedId = 1;
-  map<int32, MailboxInfos> mailboxMetadata = 2;
+  map<int32, bytes> mailboxInfos = 2; // Stage id to serialized MailboxInfos
   map<string, string> customProperty = 3;
 }
 

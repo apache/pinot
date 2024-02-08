@@ -16,10 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.plan.serde;
+package org.apache.pinot.query.routing;
 
+import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -27,10 +29,6 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
-import org.apache.pinot.query.routing.MailboxInfo;
-import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.query.runtime.plan.StagePlan;
 
 
 /**
@@ -50,23 +48,30 @@ public class QueryPlanSerDeUtils {
 
   private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata)
       throws InvalidProtocolBufferException {
-    List<WorkerMetadata> workerMetadataList =
-        protoStageMetadata.getWorkerMetadataList().stream().map(QueryPlanSerDeUtils::fromProtoWorkerMetadata)
-            .collect(Collectors.toList());
+    List<Worker.WorkerMetadata> protoWorkerMetadataList = protoStageMetadata.getWorkerMetadataList();
+    List<WorkerMetadata> workerMetadataList = new ArrayList<>(protoWorkerMetadataList.size());
+    for (Worker.WorkerMetadata protoWorkerMetadata : protoWorkerMetadataList) {
+      workerMetadataList.add(fromProtoWorkerMetadata(protoWorkerMetadata));
+    }
     Map<String, String> customProperties = fromProtoProperties(protoStageMetadata.getCustomProperty());
     return new StageMetadata(protoStageMetadata.getStageId(), workerMetadataList, customProperties);
   }
 
-  private static WorkerMetadata fromProtoWorkerMetadata(Worker.WorkerMetadata protoWorkerMetadata) {
-    Map<Integer, List<MailboxInfo>> mailboxInfosMap = protoWorkerMetadata.getMailboxMetadataMap().entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getKey, e -> fromProtoMailboxInfos(e.getValue())));
+  private static WorkerMetadata fromProtoWorkerMetadata(Worker.WorkerMetadata protoWorkerMetadata)
+      throws InvalidProtocolBufferException {
+    Map<Integer, ByteString> protoMailboxInfosMap = protoWorkerMetadata.getMailboxInfosMap();
+    Map<Integer, MailboxInfos> mailboxInfosMap = Maps.newHashMapWithExpectedSize(protoMailboxInfosMap.size());
+    for (Map.Entry<Integer, ByteString> entry : protoMailboxInfosMap.entrySet()) {
+      mailboxInfosMap.put(entry.getKey(), fromProtoMailboxInfos(entry.getValue()));
+    }
     return new WorkerMetadata(protoWorkerMetadata.getWorkedId(), mailboxInfosMap,
         protoWorkerMetadata.getCustomPropertyMap());
   }
 
-  private static List<MailboxInfo> fromProtoMailboxInfos(Worker.MailboxInfos protoMailboxInfos) {
-    return protoMailboxInfos.getMailboxInfoList().stream()
-        .map(v -> new MailboxInfo(v.getHostname(), v.getPort(), v.getWorkerIdList())).collect(Collectors.toList());
+  private static MailboxInfos fromProtoMailboxInfos(ByteString protoMailboxInfos)
+      throws InvalidProtocolBufferException {
+    return new MailboxInfos(Worker.MailboxInfos.parseFrom(protoMailboxInfos).getMailboxInfoList().stream()
+        .map(v -> new MailboxInfo(v.getHostname(), v.getPort(), v.getWorkerIdList())).collect(Collectors.toList()));
   }
 
   public static Map<String, String> fromProtoProperties(ByteString protoProperties)
@@ -79,13 +84,13 @@ public class QueryPlanSerDeUtils {
   }
 
   private static Worker.WorkerMetadata toProtoWorkerMetadata(WorkerMetadata workerMetadata) {
-    Map<Integer, Worker.MailboxInfos> mailboxInfosMap = workerMetadata.getMailboxInfosMap().entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getKey, e -> toProtoMailboxInfos(e.getValue())));
+    Map<Integer, ByteString> mailboxInfosMap = workerMetadata.getMailboxInfosMap().entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toProtoBytes()));
     return Worker.WorkerMetadata.newBuilder().setWorkedId(workerMetadata.getWorkerId())
-        .putAllMailboxMetadata(mailboxInfosMap).putAllCustomProperty(workerMetadata.getCustomProperties()).build();
+        .putAllMailboxInfos(mailboxInfosMap).putAllCustomProperty(workerMetadata.getCustomProperties()).build();
   }
 
-  private static Worker.MailboxInfos toProtoMailboxInfos(List<MailboxInfo> mailboxInfos) {
+  public static Worker.MailboxInfos toProtoMailboxInfos(List<MailboxInfo> mailboxInfos) {
     List<Worker.MailboxInfo> protoMailboxInfos = mailboxInfos.stream().map(
         v -> Worker.MailboxInfo.newBuilder().setHostname(v.getHostname()).setPort(v.getPort())
             .addAllWorkerId(v.getWorkerIds()).build()).collect(Collectors.toList());
