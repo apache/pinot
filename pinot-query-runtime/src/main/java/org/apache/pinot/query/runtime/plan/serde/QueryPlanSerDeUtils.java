@@ -27,8 +27,7 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
-import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.runtime.plan.StagePlan;
@@ -46,7 +45,7 @@ public class QueryPlanSerDeUtils {
     AbstractPlanNode rootNode =
         StageNodeSerDeUtils.deserializeStageNode(Plan.StageNode.parseFrom(protoStagePlan.getRootNode()));
     StageMetadata stageMetadata = fromProtoStageMetadata(protoStagePlan.getStageMetadata());
-    return new StagePlan(protoStagePlan.getStageId(), rootNode, stageMetadata);
+    return new StagePlan(rootNode, stageMetadata);
   }
 
   private static StageMetadata fromProtoStageMetadata(Worker.StageMetadata protoStageMetadata)
@@ -55,21 +54,19 @@ public class QueryPlanSerDeUtils {
         protoStageMetadata.getWorkerMetadataList().stream().map(QueryPlanSerDeUtils::fromProtoWorkerMetadata)
             .collect(Collectors.toList());
     Map<String, String> customProperties = fromProtoProperties(protoStageMetadata.getCustomProperty());
-    return new StageMetadata(workerMetadataList, customProperties);
+    return new StageMetadata(protoStageMetadata.getStageId(), workerMetadataList, customProperties);
   }
 
   private static WorkerMetadata fromProtoWorkerMetadata(Worker.WorkerMetadata protoWorkerMetadata) {
-    VirtualServerAddress virtualAddress = VirtualServerAddress.parse(protoWorkerMetadata.getVirtualAddress());
-    Map<Integer, MailboxMetadata> mailboxMetadataMap = protoWorkerMetadata.getMailboxMetadataMap().entrySet().stream()
-        .collect(Collectors.toMap(Map.Entry::getKey, e -> fromProtoMailbox(e.getValue())));
-    return new WorkerMetadata(virtualAddress, mailboxMetadataMap, protoWorkerMetadata.getCustomPropertyMap());
+    Map<Integer, List<MailboxInfo>> mailboxInfosMap = protoWorkerMetadata.getMailboxMetadataMap().entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> fromProtoMailboxInfos(e.getValue())));
+    return new WorkerMetadata(protoWorkerMetadata.getWorkedId(), mailboxInfosMap,
+        protoWorkerMetadata.getCustomPropertyMap());
   }
 
-  private static MailboxMetadata fromProtoMailbox(Worker.MailboxMetadata protoMailboxMetadata) {
-    List<VirtualServerAddress> virtualAddresses =
-        protoMailboxMetadata.getVirtualAddressList().stream().map(VirtualServerAddress::parse)
-            .collect(Collectors.toList());
-    return new MailboxMetadata(protoMailboxMetadata.getMailboxIdList(), virtualAddresses);
+  private static List<MailboxInfo> fromProtoMailboxInfos(Worker.MailboxInfos protoMailboxInfos) {
+    return protoMailboxInfos.getMailboxInfoList().stream()
+        .map(v -> new MailboxInfo(v.getHostname(), v.getPort(), v.getWorkerIdList())).collect(Collectors.toList());
   }
 
   public static Map<String, String> fromProtoProperties(ByteString protoProperties)
@@ -82,19 +79,17 @@ public class QueryPlanSerDeUtils {
   }
 
   private static Worker.WorkerMetadata toProtoWorkerMetadata(WorkerMetadata workerMetadata) {
-    Map<Integer, Worker.MailboxMetadata> protoMailboxMetadataMap =
-        workerMetadata.getMailboxMetadataMap().entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, e -> toProtoMailboxMetadata(e.getValue())));
-    return Worker.WorkerMetadata.newBuilder().setVirtualAddress(workerMetadata.getVirtualAddress().toString())
-        .putAllMailboxMetadata(protoMailboxMetadataMap).putAllCustomProperty(workerMetadata.getCustomProperties())
-        .build();
+    Map<Integer, Worker.MailboxInfos> mailboxInfosMap = workerMetadata.getMailboxInfosMap().entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> toProtoMailboxInfos(e.getValue())));
+    return Worker.WorkerMetadata.newBuilder().setWorkedId(workerMetadata.getWorkerId())
+        .putAllMailboxMetadata(mailboxInfosMap).putAllCustomProperty(workerMetadata.getCustomProperties()).build();
   }
 
-  private static Worker.MailboxMetadata toProtoMailboxMetadata(MailboxMetadata mailboxMetadata) {
-    List<String> virtualAddresses =
-        mailboxMetadata.getVirtualAddresses().stream().map(VirtualServerAddress::toString).collect(Collectors.toList());
-    return Worker.MailboxMetadata.newBuilder().addAllMailboxId(mailboxMetadata.getMailboxIds())
-        .addAllVirtualAddress(virtualAddresses).build();
+  private static Worker.MailboxInfos toProtoMailboxInfos(List<MailboxInfo> mailboxInfos) {
+    List<Worker.MailboxInfo> protoMailboxInfos = mailboxInfos.stream().map(
+        v -> Worker.MailboxInfo.newBuilder().setHostname(v.getHostname()).setPort(v.getPort())
+            .addAllWorkerId(v.getWorkerIds()).build()).collect(Collectors.toList());
+    return Worker.MailboxInfos.newBuilder().addAllMailboxInfo(protoMailboxInfos).build();
   }
 
   public static ByteString toProtoProperties(Map<String, String> properties) {

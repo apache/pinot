@@ -19,9 +19,10 @@
 package org.apache.pinot.query.planner.physical;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.RoutingInfo;
 
 
 public class MailboxIdUtils {
@@ -30,23 +31,35 @@ public class MailboxIdUtils {
 
   public static final char SEPARATOR = '|';
 
-  public static String toPlanMailboxId(int senderStageId, int senderWorkerId, int receiverStageId,
-      int receiverWorkerId) {
-    return Integer.toString(senderStageId) + SEPARATOR + senderWorkerId + SEPARATOR + receiverStageId + SEPARATOR
-        + receiverWorkerId;
-  }
-
-  public static String toMailboxId(long requestId, String planMailboxId) {
-    return Long.toString(requestId) + SEPARATOR + planMailboxId;
-  }
-
-  public static List<String> toMailboxIds(long requestId, MailboxMetadata mailboxMetadata) {
-    return mailboxMetadata.getMailboxIds().stream().map(v -> toMailboxId(requestId, v)).collect(Collectors.toList());
-  }
-
   @VisibleForTesting
   public static String toMailboxId(long requestId, int senderStageId, int senderWorkerId, int receiverStageId,
       int receiverWorkerId) {
-    return toMailboxId(requestId, toPlanMailboxId(senderStageId, senderWorkerId, receiverStageId, receiverWorkerId));
+    return Long.toString(requestId) + SEPARATOR + senderStageId + SEPARATOR + senderWorkerId + SEPARATOR
+        + receiverStageId + SEPARATOR + receiverWorkerId;
+  }
+
+  public static List<RoutingInfo> toRoutingInfos(long requestId, int senderStageId, int senderWorkerId,
+      int receiverStageId, List<MailboxInfo> receiverMailboxInfos) {
+    List<RoutingInfo> routingInfos = new ArrayList<>();
+    for (MailboxInfo mailboxInfo : receiverMailboxInfos) {
+      String hostname = mailboxInfo.getHostname();
+      int port = mailboxInfo.getPort();
+      for (int receiverWorkerId : mailboxInfo.getWorkerIds()) {
+        routingInfos.add(new RoutingInfo(hostname, port,
+            toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiverWorkerId)));
+      }
+    }
+    return routingInfos;
+  }
+
+  public static List<String> toMailboxIds(long requestId, int senderStageId, List<MailboxInfo> senderMailboxInfos,
+      int receiverStageId, int receiverWorkerId) {
+    List<String> mailboxIds = new ArrayList<>();
+    for (MailboxInfo mailboxInfo : senderMailboxInfos) {
+      for (int senderWorkerId : mailboxInfo.getWorkerIds()) {
+        mailboxIds.add(toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiverWorkerId));
+      }
+    }
+    return mailboxIds;
   }
 }

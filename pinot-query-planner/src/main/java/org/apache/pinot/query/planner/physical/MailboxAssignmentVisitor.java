@@ -19,18 +19,18 @@
 package org.apache.pinot.query.planner.physical;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.planner.plannode.DefaultPostOrderTraversalVisitor;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 
 
 public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<Void, DispatchablePlanContext> {
@@ -47,8 +47,8 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       DispatchablePlanMetadata receiverMetadata = metadataMap.get(receiverFragmentId);
       Map<Integer, QueryServerInstance> senderServerMap = senderMetadata.getWorkerIdToServerInstanceMap();
       Map<Integer, QueryServerInstance> receiverServerMap = receiverMetadata.getWorkerIdToServerInstanceMap();
-      Map<Integer, Map<Integer, MailboxMetadata>> senderMailboxesMap = senderMetadata.getWorkerIdToMailboxesMap();
-      Map<Integer, Map<Integer, MailboxMetadata>> receiverMailboxesMap = receiverMetadata.getWorkerIdToMailboxesMap();
+      Map<Integer, Map<Integer, List<MailboxInfo>>> senderMailboxesMap = senderMetadata.getWorkerIdToMailboxesMap();
+      Map<Integer, Map<Integer, List<MailboxInfo>>> receiverMailboxesMap = receiverMetadata.getWorkerIdToMailboxesMap();
 
       int numSenders = senderServerMap.size();
       int numReceivers = receiverServerMap.size();
@@ -63,11 +63,11 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
           Preconditions.checkState(senderServer.equals(receiverServer),
               "Got different server for SINGLETON distribution type for worker id: %s, sender: %s, receiver: %s",
               workerId, senderServer, receiverServer);
-          MailboxMetadata mailboxMetadata = new MailboxMetadata(Collections.singletonList(
-              MailboxIdUtils.toPlanMailboxId(senderFragmentId, workerId, receiverFragmentId, workerId)),
-              Collections.singletonList(new VirtualServerAddress(senderServer, workerId)));
-          senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(receiverFragmentId, mailboxMetadata);
-          receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderFragmentId, mailboxMetadata);
+          List<MailboxInfo> mailboxInfos = ImmutableList.of(
+              new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(),
+                  ImmutableList.of(workerId)));
+          senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(receiverFragmentId, mailboxInfos);
+          receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>()).put(senderFragmentId, mailboxInfos);
         }
       } else if (senderMetadata.isPrePartitioned() && isDirectExchangeCompatible(senderMetadata, receiverMetadata)) {
         // - direct exchange possible:
@@ -78,82 +78,65 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
         if (partitionParallelism == 1) {
           // 1-to-1 mapping
           for (int workerId = 0; workerId < numSenders; workerId++) {
-            String mailboxId = MailboxIdUtils.toPlanMailboxId(senderFragmentId, workerId, receiverFragmentId, workerId);
-            MailboxMetadata serderMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
-                Collections.singletonList(new VirtualServerAddress(receiverServerMap.get(workerId), workerId)));
-            MailboxMetadata receiverMailboxMetadata = new MailboxMetadata(Collections.singletonList(mailboxId),
-                Collections.singletonList(new VirtualServerAddress(senderServerMap.get(workerId), workerId)));
+            QueryServerInstance senderServer = senderServerMap.get(workerId);
+            QueryServerInstance receiverServer = receiverServerMap.get(workerId);
+            List<Integer> workerIds = ImmutableList.of(workerId);
+            MailboxInfo senderMailboxInfo =
+                new MailboxInfo(receiverServer.getHostname(), receiverServer.getQueryMailboxPort(), workerIds);
+            MailboxInfo receiverMailboxInfo =
+                new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(), workerIds);
             senderMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
-                .put(receiverFragmentId, serderMailboxMetadata);
+                .put(receiverFragmentId, ImmutableList.of(senderMailboxInfo));
             receiverMailboxesMap.computeIfAbsent(workerId, k -> new HashMap<>())
-                .put(senderFragmentId, receiverMailboxMetadata);
+                .put(senderFragmentId, ImmutableList.of(receiverMailboxInfo));
           }
         } else {
           // 1-to-<partition_parallelism> mapping
           int receiverWorkerId = 0;
           for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
-            VirtualServerAddress senderAddress =
-                new VirtualServerAddress(senderServerMap.get(senderWorkerId), senderWorkerId);
-            List<String> receivingMailboxIds = new ArrayList<>(partitionParallelism);
-            List<VirtualServerAddress> receivingAddresses = new ArrayList<>(partitionParallelism);
-            MailboxMetadata senderMailboxMetadata = new MailboxMetadata(receivingMailboxIds, receivingAddresses);
-            senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>())
-                .put(receiverFragmentId, senderMailboxMetadata);
+            QueryServerInstance senderServer = senderServerMap.get(senderWorkerId);
+            QueryServerInstance receiverServer = receiverServerMap.get(receiverWorkerId);
+            List<Integer> receiverWorkerIds = new ArrayList<>(partitionParallelism);
+            senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>()).put(receiverFragmentId,
+                ImmutableList.of(new MailboxInfo(receiverServer.getHostname(), receiverServer.getQueryMailboxPort(),
+                    receiverWorkerIds)));
             for (int i = 0; i < partitionParallelism; i++) {
-              String mailboxId = MailboxIdUtils.toPlanMailboxId(senderFragmentId, senderWorkerId, receiverFragmentId,
-                  receiverWorkerId);
-              receivingMailboxIds.add(mailboxId);
-              receivingAddresses.add(
-                  new VirtualServerAddress(receiverServerMap.get(receiverWorkerId), receiverWorkerId));
-
-              MailboxMetadata receiverMailboxMetadata =
-                  receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
-                      .computeIfAbsent(senderFragmentId, k -> new MailboxMetadata());
-              receiverMailboxMetadata.getMailboxIds().add(mailboxId);
-              receiverMailboxMetadata.getVirtualAddresses().add(senderAddress);
-
+              receiverWorkerIds.add(receiverWorkerId);
+              MailboxInfo receiverMailboxInfo =
+                  new MailboxInfo(senderServer.getHostname(), senderServer.getQueryMailboxPort(),
+                      ImmutableList.of(senderWorkerId));
+              receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
+                  .put(senderFragmentId, ImmutableList.of(receiverMailboxInfo));
               receiverWorkerId++;
             }
           }
         }
       } else {
         // For other exchange types, send the data to all the instances in the receiver fragment
-        // NOTE: Keep the receiver worker id sequential in the senderMailboxMetadata so that the partitionId aligns with
-        //       the workerId. It is useful for JOIN query when only left table is partitioned.
         // TODO: Add support for more exchange types
+        List<MailboxInfo> senderMailboxInfos = getMailboxInfos(senderServerMap);
+        List<MailboxInfo> receiverMailboxInfos = getMailboxInfos(receiverServerMap);
         for (int senderWorkerId = 0; senderWorkerId < numSenders; senderWorkerId++) {
-          VirtualServerAddress senderAddress =
-              new VirtualServerAddress(senderServerMap.get(senderWorkerId), senderWorkerId);
-          List<String> receivingMailboxIds = new ArrayList<>(numReceivers);
-          List<VirtualServerAddress> receivingAddresses = new ArrayList<>(numReceivers);
-          MailboxMetadata senderMailboxMetadata = new MailboxMetadata(receivingMailboxIds, receivingAddresses);
           senderMailboxesMap.computeIfAbsent(senderWorkerId, k -> new HashMap<>())
-              .put(receiverFragmentId, senderMailboxMetadata);
-          for (int receiverWorkerId = 0; receiverWorkerId < numReceivers; receiverWorkerId++) {
-            String mailboxId =
-                MailboxIdUtils.toPlanMailboxId(senderFragmentId, senderWorkerId, receiverFragmentId, receiverWorkerId);
-            receivingMailboxIds.add(mailboxId);
-            receivingAddresses.add(new VirtualServerAddress(receiverServerMap.get(receiverWorkerId), receiverWorkerId));
-
-            MailboxMetadata receiverMailboxMetadata =
-                receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
-                    .computeIfAbsent(senderFragmentId, k -> new MailboxMetadata());
-            receiverMailboxMetadata.getMailboxIds().add(mailboxId);
-            receiverMailboxMetadata.getVirtualAddresses().add(senderAddress);
-          }
+              .put(receiverFragmentId, receiverMailboxInfos);
+        }
+        for (int receiverWorkerId = 0; receiverWorkerId < numReceivers; receiverWorkerId++) {
+          receiverMailboxesMap.computeIfAbsent(receiverWorkerId, k -> new HashMap<>())
+              .put(senderFragmentId, senderMailboxInfos);
         }
       }
     }
     return null;
   }
 
-  private boolean isDirectExchangeCompatible(DispatchablePlanMetadata sender, DispatchablePlanMetadata receiver) {
+  private static boolean isDirectExchangeCompatible(DispatchablePlanMetadata sender,
+      DispatchablePlanMetadata receiver) {
     Map<Integer, QueryServerInstance> senderServerMap = sender.getWorkerIdToServerInstanceMap();
     Map<Integer, QueryServerInstance> receiverServerMap = receiver.getWorkerIdToServerInstanceMap();
 
     int numSenders = senderServerMap.size();
     int numReceivers = receiverServerMap.size();
-    if (sender.getScannedTables().size() > 0 && receiver.getScannedTables().size() == 0) {
+    if (!sender.getScannedTables().isEmpty() && receiver.getScannedTables().isEmpty()) {
       // leaf-to-intermediate condition
       return numSenders * sender.getPartitionParallelism() == numReceivers && sender.getPartitionFunction() != null
           && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
@@ -162,5 +145,16 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       return numSenders == numReceivers && sender.getPartitionFunction() != null && sender.getPartitionFunction()
           .equalsIgnoreCase(receiver.getPartitionFunction());
     }
+  }
+
+  private static List<MailboxInfo> getMailboxInfos(Map<Integer, QueryServerInstance> workerIdToServerMap) {
+    Map<QueryServerInstance, List<Integer>> serverToWorkerIdsMap = new HashMap<>();
+    int numServers = workerIdToServerMap.size();
+    for (int workerId = 0; workerId < numServers; workerId++) {
+      serverToWorkerIdsMap.computeIfAbsent(workerIdToServerMap.get(workerId), k -> new ArrayList<>()).add(workerId);
+    }
+    return serverToWorkerIdsMap.entrySet().stream()
+        .map(e -> new MailboxInfo(e.getKey().getHostname(), e.getKey().getQueryMailboxPort(), e.getValue()))
+        .collect(Collectors.toList());
   }
 }

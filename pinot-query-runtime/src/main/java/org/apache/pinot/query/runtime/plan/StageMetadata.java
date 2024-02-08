@@ -29,12 +29,18 @@ import org.apache.pinot.query.routing.WorkerMetadata;
  * {@code StageMetadata} is used to send plan fragment-level info about how to execute a stage physically.
  */
 public class StageMetadata {
+  private final int _stageId;
   private final List<WorkerMetadata> _workerMetadataList;
   private final Map<String, String> _customProperties;
 
-  public StageMetadata(List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
+  public StageMetadata(int stageId, List<WorkerMetadata> workerMetadataList, Map<String, String> customProperties) {
+    _stageId = stageId;
     _workerMetadataList = workerMetadataList;
     _customProperties = customProperties;
+  }
+
+  public int getStageId() {
+    return _stageId;
   }
 
   public List<WorkerMetadata> getWorkerMetadataList() {

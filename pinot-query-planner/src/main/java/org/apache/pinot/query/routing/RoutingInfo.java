@@ -16,30 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.plan;
+package org.apache.pinot.query.routing;
 
-import org.apache.pinot.query.planner.plannode.PlanNode;
+public class RoutingInfo {
+  private final String _hostname;
+  private final int _port;
+  private final String _mailboxId;
 
-
-/**
- * {@code StagePlan} is the deserialized version of the {@link org.apache.pinot.common.proto.Worker.StagePlan}.
- *
- * <p>It is also the extended version of the {@link org.apache.pinot.core.query.request.ServerQueryRequest}.
- */
-public class StagePlan {
-  private final PlanNode _rootNode;
-  private final StageMetadata _stageMetadata;
-
-  public StagePlan(PlanNode rootNode, StageMetadata stageMetadata) {
-    _rootNode = rootNode;
-    _stageMetadata = stageMetadata;
+  public RoutingInfo(String hostname, int port, String mailboxId) {
+    _hostname = hostname;
+    _port = port;
+    _mailboxId = mailboxId;
   }
 
-  public PlanNode getRootNode() {
-    return _rootNode;
+  public String getHostname() {
+    return _hostname;
   }
 
-  public StageMetadata getStageMetadata() {
-    return _stageMetadata;
+  public int getPort() {
+    return _port;
+  }
+
+  public String getMailboxId() {
+    return _mailboxId;
   }
 }

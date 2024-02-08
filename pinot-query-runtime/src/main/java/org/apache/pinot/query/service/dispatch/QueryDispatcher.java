@@ -170,11 +170,11 @@ public class QueryDispatcher {
                   QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList);
               StageInfo stageInfo = stageInfos.get(i);
               Worker.StageMetadata stageMetadata =
-                  Worker.StageMetadata.newBuilder().addAllWorkerMetadata(protoWorkerMetadataList)
+                  Worker.StageMetadata.newBuilder().setStageId(stageId).addAllWorkerMetadata(protoWorkerMetadataList)
                       .setCustomProperty(stageInfo._customProperty).build();
               requestBuilder.addStagePlan(
-                  Worker.StagePlan.newBuilder().setStageId(stageId).setRootNode(stageInfo._rootNode)
-                      .setStageMetadata(stageMetadata).build());
+                  Worker.StagePlan.newBuilder().setRootNode(stageInfo._rootNode).setStageMetadata(stageMetadata)
+                      .build());
             }
           }
           requestBuilder.setMetadata(protoRequestMetadata);
@@ -264,10 +264,10 @@ public class QueryDispatcher {
     List<WorkerMetadata> workerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
     Preconditions.checkState(workerMetadataList.size() == 1, "Expecting single worker for reduce stage, got: %s",
         workerMetadataList.size());
-    StageMetadata stageMetadata = new StageMetadata(workerMetadataList, dispatchableStagePlan.getCustomProperties());
+    StageMetadata stageMetadata = new StageMetadata(0, workerMetadataList, dispatchableStagePlan.getCustomProperties());
     OpChainExecutionContext opChainExecutionContext =
-        new OpChainExecutionContext(mailboxService, requestId, planFragment.getFragmentId(),
-            System.currentTimeMillis() + timeoutMs, queryOptions, stageMetadata, workerMetadataList.get(0), null);
+        new OpChainExecutionContext(mailboxService, requestId, System.currentTimeMillis() + timeoutMs, queryOptions,
+            stageMetadata, workerMetadataList.get(0), null);
     MailboxReceiveOperator receiveOperator =
         new MailboxReceiveOperator(opChainExecutionContext, receiveNode.getDistributionType(),
             receiveNode.getSenderStageId());

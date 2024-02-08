@@ -77,12 +77,12 @@ public class PipelineBreakerExecutor {
         //     OpChain receive-mail callbacks.
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
-            new OpChainExecutionContext(mailboxService, requestId, stagePlan.getStageId(), deadlineMs, opChainMetadata,
+            new OpChainExecutionContext(mailboxService, requestId, deadlineMs, opChainMetadata,
                 stagePlan.getStageMetadata(), workerMetadata, null);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {
         LOGGER.error("Caught exception executing pipeline breaker for request: {}, stage: {}", requestId,
-            stagePlan.getStageId(), e);
+            stagePlan.getStageMetadata().getStageId(), e);
         return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), Collections.emptyMap(),
             TransferableBlockUtils.getErrorTransferableBlock(e), null);
       }

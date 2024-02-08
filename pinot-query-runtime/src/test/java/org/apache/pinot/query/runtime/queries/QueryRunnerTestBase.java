@@ -162,9 +162,9 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       QueryServerEnclosure serverEnclosure = _servers.get(entry.getKey());
       List<WorkerMetadata> workerMetadataList =
           entry.getValue().stream().map(stageWorkerMetadataList::get).collect(Collectors.toList());
-      StageMetadata stageMetadata = new StageMetadata(workerMetadataList, dispatchableStagePlan.getCustomProperties());
-      StagePlan stagePlan =
-          new StagePlan(stageId, dispatchableStagePlan.getPlanFragment().getFragmentRoot(), stageMetadata);
+      StageMetadata stageMetadata =
+          new StageMetadata(stageId, workerMetadataList, dispatchableStagePlan.getCustomProperties());
+      StagePlan stagePlan = new StagePlan(dispatchableStagePlan.getPlanFragment().getFragmentRoot(), stageMetadata);
       for (WorkerMetadata workerMetadata : workerMetadataList) {
         submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap));
       }

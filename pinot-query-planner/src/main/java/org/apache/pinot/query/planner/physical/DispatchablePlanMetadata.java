@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
-import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
@@ -54,6 +54,8 @@ public class DispatchablePlanMetadata implements Serializable {
   // info from PlanNode that requires singleton (e.g. SortNode/AggregateNode)
   private boolean _requiresSingletonInstance;
 
+  // TODO: Change the following maps to lists
+
   // --------------------------------------------------------------------------
   // Fields extracted with {@link PinotDispatchPlanner}
   // --------------------------------------------------------------------------
@@ -67,7 +69,7 @@ public class DispatchablePlanMetadata implements Serializable {
 
   // used for build mailboxes between workers.
   // workerId -> {planFragmentId -> mailbox list}
-  private final Map<Integer, Map<Integer, MailboxMetadata>> _workerIdToMailboxesMap;
+  private final Map<Integer, Map<Integer, List<MailboxInfo>>> _workerIdToMailboxesMap;
 
   // used for tracking unavailable segments from routing table, then assemble missing segments exception.
   private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
@@ -123,7 +125,7 @@ public class DispatchablePlanMetadata implements Serializable {
     _workerIdToSegmentsMap = workerIdToSegmentsMap;
   }
 
-  public Map<Integer, Map<Integer, MailboxMetadata>> getWorkerIdToMailboxesMap() {
+  public Map<Integer, Map<Integer, List<MailboxInfo>>> getWorkerIdToMailboxesMap() {
     return _workerIdToMailboxesMap;
   }
 

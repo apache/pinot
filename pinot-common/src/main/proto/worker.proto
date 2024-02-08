@@ -49,25 +49,30 @@ message QueryResponse {
 }
 
 message StagePlan {
-  int32 stageId = 1;
-  bytes rootNode = 2; // Serialized StageNode
-  StageMetadata stageMetadata = 3;
+  bytes rootNode = 1; // Serialized StageNode
+  StageMetadata stageMetadata = 2;
 }
 
 message StageMetadata {
-  repeated WorkerMetadata workerMetadata = 1;
-  bytes customProperty = 2; // Serialized Properties
+  int32 stageId = 1;
+  repeated WorkerMetadata workerMetadata = 2;
+  bytes customProperty = 3; // Serialized Properties
 }
 
 message WorkerMetadata {
-  string virtualAddress = 1;
-  map<int32, MailboxMetadata> mailboxMetadata = 2;
+  int32 workedId = 1;
+  map<int32, MailboxInfos> mailboxMetadata = 2;
   map<string, string> customProperty = 3;
 }
 
-message MailboxMetadata {
-  repeated string mailboxId = 1;
-  repeated string virtualAddress = 2;
+message MailboxInfos {
+  repeated MailboxInfo mailboxInfo = 1;
+}
+
+message MailboxInfo {
+  string hostname = 1;
+  int32 port = 2;
+  repeated int32 workerId = 3;
 }
 
 message Properties {

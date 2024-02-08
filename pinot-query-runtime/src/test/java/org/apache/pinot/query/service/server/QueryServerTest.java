@@ -135,7 +135,8 @@ public class QueryServerTest extends QueryTestSet {
 
       DispatchablePlanFragment dispatchableStagePlan = stagePlans.get(stageId);
       List<WorkerMetadata> workerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
-      StageMetadata stageMetadata = new StageMetadata(workerMetadataList, dispatchableStagePlan.getCustomProperties());
+      StageMetadata stageMetadata =
+          new StageMetadata(stageId, workerMetadataList, dispatchableStagePlan.getCustomProperties());
 
       // ensure mock query runner received correctly deserialized payload.
       QueryRunner mockRunner = _queryRunnerMap.get(Integer.parseInt(requestMetadata.get(KEY_OF_SERVER_INSTANCE_PORT)));
@@ -190,8 +191,8 @@ public class QueryServerTest extends QueryTestSet {
   }
 
   private static boolean isWorkerMetadataEqual(WorkerMetadata expected, WorkerMetadata actual) {
-    return expected.getVirtualAddress().equals(actual.getVirtualAddress()) && EqualityUtils.isEqual(
-        expected.getTableSegmentsMap(), actual.getTableSegmentsMap());
+    return expected.getWorkerId() == actual.getWorkerId() && EqualityUtils.isEqual(expected.getTableSegmentsMap(),
+        actual.getTableSegmentsMap());
   }
 
   private static boolean isStageNodesEqual(PlanNode left, PlanNode right) {
@@ -235,11 +236,10 @@ public class QueryServerTest extends QueryTestSet {
     // as it is not testing the multi-tenancy dispatch (which is in the QueryDispatcherTest)
     QueryServerInstance serverInstance = stagePlan.getServerInstanceToWorkerIdMap().keySet().iterator().next();
     Worker.StageMetadata stageMetadata =
-        Worker.StageMetadata.newBuilder().addAllWorkerMetadata(workerMetadataList).setCustomProperty(customProperty)
-            .build();
+        Worker.StageMetadata.newBuilder().setStageId(stageId).addAllWorkerMetadata(workerMetadataList)
+            .setCustomProperty(customProperty).build();
     Worker.StagePlan protoStagePlan =
-        Worker.StagePlan.newBuilder().setStageId(stageId).setRootNode(rootNode.toByteString())
-            .setStageMetadata(stageMetadata).build();
+        Worker.StagePlan.newBuilder().setRootNode(rootNode.toByteString()).setStageMetadata(stageMetadata).build();
 
     Map<String, String> requestMetadata = new HashMap<>();
     // the default configurations that must exist.

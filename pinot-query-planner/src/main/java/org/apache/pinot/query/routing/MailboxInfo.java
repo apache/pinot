@@ -18,42 +18,37 @@
  */
 package org.apache.pinot.query.routing;
 
-import java.util.ArrayList;
 import java.util.List;
 
 
 /**
- * {@code MailboxMetadata} wraps around a list of mailboxes information from/to one connected stage.
- *  It contains the following information:
- *  <ul>
- *    <li>MailboxId: the unique id of the mailbox</li>
- *    <li>VirtualAddress: the virtual address of the mailbox</li>
- *  </ul>
+ * {@code MailboxInfo} wraps the mailbox information from/to one connected server.
  */
-public class MailboxMetadata {
-  private final List<String> _mailboxIds;
-  private final List<VirtualServerAddress> _virtualAddresses;
+public class MailboxInfo {
+  private final String _hostname;
+  private final int _port;
+  private final List<Integer> _workerIds;
 
-  public MailboxMetadata() {
-    _mailboxIds = new ArrayList<>();
-    _virtualAddresses = new ArrayList<>();
+  public MailboxInfo(String hostname, int port, List<Integer> workerIds) {
+    _hostname = hostname;
+    _port = port;
+    _workerIds = workerIds;
   }
 
-  public MailboxMetadata(List<String> mailboxIds, List<VirtualServerAddress> virtualAddresses) {
-    _mailboxIds = mailboxIds;
-    _virtualAddresses = virtualAddresses;
+  public String getHostname() {
+    return _hostname;
   }
 
-  public List<String> getMailboxIds() {
-    return _mailboxIds;
+  public int getPort() {
+    return _port;
   }
 
-  public List<VirtualServerAddress> getVirtualAddresses() {
-    return _virtualAddresses;
+  public List<Integer> getWorkerIds() {
+    return _workerIds;
   }
 
   @Override
   public String toString() {
-    return _mailboxIds + "@" + _virtualAddresses;
+    return _hostname + ":" + _port + "|" + _workerIds;
   }
 }

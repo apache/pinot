@@ -124,7 +124,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         } catch (Exception e) {
           throw new RuntimeException(
               String.format("Caught exception while deserializing stage plan for request: %d, stage: %d", requestId,
-                  protoStagePlan.getStageId()), e);
+                  protoStagePlan.getStageMetadata().getStageId()), e);
         }
         StageMetadata stageMetadata = stagePlan.getStageMetadata();
         List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
@@ -142,7 +142,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         } catch (Exception e) {
           throw new RuntimeException(
               String.format("Caught exception while submitting request: %d, stage: %d", requestId,
-                  protoStagePlan.getStageId()), e);
+                  stageMetadata.getStageId()), e);
         } finally {
           for (CompletableFuture<?> future : workerSubmissionStubs) {
             if (!future.isDone()) {

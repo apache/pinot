@@ -44,9 +44,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.physical.MailboxIdUtils;
-import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -76,15 +74,12 @@ public class OpChainTest {
   private final List<TransferableBlock> _blockList = new ArrayList<>();
   private final ExecutorService _executor = Executors.newCachedThreadPool();
   private final AtomicReference<LeafStageTransferableBlockOperator> _leafOpRef = new AtomicReference<>();
-  private final VirtualServerAddress _serverAddress = new VirtualServerAddress("localhost", 123, 0);
-  private final WorkerMetadata _workerMetadata = new WorkerMetadata(_serverAddress, ImmutableMap.of(0,
-      new MailboxMetadata(ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
-          ImmutableList.of(_serverAddress)), 1,
-      new MailboxMetadata(ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
-          ImmutableList.of(_serverAddress)), 2,
-      new MailboxMetadata(ImmutableList.of(MailboxIdUtils.toPlanMailboxId(0, 0, 0, 0)),
-          ImmutableList.of(_serverAddress))), ImmutableMap.of());
-  private final StageMetadata _stageMetadata = new StageMetadata(ImmutableList.of(_workerMetadata), ImmutableMap.of());
+  private final List<MailboxInfo> _mailboxInfos =
+      ImmutableList.of(new MailboxInfo("localhost", 1234, ImmutableList.of(0)));
+  private final WorkerMetadata _workerMetadata =
+      new WorkerMetadata(0, ImmutableMap.of(0, _mailboxInfos, 1, _mailboxInfos, 2, _mailboxInfos), ImmutableMap.of());
+  private final StageMetadata _stageMetadata =
+      new StageMetadata(0, ImmutableList.of(_workerMetadata), ImmutableMap.of());
 
   private AutoCloseable _mocks;
   @Mock
@@ -199,13 +194,9 @@ public class OpChainTest {
   public void testStatsCollectionTracingEnabledMultipleOperators() {
     long dummyOperatorWaitTime = 1000L;
 
-    int receivedStageId = 2;
-    int senderStageId = 1;
-    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 1, senderStageId, Long.MAX_VALUE,
+    OpChainExecutionContext context = new OpChainExecutionContext(_mailboxService1, 123L, Long.MAX_VALUE,
         ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"), _stageMetadata, _workerMetadata, null);
-
-    Stack<MultiStageOperator> operators =
-        getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
+    Stack<MultiStageOperator> operators = getFullOpChain(context, dummyOperatorWaitTime);
 
     OpChain opChain = new OpChain(context, operators.peek());
     opChain.getStats().executing();
@@ -214,12 +205,10 @@ public class OpChainTest {
     }
     opChain.getStats().queued();
 
-    OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, Long.MAX_VALUE,
-            ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"), _stageMetadata, _workerMetadata, null);
-
+    OpChainExecutionContext secondStageContext = new OpChainExecutionContext(_mailboxService2, 123L, Long.MAX_VALUE,
+        ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"), _stageMetadata, _workerMetadata, null);
     MailboxReceiveOperator secondStageReceiveOp =
-        new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId + 1);
+        new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, 1);
 
     assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
     int numOperators = operators.size();
@@ -238,14 +227,10 @@ public class OpChainTest {
   public void testStatsCollectionTracingDisableMultipleOperators() {
     long dummyOperatorWaitTime = 1000L;
 
-    int receivedStageId = 2;
-    int senderStageId = 1;
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService1, 1, senderStageId, Long.MAX_VALUE, ImmutableMap.of(),
-            _stageMetadata, _workerMetadata, null);
-
-    Stack<MultiStageOperator> operators =
-        getFullOpchain(receivedStageId, senderStageId, context, dummyOperatorWaitTime);
+        new OpChainExecutionContext(_mailboxService1, 123L, Long.MAX_VALUE, ImmutableMap.of(), _stageMetadata,
+            _workerMetadata, null);
+    Stack<MultiStageOperator> operators = getFullOpChain(context, dummyOperatorWaitTime);
 
     OpChain opChain = new OpChain(context, operators.peek());
     opChain.getStats().executing();
@@ -253,10 +238,10 @@ public class OpChainTest {
     opChain.getStats().queued();
 
     OpChainExecutionContext secondStageContext =
-        new OpChainExecutionContext(_mailboxService2, 1, senderStageId + 1, Long.MAX_VALUE, ImmutableMap.of(),
-            _stageMetadata, _workerMetadata, null);
+        new OpChainExecutionContext(_mailboxService2, 123L, Long.MAX_VALUE, ImmutableMap.of(), _stageMetadata,
+            _workerMetadata, null);
     MailboxReceiveOperator secondStageReceiveOp =
-        new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, senderStageId);
+        new MailboxReceiveOperator(secondStageContext, RelDistribution.Type.BROADCAST_DISTRIBUTED, 1);
 
     assertTrue(opChain.getStats().getExecutionTime() >= dummyOperatorWaitTime);
     assertEquals(opChain.getStats().getOperatorStatsMap().size(), 2);
@@ -275,8 +260,7 @@ public class OpChainTest {
     assertEquals(secondStageContext.getStats().getOperatorStatsMap().size(), 2);
   }
 
-  private Stack<MultiStageOperator> getFullOpchain(int receivedStageId, int senderStageId,
-      OpChainExecutionContext context, long waitTimeInMillis) {
+  private Stack<MultiStageOperator> getFullOpChain(OpChainExecutionContext context, long waitTimeInMillis) {
     Stack<MultiStageOperator> operators = new Stack<>();
     DataSchema upStreamSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{ColumnDataType.INT});
     //Mailbox Receive Operator

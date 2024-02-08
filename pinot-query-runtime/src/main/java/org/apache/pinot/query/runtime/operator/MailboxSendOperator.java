@@ -20,11 +20,11 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -32,8 +32,8 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
-import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -91,18 +91,13 @@ public class MailboxSendOperator extends MultiStageOperator {
     long requestId = context.getRequestId();
     long deadlineMs = context.getDeadlineMs();
 
-    MailboxMetadata mailboxMetadata = context.getWorkerMetadata().getMailboxMetadataMap().get(receiverStageId);
-    List<String> sendingMailboxIds = MailboxIdUtils.toMailboxIds(requestId, mailboxMetadata);
-    List<VirtualServerAddress> sendingAddresses = mailboxMetadata.getVirtualAddresses();
-    int numMailboxes = sendingMailboxIds.size();
-    List<SendingMailbox> sendingMailboxes = new ArrayList<>(numMailboxes);
-    for (int i = 0; i < numMailboxes; i++) {
-      String sendingMailboxId = sendingMailboxIds.get(i);
-      VirtualServerAddress sendingAddress = sendingAddresses.get(i);
-      sendingMailboxes.add(
-          mailboxService.getSendingMailbox(sendingAddress.hostname(), sendingAddress.port(), sendingMailboxId,
-              deadlineMs));
-    }
+    List<MailboxInfo> mailboxInfos = context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId);
+    List<RoutingInfo> routingInfos =
+        MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
+            mailboxInfos);
+    List<SendingMailbox> sendingMailboxes = routingInfos.stream()
+        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs))
+        .collect(Collectors.toList());
     return BlockExchange.getExchange(sendingMailboxes, distributionType, distributionKeys,
         TransferableBlockUtils::splitBlock);
   }
