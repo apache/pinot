@@ -451,8 +451,8 @@ public final class TlsUtils {
               + "(built from key store {} and truststore {})",
               changedFile, baseSslFactory, keyStorePath, trustStorePath);
           try {
-            // Need to retry a few times because when one file is updated, the file may not have been fully written
-            // yet, so we need to wait a bit and retry.
+            // Need to retry a few times because when one file (key store or trust store) is updated, the other file
+            // (trust store or key store) may not have been fully written yet, so we need to wait a bit and retry.
             RetryPolicies.fixedDelayRetryPolicy(maxSslFactoryReloadingAttempts, sslFactoryReloadingRetryDelayMs)
                 .attempt(() -> {
                   try {
