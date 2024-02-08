@@ -114,7 +114,7 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
    * @param segmentName the name of the segment to fetch.
    * @param uriSupplier the supplier to the list of segment download uris.
    * @param dest        The destination to put the downloaded segment.
-   * throws exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
+   * @throws Exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
    * This method keeps retrying (with exponential backoff) to go through the list download uris to fetch the segment
    * until the retry limit is reached.
    *

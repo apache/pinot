@@ -667,7 +667,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             Collections.shuffle(peerServerURIs);
             return peerServerURIs;
           }, segmentTarFile);
-      _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, segmentTarFile,
+      _logger.info("Fetched segment {} successfully to {} of size {}", segmentName, segmentTarFile,
           segmentTarFile.length());
       untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile, tempRootDir);
     } catch (Exception e) {
