@@ -30,81 +30,59 @@ import org.apache.http.client.utils.URIBuilder;
 
 
 /**
- * RoundRobinURIProvider accept a URI / list of URIs and whether to resolve them into multiple URIs with IP address.
- * If resolveHost = true (default), it returns a IP address URI in a Round Robin way.
+ * RoundRobinURIProvider accept a list of URIs and whether to resolve them into multiple URIs with IP address.
+ * If resolveHost = true, it returns a IP address URI in a Round Robin way.
  * If resolveHost = false, then it returns a URI in a Round Robin way.
  */
 public class RoundRobinURIProvider {
 
-  private final URI[] _uris;
+  private final List<URI> _uris;
   private int _index;
-
-  public RoundRobinURIProvider(URI originalUri)
-      throws UnknownHostException, URISyntaxException {
-    this(originalUri, true);
-  }
-
-  public RoundRobinURIProvider(URI originalUri, boolean resolveHost)
-      throws UnknownHostException, URISyntaxException {
-    if (resolveHost) {
-      _uris = resolveHostToIPAddresses(originalUri);
-    } else {
-      _uris = new URI[]{originalUri};
-    }
-    _index = new Random().nextInt(_uris.length);
-  }
-
-  public RoundRobinURIProvider(List<URI> originalUris)
-      throws UnknownHostException, URISyntaxException {
-    this(originalUris, true);
-  }
 
   public RoundRobinURIProvider(List<URI> originalUris, boolean resolveHost)
       throws UnknownHostException, URISyntaxException {
     if (resolveHost) {
       _uris = resolveHostsToIPAddresses(originalUris);
     } else {
-      _uris = originalUris.toArray(new URI[0]);
+      _uris = originalUris;
     }
-    _index = new Random().nextInt(_uris.length);
+    _index = new Random().nextInt(_uris.size());
   }
 
   public int numAddresses() {
-    return _uris.length;
+    return _uris.size();
   }
 
   public URI next() {
-    URI result = _uris[_index];
-    _index = (_index + 1) % _uris.length;
+    URI result = _uris.get(_index);
+    _index = (_index + 1) % _uris.size();
     return result;
   }
 
-  public URI[] resolveHostToIPAddresses(URI originalUri)
+  private List<URI> resolveHostToIPAddresses(URI originalUri)
       throws UnknownHostException, URISyntaxException {
-    URI[] resolvedUris;
+    List<URI> resolvedUris = new ArrayList<>();
     String hostName = originalUri.getHost();
     if (InetAddresses.isInetAddress(hostName)) {
-      resolvedUris = new URI[]{originalUri};
+      resolvedUris.add(originalUri);
     } else {
       // Resolve host name to IP addresses via DNS
       InetAddress[] addresses = InetAddress.getAllByName(hostName);
-      resolvedUris = new URI[addresses.length];
       URIBuilder uriBuilder = new URIBuilder(originalUri);
-      for (int i = 0; i < addresses.length; i++) {
-        String ip = addresses[i].getHostAddress();
-        resolvedUris[i] = uriBuilder.setHost(ip).build();
+      for (InetAddress address : addresses) {
+        String ip = address.getHostAddress();
+        resolvedUris.add(uriBuilder.setHost(ip).build());
       }
     }
     return resolvedUris;
   }
 
-  public URI[] resolveHostsToIPAddresses(List<URI> originalUri)
+  private List<URI> resolveHostsToIPAddresses(List<URI> originalUri)
       throws UnknownHostException, URISyntaxException {
-    List<URI> resolvedUrisList = new ArrayList<>();
+    List<URI> resolvedUris = new ArrayList<>();
     for (URI uri : originalUri) {
-      resolvedUrisList.addAll(List.of(resolveHostToIPAddresses(uri)));
+      resolvedUris.addAll(resolveHostToIPAddresses(uri));
     }
-
-    return resolvedUrisList.toArray(new URI[0]);
+    return resolvedUris;
   }
 }

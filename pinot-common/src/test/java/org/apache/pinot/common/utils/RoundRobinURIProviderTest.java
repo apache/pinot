@@ -162,7 +162,7 @@ public class RoundRobinURIProviderTest {
 
     for (TestCase testCase : testCases) {
       String uri = testCase._originalUri;
-      RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(new URI(uri));
+      RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(List.of(new URI(uri)), true);
       int n = testCase._expectedUris.size();
       int previousIndex = -1;
       int currentIndex;
