@@ -142,6 +142,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected volatile boolean _isServerReadyToServeQueries = false;
+  protected String _serverTimezone;
 
   @Override
   public void init(PinotConfiguration serverConf)
@@ -153,6 +154,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
 
     setupHelixSystemProperties();
+    setupServerTimezone();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
     _hostname = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
         _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
@@ -417,7 +419,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
-    // Update system resource info (CPU, memory, etc)
+    // Update system resource info (CPU, memory, etc.)
     Map<String, String> newSystemResourceInfoMap = new SystemResourceInfo().toMap();
     Map<String, String> existingSystemResourceInfoMap =
         znRecord.getMapField(CommonConstants.Helix.Instance.SYSTEM_RESOURCE_INFO_KEY);
@@ -426,7 +428,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       if (existingSystemResourceInfoMap == null) {
         existingSystemResourceInfoMap = newSystemResourceInfoMap;
       } else {
-        // existingSystemResourceInfoMap may contains more KV pairs than newSystemResourceInfoMap,
+        // existingSystemResourceInfoMap may contain more KV pairs than newSystemResourceInfoMap,
         // we need to preserve those KV pairs and only update the different values.
         for (Map.Entry<String, String> entry : newSystemResourceInfoMap.entrySet()) {
           existingSystemResourceInfoMap.put(entry.getKey(), entry.getValue());
@@ -468,6 +470,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
     return false;
+  }
+
+  private void setupServerTimezone() {
+   _serverTimezone = _serverConf.getProperty(Server.CONFIG_OF_TIMEZONE, Server.DEFAULT_TIMEZONE);
+   System.setProperty("user.timezone", _serverTimezone);
+   LOGGER.info("Server Timezone: {}", _serverTimezone);
   }
 
   private void setupHelixSystemProperties() {
@@ -768,7 +776,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   /**
    * When shutting down the server, waits for all the resources turn OFFLINE (all partitions served by the server are
-   * neither ONLINE or CONSUMING).
+   * neither ONLINE nor CONSUMING).
    *
    * @param endTimeMs Timeout for the check
    */

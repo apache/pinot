@@ -128,6 +128,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   // Handles the server routing stats.
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
   protected BrokerQueryEventListener _brokerQueryEventListener;
+  protected String _brokerTimezone;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -143,6 +144,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       _brokerConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, NetUtils.findOpenPort());
     }
     setupHelixSystemProperties();
+    setupBrokerTimezone();
     _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
     _hostname = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
     if (_hostname == null) {
@@ -177,6 +179,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // non-positive value, so set the default value as 1.
     System.setProperty(SystemPropertyKeys.FLAPPING_TIME_WINDOW,
         _brokerConf.getProperty(Helix.CONFIG_OF_BROKER_FLAPPING_TIME_WINDOW_MS, Helix.DEFAULT_FLAPPING_TIME_WINDOW_MS));
+  }
+
+  private void setupBrokerTimezone() {
+    _brokerTimezone = _brokerConf.getProperty(Broker.CONFIG_OF_TIMEZONE, Broker.DEFAULT_TIMEZONE);
+    System.setProperty("user.timezone", _brokerTimezone);
+    LOGGER.info("Broker Timezone: {}", _brokerTimezone );
   }
 
   public int getPort() {
