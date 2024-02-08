@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.plan;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.operator.OpChainId;
@@ -38,11 +39,11 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class OpChainExecutionContext {
   private final MailboxService _mailboxService;
   private final long _requestId;
-  private final int _stageId;
   private final long _deadlineMs;
   private final Map<String, String> _opChainMetadata;
   private final StageMetadata _stageMetadata;
   private final WorkerMetadata _workerMetadata;
+  private final VirtualServerAddress _server;
   private final OpChainId _id;
   private final OpChainStats _stats;
   private final PipelineBreakerResult _pipelineBreakerResult;
@@ -50,17 +51,18 @@ public class OpChainExecutionContext {
 
   private ServerPlanRequestContext _leafStageContext;
 
-  public OpChainExecutionContext(MailboxService mailboxService, long requestId, int stageId, long deadlineMs,
+  public OpChainExecutionContext(MailboxService mailboxService, long requestId, long deadlineMs,
       Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
       PipelineBreakerResult pipelineBreakerResult) {
     _mailboxService = mailboxService;
     _requestId = requestId;
-    _stageId = stageId;
     _deadlineMs = deadlineMs;
     _opChainMetadata = Collections.unmodifiableMap(opChainMetadata);
     _stageMetadata = stageMetadata;
     _workerMetadata = workerMetadata;
-    _id = new OpChainId(requestId, workerMetadata.getVirtualAddress().workerId(), stageId);
+    _server =
+        new VirtualServerAddress(mailboxService.getHostname(), mailboxService.getPort(), workerMetadata.getWorkerId());
+    _id = new OpChainId(requestId, workerMetadata.getWorkerId(), stageMetadata.getStageId());
     _stats = new OpChainStats(_id.toString());
     _pipelineBreakerResult = pipelineBreakerResult;
     if (pipelineBreakerResult != null && pipelineBreakerResult.getOpChainStats() != null) {
@@ -78,11 +80,15 @@ public class OpChainExecutionContext {
   }
 
   public int getStageId() {
-    return _stageId;
+    return _stageMetadata.getStageId();
+  }
+
+  public int getWorkerId() {
+    return _workerMetadata.getWorkerId();
   }
 
   public VirtualServerAddress getServer() {
-    return _workerMetadata.getVirtualAddress();
+    return _server;
   }
 
   public long getDeadlineMs() {

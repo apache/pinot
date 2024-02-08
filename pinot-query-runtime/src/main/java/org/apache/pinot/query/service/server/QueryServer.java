@@ -31,11 +31,11 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
+import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.query.runtime.plan.StagePlan;
-import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -124,7 +124,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         } catch (Exception e) {
           throw new RuntimeException(
               String.format("Caught exception while deserializing stage plan for request: %d, stage: %d", requestId,
-                  protoStagePlan.getStageId()), e);
+                  protoStagePlan.getStageMetadata().getStageId()), e);
         }
         StageMetadata stageMetadata = stagePlan.getStageMetadata();
         List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
@@ -142,7 +142,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         } catch (Exception e) {
           throw new RuntimeException(
               String.format("Caught exception while submitting request: %d, stage: %d", requestId,
-                  protoStagePlan.getStageId()), e);
+                  stageMetadata.getStageId()), e);
         } finally {
           for (CompletableFuture<?> future : workerSubmissionStubs) {
             if (!future.isDone()) {

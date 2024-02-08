@@ -24,7 +24,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.runtime.plan.StagePlan;
+import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 
 

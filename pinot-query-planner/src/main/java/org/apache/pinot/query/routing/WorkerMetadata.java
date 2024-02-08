@@ -44,29 +44,29 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class WorkerMetadata {
   public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
 
-  private final VirtualServerAddress _virtualAddress;
-  private final Map<Integer, MailboxMetadata> _mailboxMetadataMap;
+  private final int _workerId;
+  private final Map<Integer, MailboxInfos> _mailboxInfosMap;
   private final Map<String, String> _customProperties;
 
-  public WorkerMetadata(VirtualServerAddress virtualAddress, Map<Integer, MailboxMetadata> mailboxMetadataMap) {
-    _virtualAddress = virtualAddress;
-    _mailboxMetadataMap = mailboxMetadataMap;
+  public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap) {
+    _workerId = workerId;
+    _mailboxInfosMap = mailboxInfosMap;
     _customProperties = new HashMap<>();
   }
 
-  public WorkerMetadata(VirtualServerAddress virtualAddress, Map<Integer, MailboxMetadata> mailboxMetadataMap,
+  public WorkerMetadata(int workerId, Map<Integer, MailboxInfos> mailboxInfosMap,
       Map<String, String> customProperties) {
-    _virtualAddress = virtualAddress;
-    _mailboxMetadataMap = mailboxMetadataMap;
+    _workerId = workerId;
+    _mailboxInfosMap = mailboxInfosMap;
     _customProperties = customProperties;
   }
 
-  public VirtualServerAddress getVirtualAddress() {
-    return _virtualAddress;
+  public int getWorkerId() {
+    return _workerId;
   }
 
-  public Map<Integer, MailboxMetadata> getMailboxMetadataMap() {
-    return _mailboxMetadataMap;
+  public Map<Integer, MailboxInfos> getMailboxInfosMap() {
+    return _mailboxInfosMap;
   }
 
   public Map<String, String> getCustomProperties() {

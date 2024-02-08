@@ -34,8 +34,10 @@ import org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
-import org.apache.pinot.query.routing.MailboxMetadata;
-import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.RoutingInfo;
+import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
@@ -43,8 +45,6 @@ import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.query.runtime.plan.StagePlan;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
@@ -62,6 +62,8 @@ import org.slf4j.LoggerFactory;
 public class QueryRunner {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
 
+  private String _hostname;
+  private int _port;
   private HelixManager _helixManager;
   private ServerMetrics _serverMetrics;
 
@@ -88,15 +90,16 @@ public class QueryRunner {
    */
   public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, HelixManager helixManager,
       ServerMetrics serverMetrics) {
-    _helixManager = helixManager;
-    _serverMetrics = serverMetrics;
-
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH);
     }
     int port = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
+    _hostname = hostname;
+    _port = port;
+    _helixManager = helixManager;
+    _serverMetrics = serverMetrics;
 
     // TODO: Consider using separate config for intermediate stage and leaf stage
     String numGroupsLimitStr = config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
@@ -163,25 +166,25 @@ public class QueryRunner {
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
       TransferableBlock errorBlock = pipelineBreakerResult.getErrorBlock();
+      int stageId = stageMetadata.getStageId();
       LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
-          stagePlan.getStageId(), errorBlock.getExceptions());
+          stageId, errorBlock.getExceptions());
       int receiverStageId = ((MailboxSendNode) stagePlan.getRootNode()).getReceiverStageId();
-      MailboxMetadata mailboxMetadata = workerMetadata.getMailboxMetadataMap().get(receiverStageId);
-      List<String> mailboxIds = MailboxIdUtils.toMailboxIds(requestId, mailboxMetadata);
-      List<VirtualServerAddress> virtualAddresses = mailboxMetadata.getVirtualAddresses();
-      int numMailboxes = mailboxIds.size();
-      for (int i = 0; i < numMailboxes; i++) {
-        String mailboxId = mailboxIds.get(i);
-        VirtualServerAddress virtualAddress = virtualAddresses.get(i);
+      List<MailboxInfo> receiverMailboxInfos =
+          workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+      List<RoutingInfo> routingInfos =
+          MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
+              receiverMailboxInfos);
+      for (RoutingInfo routingInfo : routingInfos) {
         try {
-          _mailboxService.getSendingMailbox(virtualAddress.hostname(), virtualAddress.port(), mailboxId, deadlineMs)
-              .send(errorBlock);
+          _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
+              routingInfo.getMailboxId(), deadlineMs).send(errorBlock);
         } catch (TimeoutException e) {
-          LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}", mailboxId, requestId,
-              stagePlan.getStageId(), e);
+          LOGGER.warn("Timed out sending error block to mailbox: {} for request: {}, stage: {}",
+              routingInfo.getMailboxId(), requestId, stageId, e);
         } catch (Exception e) {
-          LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}", mailboxId,
-              requestId, stagePlan.getStageId(), e);
+          LOGGER.error("Caught exception sending error block to mailbox: {} for request: {}, stage: {}",
+              routingInfo.getMailboxId(), requestId, stageId, e);
         }
       }
       return;
@@ -189,8 +192,8 @@ public class QueryRunner {
 
     // run OpChain
     OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(_mailboxService, requestId, stagePlan.getStageId(), deadlineMs, opChainMetadata,
-            stageMetadata, workerMetadata, pipelineBreakerResult);
+        new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
+            workerMetadata, pipelineBreakerResult);
     OpChain opChain;
     if (workerMetadata.isLeafStageWorker()) {
       opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager, _serverMetrics,
