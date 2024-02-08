@@ -271,6 +271,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     System.setProperty("user.timezone", _controllerTimezone);
     LOGGER.info("Controller Timezone: {}", _controllerTimezone);
   }
+
   private void setupHelixSystemProperties() {
     // NOTE: Helix will disconnect the manager and disable the instance if it detects flapping (too frequent disconnect
     // from ZooKeeper). Setting flapping time window to a small value can avoid this from happening. Helix ignores the
