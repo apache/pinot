@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.query.planner.explain;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
@@ -41,8 +39,8 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 
 
 /**
@@ -214,14 +212,13 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
     appendInfo(node, context);
 
     int receiverStageId = node.getReceiverStageId();
-    List<VirtualServerAddress> serverAddressList =
+    List<MailboxInfo> receiverMailboxInfos =
         _dispatchableSubPlan.getQueryStageList().get(node.getPlanFragmentId()).getWorkerMetadataList()
-            .get(context._workerId).getMailboxMetadataMap().get(receiverStageId).getVirtualAddresses();
-    List<String> serverInstanceToWorkerIdList = stringifyVirtualServerAddresses(serverAddressList);
+            .get(context._workerId).getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
     context._builder.append("->");
-    String receivers = serverInstanceToWorkerIdList.stream()
-        .map(s -> "[" + receiverStageId + "]@" + s)
-        .collect(Collectors.joining(",", "{", "}"));
+    // Sort to ensure print order
+    String receivers = receiverMailboxInfos.stream().sorted(Comparator.comparingInt(MailboxInfo::getPort))
+        .map(v -> "[" + receiverStageId + "]@" + v).collect(Collectors.joining(",", "{", "}"));
     return context._builder.append(receivers);
   }
 
@@ -275,25 +272,5 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
           _builder
       );
     }
-  }
-
-  public static List<String> stringifyVirtualServerAddresses(List<VirtualServerAddress> serverAddressList) {
-    // using tree map to ensure print order.
-    Map<QueryServerInstance, List<Integer>> serverToWorkerIdMap = new TreeMap<>(
-        Comparator.comparing(QueryServerInstance::toString));
-    for (VirtualServerAddress serverAddress : serverAddressList) {
-      QueryServerInstance server = new QueryServerInstance(serverAddress.hostname(), serverAddress.port(), -1);
-      List<Integer> workerIds = serverToWorkerIdMap.getOrDefault(server, new ArrayList<>());
-      workerIds.add(serverAddress.workerId());
-      serverToWorkerIdMap.put(server, workerIds);
-    }
-    return serverToWorkerIdMap.entrySet().stream()
-        .map(PhysicalExplainPlanVisitor::stringifyQueryServerInstanceToWorkerIdsEntry)
-        .collect(Collectors.toList());
-  }
-
-  public static String stringifyQueryServerInstanceToWorkerIdsEntry(Map.Entry<QueryServerInstance, List<Integer>> e) {
-    QueryServerInstance server = e.getKey();
-    return server.getHostname() + ":" + server.getQueryServicePort() + "|" + e.getValue();
   }
 }

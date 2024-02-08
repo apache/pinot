@@ -25,13 +25,12 @@ import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
@@ -52,20 +51,17 @@ public class MailboxSendOperatorTest {
 
   private AutoCloseable _mocks;
   @Mock
-  private VirtualServerAddress _server;
+  private MailboxService _mailboxService;
   @Mock
   private MultiStageOperator _sourceOperator;
-  @Mock
-  private MailboxService _mailboxService;
   @Mock
   private BlockExchange _exchange;
 
   @BeforeMethod
   public void setUpMethod() {
     _mocks = openMocks(this);
-    when(_server.hostname()).thenReturn("mock");
-    when(_server.port()).thenReturn(0);
-    when(_server.workerId()).thenReturn(0);
+    when(_mailboxService.getHostname()).thenReturn("localhost");
+    when(_mailboxService.getPort()).thenReturn(1234);
   }
 
   @AfterMethod
@@ -198,11 +194,12 @@ public class MailboxSendOperatorTest {
   }
 
   private MailboxSendOperator getMailboxSendOperator() {
-    WorkerMetadata workerMetadata = new WorkerMetadata(_server, ImmutableMap.of(), ImmutableMap.of());
-    StageMetadata stageMetadata = new StageMetadata(ImmutableList.of(workerMetadata), ImmutableMap.of());
+    WorkerMetadata workerMetadata = new WorkerMetadata(0, ImmutableMap.of(), ImmutableMap.of());
+    StageMetadata stageMetadata =
+        new StageMetadata(SENDER_STAGE_ID, ImmutableList.of(workerMetadata), ImmutableMap.of());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(_mailboxService, 0, SENDER_STAGE_ID, Long.MAX_VALUE, ImmutableMap.of(),
-            stageMetadata, workerMetadata, null);
+        new OpChainExecutionContext(_mailboxService, 123L, Long.MAX_VALUE, ImmutableMap.of(), stageMetadata,
+            workerMetadata, null);
     return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
   }
 }

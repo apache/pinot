@@ -54,7 +54,9 @@ import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.StageNodeSerDeUtils;
+import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -63,8 +65,6 @@ import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
-import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -170,11 +170,11 @@ public class QueryDispatcher {
                   QueryPlanSerDeUtils.toProtoWorkerMetadataList(workerMetadataList);
               StageInfo stageInfo = stageInfos.get(i);
               Worker.StageMetadata stageMetadata =
-                  Worker.StageMetadata.newBuilder().addAllWorkerMetadata(protoWorkerMetadataList)
+                  Worker.StageMetadata.newBuilder().setStageId(stageId).addAllWorkerMetadata(protoWorkerMetadataList)
                       .setCustomProperty(stageInfo._customProperty).build();
               requestBuilder.addStagePlan(
-                  Worker.StagePlan.newBuilder().setStageId(stageId).setRootNode(stageInfo._rootNode)
-                      .setStageMetadata(stageMetadata).build());
+                  Worker.StagePlan.newBuilder().setRootNode(stageInfo._rootNode).setStageMetadata(stageMetadata)
+                      .build());
             }
           }
           requestBuilder.setMetadata(protoRequestMetadata);
@@ -264,10 +264,10 @@ public class QueryDispatcher {
     List<WorkerMetadata> workerMetadataList = dispatchableStagePlan.getWorkerMetadataList();
     Preconditions.checkState(workerMetadataList.size() == 1, "Expecting single worker for reduce stage, got: %s",
         workerMetadataList.size());
-    StageMetadata stageMetadata = new StageMetadata(workerMetadataList, dispatchableStagePlan.getCustomProperties());
+    StageMetadata stageMetadata = new StageMetadata(0, workerMetadataList, dispatchableStagePlan.getCustomProperties());
     OpChainExecutionContext opChainExecutionContext =
-        new OpChainExecutionContext(mailboxService, requestId, planFragment.getFragmentId(),
-            System.currentTimeMillis() + timeoutMs, queryOptions, stageMetadata, workerMetadataList.get(0), null);
+        new OpChainExecutionContext(mailboxService, requestId, System.currentTimeMillis() + timeoutMs, queryOptions,
+            stageMetadata, workerMetadataList.get(0), null);
     MailboxReceiveOperator receiveOperator =
         new MailboxReceiveOperator(opChainExecutionContext, receiveNode.getDistributionType(),
             receiveNode.getSenderStageId());

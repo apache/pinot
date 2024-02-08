@@ -16,36 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.plan;
+package org.apache.pinot.query.routing;
 
-import org.apache.pinot.query.planner.plannode.PlanNode;
+import com.google.protobuf.ByteString;
+import java.util.List;
 
 
 /**
- * {@code StagePlan} is the deserialized version of the {@link org.apache.pinot.common.proto.Worker.StagePlan}.
- *
- * <p>It is also the extended version of the {@link org.apache.pinot.core.query.request.ServerQueryRequest}.
+ * {@code SharedMailboxInfos} is the shared version of the {@link MailboxInfos} which can cache the proto bytes and
+ * reduce overhead of serialization.
  */
-public class StagePlan {
-  private final int _stageId;
-  private final PlanNode _rootNode;
-  private final StageMetadata _stageMetadata;
+public class SharedMailboxInfos extends MailboxInfos {
+  private ByteString _protoBytes;
 
-  public StagePlan(int stageId, PlanNode rootNode, StageMetadata stageMetadata) {
-    _stageId = stageId;
-    _rootNode = rootNode;
-    _stageMetadata = stageMetadata;
+  public SharedMailboxInfos(List<MailboxInfo> mailboxInfos) {
+    super(mailboxInfos);
   }
 
-  public int getStageId() {
-    return _stageId;
+  public SharedMailboxInfos(MailboxInfo mailboxInfo) {
+    super(mailboxInfo);
   }
 
-  public PlanNode getRootNode() {
-    return _rootNode;
-  }
-
-  public StageMetadata getStageMetadata() {
-    return _stageMetadata;
+  @Override
+  public synchronized ByteString toProtoBytes() {
+    if (_protoBytes == null) {
+      _protoBytes = super.toProtoBytes();
+    }
+    return _protoBytes;
   }
 }

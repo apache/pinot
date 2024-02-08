@@ -26,14 +26,17 @@ import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageMetadata;
 import org.apache.pinot.query.testutils.MockDataBlockOperatorFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class OperatorTestUtil {
@@ -78,7 +81,7 @@ public class OperatorTestUtil {
 
   public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, long deadlineMs,
       StageMetadata stageMetadata) {
-    return new OpChainExecutionContext(mailboxService, 0, 0, deadlineMs, ImmutableMap.of(), stageMetadata,
+    return new OpChainExecutionContext(mailboxService, 0, deadlineMs, ImmutableMap.of(), stageMetadata,
         stageMetadata.getWorkerMetadataList().get(0), null);
   }
 
@@ -91,9 +94,11 @@ public class OperatorTestUtil {
   }
 
   private static OpChainExecutionContext getDefaultContext(Map<String, String> opChainMetadata) {
-    WorkerMetadata workerMetadata =
-        new WorkerMetadata(new VirtualServerAddress("mock", 80, 0), ImmutableMap.of(), ImmutableMap.of());
-    return new OpChainExecutionContext(null, 1, 2, Long.MAX_VALUE, opChainMetadata,
-        new StageMetadata(ImmutableList.of(workerMetadata), ImmutableMap.of()), workerMetadata, null);
+    MailboxService mailboxService = mock(MailboxService.class);
+    when(mailboxService.getHostname()).thenReturn("localhost");
+    when(mailboxService.getPort()).thenReturn(1234);
+    WorkerMetadata workerMetadata = new WorkerMetadata(0, ImmutableMap.of(), ImmutableMap.of());
+    return new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE, opChainMetadata,
+        new StageMetadata(0, ImmutableList.of(workerMetadata), ImmutableMap.of()), workerMetadata, null);
   }
 }
