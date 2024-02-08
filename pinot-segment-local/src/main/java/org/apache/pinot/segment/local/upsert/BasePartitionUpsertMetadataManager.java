@@ -616,7 +616,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     _snapshotLock.writeLock().lock();
     try {
+      long startTime = System.currentTimeMillis();
       doTakeSnapshot();
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_TIME_MS, duration,
+          TimeUnit.MILLISECONDS);
     } finally {
       _snapshotLock.writeLock().unlock();
       finishOperation();
@@ -631,6 +635,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     long startTimeMs = System.currentTimeMillis();
 
     int numImmutableSegments = 0;
+    int numConsumingSegments = 0;
     // The segments without validDocIds snapshots should take their snapshots at last. So that when there is failure
     // to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of valid docs across
     // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
@@ -638,6 +643,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     for (IndexSegment segment : _trackedSegments) {
       if (!(segment instanceof ImmutableSegmentImpl)) {
+        numConsumingSegments++;
         continue;
       }
       ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
@@ -660,8 +666,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
     _logger.info(
-        "Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments) in {}ms",
-        numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments, System.currentTimeMillis() - startTimeMs);
+        "Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
+            + "{} consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
+        numConsumingSegments, System.currentTimeMillis() - startTimeMs);
   }
 
   /**
