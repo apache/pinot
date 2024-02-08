@@ -23,6 +23,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -107,6 +108,40 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
       AtomicInteger attempts)
       throws Exception {
     throw new UnsupportedOperationException();
+  }
+
+  /**
+   * @param segmentName the name of the segment to fetch.
+   * @param uriSupplier the supplier to the list of segment download uris.
+   * @param dest        The destination to put the downloaded segment.
+   * @throws Exception when the segment fetch fails after all attempts are exhausted or other runtime exceptions occur.
+   * This method keeps retrying (with exponential backoff) to go through the list download uris to fetch the segment
+   * until the retry limit is reached.
+   *
+   */
+  @Override
+  public void fetchSegmentToLocal(String segmentName, Supplier<List<URI>> uriSupplier, File dest) throws Exception {
+    try {
+      int attempt =
+          RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+            List<URI> suppliedURIs = uriSupplier.get();
+            // Go through the list of URIs to fetch the segment until success.
+            for (URI uri : suppliedURIs) {
+              try {
+                fetchSegmentToLocalWithoutRetry(uri, dest);
+                return true;
+              } catch (Exception e) {
+                _logger.warn("Download segment {} from peer {} failed.", segmentName, uri, e);
+              }
+            }
+            // None of the URI works. Return false for retry.
+            return false;
+          });
+      _logger.info("Download segment {} successfully with {} attempts.", segmentName, attempt + 1);
+    } catch (Exception e) {
+      _logger.error("Failed to download segment {} after retries.", segmentName, e);
+      throw e;
+    }
   }
 
   /**
