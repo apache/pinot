@@ -709,6 +709,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   /**
+   * Retrieves a mapping of partition id to the primary key count for the partition.
+   *
+   * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition.
+   */
+  public Map<Integer, Long> getUpsertPartitionToPrimaryKeyCount() {
+    if (isUpsertEnabled()) {
+      return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
+    }
+    return Collections.emptyMap();
+  }
+
+  /**
    * Validate a schema against the table config for real-time record consumption.
    * Ideally, we should validate these things when schema is added or table is created, but either of these
    * may be changed while the table is already provisioned. For the change to take effect, we need to restart the

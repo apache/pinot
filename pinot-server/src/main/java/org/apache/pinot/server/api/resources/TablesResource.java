@@ -80,6 +80,7 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -286,9 +287,23 @@ public class TablesResource {
       }
     }
 
+    // fetch partition to primary key count for realtime tables that have upsert enabled
+    Map<Integer, Long> upsertPartitionToPrimaryKeyCountMap = new HashMap<>();
+    if (tableDataManager instanceof RealtimeTableDataManager) {
+      RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
+      upsertPartitionToPrimaryKeyCountMap = realtimeTableDataManager.getUpsertPartitionToPrimaryKeyCount();
+    }
+
+    // construct upsertPartitionToServerPrimaryKeyCountMap to populate in TableMetadataInfo
+    Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap = new HashMap<>();
+    upsertPartitionToPrimaryKeyCountMap.forEach(
+        (partition, primaryKeyCount) -> upsertPartitionToServerPrimaryKeyCountMap.put(partition,
+            Map.of(instanceDataManager.getInstanceId(), primaryKeyCount)));
+
     TableMetadataInfo tableMetadataInfo =
         new TableMetadataInfo(tableDataManager.getTableName(), totalSegmentSizeBytes, segmentDataManagers.size(),
-            totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap);
+            totalNumRows, columnLengthMap, columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizesMap,
+            upsertPartitionToServerPrimaryKeyCountMap);
     return ResourceUtils.convertToJsonString(tableMetadataInfo);
   }
 
