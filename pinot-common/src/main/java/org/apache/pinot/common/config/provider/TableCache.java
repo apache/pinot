@@ -47,6 +47,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -70,6 +71,8 @@ public class TableCache implements PinotConfigProvider {
   private static final String REALTIME_TABLE_SUFFIX = "_REALTIME";
   private static final String LOWER_CASE_OFFLINE_TABLE_SUFFIX = OFFLINE_TABLE_SUFFIX.toLowerCase();
   private static final String LOWER_CASE_REALTIME_TABLE_SUFFIX = REALTIME_TABLE_SUFFIX.toLowerCase();
+
+  private static final String DEFAULT_DATABASE_PREFIX = CommonConstants.DEFAULT_DATABASE + ".";
 
   // NOTE: No need to use concurrent set because it is always accessed within the ZK change listener lock
   private final Set<TableConfigChangeListener> _tableConfigChangeListeners = new HashSet<>();
@@ -145,6 +148,26 @@ public class TableCache implements PinotConfigProvider {
     } else {
       return _tableNameMap.get(tableName);
     }
+  }
+
+  /**
+   * Returns the actual table name for the given table name (with or without type suffix) and database name,
+   * or returns the fully qualified table name if the table does not exist.
+   */
+  public String getActualTableName(String tableName, String databaseName) {
+    String[] tableSplit = tableName.split("\\.");
+    if (tableSplit.length > 2) {
+      // TODO revisit this handling
+      return tableName;
+    } else if (tableSplit.length == 2) {
+      databaseName = tableSplit[0];
+      tableName = tableSplit[1];
+    }
+    if (databaseName != null && !databaseName.isBlank()) {
+      tableName = String.format("%s.%s", databaseName, tableName);
+    }
+    String actualTableName = getActualTableName(tableName);
+    return actualTableName != null ? actualTableName : tableName;
   }
 
   /**
@@ -264,11 +287,18 @@ public class TableCache implements PinotConfigProvider {
     String tableNameWithType = tableConfig.getTableName();
     _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
 
+    // if the tableName has no database prefix consider is as part of "default" database
+    boolean isDefaultDatabase = tableNameWithType.split("\\.").length == 1;
+
     String schemaName = tableConfig.getValidationConfig().getSchemaName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     if (schemaName != null && !schemaName.equals(rawTableName)) {
       _schemaNameMap.put(tableNameWithType, schemaName);
       _schemaNameMap.put(rawTableName, schemaName);
+      if (isDefaultDatabase) {
+        _schemaNameMap.put(DEFAULT_DATABASE_PREFIX + tableNameWithType, schemaName);
+        _schemaNameMap.put(DEFAULT_DATABASE_PREFIX + rawTableName, schemaName);
+      }
     } else {
       removeSchemaName(tableNameWithType);
     }
@@ -276,9 +306,17 @@ public class TableCache implements PinotConfigProvider {
     if (_ignoreCase) {
       _tableNameMap.put(tableNameWithType.toLowerCase(), tableNameWithType);
       _tableNameMap.put(rawTableName.toLowerCase(), rawTableName);
+      if (isDefaultDatabase) {
+        _tableNameMap.put(DEFAULT_DATABASE_PREFIX + tableNameWithType.toLowerCase(), tableNameWithType);
+        _tableNameMap.put(DEFAULT_DATABASE_PREFIX + rawTableName.toLowerCase(), rawTableName);
+      }
     } else {
       _tableNameMap.put(tableNameWithType, tableNameWithType);
       _tableNameMap.put(rawTableName, rawTableName);
+      if (isDefaultDatabase) {
+        _tableNameMap.put(DEFAULT_DATABASE_PREFIX + tableNameWithType, tableNameWithType);
+        _tableNameMap.put(DEFAULT_DATABASE_PREFIX + rawTableName, rawTableName);
+      }
     }
   }
 
