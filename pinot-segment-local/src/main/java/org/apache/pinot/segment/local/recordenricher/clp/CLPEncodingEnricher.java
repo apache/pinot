@@ -22,8 +22,8 @@ import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.recordenricher.RecordEnricher;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -36,7 +36,7 @@ public class CLPEncodingEnricher extends RecordEnricher {
   public static final String FIELDS_FOR_CLP_ENCODING_SEPARATOR = ",";
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPEncodingEnricher.class);
 
-  private Set<String> _fields;
+  private List<String> _fields;
   private EncodedMessage _clpEncodedMessage;
   private MessageEncoder _clpMessageEncoder;
 
@@ -46,7 +46,7 @@ public class CLPEncodingEnricher extends RecordEnricher {
     if (StringUtils.isEmpty(concatenatedFieldNames)) {
       throw new IllegalArgumentException("Missing required property: " + FIELDS_FOR_CLP_ENCODING_CONFIG_KEY);
     } else {
-      _fields = Set.of(concatenatedFieldNames.split(FIELDS_FOR_CLP_ENCODING_SEPARATOR));
+      _fields = List.of(concatenatedFieldNames.split(FIELDS_FOR_CLP_ENCODING_SEPARATOR));
     }
 
     _clpEncodedMessage = new EncodedMessage();
@@ -55,7 +55,7 @@ public class CLPEncodingEnricher extends RecordEnricher {
   }
 
   @Override
-  public Set<String> getInputColumns() {
+  public List<String> getInputColumns() {
     return _fields;
   }
 
