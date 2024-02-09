@@ -84,7 +84,7 @@ public class AccessControlTest {
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID,
         CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port);
-    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(), serverConf);
+    _adminApiApplication = new AdminApiApplication(serverInstance, new DenyAllAccessFactory(), serverConf, "", null);
 
     int adminApiApplicationPort = getAvailablePort();
     _adminApiApplication.start(Collections.singletonList(

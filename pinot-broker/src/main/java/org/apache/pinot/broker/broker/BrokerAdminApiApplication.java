@@ -23,6 +23,7 @@ import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -31,6 +32,7 @@ import org.apache.helix.HelixManager;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.pinot.broker.api.resources.PinotBrokerHealthCheck;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -70,7 +72,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
       ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory,
-      HelixManager helixManager) {
+      HelixManager helixManager, String instanceId) {
     _brokerResourcePackages = brokerConf.getProperty(CommonConstants.Broker.BROKER_RESOURCE_PACKAGES,
         CommonConstants.Broker.DEFAULT_BROKER_RESOURCE_PACKAGES);
     String[] pkgs = _brokerResourcePackages.split(",");
@@ -89,7 +91,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         .getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
             CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     connMgr.setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(timeoutMs).build());
-
+    PinotBrokerHealthCheck pinotBrokerHealthCheck =
+        new PinotBrokerHealthCheck(Instant.now(), instanceId, brokerMetrics);
     register(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -109,6 +112,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID)).named(BROKER_INSTANCE_ID);
         bind(serverRoutingStatsManager).to(ServerRoutingStatsManager.class);
         bind(accessFactory).to(AccessControlFactory.class);
+        bind(instanceId).named(BrokerAdminApiApplication.BROKER_INSTANCE_ID);
+        bind(pinotBrokerHealthCheck).to(PinotBrokerHealthCheck.class);
       }
     });
     boolean enableBoundedJerseyThreadPoolExecutor = brokerConf

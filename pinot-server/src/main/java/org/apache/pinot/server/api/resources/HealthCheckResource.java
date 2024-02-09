@@ -23,10 +23,12 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nullable;
-import javax.inject.Inject;
 import javax.inject.Named;
+import javax.inject.Singleton;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -38,25 +40,36 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.server.api.AdminApiApplication;
 
 
 /**
  * REST API to do health check through ServiceStatus.
  */
+@Singleton
 @Api(tags = "Health")
 @Path("/")
 public class HealthCheckResource {
 
-  @Inject
   private AtomicBoolean _shutDownInProgress;
 
-  @Inject
-  @Named(AdminApiApplication.SERVER_INSTANCE_ID)
   private String _instanceId;
 
-  @Inject
   private ServerMetrics _serverMetrics;
+
+  private Instant _startTime;
+
+  public HealthCheckResource(AtomicBoolean shutDownInProgress,
+      @Named(AdminApiApplication.SERVER_INSTANCE_ID) String instanceId, ServerMetrics serverMetrics,
+      Instant startTime) {
+    _shutDownInProgress = shutDownInProgress;
+    _instanceId = instanceId;
+    _serverMetrics = serverMetrics;
+    _startTime = startTime;
+  }
 
   @GET
   @Path("/health")
@@ -113,5 +126,42 @@ public class HealthCheckResource {
     Response response =
         Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
     throw new WebApplicationException(errMessage, response);
+  }
+
+  @GET
+  @Path("uptime")
+  @Produces(MediaType.TEXT_PLAIN)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
+  @ApiOperation(value = "Get server uptime")
+  public String getUptime() {
+    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
+    if (status == ServiceStatus.Status.GOOD) {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
+      Instant now = Instant.now();
+      Duration uptime = Duration.between(_startTime, now);
+      return "Uptime: " + uptime.getSeconds() + " seconds";
+    }
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_BAD_CALLS, 1);
+    String errMessage = String.format("Cannot tell Pinot server uptime "
+        + "(Server is not ready to serve queries). Pinot server status is %s", status);
+    Response response =
+        Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
+    throw new WebApplicationException(errMessage, response);
+  }
+
+  @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  @Path("start-time")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
+  @ApiOperation(value = "Get server start time")
+  public String getStartTime() {
+    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
+    if (status == ServiceStatus.Status.GOOD) {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_OK_CALLS, 1);
+    } else {
+      _serverMetrics.addMeteredGlobalValue(ServerMeter.READINESS_CHECK_BAD_CALLS, 1);
+    }
+    String returnMessage = String.format("Pinot server started at: %s. Pinot server status is %s", _startTime, status);
+    return returnMessage;
   }
 }

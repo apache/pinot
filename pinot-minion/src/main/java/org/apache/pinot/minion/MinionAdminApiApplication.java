@@ -22,12 +22,15 @@ import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.time.Instant;
 import java.util.List;
+import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.minion.api.resources.HealthCheckResource;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
@@ -53,10 +56,11 @@ public class MinionAdminApiApplication extends ResourceConfig {
   private HttpServer _httpServer;
   private final boolean _useHttps;
 
-  public MinionAdminApiApplication(String instanceId, PinotConfiguration minionConf) {
+  public MinionAdminApiApplication(String instanceId, PinotConfiguration minionConf, MinionMetrics minionMetrics) {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, minionConf);
     _useHttps = Boolean.parseBoolean(minionConf.getProperty(CommonConstants.Minion.CONFIG_OF_SWAGGER_USE_HTTPS));
+    HealthCheckResource healthCheckResource = new HealthCheckResource(instanceId, minionMetrics, Instant.now());
     register(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -68,6 +72,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
         } else {
           bind(new DummyLogFileServer()).to(LogFileServer.class);
         }
+        bind(healthCheckResource).to(HealthCheckResource.class);
       }
     });
 

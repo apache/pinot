@@ -26,8 +26,10 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import javax.inject.Inject;
+import java.time.Duration;
+import java.time.Instant;
 import javax.inject.Named;
+import javax.inject.Singleton;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -35,8 +37,13 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.metrics.MinionMeter;
+import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.minion.MinionAdminApiApplication;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -45,14 +52,25 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 /**
  * REST API to do health check through ServiceStatus.
  */
+@Singleton
 @Api(tags = "Health", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("/")
 public class HealthCheckResource {
-  @Inject
-  @Named(MinionAdminApiApplication.MINION_INSTANCE_ID)
+
   private String _instanceId;
+
+  private MinionMetrics _minionMetrics;
+
+  private Instant _startTime;
+
+  public HealthCheckResource(@Named(MinionAdminApiApplication.MINION_INSTANCE_ID) String instanceId,
+      MinionMetrics minionMetrics, Instant startTime) {
+    _instanceId = instanceId;
+    _minionMetrics = minionMetrics;
+    _startTime = startTime;
+  }
 
   @GET
   @Path("/health")
@@ -71,5 +89,41 @@ public class HealthCheckResource {
     Response response =
         Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
     throw new WebApplicationException(errMessage, response);
+  }
+
+  @GET
+  @Path("uptime")
+  @Produces(MediaType.TEXT_PLAIN)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
+  @ApiOperation(value = "Get minion uptime")
+  public String getUptime() {
+    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
+    if (status == ServiceStatus.Status.GOOD) {
+      _minionMetrics.addMeteredGlobalValue(MinionMeter.HEALTH_CHECK_GOOD_CALLS, 1);
+      Instant now = Instant.now();
+      Duration uptime = Duration.between(_startTime, now);
+      return "Uptime: " + uptime.getSeconds() + " seconds";
+    }
+    _minionMetrics.addMeteredGlobalValue(MinionMeter.HEALTH_CHECK_BAD_CALLS, 1);
+    String errMessage = String.format("Cannot tell Pinot minion uptime. Pinot minion status is %s", status);
+    Response response =
+        Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
+    throw new WebApplicationException(errMessage, response);
+  }
+
+  @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  @Path("start-time")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
+  @ApiOperation(value = "Get minion start time")
+  public String getStartTime() {
+    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
+    if (status == ServiceStatus.Status.GOOD) {
+      _minionMetrics.addMeteredGlobalValue(MinionMeter.HEALTH_CHECK_GOOD_CALLS, 1);
+    } else {
+      _minionMetrics.addMeteredGlobalValue(MinionMeter.HEALTH_CHECK_BAD_CALLS, 1);
+    }
+    String returnMessage = String.format("Pinot minion started at: %s. Pinot minion status is %s", _startTime, status);
+    return returnMessage;
   }
 }
