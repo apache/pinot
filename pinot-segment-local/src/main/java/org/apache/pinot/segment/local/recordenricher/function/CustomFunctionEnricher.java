@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.pinot.segment.local.recordenricher.groovy;
+package org.apache.pinot.segment.local.recordenricher.function;
 
 import java.util.List;
 import java.util.Map;
