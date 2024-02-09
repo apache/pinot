@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -578,6 +580,81 @@ public class StringFunctions {
   @ScalarFunction(names = {"split", "string_to_array"})
   public static String[] split(String input, String delimiter, int limit) {
     return StringUtils.splitByWholeSeparator(input, delimiter, limit);
+  }
+
+  /**
+   * @param input an input string for prefix strings generations.
+   * @param length the max length of the prefix strings for the string.
+   * @param regexChar the character for regex matching to be added to prefix strings generated. e.g. '^'
+   * @return generate an array of prefix strings of the string that are shorter than the specified length.
+   */
+  @ScalarFunction
+  public static String[] prefix(String input, int length, String regexChar) {
+    ObjectSet<String> prefixSet = new ObjectLinkedOpenHashSet<>();
+    for (int prefixLength = 1; prefixLength <= length && prefixLength <= input.length(); prefixLength++) {
+      if (regexChar != null) {
+        prefixSet.add(regexChar + input.substring(0, prefixLength));
+      } else {
+        prefixSet.add(input.substring(0, prefixLength));
+      }
+    }
+    return prefixSet.toArray(new String[0]);
+  }
+
+  /**
+   * @param input an input string for suffix strings generations.
+   * @param length the max length of the suffix strings for the string.
+   * @param regexChar the character for regex matching to be added to suffix strings generated. e.g. '$'
+   * @return generate an array of suffix strings of the string that are shorter than the specified length.
+   */
+  @ScalarFunction
+  public static String[] suffix(String input, int length, String regexChar) {
+    ObjectSet<String> suffixSet = new ObjectLinkedOpenHashSet<>();
+    for (int suffixLength = 1; suffixLength <= length && suffixLength <= input.length(); suffixLength++) {
+      if (regexChar != null) {
+        suffixSet.add(input.substring(input.length() - suffixLength) + regexChar);
+      } else {
+        suffixSet.add(input.substring(input.length() - suffixLength));
+      }
+    }
+    return suffixSet.toArray(new String[0]);
+  }
+
+  /**
+   * @param input an input string for ngram generations.
+   * @param length the max length of the ngram for the string.
+   * @return generate an array of ngram of the string that length are exactly matching the specified length.
+   */
+  @ScalarFunction
+  public static String[] ngram(String input, int length) {
+    if (length == 0 || length > input.length()) {
+      return new String[0];
+    }
+    ObjectSet<String> ngramSet = new ObjectLinkedOpenHashSet<>();
+    for (int i = 0; i < input.length() - length + 1; i++) {
+      ngramSet.add(input.substring(i, i + length));
+    }
+    return ngramSet.toArray(new String[0]);
+  }
+
+  /**
+   * @param input an input string for ngram generations.
+   * @param minGram the min length of the ngram for the string.
+   * @param maxGram the max length of the ngram for the string.
+   * @return generate an array of ngram of the string that length are within the specified range [minGram, maxGram].
+   */
+  @ScalarFunction
+  public static String[] ngram(String input, int minGram, int maxGram) {
+    ObjectSet<String> ngramSet = new ObjectLinkedOpenHashSet<>();
+    for (int n = minGram; n <= maxGram && n <= input.length(); n++) {
+      if (n == 0) {
+        continue;
+      }
+      for (int i = 0; i < input.length() - n + 1; i++) {
+        ngramSet.add(input.substring(i, i + n));
+      }
+    }
+    return ngramSet.toArray(new String[0]);
   }
 
   /**
