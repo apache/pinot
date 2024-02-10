@@ -241,7 +241,12 @@ public class CommonsConfigurationUtils {
    * {@link #replaceSpecialCharacterInPropertyValue(String)}.
    */
   public static String recoverSpecialCharacterInPropertyValue(String value) {
-    value = StringEscapeUtils.unescapeJava(value);
+    try {
+      // This is for backward compatibility, to handle the old commons library escape character behavior.
+      value = StringEscapeUtils.unescapeJava(value);
+    } catch (Exception e) {
+      // If the value is not a valid escaped string, ignore the exception and continue
+    }
     if (value.isEmpty()) {
       return value;
     }
