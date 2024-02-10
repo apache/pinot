@@ -101,7 +101,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               // doc ids for the old segment because it has not been replaced yet. We pass in an optional valid doc ids
               // snapshot for the old segment, which can be updated and used to track the docs not replaced yet.
               if (currentSegment == oldSegment) {
-                if (comparisonResult >= 0) {
+                // TODO: DO NOT MERGE. This will break both partial-upsert and upsert tables when sorted column is set.
+                if (comparisonResult > 0 || (comparisonResult == 0 && newDocId == currentDocId)) {
                   addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
                   if (validDocIdsForOldSegment != null) {
                     validDocIdsForOldSegment.remove(currentDocId);

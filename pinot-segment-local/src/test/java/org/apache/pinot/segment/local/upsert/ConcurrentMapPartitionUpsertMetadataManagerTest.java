@@ -377,6 +377,45 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.MURMUR3, true);
   }
 
+  // TODO: Will be updated/deleted after discussion.
+  @Test
+  public void testAddReplaceWithEqualComparisonColumn() {
+    final boolean enableSnapshot = false;
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(HashFunction.NONE).build());
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+    Set<IndexSegment> trackedSegments = upsertMetadataManager._trackedSegments;
+    // Add the first segment
+    int numRecords = 6;
+    int[] primaryKeys = new int[]{0, 1, 2, 0, 1, 0};
+    int[] timestamps = new int[]{0, 0, 0, 0, 0, 0};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
+    ImmutableSegmentImpl segment1 = mockImmutableSegment(1, validDocIds1, null, primaryKeys1);
+    List<RecordInfo> recordInfoList1;
+    if (enableSnapshot) {
+      // get recordInfo from validDocIdSnapshot.
+      // segment1 snapshot: 0 -> {5, 100}, 1 -> {4, 120}, 2 -> {2, 100}
+      int[] docIds1 = new int[]{2, 4, 5};
+      MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
+      validDocIdsSnapshot1.add(docIds1);
+      recordInfoList1 = getRecordInfoList(validDocIdsSnapshot1, primaryKeys, timestamps, null);
+    } else {
+      // get recordInfo by iterating all records.
+      recordInfoList1 = getRecordInfoList(numRecords, primaryKeys, timestamps, null);
+    }
+    upsertMetadataManager.addSegment(segment1, validDocIds1, null, recordInfoList1.iterator());
+    trackedSegments.add(segment1);
+
+    // Replace (reload) the first segment
+    ThreadSafeMutableRoaringBitmap newValidDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    ImmutableSegmentImpl newSegment1 = mockImmutableSegment(1, newValidDocIds1, null, primaryKeys1);
+    upsertMetadataManager.replaceSegment(newSegment1, newValidDocIds1, null, recordInfoList1.iterator(), segment1);
+    trackedSegments.add(newSegment1);
+    trackedSegments.remove(segment1);
+  }
+
   private void verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction hashFunction, boolean enableSnapshot)
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
