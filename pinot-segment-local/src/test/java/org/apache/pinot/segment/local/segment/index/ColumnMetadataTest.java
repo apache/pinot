@@ -19,12 +19,15 @@
 package org.apache.pinot.segment.local.segment.index;
 
 import java.io.File;
+import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -34,11 +37,13 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.partition.BoundedColumnValuePartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -206,5 +211,18 @@ public class ColumnMetadataTest {
     Assert.assertEquals(col3Meta.getPartitionFunction().getNumPartitions(), 4);
     Assert.assertEquals(col3Meta.getPartitionFunction().getFunctionConfig(), functionConfig);
     Assert.assertEquals(col3Meta.getPartitions(), Stream.of(0, 1, 2, 3).collect(Collectors.toSet()));
+  }
+
+  @Test
+  public void testMetadataWithEscapedValue()
+      throws ConfigurationException {
+    // Reading metadata file:
+    ClassLoader classLoader = getClass().getClassLoader();
+    URL resource = classLoader.getResource("data/metadata-with-unescaped.properties");
+    File metadataFile = new File(resource.getFile());
+    PropertiesConfiguration propertiesConfiguration = CommonsConfigurationUtils.fromFile(metadataFile);
+    ColumnMetadataImpl installationOutput =
+        ColumnMetadataImpl.fromPropertiesConfiguration("installation_output", propertiesConfiguration);
+    Assert.assertNotNull(installationOutput);
   }
 }
