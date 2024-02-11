@@ -265,7 +265,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     }
   }
 
-  private void setupControllerTimeZone(){
+  private void setupControllerTimeZone() {
     _controllerTimezone = _config.getProperty(CommonConstants.Controller.CONFIG_OF_TIMEZONE,
         CommonConstants.Controller.DEFAULT_TIMEZONE);
     System.setProperty("user.timezone", _controllerTimezone);

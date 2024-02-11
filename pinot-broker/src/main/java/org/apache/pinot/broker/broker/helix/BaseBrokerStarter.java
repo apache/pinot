@@ -184,7 +184,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   private void setupBrokerTimezone() {
     _brokerTimezone = _brokerConf.getProperty(Broker.CONFIG_OF_TIMEZONE, Broker.DEFAULT_TIMEZONE);
     System.setProperty("user.timezone", _brokerTimezone);
-    LOGGER.info("Broker Timezone: {}", _brokerTimezone );
+    LOGGER.info("Broker Timezone: {}", _brokerTimezone);
   }
 
   public int getPort() {
