@@ -69,6 +69,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     String segmentName = segment.getSegmentName();
     segment.enableUpsert(this, validDocIds, queryableDocIds);
 
+    // TODO: Is this correct?
+    boolean isPartialUpsert = _partialUpsertHandler != null;
     AtomicInteger numKeysInWrongSegment = new AtomicInteger();
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
@@ -102,14 +104,27 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               // snapshot for the old segment, which can be updated and used to track the docs not replaced yet.
               if (currentSegment == oldSegment) {
                 // TODO: DO NOT MERGE. This will break both partial-upsert and upsert tables when sorted column is set.
-                if (comparisonResult > 0 || (comparisonResult == 0 && newDocId == currentDocId)) {
-                  addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
-                  if (validDocIdsForOldSegment != null) {
-                    validDocIdsForOldSegment.remove(currentDocId);
+                if (!isPartialUpsert) {
+                  if (comparisonResult >= 0) {
+                    addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
+                    if (validDocIdsForOldSegment != null) {
+                      validDocIdsForOldSegment.remove(currentDocId);
+                    }
+                    return new RecordLocation(segment, newDocId, newComparisonValue);
+                  } else {
+                    return currentRecordLocation;
                   }
-                  return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
-                  return currentRecordLocation;
+                  // For partial upsert, comparison result ties need to be resolved carefully.
+                  if (comparisonResult > 0 || (comparisonResult == 0 && newDocId == currentDocId)) {
+                    addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
+                    if (validDocIdsForOldSegment != null) {
+                      validDocIdsForOldSegment.remove(currentDocId);
+                    }
+                    return new RecordLocation(segment, newDocId, newComparisonValue);
+                  } else {
+                    return currentRecordLocation;
+                  }
                 }
               }
 
