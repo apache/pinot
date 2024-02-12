@@ -208,6 +208,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
+  public void removeTimer(String tableName, T timer) {
+    String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
+    PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName);
+    PinotMetricUtils.removeMetric(_metricsRegistry, metricName);
+  }
+
   /**
    * Logs a value to a meter.
    *
