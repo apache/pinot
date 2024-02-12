@@ -320,6 +320,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         // Compile the request into PinotQuery
         compilationStartTimeNs = System.nanoTime();
         pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
+        pinotQuery.getDataSource().setTableName(_tableCache.getActualTableName(
+            pinotQuery.getDataSource().getTableName()));
       } catch (Exception e) {
         LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -372,8 +374,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       }
 
-      String tableName = getActualTableName(dataSource.getTableName(), _tableCache);
-      dataSource.setTableName(tableName);
+      String tableName = _tableCache.getActualTableName(dataSource.getTableName());
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       requestContext.setTableName(rawTableName);
 
@@ -941,34 +942,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         handleSubquery(operand, requestId, jsonRequest, requesterIdentity, requestContext, httpHeaders);
       }
     }
-  }
-
-  /**
-   * Resolves the actual table name for:
-   * - Case-insensitive cluster
-   * - Table name in the format of [database_name].[table_name]
-   *
-   * @param tableName the table name in the query
-   * @param tableCache the table case-sensitive cache
-   * @return table name if the table name is found in Pinot registry, drop the database_name in the format
-   *  of [database_name].[table_name] if only [table_name] is found in Pinot registry.
-   */
-  @VisibleForTesting
-  static String getActualTableName(String tableName, TableCache tableCache) {
-    String actualTableName = tableCache.getActualTableName(tableName);
-    if (actualTableName != null) {
-      return actualTableName;
-    }
-
-    // Check if table is in the format of [database_name].[table_name]
-    String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
-    if (tableNameSplits.length == 2) {
-      actualTableName = tableCache.getActualTableName(tableNameSplits[1]);
-      if (actualTableName != null) {
-        return actualTableName;
-      }
-    }
-    return tableName;
   }
 
   /**

@@ -215,12 +215,7 @@ public class PinotTableRestletResource {
 
       // TableConfigUtils.validate(...) is used across table create/update.
       TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
-      // TableConfigUtils.validateTableName(...) checks table name rules.
-      // So it won't affect already created tables.
-      boolean allowTableNameWithDatabase =
-          _controllerConf.getProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE,
-              CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE);
-      TableConfigUtils.validateTableName(tableConfig, allowTableNameWithDatabase);
+      TableConfigUtils.validateTableName(tableConfig);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }

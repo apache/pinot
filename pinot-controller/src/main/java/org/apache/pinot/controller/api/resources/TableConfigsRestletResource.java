@@ -70,7 +70,6 @@ import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
@@ -463,21 +462,18 @@ public class TableConfigsRestletResource {
       Preconditions.checkState(rawTableName.equals(schema.getSchemaName()),
           "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
       SchemaUtils.validate(schema);
-      boolean allowTableNameWithDatabase = _controllerConf.getProperty(
-          CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE,
-          CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE);
       if (offlineTableConfig != null) {
         String offlineRawTableName = TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName());
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
-        TableConfigUtils.validateTableName(offlineTableConfig, allowTableNameWithDatabase);
+        TableConfigUtils.validateTableName(offlineTableConfig);
         TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
       }
       if (realtimeTableConfig != null) {
         String realtimeRawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
         Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
-        TableConfigUtils.validateTableName(realtimeTableConfig, allowTableNameWithDatabase);
+        TableConfigUtils.validateTableName(realtimeTableConfig);
         TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {
