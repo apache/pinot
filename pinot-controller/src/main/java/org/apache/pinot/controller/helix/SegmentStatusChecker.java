@@ -331,11 +331,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       LOGGER.warn("Table {} has {} segments with no online replicas", tableNameWithType, nOffline);
     }
     if (nLessReplicas > 0) {
-      LOGGER.info("Table {} has {} segments with no high availability", tableNameWithType, nLessReplicas);
+      LOGGER.warn("Table {} has {} segments with number of replicas less than the replication factor",
+          tableNameWithType, nLessReplicas);
     }
     if (nReplicasExternal < nReplicasIdealMax) {
-      LOGGER.warn("Table {} has {} replicas, below replication threshold :{}, with {} segments running with less than"
-              + "expected replica numbers", tableNameWithType, nReplicasExternal, nReplicasIdealMax, nLessReplicas);
+      LOGGER.warn("Table {} has at least one segment running with only {} replicas, below replication threshold :{}",
+          tableNameWithType, nReplicasExternal, nReplicasIdealMax);
     }
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
