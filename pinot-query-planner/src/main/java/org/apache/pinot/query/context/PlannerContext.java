@@ -44,15 +44,33 @@ public class PlannerContext implements AutoCloseable {
 
   private final SqlValidator _validator;
 
+  /**
+   * This planner is applied after the query is validated but before it is trimmed.
+   *
+   * The main usage is to apply small transformations to the row expressions before it is further touched by Calcite.
+   * As an example, one of the transformations we do is to change {@code cast(str as VARBINARY)} to
+   * {@code hexToBytes(str)}. We need to do that because Calcite and Pinot logic on casting is different. Although
+   * usually is Pinot the one that applies the transformation at execution time, when the value is a constant, Calcite
+   * tries to optimize it applying its own semantics and therefore the query semantic is broken.
+   */
+  private final RelOptPlanner _rewritePlanner;
+  /**
+   * This planner contains most of the optimization logic. It is applied after {@link #_rewritePlanner} and before
+   * {@link #_relTraitPlanner}.
+   */
   private final RelOptPlanner _relOptPlanner;
+  /**
+   * This planner runs after {@link #_relTraitPlanner}.
+   */
   private final LogicalPlanner _relTraitPlanner;
 
   private Map<String, String> _options;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
-      HepProgram optProgram, HepProgram traitProgram) {
+      HepProgram rewriteProgram, HepProgram optProgram, HepProgram traitProgram) {
     _planner = new PlannerImpl(config);
     _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
+    _rewritePlanner = new LogicalPlanner(rewriteProgram, Contexts.EMPTY_CONTEXT);
     _relOptPlanner = new LogicalPlanner(optProgram, Contexts.EMPTY_CONTEXT, config.getTraitDefs());
     _relTraitPlanner = new LogicalPlanner(traitProgram, Contexts.EMPTY_CONTEXT,
         Collections.singletonList(RelDistributionTraitDef.INSTANCE));
@@ -64,6 +82,10 @@ public class PlannerContext implements AutoCloseable {
 
   public SqlValidator getValidator() {
     return _validator;
+  }
+
+  public RelOptPlanner getRewritePlanner() {
+    return _rewritePlanner;
   }
 
   public RelOptPlanner getRelOptPlanner() {

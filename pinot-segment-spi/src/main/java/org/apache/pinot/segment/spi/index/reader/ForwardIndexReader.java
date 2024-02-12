@@ -319,7 +319,7 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
         }
         break;
       default:
-        throw new IllegalArgumentException();
+        throw new IllegalArgumentException("It is not defined how to read " + getStoredType());
     }
   }
 

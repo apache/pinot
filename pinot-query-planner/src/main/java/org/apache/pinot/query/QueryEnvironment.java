@@ -39,11 +39,13 @@ import org.apache.calcite.prepare.PinotCalciteCatalogReader;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.core.RelFactories;
 import org.apache.calcite.rel.hint.HintStrategyTable;
 import org.apache.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.calcite.rel.rules.PinotRelDistributionTraitRule;
+import org.apache.calcite.rel.rules.StringToByteCastRule;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
@@ -91,6 +93,7 @@ public class QueryEnvironment {
   private final Prepare.CatalogReader _catalogReader;
   private final RelDataTypeFactory _typeFactory;
 
+  private final HepProgram _rewriteProgram;
   private final HepProgram _optProgram;
   private final HepProgram _traitProgram;
 
@@ -125,6 +128,7 @@ public class QueryEnvironment {
             .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true))
             .addRelBuilderConfigTransform(c -> c.withPruneInputOfAggregate(false)))
         .build();
+    _rewriteProgram = getRewriteProgram();
     _optProgram = getOptProgram();
     _traitProgram = getTraitProgram();
   }
@@ -142,8 +146,8 @@ public class QueryEnvironment {
    * @return QueryPlannerResult containing the dispatchable query plan and the relRoot.
    */
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
-    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram,
-        _traitProgram)) {
+    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory,
+        _rewriteProgram, _optProgram, _traitProgram)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
@@ -171,8 +175,8 @@ public class QueryEnvironment {
    * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
   public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
-    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram,
-        _traitProgram)) {
+    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory,
+        _rewriteProgram, _optProgram, _traitProgram)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
@@ -205,8 +209,8 @@ public class QueryEnvironment {
   }
 
   public List<String> getTableNamesForQuery(String sqlQuery) {
-    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram,
-        _traitProgram)) {
+    try (PlannerContext plannerContext = new PlannerContext(_config, _catalogReader, _typeFactory,
+        _rewriteProgram, _optProgram, _traitProgram)) {
       SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
@@ -299,13 +303,35 @@ public class QueryEnvironment {
 
   private RelRoot toRelation(SqlNode parsed, PlannerContext plannerContext) {
     // 3. convert sqlNode to relNode.
+    SqlToRelConverter withoutSimplify = createSqlToRelConverter(plannerContext, false);
+    RelRoot relRoot = withoutSimplify.convertQuery(parsed, false, true);
+
+    // Here, just after the AST was converted to relational logic, we apply the initial
+    // rewrite transformations.
+    RelOptPlanner rewritePlanner = plannerContext.getRewritePlanner();
+    rewritePlanner.setRoot(relRoot.rel);
+    RelNode rewritten = rewritePlanner.findBestExp();
+
+    // After that rewrite, we try to simplify the query by removing unused fields
+    // and simplifying the expressions.
+    SqlToRelConverter withSimplify = createSqlToRelConverter(plannerContext, true);
+    return relRoot.withRel(withSimplify.trimUnusedFields(false, rewritten));
+  }
+
+  private SqlToRelConverter createSqlToRelConverter(PlannerContext plannerContext, boolean simplifying) {
     RexBuilder rexBuilder = new RexBuilder(_typeFactory);
+
+    SqlToRelConverter.Config sqlToRelConfig = _config.getSqlToRelConverterConfig();;
+    if (!simplifying) {
+      sqlToRelConfig = sqlToRelConfig.withRelBuilderFactory(
+          (cluster, schema) -> RelFactories.LOGICAL_BUILDER.create(cluster, schema)
+              .transform(config -> config.withSimplify(false)));
+    }
+
     RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
-    SqlToRelConverter sqlToRelConverter =
-        new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
-            PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
-    RelRoot relRoot = sqlToRelConverter.convertQuery(parsed, false, true);
-    return relRoot.withRel(sqlToRelConverter.trimUnusedFields(false, relRoot.rel));
+
+    return new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
+            PinotConvertletTable.INSTANCE, sqlToRelConfig);
   }
 
   private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {
@@ -344,6 +370,19 @@ public class QueryEnvironment {
 
   private HintStrategyTable getHintStrategyTable() {
     return PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE;
+  }
+
+  private static HepProgram getRewriteProgram() {
+    HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
+    // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
+    // best to be explicit.
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.DEPTH_FIRST);
+
+    hepProgramBuilder.addRuleInstance(StringToByteCastRule.OnFilter.INSTANCE);
+    hepProgramBuilder.addRuleInstance(StringToByteCastRule.OnProject.INSTANCE);
+    hepProgramBuilder.addRuleInstance(StringToByteCastRule.OnJoin.INSTANCE);
+
+    return hepProgramBuilder.build();
   }
 
   private static HepProgram getOptProgram() {
