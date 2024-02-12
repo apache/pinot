@@ -242,7 +242,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     int nReplicasExternal = -1; // Keeps track of minimum number of replicas in external view
     int nErrors = 0; // Keeps track of number of segments in error state
     int nOffline = 0; // Keeps track of number segments with no online replicas
-    int nLessReplicas = 0; // Keeps track of number of segments running with less than expected replicas
+    int nNumOfReplicasLessThanIdeal = 0; // Keeps track of number of segments running with less than expected replicas
     int nSegments = 0; // Counts number of segments
     long tableCompressedSize = 0; // Tracks the total compressed segment size in deep store per table
     for (String partitionName : segmentsExcludeReplaced) {
@@ -307,7 +307,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       } else if (nReplicas < nReplicasIdealMax) {
         LOGGER.debug("Segment {} of table {} is running with {} replicas which is less than the expected values {}",
             partitionName, tableNameWithType, nReplicas, nReplicasIdealMax);
-        nLessReplicas++;
+        nNumOfReplicasLessThanIdeal++;
       }
       nReplicasExternal =
           ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
@@ -321,7 +321,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         (nReplicasIdealMax > 0) ? (nReplicasExternal * 100 / nReplicasIdealMax) : 100);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE, nErrors);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS,
-        nLessReplicas);
+        nNumOfReplicasLessThanIdeal);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
         (nSegments > 0) ? (nSegments - nOffline) * 100 / nSegments : 100);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_SIZE,
@@ -330,9 +330,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     if (nOffline > 0) {
       LOGGER.warn("Table {} has {} segments with no online replicas", tableNameWithType, nOffline);
     }
-    if (nLessReplicas > 0) {
+    if (nNumOfReplicasLessThanIdeal > 0) {
       LOGGER.warn("Table {} has {} segments with number of replicas less than the replication factor",
-          tableNameWithType, nLessReplicas);
+          tableNameWithType, nNumOfReplicasLessThanIdeal);
     }
     if (nReplicasExternal < nReplicasIdealMax) {
       LOGGER.warn("Table {} has at least one segment running with only {} replicas, below replication threshold :{}",
