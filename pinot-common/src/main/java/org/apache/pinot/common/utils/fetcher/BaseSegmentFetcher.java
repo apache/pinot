@@ -21,10 +21,10 @@ package org.apache.pinot.common.utils.fetcher;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -90,9 +90,9 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
     if (uris == null || uris.isEmpty()) {
       throw new IllegalArgumentException("The input uri list is null or empty");
     }
-    Random r = new Random();
+    RoundRobinURIProvider roundRobinURIProvider = new RoundRobinURIProvider(uris, false);
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
-      URI uri = uris.get(r.nextInt(uris.size()));
+      URI uri = roundRobinURIProvider.next();
       try {
         fetchSegmentToLocalWithoutRetry(uri, dest);
         _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
