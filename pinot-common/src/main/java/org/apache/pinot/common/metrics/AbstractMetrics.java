@@ -135,7 +135,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   public void removePhaseTiming(String tableName, QP phase) {
     String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
-    removeTimedValue(fullTimerName);
+    removeTimer(fullTimerName);
   }
 
   public void addPhaseTiming(String tableName, QP phase, long duration, TimeUnit timeUnit) {
@@ -197,16 +197,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     addValueToTimer(fullTimerName, duration, timeUnit);
   }
 
-  public void removeTimedValue(final String fullTimerName) {
-    PinotMetricUtils
-        .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName));
-  }
-
-  public void removeTimedValue(final String tableName, final T timer) {
-    final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
-    removeTimedValue(fullTimerName);
-  }
-
   /**
    * Logs the timing for a metric
    *
@@ -223,10 +213,14 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
-  public void removeTimer(String tableName, T timer) {
-    String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
-    PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName);
-    PinotMetricUtils.removeMetric(_metricsRegistry, metricName);
+  public void removeTimer(final String fullTimerName) {
+    PinotMetricUtils
+        .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName));
+  }
+
+  public void removeTableTimer(final String tableName, final T timer) {
+    final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
+    removeTimer(fullTimerName);
   }
 
   /**

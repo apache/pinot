@@ -370,7 +370,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
     for (ControllerTimer metric : ControllerTimer.values()) {
       if (!metric.isGlobal()) {
-        _controllerMetrics.removeTimer(tableNameWithType, metric);
+        _controllerMetrics.removeTableTimer(tableNameWithType, metric);
       }
     }
   }

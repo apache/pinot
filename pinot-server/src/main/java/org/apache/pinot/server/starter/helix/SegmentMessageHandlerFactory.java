@@ -185,7 +185,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
             .forEach(g -> _metrics.removeTableGauge(_tableNameWithType, g));
         Arrays.stream(ServerTimer.values())
             .filter(t -> !t.isGlobal())
-            .forEach(t -> _metrics.removeTimedValue(_tableNameWithType, t));
+            .forEach(t -> _metrics.removeTableTimer(_tableNameWithType, t));
         Arrays.stream(ServerQueryPhase.values())
             .forEach(p -> _metrics.removePhaseTiming(_tableNameWithType, p));
       } catch (Exception e) {
