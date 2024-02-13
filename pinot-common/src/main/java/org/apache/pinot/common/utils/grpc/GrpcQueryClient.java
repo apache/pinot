@@ -22,10 +22,13 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.net.ssl.SSLException;
 import nl.altindag.ssl.SSLFactory;
@@ -41,6 +44,7 @@ import org.slf4j.LoggerFactory;
 public class GrpcQueryClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryClient.class);
   private static final int DEFAULT_CHANNEL_SHUTDOWN_TIMEOUT_SECOND = 10;
+  private static final Map<TlsConfig, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private final ManagedChannel _managedChannel;
   private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
@@ -55,30 +59,40 @@ public class GrpcQueryClient {
           ManagedChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
               .usePlaintext().build();
     } else {
+      _managedChannel =
+          NettyChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
+              .sslContext(buildSslContext(config.getTlsConfig())).build();
+    }
+    _blockingStub = PinotQueryServerGrpc.newBlockingStub(_managedChannel);
+  }
+
+  private SslContext buildSslContext(TlsConfig tlsConfig) {
+    LOGGER.info("Building gRPC SSL context");
+    // Make a copy of the TlsConfig because the TlsConfig is mutable, when the TlsConfig is used as the key of the
+    // CLIENT_SSL_CONTEXTS_CACHE, the TlsConfig should not be changed.
+    TlsConfig tlsConfigCopy = new TlsConfig(tlsConfig);
+    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfigCopy, config -> {
       try {
-        TlsConfig tlsConfig = config.getTlsConfig();
-        SSLFactory sslFactory = TlsUtils.createSSLFactory(tlsConfig);
-        if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
-            && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
-          TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
+        SSLFactory sslFactory = TlsUtils.createSSLFactory(config);
+        if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(config.getKeyStorePath())
+            && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(config.getTrustStorePath())) {
+          TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, config);
         }
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
         sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
         sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
-        if (tlsConfig.getSslProvider() != null) {
+        if (config.getSslProvider() != null) {
           sslContextBuilder =
-              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(tlsConfig.getSslProvider()));
+              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(config.getSslProvider()));
         } else {
           sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
         }
-        _managedChannel =
-            NettyChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
-                .sslContext(sslContextBuilder.build()).build();
+        return sslContextBuilder.build();
       } catch (SSLException e) {
-        throw new RuntimeException("Failed to create Netty gRPC channel with SSL Context", e);
+        throw new RuntimeException("Failed to build gRPC SSL context", e);
       }
-    }
-    _blockingStub = PinotQueryServerGrpc.newBlockingStub(_managedChannel);
+    });
+    return sslContext;
   }
 
   public Iterator<Server.ServerResponse> submit(Server.ServerRequest request) {

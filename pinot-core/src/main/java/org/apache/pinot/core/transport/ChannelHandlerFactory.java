@@ -22,6 +22,8 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import io.netty.handler.ssl.SslContext;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -36,8 +38,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * The {@code ChannelHandlerFactory} provides all kinds of Netty ChannelHandlers
  */
 public class ChannelHandlerFactory {
-
   public static final String SSL = "ssl";
+  private static final Map<TlsConfig, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
+  private static final Map<TlsConfig, SslContext> SERVER_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private ChannelHandlerFactory() {
   }
@@ -61,14 +64,22 @@ public class ChannelHandlerFactory {
    * The {@code getClientTlsHandler} return a Client side Tls handler that encrypt and decrypt everything.
    */
   public static ChannelHandler getClientTlsHandler(TlsConfig tlsConfig, SocketChannel ch) {
-    return TlsUtils.buildClientContext(tlsConfig).newHandler(ch.alloc());
+    // Make a copy of the TlsConfig because the TlsConfig is mutable, when the TlsConfig is used as the key of the
+    // CLIENT_SSL_CONTEXTS_CACHE, the TlsConfig should not be changed.
+    TlsConfig tlsConfigCopy = new TlsConfig(tlsConfig);
+    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfigCopy, TlsUtils::buildClientContext);
+    return sslContext.newHandler(ch.alloc());
   }
 
   /**
    * The {@code getServerTlsHandler} return a Server side Tls handler that encrypt and decrypt everything.
    */
   public static ChannelHandler getServerTlsHandler(TlsConfig tlsConfig, SocketChannel ch) {
-    return TlsUtils.buildServerContext(tlsConfig).newHandler(ch.alloc());
+    // Make a copy of the TlsConfig because the TlsConfig is mutable, when the TlsConfig is used as the key of the
+    // SERVER_SSL_CONTEXTS_CACHE, the TlsConfig should not be changed.
+    TlsConfig tlsConfigCopy = new TlsConfig(tlsConfig);
+    SslContext sslContext = SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfigCopy, TlsUtils::buildServerContext);
+    return sslContext.newHandler(ch.alloc());
   }
 
   /**

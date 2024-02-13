@@ -29,6 +29,8 @@ import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import nl.altindag.ssl.SSLFactory;
@@ -56,6 +58,7 @@ import org.slf4j.LoggerFactory;
 // TODO: Plug in QueryScheduler
 public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryServer.class);
+  private static final Map<TlsConfig, SslContext> SERVER_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private final QueryExecutor _queryExecutor;
   private final ServerMetrics _serverMetrics;
@@ -85,23 +88,33 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
   }
 
   private SslContext buildGRpcSslContext(TlsConfig tlsConfig)
-      throws Exception {
+      throws IllegalArgumentException {
     LOGGER.info("Building gRPC SSL context");
     if (tlsConfig.getKeyStorePath() == null) {
       throw new IllegalArgumentException("Must provide key store path for secured gRpc server");
     }
-    SSLFactory sslFactory = TlsUtils.createSSLFactory(tlsConfig);
-    if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
-        && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
-      TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
-    }
-    SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
-        .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
-    sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
-    if (tlsConfig.isClientAuthEnabled()) {
-      sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
-    }
-    return GrpcSslContexts.configure(sslContextBuilder).build();
+    // Make a copy of the TlsConfig because the TlsConfig is mutable, when the TlsConfig is used as the key of the
+    // SERVER_SSL_CONTEXTS_CACHE, the TlsConfig should not be changed.
+    TlsConfig tlsConfigCopy = new TlsConfig(tlsConfig);
+    SslContext sslContext = SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfigCopy, config -> {
+      try {
+        SSLFactory sslFactory = TlsUtils.createSSLFactory(config);
+        if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(config.getKeyStorePath())
+            && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(config.getTrustStorePath())) {
+          TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, config);
+        }
+        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
+            .sslProvider(SslProvider.valueOf(config.getSslProvider()));
+        sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
+        if (config.isClientAuthEnabled()) {
+          sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+        }
+        return GrpcSslContexts.configure(sslContextBuilder).build();
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to build gRPC SSL context", e);
+      }
+    });
+    return sslContext;
   }
 
   public void start() {
