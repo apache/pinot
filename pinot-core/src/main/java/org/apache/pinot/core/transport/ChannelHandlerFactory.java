@@ -39,9 +39,13 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public class ChannelHandlerFactory {
   public static final String SSL = "ssl";
-  // the key is the hashCode of the TlsConfig, the value is the SslContext
+  // The key is the hashCode of the TlsConfig, the value is the SslContext
+  // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
+  // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
   private static final Map<Integer, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
   // the key is the hashCode of the TlsConfig, the value is the SslContext
+  // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
+  // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
   private static final Map<Integer, SslContext> SERVER_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private ChannelHandlerFactory() {

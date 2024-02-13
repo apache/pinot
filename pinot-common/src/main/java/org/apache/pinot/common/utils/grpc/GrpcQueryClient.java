@@ -45,6 +45,8 @@ public class GrpcQueryClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryClient.class);
   private static final int DEFAULT_CHANNEL_SHUTDOWN_TIMEOUT_SECOND = 10;
   // the key is the hashCode of the TlsConfig, the value is the SslContext
+  // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
+  // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
   private static final Map<Integer, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private final ManagedChannel _managedChannel;
