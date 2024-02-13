@@ -39,6 +39,8 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -51,6 +53,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -62,7 +65,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Api(tags = Constants.LEAD_CONTROLLER_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
-@Path("/leader")
+@Path("/")
 public class PinotLeadControllerRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLeadControllerRestletResource.class);
 
@@ -71,10 +74,10 @@ public class PinotLeadControllerRestletResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tables")
+  @Path("/leader/tables")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_LEADER)
   @ApiOperation(value = "Gets leaders for all tables", notes = "Gets leaders for all tables")
-  public LeadControllerResponse getLeadersForAllTables() {
+  public LeadControllerResponse getLeadersForAllTables(@Context HttpHeaders headers) {
     Map<String, LeadControllerEntry> leadControllerEntryMap = new LinkedHashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
     boolean isLeadControllerResourceEnabled;
@@ -101,7 +104,8 @@ public class PinotLeadControllerRestletResource {
     }
 
     // Assigns all the tables to the relevant partitions.
-    List<String> tableNames = _pinotHelixResourceManager.getAllTables();
+    List<String> tableNames = _pinotHelixResourceManager.getAllTables(
+        headers.getHeaderString(CommonConstants.DATABASE));
     for (String tableName : tableNames) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
@@ -114,11 +118,24 @@ public class PinotLeadControllerRestletResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tables/{tableName}")
+  @Path("/leader/tables/{tableName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_LEADER)
   @ApiOperation(value = "Gets leader for a given table", notes = "Gets leader for a given table")
   public LeadControllerResponse getLeaderForTable(
-      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    return getLeaderForTableV2(tableName);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/v2/leader/tables")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_LEADER)
+  @ApiOperation(value = "Gets leader for a given table", notes = "Gets leader for a given table")
+  public LeadControllerResponse getLeaderForTableV2(
+      @ApiParam(value = "Table name", required = true) @QueryParam("tableName") String tableName) {
     Map<String, LeadControllerEntry> leadControllerEntryMap = new HashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
     boolean isLeadControllerResourceEnabled;

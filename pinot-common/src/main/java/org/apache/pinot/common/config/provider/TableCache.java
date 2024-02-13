@@ -151,26 +151,6 @@ public class TableCache implements PinotConfigProvider {
   }
 
   /**
-   * Returns the actual table name for the given table name (with or without type suffix) and database name,
-   * or returns the fully qualified table name if the table does not exist.
-   */
-  public String getActualTableName(String tableName, String databaseName) {
-    String[] tableSplit = tableName.split("\\.");
-    if (tableSplit.length > 2) {
-      // TODO revisit this handling
-      return tableName;
-    } else if (tableSplit.length == 2) {
-      databaseName = tableSplit[0];
-      tableName = tableSplit[1];
-    }
-    if (databaseName != null && !databaseName.isBlank()) {
-      tableName = String.format("%s.%s", databaseName, tableName);
-    }
-    String actualTableName = getActualTableName(tableName);
-    return actualTableName != null ? actualTableName : tableName;
-  }
-
-  /**
    * Returns a map from table name to actual table name. For case-insensitive case, the keys of the map are in lower
    * case.
    */

@@ -48,6 +48,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -93,7 +94,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Api(tags = Constants.CLUSTER_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
-@Path("/debug/")
+@Path("/")
 public class DebugResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(DebugResource.class);
 
@@ -116,7 +117,7 @@ public class DebugResource {
   ControllerConf _controllerConf;
 
   @GET
-  @Path("tables/{tableName}")
+  @Path("/debug/tables/{tableName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for table.", notes = "Debug information for table.")
@@ -127,6 +128,27 @@ public class DebugResource {
   })
   public String getTableDebugInfo(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Verbosity of debug information") @DefaultValue("0") @QueryParam("verbosity") int verbosity,
+      @Context HttpHeaders headers)
+      throws JsonProcessingException {
+    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    return getTableDebugInfoV2(tableName, tableTypeStr, verbosity);
+  }
+
+  @GET
+  @Path("/v2/debug/tables")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get debug information for table.", notes = "Debug information for table.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getTableDebugInfoV2(
+      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Verbosity of debug information") @DefaultValue("0") @QueryParam("verbosity") int verbosity)
       throws JsonProcessingException {
@@ -148,7 +170,7 @@ public class DebugResource {
   }
 
   @GET
-  @Path("segments/{tableName}/{segmentName}")
+  @Path("/debug/segments/{tableName}/{segmentName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for segment.", notes = "Debug information for segment.")
@@ -159,6 +181,26 @@ public class DebugResource {
   public TableDebugInfo.SegmentDebugInfo getSegmentDebugInfo(
       @ApiParam(value = "Name of the table (with type)", required = true) @PathParam("tableName")
           String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @Context HttpHeaders headers)
+      throws Exception {
+    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    return getSegmentDebugInfoV2(tableNameWithType, segmentName);
+  }
+
+  @GET
+  @Path("/v2/debug/segments/{segmentName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get debug information for segment.", notes = "Debug information for segment.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Segment not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public TableDebugInfo.SegmentDebugInfo getSegmentDebugInfoV2(
+      @ApiParam(value = "Name of the table (with type)", required = true) @QueryParam("tableName")
+      String tableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName)
       throws Exception {
     return debugSegment(tableNameWithType, segmentName);

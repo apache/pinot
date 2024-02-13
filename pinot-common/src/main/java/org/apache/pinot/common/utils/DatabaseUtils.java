@@ -29,7 +29,7 @@ public class DatabaseUtils {
     for (String key : TABLE_NAME_KEYS) {
       if (queryParams.containsKey(key)) {
         String tableName = queryParams.getFirst(key);
-        String actualTableName = tableCache.getActualTableName(tableName, databaseName);
+        String actualTableName = translateTableName(tableName, databaseName, tableCache);
         // table is not part of default database
         if (!actualTableName.equals(tableName)) {
           uri = uri.replaceAll(String.format("%s=%s", key, tableName),
@@ -42,5 +42,23 @@ public class DatabaseUtils {
         }
       }
     }
+  }
+
+  public static String translateTableName(String tableName, String databaseName, TableCache tableCache) {
+    String[] tableSplit = tableName.split("\\.");
+    if (tableSplit.length > 2) {
+      throw new IllegalStateException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
+    } else if (tableSplit.length == 2) {
+      databaseName = tableSplit[0];
+      tableName = tableSplit[1];
+    }
+    if (databaseName != null && !databaseName.isBlank()) {
+      tableName = String.format("%s.%s", databaseName, tableName);
+    }
+    String actualTableName = null;
+    if (tableCache != null) {
+      actualTableName = tableCache.getActualTableName(tableName);
+    }
+    return actualTableName != null ? actualTableName : tableName;
   }
 }

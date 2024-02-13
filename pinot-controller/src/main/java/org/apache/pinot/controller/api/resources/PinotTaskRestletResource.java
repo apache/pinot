@@ -86,6 +86,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.server.ManagedAsync;
@@ -215,7 +216,21 @@ public class PinotTaskRestletResource {
   public Map<String, TaskState> getTaskStatesByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType) {
+      String tableNameWithType, @Context HttpHeaders headers) {
+    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    return getTaskStatesByTableV2(taskType, tableNameWithType);
+  }
+
+  @GET
+  @Path("/v2/tasks/{taskType}/state")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("List all tasks for the given task type")
+  public Map<String, TaskState> getTaskStatesByTableV2(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @QueryParam("tableNameWithType")
+      String tableNameWithType) {
     return _pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, tableNameWithType);
   }
 
@@ -227,7 +242,21 @@ public class PinotTaskRestletResource {
   public String getTaskMetadataByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType) {
+      String tableNameWithType, @Context HttpHeaders headers) {
+    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    return getTaskMetadataByTableV2(taskType, tableNameWithType);
+  }
+
+  @GET
+  @Path("/v2/tasks/{taskType}/metadata")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get task metadata for the given task type and table")
+  public String getTaskMetadataByTableV2(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @QueryParam("tableNameWithType")
+      String tableNameWithType) {
     try {
       return _pinotHelixTaskResourceManager.getTaskMetadataByTable(taskType, tableNameWithType);
     } catch (JsonProcessingException e) {
@@ -245,7 +274,21 @@ public class PinotTaskRestletResource {
   public SuccessResponse deleteTaskMetadataByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType) {
+      String tableNameWithType, @Context HttpHeaders headers) {
+    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    return deleteTaskMetadataByTableV2(taskType, tableNameWithType);
+  }
+
+  @DELETE
+  @Path("/v2/tasks/{taskType}/metadata")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_TASK)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Delete task metadata for the given task type and table")
+  public SuccessResponse deleteTaskMetadataByTableV2(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @QueryParam("tableNameWithType")
+      String tableNameWithType) {
     _pinotHelixTaskResourceManager.deleteTaskMetadataByTable(taskType, tableNameWithType);
     return new SuccessResponse(
         String.format("Successfully deleted metadata for task type: %s from table: %s", taskType, tableNameWithType));
@@ -287,6 +330,24 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "verbosity (Prints information for all the tasks for the given task type and table."
           + "By default, only prints subtask details for running and error tasks. "
           + "Value of > 0 prints subtask details for all tasks)")
+      @DefaultValue("0") @QueryParam("verbosity") int verbosity, @Context HttpHeaders headers) {
+    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    return getTasksDebugInfoV2(taskType, tableNameWithType, verbosity);
+  }
+
+  @GET
+  @Path("/v2/tasks/{taskType}/debug")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_TASK)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Fetch information for all the tasks for the given task type and table")
+  public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfoV2(
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @QueryParam("tableNameWithType")
+      String tableNameWithType,
+      @ApiParam(value = "verbosity (Prints information for all the tasks for the given task type and table."
+          + "By default, only prints subtask details for running and error tasks. "
+          + "Value of > 0 prints subtask details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
     return _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, tableNameWithType, verbosity);
   }
@@ -303,6 +364,24 @@ public class PinotTaskRestletResource {
           String tableNameWithType,
       @ApiParam(value = "Whether to only lookup local cache for logs", defaultValue = "false") @QueryParam("localOnly")
           boolean localOnly)
+      throws JsonProcessingException {
+    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+        httpHeaders.getHeaderString(CommonConstants.DATABASE));
+    return getTaskGenerationDebugIntoV2(httpHeaders, taskType, tableNameWithType, localOnly);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/v2/tasks/generator/{taskType}/debug")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
+  @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
+  public String getTaskGenerationDebugIntoV2(
+      @Context HttpHeaders httpHeaders,
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Table name with type", required = true) @QueryParam("tableNameWithType")
+      String tableNameWithType,
+      @ApiParam(value = "Whether to only lookup local cache for logs", defaultValue = "false") @QueryParam("localOnly")
+      boolean localOnly)
       throws JsonProcessingException {
     if (localOnly) {
       BaseTaskGeneratorInfo taskGeneratorMostRecentRunInfo =

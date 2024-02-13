@@ -78,7 +78,6 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
-import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -154,19 +153,23 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders)
       throws Exception {
-    // Validate data access
-    boolean hasDataAccess;
-    try {
-      AccessControl accessControl = _accessControlFactory.create();
-      hasDataAccess = accessControl.hasDataAccess(httpHeaders, tableName);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER,
-          "Caught exception while validating access to table: " + tableName, Response.Status.INTERNAL_SERVER_ERROR, e);
-    }
-    if (!hasDataAccess) {
-      throw new ControllerApplicationException(LOGGER, "No data access to table: " + tableName,
-          Response.Status.FORBIDDEN);
-    }
+    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+        httpHeaders.getHeaderString(CommonConstants.DATABASE));
+    return downloadSegmentV2(tableName, segmentName);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_OCTET_STREAM)
+  @Path("/v2/segments/{segmentName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DOWNLOAD_SEGMENT)
+  @ApiOperation(value = "Download a segment", notes = "Download a segment")
+  @TrackInflightRequestMetrics
+  @TrackedByGauge(gauge = ControllerGauge.SEGMENT_DOWNLOADS_IN_PROGRESS)
+  @Authenticate(AccessType.READ)
+  public Response downloadSegmentV2(
+      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName)
+      throws Exception {
     segmentName = URIUtils.decode(segmentName);
     URI dataDirURI = ControllerFilePathProvider.getInstance().getDataDirURI();
     Response.ResponseBuilder builder = Response.ok();
@@ -646,7 +649,24 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
       @ApiParam(value = "Fields belonging to start replace segment request", required = true)
-          StartReplaceSegmentsRequest startReplaceSegmentsRequest) {
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders headers) {
+    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    return startReplaceSegmentsV2(tableName, tableTypeStr, forceCleanup, startReplaceSegmentsRequest);
+  }
+
+  @POST
+  @Path("/v2/segments/startReplaceSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REPLACE_SEGMENT)
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Start to replace segments", notes = "Start to replace segments")
+  public Response startReplaceSegmentsV2(
+      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
+      @ApiParam(value = "Fields belonging to start replace segment request", required = true)
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -676,8 +696,26 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
       @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
-      @ApiParam(value = "Fields belonging to end replace segment request", required = false)
-          EndReplaceSegmentsRequest endReplaceSegmentsRequest) {
+      @ApiParam(value = "Fields belonging to end replace segment request")
+          EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers) {
+    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    return endReplaceSegmentsV2(tableName, tableTypeStr, segmentLineageEntryId, endReplaceSegmentsRequest);
+  }
+
+  @POST
+  @Path("/v2/segments/endReplaceSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REPLACE_SEGMENT)
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "End to replace segments", notes = "End to replace segments")
+  public Response endReplaceSegmentsV2(
+      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
+      @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
+      @ApiParam(value = "Fields belonging to end replace segment request")
+      EndReplaceSegmentsRequest endReplaceSegmentsRequest) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -710,8 +748,29 @@ public class PinotSegmentUploadDownloadRestletResource {
           String segmentLineageEntryId,
       @ApiParam(value = "Force revert in case the user knows that the lineage entry is interrupted")
       @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert,
-      @ApiParam(value = "Fields belonging to revert replace segment request", required = false)
-          RevertReplaceSegmentsRequest revertReplaceSegmentsRequest) {
+      @ApiParam(value = "Fields belonging to revert replace segment request")
+      RevertReplaceSegmentsRequest revertReplaceSegmentsRequest, @Context HttpHeaders headers) {
+    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    return revertReplaceSegmentsV2(tableName, tableTypeStr, segmentLineageEntryId, forceRevert,
+        revertReplaceSegmentsRequest);
+  }
+
+  @POST
+  @Path("/v2/segments/revertReplaceSegments")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REPLACE_SEGMENT)
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Revert segments replacement", notes = "Revert segments replacement")
+  public Response revertReplaceSegmentsV2(
+      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Segment lineage entry id to revert", required = true) @QueryParam("segmentLineageEntryId")
+      String segmentLineageEntryId,
+      @ApiParam(value = "Force revert in case the user knows that the lineage entry is interrupted")
+      @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert,
+      @ApiParam(value = "Fields belonging to revert replace segment request")
+      RevertReplaceSegmentsRequest revertReplaceSegmentsRequest) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
