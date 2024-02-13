@@ -73,9 +73,9 @@ public class ColumnMetadataTest {
     final String filePath =
         TestUtils.getFileFromResourceUrl(ColumnMetadataTest.class.getClassLoader().getResource(AVRO_DATA));
     // Intentionally changed this to TimeUnit.Hours to make it non-default for testing.
-    SegmentGeneratorConfig config = SegmentTestUtils
-        .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS,
-            "testTable");
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
+            TimeUnit.HOURS, "testTable");
     config.setSegmentNamePostfix("1");
     return config;
   }
@@ -223,6 +223,7 @@ public class ColumnMetadataTest {
     PropertiesConfiguration propertiesConfiguration = CommonsConfigurationUtils.fromFile(metadataFile);
     ColumnMetadataImpl installationOutput =
         ColumnMetadataImpl.fromPropertiesConfiguration("installation_output", propertiesConfiguration);
-    Assert.assertNotNull(installationOutput);
+    Assert.assertEquals(installationOutput.getMinValue(),
+        "\r\n\r\n  utils   em::C:\\dir\\utils\r\nPSParentPath            : Mi");
   }
 }
