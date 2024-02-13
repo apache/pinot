@@ -44,7 +44,8 @@ import org.slf4j.LoggerFactory;
 public class GrpcQueryClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryClient.class);
   private static final int DEFAULT_CHANNEL_SHUTDOWN_TIMEOUT_SECOND = 10;
-  private static final Map<TlsConfig, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
+  // the key is the hashCode of the TlsConfig, the value is the SslContext
+  private static final Map<Integer, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private final ManagedChannel _managedChannel;
   private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
@@ -68,22 +69,19 @@ public class GrpcQueryClient {
 
   private SslContext buildSslContext(TlsConfig tlsConfig) {
     LOGGER.info("Building gRPC SSL context");
-    // Make a copy of the TlsConfig because the TlsConfig is mutable, when the TlsConfig is used as the key of the
-    // CLIENT_SSL_CONTEXTS_CACHE, the TlsConfig should not be changed.
-    TlsConfig tlsConfigCopy = new TlsConfig(tlsConfig);
-    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfigCopy, config -> {
+    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
       try {
-        SSLFactory sslFactory = TlsUtils.createSSLFactory(config);
-        if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(config.getKeyStorePath())
-            && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(config.getTrustStorePath())) {
-          TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, config);
+        SSLFactory sslFactory = TlsUtils.createSSLFactory(tlsConfig);
+        if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
+            && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
+          TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
         }
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
         sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
         sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
-        if (config.getSslProvider() != null) {
+        if (tlsConfig.getSslProvider() != null) {
           sslContextBuilder =
-              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(config.getSslProvider()));
+              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(tlsConfig.getSslProvider()));
         } else {
           sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
         }

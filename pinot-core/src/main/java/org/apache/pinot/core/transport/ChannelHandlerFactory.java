@@ -39,8 +39,10 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public class ChannelHandlerFactory {
   public static final String SSL = "ssl";
-  private static final Map<TlsConfig, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
-  private static final Map<TlsConfig, SslContext> SERVER_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
+  // the key is the hashCode of the TlsConfig, the value is the SslContext
+  private static final Map<Integer, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
+  // the key is the hashCode of the TlsConfig, the value is the SslContext
+  private static final Map<Integer, SslContext> SERVER_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private ChannelHandlerFactory() {
   }
@@ -64,10 +66,8 @@ public class ChannelHandlerFactory {
    * The {@code getClientTlsHandler} return a Client side Tls handler that encrypt and decrypt everything.
    */
   public static ChannelHandler getClientTlsHandler(TlsConfig tlsConfig, SocketChannel ch) {
-    // Make a copy of the TlsConfig because the TlsConfig is mutable, when the TlsConfig is used as the key of the
-    // CLIENT_SSL_CONTEXTS_CACHE, the TlsConfig should not be changed.
-    TlsConfig tlsConfigCopy = new TlsConfig(tlsConfig);
-    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfigCopy, TlsUtils::buildClientContext);
+    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE
+        .computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> TlsUtils.buildClientContext(tlsConfig));
     return sslContext.newHandler(ch.alloc());
   }
 
@@ -75,10 +75,8 @@ public class ChannelHandlerFactory {
    * The {@code getServerTlsHandler} return a Server side Tls handler that encrypt and decrypt everything.
    */
   public static ChannelHandler getServerTlsHandler(TlsConfig tlsConfig, SocketChannel ch) {
-    // Make a copy of the TlsConfig because the TlsConfig is mutable, when the TlsConfig is used as the key of the
-    // SERVER_SSL_CONTEXTS_CACHE, the TlsConfig should not be changed.
-    TlsConfig tlsConfigCopy = new TlsConfig(tlsConfig);
-    SslContext sslContext = SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfigCopy, TlsUtils::buildServerContext);
+    SslContext sslContext = SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(
+        tlsConfig.hashCode(), tlsConfigHashCode -> TlsUtils.buildServerContext(tlsConfig));
     return sslContext.newHandler(ch.alloc());
   }
 
