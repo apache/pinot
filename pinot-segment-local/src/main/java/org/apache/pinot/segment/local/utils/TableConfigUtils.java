@@ -1161,15 +1161,15 @@ public final class TableConfigUtils {
 
     for (FieldConfig fieldConfig : fieldConfigList) {
       String columnName = fieldConfig.getName();
-      EncodingType encodingType = fieldConfig.getEncodingType();
-      Preconditions.checkArgument(encodingType != null, "Encoding type must be specified for column: %s", columnName);
       CompressionCodec compressionCodec = fieldConfig.getCompressionCodec();
-      switch (encodingType) {
+      // By default, encoding is DICTIONARY
+      switch (fieldConfig.getEncodingType()) {
         case RAW:
           Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToRawIndex(),
               "Compression codec: %s is not applicable to raw index", compressionCodec);
           break;
         case DICTIONARY:
+        default:
           Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex(),
               "Compression codec: %s is not applicable to dictionary encoded index", compressionCodec);
           List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
@@ -1178,8 +1178,6 @@ public final class TableConfigUtils {
           Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
           Preconditions.checkArgument(noDictionaryConfig == null || !noDictionaryConfig.containsKey(columnName),
               "FieldConfig encoding type is different from indexingConfig for column: %s", columnName);
-          break;
-        default:
           break;
       }
 
