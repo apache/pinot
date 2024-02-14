@@ -183,9 +183,10 @@ public final class TlsUtils {
    */
   public static TrustManagerFactory createTrustManagerFactory(TlsConfig tlsConfig) {
     if (tlsConfig.isInsecure()) {
-     return  InsecureTrustManagerFactory.INSTANCE;
+      return InsecureTrustManagerFactory.INSTANCE;
     } else {
-      return createTrustManagerFactory(tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword(), tlsConfig.getTrustStoreType());
+      return createTrustManagerFactory(tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword(),
+          tlsConfig.getTrustStoreType());
     }
   }
 
