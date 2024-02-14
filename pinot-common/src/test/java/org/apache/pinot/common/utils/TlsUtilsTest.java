@@ -131,7 +131,7 @@ public class TlsUtilsTest {
     sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), secureRandom);
     SSLFactory sslFactory =
         TlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD,
-            TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, true);
+            TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, true, false);
     KeyManagerFactory swappableKeyManagerFactory = sslFactory.getKeyManagerFactory().get();
     assertEquals(swappableKeyManagerFactory.getKeyManagers().length, keyManagerFactory.getKeyManagers().length);
     assertEquals(swappableKeyManagerFactory.getKeyManagers().length, 1);
@@ -173,7 +173,7 @@ public class TlsUtilsTest {
       throws IOException, URISyntaxException, InterruptedException {
     SecureRandom secureRandom = new SecureRandom();
     SSLFactory sslFactory = TlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD, TRUSTSTORE_TYPE,
-        TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, true);
+        TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, true, false);
     X509ExtendedKeyManager x509ExtendedKeyManager = sslFactory.getKeyManager().get();
     X509ExtendedTrustManager x509ExtendedTrustManager = sslFactory.getTrustManager().get();
     SSLContext sslContext = sslFactory.getSslContext();
@@ -188,7 +188,7 @@ public class TlsUtilsTest {
         () -> {
           try {
             TlsUtils.reloadSslFactoryWhenFileStoreChanges(sslFactory, KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD,
-                TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom);
+                TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, false);
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -231,7 +231,7 @@ public class TlsUtilsTest {
   public void enableAutoRenewalFromFileStoreForSSLFactoryThrows() {
     SSLFactory swappableSslFactory =
         TlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD, TRUSTSTORE_TYPE,
-            TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", null, true);
+            TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", null, true, false);
     TlsConfig tlsConfig = new TlsConfig();
     tlsConfig.setKeyStoreType(KEYSTORE_TYPE);
     tlsConfig.setKeyStorePath("ftp://" + TLS_KEYSTORE_FILE_PATH);
@@ -262,7 +262,7 @@ public class TlsUtilsTest {
 
     SSLFactory nonSwappableSslFactory =
         TlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD, TRUSTSTORE_TYPE,
-            TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", null, false);
+            TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", null, false, false);
     e = null;
     tlsConfig.setTrustStorePath(TLS_TRUSTSTORE_FILE_PATH);
     try {
