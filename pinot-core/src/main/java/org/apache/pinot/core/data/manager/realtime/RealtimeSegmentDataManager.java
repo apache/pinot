@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -418,13 +419,24 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .create(_currentOffset);  // so that we always update the metric when we enter this method.
 
     _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
+    boolean consumptionStarted = false;
+    boolean asyncConsumerEnabled = false;
+    ConcurrentLinkedQueue<MessageBatch> messagesQueue = null;
     while (!_shouldStop && !endCriteriaReached()) {
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
+      if (!consumptionStarted && asyncConsumerEnabled) {
+        consumptionStarted = true;
+        messagesQueue = new ConcurrentLinkedQueue<>();
+        _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis(), messagesQueue);
+      }
       try {
-        messageBatch =
-            _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
+        if (!asyncConsumerEnabled) {
+          messageBatch = _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
+        } else {
+          messageBatch = messagesQueue.poll();
+        }
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("message batch received. filtered={} unfiltered={} endOfPartitionGroup={}",
               messageBatch.getMessageCount(), messageBatch.getUnfilteredMessageCount(),
