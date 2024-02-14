@@ -65,18 +65,17 @@ public class DatabaseUtils {
   }
 
   public static String translateTableName(String tableName, String databaseName, @Nullable TableCache tableCache) {
-    if (tableName == null || databaseName == null) {
-      return tableName;
-    }
-    String[] tableSplit = tableName.split("\\.");
-    if (tableSplit.length > 2) {
-      throw new IllegalStateException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
-    } else if (tableSplit.length == 2) {
-      databaseName = tableSplit[0];
-      tableName = tableSplit[1];
-    }
-    if (databaseName != null && !databaseName.isBlank()) {
-      tableName = String.format("%s.%s", databaseName, tableName);
+    if (tableName != null && databaseName != null) {
+      String[] tableSplit = tableName.split("\\.");
+      if (tableSplit.length > 2) {
+        throw new IllegalStateException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
+      } else if (tableSplit.length == 2) {
+        databaseName = tableSplit[0];
+        tableName = tableSplit[1];
+      }
+      if (databaseName != null && !databaseName.isBlank()) {
+        tableName = String.format("%s.%s", databaseName, tableName);
+      }
     }
     String actualTableName = null;
     if (tableCache != null) {
