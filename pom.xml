@@ -110,7 +110,7 @@
   <properties>
     <pinot.root>${basedir}</pinot.root>
     <build.profile.id>dev</build.profile.id>
-    <jdk.version>11</jdk.version>
+    <jdk.version>21</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     <!-- Setting maven.compiler flags to the jdk version. These are used by maven plugins like maven-javadoc-plugin -->
