@@ -621,7 +621,7 @@ public class TablesResource {
   @POST
   @Path("/tables/{tableNameWithType}/validDocIdsMetadata")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Provides segment valid doc ids metadata", notes = "Provides segment valid doc ids metadata")
+  @ApiOperation(value = "Provides segment validDocIds metadata", notes = "Provides segment validDocIds metadata")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
       response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
