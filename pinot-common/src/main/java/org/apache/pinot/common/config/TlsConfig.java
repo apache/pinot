@@ -35,6 +35,7 @@ public class TlsConfig {
   private String _trustStorePath;
   private String _trustStorePassword;
   private String _sslProvider = SslProvider.JDK.toString();
+  private boolean _insecure = false;
 
   public TlsConfig() {
     // left blank
@@ -117,5 +118,13 @@ public class TlsConfig {
 
   public boolean isCustomized() {
     return StringUtils.isNoneBlank(_keyStorePath) || StringUtils.isNoneBlank(_trustStorePath);
+  }
+
+  public boolean isInsecure() {
+    return _insecure;
+  }
+
+  public void setInsecure(boolean insecure) {
+    _insecure = insecure;
   }
 }

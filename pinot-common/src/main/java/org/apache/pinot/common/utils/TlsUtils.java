@@ -24,6 +24,7 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -80,6 +81,7 @@ public final class TlsUtils {
   private static final String FILE_SCHEME = "file";
   private static final String FILE_SCHEME_PREFIX = FILE_SCHEME + "://";
   private static final String FILE_SCHEME_PREFIX_WITHOUT_SLASH = FILE_SCHEME + ":";
+  private static final String INSECURE = "insecure";
 
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
 
@@ -126,6 +128,8 @@ public final class TlsUtils {
         pinotConfig.getProperty(key(namespace, TRUSTSTORE_PASSWORD), defaultConfig.getTrustStorePassword()));
     tlsConfig.setSslProvider(
         pinotConfig.getProperty(key(namespace, SSL_PROVIDER), defaultConfig.getSslProvider()));
+    tlsConfig.setInsecure(
+        pinotConfig.getProperty(key(namespace, INSECURE), defaultConfig.isInsecure()));
 
     return tlsConfig;
   }
@@ -178,8 +182,12 @@ public final class TlsUtils {
    * @return TrustManagerFactory
    */
   public static TrustManagerFactory createTrustManagerFactory(TlsConfig tlsConfig) {
-    return createTrustManagerFactory(tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword(),
-        tlsConfig.getTrustStoreType());
+    if (tlsConfig.isInsecure()) {
+      return InsecureTrustManagerFactory.INSTANCE;
+    } else {
+      return createTrustManagerFactory(tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword(),
+          tlsConfig.getTrustStoreType());
+    }
   }
 
   /**
