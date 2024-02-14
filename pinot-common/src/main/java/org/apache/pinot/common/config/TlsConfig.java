@@ -41,6 +41,7 @@ public class TlsConfig {
   private String _trustStorePath;
   private String _trustStorePassword;
   private String _sslProvider = SslProvider.JDK.toString();
+  // If true, the client will not verify the server's certificate
   private boolean _insecure = false;
 
   public TlsConfig() {
@@ -60,13 +61,5 @@ public class TlsConfig {
 
   public boolean isCustomized() {
     return StringUtils.isNoneBlank(_keyStorePath) || StringUtils.isNoneBlank(_trustStorePath);
-  }
-
-  public boolean isInsecure() {
-    return _insecure;
-  }
-
-  public void setInsecure(boolean insecure) {
-    _insecure = insecure;
   }
 }
