@@ -75,6 +75,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
@@ -320,6 +321,11 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         // Compile the request into PinotQuery
         compilationStartTimeNs = System.nanoTime();
         pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
+        if (pinotQuery.getDataSource() != null) {
+        pinotQuery.getDataSource().setTableName(DatabaseUtils.translateTableName(
+            pinotQuery.getDataSource().getTableName(), httpHeaders.getHeaderString(CommonConstants.DATABASE),
+            _tableCache));
+        }
       } catch (Exception e) {
         LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -372,7 +378,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       }
 
-      String tableName = getActualTableName(dataSource.getTableName(), _tableCache);
+      String tableName = DatabaseUtils.translateTableName(dataSource.getTableName(),
+          httpHeaders.getHeaderString(CommonConstants.DATABASE), _tableCache);
       dataSource.setTableName(tableName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       requestContext.setTableName(rawTableName);
@@ -941,34 +948,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         handleSubquery(operand, requestId, jsonRequest, requesterIdentity, requestContext, httpHeaders);
       }
     }
-  }
-
-  /**
-   * Resolves the actual table name for:
-   * - Case-insensitive cluster
-   * - Table name in the format of [database_name].[table_name]
-   *
-   * @param tableName the table name in the query
-   * @param tableCache the table case-sensitive cache
-   * @return table name if the table name is found in Pinot registry, drop the database_name in the format
-   *  of [database_name].[table_name] if only [table_name] is found in Pinot registry.
-   */
-  @VisibleForTesting
-  static String getActualTableName(String tableName, TableCache tableCache) {
-    String actualTableName = tableCache.getActualTableName(tableName);
-    if (actualTableName != null) {
-      return actualTableName;
-    }
-
-    // Check if table is in the format of [database_name].[table_name]
-    String[] tableNameSplits = StringUtils.split(tableName, ".", 2);
-    if (tableNameSplits.length == 2) {
-      actualTableName = tableCache.getActualTableName(tableNameSplits[1]);
-      if (actualTableName != null) {
-        return actualTableName;
-      }
-    }
-    return tableName;
   }
 
   /**
@@ -1652,6 +1631,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Returns the actual column name for the given column name for:
    * - Case-insensitive cluster
    * - Column name in the format of [table_name].[column_name]
+   * - Column name in the format of [database_name].[table_name].[column_name]
    */
   @VisibleForTesting
   static String getActualColumnName(String rawTableName, String columnName, @Nullable Map<String, String> columnNameMap,
@@ -1660,10 +1640,25 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return columnName;
     }
     String columnNameToCheck;
-    if (columnName.regionMatches(ignoreCase, 0, rawTableName, 0, rawTableName.length())
-        && columnName.length() > rawTableName.length() && columnName.charAt(rawTableName.length()) == '.') {
-      columnNameToCheck = ignoreCase ? columnName.substring(rawTableName.length() + 1).toLowerCase()
-          : columnName.substring(rawTableName.length() + 1);
+    String resolvedColumnName = columnName;
+    if (rawTableName.contains(".")) { // table name has database prefix
+      String databaseName = rawTableName.split("\\.")[0];
+      // if column name only has table prefix, we need to append the database prefix as well
+      // to ensure following logic does not break
+      if (columnName.split("\\.").length == 2) {
+        resolvedColumnName = String.format("%s.%s", databaseName, columnName);
+      }
+    } else { // table name does not have database prefix -> table is under "default" database
+      // remove the "default" database prefix from column name if present
+      if (columnName.split("\\.").length == 3 && columnName.startsWith(CommonConstants.DEFAULT_DATABASE + ".")) {
+        resolvedColumnName = columnName.substring(CommonConstants.DEFAULT_DATABASE.length() + 1);
+      }
+    }
+    if (resolvedColumnName.regionMatches(ignoreCase, 0, rawTableName, 0, rawTableName.length())
+        && resolvedColumnName.length() > rawTableName.length()
+        && resolvedColumnName.charAt(rawTableName.length()) == '.') {
+      columnNameToCheck = ignoreCase ? resolvedColumnName.substring(rawTableName.length() + 1).toLowerCase()
+          : resolvedColumnName.substring(rawTableName.length() + 1);
     } else {
       columnNameToCheck = ignoreCase ? columnName.toLowerCase() : columnName;
     }
