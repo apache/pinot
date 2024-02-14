@@ -35,6 +35,8 @@ public interface RexExpression {
 
   ColumnDataType getDataType();
 
+  <R, A> R accept(RexExpressionVisitor<R, A> visitor, A arg);
+
   class InputRef implements RexExpression {
     @ProtoProperties
     private SqlKind _sqlKind;
@@ -61,6 +63,11 @@ public interface RexExpression {
     @Override
     public ColumnDataType getDataType() {
       throw new IllegalStateException("InputRef does not have data type");
+    }
+
+    @Override
+    public <R, A> R accept(RexExpressionVisitor<R, A> visitor, A arg) {
+      return visitor.visit(this, arg);
     }
   }
 
@@ -96,6 +103,11 @@ public interface RexExpression {
     @Override
     public ColumnDataType getDataType() {
       return _dataType;
+    }
+
+    @Override
+    public <R, A> R accept(RexExpressionVisitor<R, A> visitor, A arg) {
+      return visitor.visit(this, arg);
     }
   }
 
@@ -142,6 +154,11 @@ public interface RexExpression {
     @Override
     public ColumnDataType getDataType() {
       return _dataType;
+    }
+
+    @Override
+    public <R, A> R accept(RexExpressionVisitor<R, A> visitor, A arg) {
+      return visitor.visit(this, arg);
     }
   }
 }

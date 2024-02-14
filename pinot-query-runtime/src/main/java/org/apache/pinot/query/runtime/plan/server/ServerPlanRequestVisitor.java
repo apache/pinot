@@ -22,12 +22,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.DataSource;
+import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
+import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.logical.RexExpressionVisitor;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -59,6 +63,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  */
 public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
   private static final ServerPlanRequestVisitor INSTANCE = new ServerPlanRequestVisitor();
+
+  private static final RexExpressionVisitor.Walker<ServerPlanRequestContext> REX_VISITOR = createDateTrunkFinder();
 
   static void walkStageNode(PlanNode node, ServerPlanRequestContext context) {
     node.visit(INSTANCE, context);
@@ -120,6 +126,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         context.setLeafStageBoundaryNode(node.getInputs().get(0));
       }
     }
+    node.getCondition().accept(REX_VISITOR, context);
     return null;
   }
 
@@ -214,5 +221,23 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   private boolean visit(PlanNode node, ServerPlanRequestContext context) {
     node.visit(this, context);
     return context.getLeafStageBoundaryNode() == null;
+  }
+
+  private static RexExpressionVisitor.Walker<ServerPlanRequestContext> createDateTrunkFinder() {
+    return new RexExpressionVisitor.Walker<>() {
+      @Override
+      public Void visit(RexExpression.FunctionCall call, ServerPlanRequestContext arg) {
+        if (call.getFunctionName().equalsIgnoreCase("datetrunc")) {
+          List<RexExpression> operands = call.getFunctionOperands();
+          if (operands.size() == 2 && operands.get(0).getKind() == SqlKind.LITERAL
+              && operands.get(1).getKind() == SqlKind.INPUT_REF) {
+            Expression key = CalciteRexExpressionParser.toExpression(call, arg.getPinotQuery());
+
+            RequestUtils.applyTimestampIndex(key, arg.getPinotQuery());
+          }
+        }
+        return super.visit(call, arg);
+      }
+    };
   }
 }
