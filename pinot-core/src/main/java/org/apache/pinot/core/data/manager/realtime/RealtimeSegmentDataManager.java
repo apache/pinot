@@ -442,6 +442,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         } else {
           messageBatch = messagesQueue.get();
         }
+
         //track realtime rows fetched on a table level. This included valid + invalid rows
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FETCHED,
             messageBatch.getUnfilteredMessageCount());
