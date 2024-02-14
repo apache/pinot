@@ -68,7 +68,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
       throws Exception {
     // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise may always try to
     // download from a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
-    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(downloadURI);
+    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(List.of(downloadURI), true);
 
     int retryCount = getRetryCount(uriProvider);
 
@@ -124,7 +124,7 @@ public class HttpSegmentFetcher extends BaseSegmentFetcher {
       throws Exception {
     // Create a RoundRobinURIProvider to round robin IP addresses when retry uploading. Otherwise, may always try to
     // download from a same broken host as: 1) DNS may not RR the IP addresses 2) OS cache the DNS resolution result.
-    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(downloadURI);
+    RoundRobinURIProvider uriProvider = new RoundRobinURIProvider(List.of(downloadURI), true);
 
     int retryCount = getRetryCount(uriProvider);
 

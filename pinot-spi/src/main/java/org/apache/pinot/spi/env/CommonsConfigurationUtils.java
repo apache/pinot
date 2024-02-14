@@ -29,12 +29,12 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.io.FileHandler;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 
 
@@ -43,6 +43,7 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class CommonsConfigurationUtils {
   private static final Character DEFAULT_LIST_DELIMITER = ',';
+
   private CommonsConfigurationUtils() {
   }
 
@@ -99,7 +100,8 @@ public class CommonsConfigurationUtils {
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromInputStream(InputStream stream, boolean setIOFactory,
-      boolean setDefaultDelimiter) throws ConfigurationException {
+      boolean setDefaultDelimiter)
+      throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(stream);
@@ -113,8 +115,8 @@ public class CommonsConfigurationUtils {
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
-      boolean setDefaultDelimiter) throws ConfigurationException {
+  public static PropertiesConfiguration fromFile(File file, boolean setIOFactory, boolean setDefaultDelimiter)
+      throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     FileHandler fileHandler = new FileHandler(config);
     // check if file exists, load the properties otherwise set the file.
@@ -216,16 +218,32 @@ public class CommonsConfigurationUtils {
   /**
    * Replaces the special character in the given property value.
    * - Leading/trailing space is prefixed/suffixed with "\0"
-   * - Comma is replaces with "\0\0"
+   * - Comma is replaced with "\0\0"
+   * Returns {@code null} when the given value contains surrogate characters because it is not supported by
+   * {@link PropertiesConfiguration}.
    *
    * Note:
    * - '\0' is not allowed in string values, so we can use it as the replaced character
    * - Escaping comma with backslash doesn't work when comma is preceded by a backslash
    */
+  @Nullable
   public static String replaceSpecialCharacterInPropertyValue(String value) {
-    value = StringEscapeUtils.escapeJava(value);
-    if (value.isEmpty()) {
+    int length = value.length();
+    if (length == 0) {
       return value;
+    }
+    boolean containsDelimiter = false;
+    for (int i = 0; i < length; i++) {
+      char c = value.charAt(i);
+      if (Character.isSurrogate(c)) {
+        return null;
+      }
+      if (c == DEFAULT_LIST_DELIMITER) {
+        containsDelimiter = true;
+      }
+    }
+    if (containsDelimiter) {
+      value = value.replace(",", "\0\0");
     }
     if (value.charAt(0) == ' ') {
       value = "\0" + value;
@@ -233,7 +251,7 @@ public class CommonsConfigurationUtils {
     if (value.charAt(value.length() - 1) == ' ') {
       value = value + "\0";
     }
-    return value.replace(",", "\0\0");
+    return value;
   }
 
   /**
@@ -241,12 +259,6 @@ public class CommonsConfigurationUtils {
    * {@link #replaceSpecialCharacterInPropertyValue(String)}.
    */
   public static String recoverSpecialCharacterInPropertyValue(String value) {
-    try {
-      // This is for backward compatibility, to handle the old commons library escape character behavior.
-      value = StringEscapeUtils.unescapeJava(value);
-    } catch (Exception e) {
-      // If the value is not a valid escaped string, ignore the exception and continue
-    }
     if (value.isEmpty()) {
       return value;
     }
@@ -270,13 +282,9 @@ public class CommonsConfigurationUtils {
 
     // setting DEFAULT_LIST_DELIMITER
     if (setDefaultDelimiter) {
-      setListDelimiterHandler(config);
+      config.setListDelimiterHandler(new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER));
     }
 
     return config;
-  }
-
-  private static void setListDelimiterHandler(PropertiesConfiguration configuration) {
-    configuration.setListDelimiterHandler(new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER));
   }
 }
