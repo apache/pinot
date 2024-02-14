@@ -47,7 +47,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
-  private final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
+  protected final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
 
   public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       int senderStageId) {
@@ -71,14 +71,6 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         .collect(Collectors.toList());
     _multiConsumer =
         new BlockingMultiStreamConsumer.OfTransferableBlock(context.getId(), context.getDeadlineMs(), asyncStreams);
-  }
-
-  protected BlockingMultiStreamConsumer.OfTransferableBlock getMultiConsumer() {
-    return _multiConsumer;
-  }
-
-  public List<String> getMailboxIds() {
-    return _mailboxIds;
   }
 
   @Override
