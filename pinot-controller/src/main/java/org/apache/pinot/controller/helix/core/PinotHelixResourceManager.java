@@ -1607,10 +1607,13 @@ public class PinotHelixResourceManager {
   }
 
   public List<String> getSchemaNames(String databaseName) {
-    return _propertyStore.getChildNames(
-            PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT)
-        .stream().filter(schemaName -> isPartOfDatabase(schemaName, databaseName))
-        .collect(Collectors.toList());
+    List<String> schemas = _propertyStore.getChildNames(
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
+    if (schemas != null) {
+        return schemas.stream().filter(schemaName -> isPartOfDatabase(schemaName, databaseName))
+            .collect(Collectors.toList());
+    }
+    return schemas;
   }
 
   public void initUserACLConfig(ControllerConf controllerConf)

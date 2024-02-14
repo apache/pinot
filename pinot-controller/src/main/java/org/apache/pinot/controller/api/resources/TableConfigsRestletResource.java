@@ -50,6 +50,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -70,6 +71,7 @@ import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
@@ -262,6 +264,11 @@ public class TableConfigsRestletResource {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+      if (!DatabaseUtils.isTableNameEquivalent(tableConfigs.getTableName(), tableName)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Request table " + tableName + " does not match table name in the body " + tableConfigs.getTableName(),
+            Response.Status.BAD_REQUEST);
+      }
       tableConfigs.setTableName(tableName);
       validateConfig(tableConfigs, typesToSkip);
     } catch (Exception e) {
@@ -448,6 +455,10 @@ public class TableConfigsRestletResource {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+      if (!DatabaseUtils.isTableNameEquivalent(tableConfigs.getTableName(), tableName)) {
+        throw new IllegalArgumentException(
+            "Table name mismatch: " + tableConfigs.getTableName() + " is not equivalent to " + tableName);
+      }
       tableConfigs.setTableName(tableName);
       validateConfig(tableConfigs, typesToSkip);
     } catch (Exception e) {

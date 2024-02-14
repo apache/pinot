@@ -57,6 +57,7 @@ import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -231,9 +232,18 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Name of the schema", required = true) @QueryParam("schemaName") String schemaName,
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload, FormDataMultiPart multiPart) {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
-        getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
+    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps;
+    try {
+      schemaAndUnrecognizedProps = getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
+    } finally {
+      multiPart.cleanup();
+    }
     Schema schema = schemaAndUnrecognizedProps.getLeft();
+    if (!DatabaseUtils.isTableNameEquivalent(schema.getSchemaName(), schemaName)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Schema name mismatch: " + schema.getSchemaName() + " is not equivalent to " + schemaName,
+          Response.Status.BAD_REQUEST);
+    }
     schema.setSchemaName(schemaName);
     SuccessResponse successResponse = updateSchema(schema, reload);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
@@ -286,6 +296,11 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     Schema schema = schemaAndUnrecognizedProps.getLeft();
+    if (!DatabaseUtils.isTableNameEquivalent(schema.getSchemaName(), schemaName)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Schema name mismatch: " + schema.getSchemaName() + " is not equivalent to " + schemaName,
+          Response.Status.BAD_REQUEST);
+    }
     schema.setSchemaName(schemaName);
     SuccessResponse successResponse = updateSchema(schema, reload);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
@@ -347,9 +362,18 @@ public class PinotSchemaRestletResource {
       FormDataMultiPart multiPart,
       @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
-        getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
+    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps;
+    try {
+      schemaAndUnrecognizedProps = getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
+    } finally {
+      multiPart.cleanup();
+    }
     Schema schema = schemaAndUnrecognizedProps.getLeft();
+    if (!DatabaseUtils.isTableNameEquivalent(schema.getSchemaName(), schemaName)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Schema name mismatch: " + schema.getSchemaName() + " is not equivalent to " + schemaName,
+          Response.Status.BAD_REQUEST);
+    }
     schema.setSchemaName(schemaName);
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
@@ -428,6 +452,11 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     Schema schema = schemaAndUnrecognizedProperties.getLeft();
+    if (!DatabaseUtils.isTableNameEquivalent(schema.getSchemaName(), schemaName)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Schema name mismatch: " + schema.getSchemaName() + " is not equivalent to " + schemaName,
+          Response.Status.BAD_REQUEST);
+    }
     schema.setSchemaName(schemaName);
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProperties.getRight());
@@ -446,8 +475,12 @@ public class PinotSchemaRestletResource {
   @ManualAuthorization // performed after parsing schema
   public String validateSchema(FormDataMultiPart multiPart, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
-        getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
+    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps;
+    try {
+      schemaAndUnrecognizedProps = getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
+    } finally {
+      multiPart.cleanup();
+    }
     Schema schema = schemaAndUnrecognizedProps.getLeft();
     String endpointUrl = request.getRequestURL().toString();
     validateSchemaInternal(schema);
@@ -585,7 +618,7 @@ public class PinotSchemaRestletResource {
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
-      return new SuccessResponse(schemaName + " successfully updated");
+      return new SuccessResponse(schemaName + " successfully added");
     } catch (SchemaNotFoundException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, String.format("Failed to find schema %s", schemaName),
@@ -609,22 +642,18 @@ public class PinotSchemaRestletResource {
 
   private Pair<Schema, Map<String, Object>> getSchemaAndUnrecognizedPropertiesFromMultiPart(
       FormDataMultiPart multiPart) {
-    try {
-      Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-      if (!PinotSegmentUploadDownloadRestletResource.validateMultiPart(map, null)) {
-        throw new ControllerApplicationException(LOGGER, "Found not exactly one file from the multi-part fields",
-            Response.Status.BAD_REQUEST);
-      }
-      FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
-      try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
-        return Schema.parseSchemaAndUnrecognizedPropsfromInputStream(inputStream);
-      } catch (IOException e) {
-        throw new ControllerApplicationException(LOGGER,
-            "Caught exception while de-serializing the schema from request body: " + e.getMessage(),
-            Response.Status.BAD_REQUEST);
-      }
-    } finally {
-      multiPart.cleanup();
+    Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
+    if (!PinotSegmentUploadDownloadRestletResource.validateMultiPart(map, null)) {
+      throw new ControllerApplicationException(LOGGER, "Found not exactly one file from the multi-part fields",
+          Response.Status.BAD_REQUEST);
+    }
+    FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
+    try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
+      return Schema.parseSchemaAndUnrecognizedPropsfromInputStream(inputStream);
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Caught exception while de-serializing the schema from request body: " + e.getMessage(),
+          Response.Status.BAD_REQUEST);
     }
   }
 

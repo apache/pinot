@@ -81,6 +81,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -216,7 +217,7 @@ public class PinotTableRestletResource {
   @Path("/v2/tables")
   @ApiOperation(value = "Adds a table to given database", notes = "Adds a table to given database")
   public ConfigSuccessResponse addTable(String tableConfigStr,
-      @ApiParam(value = "Provide table name in case of non default database", required = true)
+      @ApiParam(value = "Name of the table to create", required = true)
       @QueryParam("tableName") String tableName,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
@@ -228,7 +229,13 @@ public class PinotTableRestletResource {
       tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
-      tableConfig.setTableName(tableName);
+      String tableNameWithType = TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName);
+      if (!DatabaseUtils.isTableNameEquivalent(tableConfig.getTableName(), tableNameWithType)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Request table " + tableName + " does not match table name in the body " + tableConfig.getTableName(),
+            Response.Status.BAD_REQUEST);
+      }
+      tableConfig.setTableName(tableNameWithType);
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
@@ -509,7 +516,7 @@ public class PinotTableRestletResource {
       String tableConfigString)
       throws Exception {
     return updateTableConfig(
-        _pinotHelixResourceManager.getActualTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
+        DatabaseUtils.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE), null),
         typesToSkip, tableConfigString);
   }
 
@@ -526,13 +533,18 @@ public class PinotTableRestletResource {
     throws Exception {
     Pair<TableConfig, Map<String, Object>> tableConfigJsonPojoWithUnparsableProps;
     TableConfig tableConfig;
-    TableNameBuilder tableNameBuilder;
+    String tableNameWithType;
     try {
       tableConfigJsonPojoWithUnparsableProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigString, TableConfig.class);
       tableConfig = tableConfigJsonPojoWithUnparsableProps.getLeft();
-      tableNameBuilder = TableNameBuilder.forType(tableConfig.getTableType());
-      tableName = tableNameBuilder.tableNameWithType(tableName);
+      tableNameWithType = TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName);
+      if (!DatabaseUtils.isTableNameEquivalent(tableConfig.getTableName(), tableNameWithType)) {
+        throw new ControllerApplicationException(LOGGER,
+            "Request table " + tableName + " does not match table name in the body " + tableConfig.getTableName(),
+            Response.Status.BAD_REQUEST);
+      }
+      tableConfig.setTableName(tableNameWithType);
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
     } catch (Exception e) {
@@ -541,9 +553,8 @@ public class PinotTableRestletResource {
     }
 
     try {
-      if (!_pinotHelixResourceManager.hasTable(tableName)) {
-        throw new ControllerApplicationException(LOGGER,
-            "Table " + tableNameBuilder.tableNameWithType(tableName) + " does not exist",
+      if (!_pinotHelixResourceManager.hasTable(tableNameWithType)) {
+        throw new ControllerApplicationException(LOGGER, "Table " + tableNameWithType + " does not exist",
             Response.Status.NOT_FOUND);
       }
 
