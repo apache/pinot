@@ -584,38 +584,64 @@ public class StringFunctions {
 
   /**
    * @param input an input string for prefix strings generations.
-   * @param length the max length of the prefix strings for the string.
-   * @param regexChar the character for regex matching to be added to prefix strings generated. e.g. '^'
+   * @param maxlength the max length of the prefix strings for the string.
    * @return generate an array of prefix strings of the string that are shorter than the specified length.
    */
   @ScalarFunction
-  public static String[] prefix(String input, int length, String regexChar) {
+  public static String[] prefixes(String input, int maxlength) {
     ObjectSet<String> prefixSet = new ObjectLinkedOpenHashSet<>();
-    for (int prefixLength = 1; prefixLength <= length && prefixLength <= input.length(); prefixLength++) {
-      if (regexChar != null) {
-        prefixSet.add(regexChar + input.substring(0, prefixLength));
-      } else {
-        prefixSet.add(input.substring(0, prefixLength));
-      }
+    for (int prefixLength = 1; prefixLength <= maxlength && prefixLength <= input.length(); prefixLength++) {
+      prefixSet.add(input.substring(0, prefixLength));
+    }
+    return prefixSet.toArray(new String[0]);
+  }
+
+  /**
+   * @param input an input string for prefix strings generations.
+   * @param maxlength the max length of the prefix strings for the string.
+   * @param regexChar the character for regex matching to be added to prefix strings generated. e.g. '^'
+   * @return generate an array of prefix matchers of the string that are shorter than the specified length.
+   */
+  @ScalarFunction
+  public static String[] prefixMatchers(String input, int maxlength, String regexChar) {
+    if (regexChar == null) {
+      return prefixes(input, maxlength);
+    }
+    ObjectSet<String> prefixSet = new ObjectLinkedOpenHashSet<>();
+    for (int prefixLength = 1; prefixLength <= maxlength && prefixLength <= input.length(); prefixLength++) {
+      prefixSet.add(regexChar + input.substring(0, prefixLength));
     }
     return prefixSet.toArray(new String[0]);
   }
 
   /**
    * @param input an input string for suffix strings generations.
-   * @param length the max length of the suffix strings for the string.
-   * @param regexChar the character for regex matching to be added to suffix strings generated. e.g. '$'
+   * @param maxlength the max length of the suffix strings for the string.
    * @return generate an array of suffix strings of the string that are shorter than the specified length.
    */
   @ScalarFunction
-  public static String[] suffix(String input, int length, String regexChar) {
+  public static String[] suffixes(String input, int maxlength) {
     ObjectSet<String> suffixSet = new ObjectLinkedOpenHashSet<>();
-    for (int suffixLength = 1; suffixLength <= length && suffixLength <= input.length(); suffixLength++) {
-      if (regexChar != null) {
-        suffixSet.add(input.substring(input.length() - suffixLength) + regexChar);
-      } else {
-        suffixSet.add(input.substring(input.length() - suffixLength));
-      }
+    for (int suffixLength = 1; suffixLength <= maxlength && suffixLength <= input.length(); suffixLength++) {
+      suffixSet.add(input.substring(input.length() - suffixLength));
+    }
+    return suffixSet.toArray(new String[0]);
+  }
+
+  /**
+   * @param input an input string for suffix strings generations.
+   * @param maxlength the max length of the suffix strings for the string.
+   * @param regexChar the character for regex matching to be added to suffix strings generated. e.g. '$'
+   * @return generate an array of suffix matchers of the string that are shorter than the specified length.
+   */
+  @ScalarFunction
+  public static String[] suffixMatchers(String input, int maxlength, String regexChar) {
+    if (regexChar == null) {
+      return suffixes(input, maxlength);
+    }
+    ObjectSet<String> suffixSet = new ObjectLinkedOpenHashSet<>();
+    for (int suffixLength = 1; suffixLength <= maxlength && suffixLength <= input.length(); suffixLength++) {
+      suffixSet.add(input.substring(input.length() - suffixLength) + regexChar);
     }
     return suffixSet.toArray(new String[0]);
   }
@@ -626,7 +652,7 @@ public class StringFunctions {
    * @return generate an array of ngram of the string that length are exactly matching the specified length.
    */
   @ScalarFunction
-  public static String[] ngram(String input, int length) {
+  public static String[] ngrams(String input, int length) {
     if (length == 0 || length > input.length()) {
       return new String[0];
     }
@@ -644,7 +670,7 @@ public class StringFunctions {
    * @return generate an array of ngram of the string that length are within the specified range [minGram, maxGram].
    */
   @ScalarFunction
-  public static String[] ngram(String input, int minGram, int maxGram) {
+  public static String[] ngrams(String input, int minGram, int maxGram) {
     ObjectSet<String> ngramSet = new ObjectLinkedOpenHashSet<>();
     for (int n = minGram; n <= maxGram && n <= input.length(); n++) {
       if (n == 0) {
