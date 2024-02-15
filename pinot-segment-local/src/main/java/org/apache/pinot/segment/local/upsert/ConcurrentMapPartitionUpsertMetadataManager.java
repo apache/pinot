@@ -19,7 +19,9 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -69,14 +71,34 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     String segmentName = segment.getSegmentName();
     segment.enableUpsert(this, validDocIds, queryableDocIds);
 
-    // TODO: Is this correct?
-    boolean isPartialUpsert = _partialUpsertHandler != null;
-    AtomicInteger numKeysInWrongSegment = new AtomicInteger();
+    // Within the segment, if there are comparison column ties, we only need to keep the latest recordInfo.
+    // Resolving ties before updating the map will make sure that the map doesn't point to an old version of a record
+    // when there are comparison column ties for a primary key in the next iteration.
+    // Refer to issue for more details: https://github.com/apache/pinot/issues/12398
+    Map<Object, RecordInfo> deDupedRecordInfo = new HashMap<>();
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
-      int newDocId = recordInfo.getDocId();
       Comparable newComparisonValue = recordInfo.getComparisonValue();
-      _primaryKeyToRecordLocationMap.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+      deDupedRecordInfo.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
+          (key, existingRecordInfo) -> {
+            if (existingRecordInfo == null) {
+              return recordInfo;
+            }
+            int comparisonResult = newComparisonValue.compareTo(existingRecordInfo.getComparisonValue());
+            if (comparisonResult >= 0) {
+              return recordInfo;
+            }
+            return existingRecordInfo;
+          });
+    }
+    // Iterate only using the latest entry for each primary-key.
+    AtomicInteger numKeysInWrongSegment = new AtomicInteger();
+    for (Map.Entry<Object, RecordInfo> entry : deDupedRecordInfo.entrySet()) {
+      Object hashedKey = entry.getKey();
+      RecordInfo recordInfo = entry.getValue();
+      Comparable newComparisonValue = recordInfo.getComparisonValue();
+      int newDocId = recordInfo.getDocId();
+      _primaryKeyToRecordLocationMap.compute(hashedKey,
           (primaryKey, currentRecordLocation) -> {
             if (currentRecordLocation != null) {
               // Existing primary key
@@ -103,28 +125,14 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               // doc ids for the old segment because it has not been replaced yet. We pass in an optional valid doc ids
               // snapshot for the old segment, which can be updated and used to track the docs not replaced yet.
               if (currentSegment == oldSegment) {
-                // TODO: DO NOT MERGE. This will break both partial-upsert and upsert tables when sorted column is set.
-                if (!isPartialUpsert) {
-                  if (comparisonResult >= 0) {
-                    addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
-                    if (validDocIdsForOldSegment != null) {
-                      validDocIdsForOldSegment.remove(currentDocId);
-                    }
-                    return new RecordLocation(segment, newDocId, newComparisonValue);
-                  } else {
-                    return currentRecordLocation;
+                if (comparisonResult >= 0) {
+                  addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
+                  if (validDocIdsForOldSegment != null) {
+                    validDocIdsForOldSegment.remove(currentDocId);
                   }
+                  return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
-                  // For partial upsert, comparison result ties need to be resolved carefully.
-                  if (comparisonResult > 0 || (comparisonResult == 0 && newDocId == currentDocId)) {
-                    addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
-                    if (validDocIdsForOldSegment != null) {
-                      validDocIdsForOldSegment.remove(currentDocId);
-                    }
-                    return new RecordLocation(segment, newDocId, newComparisonValue);
-                  } else {
-                    return currentRecordLocation;
-                  }
+                  return currentRecordLocation;
                 }
               }
 
