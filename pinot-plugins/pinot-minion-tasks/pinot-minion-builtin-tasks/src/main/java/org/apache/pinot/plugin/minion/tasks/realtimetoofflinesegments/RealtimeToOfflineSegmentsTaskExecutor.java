@@ -155,6 +155,10 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     // Progress observer
     segmentProcessorConfigBuilder.setProgressObserver(p -> _eventObserver.notifyProgress(_pinotTaskConfig, p));
 
+    // Set the number of concurrent tasks per instance
+    segmentProcessorConfigBuilder.setNumConcurrentTasksPerInstance(
+        Integer.parseInt(configs.getOrDefault(MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY, "1")));
+
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
 
     List<RecordReader> recordReaders = new ArrayList<>(numInputSegments);

@@ -46,11 +46,12 @@ public class SegmentProcessorConfig {
   private final Map<String, AggregationFunctionType> _aggregationTypes;
   private final SegmentConfig _segmentConfig;
   private final Consumer<Object> _progressObserver;
+  private final int _numConcurrentTasksPerInstance;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema, TimeHandlerConfig timeHandlerConfig,
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
       Map<String, AggregationFunctionType> aggregationTypes, SegmentConfig segmentConfig,
-      Consumer<Object> progressObserver) {
+      Consumer<Object> progressObserver, int numConcurrentTasksPerInstance) {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableConfig = tableConfig;
     _schema = schema;
@@ -62,6 +63,7 @@ public class SegmentProcessorConfig {
     _progressObserver = (progressObserver != null) ? progressObserver : p -> {
       // Do nothing.
     };
+    _numConcurrentTasksPerInstance = numConcurrentTasksPerInstance;
   }
 
   /**
@@ -136,6 +138,7 @@ public class SegmentProcessorConfig {
     private Map<String, AggregationFunctionType> _aggregationTypes;
     private SegmentConfig _segmentConfig;
     private Consumer<Object> _progressObserver;
+    private int _numConcurrentTasksPerInstance = 1;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -177,6 +180,11 @@ public class SegmentProcessorConfig {
       return this;
     }
 
+    public Builder setNumConcurrentTasksPerInstance(int numConcurrentTasksPerInstance) {
+      _numConcurrentTasksPerInstance = numConcurrentTasksPerInstance;
+      return this;
+    }
+
     public SegmentProcessorConfig build() {
       Preconditions.checkState(_tableConfig != null, "Must provide table config in SegmentProcessorConfig");
       Preconditions.checkState(_schema != null, "Must provide schema in SegmentProcessorConfig");
@@ -197,7 +205,7 @@ public class SegmentProcessorConfig {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
       return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
-          _aggregationTypes, _segmentConfig, _progressObserver);
+          _aggregationTypes, _segmentConfig, _progressObserver, _numConcurrentTasksPerInstance);
     }
   }
 }
