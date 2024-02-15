@@ -107,9 +107,21 @@ public class SegmentMapper {
         _recordReaderFileConfigs.size(), _mapperOutputDir, _timeHandler.getClass(),
         Arrays.stream(_partitioners).map(p -> p.getClass().toString()).collect(Collectors.joining(",")));
 
-    // initialize adaptive writer.
-    _adaptiveSizeBasedWriter =
-        new AdaptiveSizeBasedWriter(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold());
+    // Get the threshold for intermediate file size during map phase.
+    long intermediateFileSizeThresholdPerTask = processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold();
+
+    // If the threshold is set, we distribute it across the number of concurrent tasks. We do this because we want to
+    // limit the disk usage to the specified threshold across all the concurrent tasks. If we do not distribute it, all
+    // the concurrent tasks can run into the mapper phase simultaneously and the total disk usage can be much higher
+    // than the specified total threshold. We do not enforce the threshold per task if the threshold for mapper output
+    // size is not set.
+    if (intermediateFileSizeThresholdPerTask != Long.MAX_VALUE) {
+      intermediateFileSizeThresholdPerTask =
+          (intermediateFileSizeThresholdPerTask / processorConfig.getNumConcurrentTasksPerInstance());
+    }
+
+    // Initialize the adaptive writer with the distributed threshold.
+    _adaptiveSizeBasedWriter = new AdaptiveSizeBasedWriter(intermediateFileSizeThresholdPerTask);
   }
 
   /**
