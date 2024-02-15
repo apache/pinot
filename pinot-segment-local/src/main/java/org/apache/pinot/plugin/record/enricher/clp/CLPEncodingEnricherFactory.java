@@ -1,3 +1,11 @@
+package org.apache.pinot.plugin.record.enricher.clp;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import org.apache.pinot.spi.recordenricher.RecordEnricher;
+import org.apache.pinot.spi.recordenricher.RecordEnricherFactoryInterface;
+
+
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,15 +24,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.recordenricher;
 
-import java.util.List;
-import java.util.Map;
-import org.apache.pinot.spi.data.readers.GenericRow;
+@org.apache.pinot.spi.annotations.RecordEnricherFactory
+public class CLPEncodingEnricherFactory implements RecordEnricherFactoryInterface {
+  private static final String ENRICHER_TYPE = "clpEnricher";
+  @Override
+  public String getEnricherType() {
+    return ENRICHER_TYPE;
+  }
 
-
-public abstract class RecordEnricher {
-  abstract public void init(Map<String, String> enricherProps);
-  abstract public List<String> getInputColumns();
-  abstract public void enrich(GenericRow record);
+  @Override
+  public RecordEnricher createEnricher(JsonNode enricherProps)
+      throws IOException {
+    return new CLPEncodingEnricher(enricherProps);
+  }
 }

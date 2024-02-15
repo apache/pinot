@@ -16,34 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table.ingestion;
+package org.apache.pinot.plugin.record.enricher.function;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.pinot.spi.config.BaseJsonConfig;
+import java.util.LinkedHashMap;
 
-
-public class EnrichmentConfig extends BaseJsonConfig {
-  @JsonPropertyDescription("Enricher type")
-  private final String _enricherType;
-
-  @JsonPropertyDescription("Enricher properties")
-  private final JsonNode _properties;
+public class CustomFunctionEnricherConfig {
+  private final LinkedHashMap<String, String> _columnTofunctionMap;
 
   @JsonCreator
-  public EnrichmentConfig(@JsonProperty("enricherType") String enricherType,
-      @JsonProperty("properties") JsonNode properties) {
-    _enricherType = enricherType;
-    _properties = properties;
+  public CustomFunctionEnricherConfig(
+      @JsonProperty("columnToFunctionMap") LinkedHashMap<String, String> columnTofunctionMap) {
+    _columnTofunctionMap = columnTofunctionMap;
   }
 
-  public String getEnricherType() {
-    return _enricherType;
-  }
-
-  public JsonNode getProperties() {
-    return _properties;
+  public LinkedHashMap<String, String> getColumnTofunctionMap() {
+    return _columnTofunctionMap;
   }
 }

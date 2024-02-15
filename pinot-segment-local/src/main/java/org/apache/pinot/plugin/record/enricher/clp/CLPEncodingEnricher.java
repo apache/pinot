@@ -16,39 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.recordenricher.clp;
+package org.apache.pinot.plugin.record.enricher.clp;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.segment.local.recordenricher.RecordEnricher;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter;
+import org.apache.pinot.spi.recordenricher.RecordEnricher;
+import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.sql.parsers.rewriter.ClpRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CLPEncodingEnricher extends RecordEnricher {
-  public static final String FIELDS_FOR_CLP_ENCODING_CONFIG_KEY = "fieldsForClpEncoding";
-  public static final String FIELDS_FOR_CLP_ENCODING_SEPARATOR = ",";
+public class CLPEncodingEnricher implements RecordEnricher {
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPEncodingEnricher.class);
+  private final ClpEnricherConfig _config;
+  private final EncodedMessage _clpEncodedMessage;
+  private final MessageEncoder _clpMessageEncoder;
 
-  private List<String> _fields;
-  private EncodedMessage _clpEncodedMessage;
-  private MessageEncoder _clpMessageEncoder;
-
-  @Override
-  public void init(Map<String, String> enricherProperties) {
-    String concatenatedFieldNames = enricherProperties.get(FIELDS_FOR_CLP_ENCODING_CONFIG_KEY);
-    if (StringUtils.isEmpty(concatenatedFieldNames)) {
-      throw new IllegalArgumentException("Missing required property: " + FIELDS_FOR_CLP_ENCODING_CONFIG_KEY);
-    } else {
-      _fields = List.of(concatenatedFieldNames.split(FIELDS_FOR_CLP_ENCODING_SEPARATOR));
-    }
-
+  public CLPEncodingEnricher(JsonNode enricherProperties) throws IOException {
+    _config = JsonUtils.jsonNodeToObject(enricherProperties, ClpEnricherConfig.class);
     _clpEncodedMessage = new EncodedMessage();
     _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
@@ -56,13 +46,13 @@ public class CLPEncodingEnricher extends RecordEnricher {
 
   @Override
   public List<String> getInputColumns() {
-    return _fields;
+    return _config.getFields();
   }
 
   @Override
   public void enrich(GenericRow record) {
     try {
-      for (String field : _fields) {
+      for (String field : _config.getFields()) {
         Object value = record.getValue(field);
         if (value != null) {
           enrichWithClpEncodedFields(field, value, record);
@@ -78,10 +68,7 @@ public class CLPEncodingEnricher extends RecordEnricher {
     Object[] dictVars = null;
     Object[] encodedVars = null;
     if (null != value) {
-      if (!(value instanceof String)) {
-        LOGGER.error("Can't encode value of type {} with CLP. name: '{}', value: '{}'",
-            value.getClass().getSimpleName(), key, value);
-      } else {
+      if (value instanceof String) {
         String valueAsString = (String) value;
         try {
           _clpMessageEncoder.encodeMessage(valueAsString, _clpEncodedMessage);
@@ -92,11 +79,14 @@ public class CLPEncodingEnricher extends RecordEnricher {
           LOGGER.error("Can't encode field with CLP. name: '{}', value: '{}', error: {}", key, valueAsString,
               e.getMessage());
         }
+      } else {
+        LOGGER.error("Can't encode value of type {} with CLP. name: '{}', value: '{}'",
+            value.getClass().getSimpleName(), key, value);
       }
     }
 
-    to.putValue(key + CLPDecodeRewriter.LOGTYPE_COLUMN_SUFFIX, logtype);
-    to.putValue(key + CLPDecodeRewriter.DICTIONARY_VARS_COLUMN_SUFFIX, dictVars);
-    to.putValue(key + CLPDecodeRewriter.ENCODED_VARS_COLUMN_SUFFIX, encodedVars);
+    to.putValue(key + ClpRewriter.LOGTYPE_COLUMN_SUFFIX, logtype);
+    to.putValue(key + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX, dictVars);
+    to.putValue(key + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX, encodedVars);
   }
 }

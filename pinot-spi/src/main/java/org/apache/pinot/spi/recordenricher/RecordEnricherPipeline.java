@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.recordenricher;
+package org.apache.pinot.spi.recordenricher;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -44,12 +45,10 @@ public class RecordEnricherPipeline {
     List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
     for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
       try {
-        RecordEnricher enricher = (RecordEnricher) Class.forName(enrichmentConfig.getEnricherClassName()).newInstance();
-        enricher.init(enrichmentConfig.getProperties());
+        RecordEnricher enricher = RecordEnricherRegistry.createRecordEnricher(enrichmentConfig);
         pipeline.add(enricher);
-      } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
-        throw new RuntimeException("Failed to instantiate record enricher" + enrichmentConfig.getEnricherClassName(),
-            e);
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to instantiate record enricher " + enrichmentConfig.getEnricherType(), e);
       }
     }
     return pipeline;
