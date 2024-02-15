@@ -239,9 +239,11 @@ public class ServerSegmentMetadataReader {
           serverToEndpoints.get(serverToSegments.getKey())));
     }
 
+    BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();
+
     // request the urls from the servers
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverToEndpoints);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
 
     Map<String, String> requestHeaders = Map.of("Content-Type", "application/json");
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
