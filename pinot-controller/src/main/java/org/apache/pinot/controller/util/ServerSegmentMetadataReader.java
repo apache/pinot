@@ -276,7 +276,7 @@ public class ServerSegmentMetadataReader {
 
     if (segmentNames != null && !segmentNames.isEmpty() && segmentNames.size() != validDocIdsMetadataInfos.size()) {
       LOGGER.error("Unable to get validDocIdsMetadata for all segments. Expected: {}, Actual: {}",
-          serverURLsAndBodies.size(), returnedServersCount);
+          segmentNames.size(), validDocIdsMetadataInfos.size());
     }
 
     LOGGER.info("Retrieved validDocIds metadata for {} segments from {} servers.", validDocIdsMetadataInfos.size(),
