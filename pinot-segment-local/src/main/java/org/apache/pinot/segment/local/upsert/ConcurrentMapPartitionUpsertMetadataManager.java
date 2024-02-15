@@ -73,7 +73,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
 
     // Within the segment, if there are comparison column ties, we only need to keep the latest recordInfo.
     // Resolving ties before updating the map will make sure that the map doesn't point to an old version of a record
-    // when there are comparison column ties for a primary key in the next iteration.
+    // when there are comparison column ties for a primary key.
     // Refer to issue for more details: https://github.com/apache/pinot/issues/12398
     Map<Object, RecordInfo> deDupedRecordInfo = new HashMap<>();
     while (recordInfoIterator.hasNext()) {
