@@ -23,15 +23,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.LinkedHashMap;
 
 public class CustomFunctionEnricherConfig {
-  private final LinkedHashMap<String, String> _columnTofunctionMap;
+  private final LinkedHashMap<String, String> _columnToFunctionMap;
 
   @JsonCreator
   public CustomFunctionEnricherConfig(
       @JsonProperty("columnToFunctionMap") LinkedHashMap<String, String> columnTofunctionMap) {
-    _columnTofunctionMap = columnTofunctionMap;
+    _columnToFunctionMap = columnTofunctionMap;
   }
 
   public LinkedHashMap<String, String> getColumnTofunctionMap() {
-    return _columnTofunctionMap;
+    return _columnToFunctionMap;
   }
 }

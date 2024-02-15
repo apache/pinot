@@ -1,11 +1,3 @@
-package org.apache.pinot.plugin.record.enricher.function;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import java.io.IOException;
-import org.apache.pinot.spi.recordenricher.RecordEnricher;
-import org.apache.pinot.spi.recordenricher.RecordEnricherFactoryInterface;
-
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,6 +16,15 @@ import org.apache.pinot.spi.recordenricher.RecordEnricherFactoryInterface;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.plugin.record.enricher.function;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
+import org.apache.pinot.spi.recordenricher.RecordEnricher;
+import org.apache.pinot.spi.recordenricher.RecordEnricherFactoryInterface;
+import org.apache.pinot.spi.utils.JsonUtils;
+
 public class CustomFunctionEnricherFactory implements RecordEnricherFactoryInterface {
   private static final String TYPE = "generateColumn";
   @Override
@@ -35,5 +36,23 @@ public class CustomFunctionEnricherFactory implements RecordEnricherFactoryInter
   public RecordEnricher createEnricher(JsonNode enricherProps)
       throws IOException {
     return new CustomFunctionEnricher(enricherProps);
+  }
+
+  @Override
+  public void validateEnrichmentConfig(JsonNode enricherProps, boolean disableGroovy) {
+    CustomFunctionEnricherConfig config;
+    try {
+      config = JsonUtils.jsonNodeToObject(enricherProps, CustomFunctionEnricherConfig.class);
+      if (!disableGroovy) {
+        return;
+      }
+      for (String function : config.getColumnTofunctionMap().values()) {
+        if (FunctionEvaluatorFactory.isGroovyExpression(function)) {
+          throw new IllegalArgumentException("Groovy expression is not allowed for enrichment");
+        }
+      }
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Failed to parse custom function enricher config", e);
+    }
   }
 }

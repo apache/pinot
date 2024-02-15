@@ -36,6 +36,15 @@ public class RecordEnricherRegistry {
   private RecordEnricherRegistry() {
   }
 
+  public static void validateEnrichmentConfig(EnrichmentConfig enrichmentConfig, boolean disableGroovy) {
+    if (!RECORD_ENRICHER_FACTORY_MAP.containsKey(enrichmentConfig.getEnricherType())) {
+      throw new IllegalArgumentException("No record enricher found for type: " + enrichmentConfig.getEnricherType());
+    }
+
+    RECORD_ENRICHER_FACTORY_MAP.get(enrichmentConfig.getEnricherType())
+        .validateEnrichmentConfig(enrichmentConfig.getProperties(), disableGroovy);
+  }
+
   public static RecordEnricher createRecordEnricher(EnrichmentConfig enrichmentConfig)
       throws IOException {
     if (!RECORD_ENRICHER_FACTORY_MAP.containsKey(enrichmentConfig.getEnricherType())) {

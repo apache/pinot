@@ -1,11 +1,3 @@
-package org.apache.pinot.plugin.record.enricher.clp;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import java.io.IOException;
-import org.apache.pinot.spi.recordenricher.RecordEnricher;
-import org.apache.pinot.spi.recordenricher.RecordEnricherFactoryInterface;
-
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,6 +16,13 @@ import org.apache.pinot.spi.recordenricher.RecordEnricherFactoryInterface;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.plugin.record.enricher.clp;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
+import org.apache.pinot.spi.recordenricher.RecordEnricher;
+import org.apache.pinot.spi.recordenricher.RecordEnricherFactoryInterface;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 @org.apache.pinot.spi.annotations.RecordEnricherFactory
 public class CLPEncodingEnricherFactory implements RecordEnricherFactoryInterface {
@@ -37,5 +36,14 @@ public class CLPEncodingEnricherFactory implements RecordEnricherFactoryInterfac
   public RecordEnricher createEnricher(JsonNode enricherProps)
       throws IOException {
     return new CLPEncodingEnricher(enricherProps);
+  }
+
+  @Override
+  public void validateEnrichmentConfig(JsonNode enricherProps, boolean disableGroovy) {
+    try {
+      ClpEnricherConfig config = JsonUtils.jsonNodeToObject(enricherProps, ClpEnricherConfig.class);
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Failed to parse clp enricher config", e);
+    }
   }
 }

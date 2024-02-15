@@ -25,4 +25,5 @@ import java.io.IOException;
 public interface RecordEnricherFactoryInterface {
   String getEnricherType();
   RecordEnricher createEnricher(JsonNode enricherProps) throws IOException;
+  void validateEnrichmentConfig(JsonNode enricherProps, boolean disableGroovy);
 }
