@@ -26,7 +26,6 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.DoubleAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
@@ -34,17 +33,15 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class SumAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
+public class SumAggregationFunctionFoldPrimitive extends NullableSingleInputAggregationFunction<Double, Double> {
   private static final double DEFAULT_VALUE = 0.0;
-  private final boolean _nullHandlingEnabled;
 
-  public SumAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+  public SumAggregationFunctionFoldPrimitive(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     this(arguments.get(0), nullHandlingEnabled);
   }
 
-  protected SumAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
+  protected SumAggregationFunctionFoldPrimitive(ExpressionContext expression, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
   }
 
   @Override
@@ -54,10 +51,7 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public AggregationResultHolder createAggregationResultHolder() {
-    if (_nullHandlingEnabled) {
-      return new ObjectAggregationResultHolder();
-    }
-    return new DoubleAggregationResultHolder(DEFAULT_VALUE);
+    return new DoubleAggregationResultHolder(DEFAULT_VALUE, _nullHandlingEnabled);
   }
 
   @Override
@@ -72,29 +66,32 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap == null) {
-        nullBitmap = new RoaringBitmap();
-      }
-      aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
+
+    if (blockValSet.getNullBitmap() != null && blockValSet.getNullBitmap().getCardinality() >= length) {
       return;
     }
-
     double sum = aggregationResultHolder.getDoubleResult();
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length & i < values.length; i++) {
-          sum += values[i];
-        }
+        sum += foldNotNull(length, blockValSet.getNullBitmap(), 0, (acum, from, to) -> {
+          int innerSum = 0;
+          for (int i = from; i < to; i++) {
+            innerSum += values[i];
+          }
+          return innerSum + acum;
+        });
         break;
       }
       case LONG: {
         long[] values = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length & i < values.length; i++) {
-          sum += values[i];
-        }
+        sum += foldNotNull(length, blockValSet.getNullBitmap(), 0L, (acum, from, to) -> {
+          long innerSum = 0;
+          for (int i = from; i < to; i++) {
+            innerSum += values[i];
+          }
+          return innerSum + acum;
+        });
         break;
       }
       case FLOAT: {
@@ -125,82 +122,6 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
         throw new IllegalStateException("Cannot compute sum for non-numeric type: " + blockValSet.getValueType());
     }
     aggregationResultHolder.setValue(sum);
-  }
-
-  private void aggregateNullHandlingEnabled(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    double sum = 0;
-    switch (blockValSet.getValueType().getStoredType()) {
-      case INT: {
-        if (nullBitmap.getCardinality() < length) {
-          int[] values = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length & i < values.length; i++) {
-            if (!nullBitmap.contains(i)) {
-              sum += values[i];
-            }
-          }
-          setAggregationResultHolder(aggregationResultHolder, sum);
-        }
-        break;
-      }
-      case LONG: {
-        if (nullBitmap.getCardinality() < length) {
-          long[] values = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length & i < values.length; i++) {
-            if (!nullBitmap.contains(i)) {
-              sum += values[i];
-            }
-          }
-          setAggregationResultHolder(aggregationResultHolder, sum);
-        }
-        break;
-      }
-      case FLOAT: {
-        if (nullBitmap.getCardinality() < length) {
-          float[] values = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length & i < values.length; i++) {
-            if (!nullBitmap.contains(i)) {
-              sum += values[i];
-            }
-          }
-          setAggregationResultHolder(aggregationResultHolder, sum);
-        }
-        break;
-      }
-      case DOUBLE: {
-        if (nullBitmap.getCardinality() < length) {
-          double[] values = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length & i < values.length; i++) {
-            if (!nullBitmap.contains(i)) {
-              sum += values[i];
-            }
-          }
-          setAggregationResultHolder(aggregationResultHolder, sum);
-        }
-        break;
-      }
-      case BIG_DECIMAL: {
-        if (nullBitmap.getCardinality() < length) {
-          BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
-          BigDecimal decimalSum = BigDecimal.valueOf(sum);
-          for (int i = 0; i < length & i < values.length; i++) {
-            if (!nullBitmap.contains(i)) {
-              decimalSum = decimalSum.add(values[i]);
-            }
-          }
-          // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
-          setAggregationResultHolder(aggregationResultHolder, decimalSum.doubleValue());
-        }
-        break;
-      }
-      default:
-        throw new IllegalStateException("Cannot compute sum for non-numeric type: " + blockValSet.getValueType());
-    }
-  }
-
-  private void setAggregationResultHolder(AggregationResultHolder aggregationResultHolder, double sum) {
-    Double otherSum = aggregationResultHolder.getResult();
-    aggregationResultHolder.setValue(otherSum == null ? sum : sum + otherSum);
   }
 
   @Override
@@ -253,8 +174,8 @@ public class SumAggregationFunction extends BaseSingleInputAggregationFunction<D
 
   @Override
   public Double extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    if (_nullHandlingEnabled) {
-      return aggregationResultHolder.getResult();
+    if (aggregationResultHolder.isNull()) {
+      return null;
     }
     return aggregationResultHolder.getDoubleResult();
   }

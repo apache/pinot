@@ -77,6 +77,11 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
     });
   }
 
+  public <A> A foldNotNull(int length, @Nullable RoaringBitmap roaringBitmap, A initialAcum, Reducer<A> reducer) {
+    IntIterator intIterator = roaringBitmap == null ? null : roaringBitmap.getIntIterator();
+    return foldNotNull(length, intIterator, initialAcum, reducer);
+  }
+
   /**
    * @param nullIndexIterator an int iterator that returns values in ascending order whose min value is 0.
    *                          Rows are considered null if and only if their index is emitted.

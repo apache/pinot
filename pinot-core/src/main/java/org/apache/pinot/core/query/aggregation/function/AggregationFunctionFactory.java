@@ -202,7 +202,18 @@ public class AggregationFunctionFactory {
             return new MaxAggregationFunction(arguments, nullHandlingEnabled);
           case SUM:
           case SUM0:
-            return new SumAggregationFunction(arguments, nullHandlingEnabled);
+            if (arguments.size() == 1) {
+              return new SumAggregationFunction(arguments, nullHandlingEnabled);
+            } else {
+              switch (arguments.get(1).getLiteral().getStringValue()) {
+                case "foldDouble": return new SumAggregationFunctionFoldDouble(arguments, nullHandlingEnabled);
+                case "foldPrimitive": return new SumAggregationFunctionFoldPrimitive(arguments, nullHandlingEnabled);
+                case "foldHolder": return new SumAggregationFunctionFoldHolder(arguments, nullHandlingEnabled);
+                case "normal":
+                default:
+                  return new SumAggregationFunction(arguments, nullHandlingEnabled);
+              }
+            }
           case SUMPRECISION:
             return new SumPrecisionAggregationFunction(arguments, nullHandlingEnabled);
           case AVG:
