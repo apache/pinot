@@ -33,14 +33,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration2.Configuration;
-import org.apache.commons.configuration2.ConfigurationConverter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -74,7 +73,6 @@ import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.slf4j.Logger;
@@ -223,8 +221,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
       segmentDataManagers = new ArrayList<>(_segmentDataManagerMap.values());
       _segmentDataManagerMap.clear();
     }
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      releaseSegment(segmentDataManager);
+    if (!segmentDataManagers.isEmpty()) {
+      int numThreads = Math.min(Runtime.getRuntime().availableProcessors(), segmentDataManagers.size());
+      ExecutorService stopExecutorService = Executors.newFixedThreadPool(numThreads);
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        stopExecutorService.submit(() -> releaseSegment(segmentDataManager));
+      }
+      stopExecutorService.shutdown();
+      try {
+        // Wait at most 10 minutes before exiting this method.
+        if (!stopExecutorService.awaitTermination(10, TimeUnit.MINUTES)) {
+          stopExecutorService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        stopExecutorService.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
@@ -938,12 +950,5 @@ public abstract class BaseTableDataManager implements TableDataManager {
         LOGGER.warn("Failed to close SegmentDirectory due to error: {}", e.getMessage());
       }
     }
-  }
-
-  private static PinotConfiguration toPinotConfiguration(Configuration configuration) {
-    if (configuration == null) {
-      return new PinotConfiguration();
-    }
-    return new PinotConfiguration((Map<String, Object>) (Map) ConfigurationConverter.getMap(configuration));
   }
 }

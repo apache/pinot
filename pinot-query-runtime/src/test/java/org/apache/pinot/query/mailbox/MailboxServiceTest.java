@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
@@ -299,7 +300,8 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService1.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> { });
+    receivingMailbox.registeredReader(() -> {
+    });
 
     // send a block
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
@@ -591,15 +593,16 @@ public class MailboxServiceTest {
     SendingMailbox sendingMailbox =
         _mailboxService2.getSendingMailbox("localhost", _mailboxService1.getPort(), mailboxId, Long.MAX_VALUE);
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
-    receivingMailbox.registeredReader(() -> { });
+    receivingMailbox.registeredReader(() -> {
+    });
 
     // send a block
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
     // receiving-side early terminates after pulling the first block
     TestUtils.waitForCondition(aVoid -> {
-          TransferableBlock block = receivingMailbox.poll();
-          return block != null && block.getNumRows() == 1;
-        }, 1000L, "Failed to deliver mails");
+      TransferableBlock block = receivingMailbox.poll();
+      return block != null && block.getNumRows() == 1;
+    }, 1000L, "Failed to deliver mails");
     receivingMailbox.earlyTerminate();
 
     // send another block b/c it doesn't guarantee the next block must be EOS

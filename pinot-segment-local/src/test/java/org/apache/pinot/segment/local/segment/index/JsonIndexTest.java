@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.segment.local.segment.index;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -68,6 +70,7 @@ public class JsonIndexTest {
       throws IOException {
     FileUtils.deleteDirectory(INDEX_DIR);
   }
+
 
   @Test
   public void testSmallIndex()
@@ -369,6 +372,50 @@ public class JsonIndexTest {
         Assert.assertEquals(values, new String[]{"value2", "value1"});
       }
     }
+  }
+
+  @Test
+  public void testSkipInvalidJsonEnable() throws Exception {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    jsonIndexConfig.setSkipInvalidJson(true);
+    // the braces don't match and cannot be parsed
+    String[] records = {"{\"key1\":\"va\""};
+
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(offHeapIndexFile.exists());
+
+    try (PinotDataBuffer onHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+        PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+        JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
+        JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+      for (String record : records) {
+        mutableJsonIndex.add(record);
+      }
+      Map<String, RoaringBitmap> onHeapRes = onHeapIndexReader.getMatchingDocsMap("");
+      Map<String, RoaringBitmap> offHeapRes = offHeapIndexReader.getMatchingDocsMap("");
+      Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingDocsMap("");
+      Map<String, RoaringBitmap> expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT,
+          RoaringBitmap.bitmapOf(0));
+      Assert.assertEquals(expectedRes, onHeapRes);
+      Assert.assertEquals(expectedRes, offHeapRes);
+      Assert.assertEquals(expectedRes, mutableRes);
+    }
+  }
+
+  @Test(expectedExceptions = JsonProcessingException.class)
+  public void testSkipInvalidJsonDisabled() throws Exception {
+    // by default, skipInvalidJson is disabled
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    // the braces don't match and cannot be parsed
+    String[] records = {"{\"key1\":\"va\""};
+
+    createIndex(true, jsonIndexConfig, records);
   }
 
   public static class ConfTest extends AbstractSerdeIndexContract {

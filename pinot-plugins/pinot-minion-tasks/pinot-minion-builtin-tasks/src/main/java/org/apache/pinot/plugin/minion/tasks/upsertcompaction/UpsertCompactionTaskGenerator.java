@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,7 +31,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.restlet.resources.ValidDocIdMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -41,6 +43,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -49,6 +52,7 @@ import org.slf4j.LoggerFactory;
 
 @TaskGenerator
 public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
+
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskGenerator.class);
   private static final String DEFAULT_BUFFER_PERIOD = "7d";
   private static final double DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT = 0.0;
@@ -56,9 +60,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
   public static class SegmentSelectionResult {
 
-    private List<SegmentZKMetadata> _segmentsForCompaction;
+    private final List<SegmentZKMetadata> _segmentsForCompaction;
 
-    private List<String> _segmentsForDeletion;
+    private final List<String> _segmentsForDeletion;
 
     SegmentSelectionResult(List<SegmentZKMetadata> segmentsForCompaction, List<String> segmentsForDeletion) {
       _segmentsForCompaction = segmentsForCompaction;
@@ -92,8 +96,17 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       String tableNameWithType = tableConfig.getTableName();
       LOGGER.info("Start generating task configs for table: {}", tableNameWithType);
 
+      if (tableConfig.getTaskConfig() == null) {
+        LOGGER.warn("Task config is null for table: {}", tableNameWithType);
+        continue;
+      }
+
       Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
-      List<SegmentZKMetadata> completedSegments = getCompletedSegments(tableNameWithType, taskConfigs);
+      List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+
+      // Get completed segments and filter out the segments based on the buffer time configuration
+      List<SegmentZKMetadata> completedSegments =
+          getCompletedSegments(taskConfigs, allSegments, System.currentTimeMillis());
 
       if (completedSegments.isEmpty()) {
         LOGGER.info("No completed segments were eligible for compaction for table: {}", tableNameWithType);
@@ -125,20 +138,44 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       // TODO: currently, we put segmentNames=null to get metadata for all segments. We can change this to get
       // valid doc id metadata in batches with the loop.
-      List<ValidDocIdMetadataInfo> validDocIdMetadataList =
-          serverSegmentMetadataReader.getValidDocIdMetadataFromServer(tableNameWithType, serverToSegments,
-              serverToEndpoints, null, 60_000);
+
+      // By default, we use 'snapshot' for validDocIdsType. This means that we will use the validDocIds bitmap from
+      // the snapshot from Pinot segment. This will require 'enableSnapshot' from UpsertConfig to be set to true.
+      String validDocIdsTypeStr =
+          taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.toString());
+      ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
+
+      // Validate that the snapshot is enabled if validDocIdsType is validDocIdsSnapshot
+      if (validDocIdsType == ValidDocIdsType.SNAPSHOT) {
+        UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+        Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+        Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
+            "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdsType = %s",
+            validDocIdsType));
+      } else if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE) {
+        UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+        Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+        Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(),
+            String.format("deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
+                validDocIdsType));
+      }
+
+      List<ValidDocIdsMetadataInfo> validDocIdsMetadataList =
+          serverSegmentMetadataReader.getValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
+              serverToEndpoints, null, 60_000, validDocIdsType.toString());
 
       Map<String, SegmentZKMetadata> completedSegmentsMap =
           completedSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
 
       SegmentSelectionResult segmentSelectionResult =
-          processValidDocIdMetadata(taskConfigs, completedSegmentsMap, validDocIdMetadataList);
+          processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList);
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
             "0d");
-        LOGGER.info("Deleted segments containing only invalid records for table: {}", tableNameWithType);
+        LOGGER.info(
+            "Deleted segments containing only invalid records for table: {}, number of segments to be deleted: {}",
+            tableNameWithType, segmentSelectionResult.getSegmentsForDeletion());
       }
 
       int numTasks = 0;
@@ -157,6 +194,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, segment.getDownloadUrl());
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));
+        configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType.toString());
         pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
         numTasks++;
       }
@@ -166,8 +204,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  public static SegmentSelectionResult processValidDocIdMetadata(Map<String, String> taskConfigs,
-      Map<String, SegmentZKMetadata> completedSegmentsMap, List<ValidDocIdMetadataInfo> validDocIdMetadataInfoList) {
+  public static SegmentSelectionResult processValidDocIdsMetadata(Map<String, String> taskConfigs,
+      Map<String, SegmentZKMetadata> completedSegmentsMap, List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfoList) {
     double invalidRecordsThresholdPercent = Double.parseDouble(
         taskConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_PERCENT)));
@@ -176,11 +214,24 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT)));
     List<SegmentZKMetadata> segmentsForCompaction = new ArrayList<>();
     List<String> segmentsForDeletion = new ArrayList<>();
-    for (ValidDocIdMetadataInfo validDocIdMetadata : validDocIdMetadataInfoList) {
-      long totalInvalidDocs = validDocIdMetadata.getTotalInvalidDocs();
-      String segmentName = validDocIdMetadata.getSegmentName();
+    for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoList) {
+      long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
+      String segmentName = validDocIdsMetadata.getSegmentName();
+
+      // Skip segments if the crc from zk metadata and server does not match. They may be being reloaded.
       SegmentZKMetadata segment = completedSegmentsMap.get(segmentName);
-      long totalDocs = validDocIdMetadata.getTotalDocs();
+      if (segment == null) {
+        LOGGER.warn("Segment {} is not found in the completed segments list, skipping it for compaction", segmentName);
+        continue;
+      }
+
+      if (segment.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
+        LOGGER.warn(
+            "CRC mismatch for segment: {}, skipping it for compaction (segmentZKMetadata={}, validDocIdsMetadata={})",
+            segmentName, segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
+        continue;
+      }
+      long totalDocs = validDocIdsMetadata.getTotalDocs();
       double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
       if (totalInvalidDocs == totalDocs) {
         segmentsForDeletion.add(segment.getSegmentName());
@@ -192,15 +243,16 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     return new SegmentSelectionResult(segmentsForCompaction, segmentsForDeletion);
   }
 
-  private List<SegmentZKMetadata> getCompletedSegments(String tableNameWithType, Map<String, String> taskConfigs) {
+  @VisibleForTesting
+  public static List<SegmentZKMetadata> getCompletedSegments(Map<String, String> taskConfigs,
+      List<SegmentZKMetadata> allSegments, long currentTimeInMillis) {
     List<SegmentZKMetadata> completedSegments = new ArrayList<>();
     String bufferPeriod = taskConfigs.getOrDefault(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY, DEFAULT_BUFFER_PERIOD);
     long bufferMs = TimeUtils.convertPeriodToMillis(bufferPeriod);
-    List<SegmentZKMetadata> allSegments = getSegmentsZKMetadataForTable(tableNameWithType);
     for (SegmentZKMetadata segment : allSegments) {
       CommonConstants.Segment.Realtime.Status status = segment.getStatus();
       // initial segments selection based on status and age
-      if (status.isCompleted() && (segment.getEndTimeMs() <= (System.currentTimeMillis() - bufferMs))) {
+      if (status.isCompleted() && (segment.getEndTimeMs() <= (currentTimeInMillis - bufferMs))) {
         completedSegments.add(segment);
       }
     }

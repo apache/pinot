@@ -24,6 +24,7 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
@@ -57,6 +58,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +81,7 @@ public final class TlsUtils {
   private static final String FILE_SCHEME = "file";
   private static final String FILE_SCHEME_PREFIX = FILE_SCHEME + "://";
   private static final String FILE_SCHEME_PREFIX_WITHOUT_SLASH = FILE_SCHEME + ":";
+  private static final String INSECURE = "insecure";
 
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
 
@@ -125,6 +128,8 @@ public final class TlsUtils {
         pinotConfig.getProperty(key(namespace, TRUSTSTORE_PASSWORD), defaultConfig.getTrustStorePassword()));
     tlsConfig.setSslProvider(
         pinotConfig.getProperty(key(namespace, SSL_PROVIDER), defaultConfig.getSslProvider()));
+    tlsConfig.setInsecure(
+        pinotConfig.getProperty(key(namespace, INSECURE), defaultConfig.isInsecure()));
 
     return tlsConfig;
   }
@@ -177,8 +182,12 @@ public final class TlsUtils {
    * @return TrustManagerFactory
    */
   public static TrustManagerFactory createTrustManagerFactory(TlsConfig tlsConfig) {
-    return createTrustManagerFactory(tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword(),
-        tlsConfig.getTrustStoreType());
+    if (tlsConfig.isInsecure()) {
+      return InsecureTrustManagerFactory.INSTANCE;
+    } else {
+      return createTrustManagerFactory(tlsConfig.getTrustStorePath(), tlsConfig.getTrustStorePassword(),
+          tlsConfig.getTrustStoreType());
+    }
   }
 
   /**
@@ -433,19 +442,48 @@ public final class TlsUtils {
       String trustStoreType, String trustStorePath, String trustStorePassword,
       String sslContextProtocol, SecureRandom secureRandom)
       throws IOException, URISyntaxException, InterruptedException {
+    LOGGER.info("Enable auto renewal of SSLFactory {} when key store {} or trust store {} changes",
+        baseSslFactory, keyStorePath, trustStorePath);
     WatchService watchService = FileSystems.getDefault().newWatchService();
     Map<WatchKey, Set<Path>> watchKeyPathMap = new HashMap<>();
     registerFile(watchService, watchKeyPathMap, keyStorePath);
     registerFile(watchService, watchKeyPathMap, trustStorePath);
+    int maxSslFactoryReloadingAttempts = 3;
+    int sslFactoryReloadingRetryDelayMs = 1000;
     WatchKey key;
     while ((key = watchService.take()) != null) {
       for (WatchEvent<?> event : key.pollEvents()) {
         Path changedFile = (Path) event.context();
         if (watchKeyPathMap.get(key).contains(changedFile)) {
-          SSLFactory updatedSslFactory = createSSLFactory(
-              keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath, trustStorePassword,
-              sslContextProtocol, secureRandom, false);
-          SSLFactoryUtils.reload(baseSslFactory, updatedSslFactory);
+          LOGGER.info("Detected change in file: {}, try to renew SSLFactory {} "
+              + "(built from key store {} and truststore {})",
+              changedFile, baseSslFactory, keyStorePath, trustStorePath);
+          try {
+            // Need to retry a few times because when one file (key store or trust store) is updated, the other file
+            // (trust store or key store) may not have been fully written yet, so we need to wait a bit and retry.
+            RetryPolicies.fixedDelayRetryPolicy(maxSslFactoryReloadingAttempts, sslFactoryReloadingRetryDelayMs)
+                .attempt(() -> {
+                  try {
+                    SSLFactory updatedSslFactory =
+                        createSSLFactory(keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath,
+                            trustStorePassword, sslContextProtocol, secureRandom, false);
+                    SSLFactoryUtils.reload(baseSslFactory, updatedSslFactory);
+                    LOGGER.info("Successfully renewed SSLFactory {} (built from key store {} and truststore {}) on file"
+                        + " {} changes", baseSslFactory, keyStorePath, trustStorePath, changedFile);
+                    return true;
+                  } catch (Exception e) {
+                    LOGGER.info(
+                        "Encountered issues when renewing SSLFactory {} (built from key store {} and truststore {}) on "
+                            + "file {} changes", baseSslFactory, keyStorePath, trustStorePath, changedFile, e);
+                    return false;
+                  }
+                });
+          } catch (Exception e) {
+            LOGGER.error(
+                "Failed to renew SSLFactory {} (built from key store {} and truststore {}) on file {} changes after {} "
+                    + "retries", baseSslFactory, keyStorePath, trustStorePath, changedFile,
+                maxSslFactoryReloadingAttempts, e);
+          }
         }
       }
       key.reset();
@@ -514,6 +552,9 @@ public final class TlsUtils {
       if (trustStoreStream != null) {
         trustStoreStream.close();
       }
+      LOGGER.info("Successfully created SSLFactory {} with key store {} and trust store {}. "
+              + "Key and trust material swappable: {}",
+          sslFactory, keyStorePath, trustStorePath, keyAndTrustMaterialSwappable);
       return sslFactory;
     } catch (Exception e) {
       throw new IllegalStateException(e);

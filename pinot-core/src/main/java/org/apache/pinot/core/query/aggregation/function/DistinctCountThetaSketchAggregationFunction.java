@@ -947,12 +947,9 @@ public class DistinctCountThetaSketchAggregationFunction
     }
 
     if (result.get(0) instanceof Sketch) {
-      int numSketches = result.size();
-      ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(numSketches);
+      ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(result.size());
       for (Object o : result) {
-        ThetaSketchAccumulator thetaSketchAccumulator =
-            new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold);
-        thetaSketchAccumulator.apply((Sketch) o);
+        ThetaSketchAccumulator thetaSketchAccumulator = convertSketchAccumulator(o);
         thetaSketchAccumulators.add(thetaSketchAccumulator);
       }
       return thetaSketchAccumulators;
@@ -974,12 +971,9 @@ public class DistinctCountThetaSketchAggregationFunction
     }
 
     if (result.get(0) instanceof Sketch) {
-      int numSketches = result.size();
-      ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(numSketches);
+      ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(result.size());
       for (Object o : result) {
-        ThetaSketchAccumulator thetaSketchAccumulator =
-            new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold);
-        thetaSketchAccumulator.apply((Sketch) o);
+        ThetaSketchAccumulator thetaSketchAccumulator = convertSketchAccumulator(o);
         thetaSketchAccumulators.add(thetaSketchAccumulator);
       }
       return thetaSketchAccumulators;
@@ -1024,7 +1018,8 @@ public class DistinctCountThetaSketchAggregationFunction
     int numAccumulators = accumulators.size();
     List<Sketch> mergedSketches = new ArrayList<>(numAccumulators);
 
-    for (ThetaSketchAccumulator accumulator : accumulators) {
+    for (Object accumulatorObject : accumulators) {
+      ThetaSketchAccumulator accumulator = convertSketchAccumulator(accumulatorObject);
       accumulator.setThreshold(_accumulatorThreshold);
       accumulator.setSetOperationBuilder(_setOperationBuilder);
       mergedSketches.add(accumulator.getResult());
@@ -1037,14 +1032,14 @@ public class DistinctCountThetaSketchAggregationFunction
   // The AggregationDataTableReducer casts intermediate results to Objects and although the code compiles,
   // types might still be incompatible at runtime due to type erasure.
   // Due to performance overheads of redundant casts, this should be removed at some future point.
-  private ThetaSketchAccumulator convertSketchAccumulator(Object mergeResult) {
-    if (mergeResult instanceof Sketch) {
-      Sketch sketch = (Sketch) mergeResult;
+  protected ThetaSketchAccumulator convertSketchAccumulator(Object result) {
+    if (result instanceof Sketch) {
+      Sketch sketch = (Sketch) result;
       ThetaSketchAccumulator accumulator = new ThetaSketchAccumulator(_setOperationBuilder, _accumulatorThreshold);
       accumulator.apply(sketch);
       return accumulator;
     }
-    return (ThetaSketchAccumulator) mergeResult;
+    return (ThetaSketchAccumulator) result;
   }
 
   /**

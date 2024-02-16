@@ -2,7 +2,6 @@ package org.apache.pinot.perf;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntFunction;
@@ -51,10 +50,10 @@ public class BenchmarkSumAggregation extends BaseQueryBenchmark {
   @Param({ "true", "false" })
   public boolean _nullHandling;
   @Param({"normal", "foldDouble", "foldPrimitive", "foldHolder"})
-  public int _impl;
+  public String _impl;
   @Param({
-      "select sum(valueLong, %s) from benchmark",
-      "select sum(valueInt, %s) from benchmark"
+      "select sum(valueLong, '%s') from benchmark",
+      "select sum(valueInt, '%s') from benchmark"
   })
   public String _aQueryTemplate;
   private String _query;
@@ -95,7 +94,6 @@ public class BenchmarkSumAggregation extends BaseQueryBenchmark {
   protected TableConfig createTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE)
         .setTableName("benchmark")
-        .setNoDictionaryColumns(Collections.singletonList("value"))
         .build();
   }
 
@@ -104,7 +102,7 @@ public class BenchmarkSumAggregation extends BaseQueryBenchmark {
       throws IOException {
     init();
     _scenarioBuilder.setup(_nullHandling);
-    _query = String.format(_aQueryTemplate, Integer.toString(_impl));
+    _query = String.format(_aQueryTemplate, _impl);
   }
 
   @TearDown(Level.Trial)
