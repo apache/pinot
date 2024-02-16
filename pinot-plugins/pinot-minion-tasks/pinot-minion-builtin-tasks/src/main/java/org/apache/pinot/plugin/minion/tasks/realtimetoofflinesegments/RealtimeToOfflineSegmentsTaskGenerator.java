@@ -230,6 +230,11 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         configs.put(RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, maxNumRecordsPerSegment);
       }
 
+      // Add the number of concurrent tasks to the taskConfig for the segment processor.
+      String configKey = taskType + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
+      String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
+      configs.put(MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY, configValue);
+
       pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
       LOGGER.info("Finished generating task configs for table: {} for task: {}", realtimeTableName, taskType);
     }
