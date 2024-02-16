@@ -19,9 +19,7 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -72,7 +70,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     segment.enableUpsert(this, validDocIds, queryableDocIds);
 
     if (_partialUpsertHandler != null) {
-      recordInfoIterator = resolveComparisonTies(recordInfoIterator);
+      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
     }
     AtomicInteger numKeysInWrongSegment = new AtomicInteger();
     while (recordInfoIterator.hasNext()) {
@@ -170,45 +168,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _primaryKeyToRecordLocationMap.put(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
           new RecordLocation(segment, newDocId, newComparisonValue));
     }
-  }
-
-  /**
-   * When we have to process a new segment, if there are comparison value ties for the same primary-key within the
-   * segment, then for Partial Upsert tables we need to make sure that the record location map is updated only
-   * for the latest version of the record. This is specifically a concern for Partial Upsert tables because Realtime
-   * consumption can potentially end up reading the wrong version of a record, which will lead to permanent
-   * data-inconsistency.
-   *
-   * <p>
-   *  This function returns an iterator that will de-dup
-   *  records
-   *  with the same primary-key. Moreover, for comparison ties, it will only keep the latest record. This iterator can
-   *  then further be used to update the primary-key record location map safely.
-   * </p>
-   *
-   * @param recordInfoIterator iterator over the new segment
-   * @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
-   *         return the latest record.
-   */
-  @VisibleForTesting
-  protected Iterator<RecordInfo> resolveComparisonTies(Iterator<RecordInfo> recordInfoIterator) {
-    Map<Object, RecordInfo> deDuplicatedRecordInfo = new HashMap<>();
-    while (recordInfoIterator.hasNext()) {
-      RecordInfo recordInfo = recordInfoIterator.next();
-      Comparable newComparisonValue = recordInfo.getComparisonValue();
-      deDuplicatedRecordInfo.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), _hashFunction),
-          (key, existingRecordInfo) -> {
-            if (existingRecordInfo == null) {
-              return recordInfo;
-            }
-            int comparisonResult = newComparisonValue.compareTo(existingRecordInfo.getComparisonValue());
-            if (comparisonResult >= 0) {
-              return recordInfo;
-            }
-            return existingRecordInfo;
-          });
-    }
-    return deDuplicatedRecordInfo.values().iterator();
   }
 
   private static void replaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,

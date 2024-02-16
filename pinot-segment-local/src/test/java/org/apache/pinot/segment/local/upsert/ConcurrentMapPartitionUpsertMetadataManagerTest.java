@@ -378,28 +378,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction.MURMUR3, true);
   }
 
-  @Test
-  public void testResolveComparisonTies() {
-    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
-            _contextBuilder.setHashFunction(HashFunction.NONE).build());
-    int[] primaryKeys = new int[]{0, 1, 2, 0, 1, 0};
-    int[] timestamps = new int[]{0, 0, 0, 0, 0, 0};
-    int numRecords = primaryKeys.length;
-    List<RecordInfo> recordInfoList = getRecordInfoList(numRecords, primaryKeys, timestamps, null);
-    Iterator<RecordInfo> deDuplicatedRecords = upsertMetadataManager.resolveComparisonTies(recordInfoList.iterator());
-    Map<PrimaryKey, RecordInfo> recordsByPrimaryKeys = new HashMap<>();
-    while (deDuplicatedRecords.hasNext()) {
-      RecordInfo recordInfo = deDuplicatedRecords.next();
-      assertFalse(recordsByPrimaryKeys.containsKey(recordInfo.getPrimaryKey()));
-      recordsByPrimaryKeys.put(recordInfo.getPrimaryKey(), recordInfo);
-    }
-    assertEquals(recordsByPrimaryKeys.size(), 3);
-    assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(0)).getDocId(), 5);
-    assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(1)).getDocId(), 4);
-    assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(2)).getDocId(), 2);
-  }
-
   private void verifyAddReplaceRemoveSegmentWithRecordDelete(HashFunction hashFunction, boolean enableSnapshot)
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
