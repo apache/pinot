@@ -99,13 +99,13 @@ recordReaderSpec:
 tableSpec:
 
   # tableName: Table name
-  tableName: 'airlineStats'
+  tableName: 'db1.airlineStats'
 
   # schemaURI: defines where to read the table schema, supports PinotFS or HTTP.
   # E.g.
   #   hdfs://path/to/table_schema.json
   #   http://localhost:9000/tables/myTable/schema
-  schemaURI: 'http://localhost:9000/tables/airlineStats/schema'
+  schemaURI: 'http://localhost:9000/tables/db1.airlineStats/schema'
 
   # tableConfigURI: defines where to reade the table config.
   # Supports using PinotFS or HTTP.
@@ -114,7 +114,7 @@ tableSpec:
   #   http://localhost:9000/tables/myTable
   # Note that the API to read Pinot table config directly from pinot controller contains a JSON wrapper.
   # The real table config is the object under the field 'OFFLINE'.
-  tableConfigURI: 'http://localhost:9000/tables/airlineStats'
+  tableConfigURI: 'http://localhost:9000/tables/db1.airlineStats'
 
 # pinotClusterSpecs: defines the Pinot Cluster Access Point.
 pinotClusterSpecs:

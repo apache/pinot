@@ -344,5 +344,5 @@
       "granularity": "1:SECONDS"
     }
   ],
-  "schemaName": "airlineStats"
+  "schemaName": "db1.airlineStats"
 }
