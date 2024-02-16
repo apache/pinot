@@ -21,7 +21,6 @@ package org.apache.pinot.query;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -190,7 +189,7 @@ public class QueryEnvironment {
   }
 
   public List<String> getTableNamesForQuery(String sqlQuery) {
-    return getTableNamesForQuery(sqlQuery, Collections.emptyMap());
+    return getTableNamesForQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getOptions());
   }
 
   public List<String> getTableNamesForQuery(String sqlQuery, Map<String, String> options) {
@@ -330,11 +329,16 @@ public class QueryEnvironment {
   // utils
   // --------------------------------------------------------------------------
 
-  private Prepare.CatalogReader getCatalog(String path) {
+  private Prepare.CatalogReader getCatalog(@Nullable String schemaPath) {
     Properties catalogReaderConfigProperties = new Properties();
     catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
-    return new PinotCalciteCatalogReader(_rootSchema, _rootSchema.path(path), _typeFactory,
-        new CalciteConnectionConfigImpl(catalogReaderConfigProperties));
+    CalciteSchema subSchema = schemaPath == null ? _rootSchema : _rootSchema.getSubSchema(schemaPath, false);
+    if (subSchema != null) {
+      return new PinotCalciteCatalogReader(subSchema, subSchema.path(null), _typeFactory,
+          new CalciteConnectionConfigImpl(catalogReaderConfigProperties));
+    } else {
+      throw new IllegalArgumentException("Cannot find schema with path: " + schemaPath);
+    }
   }
 
   private FrameworkConfig getConfig(Prepare.CatalogReader catalogReader) {

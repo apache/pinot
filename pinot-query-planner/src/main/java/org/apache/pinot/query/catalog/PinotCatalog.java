@@ -171,7 +171,7 @@ public class PinotCatalog implements Schema {
 
   @Override
   public Set<String> getSubSchemaNames() {
-    return Collections.emptySet();
+    return _subCatalog.keySet();
   }
 
   @Override

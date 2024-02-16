@@ -79,9 +79,9 @@ import org.slf4j.LoggerFactory;
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
 
-  private final QueryEnvironment _queryEnvironment;
   private final MailboxService _mailboxService;
   private final QueryDispatcher _queryDispatcher;
+  private final WorkerManager _workerManager;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -91,9 +91,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     LOGGER.info("Using Multi-stage BrokerRequestHandler.");
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
-        new WorkerManager(hostname, port, routingManager), _tableCache);
+    _workerManager = new WorkerManager(hostname, port, _routingManager);
     _mailboxService = new MailboxService(hostname, port, config);
     _queryDispatcher = new QueryDispatcher(_mailboxService);
 
@@ -126,9 +124,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       queryTimeoutMs = timeoutMsFromQueryOption == null ? _brokerTimeoutMs : timeoutMsFromQueryOption;
       // Compile the request
       compilationStartTimeNs = System.nanoTime();
+      QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
+          CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_tableCache)), _workerManager, _tableCache);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
+          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           if (!hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders)) {
@@ -138,7 +138,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
-          queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
+          queryPlanResult = queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
           break;
       }
     } catch (WebApplicationException e) {
