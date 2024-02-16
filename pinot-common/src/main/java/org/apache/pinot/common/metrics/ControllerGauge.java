@@ -40,6 +40,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // ideal state
   PERCENT_SEGMENTS_AVAILABLE("segments", false),
 
+  // Number of segments running with less than expected replicas in external view
+  SEGMENTS_WITH_LESS_REPLICAS("segments", false),
+
   SEGMENT_COUNT("SegmentCount", false),
 
   // Number of segments including the replaced segments which are specified in the segment lineage entries and cannot

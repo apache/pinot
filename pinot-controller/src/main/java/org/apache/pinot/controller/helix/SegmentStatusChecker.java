@@ -242,6 +242,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     int nReplicasExternal = -1; // Keeps track of minimum number of replicas in external view
     int nErrors = 0; // Keeps track of number of segments in error state
     int nOffline = 0; // Keeps track of number segments with no online replicas
+    int nNumOfReplicasLessThanIdeal = 0; // Keeps track of number of segments running with less than expected replicas
     int nSegments = 0; // Counts number of segments
     long tableCompressedSize = 0; // Tracks the total compressed segment size in deep store per table
     for (String partitionName : segmentsExcludeReplaced) {
@@ -303,6 +304,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           LOGGER.warn("Segment {} of table {} has no online replicas", partitionName, tableNameWithType);
         }
         nOffline++;
+      } else if (nReplicas < nReplicasIdealMax) {
+        LOGGER.debug("Segment {} of table {} is running with {} replicas which is less than the expected values {}",
+            partitionName, tableNameWithType, nReplicas, nReplicasIdealMax);
+        nNumOfReplicasLessThanIdeal++;
       }
       nReplicasExternal =
           ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
@@ -315,6 +320,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
         (nReplicasIdealMax > 0) ? (nReplicasExternal * 100 / nReplicasIdealMax) : 100);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE, nErrors);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS,
+        nNumOfReplicasLessThanIdeal);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
         (nSegments > 0) ? (nSegments - nOffline) * 100 / nSegments : 100);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_SIZE,
@@ -323,9 +330,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     if (nOffline > 0) {
       LOGGER.warn("Table {} has {} segments with no online replicas", tableNameWithType, nOffline);
     }
+    if (nNumOfReplicasLessThanIdeal > 0) {
+      LOGGER.warn("Table {} has {} segments with number of replicas less than the replication factor",
+          tableNameWithType, nNumOfReplicasLessThanIdeal);
+    }
     if (nReplicasExternal < nReplicasIdealMax) {
-      LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", tableNameWithType, nReplicasExternal,
-          nReplicasIdealMax);
+      LOGGER.warn("Table {} has at least one segment running with only {} replicas, below replication threshold :{}",
+          tableNameWithType, nReplicasExternal, nReplicasIdealMax);
     }
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
@@ -346,13 +357,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE);
-
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_BYTE_SIZE);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT_INCLUDING_REPLACED);
 
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE);
+    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED);
     _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_CONSUMPTION_PAUSED);
@@ -371,6 +382,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, Long.MIN_VALUE);
     _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, Long.MIN_VALUE);
     _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, Long.MIN_VALUE);
+    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS,
+        Long.MIN_VALUE);
     _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, Long.MIN_VALUE);
   }
 
