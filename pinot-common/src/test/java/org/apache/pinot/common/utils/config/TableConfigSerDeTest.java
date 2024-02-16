@@ -536,7 +536,7 @@ public class TableConfigSerDeTest {
 
     FieldConfig secondFieldConfig = fieldConfigList.get(1);
     assertEquals(secondFieldConfig.getName(), "column2");
-    assertNull(secondFieldConfig.getEncodingType());
+    assertEquals(secondFieldConfig.getEncodingType(), FieldConfig.EncodingType.DICTIONARY);
     assertNull(secondFieldConfig.getIndexType());
     assertEquals(secondFieldConfig.getIndexTypes().size(), 0);
     assertNull(secondFieldConfig.getProperties());
