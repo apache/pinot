@@ -643,7 +643,36 @@ public class SegmentProcessorFrameworkTest {
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_singleSegment);
 
-    // Test 4 :  Test mapper with threshold output size (multiple record readers).
+    // Test 4 :  Test mapper with threshold output size (single record reader) with number of concurrent tasks
+    // configured.
+
+    // Create a segmentConfig with intermediate mapper output size threshold set to (2 * the number of bytes in each
+    // row) from the data. Now we set the number of concurrent tasks to 2. In this way, we can test if each row is
+    // written to a separate segment and the number of concurrent tasks is respected.
+    int numConcurrentTasks = 2;
+    segmentConfig =
+        new SegmentConfig.Builder().setIntermediateFileSizeThreshold(32).setSegmentNamePrefix("testPrefix")
+            .setSegmentNamePostfix("testPostfix").build();
+    config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(_tableConfig)
+        .setSchema(_schema).setNumConcurrentTasksPerInstance(numConcurrentTasks).build();
+    framework = new SegmentProcessorFramework(_singleSegment, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), expectedTotalDocsCount);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
+
+    // Verify that each segment has only one row, and the segment name is correct.
+
+    for (int i = 0; i < expectedTotalDocsCount; i++) {
+      segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
+      assertEquals(segmentMetadata.getTotalDocs(), 1);
+      assertTrue(segmentMetadata.getName().matches("testPrefix_.*_testPostfix_" + i));
+    }
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_singleSegment);
+
+
+    // Test 5 :  Test mapper with threshold output size (multiple record readers).
 
     // Create a segmentConfig with intermediate mapper output size threshold set to the number of bytes in each row
     // from the data. In this way, we can test if each row is written to a separate segment.
@@ -667,7 +696,33 @@ public class SegmentProcessorFrameworkTest {
     FileUtils.cleanDirectory(workingDir);
     rewindRecordReaders(_multipleSegments);
 
-    // Test 5 :  Test with injected failure in mapper to verify output directory is cleaned up.
+    // Test 6 :  Test mapper with threshold output size (multiple record readers) with number of concurrent tasks
+    // configured.
+
+    // Create a segmentConfig with intermediate mapper output size threshold set to (2 * the number of bytes in each
+    // row) from the data. Now we set the number of concurrent tasks to 2. In this way, we can test if each row is
+    // written to a separate segment and the number of concurrent tasks is respected.
+    segmentConfig = new SegmentConfig.Builder().setIntermediateFileSizeThreshold(32).setSegmentNamePrefix("testPrefix")
+        .setSegmentNamePostfix("testPostfix").build();
+    config = new SegmentProcessorConfig.Builder().setSegmentConfig(segmentConfig).setTableConfig(_tableConfig)
+        .setSchema(_schema).setNumConcurrentTasksPerInstance(numConcurrentTasks).build();
+    framework = new SegmentProcessorFramework(_multipleSegments, config, workingDir);
+    outputSegments = framework.process();
+    assertEquals(outputSegments.size(), expectedTotalDocsCount);
+    outputDirs = workingDir.list();
+    assertTrue(outputDirs != null && outputDirs.length == 1, Arrays.toString(outputDirs));
+
+    // Verify that each segment has only one row, and the segment name is correct.
+
+    for (int i = 0; i < expectedTotalDocsCount; i++) {
+      segmentMetadata = new SegmentMetadataImpl(outputSegments.get(i));
+      assertEquals(segmentMetadata.getTotalDocs(), 1);
+      assertTrue(segmentMetadata.getName().matches("testPrefix_.*_testPostfix_" + i));
+    }
+    FileUtils.cleanDirectory(workingDir);
+    rewindRecordReaders(_multipleSegments);
+
+    // Test 7 :  Test with injected failure in mapper to verify output directory is cleaned up.
 
     List<RecordReader> testList = new ArrayList<>(_multipleSegments);
     testList.set(1, null);
@@ -680,7 +735,7 @@ public class SegmentProcessorFrameworkTest {
     assertTrue(FileUtils.isEmptyDirectory(workingDir));
     rewindRecordReaders(_multipleSegments);
 
-    // Test 6: RecordReader should be closed when recordReader is created inside RecordReaderFileConfig (without mapper
+    // Test 8: RecordReader should be closed when recordReader is created inside RecordReaderFileConfig (without mapper
     // output size threshold configured).
 
     ClassLoader classLoader = getClass().getClassLoader();
@@ -711,7 +766,7 @@ public class SegmentProcessorFrameworkTest {
     assertTrue(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
     FileUtils.cleanDirectory(workingDir);
 
-    // Test 7: RecordReader should not be closed when recordReader is passed to RecordReaderFileConfig. (Without
+    // Test 9: RecordReader should not be closed when recordReader is passed to RecordReaderFileConfig. (Without
     // mapper output size threshold configured)
 
     RecordReader recordReader = recordReaderFileConfig.getRecordReader();
@@ -734,7 +789,7 @@ public class SegmentProcessorFrameworkTest {
     assertFalse(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
     FileUtils.cleanDirectory(workingDir);
 
-    // Test 8: RecordReader should be closed when recordReader is created inside RecordReaderFileConfig (With mapper
+    // Test 10: RecordReader should be closed when recordReader is created inside RecordReaderFileConfig (With mapper
     // output size threshold configured).
 
     expectedTotalDocsCount = 52;
@@ -760,7 +815,7 @@ public class SegmentProcessorFrameworkTest {
     assertTrue(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig());
     FileUtils.cleanDirectory(workingDir);
 
-    // Test 9: RecordReader should not be closed when recordReader is passed to RecordReaderFileConfig (With mapper
+    // Test 11: RecordReader should not be closed when recordReader is passed to RecordReaderFileConfig (With mapper
     // output size threshold configured).
 
     recordReader = recordReaderFileConfig.getRecordReader();
