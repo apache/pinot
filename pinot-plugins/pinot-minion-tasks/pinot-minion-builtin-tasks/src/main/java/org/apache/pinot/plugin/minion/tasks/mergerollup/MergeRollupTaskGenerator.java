@@ -723,9 +723,8 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
                 + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(tableNameWithType));
 
         // Add the number of concurrent tasks to the taskConfig for the segment processor.
-        String configKey = MergeRollupTask.TASK_TYPE + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
-        String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
-        configs.put(MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY, configValue);
+        configs.put(MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY,
+            String.valueOf(getNumConcurrentTasksPerInstance()));
 
         pinotTaskConfigs.add(new PinotTaskConfig(MergeRollupTask.TASK_TYPE, configs));
       }
