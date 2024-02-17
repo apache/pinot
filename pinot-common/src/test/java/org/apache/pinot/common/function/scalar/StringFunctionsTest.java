@@ -26,6 +26,25 @@ import static org.testng.Assert.assertEquals;
 
 public class StringFunctionsTest {
 
+  @DataProvider(name = "splitPartTestCases")
+  public static Object[][] splitPartTestCases() {
+    return new Object[][]{
+        {"org.apache.pinot.common.function", ".", 0, 100, "org", "org", "function"},
+        {"org.apache.pinot.common.function", ".", 10, 100, "null", "null", "null"},
+        {"org.apache.pinot.common.function", ".", 1, 0, "apache", "apache", "common"},
+        {"org.apache.pinot.common.function", ".", 1, 1, "apache", "null", "common"},
+        {"org.apache.pinot.common.function", ".", 0, 1, "org", "org.apache.pinot.common.function", "function"},
+        {"org.apache.pinot.common.function", ".", 1, 2, "apache", "apache.pinot.common.function", "common"},
+        {"org.apache.pinot.common.function", ".", 2, 3, "pinot", "pinot.common.function", "pinot"},
+        {"org.apache.pinot.common.function", ".", 3, 4, "common", "common.function", "apache"},
+        {"org.apache.pinot.common.function", ".", 4, 5, "function", "function", "org"},
+        {"org.apache.pinot.common.function", ".", 5, 6, "null", "null", "null"},
+        {"org.apache.pinot.common.function", ".", 3, 3, "common", "null", "apache"},
+        {"+++++", "+", 0, 100, "", "", ""},
+        {"+++++", "+", 1, 100, "null", "null", "null"},
+    };
+  }
+
   @DataProvider(name = "isJson")
   public static Object[][] isJsonTestCases() {
     return new Object[][]{
@@ -39,5 +58,13 @@ public class StringFunctionsTest {
   @Test(dataProvider = "isJson")
   public void testIsJson(String input, boolean expectedValue) {
     assertEquals(StringFunctions.isJson(input), expectedValue);
+  }
+
+  @Test(dataProvider = "splitPartTestCases")
+  public void testSplitPark(String input, String delimiter, int index, int max, String expectedToken,
+      String expectedTokenWithLimitCounts, String expectedTokenFromEnd) {
+    assertEquals(StringFunctions.splitPart(input, delimiter, index), expectedToken);
+    assertEquals(StringFunctions.splitPart(input, delimiter, index, max), expectedTokenWithLimitCounts);
+    assertEquals(StringFunctions.splitPartFromEnd(input, delimiter, index), expectedTokenFromEnd);
   }
 }
