@@ -250,7 +250,7 @@ public class ServerSegmentMetadataReader {
 
     List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfos = new ArrayList<>();
     int failedParses = 0;
-    int returnedSegmentsCount = 0;
+    int returnedServersCount = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         String validDocIdsMetadataList = streamResponse.getValue();
@@ -258,7 +258,7 @@ public class ServerSegmentMetadataReader {
             JsonUtils.stringToObject(validDocIdsMetadataList, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
             });
         validDocIdsMetadataInfos.addAll(validDocIdsMetadataInfo);
-        returnedSegmentsCount++;
+        returnedServersCount++;
       } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
@@ -269,12 +269,18 @@ public class ServerSegmentMetadataReader {
           serverURLsAndBodies.size());
     }
 
-    if (segmentNames != null && returnedSegmentsCount != segmentNames.size()) {
-      LOGGER.error("Unable to get validDocIdsMetadata from all servers. Expected: {}, Actual: {}", segmentNames.size(),
-          returnedSegmentsCount);
+    if (returnedServersCount != serverURLsAndBodies.size()) {
+      LOGGER.error("Unable to get validDocIdsMetadata from all servers. Expected: {}, Actual: {}",
+          serverURLsAndBodies.size(), returnedServersCount);
     }
-    LOGGER.info("Retrieved valid doc id metadata for {} segments from {} servers.", returnedSegmentsCount,
-        serverURLsAndBodies.size());
+
+    if (segmentNames != null && !segmentNames.isEmpty() && segmentNames.size() != validDocIdsMetadataInfos.size()) {
+      LOGGER.error("Unable to get validDocIdsMetadata for all segments. Expected: {}, Actual: {}",
+          segmentNames.size(), validDocIdsMetadataInfos.size());
+    }
+
+    LOGGER.info("Retrieved validDocIds metadata for {} segments from {} servers.", validDocIdsMetadataInfos.size(),
+        returnedServersCount);
     return validDocIdsMetadataInfos;
   }
 
