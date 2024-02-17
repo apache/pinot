@@ -950,8 +950,8 @@ public class PinotTableRestletResource {
   @Path("tables/{tableName}/validDocIdsMetadata")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the aggregate valid doc id metadata of all segments for a table", notes = "Get the "
-      + "aggregate valid doc id metadata of all segments for a table")
+  @ApiOperation(value = "Get the aggregate validDocIds metadata of all segments for a table", notes = "Get the "
+      + "aggregate validDocIds metadata of all segments for a table")
   public String getTableAggregateValidDocIdsMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
@@ -959,7 +959,7 @@ public class PinotTableRestletResource {
       List<String> segmentNames,
       @ApiParam(value = "Valid doc ids type")
       @QueryParam("validDocIdsType") @DefaultValue("SNAPSHOT") ValidDocIdsType validDocIdsType) {
-    LOGGER.info("Received a request to fetch aggregate valid doc id metadata for a table {}", tableName);
+    LOGGER.info("Received a request to fetch aggregate validDocIds metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.OFFLINE) {
       throw new ControllerApplicationException(LOGGER, "Table type : " + tableTypeStr + " not yet supported.",
