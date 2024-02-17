@@ -165,11 +165,17 @@
     <woodstox.version>6.4.0</woodstox.version>
     <sslcontext.kickstart.version>8.2.0</sslcontext.kickstart.version>
 
+    <!-- google libraries -->
+    <guava.version>33.0.0-jre</guava.version>
+    <error_prone_annotations.version>2.24.1</error_prone_annotations.version>
+    <protobuf.version>3.25.2</protobuf.version>
+    <proto-google-common-protos.version>2.34.0</proto-google-common-protos.version>
+    <grpc.version>1.61.1</grpc.version>
+
+    <confluent.version>7.2.6</confluent.version>
+
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
-    <protobuf.version>3.24.3</protobuf.version>
-    <grpc.version>1.59.0</grpc.version>
-    <confluent.version>7.2.6</confluent.version>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
@@ -191,8 +197,6 @@
 
     <flink.version>1.14.6</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
-
-    <proto.google.common.protos.version>2.29.0</proto.google.common.protos.version>
 
     <kotlin.stdlib.version>1.7.22</kotlin.stdlib.version>
   </properties>
@@ -441,12 +445,8 @@
       <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
-        <version>32.1.3-jre</version>
+        <version>${guava.version}</version>
         <exclusions>
-          <exclusion>
-            <groupId>com.google.errorprone</groupId>
-            <artifactId>error_prone_annotations</artifactId>
-          </exclusion>
           <exclusion>
             <groupId>org.checkerframework</groupId>
             <artifactId>checker-qual</artifactId>
@@ -454,10 +454,9 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>com.google.auto.service</groupId>
-        <artifactId>auto-service</artifactId>
-        <version>1.1.1</version>
-        <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
+        <groupId>com.google.errorprone</groupId>
+        <artifactId>error_prone_annotations</artifactId>
+        <version>${error_prone_annotations.version}</version>
       </dependency>
       <dependency>
         <groupId>commons-cli</groupId>
@@ -827,10 +826,10 @@
         <version>${hadoop.version}</version>
         <scope>provided</scope>
         <exclusions>
-            <exclusion>
-              <groupId>com.zaxxer</groupId>
-              <artifactId>HikariCP-java7</artifactId>
-            </exclusion>
+          <exclusion>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP-java7</artifactId>
+          </exclusion>
           <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
@@ -1043,10 +1042,6 @@
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>com.google.errorprone</groupId>
-            <artifactId>error_prone_annotations</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -1060,9 +1055,20 @@
         <version>0.18.1</version>
       </dependency>
       <dependency>
+        <groupId>com.google.auto.service</groupId>
+        <artifactId>auto-service</artifactId>
+        <version>1.1.1</version>
+        <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
+      </dependency>
+      <dependency>
         <groupId>com.google.code.findbugs</groupId>
         <artifactId>jsr305</artifactId>
         <version>3.0.2</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.j2objc</groupId>
+        <artifactId>j2objc-annotations</artifactId>
+        <version>2.8</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.containers</groupId>
@@ -1263,6 +1269,11 @@
       </dependency>
       <dependency>
         <groupId>io.grpc</groupId>
+        <artifactId>grpc-context</artifactId>
+        <version>${grpc.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.grpc</groupId>
         <artifactId>grpc-netty-shaded</artifactId>
         <version>${grpc.version}</version>
       </dependency>
@@ -1279,7 +1290,7 @@
       <dependency>
         <groupId>com.google.api.grpc</groupId>
         <artifactId>proto-google-common-protos</artifactId>
-        <version>${proto.google.common.protos.version}</version>
+        <version>${proto-google-common-protos.version}</version>
       </dependency>
       <!-- geo dependencies -->
       <dependency>
