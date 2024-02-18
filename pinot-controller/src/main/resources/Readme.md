@@ -1,4 +1,7 @@
-# How to setup Pinot UI for development 
+# Pinot Controller UI
+This package contains code for Pinot Controller UI.
+
+## How to setup Pinot UI for development 
 
 1. Make sure pinot backend is running on port 9000. Follow [this guide](https://github.com/apache/pinot?tab=readme-ov-file#building-pinot) for the same.
 2. Navigate to ui source code folder 
