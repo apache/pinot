@@ -97,6 +97,8 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.stream.buffer.MessageBatchBuffer;
+import org.apache.pinot.spi.stream.buffer.OnHeapMessageBatchBuffer;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -423,7 +425,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     boolean consumptionStarted = false;
     boolean asyncConsumerEnabled = false;
-    ConcurrentLinkedQueue<MessageBatch> messagesQueue = null;
+    MessageBatchBuffer<MessageBatch> messagesQueue = null;
     while (!_shouldStop && !endCriteriaReached()) {
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
@@ -431,14 +433,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       MessageBatch messageBatch;
       if (!consumptionStarted && asyncConsumerEnabled) {
         consumptionStarted = true;
-        messagesQueue = new ConcurrentLinkedQueue<>();
+        messagesQueue = new OnHeapMessageBatchBuffer(10000);
         _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis(), messagesQueue);
       }
       try {
         if (!asyncConsumerEnabled) {
           messageBatch = _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
         } else {
-          messageBatch = messagesQueue.poll();
+          messageBatch = messagesQueue.get();
         }
 
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FETCHED,

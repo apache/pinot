@@ -21,6 +21,8 @@ package org.apache.pinot.spi.stream;
 import java.io.Closeable;
 import java.util.Queue;
 import java.util.concurrent.TimeoutException;
+import org.apache.pinot.spi.stream.buffer.MessageBatchBuffer;
+
 
 /**
  * Consumer interface for consuming from a partition group of a stream
@@ -59,8 +61,11 @@ public interface PartitionGroupConsumer extends Closeable {
   MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, int timeoutMs)
       throws TimeoutException;
 
-  void fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
-      int timeoutMillis, Queue<MessageBatch> emitter) throws TimeoutException;
+  default void fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
+      int timeoutMillis, MessageBatchBuffer emitter) throws Exception {
+    MessageBatch messageBatch = fetchMessages(startOffset, endOffset, timeoutMillis);
+    emitter.put(messageBatch);
+  }
 
   /**
    * Checkpoints the consumption state of the stream partition group in the source
