@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.util.Queue;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.stream.buffer.MessageBatchBuffer;
 
 
 /**
@@ -66,12 +67,16 @@ public interface PartitionLevelConsumer extends Closeable, PartitionGroupConsume
   }
 
   default void fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
-      int timeoutMillis, Queue<MessageBatch> emitter)
-      throws java.util.concurrent.TimeoutException {
+      int timeoutMillis, MessageBatchBuffer emitter)
+      throws Exception {
     // TODO Issue 5359 remove this default implementation once all kafka consumers have migrated to use this API
     long startOffsetLong = ((LongMsgOffset) startOffset).getOffset();
     long endOffsetLong = endOffset == null ? Long.MAX_VALUE : ((LongMsgOffset) endOffset).getOffset();
     MessageBatch messageBatch = fetchMessages(startOffsetLong, endOffsetLong, timeoutMillis);
-    emitter.add(messageBatch);
+    try {
+      emitter.put(messageBatch);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }

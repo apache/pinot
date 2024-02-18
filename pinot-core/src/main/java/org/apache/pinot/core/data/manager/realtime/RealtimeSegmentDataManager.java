@@ -96,6 +96,8 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.stream.buffer.MessageBatchBuffer;
+import org.apache.pinot.spi.stream.buffer.OnHeapMessageBatchBuffer;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -421,21 +423,21 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     boolean consumptionStarted = false;
     boolean asyncConsumerEnabled = false;
-    ConcurrentLinkedQueue<MessageBatch> messagesQueue = null;
+    MessageBatchBuffer<MessageBatch> messagesQueue = null;
     while (!_shouldStop && !endCriteriaReached()) {
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
       if (!consumptionStarted && asyncConsumerEnabled) {
         consumptionStarted = true;
-        messagesQueue = new ConcurrentLinkedQueue<>();
+        messagesQueue = new OnHeapMessageBatchBuffer(10000);
         _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis(), messagesQueue);
       }
       try {
         if (!asyncConsumerEnabled) {
           messageBatch = _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
         } else {
-          messageBatch = messagesQueue.poll();
+          messageBatch = messagesQueue.get();
         }
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("message batch received. filtered={} unfiltered={} endOfPartitionGroup={}",
