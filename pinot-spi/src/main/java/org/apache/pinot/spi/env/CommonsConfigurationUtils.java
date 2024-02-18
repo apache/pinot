@@ -32,6 +32,7 @@ import java.util.stream.StreamSupport;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration.IOFactory;
 import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.configuration2.io.FileHandler;
@@ -54,7 +55,7 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromFile(File file)
       throws ConfigurationException {
-    return fromFile(file, false, true);
+    return fromFile(file, false, true, PropertyReaderKind.DefaultPropertyReader);
   }
 
   /**
@@ -64,7 +65,7 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromInputStream(InputStream stream)
       throws ConfigurationException {
-    return fromInputStream(stream, false, true);
+    return fromInputStream(stream, false, true, PropertyReaderKind.DefaultPropertyReader);
   }
 
   /**
@@ -74,7 +75,7 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromPath(String path)
       throws ConfigurationException {
-    return fromPath(path, false, true);
+    return fromPath(path, false, true, PropertyReaderKind.DefaultPropertyReader);
   }
 
   /**
@@ -84,6 +85,8 @@ public class CommonsConfigurationUtils {
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @return a {@link PropertiesConfiguration} instance.
    */
+  public static PropertiesConfiguration fromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter,
+      PropertyReaderKind ioFactoryKind)
   public static PropertiesConfiguration fromPath(@Nullable String path, boolean setIOFactory,
       boolean setDefaultDelimiter)
       throws ConfigurationException {
@@ -103,6 +106,8 @@ public class CommonsConfigurationUtils {
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @return a {@link PropertiesConfiguration} instance.
    */
+  public static PropertiesConfiguration fromInputStream(InputStream stream, boolean setIOFactory,
+      boolean setDefaultDelimiter, PropertyReaderKind ioFactoryKind)
   public static PropertiesConfiguration fromInputStream(@Nullable InputStream stream, boolean setIOFactory,
       boolean setDefaultDelimiter)
       throws ConfigurationException {
@@ -123,6 +128,8 @@ public class CommonsConfigurationUtils {
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromFile(@Nullable File file, boolean setIOFactory, boolean setDefaultDelimiter)
+  public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
+      boolean setDefaultDelimiter, PropertyReaderKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter);
     // check if file exists, load the existing properties.
@@ -277,12 +284,12 @@ public class CommonsConfigurationUtils {
   }
 
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
-      boolean setDefaultDelimiter) {
+      boolean setDefaultDelimiter, PropertyReaderKind ioFactoryKind) {
     PropertiesConfiguration config = new PropertiesConfiguration();
 
     // setting IO Reader Factory
     if (setIOFactory) {
-      config.setIOFactory(new ConfigFilePropertyReaderFactory());
+      config.setIOFactory(createPropertiesReader(ioFactoryKind));
     }
 
     // setting DEFAULT_LIST_DELIMITER
@@ -291,5 +298,17 @@ public class CommonsConfigurationUtils {
     }
 
     return config;
+  }
+
+  private static IOFactory createPropertiesReader(PropertyReaderKind kind) {
+    switch (kind) {
+      case ConfigFilePropertyReader:
+        return new ConfigFilePropertyReaderFactory();
+      case SegmentMetadataPropertyReader:
+        return new SegmentMetadataPropertyReaderFactory();
+      case DefaultPropertyReader:
+      default:
+        return new PropertiesConfiguration.DefaultIOFactory();
+    }
   }
 }

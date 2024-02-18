@@ -111,14 +111,16 @@ public class CommonsConfigurationUtilsTest {
       return;
     }
 
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true,
+        PropertyReaderKind.DefaultPropertyReader);
     configuration.setProperty(PROPERTY_KEY, replacedValue);
     String recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
 
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true);
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true,
+        PropertyReaderKind.DefaultPropertyReader);
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
