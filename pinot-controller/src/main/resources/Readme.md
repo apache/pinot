@@ -14,3 +14,4 @@ npm install
 npm run dev
 ```
 
+5. App should be running on [http://localhost:8080](http://localhost:8080)
