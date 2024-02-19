@@ -27,9 +27,12 @@ import org.apache.helix.task.JobConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,5 +122,18 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   public List<PinotTaskConfig> generateTasks(TableConfig tableConfig, Map<String, String> taskConfigs)
       throws Exception {
     throw new UnknownTaskTypeException("Adhoc task generation is not supported for task type - " + this.getTaskType());
+  }
+
+  @Override
+  public String getMinionInstanceTag(TableConfig tableConfig) {
+    TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
+    if (tableTaskConfig != null) {
+      Map<String, String> configs = tableTaskConfig.getConfigsForTaskType(getTaskType());
+      if (!configs.isEmpty()) {
+        return configs.getOrDefault(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG,
+            CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+      }
+    }
+    return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
   }
 }

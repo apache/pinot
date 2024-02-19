@@ -89,6 +89,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   public final static String MAX_CRON_SCHEDULE_DELAY_IN_SECONDS = "MaxCronScheduleDelayInSeconds";
   public final static String LEAD_CONTROLLER_MANAGER_KEY = "LeadControllerManager";
   public final static String SCHEDULE_KEY = "schedule";
+  public final static String MINION_INSTANCE_TAG_CONFIG = "minionInstanceTag";
 
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
@@ -160,7 +161,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       LOGGER.info("Task name is missing, auto-generate one: {}", taskName);
     }
     String minionInstanceTag =
-        taskConfigs.getOrDefault("minionInstanceTag", CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+        taskConfigs.getOrDefault(MINION_INSTANCE_TAG_CONFIG, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
     _helixTaskResourceManager.ensureTaskQueueExists(taskType);
     addTaskTypeMetricsUpdaterIfNeeded(taskType);
     String parentTaskName = _helixTaskResourceManager.getParentTaskName(taskType, taskName);
@@ -472,14 +473,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   /**
-   * Registers a task generator.
-   * <p>This method can be used to plug in custom task generators.
-   */
-  public void registerTaskGenerator(PinotTaskGenerator taskGenerator) {
-    _taskGeneratorRegistry.registerTaskGenerator(taskGenerator);
-  }
-
-  /**
    * Public API to schedule tasks (all task types) for all tables. It might be called from the non-leader controller.
    * Returns a map from the task type to the task scheduled.
    */
@@ -537,56 +530,72 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private String scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
       boolean isLeader) {
     LOGGER.info("Trying to schedule task type: {}, isLeader: {}", taskGenerator.getTaskType(), isLeader);
-    List<PinotTaskConfig> pinotTaskConfigs;
-    try {
-      /* TODO taskGenerator may skip generating tasks for some of the tables being passed to it.
-        In that case, we should not be storing success timestamps for those table. Same with exceptions that should
-        only be associated with the table for which it was raised and not every eligible table. We can have the
-        generateTasks() return a list of TaskGeneratorMostRecentRunInfo for each table
-       */
-      pinotTaskConfigs = taskGenerator.generateTasks(enabledTableConfigs);
-      long successRunTimestamp = System.currentTimeMillis();
-      for (TableConfig tableConfig : enabledTableConfigs) {
-        _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
+    Map<String, List<PinotTaskConfig>> pinotMinionInstanceToTaskConfigs = new HashMap<>();
+    String taskType = taskGenerator.getTaskType();
+    for (TableConfig tableConfig : enabledTableConfigs) {
+      String tableName = tableConfig.getTableName();
+      try {
+        String minionInstanceTag = taskGenerator.getMinionInstanceTag(tableConfig);
+        List<PinotTaskConfig> pinotTaskConfig = taskGenerator.generateTasks(List.of(tableConfig));
+        List<PinotTaskConfig> presentTaskConfig = pinotMinionInstanceToTaskConfigs.get(minionInstanceTag);
+        presentTaskConfig.addAll(pinotTaskConfig);
+        pinotMinionInstanceToTaskConfigs.put(minionInstanceTag, presentTaskConfig);
+        long successRunTimestamp = System.currentTimeMillis();
+        _taskManagerStatusCache.saveTaskGeneratorInfo(tableName, taskType,
             taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(successRunTimestamp));
         // before the first task schedule, the follow two gauge metrics will be empty
         // TODO: find a better way to report task generation information
-        _controllerMetrics.setOrUpdateTableGauge(tableConfig.getTableName(), taskGenerator.getTaskType(),
+        _controllerMetrics.setOrUpdateTableGauge(tableName, taskType,
             ControllerGauge.TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION,
             () -> System.currentTimeMillis() - successRunTimestamp);
-        _controllerMetrics.setOrUpdateTableGauge(tableConfig.getTableName(), taskGenerator.getTaskType(),
+        _controllerMetrics.setOrUpdateTableGauge(tableName, taskType,
             ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR, 0L);
-      }
-    } catch (Exception e) {
-      StringWriter errors = new StringWriter();
-      try (PrintWriter pw = new PrintWriter(errors)) {
-        e.printStackTrace(pw);
-      }
-      long successRunTimestamp = System.currentTimeMillis();
-      for (TableConfig tableConfig : enabledTableConfigs) {
-        _taskManagerStatusCache.saveTaskGeneratorInfo(tableConfig.getTableName(), taskGenerator.getTaskType(),
-            taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addErrorRunMessage(successRunTimestamp,
+      } catch (Exception e) {
+        StringWriter errors = new StringWriter();
+        try (PrintWriter pw = new PrintWriter(errors)) {
+          e.printStackTrace(pw);
+        }
+        long failureRunTimestamp = System.currentTimeMillis();
+        _taskManagerStatusCache.saveTaskGeneratorInfo(tableName, taskType,
+            taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addErrorRunMessage(failureRunTimestamp,
                 errors.toString()));
         // before the first task schedule, the follow gauge metric will be empty
         // TODO: find a better way to report task generation information
-        _controllerMetrics.setOrUpdateTableGauge(tableConfig.getTableName(), taskGenerator.getTaskType(),
+        _controllerMetrics.setOrUpdateTableGauge(tableName, taskType,
             ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR, 1L);
+        LOGGER.error("Failed to generate tasks for task type {} for table {}", taskType, tableName, e);
       }
-      throw e;
     }
     if (!isLeader) {
       taskGenerator.nonLeaderCleanUp();
     }
-    String taskType = taskGenerator.getTaskType();
-    int numTasks = pinotTaskConfigs.size();
-    if (numTasks > 0) {
-      LOGGER.info("Submitting {} tasks for task type: {} with task configs: {}", numTasks, taskType, pinotTaskConfigs);
-      _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
-      return _helixTaskResourceManager.submitTask(pinotTaskConfigs, taskGenerator.getTaskTimeoutMs(),
-          taskGenerator.getNumConcurrentTasksPerInstance(), taskGenerator.getMaxAttemptsPerTask());
+    int numErrorTasksScheduled = 0;
+    for (String minionInstanceTag : pinotMinionInstanceToTaskConfigs.keySet()) {
+      List<PinotTaskConfig> pinotTaskConfigs = pinotMinionInstanceToTaskConfigs.get(minionInstanceTag);
+      int numTasks = pinotTaskConfigs.size();
+      try {
+        if (numTasks > 0) {
+          // This might lead to lot of logs, maybe sum it up and move outside the loop
+          LOGGER.info("Submitting {} tasks for task type: {} to minionInstance: {} with task configs: {}", numTasks,
+              taskType, minionInstanceTag, pinotTaskConfigs);
+          _helixTaskResourceManager.submitTask(pinotTaskConfigs, minionInstanceTag, taskGenerator.getTaskTimeoutMs(),
+              taskGenerator.getNumConcurrentTasksPerInstance(), taskGenerator.getMaxAttemptsPerTask());
+          _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
+        }
+      } catch (Exception e) {
+        numErrorTasksScheduled++;
+        LOGGER.error("Failed to schedule task type {} with task configs: {}", taskType, pinotTaskConfigs, e);
+      }
     }
-    LOGGER.info("No task to schedule for task type: {}", taskType);
-    return null;
+    if (numErrorTasksScheduled > 0) {
+      LOGGER.warn("Failed to schedule {} tasks for task type type {}", numErrorTasksScheduled, taskType);
+    }
+    // No job got scheduled
+    if (numErrorTasksScheduled == pinotMinionInstanceToTaskConfigs.size()) {
+      return null;
+    }
+    // atleast one job got scheduled
+    return taskType;
   }
 
   /**
