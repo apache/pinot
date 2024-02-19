@@ -39,6 +39,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -100,6 +104,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private int _numPendingOperations = 1;
   private boolean _closed;
 
+  private HelixManager _helixManager;
+
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
@@ -115,6 +121,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _deletedKeysTTL = context.getDeletedKeysTTL();
     _tableIndexDir = context.getTableIndexDir();
     _serverMetrics = ServerMetrics.get();
+    _helixManager = context.getHelixManager();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
     if (_metadataTTL > 0) {
       _largestSeenComparisonValue = new AtomicDouble(loadWatermark());
@@ -519,6 +526,24 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         return;
       }
     }
+
+    if (_helixManager != null) {
+      try {
+        HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
+        PropertyKey propertyKey = dataAccessor.keyBuilder().idealStates(_tableNameWithType);
+        IdealState idealState = dataAccessor.getProperty(propertyKey);
+        if (!idealState.isEnabled()) {
+          _logger.info("Skip removing segment: {} because the ideal state for the table {} is disabled", segmentName,
+              _tableNameWithType);
+          return;
+        }
+      } catch (Exception e) {
+        _logger.warn(
+            "Caught exception while checking if the ideal state for the table {} is disabled during remove segment",
+            _tableNameWithType, e);
+      }
+    }
+
     if (!startOperation()) {
       _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
       return;
