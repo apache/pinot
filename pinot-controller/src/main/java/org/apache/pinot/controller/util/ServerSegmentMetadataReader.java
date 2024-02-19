@@ -264,6 +264,12 @@ public class ServerSegmentMetadataReader {
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
     }
+
+    Map<String, ValidDocIdsMetadataInfo> dedupedValidDocIdsMapping = new HashMap<>();
+    for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo: validDocIdsMetadataInfos) {
+      dedupedValidDocIdsMapping.put(validDocIdsMetadataInfo.getSegmentName(), validDocIdsMetadataInfo);
+    }
+
     if (failedParses != 0) {
       LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses,
           serverURLsAndBodies.size());
@@ -274,14 +280,14 @@ public class ServerSegmentMetadataReader {
           serverURLsAndBodies.size(), returnedServersCount);
     }
 
-    if (segmentNames != null && !segmentNames.isEmpty() && segmentNames.size() != validDocIdsMetadataInfos.size()) {
+    if (segmentNames != null && !segmentNames.isEmpty() && segmentNames.size() != dedupedValidDocIdsMapping.size()) {
       LOGGER.error("Unable to get validDocIdsMetadata for all segments. Expected: {}, Actual: {}",
-          segmentNames.size(), validDocIdsMetadataInfos.size());
+          segmentNames.size(), dedupedValidDocIdsMapping.size());
     }
 
-    LOGGER.info("Retrieved validDocIds metadata for {} segments from {} servers.", validDocIdsMetadataInfos.size(),
+    LOGGER.info("Retrieved validDocIds metadata for {} segments from {} servers.", dedupedValidDocIdsMapping.size(),
         returnedServersCount);
-    return validDocIdsMetadataInfos;
+    return new ArrayList<>(dedupedValidDocIdsMapping.values());
   }
 
   /**
