@@ -384,12 +384,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   }
 
   private void resetTableMetrics(String tableName) {
-    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, Long.MIN_VALUE);
-    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, Long.MIN_VALUE);
-    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, Long.MIN_VALUE);
-    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS,
-        Long.MIN_VALUE);
-    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, Long.MIN_VALUE);
+    for (ControllerGauge gauge : ControllerGauge.values()) {
+      if (gauge.getDefaultValueOnReset() != null) {
+        _controllerMetrics.setValueOfTableGauge(tableName, gauge, gauge.getDefaultValueOnReset());
+      }
+    }
   }
 
   @Override

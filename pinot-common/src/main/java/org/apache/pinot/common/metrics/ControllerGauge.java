@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.common.Utils;
 
 
@@ -29,19 +30,19 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   REPLICATION_FROM_CONFIG("replicas", false),
   // Number of complete replicas of table in external view containing all segments online in ideal state
-  NUMBER_OF_REPLICAS("replicas", false),
+  NUMBER_OF_REPLICAS("replicas", Long.MIN_VALUE),
 
   // Percentage of complete online replicas in external view as compared to replicas in ideal state
-  PERCENT_OF_REPLICAS("percent", false),
+  PERCENT_OF_REPLICAS("percent", Long.MIN_VALUE),
 
-  SEGMENTS_IN_ERROR_STATE("segments", false),
+  SEGMENTS_IN_ERROR_STATE("segments", Long.MIN_VALUE),
 
   // Percentage of segments with at least one online replica in external view as compared to total number of segments in
   // ideal state
-  PERCENT_SEGMENTS_AVAILABLE("segments", false),
+  PERCENT_SEGMENTS_AVAILABLE("segments", Long.MIN_VALUE),
 
   // Number of segments running with less than expected replicas in external view
-  SEGMENTS_WITH_LESS_REPLICAS("segments", false),
+  SEGMENTS_WITH_LESS_REPLICAS("segments", Long.MIN_VALUE),
 
   SEGMENT_COUNT("SegmentCount", false),
 
@@ -163,11 +164,27 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   private final String _gaugeName;
   private final String _unit;
   private final boolean _global;
+  @Nullable
+  private final Long _defaultValueOnReset;
 
   ControllerGauge(String unit, boolean global) {
     _unit = unit;
     _global = global;
     _gaugeName = Utils.toCamelCase(name().toLowerCase());
+    _defaultValueOnReset = null;
+  }
+
+  /**
+   * Creates a Gauge with a default value on reset.
+   *
+   * These gauges are always table based (aka not global) and they are automatically reset to the given value whenever
+   * it is considered they should be reset (ie when the table is disabled).
+   */
+  ControllerGauge(String unit, long defaultValueOnReset) {
+    _unit = unit;
+    _global = false;
+    _gaugeName = Utils.toCamelCase(name().toLowerCase());
+    _defaultValueOnReset = defaultValueOnReset;
   }
 
   @Override
@@ -188,5 +205,10 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   @Override
   public boolean isGlobal() {
     return _global;
+  }
+
+  @Nullable
+  public Long getDefaultValueOnReset() {
+    return _defaultValueOnReset;
   }
 }
