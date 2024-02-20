@@ -20,10 +20,8 @@ package org.apache.pinot.segment.spi.index.reader;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import javax.annotation.Nullable;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
@@ -990,12 +988,39 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   /**
    * This class represents the buffer byte ranges accessed while reading a given docId.
    */
-  @AllArgsConstructor
-  @EqualsAndHashCode
-  @Getter
   class ByteRange {
     private final long _offset;
     private final int _sizeInBytes;
+
+    public ByteRange(long offset, int sizeInBytes) {
+      _offset = offset;
+      _sizeInBytes = sizeInBytes;
+    }
+
+    public long getOffset() {
+      return _offset;
+    }
+
+    public int getSizeInBytes() {
+      return _sizeInBytes;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      ByteRange byteRange = (ByteRange) o;
+      return _offset == byteRange._offset && _sizeInBytes == byteRange._sizeInBytes;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_offset, _sizeInBytes);
+    }
 
     @Override
     public String toString() {
