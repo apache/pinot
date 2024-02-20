@@ -1313,18 +1313,6 @@
         <artifactId>test-clock</artifactId>
         <version>1.0.4</version>
         <scope>test</scope>
-        <exclusions>
-          <exclusion>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <!-- starting from 1.18.30, JDK21 is supported -->
-        <groupId>org.projectlombok</groupId>
-        <artifactId>lombok</artifactId>
-        <version>1.18.30</version>
       </dependency>
 
       <dependency>
