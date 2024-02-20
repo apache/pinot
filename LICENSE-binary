@@ -268,14 +268,8 @@ com.squareup.wire:wire-schema:3.2.2
 com.tdunning:t-digest:3.2
 com.twitter:chill-java:0.7.6
 com.twitter:chill_2.12:0.7.6
-com.typesafe.akka:akka-actor_2.12:2.5.21
-com.typesafe.akka:akka-protobuf_2.12:2.5.21
-com.typesafe.akka:akka-slf4j_2.12:2.5.21
-com.typesafe.akka:akka-stream_2.12:2.5.21
 com.typesafe.netty:netty-reactive-streams:2.0.6
 com.typesafe.scala-logging:scala-logging_2.12:3.9.2
-com.typesafe:config:1.3.3
-com.typesafe:ssl-config-core_2.12:0.3.7
 com.uber:h3:4.1.1
 com.yahoo.datasketches:memory:0.8.3
 com.yahoo.datasketches:sketches-core:0.8.3
