@@ -29,6 +29,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_TIMEZONE;
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_TIMEZONE;
+
 
 public class ServiceStartableUtils {
   private ServiceStartableUtils() {
@@ -38,6 +41,7 @@ public class ServiceStartableUtils {
   private static final String CLUSTER_CONFIG_ZK_PATH_TEMPLATE = "/%s/CONFIGS/CLUSTER/%s";
   private static final String PINOT_ALL_CONFIG_KEY_PREFIX = "pinot.all.";
   private static final String PINOT_INSTANCE_CONFIG_KEY_PREFIX_TEMPLATE = "pinot.%s.";
+  protected static String _timeZone;
 
   /**
    * Applies the ZK cluster config to the given instance config if it does not already exist.
@@ -61,6 +65,7 @@ public class ServiceStartableUtils {
         .build();
     zkClient.waitUntilConnected(zkClientConnectionTimeoutMs, TimeUnit.MILLISECONDS);
 
+    setupTimezone(instanceConfig);
     try {
       ZNRecord clusterConfigZNRecord =
           zkClient.readData(String.format(CLUSTER_CONFIG_ZK_PATH_TEMPLATE, clusterName, clusterName), true);
@@ -93,5 +98,11 @@ public class ServiceStartableUtils {
     if (!instanceConfig.containsKey(key)) {
       instanceConfig.setProperty(key, value);
     }
+  }
+
+  private static void setupTimezone(PinotConfiguration instanceConfig) {
+    _timeZone = instanceConfig.getProperty(CONFIG_OF_TIMEZONE, DEFAULT_TIMEZONE);
+    System.setProperty("user.timezone", _timeZone);
+    LOGGER.info("Timezone: {}", _timeZone);
   }
 }

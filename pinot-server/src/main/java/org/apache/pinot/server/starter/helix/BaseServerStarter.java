@@ -142,7 +142,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected volatile boolean _isServerReadyToServeQueries = false;
-  protected String _serverTimezone;
 
   @Override
   public void init(PinotConfiguration serverConf)
@@ -154,7 +153,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
 
     setupHelixSystemProperties();
-    setupServerTimezone();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
     _hostname = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
         _serverConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
@@ -470,12 +468,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
     return false;
-  }
-
-  private void setupServerTimezone() {
-   _serverTimezone = _serverConf.getProperty(Server.CONFIG_OF_TIMEZONE, Server.DEFAULT_TIMEZONE);
-   System.setProperty("user.timezone", _serverTimezone);
-   LOGGER.info("Server Timezone: {}", _serverTimezone);
   }
 
   private void setupHelixSystemProperties() {

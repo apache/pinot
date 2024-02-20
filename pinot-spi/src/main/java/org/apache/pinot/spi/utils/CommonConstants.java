@@ -52,6 +52,8 @@ public class CommonConstants {
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.1.0/";
+  public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
+  public static final String DEFAULT_TIMEZONE = "UTC";
 
   /**
    * The state of the consumer for a given segment
@@ -216,8 +218,6 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_DELAY_SHUTDOWN_TIME_MS = "pinot.broker.delayShutdownTimeMs";
     public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000L;
-    public static final String CONFIG_OF_TIMEZONE = "pinot.broker.timezone";
-    public static final String DEFAULT_TIMEZONE = "UTC";
     public static final String CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS = "pinot.broker.enableTableLevelMetrics";
     public static final boolean DEFAULT_ENABLE_TABLE_LEVEL_METRICS = true;
     public static final String CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS =
@@ -555,8 +555,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES = "pinot.server.query.rewriter.class.names";
     public static final String CONFIG_OF_ENABLE_QUERY_CANCELLATION = "pinot.server.enable.query.cancellation";
     public static final String CONFIG_OF_NETTY_SERVER_ENABLED = "pinot.server.netty.enabled";
-    public static final String CONFIG_OF_TIMEZONE = "pinot.server.timezone";
-    public static final String DEFAULT_TIMEZONE = "UTC";
     public static final boolean DEFAULT_NETTY_SERVER_ENABLED = true;
     public static final String CONFIG_OF_ENABLE_GRPC_SERVER = "pinot.server.grpc.enable";
     public static final boolean DEFAULT_ENABLE_GRPC_SERVER = true;
@@ -782,8 +780,6 @@ public class CommonConstants {
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
-    public static final String CONFIG_OF_TIMEZONE = "pinot.controller.timezone";
-    public static final String DEFAULT_TIMEZONE = "UTC";
   }
 
   public static class Minion {

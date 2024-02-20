@@ -190,7 +190,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected PoolingHttpClientConnectionManager _connectionManager;
   protected TenantRebalancer _tenantRebalancer;
   protected ExecutorService _tenantRebalanceExecutorService;
-  protected String _controllerTimezone;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -201,7 +200,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
 
     setupHelixSystemProperties();
-    setupControllerTimeZone();
     HelixHelper.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
     _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
     _controllerMode = _config.getControllerMode();
@@ -263,13 +261,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         }
       }
     }
-  }
-
-  private void setupControllerTimeZone() {
-    _controllerTimezone = _config.getProperty(CommonConstants.Controller.CONFIG_OF_TIMEZONE,
-        CommonConstants.Controller.DEFAULT_TIMEZONE);
-    System.setProperty("user.timezone", _controllerTimezone);
-    LOGGER.info("Controller Timezone: {}", _controllerTimezone);
   }
 
   private void setupHelixSystemProperties() {
