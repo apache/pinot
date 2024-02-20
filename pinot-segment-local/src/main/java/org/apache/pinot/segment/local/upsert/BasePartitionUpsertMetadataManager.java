@@ -510,13 +510,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing untracked (replaced or empty) segment: {}", segmentName);
       return;
     }
-    // Skip removing segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
+    // Skip removing the upsert metadata of segment that has max comparison value smaller than
+    // (largestSeenComparisonValue - TTL), i.e. out of metadata TTL. The expired metadata is removed while creating
+    // new consuming segment in batches.
+    boolean skipRemoveMetadata = false;
     if (_metadataTTL > 0 && _largestSeenComparisonValue.get() > 0) {
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
       if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL) {
         _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
-        return;
+        skipRemoveMetadata = true;
       }
     }
     if (!startOperation()) {
@@ -527,7 +530,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _snapshotLock.readLock().lock();
     }
     try {
-      doRemoveSegment(segment);
+      if (!skipRemoveMetadata) {
+        doRemoveSegment(segment);
+      }
       _trackedSegments.remove(segment);
     } finally {
       if (_enableSnapshot) {
@@ -665,8 +670,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
-    _logger.info(
-        "Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
+    _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
             + "{} are consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);
   }
