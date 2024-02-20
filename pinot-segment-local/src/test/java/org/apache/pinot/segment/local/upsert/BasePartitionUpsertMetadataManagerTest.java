@@ -143,6 +143,9 @@ public class BasePartitionUpsertMetadataManagerTest {
     segmentAssignment.put(seg01Name, ImmutableMap.of(instanceId, "ONLINE"));
     String seg02Name = "testTable__0__2__" + System.currentTimeMillis();
     segmentAssignment.put(seg02Name, ImmutableMap.of(instanceId, "ONLINE"));
+    // This segment is skipped as it's not from partition 0.
+    String seg03Name = "testTable__1__3__" + System.currentTimeMillis();
+    segmentAssignment.put(seg03Name, ImmutableMap.of(instanceId, "ONLINE"));
 
     SegmentZKMetadata zkMetadata = new SegmentZKMetadata(seg01Name);
     zkMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
@@ -150,6 +153,9 @@ public class BasePartitionUpsertMetadataManagerTest {
     zkMetadata = new SegmentZKMetadata(seg02Name);
     zkMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
     segmentMetadataMap.put(seg02Name, zkMetadata);
+    zkMetadata = new SegmentZKMetadata(seg03Name);
+    zkMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    segmentMetadataMap.put(seg03Name, zkMetadata);
 
     // Setup mocks to get file path to validDocIds snapshot.
     File tableDataDir = new File(TEMP_DIR, realtimeTableName);
