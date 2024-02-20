@@ -94,11 +94,6 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
 
     // Initialize the query generator
     setUpQueryGenerator(avroFiles);
-
-    // TODO: this doesn't work so we simple wait for 5 second here. will be fixed after:
-    // https://github.com/apache/pinot/pull/7839
-    // waitForAllDocsLoaded(600_000L);
-    Thread.sleep(5000);
   }
 
   protected void startHybridCluster()
