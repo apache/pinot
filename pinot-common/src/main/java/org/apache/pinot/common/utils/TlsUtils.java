@@ -87,7 +87,8 @@ public final class TlsUtils {
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
 
   static {
-    // Set the default SSL context to the default SSL context created by SSLFactory
+    // Set the default SSL context to the default SSL context created by SSLFactory, and enable auto renewal of
+    // SSLFactory when the key store or trust store file changes.
     String jvmKeyStorePath = System.getProperty("javax.net.ssl.keyStore");
     String jvmKeystorePassword = Optional.ofNullable(System.getProperty("javax.net.ssl.keyStorePassword"))
         .map(String::trim)
