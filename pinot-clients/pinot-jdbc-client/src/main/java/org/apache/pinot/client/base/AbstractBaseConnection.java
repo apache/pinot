@@ -189,7 +189,7 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public void setTransactionIsolation(int level)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op
   }
 
   @Override
@@ -299,7 +299,7 @@ public abstract class AbstractBaseConnection implements Connection {
   @Override
   public void rollback()
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op
   }
 
   @Override
