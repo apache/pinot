@@ -352,6 +352,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerAdminApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager);
+    _brokerAdminApplication.register(new AbstractBinder() {
+      @Override
+      protected void configure() {
+        bind(_tableCache).to(TableCache.class);
+      }
+    });
     registerExtraComponents(_brokerAdminApplication);
     _brokerAdminApplication.start(_listenerConfigs);
 
@@ -422,12 +428,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    * @param brokerAdminApplication is the application
    */
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
-    brokerAdminApplication.register(new AbstractBinder() {
-      @Override
-      protected void configure() {
-        bind(_tableCache).to(TableCache.class);
-      }
-    });
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
