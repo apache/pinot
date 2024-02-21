@@ -82,6 +82,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
+import org.testng.annotations.Listeners;
 
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
 import static org.testng.Assert.assertEquals;
@@ -92,6 +93,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Base class for integration tests that involve a complete Pinot cluster.
  */
+@Listeners(NettyTestNGListener.class)
 public abstract class ClusterTest extends ControllerTest {
   protected static final int DEFAULT_BROKER_PORT = 18099;
   protected static final Random RANDOM = new Random(System.currentTimeMillis());
