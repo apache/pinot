@@ -177,6 +177,11 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       try {
         _instanceDataManager.deleteTable(_tableNameWithType);
         helixTaskResult.setSuccess(true);
+      } catch (Exception e) {
+        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETE_TABLE_FAILURES, 1);
+        Utils.rethrowException(e);
+      }
+      try {
         Arrays.stream(ServerMeter.values())
             .filter(m -> !m.isGlobal())
             .forEach(m -> _metrics.removeTableMeter(_tableNameWithType, m));
@@ -189,8 +194,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         Arrays.stream(ServerQueryPhase.values())
             .forEach(p -> _metrics.removePhaseTiming(_tableNameWithType, p));
       } catch (Exception e) {
-        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETE_TABLE_FAILURES, 1);
-        Utils.rethrowException(e);
+        LOGGER.warn("Error while removing metrics of removed table {}. "
+            + "Some metrics may survive until the next restart.", _tableNameWithType);
       }
       return helixTaskResult;
     }
