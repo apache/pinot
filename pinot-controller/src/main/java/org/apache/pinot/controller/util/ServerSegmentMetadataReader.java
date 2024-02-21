@@ -239,31 +239,36 @@ public class ServerSegmentMetadataReader {
           serverToEndpoints.get(serverToSegments.getKey())));
     }
 
+    BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();
+
     // request the urls from the servers
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverToEndpoints);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
 
     Map<String, String> requestHeaders = Map.of("Content-Type", "application/json");
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiPostRequest(serverURLsAndBodies, tableNameWithType, false, requestHeaders,
             timeoutMs, null);
 
-    List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfos = new ArrayList<>();
+    Map<String, ValidDocIdsMetadataInfo> validDocIdsMetadataInfos = new HashMap<>();
     int failedParses = 0;
     int returnedServersCount = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         String validDocIdsMetadataList = streamResponse.getValue();
-        List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfo =
+        List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfoList =
             JsonUtils.stringToObject(validDocIdsMetadataList, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
             });
-        validDocIdsMetadataInfos.addAll(validDocIdsMetadataInfo);
+        for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo: validDocIdsMetadataInfoList) {
+          validDocIdsMetadataInfos.put(validDocIdsMetadataInfo.getSegmentName(), validDocIdsMetadataInfo);
+        }
         returnedServersCount++;
       } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
     }
+
     if (failedParses != 0) {
       LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses,
           serverURLsAndBodies.size());
@@ -281,7 +286,7 @@ public class ServerSegmentMetadataReader {
 
     LOGGER.info("Retrieved validDocIds metadata for {} segments from {} servers.", validDocIdsMetadataInfos.size(),
         returnedServersCount);
-    return validDocIdsMetadataInfos;
+    return new ArrayList<>(validDocIdsMetadataInfos.values());
   }
 
   /**
