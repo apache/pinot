@@ -259,6 +259,7 @@ public class UpsertCompactionTaskGeneratorTest {
         UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
             validDocIdsMetadataInfo);
     assertTrue(segmentSelectionResult.getSegmentsForCompaction().isEmpty());
+    assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0), _completedSegment2.getSegmentName());
 
     // test without an invalidRecordsThresholdPercent
     compactionConfigs = getCompactionConfigs("0", "10");
@@ -267,6 +268,7 @@ public class UpsertCompactionTaskGeneratorTest {
             validDocIdsMetadataInfo);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
         _completedSegment.getSegmentName());
+    assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0), _completedSegment2.getSegmentName());
 
     // test without a invalidRecordsThresholdCount
     compactionConfigs = getCompactionConfigs("30", "0");
@@ -275,6 +277,7 @@ public class UpsertCompactionTaskGeneratorTest {
             validDocIdsMetadataInfo);
     assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
         _completedSegment.getSegmentName());
+    assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0), _completedSegment2.getSegmentName());
 
     // Test the case where the completedSegment from api has different crc than segment from zk metadata.
     json = "[{" + "\"totalValidDocs\" : 50," + "\"totalInvalidDocs\" : 50," + "\"segmentName\" : \""
@@ -295,6 +298,25 @@ public class UpsertCompactionTaskGeneratorTest {
     // completedSegment2 is still supposed to be deleted
     Assert.assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 1);
     assertEquals(segmentSelectionResult.getSegmentsForDeletion().get(0),
+        _completedSegment2.getSegmentName());
+
+    // check if both the candidates for compaction are coming in sorted descending order
+    json = "[{" + "\"totalValidDocs\" : 50," + "\"totalInvalidDocs\" : 50," + "\"segmentName\" : \""
+        + _completedSegment.getSegmentName() + "\"," + "\"totalDocs\" : 100" + ", \"segmentCrc\": \""
+        + _completedSegment.getCrc() + "\"}," + "{" + "\"totalValidDocs\" : 10," + "\"totalInvalidDocs\" : 40,"
+        + "\"segmentName\" : \"" + _completedSegment2.getSegmentName() + "\", " + "\"segmentCrc\" : \""
+        + _completedSegment2.getCrc() + "\"," + "\"totalDocs\" : 50" + "}]";
+    validDocIdsMetadataInfo = JsonUtils.stringToObject(json, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
+    });
+    compactionConfigs = getCompactionConfigs("30", "0");
+    segmentSelectionResult =
+        UpsertCompactionTaskGenerator.processValidDocIdsMetadata(compactionConfigs, _completedSegmentsMap,
+            validDocIdsMetadataInfo);
+    Assert.assertEquals(segmentSelectionResult.getSegmentsForCompaction().size(), 2);
+    Assert.assertEquals(segmentSelectionResult.getSegmentsForDeletion().size(), 0);
+    assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(0).getSegmentName(),
+        _completedSegment.getSegmentName());
+    assertEquals(segmentSelectionResult.getSegmentsForCompaction().get(1).getSegmentName(),
         _completedSegment2.getSegmentName());
   }
 

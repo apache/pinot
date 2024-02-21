@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -212,7 +213,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     long invalidRecordsThresholdCount = Long.parseLong(
         taskConfigs.getOrDefault(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT,
             String.valueOf(DEFAULT_INVALID_RECORDS_THRESHOLD_COUNT)));
-    List<SegmentZKMetadata> segmentsForCompaction = new ArrayList<>();
+    List<Pair<SegmentZKMetadata, Long>> segmentsForCompaction = new ArrayList<>();
     List<String> segmentsForDeletion = new ArrayList<>();
     for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoList) {
       long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
@@ -237,10 +238,21 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         segmentsForDeletion.add(segment.getSegmentName());
       } else if (invalidRecordPercent > invalidRecordsThresholdPercent
           && totalInvalidDocs > invalidRecordsThresholdCount) {
-        segmentsForCompaction.add(segment);
+        segmentsForCompaction.add(Pair.of(segment, totalInvalidDocs));
       }
     }
-    return new SegmentSelectionResult(segmentsForCompaction, segmentsForDeletion);
+    segmentsForCompaction.sort((o1, o2) -> {
+      if (o1.getValue() > o2.getValue()) {
+        return -1;
+      } else if (o1.getValue().equals(o2.getValue())) {
+        return 0;
+      }
+      return 1;
+    });
+
+    return new SegmentSelectionResult(
+        segmentsForCompaction.stream().map(Map.Entry::getKey).collect(Collectors.toList()),
+        segmentsForDeletion);
   }
 
   @VisibleForTesting
