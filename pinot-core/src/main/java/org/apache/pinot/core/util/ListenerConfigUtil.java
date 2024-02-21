@@ -263,11 +263,7 @@ public final class ListenerConfigUtil {
   }
 
   private static SSLEngineConfigurator buildSSLEngineConfigurator(TlsConfig tlsConfig) {
-    SSLFactory sslFactory = TlsUtils.createSSLFactory(tlsConfig);
-    if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
-        && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
-      TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
-    }
+    SSLFactory sslFactory = TlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig);
     return new SSLEngineConfigurator(sslFactory.getSslContext()).setClientMode(false)
         .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[]{"TLSv1.2"});
   }
