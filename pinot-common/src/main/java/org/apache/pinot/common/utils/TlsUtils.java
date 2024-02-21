@@ -317,11 +317,7 @@ public final class TlsUtils {
    * @param tlsConfig TLS config
    */
   public static SslContext buildClientContext(TlsConfig tlsConfig) {
-    SSLFactory sslFactory = createSSLFactory(tlsConfig);
-    if (isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
-        && isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
-      enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
-    }
+    SSLFactory sslFactory = createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig);
     SslContextBuilder sslContextBuilder =
         SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
     sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
@@ -342,11 +338,7 @@ public final class TlsUtils {
     if (tlsConfig.getKeyStorePath() == null) {
       throw new IllegalArgumentException("Must provide key store path for secured server");
     }
-    SSLFactory sslFactory = createSSLFactory(tlsConfig);
-    if (isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
-        && isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
-      enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
-    }
+    SSLFactory sslFactory = createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig);
     SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
         .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
     sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
@@ -500,6 +492,25 @@ public final class TlsUtils {
     WatchKey key = path.getParent().register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
     keyPathMap.computeIfAbsent(key, k -> new HashSet<>());
     keyPathMap.get(key).add(path.getFileName());
+  }
+
+  /**
+   * Create a {@link SSLFactory} instance with identity material and trust material swappable for a given TlsConfig,
+   * and nables auto renewal of the {@link SSLFactory} instance when
+   * 1. the {@link SSLFactory} is created with a key manager and trust manager swappable
+   * 2. the key store is null or a local file
+   * 3. the trust store is null or a local file
+   * 4. the key store or trust store file changes.
+   * @param tlsConfig {@link TlsConfig}
+   * @return a {@link SSLFactory} instance with identity material and trust material swappable
+   */
+  public static SSLFactory createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(TlsConfig tlsConfig) {
+    SSLFactory sslFactory = createSSLFactory(tlsConfig);
+    if (isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getKeyStorePath())
+        && isKeyOrTrustStorePathNullOrHasFileScheme(tlsConfig.getTrustStorePath())) {
+      enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, tlsConfig);
+    }
+    return sslFactory;
   }
 
   /**
