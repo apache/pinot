@@ -110,6 +110,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableStatus;
@@ -236,6 +237,12 @@ public class PinotTableRestletResource {
             Response.Status.BAD_REQUEST);
       }
       tableConfig.setTableName(tableNameWithType);
+      // Handling deprecated config
+      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+      if (validationConfig != null && validationConfig.getSchemaName() != null) {
+        validationConfig.setSchemaName(_pinotHelixResourceManager.getActualTableName(validationConfig.getSchemaName(),
+            httpHeaders.getHeaderString(CommonConstants.DATABASE)));
+      }
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
@@ -516,8 +523,8 @@ public class PinotTableRestletResource {
       String tableConfigString)
       throws Exception {
     return updateTableConfig(
-        DatabaseUtils.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE), null),
-        typesToSkip, tableConfigString);
+        _pinotHelixResourceManager.getActualTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
+        typesToSkip, tableConfigString, headers);
   }
 
   @PUT
@@ -529,7 +536,8 @@ public class PinotTableRestletResource {
   public ConfigSuccessResponse updateTableConfig(
       @ApiParam(value = "Name of the table to update", required = true) @QueryParam("tableName") String tableName,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, String tableConfigString)
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, String tableConfigString,
+      @Context HttpHeaders headers)
     throws Exception {
     Pair<TableConfig, Map<String, Object>> tableConfigJsonPojoWithUnparsableProps;
     TableConfig tableConfig;
@@ -545,6 +553,13 @@ public class PinotTableRestletResource {
             Response.Status.BAD_REQUEST);
       }
       tableConfig.setTableName(tableNameWithType);
+      // Handling deprecated config
+      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+      if (validationConfig != null && validationConfig.getSchemaName() != null) {
+        validationConfig.setSchemaName(_pinotHelixResourceManager.getActualTableName(validationConfig.getSchemaName(),
+            headers.getHeaderString(CommonConstants.DATABASE)));
+      }
+
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
     } catch (Exception e) {

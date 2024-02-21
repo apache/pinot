@@ -269,8 +269,8 @@ public class TableConfigsRestletResource {
             "Request table " + tableName + " does not match table name in the body " + tableConfigs.getTableName(),
             Response.Status.BAD_REQUEST);
       }
-      tableConfigs.setTableName(tableName);
       validateConfig(tableConfigs, typesToSkip);
+      tableConfigs.setTableName(tableName);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs. %s", e.getMessage()),
           Response.Status.BAD_REQUEST, e);
@@ -459,8 +459,8 @@ public class TableConfigsRestletResource {
         throw new IllegalArgumentException(
             "Table name mismatch: " + tableConfigs.getTableName() + " is not equivalent to " + tableName);
       }
-      tableConfigs.setTableName(tableName);
       validateConfig(tableConfigs, typesToSkip);
+      tableConfigs.setTableName(tableName);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s", tableName),
           Response.Status.BAD_REQUEST, e);
