@@ -65,7 +65,7 @@ public class SegmentUtils {
   }
 
   @Nullable
-  public static Integer getRealtimeSegmentPartitionId(SegmentZKMetadata segmentZKMetadata,
+  private static Integer getRealtimeSegmentPartitionId(SegmentZKMetadata segmentZKMetadata,
       @Nullable String partitionColumn) {
     SegmentPartitionMetadata segmentPartitionMetadata = segmentZKMetadata.getPartitionMetadata();
     if (segmentPartitionMetadata != null) {

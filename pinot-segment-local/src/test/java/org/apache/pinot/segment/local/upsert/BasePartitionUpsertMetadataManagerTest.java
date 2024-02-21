@@ -178,7 +178,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     ExecutorService segmentPreloadExecutor = Executors.newFixedThreadPool(1);
     try {
       assertFalse(upsertMetadataManager.isPreloading());
-      upsertMetadataManager.preloadSegments(indexLoadingConfig, tableDataManager, helixManager, segmentPreloadExecutor);
+      upsertMetadataManager.preloadSegments(tableDataManager, indexLoadingConfig, helixManager, segmentPreloadExecutor);
       assertEquals(preloadedSegments.size(), 1);
       assertTrue(preloadedSegments.contains(seg02Name));
       assertTrue(wasPreloading.get());

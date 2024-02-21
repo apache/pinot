@@ -357,6 +357,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         && _tableUpsertMetadataManager.getUpsertMode() == UpsertConfig.Mode.PARTIAL;
   }
 
+  private boolean isUpsertPreloadEnabled() {
+    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
+    return _tableUpsertMetadataManager != null && _segmentPreloadExecutor != null && upsertConfig != null
+        && upsertConfig.isEnableSnapshot() && upsertConfig.isEnablePreload();
+  }
+
   /*
    * This call comes in one of two ways:
    * For HL Segments:
@@ -378,20 +384,27 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
         segmentName, _tableNameWithType);
-    if (isUpsertEnabled() && isReadyToPreload()) {
+    boolean upsertPreloadEnabled = isUpsertPreloadEnabled();
+    if (upsertPreloadEnabled) {
       Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, segmentZKMetadata, null);
       Preconditions.checkNotNull(partitionId,
           String.format("Failed to get partition id for segment: %s (upsert-enabled table: %s)", segmentName,
               _tableNameWithType));
       PartitionUpsertMetadataManager partitionUpsertMetadataManager =
           _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
-      partitionUpsertMetadataManager.preloadSegments(indexLoadingConfig, this, _helixManager, _segmentPreloadExecutor);
+      partitionUpsertMetadataManager.preloadSegments(this, indexLoadingConfig, _helixManager, _segmentPreloadExecutor);
       // Continue to add segment after preloading, as the segment might not be added by preloading.
     }
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
-      _logger.warn("Skipping adding existing segment: {} for table: {} with data manager class: {}", segmentName,
-          _tableNameWithType, segmentDataManager.getClass().getSimpleName());
+      if (upsertPreloadEnabled) {
+        _logger.debug(
+            "Skipping adding existing segment: {} for table: {} with data manager class: {}, as it's preloaded",
+            segmentName, _tableNameWithType, segmentDataManager.getClass().getSimpleName());
+      } else {
+        _logger.warn("Skipping adding existing segment: {} for table: {} with data manager class: {}", segmentName,
+            _tableNameWithType, segmentDataManager.getClass().getSimpleName());
+      }
       return;
     }
 
@@ -455,12 +468,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Initialized RealtimeSegmentDataManager - " + segmentName);
     registerSegment(segmentName, segmentDataManager);
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
-  }
-
-  private boolean isReadyToPreload() {
-    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
-    return upsertConfig != null && upsertConfig.isEnableSnapshot() && upsertConfig.isEnablePreload()
-        && _segmentPreloadExecutor != null;
   }
 
   /**

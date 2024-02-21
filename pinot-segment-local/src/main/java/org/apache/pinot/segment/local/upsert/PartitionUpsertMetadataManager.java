@@ -71,7 +71,7 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /**
    * Preload segments for the table partition. Segments can be added differently during preloading.
    */
-  void preloadSegments(IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager,
+  void preloadSegments(TableDataManager tableDataManager, IndexLoadingConfig indexLoadingConfig,
       HelixManager helixManager, ExecutorService segmentPreloadExecutor);
 
   boolean isPreloading();

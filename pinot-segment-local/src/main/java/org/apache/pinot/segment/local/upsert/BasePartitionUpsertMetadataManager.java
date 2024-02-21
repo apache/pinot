@@ -117,12 +117,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // Initialize with 1 pending operation to indicate the metadata manager can take more operations
   private int _numPendingOperations = 1;
   private boolean _closed;
-  // The lock and boolean flag below ensure only one thread can start preloading and preloading happens only once.
+  // The lock and boolean flag ensure only one thread can start preloading and preloading happens only once.
   private final Lock _preloadLock = new ReentrantLock();
-  private volatile boolean _isPreloaded = false;
-  // The flag below sets manager in preloading phase so that segments can be added differently to be faster and more
-  // efficient. We can't reuse _isPreloaded for this check, as preloading may be disabled and not happen at all.
-  private volatile boolean _isPreloading = false;
+  private volatile boolean _isPreloading;
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
@@ -135,6 +132,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _partialUpsertHandler = context.getPartialUpsertHandler();
     _enableSnapshot = context.isSnapshotEnabled();
     _snapshotLock = _enableSnapshot ? new ReentrantReadWriteLock() : null;
+    _isPreloading = _enableSnapshot && context.isPreloadEnabled();
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
     _tableIndexDir = context.getTableIndexDir();
@@ -181,9 +179,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
-  public void preloadSegments(IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager,
+  public void preloadSegments(TableDataManager tableDataManager, IndexLoadingConfig indexLoadingConfig,
       HelixManager helixManager, ExecutorService segmentPreloadExecutor) {
-    if (_isPreloaded) {
+    if (!_isPreloading) {
       return;
     }
     // Preloading the segments with the snapshots of validDocIds for fast upsert metadata recovery.
@@ -193,13 +191,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // segment state transitions. This is ensured by the lock here.
     _preloadLock.lock();
     try {
-      // This flag ensures preloading happens only once when the first segment of the table partition is to be added.
-      if (_isPreloaded) {
+      // Check the flag again to ensure preloading happens only once.
+      if (!_isPreloading) {
         return;
       }
-      // Mark manager as in preloading phase, so that segments can be added differently to be faster and more efficient.
-      _isPreloading = true;
-      doPreloadSegments(indexLoadingConfig, tableDataManager, helixManager, segmentPreloadExecutor);
+      // From now on, the _isPreloading flag is true until the segments are preloaded.
+      doPreloadSegments(tableDataManager, indexLoadingConfig, helixManager, segmentPreloadExecutor);
     } catch (Exception e) {
       // Even if preloading fails, we should continue to complete the initialization, so that TableDataManager can be
       // created. Once TableDataManager is created, no more segment preloading would happen, and the normal segment
@@ -213,12 +210,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     } finally {
       _isPreloading = false;
-      _isPreloaded = true;
       _preloadLock.unlock();
     }
   }
 
-  protected void doPreloadSegments(IndexLoadingConfig indexLoadingConfig, TableDataManager tableDataManager,
+  protected void doPreloadSegments(TableDataManager tableDataManager, IndexLoadingConfig indexLoadingConfig,
       HelixManager helixManager, ExecutorService segmentPreloadExecutor)
       throws Exception {
     _logger.info("Preload segments from partition: {} of table: {} for fast upsert metadata recovery", _partitionId,
@@ -803,8 +799,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    *         return the latest record.
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
-  protected static Iterator<RecordInfo> resolveComparisonTies(
-      Iterator<RecordInfo> recordInfoIterator, HashFunction hashFunction) {
+  protected static Iterator<RecordInfo> resolveComparisonTies(Iterator<RecordInfo> recordInfoIterator,
+      HashFunction hashFunction) {
     Map<Object, RecordInfo> deDuplicatedRecordInfo = new HashMap<>();
     while (recordInfoIterator.hasNext()) {
       RecordInfo recordInfo = recordInfoIterator.next();
