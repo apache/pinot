@@ -42,6 +42,7 @@ import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
@@ -84,6 +85,43 @@ public final class TlsUtils {
   private static final String INSECURE = "insecure";
 
   private static final AtomicReference<SSLContext> SSL_CONTEXT_REF = new AtomicReference<>();
+
+  static {
+    // Set the default SSL context to the default SSL context created by SSLFactory
+    String jvmKeyStorePath = System.getProperty("javax.net.ssl.keyStore");
+    String jvmKeystorePassword = Optional.ofNullable(System.getProperty("javax.net.ssl.keyStorePassword"))
+        .map(String::trim)
+        .filter(StringUtils::isNotBlank)
+        .orElse(null);
+    String jvmTrustStorePath = System.getProperty("javax.net.ssl.trustStore");
+    String jvmTrustStorePassword = Optional.ofNullable(System.getProperty("javax.net.ssl.trustStorePassword"))
+        .map(String::trim)
+        .filter(StringUtils::isNotBlank)
+        .orElse(null);
+    if (isKeyOrTrustStorePathNullOrHasFileScheme(jvmTrustStorePath)
+        && isKeyOrTrustStorePathNullOrHasFileScheme(jvmKeyStorePath)) {
+      SSLFactory jvmSslFactory =
+          SSLFactory.builder()
+              .withSwappableTrustMaterial()
+              .withSystemPropertyDerivedIdentityMaterial()
+              .withSwappableIdentityMaterial()
+              .withSystemPropertyDerivedTrustMaterial()
+              .withSystemPropertyDerivedProtocols()
+              .withSystemPropertyDerivedCiphers()
+              .build();
+      String jvmKeystoreType = Optional.ofNullable(System.getProperty("javax.net.ssl.trustStoreType"))
+          .map(String::trim)
+          .filter(StringUtils::isNotBlank)
+          .orElseGet(KeyStore::getDefaultType);
+      String jvmTrustStoreType = Optional.ofNullable(System.getProperty("javax.net.ssl.trustStoreType"))
+          .map(String::trim)
+          .filter(StringUtils::isNotBlank)
+          .orElseGet(KeyStore::getDefaultType);
+      enableAutoRenewalFromFileStoreForSSLFactory(jvmSslFactory, jvmKeystoreType, jvmKeyStorePath, jvmKeystorePassword,
+          jvmTrustStoreType, jvmTrustStorePath, jvmTrustStorePassword, null, null, false);
+      SSLContext.setDefault(jvmSslFactory.getSslContext());
+    }
+  }
 
   private TlsUtils() {
     // left blank
