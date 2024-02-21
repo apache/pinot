@@ -164,7 +164,7 @@ public abstract class AbstractBaseStatement implements Statement {
   @Override
   public void setQueryTimeout(int seconds)
       throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+    // no-op
   }
 
   @Override
