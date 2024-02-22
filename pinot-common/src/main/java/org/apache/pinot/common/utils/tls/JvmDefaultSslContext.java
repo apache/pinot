@@ -48,7 +48,7 @@ public class JvmDefaultSslContext {
    * TODO: need to support "javax.net.ssl.keyStoreProvider" and "javax.net.ssl.trustStoreProvider" system properties
    */
   public static synchronized void initDefaultSslContext() {
-    if (INITIALIZED) {
+    if (_initialized) {
       return;
     }
 
@@ -96,6 +96,6 @@ public class JvmDefaultSslContext {
       TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(jvmSslFactory, jvmKeystoreType, jvmKeyStorePath,
           jvmKeystorePassword, jvmTrustStoreType, jvmTrustStorePath, jvmTrustStorePassword, null, null, false);
     }
-    INITIALIZED = true;
+    _initialized = true;
   }
 }
