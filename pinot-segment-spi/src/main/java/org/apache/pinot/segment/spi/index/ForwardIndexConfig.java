@@ -22,6 +22,7 @@ package org.apache.pinot.segment.spi.index;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -38,21 +39,21 @@ public class ForwardIndexConfig extends IndexConfig {
   public static final ForwardIndexConfig DEFAULT = new Builder().build();
 
   @Nullable
-  private final ChunkCompressionType _chunkCompressionType;
+  private final CompressionCodec _compressionCodec;
   private final boolean _deriveNumDocsPerChunk;
   private final int _rawIndexWriterVersion;
 
+  @Deprecated
+  @Nullable
+  private final ChunkCompressionType _chunkCompressionType;
+  @Deprecated
   @Nullable
   private final DictIdCompressionType _dictIdCompressionType;
-  @Nullable
-  private final CompressionCodec _compressionCodec;
 
-  public ForwardIndexConfig(@Nullable Boolean disabled,
-      @Nullable CompressionCodec compressionCodec,
-      Boolean deriveNumDocsPerChunk,
-      Integer rawIndexWriterVersion) {
+  public ForwardIndexConfig(@Nullable Boolean disabled, @Nullable CompressionCodec compressionCodec,
+      @Nullable Boolean deriveNumDocsPerChunk, @Nullable Integer rawIndexWriterVersion) {
     super(disabled);
-    _deriveNumDocsPerChunk = deriveNumDocsPerChunk != null && deriveNumDocsPerChunk;
+    _deriveNumDocsPerChunk = Boolean.TRUE.equals(deriveNumDocsPerChunk);
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? DEFAULT_RAW_WRITER_VERSION : rawIndexWriterVersion;
     _compressionCodec = compressionCodec;
 
@@ -90,24 +91,21 @@ public class ForwardIndexConfig extends IndexConfig {
   @JsonCreator
   public ForwardIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
       @JsonProperty("compressionCodec") @Nullable CompressionCodec compressionCodec,
-      @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
-      @JsonProperty("deriveNumDocsPerChunk") Boolean deriveNumDocsPerChunk,
-      @JsonProperty("rawIndexWriterVersion") Integer rawIndexWriterVersion,
-      @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType) {
+      @Deprecated @JsonProperty("chunkCompressionType") @Nullable ChunkCompressionType chunkCompressionType,
+      @Deprecated @JsonProperty("dictIdCompressionType") @Nullable DictIdCompressionType dictIdCompressionType,
+      @JsonProperty("deriveNumDocsPerChunk") @Nullable Boolean deriveNumDocsPerChunk,
+      @JsonProperty("rawIndexWriterVersion") @Nullable Integer rawIndexWriterVersion) {
     this(disabled, getActualCompressionCodec(compressionCodec, chunkCompressionType, dictIdCompressionType),
         deriveNumDocsPerChunk, rawIndexWriterVersion);
   }
 
-  public static CompressionCodec getActualCompressionCodec(
-      @Nullable CompressionCodec compressionCodec,
-      @Nullable ChunkCompressionType chunkCompressionType,
-      @Nullable DictIdCompressionType dictIdCompressionType) {
+  public static CompressionCodec getActualCompressionCodec(@Nullable CompressionCodec compressionCodec,
+      @Nullable ChunkCompressionType chunkCompressionType, @Nullable DictIdCompressionType dictIdCompressionType) {
     if (compressionCodec != null) {
       return compressionCodec;
     }
     if (chunkCompressionType != null && dictIdCompressionType != null) {
-      throw new IllegalArgumentException(
-          "chunkCompressionType and dictIdCompressionType should not be used together");
+      throw new IllegalArgumentException("chunkCompressionType and dictIdCompressionType should not be used together");
     }
     if (chunkCompressionType != null) {
       switch (chunkCompressionType) {
@@ -135,9 +133,8 @@ public class ForwardIndexConfig extends IndexConfig {
   }
 
   @Nullable
-  @JsonIgnore
-  public ChunkCompressionType getChunkCompressionType() {
-    return _chunkCompressionType;
+  public CompressionCodec getCompressionCodec() {
+    return _compressionCodec;
   }
 
   public boolean isDeriveNumDocsPerChunk() {
@@ -148,11 +145,14 @@ public class ForwardIndexConfig extends IndexConfig {
     return _rawIndexWriterVersion;
   }
 
+  @Deprecated
   @Nullable
-  public CompressionCodec getCompressionCodec() {
-    return _compressionCodec;
+  @JsonIgnore
+  public ChunkCompressionType getChunkCompressionType() {
+    return _chunkCompressionType;
   }
 
+  @Deprecated
   @JsonIgnore
   @Nullable
   public DictIdCompressionType getDictIdCompressionType() {
@@ -171,15 +171,13 @@ public class ForwardIndexConfig extends IndexConfig {
       return false;
     }
     ForwardIndexConfig that = (ForwardIndexConfig) o;
-    return _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
-        && _rawIndexWriterVersion == that._rawIndexWriterVersion && _chunkCompressionType == that._chunkCompressionType
-        && Objects.equals(_dictIdCompressionType, that._dictIdCompressionType);
+    return _compressionCodec == that._compressionCodec && _deriveNumDocsPerChunk == that._deriveNumDocsPerChunk
+        && _rawIndexWriterVersion == that._rawIndexWriterVersion;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _chunkCompressionType, _deriveNumDocsPerChunk, _rawIndexWriterVersion,
-        _dictIdCompressionType);
+    return Objects.hash(super.hashCode(), _compressionCodec, _deriveNumDocsPerChunk, _rawIndexWriterVersion);
   }
 
   public static class Builder {
@@ -197,29 +195,8 @@ public class ForwardIndexConfig extends IndexConfig {
       _rawIndexWriterVersion = other._rawIndexWriterVersion;
     }
 
-    public Builder withCompressionType(ChunkCompressionType chunkCompressionType) {
-      if (chunkCompressionType == null) {
-        return this;
-      }
-      switch (chunkCompressionType) {
-        case LZ4:
-          _compressionCodec = CompressionCodec.LZ4;
-          break;
-        case LZ4_LENGTH_PREFIXED:
-          _compressionCodec = CompressionCodec.LZ4;
-          break;
-        case PASS_THROUGH:
-          _compressionCodec = CompressionCodec.PASS_THROUGH;
-          break;
-        case SNAPPY:
-          _compressionCodec = CompressionCodec.SNAPPY;
-          break;
-        case ZSTANDARD:
-          _compressionCodec = CompressionCodec.ZSTANDARD;
-          break;
-        default:
-          throw new IllegalArgumentException("Unrecognized chunk compression type " + chunkCompressionType);
-      }
+    public Builder withCompressionCodec(CompressionCodec compressionCodec) {
+      _compressionCodec = compressionCodec;
       return this;
     }
 
@@ -233,16 +210,39 @@ public class ForwardIndexConfig extends IndexConfig {
       return this;
     }
 
+    @Deprecated
+    public Builder withCompressionType(ChunkCompressionType chunkCompressionType) {
+      if (chunkCompressionType == null) {
+        return this;
+      }
+      switch (chunkCompressionType) {
+        case LZ4:
+        case LZ4_LENGTH_PREFIXED:
+          _compressionCodec = CompressionCodec.LZ4;
+          break;
+        case PASS_THROUGH:
+          _compressionCodec = CompressionCodec.PASS_THROUGH;
+          break;
+        case SNAPPY:
+          _compressionCodec = CompressionCodec.SNAPPY;
+          break;
+        case ZSTANDARD:
+          _compressionCodec = CompressionCodec.ZSTANDARD;
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported chunk compression type: " + chunkCompressionType);
+      }
+      return this;
+    }
+
+    @Deprecated
     public Builder withDictIdCompressionType(DictIdCompressionType dictIdCompressionType) {
       if (dictIdCompressionType == null) {
         return this;
       }
+      Preconditions.checkArgument(dictIdCompressionType == DictIdCompressionType.MV_ENTRY_DICT,
+          "Unsupported dictionary compression type: " + dictIdCompressionType);
       _compressionCodec = CompressionCodec.MV_ENTRY_DICT;
-      return this;
-    }
-
-    public Builder withCompressionCodec(CompressionCodec compressionCodec) {
-      _compressionCodec = compressionCodec;
       return this;
     }
 
