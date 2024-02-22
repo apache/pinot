@@ -45,7 +45,8 @@ public class JvmDefaultSslContext {
    * system property and they are files:
    * set the default SSL context to the default SSL context created by SSLFactory, and enable auto renewal of
    * SSLFactory when either key store or trust store file changes.
-   * TODO: need to support "javax.net.ssl.keyStoreProvider" and "javax.net.ssl.trustStoreProvider" system properties
+   * TODO: need to support "javax.net.ssl.keyStoreProvider", "javax.net.ssl.trustStoreProvider", "https.protocols" and
+   *  "https.cipherSuites" system properties.
    */
   public static synchronized void initDefaultSslContext() {
     if (_initialized) {
