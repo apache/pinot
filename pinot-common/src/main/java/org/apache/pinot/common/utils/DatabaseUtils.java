@@ -84,7 +84,7 @@ public class DatabaseUtils {
     return actualTableName != null ? actualTableName : tableName;
   }
 
-  public static boolean isTableNameEquivalent(String logicalName, String physicalName) {
-    return Objects.equals(logicalName, physicalName) || physicalName.endsWith("." + logicalName);
+  public static boolean isTableNameEquivalent(String name1, String name2) {
+    return Objects.equals(name1, name2) || name1.endsWith("." + name2) || name2.endsWith("." + name1);
   }
 }

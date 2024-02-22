@@ -593,19 +593,19 @@ public class TableConfigsRestletResource {
       Preconditions.checkState(schema != null, "Must provide 'schema' for adding TableConfigs: %s", rawTableName);
       Preconditions.checkState(!rawTableName.isEmpty(), "'tableName' cannot be empty in TableConfigs");
 
-      Preconditions.checkState(rawTableName.equals(schema.getSchemaName()),
+      Preconditions.checkState(DatabaseUtils.isTableNameEquivalent(rawTableName, schema.getSchemaName()),
           "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
       SchemaUtils.validate(schema);
       if (offlineTableConfig != null) {
         String offlineRawTableName = TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName());
-        Preconditions.checkState(offlineRawTableName.equals(rawTableName),
+        Preconditions.checkState(DatabaseUtils.isTableNameEquivalent(offlineRawTableName, rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
         TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
       }
       if (realtimeTableConfig != null) {
         String realtimeRawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
-        Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
+        Preconditions.checkState(DatabaseUtils.isTableNameEquivalent(realtimeRawTableName, rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
         TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());

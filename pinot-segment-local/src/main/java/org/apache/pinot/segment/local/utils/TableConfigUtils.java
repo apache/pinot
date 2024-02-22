@@ -42,6 +42,7 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
@@ -218,7 +219,7 @@ public final class TableConfigUtils {
     // Ensure that table is not created if schema is not present
     String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
     String schemaName = tableConfig.getValidationConfig().getSchemaName();
-    if (schemaName != null && !schemaName.equals(rawTableName)) {
+    if (schemaName != null && !DatabaseUtils.isTableNameEquivalent(schemaName, rawTableName)) {
       throw new IllegalStateException("Schema name: " + schemaName + " does not match table name: " + rawTableName);
     }
   }
