@@ -593,7 +593,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+            .setIngestionConfig(ingestionConfig).setNoDictionaryColumns(List.of("d1", "d2", "d3", "d4", "d5")).build();
 
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
