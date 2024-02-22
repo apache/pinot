@@ -43,8 +43,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   private final TextMatchPredicate _predicate;
 
   public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {
-    // This filter operator does not support AND/OR/NOT operations.
-    super(0, false);
+    super(numDocs, false);
     _textIndexReader = textIndexReader;
     _predicate = predicate;
     _numDocs = numDocs;
