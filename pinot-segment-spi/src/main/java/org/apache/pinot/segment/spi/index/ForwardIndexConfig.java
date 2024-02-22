@@ -43,10 +43,8 @@ public class ForwardIndexConfig extends IndexConfig {
   private final boolean _deriveNumDocsPerChunk;
   private final int _rawIndexWriterVersion;
 
-  @Deprecated
   @Nullable
   private final ChunkCompressionType _chunkCompressionType;
-  @Deprecated
   @Nullable
   private final DictIdCompressionType _dictIdCompressionType;
 
@@ -145,14 +143,12 @@ public class ForwardIndexConfig extends IndexConfig {
     return _rawIndexWriterVersion;
   }
 
-  @Deprecated
-  @Nullable
   @JsonIgnore
+  @Nullable
   public ChunkCompressionType getChunkCompressionType() {
     return _chunkCompressionType;
   }
 
-  @Deprecated
   @JsonIgnore
   @Nullable
   public DictIdCompressionType getDictIdCompressionType() {
