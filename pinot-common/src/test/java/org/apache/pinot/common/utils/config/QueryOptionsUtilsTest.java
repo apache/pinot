@@ -60,9 +60,8 @@ public class QueryOptionsUtilsTest {
         Set.of(FieldConfig.IndexType.SORTED));
   }
 
-  @Test(expectedExceptions = ParseException.class)
-  public void testIndexSkipConfigParsingInvalid()
-      throws ParseException {
+  @Test(expectedExceptions = RuntimeException.class)
+  public void testIndexSkipConfigParsingInvalid() {
     String indexSkipConfigStr = "col1=inverted,range&col2";
     Map<String, String> queryOptions =
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.INDEX_SKIP_CONFIG, indexSkipConfigStr);

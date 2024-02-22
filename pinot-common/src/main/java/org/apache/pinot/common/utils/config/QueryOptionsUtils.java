@@ -31,7 +31,6 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
-import org.apache.pinot.sql.parsers.parser.ParseException;
 
 
 /**
@@ -151,8 +150,7 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static Map<String, Set<FieldConfig.IndexType>> getIndexSkipConfig(Map<String, String> queryOptions)
-      throws ParseException {
+  public static Map<String, Set<FieldConfig.IndexType>> getIndexSkipConfig(Map<String, String> queryOptions) {
     // Example config:  indexSkipConfig='col1=inverted,range&col2=inverted'
     String indexSkipConfigStr = queryOptions.get(QueryOptionKey.INDEX_SKIP_CONFIG);
     if (indexSkipConfigStr == null) {
@@ -164,7 +162,7 @@ public class QueryOptionsUtils {
     for (String columnConf : perColumnIndexSkip) {
       String[] conf = columnConf.split("=");
       if (conf.length != 2) {
-        throw new ParseException("Invalid format for " + QueryOptionKey.INDEX_SKIP_CONFIG
+        throw new RuntimeException("Invalid format for " + QueryOptionKey.INDEX_SKIP_CONFIG
             + ". Example of valid format: SET indexSkipConfig='col1=inverted,range&col2=inverted'");
       }
       String columnName = conf[0];
