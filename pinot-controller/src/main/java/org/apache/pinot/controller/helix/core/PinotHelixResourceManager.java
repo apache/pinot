@@ -1455,7 +1455,7 @@ public class PinotHelixResourceManager {
     for (String resourceName : getAllResources()) {
       if (TableNameBuilder.isTableResource(resourceName)) {
         String[] split = resourceName.split("\\.");
-        databaseNames.add(split.length == 2 ? split[0] : null);
+        databaseNames.add(split.length == 2 ? split[0] : CommonConstants.DEFAULT_DATABASE);
       }
     }
     return new ArrayList<>(databaseNames);
