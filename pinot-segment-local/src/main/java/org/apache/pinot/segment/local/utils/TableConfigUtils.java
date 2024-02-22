@@ -29,6 +29,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -490,6 +491,18 @@ public final class TableConfigUtils {
           Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
               "all metric columns must be aggregated");
         }
+
+        // This is required by MutableSegmentImpl.enableMetricsAggregationIfPossible().
+        // That code will disable ingestion aggregation if all metrics aren't noDictionaryColumns.
+        // But if you do that after the table is already created, all future aggregations will
+        // just be the default value.
+        List<String> noDictionaryColumns =
+            Objects.requireNonNull(tableConfig.getIndexingConfig().getNoDictionaryColumns(),
+                "noDictionaryColumns must be specified and include all aggregation columns");
+        aggregationColumns.forEach(column -> {
+          Preconditions.checkState(noDictionaryColumns.contains(column),
+              "Aggregated column: %s must be a no-dictionary column", column);
+        });
       }
 
       // Transform configs
