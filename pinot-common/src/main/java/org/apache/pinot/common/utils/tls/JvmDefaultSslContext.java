@@ -33,7 +33,7 @@ public class JvmDefaultSslContext {
   private static final String JVM_TRUST_STORE_TYPE = "javax.net.ssl.trustStoreType";
   private static final String JVM_TRUST_STORE_PASSWORD = "javax.net.ssl.trustStorePassword";
 
-  private static boolean _initialized = false;
+  private static volatile boolean _initialized = false;
 
   private JvmDefaultSslContext() {
     throw new IllegalStateException("Should not instantiate JvmDefaultSslContext");
