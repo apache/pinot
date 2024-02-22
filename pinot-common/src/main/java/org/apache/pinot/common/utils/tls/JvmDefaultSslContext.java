@@ -59,8 +59,7 @@ public class JvmDefaultSslContext {
     if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(jvmKeyStorePath)
         && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(jvmTrustStorePath)
         && (StringUtils.isNotBlank(jvmKeyStorePath) || StringUtils.isNotBlank(jvmTrustStorePath))) {
-      SSLFactory.Builder jvmSslFactoryBuilder =
-          SSLFactory.builder().withSystemPropertyDerivedProtocols().withSystemPropertyDerivedCiphers();
+      SSLFactory.Builder jvmSslFactoryBuilder = SSLFactory.builder();
 
       // If key store "javax.net.ssl.keyStore" is specified by system property, create a new SSLFactory with the
       // keyStore
