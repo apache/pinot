@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client.utils;
 
+import io.netty.handler.ssl.SslContext;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +32,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
@@ -61,11 +61,11 @@ public class DriverUtils {
   private DriverUtils() {
   }
 
-  public static SSLContext getSSLContextFromJDBCProps(Properties properties) {
+  public static SslContext getSslContextFromJDBCProps(Properties properties) {
     TlsConfig tlsConfig = TlsUtils.extractTlsConfig(
         new PinotConfiguration(new MapConfiguration(properties)), PINOT_JDBC_TLS_PREFIX);
     TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
-    return TlsUtils.getSslContext();
+    return TlsUtils.buildClientContext(tlsConfig);
   }
 
   public static void handleAuth(Properties info, Map<String, String> headers)

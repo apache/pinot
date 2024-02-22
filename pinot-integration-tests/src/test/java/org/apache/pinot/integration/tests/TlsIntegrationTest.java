@@ -20,6 +20,7 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import groovy.lang.IntRange;
+import io.netty.handler.ssl.SslContextBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Collectors;
+import javax.net.ssl.SSLException;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.InstanceConfig;
@@ -272,10 +274,19 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
   @Override
   protected Connection getPinotConnection() {
     if (_pinotConnection == null) {
+      SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
+      sslContextBuilder.keyStoreType(PKCS_12);
+      sslContextBuilder.keyManager(TlsUtils.createKeyManagerFactory(_tlsStorePKCS12.toString(), PASSWORD, PKCS_12));
+      sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(_tlsStorePKCS12.toString(), PASSWORD, PKCS_12));
+
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
       factory.setHeaders(AUTH_HEADER);
       factory.setScheme(CommonConstants.HTTPS_PROTOCOL);
-      factory.setSslContext(TlsUtils.getSslContext());
+      try {
+        factory.setSslContext(sslContextBuilder.build());
+      } catch (SSLException sslException) {
+        Assert.fail("sslContext build failed", sslException);
+      }
 
       _pinotConnection =
           ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(), factory.buildTransport());
@@ -547,10 +558,10 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
   private java.sql.Connection getValidJDBCConnection(int controllerPort)
       throws Exception {
-    SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
-    sslContextBuilder.setKeyStoreType(PKCS_12);
-    sslContextBuilder.loadKeyMaterial(_tlsStorePKCS12, PASSWORD_CHAR, PASSWORD_CHAR);
-    sslContextBuilder.loadTrustMaterial(_tlsStorePKCS12, PASSWORD_CHAR);
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
+    sslContextBuilder.keyStoreType(PKCS_12);
+    sslContextBuilder.keyManager(TlsUtils.createKeyManagerFactory(_tlsStorePKCS12.toString(), PASSWORD, PKCS_12));
+    sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(_tlsStorePKCS12.toString(), PASSWORD, PKCS_12));
 
     PinotDriver pinotDriver = new PinotDriver(sslContextBuilder.build());
     Properties jdbcProps = new Properties();
@@ -561,10 +572,10 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
 
   private java.sql.Connection getInValidJDBCConnection(int controllerPort)
       throws Exception {
-    SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
-    sslContextBuilder.setKeyStoreType(PKCS_12);
-    sslContextBuilder.loadKeyMaterial(_tlsStoreEmptyPKCS12, PASSWORD_CHAR, PASSWORD_CHAR);
-    sslContextBuilder.loadTrustMaterial(_tlsStorePKCS12, PASSWORD_CHAR);
+    SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
+    sslContextBuilder.keyStoreType(PKCS_12);
+    sslContextBuilder.keyManager(TlsUtils.createKeyManagerFactory(_tlsStoreEmptyPKCS12.toString(), PASSWORD, PKCS_12));
+    sslContextBuilder.trustManager(TlsUtils.createTrustManagerFactory(_tlsStorePKCS12.toString(), PASSWORD, PKCS_12));
 
     PinotDriver pinotDriver = new PinotDriver(sslContextBuilder.build());
     Properties jdbcProps = new Properties();

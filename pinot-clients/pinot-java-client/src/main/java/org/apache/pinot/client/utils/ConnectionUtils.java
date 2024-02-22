@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.client.utils;
 
+import io.netty.handler.ssl.SslContext;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Properties;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -51,11 +51,11 @@ public class ConnectionUtils {
         .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
   }
 
-  public static SSLContext getSSLContextFromProperties(Properties properties) {
+  public static SslContext getSslContextFromProperties(Properties properties) {
     TlsConfig tlsConfig = TlsUtils.extractTlsConfig(
         new PinotConfiguration(new MapConfiguration(properties)), PINOT_JAVA_TLS_PREFIX);
     TlsUtils.installDefaultSSLSocketFactory(tlsConfig);
-    return TlsUtils.getSslContext();
+    return TlsUtils.buildClientContext(tlsConfig);
   }
 
 

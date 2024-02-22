@@ -20,8 +20,7 @@ package org.apache.pinot.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
-import io.netty.handler.ssl.ClientAuth;
-import io.netty.handler.ssl.JdkSslContext;
+import io.netty.handler.ssl.SslContext;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -33,7 +32,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
-import javax.net.ssl.SSLContext;
 import org.apache.pinot.client.utils.BrokerSelectorUtils;
 import org.apache.pinot.client.utils.ConnectionUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -95,8 +93,8 @@ public class BrokerCache {
     String scheme = properties.getProperty(SCHEME, CommonConstants.HTTP_PROTOCOL);
     DefaultAsyncHttpClientConfig.Builder builder = Dsl.config();
     if (scheme.contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
-      SSLContext sslContext = ConnectionUtils.getSSLContextFromProperties(properties);
-      builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
+      SslContext sslContext = ConnectionUtils.getSslContextFromProperties(properties);
+      builder.setSslContext(sslContext);
     }
 
     int readTimeoutMs = Integer.parseInt(properties.getProperty("controllerReadTimeoutMs",

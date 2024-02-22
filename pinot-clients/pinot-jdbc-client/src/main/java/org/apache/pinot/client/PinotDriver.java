@@ -20,6 +20,7 @@ package org.apache.pinot.client;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
+import io.netty.handler.ssl.SslContext;
 import java.net.URI;
 import java.sql.Connection;
 import java.sql.Driver;
@@ -33,12 +34,10 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
 import org.apache.pinot.client.utils.DriverUtils;
-import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.LoggerFactory;
 
@@ -51,12 +50,12 @@ public class PinotDriver implements Driver {
   public static final String INFO_SCHEME = "scheme";
   public static final String INFO_HEADERS = "headers";
 
-  private SSLContext _sslContext = null;
+  private SslContext _sslContext = null;
 
   public PinotDriver() { }
 
   @VisibleForTesting
-  public PinotDriver(SSLContext sslContext) {
+  public PinotDriver(SslContext sslContext) {
     _sslContext = sslContext;
   }
 
@@ -100,8 +99,8 @@ public class PinotDriver implements Driver {
         pinotControllerTransportFactory.setScheme(info.getProperty(INFO_SCHEME));
         if (info.getProperty(INFO_SCHEME).contentEquals(CommonConstants.HTTPS_PROTOCOL)) {
           if (_sslContext == null) {
-            factory.setSslContext(DriverUtils.getSSLContextFromJDBCProps(info));
-            pinotControllerTransportFactory.setSslContext(TlsUtils.getSslContext());
+            factory.setSslContext(DriverUtils.getSslContextFromJDBCProps(info));
+            pinotControllerTransportFactory.setSslContext(factory.getSslContext());
           } else {
             factory.setSslContext(_sslContext);
             pinotControllerTransportFactory.setSslContext(_sslContext);
