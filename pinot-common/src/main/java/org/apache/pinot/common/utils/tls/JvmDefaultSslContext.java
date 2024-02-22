@@ -26,17 +26,35 @@ import org.apache.commons.lang.StringUtils;
 
 
 public class JvmDefaultSslContext {
+  private static final String JVM_KEY_STORE = "javax.net.ssl.keyStore";
+  private static final String JVM_KEY_STORE_TYPE = "javax.net.ssl.keyStoreType";
+  private static final String JVM_KEY_STORE_PASSWORD = "javax.net.ssl.keyStorePassword";
+  private static final String JVM_TRUST_STORE = "javax.net.ssl.trustStore";
+  private static final String JVM_TRUST_STORE_TYPE = "javax.net.ssl.trustStoreType";
+  private static final String JVM_TRUST_STORE_PASSWORD = "javax.net.ssl.trustStorePassword";
+
+  private static boolean _initialized = false;
+
   private JvmDefaultSslContext() {
+    throw new IllegalStateException("Should not instantiate JvmDefaultSslContext");
   }
 
-  // TODO: need to support "javax.net.ssl.keyStoreProvider" and "javax.net.ssl.trustStoreProvider" system properties
-  static {
-    // When either key store "javax.net.ssl.keyStore" or trust store "javax.net.ssl.trustStore" is specified in
-    // system property and they are files:
-    // set the default SSL context to the default SSL context created by SSLFactory, and enable auto renewal of
-    // SSLFactory when either key store or trust store file changes.
-    String jvmKeyStorePath = System.getProperty("javax.net.ssl.keyStore");
-    String jvmTrustStorePath = System.getProperty("javax.net.ssl.trustStore");
+  /**
+   * Initialize the default SSL context based on the system properties.
+   * When either key store "javax.net.ssl.keyStore" or trust store "javax.net.ssl.trustStore" is specified in
+   * system property and they are files:
+   * set the default SSL context to the default SSL context created by SSLFactory, and enable auto renewal of
+   * SSLFactory when either key store or trust store file changes.
+   * TODO: need to support "javax.net.ssl.keyStoreProvider" and "javax.net.ssl.trustStoreProvider" system properties
+   */
+  public static synchronized void initDefaultSslContext() {
+    if (INITIALIZED) {
+      return;
+    }
+
+    String jvmKeyStorePath = System.getProperty(JVM_KEY_STORE);
+    String jvmTrustStorePath = System.getProperty(JVM_TRUST_STORE);
+
     // Enable auto renewal of SSLFactory when either key store or trust store file is specified.
     if (TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(jvmKeyStorePath)
         && TlsUtils.isKeyOrTrustStorePathNullOrHasFileScheme(jvmTrustStorePath)
@@ -58,22 +76,26 @@ public class JvmDefaultSslContext {
         // Must use the default one when trust store is not specified since this is the default behavior
         jvmSslFactoryBuilder.withDefaultTrustMaterial();
       }
+
       SSLFactory jvmSslFactory = jvmSslFactoryBuilder.build();
       SSLContext.setDefault(jvmSslFactory.getSslContext());
 
-      String jvmKeystoreType = Optional.ofNullable(System.getProperty("javax.net.ssl.trustStoreType")).map(String::trim)
-          .filter(StringUtils::isNotBlank).orElseGet(KeyStore::getDefaultType);
+      // enable auto renewal
+      String jvmKeystoreType =
+          Optional.ofNullable(System.getProperty(JVM_TRUST_STORE_TYPE))
+              .map(String::trim).filter(StringUtils::isNotBlank).orElseGet(KeyStore::getDefaultType);
       String jvmKeystorePassword =
-          Optional.ofNullable(System.getProperty("javax.net.ssl.keyStorePassword"))
+          Optional.ofNullable(System.getProperty(JVM_KEY_STORE_PASSWORD))
               .map(String::trim).filter(StringUtils::isNotBlank).orElse(null);
       String jvmTrustStoreType =
-          Optional.ofNullable(System.getProperty("javax.net.ssl.trustStoreType"))
+          Optional.ofNullable(System.getProperty(JVM_TRUST_STORE_TYPE))
               .map(String::trim).filter(StringUtils::isNotBlank).orElseGet(KeyStore::getDefaultType);
       String jvmTrustStorePassword =
-          Optional.ofNullable(System.getProperty("javax.net.ssl.trustStorePassword"))
+          Optional.ofNullable(System.getProperty(JVM_TRUST_STORE_PASSWORD))
               .map(String::trim).filter(StringUtils::isNotBlank).orElse(null);
       TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(jvmSslFactory, jvmKeystoreType, jvmKeyStorePath,
           jvmKeystorePassword, jvmTrustStoreType, jvmTrustStorePath, jvmTrustStorePassword, null, null, false);
     }
+    INITIALIZED = true;
   }
 }
