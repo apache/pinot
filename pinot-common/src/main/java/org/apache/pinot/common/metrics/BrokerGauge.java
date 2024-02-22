@@ -43,6 +43,12 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   NETTY_POOLED_ARENAS_HEAP("arenas", true),
 
   /**
+   * The type of Adaptive Server Selector.
+   * See {@link org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector.Type}
+   */
+  ADAPTIVE_SERVER_SELECTOR_TYPE("adaptiveServerSelectorType", true),
+
+  /**
    * The size of the small cache.
    * See {@link PooledByteBufAllocatorMetric#smallCacheSize()}
    */
