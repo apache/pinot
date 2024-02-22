@@ -52,7 +52,7 @@ import org.apache.pinot.client.PinotDriver;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.core.common.MinionConstants;

@@ -60,7 +60,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.version.PinotVersion;
