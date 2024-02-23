@@ -190,7 +190,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected PoolingHttpClientConnectionManager _connectionManager;
   protected TenantRebalancer _tenantRebalancer;
   protected ExecutorService _tenantRebalanceExecutorService;
-  protected String _timezone;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -248,7 +247,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     // Initialize the table config tuner registry.
     TableConfigTunerRegistry.init(_config.getTableConfigTunerPackages());
-    _timezone = System.getProperty("user.timezone");
   }
 
   private void inferHostnameIfNeeded(ControllerConf config) {
@@ -912,10 +910,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   public PinotMetricsRegistry getMetricsRegistry() {
     return _metricsRegistry;
-  }
-
-  public String getTimezone() {
-    return _timezone;
   }
 
   @VisibleForTesting

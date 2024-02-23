@@ -142,7 +142,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected volatile boolean _isServerReadyToServeQueries = false;
-  protected String _timezone;
 
   @Override
   public void init(PinotConfiguration serverConf)
@@ -220,7 +219,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _helixClusterName, _instanceId);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
-    _timezone = System.getProperty("user.timezone");
   }
 
   /**
@@ -886,10 +884,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
   @VisibleForTesting
   public ServerInstance getServerInstance() {
     return _serverInstance;
-  }
-
-  public String getTimezone() {
-    return _timezone;
   }
 
   /**

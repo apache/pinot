@@ -128,7 +128,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   // Handles the server routing stats.
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
   protected BrokerQueryEventListener _brokerQueryEventListener;
-  protected String _timezone;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -412,7 +411,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     _isStarting = false;
     LOGGER.info("Finish starting Pinot broker");
-    _timezone = System.getProperty("user.timezone");
   }
 
   /**
@@ -586,10 +584,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
   public PinotMetricsRegistry getMetricsRegistry() {
     return _metricsRegistry;
-  }
-
-  public String getTimezone() {
-    return _timezone;
   }
 
   public BrokerMetrics getBrokerMetrics() {

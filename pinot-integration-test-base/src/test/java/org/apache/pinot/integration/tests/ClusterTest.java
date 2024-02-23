@@ -177,7 +177,7 @@ public abstract class ClusterTest extends ControllerTest {
     for (int i = 0; i < numBrokers; i++) {
       BaseBrokerStarter brokerStarter = startOneBroker(i);
       assertEquals(brokerStarter.getConfig().getProperty(CommonConstants.CONFIG_OF_TIMEZONE, ""), CommonConstants.DEFAULT_TIMEZONE);
-      assertEquals(brokerStarter.getTimezone(), CommonConstants.DEFAULT_TIMEZONE);
+      assertEquals(System.getProperty("user.timezone"), CommonConstants.DEFAULT_TIMEZONE);
 
       _brokerStarters.add(brokerStarter);
       _brokerPorts.add(brokerStarter.getPort());
@@ -281,7 +281,7 @@ public abstract class ClusterTest extends ControllerTest {
     HelixServerStarter serverStarter = new HelixServerStarter();
     serverStarter.init(getServerConf(serverId));
     serverStarter.start();
-    assertEquals(serverStarter.getTimezone(), CommonConstants.DEFAULT_TIMEZONE);
+    assertEquals(System.getProperty("user.timezone"), CommonConstants.DEFAULT_TIMEZONE);
     return serverStarter;
   }
 
@@ -327,7 +327,7 @@ public abstract class ClusterTest extends ControllerTest {
     _minionStarter = new MinionStarter();
     _minionStarter.init(minionConf);
     _minionStarter.start();
-    assertEquals(_minionStarter.getTimezone(), CommonConstants.DEFAULT_TIMEZONE);
+    assertEquals(System.getProperty("user.timezone"), CommonConstants.DEFAULT_TIMEZONE);
   }
 
   protected void stopBroker() {

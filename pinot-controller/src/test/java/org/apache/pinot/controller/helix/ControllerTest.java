@@ -289,8 +289,7 @@ public class ControllerTest {
     configAccessor.set(scope, Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
     // Set hyperloglog log2m value to 12.
     configAccessor.set(scope, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
-    assertEquals(_controllerConfig.getProperty(CommonConstants.CONFIG_OF_TIMEZONE, ""), CommonConstants.DEFAULT_TIMEZONE);
-    assertEquals(_controllerStarter.getTimezone(), CommonConstants.DEFAULT_TIMEZONE);
+    assertEquals(System.getProperty("user.timezone"), CommonConstants.DEFAULT_TIMEZONE);
   }
 
   public void stopController() {
