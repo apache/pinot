@@ -597,7 +597,6 @@ public class StringFunctions {
   }
 
   /**
-   * TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
    * @param input the input String to be split into parts.
    * @param delimiter the specified delimiter to split the input string.
    * @param index the specified index for the splitted parts to be returned.
@@ -615,7 +614,6 @@ public class StringFunctions {
   }
 
   /**
-   * TODO: Revisit if index should be one-based (both Presto and Postgres use one-based index, which starts with 1)
    * @param input the input String to be split into parts.
    * @param delimiter the specified delimiter to split the input string.
    * @param index the specified index for the splitted parts to be returned.
