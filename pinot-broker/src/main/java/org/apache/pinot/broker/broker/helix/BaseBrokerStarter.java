@@ -262,7 +262,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
     BrokerMetrics.register(_brokerMetrics);
     // Set up request handling classes
-    _serverRoutingStatsManager = new ServerRoutingStatsManager(_brokerConf);
+    _serverRoutingStatsManager = new ServerRoutingStatsManager(_brokerConf, _brokerMetrics);
     _serverRoutingStatsManager.init();
     _routingManager = new BrokerRoutingManager(_brokerMetrics, _serverRoutingStatsManager, _brokerConf);
     _routingManager.init(_spectatorHelixManager);
