@@ -151,6 +151,11 @@ public class WindowAggregateOperator extends MultiStageOperator {
   }
 
   @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  @Override
   public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_inputOperator);
   }

@@ -31,9 +31,12 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 class PipelineBreakerOperator extends MultiStageOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerOperator.class);
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
 
   private final Map<Integer, Operator<TransferableBlock>> _workerMap;
@@ -48,6 +51,11 @@ class PipelineBreakerOperator extends MultiStageOperator {
     for (int workerKey : workerMap.keySet()) {
       _resultMap.put(workerKey, new ArrayList<>());
     }
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   public Map<Integer, List<TransferableBlock>> getResultMap() {

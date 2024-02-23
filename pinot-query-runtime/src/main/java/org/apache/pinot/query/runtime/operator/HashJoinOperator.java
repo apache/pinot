@@ -48,6 +48,8 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -65,6 +67,8 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOver
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 // TODO: Support memory size based resource limit.
 public class HashJoinOperator extends MultiStageOperator {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(HashJoinOperator.class);
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final int INITIAL_HEURISTIC_SIZE = 16;
   private static final int DEFAULT_MAX_ROWS_IN_JOIN = 1024 * 1024; // 2^20, around 1MM rows
@@ -144,6 +148,11 @@ public class HashJoinOperator extends MultiStageOperator {
     Map<String, String> metadata = context.getOpChainMetadata();
     _maxRowsInHashTable = getMaxRowInJoin(metadata, node.getJoinHints());
     _joinOverflowMode = getJoinOverflowMode(metadata, node.getJoinHints());
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   private int getMaxRowInJoin(Map<String, String> opChainMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {

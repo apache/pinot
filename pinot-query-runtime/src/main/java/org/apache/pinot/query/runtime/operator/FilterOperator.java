@@ -32,6 +32,8 @@ import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /*
@@ -48,6 +50,8 @@ import org.apache.pinot.spi.utils.BooleanUtils;
     Note: Scalar functions are the ones we have in v1 engine and only do function name and arg # matching.
  */
 public class FilterOperator extends MultiStageOperator {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(FilterOperator.class);
   private static final String EXPLAIN_NAME = "FILTER";
 
   private final MultiStageOperator _upstreamOperator;
@@ -62,6 +66,11 @@ public class FilterOperator extends MultiStageOperator {
     _filterOperand = TransformOperandFactory.getTransformOperand(filter, dataSchema);
     Preconditions.checkState(_filterOperand.getResultType() == ColumnDataType.BOOLEAN,
         "Filter operand must return BOOLEAN, got: %s", _filterOperand.getResultType());
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override

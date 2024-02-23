@@ -51,6 +51,8 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.roaringbitmap.RoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -59,6 +61,7 @@ import org.roaringbitmap.RoaringBitmap;
  * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
  */
 public class AggregateOperator extends MultiStageOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
       new CountAggregationFunction(Collections.singletonList(ExpressionContext.forIdentifier("*")), false);
@@ -116,6 +119,11 @@ public class AggregateOperator extends MultiStageOperator {
               _resultSchema, context.getOpChainMetadata(), nodeHint);
       _aggregationExecutor = null;
     }
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override

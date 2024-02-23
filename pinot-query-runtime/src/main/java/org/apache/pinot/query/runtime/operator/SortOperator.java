@@ -92,6 +92,11 @@ public class SortOperator extends MultiStageOperator {
   }
 
   @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  @Override
   public List<MultiStageOperator> getChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }

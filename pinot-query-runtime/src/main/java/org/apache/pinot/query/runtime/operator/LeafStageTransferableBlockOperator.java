@@ -54,6 +54,8 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -70,6 +72,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValu
  * </ul>
  */
 public class LeafStageTransferableBlockOperator extends MultiStageOperator {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
 
   // Use a special results block to indicate that this is the last results block
@@ -99,6 +103,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override
@@ -249,14 +258,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     for (Map.Entry<String, String> entry : stats2.entrySet()) {
       String k2 = entry.getKey();
       String v2 = entry.getValue();
-      stats1.compute(k2, (k1, v1) -> {
-        if (v1 == null) {
-          return v2;
-        }
+      stats1.merge(k2, v2, (val1, val2) -> {
         try {
-          return Long.toString(Long.parseLong(v1) + Long.parseLong(v2));
+          return Long.toString(Long.parseLong(val1) + Long.parseLong(val2));
         } catch (Exception e) {
-          return v1 + "\n" + v2;
+          return val1 + "\n" + val2;
         }
       });
     }

@@ -33,6 +33,8 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,6 +45,8 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  *        resorting via the PriorityQueue.
  */
 public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SortedMailboxReceiveOperator.class);
+
   private static final String EXPLAIN_NAME = "SORTED_MAILBOX_RECEIVE";
 
   private final DataSchema _dataSchema;
@@ -64,6 +68,11 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
     _collationDirections = collationDirections;
     _collationNullDirections = collationNullDirections;
     _isSortOnSender = isSortOnSender;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Nullable

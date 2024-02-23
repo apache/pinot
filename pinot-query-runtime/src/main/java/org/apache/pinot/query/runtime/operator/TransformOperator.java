@@ -30,6 +30,8 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,6 +45,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * and canonicalized function name matching (lower case).
  */
 public class TransformOperator extends MultiStageOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
   private static final String EXPLAIN_NAME = "TRANSFORM";
 
   private final MultiStageOperator _upstreamOperator;
@@ -64,6 +67,11 @@ public class TransformOperator extends MultiStageOperator {
       _transformOperandsList.add(TransformOperandFactory.getTransformOperand(rexExpression, upstreamDataSchema));
     }
     _resultSchema = resultSchema;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override

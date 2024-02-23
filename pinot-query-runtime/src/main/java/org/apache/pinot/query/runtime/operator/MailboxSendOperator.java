@@ -104,6 +104,11 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  @Override
   public List<MultiStageOperator> getChildOperators() {
     return Collections.singletonList(_sourceOperator);
   }

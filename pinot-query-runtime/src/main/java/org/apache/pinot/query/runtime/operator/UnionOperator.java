@@ -24,17 +24,25 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Union operator for UNION ALL queries.
  */
 public class UnionOperator extends SetOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(UnionOperator.class);
   private static final String EXPLAIN_NAME = "UNION";
 
   public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, upstreamOperators, dataSchema);
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Nullable

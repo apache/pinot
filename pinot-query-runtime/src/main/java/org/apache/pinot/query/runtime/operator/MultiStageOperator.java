@@ -28,11 +28,9 @@ import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public abstract class MultiStageOperator implements Operator<TransferableBlock>, AutoCloseable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageOperator.class);
 
   protected final OpChainExecutionContext _context;
   protected final String _operatorId;
@@ -45,6 +43,8 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
     _opChainStats = _context.getStats();
     _isEarlyTerminated = false;
   }
+
+  protected abstract Logger logger();
 
   @Override
   public TransferableBlock nextBlock() {
@@ -106,7 +106,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       try {
         op.close();
       } catch (Exception e) {
-        LOGGER.error("Failed to close operator: " + op + " with exception:" + e);
+        logger().error("Failed to close operator: " + op + " with exception:" + e);
         // Continue processing because even one operator failed to be close, we should still close the rest.
       }
     }
@@ -117,7 +117,7 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
       try {
         op.cancel(e);
       } catch (Exception e2) {
-        LOGGER.error("Failed to cancel operator:" + op + "with error:" + e + " with exception:" + e2);
+        logger().error("Failed to cancel operator:" + op + "with error:" + e + " with exception:" + e2);
         // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
       }
     }

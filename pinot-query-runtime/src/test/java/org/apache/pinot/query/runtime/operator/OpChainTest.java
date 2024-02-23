@@ -56,6 +56,8 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -320,9 +322,15 @@ public class OpChainTest {
   }
 
   static class DummyMultiStageOperator extends MultiStageOperator {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DummyMultiStageOperator.class);
 
     public DummyMultiStageOperator(OpChainExecutionContext context) {
       super(context);
+    }
+
+    @Override
+    protected Logger logger() {
+      return LOGGER;
     }
 
     @Override
@@ -343,6 +351,7 @@ public class OpChainTest {
   }
 
   static class DummyMultiStageCallableOperator extends MultiStageOperator {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DummyMultiStageCallableOperator.class);
     private final MultiStageOperator _upstream;
     private final long _sleepTimeInMillis;
 
@@ -351,6 +360,11 @@ public class OpChainTest {
       super(context);
       _upstream = upstream;
       _sleepTimeInMillis = sleepTimeInMillis;
+    }
+
+    @Override
+    protected Logger logger() {
+      return LOGGER;
     }
 
     @Override
