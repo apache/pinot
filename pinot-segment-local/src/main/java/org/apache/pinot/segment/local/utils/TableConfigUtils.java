@@ -48,6 +48,7 @@ import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexService;
@@ -498,12 +499,10 @@ public final class TableConfigUtils {
         // That code will disable ingestion aggregation if all metrics aren't noDictionaryColumns.
         // But if you do that after the table is already created, all future aggregations will
         // just be the default value.
-        Map<String, FieldIndexConfigs> fieldIndexConfigsMap = FieldIndexConfigsUtil.createIndexConfigsByColName(
-            tableConfig, schema);
-        Set<String> noDictionaryColumns =
-            FieldIndexConfigsUtil.columnsWithIndexDisabled(StandardIndexes.dictionary(), fieldIndexConfigsMap);
+        Map<String, DictionaryIndexConfig> configPerCol = StandardIndexes.dictionary().getConfig(tableConfig, schema);
         aggregationColumns.forEach(column -> {
-          Preconditions.checkState(noDictionaryColumns.contains(column),
+          DictionaryIndexConfig dictConfig = configPerCol.get(column);
+          Preconditions.checkState(dictConfig != null && dictConfig.isDisabled(),
               "Aggregated column: %s must be a no-dictionary column", column);
         });
       }
