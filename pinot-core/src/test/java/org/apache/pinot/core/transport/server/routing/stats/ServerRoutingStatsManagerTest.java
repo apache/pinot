@@ -18,13 +18,18 @@
  */
 package org.apache.pinot.core.transport.server.routing.stats;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -34,20 +39,44 @@ import static org.testng.Assert.assertTrue;
 
 
 public class ServerRoutingStatsManagerTest {
+  private BrokerMetrics _brokerMetrics;
+
+  @BeforeTest
+  public void initBrokerMetrics() {
+    // Set up metric registry and broker metrics
+    PinotConfiguration brokerConfig = new PinotConfiguration();
+    PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(
+        brokerConfig.subset(CommonConstants.Broker.METRICS_CONFIG_PREFIX));
+    _brokerMetrics = new BrokerMetrics(
+        brokerConfig.getProperty(
+            CommonConstants.Broker.CONFIG_OF_METRICS_NAME_PREFIX,
+            CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX),
+        metricsRegistry,
+        brokerConfig.getProperty(
+            CommonConstants.Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS,
+            CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
+        brokerConfig.getProperty(
+            CommonConstants.Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS,
+            Collections.emptyList()));
+    _brokerMetrics.initializeGlobalMeters();
+    BrokerMetrics.register(_brokerMetrics);
+  }
+
   @Test
   public void testInitAndShutDown() {
     Map<String, Object> properties = new HashMap<>();
 
     // Test 1: Test disabled.
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, false);
-    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties));
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
     assertFalse(manager.isEnabled());
     manager.init();
     assertFalse(manager.isEnabled());
 
     // Test 2: Test enabled.
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
-    manager = new ServerRoutingStatsManager(new PinotConfiguration(properties));
+    manager = new ServerRoutingStatsManager(new PinotConfiguration(properties), _brokerMetrics);
     assertFalse(manager.isEnabled());
     manager.init();
     assertTrue(manager.isEnabled());
@@ -64,7 +93,8 @@ public class ServerRoutingStatsManagerTest {
   public void testEmptyStats() {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_ENABLE_STATS_COLLECTION, true);
-    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties));
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
     manager.init();
 
     List<Pair<String, Integer>> numInFlightReqList = manager.fetchNumInFlightRequestsForAllServers();
@@ -94,7 +124,8 @@ public class ServerRoutingStatsManagerTest {
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_WARMUP_DURATION_MS, 0);
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_AVG_INITIALIZATION_VAL, 0.0);
     properties.put(CommonConstants.Broker.AdaptiveServerSelector.CONFIG_OF_HYBRID_SCORE_EXPONENT, 3);
-    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties));
+    ServerRoutingStatsManager manager = new ServerRoutingStatsManager(new PinotConfiguration(properties),
+        _brokerMetrics);
     manager.init();
 
     int requestId = 0;
