@@ -25,9 +25,7 @@ import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.NClob;
 import java.sql.PreparedStatement;
-import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLWarning;
 import java.sql.SQLXML;
 import java.sql.Savepoint;
@@ -43,182 +41,152 @@ public abstract class AbstractBaseConnection implements Connection {
       throws SQLException;
 
   @Override
-  public void abort(Executor executor)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void clearWarnings()
-      throws SQLException {
+  public void abort(Executor executor) {
     // no-op
   }
 
   @Override
-  public void commit()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public void clearWarnings() {
+    // no-op
   }
 
   @Override
-  public Array createArrayOf(String typeName, Object[] elements)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public void commit() {
+    // no-op
   }
 
   @Override
-  public Blob createBlob()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public Array createArrayOf(String typeName, Object[] elements) {
+    return null;
   }
 
   @Override
-  public Clob createClob()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public Blob createBlob() {
+    return null;
   }
 
   @Override
-  public NClob createNClob()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public Clob createClob() {
+    return null;
   }
 
   @Override
-  public SQLXML createSQLXML()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public NClob createNClob() {
+    return null;
   }
 
   @Override
-  public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public SQLXML createSQLXML() {
+    return null;
   }
 
   @Override
-  public Statement createStatement(int resultSetType, int resultSetConcurrency)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) {
+    return null;
   }
 
   @Override
-  public Struct createStruct(String typeName, Object[] attributes)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public Statement createStatement(int resultSetType, int resultSetConcurrency) {
+    return null;
   }
 
   @Override
-  public boolean getAutoCommit()
-      throws SQLException {
+  public Struct createStruct(String typeName, Object[] attributes) {
+    return null;
+  }
+
+  @Override
+  public boolean getAutoCommit() {
     return false;
   }
 
   @Override
-  public void setAutoCommit(boolean autoCommit)
-      throws SQLException {
+  public void setAutoCommit(boolean autoCommit) {
     // no-op
   }
 
   @Override
-  public String getCatalog()
-      throws SQLException {
+  public String getCatalog() {
     return null;
   }
 
   @Override
-  public void setCatalog(String catalog)
-      throws SQLException {
+  public void setCatalog(String catalog) {
     // no-op
   }
 
   @Override
-  public String getClientInfo(String name)
-      throws SQLException {
+  public String getClientInfo(String name) {
     return null;
   }
 
   @Override
-  public Properties getClientInfo()
-      throws SQLException {
+  public Properties getClientInfo() {
     return null;
   }
 
   @Override
-  public void setClientInfo(Properties properties)
-      throws SQLClientInfoException {
+  public void setClientInfo(Properties properties) {
     // no-op
   }
 
   @Override
-  public int getHoldability()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public int getHoldability() {
+    return 0;
   }
 
   @Override
-  public void setHoldability(int holdability)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public int getNetworkTimeout()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public String getSchema()
-      throws SQLException {
-    return null;
-  }
-
-  @Override
-  public void setSchema(String schema)
-      throws SQLException {
+  public void setHoldability(int holdability) {
     // no-op
   }
 
   @Override
-  public int getTransactionIsolation()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public int getNetworkTimeout() {
+    return 0;
   }
 
   @Override
-  public void setTransactionIsolation(int level)
-      throws SQLException {
-    // no-op
-  }
-
-  @Override
-  public Map<String, Class<?>> getTypeMap()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void setTypeMap(Map<String, Class<?>> map)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public SQLWarning getWarnings()
-      throws SQLException {
+  public String getSchema() {
     return null;
   }
 
   @Override
-  public boolean isReadOnly()
-      throws SQLException {
+  public void setSchema(String schema) {
+    // no-op
+  }
+
+  @Override
+  public int getTransactionIsolation() {
+    return Connection.TRANSACTION_NONE;
+  }
+
+  @Override
+  public void setTransactionIsolation(int level) {
+    // no-op
+  }
+
+  @Override
+  public Map<String, Class<?>> getTypeMap() {
+    return null;
+  }
+
+  @Override
+  public void setTypeMap(Map<String, Class<?>> map) {
+    // no-op
+  }
+
+  @Override
+  public SQLWarning getWarnings() {
+    return null;
+  }
+
+  @Override
+  public boolean isReadOnly() {
     return false;
   }
 
   @Override
-  public void setReadOnly(boolean readOnly)
-      throws SQLException {
+  public void setReadOnly(boolean readOnly) {
     // no-op
   }
 
@@ -229,112 +197,94 @@ public abstract class AbstractBaseConnection implements Connection {
   }
 
   @Override
-  public boolean isWrapperFor(Class<?> iface)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public boolean isWrapperFor(Class<?> iface) {
+    return false;
   }
 
   @Override
-  public String nativeSQL(String sql)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public String nativeSQL(String sql) {
+    return null;
   }
 
   @Override
-  public CallableStatement prepareCall(String sql)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public CallableStatement prepareCall(String sql) {
+    return null;
   }
 
   @Override
-  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) {
+    return null;
   }
 
   @Override
   public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency,
-      int resultSetHoldability)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+      int resultSetHoldability) {
+    return null;
   }
 
   @Override
-  public java.sql.PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public java.sql.PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) {
+    return null;
   }
 
   @Override
   public java.sql.PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
-      int resultSetHoldability)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+      int resultSetHoldability) {
+    return null;
   }
 
   @Override
-  public java.sql.PreparedStatement prepareStatement(String sql, int autoGeneratedKeys)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public java.sql.PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) {
+    return null;
   }
 
   @Override
-  public java.sql.PreparedStatement prepareStatement(String sql, int[] columnIndexes)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public java.sql.PreparedStatement prepareStatement(String sql, int[] columnIndexes) {
+    return null;
   }
 
   @Override
-  public PreparedStatement prepareStatement(String sql, String[] columnNames)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public PreparedStatement prepareStatement(String sql, String[] columnNames) {
+    return null;
   }
 
   @Override
-  public void releaseSavepoint(Savepoint savepoint)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void rollback()
-      throws SQLException {
+  public void releaseSavepoint(Savepoint savepoint) {
     // no-op
   }
 
   @Override
-  public void rollback(Savepoint savepoint)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
-  }
-
-  @Override
-  public void setClientInfo(String name, String value)
-      throws SQLClientInfoException {
+  public void rollback() {
     // no-op
   }
 
   @Override
-  public void setNetworkTimeout(Executor executor, int milliseconds)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public void rollback(Savepoint savepoint) {
+    // no-op
   }
 
   @Override
-  public Savepoint setSavepoint()
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public void setClientInfo(String name, String value) {
+    // no-op
   }
 
   @Override
-  public Savepoint setSavepoint(String name)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public void setNetworkTimeout(Executor executor, int milliseconds) {
+    // no-op
   }
 
   @Override
-  public <T> T unwrap(Class<T> iface)
-      throws SQLException {
-    throw new SQLFeatureNotSupportedException();
+  public Savepoint setSavepoint() {
+    return null;
+  }
+
+  @Override
+  public Savepoint setSavepoint(String name) {
+    return null;
+  }
+
+  @Override
+  public <T> T unwrap(Class<T> iface) {
+    return null;
   }
 }
