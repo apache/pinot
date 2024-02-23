@@ -61,7 +61,7 @@ public class StringFunctionsTest {
   }
 
   @Test(dataProvider = "splitPartTestCases")
-  public void testSplitPark(String input, String delimiter, int index, int max, String expectedToken,
+  public void testSplitPart(String input, String delimiter, int index, int max, String expectedToken,
       String expectedTokenWithLimitCounts, String expectedTokenFromEnd) {
     assertEquals(StringFunctions.splitPart(input, delimiter, index), expectedToken);
     assertEquals(StringFunctions.splitPart(input, delimiter, index, max), expectedTokenWithLimitCounts);
