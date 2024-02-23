@@ -517,7 +517,7 @@ public class TableConfigUtilsTest {
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
       Assert.fail("Should fail due to noDictionaryColumns being null");
-    } catch (NullPointerException e) {
+    } catch (IllegalStateException e) {
       // expected
     }
 

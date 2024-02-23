@@ -29,7 +29,6 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -49,8 +48,11 @@ import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -496,9 +498,10 @@ public final class TableConfigUtils {
         // That code will disable ingestion aggregation if all metrics aren't noDictionaryColumns.
         // But if you do that after the table is already created, all future aggregations will
         // just be the default value.
-        List<String> noDictionaryColumns =
-            Objects.requireNonNull(tableConfig.getIndexingConfig().getNoDictionaryColumns(),
-                "noDictionaryColumns must be specified and include all aggregation columns");
+        Map<String, FieldIndexConfigs> fieldIndexConfigsMap = FieldIndexConfigsUtil.createIndexConfigsByColName(
+            tableConfig, schema);
+        Set<String> noDictionaryColumns =
+            FieldIndexConfigsUtil.columnsWithIndexDisabled(StandardIndexes.dictionary(), fieldIndexConfigsMap);
         aggregationColumns.forEach(column -> {
           Preconditions.checkState(noDictionaryColumns.contains(column),
               "Aggregated column: %s must be a no-dictionary column", column);
