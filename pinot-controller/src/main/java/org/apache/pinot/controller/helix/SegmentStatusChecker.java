@@ -125,7 +125,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
       // Remove the metric for this table
-      resetTableMetrics(tableNameWithType);
+      removeMetricsForTable(tableNameWithType);
     }
     context._processedTables.add(tableNameWithType);
   }
@@ -189,7 +189,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
     if (idealState == null) {
       LOGGER.warn("Table {} has null ideal state. Skipping segment status checks", tableNameWithType);
-      resetTableMetrics(tableNameWithType);
+      removeMetricsForTable(tableNameWithType);
       return;
     }
 
@@ -197,7 +197,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       if (context._logDisabledTables) {
         LOGGER.warn("Table {} is disabled. Skipping segment status checks", tableNameWithType);
       }
-      resetTableMetrics(tableNameWithType);
+      removeMetricsForTable(tableNameWithType);
       context._disabledTables.add(tableNameWithType);
       return;
     }
@@ -379,15 +379,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
 
     for (String tableName : allTableNames) {
-      resetTableMetrics(tableName);
-    }
-  }
-
-  private void resetTableMetrics(String tableName) {
-    for (ControllerGauge gauge : ControllerGauge.values()) {
-      if (gauge.getDefaultValueOnReset() != null) {
-        _controllerMetrics.setValueOfTableGauge(tableName, gauge, gauge.getDefaultValueOnReset());
-      }
+      removeMetricsForTable(tableName);
     }
   }
 
