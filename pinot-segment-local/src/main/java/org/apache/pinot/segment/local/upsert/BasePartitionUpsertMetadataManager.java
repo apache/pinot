@@ -27,9 +27,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -46,6 +48,7 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -510,13 +513,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing untracked (replaced or empty) segment: {}", segmentName);
       return;
     }
-    // Skip removing segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
+    // Skip removing the upsert metadata of segment that has max comparison value smaller than
+    // (largestSeenComparisonValue - TTL), i.e. out of metadata TTL. The expired metadata is removed while creating
+    // new consuming segment in batches.
+    boolean skipRemoveMetadata = false;
     if (_metadataTTL > 0 && _largestSeenComparisonValue.get() > 0) {
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
       if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL) {
         _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
-        return;
+        skipRemoveMetadata = true;
       }
     }
     if (!startOperation()) {
@@ -527,7 +533,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _snapshotLock.readLock().lock();
     }
     try {
-      doRemoveSegment(segment);
+      if (!skipRemoveMetadata) {
+        doRemoveSegment(segment);
+      }
       _trackedSegments.remove(segment);
     } finally {
       if (_enableSnapshot) {
@@ -601,6 +609,46 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
+  /**
+   * When we have to process a new segment, if there are comparison value ties for the same primary-key within the
+   * segment, then for Partial Upsert tables we need to make sure that the record location map is updated only
+   * for the latest version of the record. This is specifically a concern for Partial Upsert tables because Realtime
+   * consumption can potentially end up reading the wrong version of a record, which will lead to permanent
+   * data-inconsistency.
+   *
+   * <p>
+   *  This function returns an iterator that will de-dup records with the same primary-key. Moreover, for comparison
+   *  ties, it will only keep the latest record. This iterator can then further be used to update the primary-key
+   *  record location map safely.
+   * </p>
+   *
+   * @param recordInfoIterator iterator over the new segment
+   * @param hashFunction       hash function configured for Upsert's primary keys
+   * @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
+   *         return the latest record.
+   */
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  protected static Iterator<RecordInfo> resolveComparisonTies(
+      Iterator<RecordInfo> recordInfoIterator, HashFunction hashFunction) {
+    Map<Object, RecordInfo> deDuplicatedRecordInfo = new HashMap<>();
+    while (recordInfoIterator.hasNext()) {
+      RecordInfo recordInfo = recordInfoIterator.next();
+      Comparable newComparisonValue = recordInfo.getComparisonValue();
+      deDuplicatedRecordInfo.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), hashFunction),
+          (key, maxComparisonValueRecordInfo) -> {
+            if (maxComparisonValueRecordInfo == null) {
+              return recordInfo;
+            }
+            int comparisonResult = newComparisonValue.compareTo(maxComparisonValueRecordInfo.getComparisonValue());
+            if (comparisonResult >= 0) {
+              return recordInfo;
+            }
+            return maxComparisonValueRecordInfo;
+          });
+    }
+    return deDuplicatedRecordInfo.values().iterator();
+  }
+
   @Override
   public void takeSnapshot() {
     if (!_enableSnapshot) {
@@ -616,7 +664,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     _snapshotLock.writeLock().lock();
     try {
+      long startTime = System.currentTimeMillis();
       doTakeSnapshot();
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_TIME_MS, duration,
+          TimeUnit.MILLISECONDS);
     } finally {
       _snapshotLock.writeLock().unlock();
       finishOperation();
@@ -631,6 +683,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     long startTimeMs = System.currentTimeMillis();
 
     int numImmutableSegments = 0;
+    int numConsumingSegments = 0;
     // The segments without validDocIds snapshots should take their snapshots at last. So that when there is failure
     // to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of valid docs across
     // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
@@ -638,6 +691,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     for (IndexSegment segment : _trackedSegments) {
       if (!(segment instanceof ImmutableSegmentImpl)) {
+        numConsumingSegments++;
         continue;
       }
       ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
@@ -659,9 +713,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
-    _logger.info(
-        "Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments) in {}ms",
-        numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments, System.currentTimeMillis() - startTimeMs);
+    _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
+            + "{} are consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
+        numConsumingSegments, System.currentTimeMillis() - startTimeMs);
   }
 
   /**

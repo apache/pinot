@@ -19,27 +19,23 @@
 
 -->
 
-## Publish helm repo
+# Pinot Controller UI
+This package contains code for Pinot Controller UI.
 
-- Update Helm Verison:
+## How to setup Pinot UI for development 
 
-Update `Chart.yaml` file for fields: `appVersion` and `version`.
-
-- Package Helm Charts
-
-Run below command to package Pinot Chart.
+1. Make sure pinot backend is running on port 9000. Follow [this guide](https://github.com/apache/pinot?tab=readme-ov-file#building-pinot) for the same.
+2. Navigate to ui source code folder 
+```shell
+cd pinot-controller/src/main/resources
 ```
-helm package pinot
+3. Install Required Packages. Make sure you are using node v14 or more specifially v14.18.1
+```shell
+npm install 
 ```
-This step will generate a `pinot-${version}.tgz` file.
-
-- Index all the packages:
-
+4. Start the Development Server
+```shell
+npm run dev
 ```
-helm repo index .
-```
-This step will generate an `index.yaml` file which contains all the Charts information.
 
-Update generated `index.yaml` accordingly:
-- Revert the changes for all previous Charts;
-- Change `entries.pinot.source` to `https://github.com/apache/pinot/tree/master/helm`.
+5. App should be running on [http://localhost:8080](http://localhost:8080)

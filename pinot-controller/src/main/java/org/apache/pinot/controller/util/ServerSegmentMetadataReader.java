@@ -239,43 +239,54 @@ public class ServerSegmentMetadataReader {
           serverToEndpoints.get(serverToSegments.getKey())));
     }
 
+    BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();
+
     // request the urls from the servers
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverToEndpoints);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
 
     Map<String, String> requestHeaders = Map.of("Content-Type", "application/json");
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiPostRequest(serverURLsAndBodies, tableNameWithType, false, requestHeaders,
             timeoutMs, null);
 
-    List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfos = new ArrayList<>();
+    Map<String, ValidDocIdsMetadataInfo> validDocIdsMetadataInfos = new HashMap<>();
     int failedParses = 0;
-    int returnedSegmentsCount = 0;
+    int returnedServersCount = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         String validDocIdsMetadataList = streamResponse.getValue();
-        List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfo =
+        List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfoList =
             JsonUtils.stringToObject(validDocIdsMetadataList, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
             });
-        validDocIdsMetadataInfos.addAll(validDocIdsMetadataInfo);
-        returnedSegmentsCount++;
+        for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo: validDocIdsMetadataInfoList) {
+          validDocIdsMetadataInfos.put(validDocIdsMetadataInfo.getSegmentName(), validDocIdsMetadataInfo);
+        }
+        returnedServersCount++;
       } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
     }
+
     if (failedParses != 0) {
       LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses,
           serverURLsAndBodies.size());
     }
 
-    if (segmentNames != null && returnedSegmentsCount != segmentNames.size()) {
-      LOGGER.error("Unable to get validDocIdsMetadata from all servers. Expected: {}, Actual: {}", segmentNames.size(),
-          returnedSegmentsCount);
+    if (returnedServersCount != serverURLsAndBodies.size()) {
+      LOGGER.error("Unable to get validDocIdsMetadata from all servers. Expected: {}, Actual: {}",
+          serverURLsAndBodies.size(), returnedServersCount);
     }
-    LOGGER.info("Retrieved valid doc id metadata for {} segments from {} servers.", returnedSegmentsCount,
-        serverURLsAndBodies.size());
-    return validDocIdsMetadataInfos;
+
+    if (segmentNames != null && !segmentNames.isEmpty() && segmentNames.size() != validDocIdsMetadataInfos.size()) {
+      LOGGER.error("Unable to get validDocIdsMetadata for all segments. Expected: {}, Actual: {}",
+          segmentNames.size(), validDocIdsMetadataInfos.size());
+    }
+
+    LOGGER.info("Retrieved validDocIds metadata for {} segments from {} servers.", validDocIdsMetadataInfos.size(),
+        returnedServersCount);
+    return new ArrayList<>(validDocIdsMetadataInfos.values());
   }
 
   /**

@@ -22,6 +22,7 @@ package org.apache.pinot.segment.local.segment.index.forward;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
@@ -42,15 +43,40 @@ import static org.testng.Assert.assertSame;
 
 public class ForwardIndexTypeTest {
 
-  @DataProvider(name = "allChunkCompressionType")
-  public static Object[][] allChunkCompressionType() {
-    return new String[][] {
-        new String[] {"PASS_THROUGH"},
-        new String[] {"SNAPPY"},
-        new String[] {"ZSTANDARD"},
-        new String[] {"LZ4"},
-        new String[] {null}
+  @DataProvider(name = "allCompressionCodec")
+  public static Object[][] allCompressionCodec() {
+    return new Object[][] {
+        new Object[] {"PASS_THROUGH", ChunkCompressionType.PASS_THROUGH, null},
+        new Object[] {"SNAPPY", ChunkCompressionType.SNAPPY, null},
+        new Object[] {"ZSTANDARD", ChunkCompressionType.ZSTANDARD, null},
+        new Object[] {"LZ4", ChunkCompressionType.LZ4, null},
+        new Object[] {"MV_ENTRY_DICT", null, DictIdCompressionType.MV_ENTRY_DICT},
+        new Object[] {null, null, null}
     };
+  }
+
+  @DataProvider(name = "allChunkCompression")
+  public static Object[][] allChuckCompression() {
+    return Arrays.stream(allCompressionCodec())
+        .filter(values -> {
+          Object compression = values[0];
+          FieldConfig.CompressionCodec compressionCodec = compression == null ? null
+              : FieldConfig.CompressionCodec.valueOf(compression.toString());
+          return compressionCodec == null || compressionCodec.isApplicableToRawIndex();
+        })
+        .toArray(Object[][]::new);
+  }
+
+  @DataProvider(name = "allDictCompression")
+  public static Object[][] allDictCompression() {
+    return Arrays.stream(allCompressionCodec())
+        .filter(values -> {
+          Object compression = values[0];
+          FieldConfig.CompressionCodec compressionCodec = compression == null ? null
+              : FieldConfig.CompressionCodec.valueOf(compression.toString());
+          return compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex();
+        })
+        .toArray(Object[][]::new);
   }
 
   public static class ConfTest extends AbstractSerdeIndexContract {
@@ -189,8 +215,9 @@ public class ForwardIndexTypeTest {
       assertEquals(ForwardIndexConfig.DEFAULT);
     }
 
-    @Test(dataProvider = "allChunkCompressionType", dataProviderClass = ForwardIndexTypeTest.class)
-    public void oldConfEnableRawWithCompression(String compression)
+    @Test(dataProvider = "allCompressionCodec", dataProviderClass = ForwardIndexTypeTest.class)
+    public void oldConfEnableRawWithCompression(String compression,
+        ChunkCompressionType expectedChunkCompression, DictIdCompressionType expectedDictCompression)
         throws IOException {
       String valueJson = compression == null ? "null" : "\"" + compression + "\"";
 
@@ -204,7 +231,9 @@ public class ForwardIndexTypeTest {
 
       assertEquals(
             new ForwardIndexConfig.Builder()
-                .withCompressionType(compression == null ? null : ChunkCompressionType.valueOf(compression))
+                .withCompressionCodec(compression == null ? null : FieldConfig.CompressionCodec.valueOf(compression))
+                .withCompressionType(expectedChunkCompression)
+                .withDictIdCompressionType(expectedDictCompression)
                 .withDeriveNumDocsPerChunk(false)
                 .withRawIndexWriterVersion(ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION)
                 .build()
@@ -296,8 +325,9 @@ public class ForwardIndexTypeTest {
           new ForwardIndexConfig.Builder().withDictIdCompressionType(DictIdCompressionType.MV_ENTRY_DICT).build());
     }
 
-    @Test(dataProvider = "allChunkCompressionType", dataProviderClass = ForwardIndexTypeTest.class)
-    public void newConfigEnabled(String compression)
+    @Test(dataProvider = "allChunkCompression", dataProviderClass = ForwardIndexTypeTest.class)
+    public void newConfigEnabledWithChunkCompression(String compression,
+        ChunkCompressionType expectedChunkCompression, DictIdCompressionType expectedDictCompression)
         throws IOException {
       String valueJson = compression == null ? "null" : "\"" + compression + "\"";
       addFieldIndexConfig(""
@@ -315,7 +345,67 @@ public class ForwardIndexTypeTest {
 
       assertEquals(
           new ForwardIndexConfig.Builder()
-              .withCompressionType(compression == null ? null : ChunkCompressionType.valueOf(compression))
+              .withCompressionType(expectedChunkCompression)
+              .withDictIdCompressionType(expectedDictCompression)
+              .withDeriveNumDocsPerChunk(true)
+              .withRawIndexWriterVersion(10)
+              .build()
+      );
+    }
+
+    @Test(dataProvider = "allDictCompression", dataProviderClass = ForwardIndexTypeTest.class)
+    public void newConfigEnabledWithDictCompression(String compression,
+        ChunkCompressionType expectedChunkCompression, DictIdCompressionType expectedDictCompression)
+        throws IOException {
+      String valueJson = compression == null ? "null" : "\"" + compression + "\"";
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"indexes\" : {"
+          + "      \"forward\": {"
+          + "        \"dictIdCompressionType\": " + valueJson + ",\n"
+          + "        \"deriveNumDocsPerChunk\": true,\n"
+          + "        \"rawIndexWriterVersion\": 10\n"
+          + "      }"
+          + "    }\n"
+          + " }"
+      );
+
+      assertEquals(
+          new ForwardIndexConfig.Builder()
+              .withCompressionCodec(compression == null ? null : FieldConfig.CompressionCodec.valueOf(compression))
+              .withCompressionType(expectedChunkCompression)
+              .withDictIdCompressionType(expectedDictCompression)
+              .withDeriveNumDocsPerChunk(true)
+              .withRawIndexWriterVersion(10)
+              .build()
+      );
+    }
+    @Test(dataProvider = "allCompressionCodec", dataProviderClass = ForwardIndexTypeTest.class)
+    public void newConfigEnabledWithCompressionCodec(String compression,
+        ChunkCompressionType expectedChunkCompression, DictIdCompressionType expectedDictCompression)
+        throws IOException {
+      FieldConfig.CompressionCodec compressionCodec = compression == null ? null
+          : FieldConfig.CompressionCodec.valueOf(compression);
+
+      String valueJson = compression == null ? "null" : "\"" + compression + "\"";
+      addFieldIndexConfig(""
+          + " {\n"
+          + "    \"name\": \"dimInt\","
+          + "    \"indexes\" : {"
+          + "      \"forward\": {"
+          + "        \"compressionCodec\": " + valueJson + ",\n"
+          + "        \"deriveNumDocsPerChunk\": true,\n"
+          + "        \"rawIndexWriterVersion\": 10\n"
+          + "      }"
+          + "    }\n"
+          + " }"
+      );
+
+      assertEquals(
+          new ForwardIndexConfig.Builder()
+              .withCompressionType(expectedChunkCompression)
+              .withDictIdCompressionType(expectedDictCompression)
               .withDeriveNumDocsPerChunk(true)
               .withRawIndexWriterVersion(10)
               .build()
