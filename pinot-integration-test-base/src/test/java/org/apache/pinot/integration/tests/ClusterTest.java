@@ -176,7 +176,11 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerPorts = new ArrayList<>();
     for (int i = 0; i < numBrokers; i++) {
       BaseBrokerStarter brokerStarter = startOneBroker(i);
-      assertEquals(brokerStarter.getConfig().getProperty(CommonConstants.CONFIG_OF_TIMEZONE, ""), CommonConstants.DEFAULT_TIMEZONE);
+      assertEquals(
+          brokerStarter.getConfig().getProperty(
+              CommonConstants.CONFIG_OF_TIMEZONE, ""),
+          CommonConstants.DEFAULT_TIMEZONE
+      );
       assertEquals(System.getProperty("user.timezone"), CommonConstants.DEFAULT_TIMEZONE);
 
       _brokerStarters.add(brokerStarter);
