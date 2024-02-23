@@ -43,11 +43,6 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   NETTY_POOLED_ARENAS_HEAP("arenas", true),
 
   /**
-   * The queue size of ServerRoutingStatsManager main executor service.
-   */
-  ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true),
-
-  /**
    * The size of the small cache.
    * See {@link PooledByteBufAllocatorMetric#smallCacheSize()}
    */
@@ -61,7 +56,12 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
    * The cache size used by the allocator for normal arenas
    */
   NETTY_POOLED_THREADLOCALCACHE("bytes", true),
-  NETTY_POOLED_CHUNK_SIZE("bytes", true);
+  NETTY_POOLED_CHUNK_SIZE("bytes", true),
+
+  /**
+   * The queue size of ServerRoutingStatsManager main executor service.
+   */
+  ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true);
 
   private final String _brokerGaugeName;
   private final String _unit;

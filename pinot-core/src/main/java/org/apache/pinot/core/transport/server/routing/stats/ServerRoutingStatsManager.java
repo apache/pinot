@@ -395,9 +395,6 @@ public class ServerRoutingStatsManager {
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ROUTING_STATS_MANAGER_QUEUE_SIZE, queueSize);
     if (queueSize > _executorQueueSizeWarnThreshold) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.ROUTING_STATS_MANAGER_Q_LIMIT_REACHED, 1L);
-      LOGGER.warn(String.format("Stats Manager queue size exceeds warn threshold = %d. "
-              + "Current queue size = %d, completed task count = %d.",
-          _executorQueueSizeWarnThreshold, queueSize, getCompletedTaskCount()));
     }
   }
 }
