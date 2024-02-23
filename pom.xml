@@ -1280,12 +1280,6 @@
         <artifactId>ipaddress</artifactId>
         <version>5.3.4</version>
       </dependency>
-      <dependency>
-        <groupId>com.mercateo</groupId>
-        <artifactId>test-clock</artifactId>
-        <version>1.0.4</version>
-        <scope>test</scope>
-      </dependency>
 
       <dependency>
         <groupId>net.openhft</groupId>
