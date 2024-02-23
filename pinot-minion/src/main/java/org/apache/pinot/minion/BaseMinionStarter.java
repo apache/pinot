@@ -90,6 +90,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   protected MinionAdminApiApplication _minionAdminApplication;
   protected List<ListenerConfig> _listenerConfigs;
   protected ExecutorService _executorService;
+  protected String _timezone;
 
   @Override
   public void init(PinotConfiguration config)
@@ -295,6 +296,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     });
 
     LOGGER.info("Pinot minion started");
+    _timezone = System.getProperty("user.timezone");
   }
 
   private void updateInstanceConfigIfNeeded() {
@@ -335,5 +337,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       LOGGER.warn("Failed to clean up Minion data directory: {}", MinionContext.getInstance().getDataDir(), e);
     }
     LOGGER.info("Pinot minion stopped");
+  }
+
+  public String getTimezone() {
+    return _timezone;
   }
 }

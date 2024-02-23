@@ -65,12 +65,12 @@ public class ServiceStartableUtils {
         .build();
     zkClient.waitUntilConnected(zkClientConnectionTimeoutMs, TimeUnit.MILLISECONDS);
 
-    setupTimezone(instanceConfig);
     try {
       ZNRecord clusterConfigZNRecord =
           zkClient.readData(String.format(CLUSTER_CONFIG_ZK_PATH_TEMPLATE, clusterName, clusterName), true);
       if (clusterConfigZNRecord == null) {
         LOGGER.warn("Failed to find cluster config for cluster: {}, skipping applying cluster config", clusterName);
+        setupTimezone(instanceConfig);
         return;
       }
 
@@ -92,6 +92,7 @@ public class ServiceStartableUtils {
     } finally {
       zkClient.close();
     }
+    setupTimezone(instanceConfig);
   }
 
   private static void addConfigIfNotExists(PinotConfiguration instanceConfig, String key, String value) {

@@ -75,6 +75,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -220,6 +221,7 @@ public class ControllerTest {
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
     // Enable groovy on the controller
     properties.put(ControllerConf.DISABLE_GROOVY, false);
+    properties.put(CommonConstants.CONFIG_OF_TIMEZONE, CommonConstants.DEFAULT_TIMEZONE);
     overrideControllerConf(properties);
     return properties;
   }
@@ -287,6 +289,8 @@ public class ControllerTest {
     configAccessor.set(scope, Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
     // Set hyperloglog log2m value to 12.
     configAccessor.set(scope, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
+    assertEquals(_controllerConfig.getProperty(CommonConstants.CONFIG_OF_TIMEZONE, ""), CommonConstants.DEFAULT_TIMEZONE);
+    assertEquals(_controllerStarter.getTimezone(), CommonConstants.DEFAULT_TIMEZONE);
   }
 
   public void stopController() {
@@ -1024,7 +1028,7 @@ public class ControllerTest {
   public void setupSharedStateAndValidate()
       throws Exception {
     if (_zookeeperInstance == null || _helixResourceManager == null) {
-      // this is expected to happen only when running a single test case outside of testNG group, i.e when test
+      // this is expected to happen only when running a single test case outside testNG group, i.e. when test
       // cases are run one at a time within IntelliJ or through maven command line. When running under a testNG
       // group, state will have already been setup by @BeforeGroups method in ControllerTestSetup.
       startSharedTestSetup();
