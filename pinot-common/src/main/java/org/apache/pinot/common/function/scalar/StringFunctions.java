@@ -588,7 +588,7 @@ public class StringFunctions {
    * @return generate an array of prefix strings of the string that are shorter than the specified length.
    */
   @ScalarFunction
-  public static String[] prefixes(String input, int maxlength) {
+  public static String[] uniquePrefixes(String input, int maxlength) {
     ObjectSet<String> prefixSet = new ObjectLinkedOpenHashSet<>();
     for (int prefixLength = 1; prefixLength <= maxlength && prefixLength <= input.length(); prefixLength++) {
       prefixSet.add(input.substring(0, prefixLength));
@@ -599,17 +599,17 @@ public class StringFunctions {
   /**
    * @param input an input string for prefix strings generations.
    * @param maxlength the max length of the prefix strings for the string.
-   * @param regexChar the character for regex matching to be added to prefix strings generated. e.g. '^'
+   * @param prefix the prefix to be prepended to prefix strings generated. e.g. '^' for regex matching
    * @return generate an array of prefix matchers of the string that are shorter than the specified length.
    */
   @ScalarFunction
-  public static String[] prefixMatchers(String input, int maxlength, String regexChar) {
-    if (regexChar == null) {
-      return prefixes(input, maxlength);
+  public static String[] uniquePrefixesWithPrefix(String input, int maxlength, String prefix) {
+    if (prefix == null) {
+      return uniquePrefixes(input, maxlength);
     }
     ObjectSet<String> prefixSet = new ObjectLinkedOpenHashSet<>();
     for (int prefixLength = 1; prefixLength <= maxlength && prefixLength <= input.length(); prefixLength++) {
-      prefixSet.add(regexChar + input.substring(0, prefixLength));
+      prefixSet.add(prefix + input.substring(0, prefixLength));
     }
     return prefixSet.toArray(new String[0]);
   }
@@ -620,7 +620,7 @@ public class StringFunctions {
    * @return generate an array of suffix strings of the string that are shorter than the specified length.
    */
   @ScalarFunction
-  public static String[] suffixes(String input, int maxlength) {
+  public static String[] uniqueSuffixes(String input, int maxlength) {
     ObjectSet<String> suffixSet = new ObjectLinkedOpenHashSet<>();
     for (int suffixLength = 1; suffixLength <= maxlength && suffixLength <= input.length(); suffixLength++) {
       suffixSet.add(input.substring(input.length() - suffixLength));
@@ -631,17 +631,17 @@ public class StringFunctions {
   /**
    * @param input an input string for suffix strings generations.
    * @param maxlength the max length of the suffix strings for the string.
-   * @param regexChar the character for regex matching to be added to suffix strings generated. e.g. '$'
+   * @param suffix the suffix string to be appended for suffix strings generated. e.g. '$' for regex matching.
    * @return generate an array of suffix matchers of the string that are shorter than the specified length.
    */
   @ScalarFunction
-  public static String[] suffixMatchers(String input, int maxlength, String regexChar) {
-    if (regexChar == null) {
-      return suffixes(input, maxlength);
+  public static String[] uniqueSuffixesWithSuffix(String input, int maxlength, String suffix) {
+    if (suffix == null) {
+      return uniqueSuffixes(input, maxlength);
     }
     ObjectSet<String> suffixSet = new ObjectLinkedOpenHashSet<>();
     for (int suffixLength = 1; suffixLength <= maxlength && suffixLength <= input.length(); suffixLength++) {
-      suffixSet.add(input.substring(input.length() - suffixLength) + regexChar);
+      suffixSet.add(input.substring(input.length() - suffixLength) + suffix);
     }
     return suffixSet.toArray(new String[0]);
   }
@@ -652,7 +652,7 @@ public class StringFunctions {
    * @return generate an array of ngram of the string that length are exactly matching the specified length.
    */
   @ScalarFunction
-  public static String[] ngrams(String input, int length) {
+  public static String[] uniqueNgrams(String input, int length) {
     if (length == 0 || length > input.length()) {
       return new String[0];
     }
@@ -670,7 +670,7 @@ public class StringFunctions {
    * @return generate an array of ngram of the string that length are within the specified range [minGram, maxGram].
    */
   @ScalarFunction
-  public static String[] ngrams(String input, int minGram, int maxGram) {
+  public static String[] uniqueNgrams(String input, int minGram, int maxGram) {
     ObjectSet<String> ngramSet = new ObjectLinkedOpenHashSet<>();
     for (int n = minGram; n <= maxGram && n <= input.length(); n++) {
       if (n == 0) {

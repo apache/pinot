@@ -120,15 +120,15 @@ public class StringFunctionsTest {
   @Test(dataProvider = "prefixAndSuffixTestCases")
   public void testPrefixAndSuffix(String input, int length, String[] expectedPrefix, String[] expectedSuffix,
       String[] expectedPrefixWithRegexChar, String[] expectedSuffixWithRegexChar) {
-    assertEquals(StringFunctions.prefixes(input, length), expectedPrefix);
-    assertEquals(StringFunctions.suffixes(input, length), expectedSuffix);
-    assertEquals(StringFunctions.prefixMatchers(input, length, "^"), expectedPrefixWithRegexChar);
-    assertEquals(StringFunctions.suffixMatchers(input, length, "$"), expectedSuffixWithRegexChar);
+    assertEquals(StringFunctions.uniquePrefixes(input, length), expectedPrefix);
+    assertEquals(StringFunctions.uniqueSuffixes(input, length), expectedSuffix);
+    assertEquals(StringFunctions.uniquePrefixesWithPrefix(input, length, "^"), expectedPrefixWithRegexChar);
+    assertEquals(StringFunctions.uniqueSuffixesWithSuffix(input, length, "$"), expectedSuffixWithRegexChar);
   }
 
   @Test(dataProvider = "ngramTestCases")
   public void testNGram(String input, int minGram, int maxGram, String[] expectedExactNGram, String[] expectedNGram) {
-    assertEquals(StringFunctions.ngrams(input, maxGram), expectedExactNGram);
-    assertEquals(StringFunctions.ngrams(input, minGram, maxGram), expectedNGram);
+    assertEquals(StringFunctions.uniqueNgrams(input, maxGram), expectedExactNGram);
+    assertEquals(StringFunctions.uniqueNgrams(input, minGram, maxGram), expectedNGram);
   }
 }
