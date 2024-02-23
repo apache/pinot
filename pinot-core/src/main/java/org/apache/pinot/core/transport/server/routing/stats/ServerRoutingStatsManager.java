@@ -31,7 +31,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.BrokerGauge;
-import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector;
@@ -58,9 +57,6 @@ public class ServerRoutingStatsManager {
 
   // ScheduledExecutorServer for processing periodic tasks like decay.
   private ScheduledExecutorService _periodicTaskExecutor;
-
-  // Warn threshold for Main executor service queue size
-  private int _executorQueueSizeWarnThreshold;
 
   private double _alpha;
   private long _autoDecayWindowMs;
@@ -97,10 +93,6 @@ public class ServerRoutingStatsManager {
     int threadPoolSize = _config.getProperty(AdaptiveServerSelector.CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE,
         AdaptiveServerSelector.DEFAULT_STATS_MANAGER_THREADPOOL_SIZE);
     _executorService = Executors.newFixedThreadPool(threadPoolSize);
-
-    _executorQueueSizeWarnThreshold = _config.getProperty(
-        AdaptiveServerSelector.CONFIG_OF_STATS_MANAGER_QUEUE_SIZE_WARN_THRESHOLD,
-        AdaptiveServerSelector.DEFAULT_STATS_MANAGER_QUEUE_SIZE_WARN_THRESHOLD);
 
     _periodicTaskExecutor = Executors.newSingleThreadScheduledExecutor();
 
@@ -393,8 +385,5 @@ public class ServerRoutingStatsManager {
   private void recordQueueSizeMetrics() {
     int queueSize = getQueueSize();
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ROUTING_STATS_MANAGER_QUEUE_SIZE, queueSize);
-    if (queueSize > _executorQueueSizeWarnThreshold) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.ROUTING_STATS_MANAGER_Q_LIMIT_REACHED, 1L);
-    }
   }
 }

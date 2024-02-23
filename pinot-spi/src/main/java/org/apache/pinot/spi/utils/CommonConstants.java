@@ -511,12 +511,6 @@ public class CommonConstants {
       public static final String CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE =
           CONFIG_PREFIX + ".stats.manager.threadpool.size";
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
-
-      // Determine the warn threshold of ServerRoutingStatsManager executor service queue size.
-      // Alert when it's above the warn threshold.
-      public static final String CONFIG_OF_STATS_MANAGER_QUEUE_SIZE_WARN_THRESHOLD =
-          CONFIG_PREFIX + ".stats.manager.queue.size.warn.threshold";
-      public static final int DEFAULT_STATS_MANAGER_QUEUE_SIZE_WARN_THRESHOLD = 1000;
     }
   }
 
