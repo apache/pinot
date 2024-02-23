@@ -95,8 +95,11 @@ public class BasePartitionUpsertMetadataManagerTest {
     Map<String, SegmentZKMetadata> segmentMetadataMap = new HashMap<>();
     Set<String> preloadedSegments = new HashSet<>();
     AtomicBoolean wasPreloading = new AtomicBoolean(false);
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    when(upsertContext.isPreloadEnabled()).thenReturn(true);
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
-        new DummyPartitionUpsertMetadataManager(realtimeTableName, 0, mock(UpsertContext.class)) {
+        new DummyPartitionUpsertMetadataManager(realtimeTableName, 0, upsertContext) {
 
           @Override
           Map<String, Map<String, String>> getSegmentAssignment(HelixManager helixManager) {
@@ -177,7 +180,8 @@ public class BasePartitionUpsertMetadataManagerTest {
 
     ExecutorService segmentPreloadExecutor = Executors.newFixedThreadPool(1);
     try {
-      assertFalse(upsertMetadataManager.isPreloading());
+      // If preloading is enabled, the _isPreloading flag is true initially, until preloading is done.
+      assertTrue(upsertMetadataManager.isPreloading());
       upsertMetadataManager.preloadSegments(tableDataManager, indexLoadingConfig, helixManager, segmentPreloadExecutor);
       assertEquals(preloadedSegments.size(), 1);
       assertTrue(preloadedSegments.contains(seg02Name));
@@ -243,8 +247,7 @@ public class BasePartitionUpsertMetadataManagerTest {
     int numRecords = primaryKeys.length;
     List<RecordInfo> recordInfoList = new ArrayList<>();
     for (int docId = 0; docId < numRecords; docId++) {
-      recordInfoList.add(new RecordInfo(
-          makePrimaryKey(primaryKeys[docId]), docId, timestamps[docId], false));
+      recordInfoList.add(new RecordInfo(makePrimaryKey(primaryKeys[docId]), docId, timestamps[docId], false));
     }
     // Resolve comparison ties
     Iterator<RecordInfo> deDuplicatedRecords =
