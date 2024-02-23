@@ -48,8 +48,10 @@ import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -490,6 +492,17 @@ public final class TableConfigUtils {
           Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
               "all metric columns must be aggregated");
         }
+
+        // This is required by MutableSegmentImpl.enableMetricsAggregationIfPossible().
+        // That code will disable ingestion aggregation if all metrics aren't noDictionaryColumns.
+        // But if you do that after the table is already created, all future aggregations will
+        // just be the default value.
+        Map<String, DictionaryIndexConfig> configPerCol = StandardIndexes.dictionary().getConfig(tableConfig, schema);
+        aggregationColumns.forEach(column -> {
+          DictionaryIndexConfig dictConfig = configPerCol.get(column);
+          Preconditions.checkState(dictConfig != null && dictConfig.isDisabled(),
+              "Aggregated column: %s must be a no-dictionary column", column);
+        });
       }
 
       // Transform configs
