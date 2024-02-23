@@ -23,9 +23,13 @@ import java.util.Optional;
 import javax.net.ssl.SSLContext;
 import nl.altindag.ssl.SSLFactory;
 import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class JvmDefaultSslContext {
+  private static final Logger LOGGER = LoggerFactory.getLogger(JvmDefaultSslContext.class);
+
   private static final String JVM_KEY_STORE = "javax.net.ssl.keyStore";
   private static final String JVM_KEY_STORE_TYPE = "javax.net.ssl.keyStoreType";
   private static final String JVM_KEY_STORE_PASSWORD = "javax.net.ssl.keyStorePassword";
@@ -49,7 +53,9 @@ public class JvmDefaultSslContext {
    *  "https.cipherSuites" system properties.
    */
   public static synchronized void initDefaultSslContext() {
+    LOGGER.info("Trying to initialize jvm default SSL context");
     if (_initialized) {
+      LOGGER.info("Jvm default SSL context has already been initialized");
       return;
     }
 
@@ -97,5 +103,6 @@ public class JvmDefaultSslContext {
           jvmKeystorePassword, jvmTrustStoreType, jvmTrustStorePath, jvmTrustStorePassword, null, null, false);
     }
     _initialized = true;
+    LOGGER.info("Successfully initialized mvm default SSL context");
   }
 }
