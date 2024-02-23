@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi.creator;
 
 import java.io.File;
 import java.io.Serializable;
-import org.apache.pinot.spi.data.IngestionSchemaValidator;
 
 
 /**
@@ -62,6 +61,4 @@ public interface SegmentIndexCreationDriver extends Serializable {
    * Returns the path of the output directory
    */
   File getOutputDirectory();
-
-  IngestionSchemaValidator getIngestionSchemaValidator();
 }

@@ -48,7 +48,6 @@ import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.IngestionSchemaValidator;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -106,11 +105,6 @@ public class QueryExecutorExceptionsTest {
       SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       driver.init(config);
       driver.build();
-      IngestionSchemaValidator ingestionSchemaValidator = driver.getIngestionSchemaValidator();
-      assertFalse(ingestionSchemaValidator.getDataTypeMismatchResult().isMismatchDetected());
-      assertFalse(ingestionSchemaValidator.getSingleValueMultiValueFieldMismatchResult().isMismatchDetected());
-      assertFalse(ingestionSchemaValidator.getMultiValueStructureMismatchResult().isMismatchDetected());
-      assertFalse(ingestionSchemaValidator.getMissingPinotColumnResult().isMismatchDetected());
       _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap));
       _segmentNames.add(driver.getSegmentName());
     }

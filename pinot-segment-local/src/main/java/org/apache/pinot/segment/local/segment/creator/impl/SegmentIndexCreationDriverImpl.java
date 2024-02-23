@@ -71,9 +71,7 @@ import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.IngestionSchemaValidator;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.SchemaValidatorFactory;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -101,7 +99,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentIndexCreationInfo _segmentIndexCreationInfo;
   private Schema _dataSchema;
   private TransformPipeline _transformPipeline;
-  private IngestionSchemaValidator _ingestionSchemaValidator;
   private int _totalDocs = 0;
   private File _tempIndexDir;
   private String _segmentName;
@@ -201,10 +198,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (!indexDir.exists()) {
       indexDir.mkdirs();
     }
-
-    _ingestionSchemaValidator =
-        SchemaValidatorFactory.getSchemaValidator(_dataSchema, _recordReader.getClass().getName(),
-            config.getInputFilePath());
 
     // Create a temporary directory used in segment creation
     _tempIndexDir = new File(indexDir, "tmp-" + UUID.randomUUID());
@@ -546,14 +539,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public File getOutputDirectory() {
     return new File(new File(_config.getOutDir()), _segmentName);
-  }
-
-  /**
-   * Returns the schema validator.
-   */
-  @Override
-  public IngestionSchemaValidator getIngestionSchemaValidator() {
-    return _ingestionSchemaValidator;
   }
 
   public SegmentPreIndexStatsContainer getSegmentStats() {
