@@ -48,16 +48,6 @@ public interface SegmentIndexCreationDriver extends Serializable {
   String getSegmentName();
 
   /**
-   *  Get the stats collector for a column
-   *
-   * @param columnName
-   * @return AbstractColumnStatisticsCollector for the column.
-   * @throws Exception
-   */
-  ColumnStatistics getColumnStatisticsCollector(final String columnName)
-      throws Exception;
-
-  /**
    * Returns the path of the output directory
    */
   File getOutputDirectory();

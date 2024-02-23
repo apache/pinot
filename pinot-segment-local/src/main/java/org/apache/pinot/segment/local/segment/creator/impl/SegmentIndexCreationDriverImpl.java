@@ -465,11 +465,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     converter.convert(segmentDirectory);
   }
 
-  public ColumnStatistics getColumnStatisticsCollector(final String columnName)
-      throws Exception {
-    return _segmentStats.getColumnProfileFor(columnName);
-  }
-
   public static void persistCreationMeta(File indexDir, long crc, long creationTime)
       throws IOException {
     File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
