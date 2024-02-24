@@ -187,7 +187,7 @@
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
     <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
-    <surefire.version>3.1.2</surefire.version>
+    <surefire.version>3.2.5</surefire.version>
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.18</scala.version>
