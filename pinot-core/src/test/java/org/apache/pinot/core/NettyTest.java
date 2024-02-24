@@ -28,31 +28,32 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
+
 public class NettyTest {
-    private static void requiredOs(final OsCheck.OSType requiredOsType) {
-        if (OsCheck.getOperatingSystemType() != requiredOsType) {
-            throw new SkipException("skipping test: " + requiredOsType + " != " + OsCheck.getOperatingSystemType());
-        }
+  private static void requiredOs(final OsCheck.OSType requiredOsType) {
+    if (OsCheck.getOperatingSystemType() != requiredOsType) {
+      throw new SkipException("skipping test: " + requiredOsType + " != " + OsCheck.getOperatingSystemType());
     }
+  }
 
-    @Test
-    public void epollIsAvailableOnLinux() {
-        requiredOs(OsCheck.OSType.Linux);
-        Epoll.ensureAvailability();
-        assertTrue(Epoll.isAvailable());
-    }
+  @Test
+  public void epollIsAvailableOnLinux() {
+    requiredOs(OsCheck.OSType.Linux);
+    Epoll.ensureAvailability();
+    assertTrue(Epoll.isAvailable());
+  }
 
-    @Test
-    public void kqueueIsAvailableOnMac() {
-        requiredOs(OsCheck.OSType.MacOS);
-        KQueue.ensureAvailability();
-        assertTrue(KQueue.isAvailable());
-    }
+  @Test
+  public void kqueueIsAvailableOnMac() {
+    requiredOs(OsCheck.OSType.MacOS);
+    KQueue.ensureAvailability();
+    assertTrue(KQueue.isAvailable());
+  }
 
-    @Test
-    public void boringSslIsAvailable() {
-        OpenSsl.ensureAvailability();
-        assertTrue(OpenSsl.isAvailable());
-        assertEquals(OpenSsl.versionString(), "BoringSSL");
-    }
+  @Test
+  public void boringSslIsAvailable() {
+    OpenSsl.ensureAvailability();
+    assertTrue(OpenSsl.isAvailable());
+    assertEquals(OpenSsl.versionString(), "BoringSSL");
+  }
 }
