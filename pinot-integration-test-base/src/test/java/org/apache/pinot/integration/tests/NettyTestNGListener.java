@@ -24,27 +24,26 @@ import org.testng.IInvokedMethodListener;
 import org.testng.ITestContext;
 import org.testng.ITestResult;
 
+
 public class NettyTestNGListener implements IInvokedMethodListener {
-    private static final NettyLeakListener NETTY_LEAK_LISTENER;
-    private static final String LEAK_DETECTION_LEVEL_PROP_KEY = "io.netty.leakDetection.level";
+  private static final NettyLeakListener NETTY_LEAK_LISTENER;
+  private static final String LEAK_DETECTION_LEVEL_PROP_KEY = "io.netty.leakDetection.level";
 
-    static {
-        if (System.getProperty(LEAK_DETECTION_LEVEL_PROP_KEY) == null) {
-            System.setProperty(LEAK_DETECTION_LEVEL_PROP_KEY, "paranoid");
-        }
-        NETTY_LEAK_LISTENER = new NettyLeakListener();
-        ByteBufUtil.setLeakListener(NETTY_LEAK_LISTENER);
+  static {
+    if (System.getProperty(LEAK_DETECTION_LEVEL_PROP_KEY) == null) {
+      System.setProperty(LEAK_DETECTION_LEVEL_PROP_KEY, "paranoid");
     }
+    NETTY_LEAK_LISTENER = new NettyLeakListener();
+    ByteBufUtil.setLeakListener(NETTY_LEAK_LISTENER);
+  }
 
-    @Override
-    public void beforeInvocation(
-            IInvokedMethod method, ITestResult testResult, ITestContext context) {
-        NETTY_LEAK_LISTENER.assertZeroLeaks();
-    }
+  @Override
+  public void beforeInvocation(IInvokedMethod method, ITestResult testResult, ITestContext context) {
+    NETTY_LEAK_LISTENER.assertZeroLeaks();
+  }
 
-    @Override
-    public void afterInvocation(
-            IInvokedMethod method, ITestResult testResult, ITestContext context) {
-        NETTY_LEAK_LISTENER.assertZeroLeaks();
-    }
+  @Override
+  public void afterInvocation(IInvokedMethod method, ITestResult testResult, ITestContext context) {
+    NETTY_LEAK_LISTENER.assertZeroLeaks();
+  }
 }

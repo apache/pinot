@@ -22,36 +22,37 @@ import io.netty.util.ResourceLeakDetector.LeakListener;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+
 public class NettyLeakListener implements LeakListener {
-    private final List<String> _leaks = new CopyOnWriteArrayList<>();
+  private final List<String> _leaks = new CopyOnWriteArrayList<>();
 
-    @Override
-    public void onLeak(String resourceType, String records) {
-        _leaks.add(resourceType);
-    }
+  @Override
+  public void onLeak(String resourceType, String records) {
+    _leaks.add(resourceType);
+  }
 
-    public int getLeakCount() {
-        return _leaks.size();
-    }
+  public int getLeakCount() {
+    return _leaks.size();
+  }
 
-    public void assertZeroLeaks() {
-        assertZeroLeaks(null);
-    }
+  public void assertZeroLeaks() {
+    assertZeroLeaks(null);
+  }
 
-    public void assertZeroLeaks(String detail) {
-        if (!_leaks.isEmpty()) {
-            StringBuilder message = new StringBuilder("Netty leaks: ");
-            if (detail != null) {
-                message.append(detail);
-                message.append(" ");
-            }
-            message.append(_leaks);
-            throw new IllegalStateException(message.toString());
-        }
+  public void assertZeroLeaks(String detail) {
+    if (!_leaks.isEmpty()) {
+      StringBuilder message = new StringBuilder("Netty leaks: ");
+      if (detail != null) {
+        message.append(detail);
+        message.append(" ");
+      }
+      message.append(_leaks);
+      throw new IllegalStateException(message.toString());
     }
+  }
 
-    @Override
-    public String toString() {
-        return "leakCount=" + this.getLeakCount();
-    }
+  @Override
+  public String toString() {
+    return "leakCount=" + this.getLeakCount();
+  }
 }
