@@ -27,6 +27,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.avro.AvroParquetWriter;
+import org.apache.parquet.avro.AvroReadSupport;
 import org.apache.parquet.avro.AvroSchemaConverter;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.hadoop.ParquetFileReader;
@@ -100,6 +101,8 @@ public class ParquetUtils {
     // in case that user's hadoop conf overwrite this item
     Configuration conf = new Configuration();
     conf.set("fs.defaultFS", DEFAULT_FS);
+    // To read Int96 as bytes.
+    conf.set(AvroReadSupport.READ_INT96_AS_FIXED, "true");
     conf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
     return conf;
   }
