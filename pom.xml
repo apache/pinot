@@ -161,7 +161,7 @@
     <stax2-api.version>4.1</stax2-api.version>
     <aws.sdk.version>2.20.137</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
-    <testng.version>7.8.0</testng.version>
+    <testng.version>7.9.0</testng.version>
     <woodstox.version>6.4.0</woodstox.version>
     <sslcontext.kickstart.version>8.2.0</sslcontext.kickstart.version>
 
