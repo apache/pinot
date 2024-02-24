@@ -90,6 +90,7 @@
     "react-dom": "16.13.1",
     "react-hook-form": "6.15.8",
     "react-router-dom": "5.3.3",
-    "react-spring": "8.0.27"
+    "react-spring": "8.0.27",
+    "@sqltools/formatter": "1.2.5"
   }
 }
