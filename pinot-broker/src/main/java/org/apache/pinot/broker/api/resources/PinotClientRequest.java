@@ -20,6 +20,7 @@ package org.apache.pinot.broker.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
@@ -352,22 +353,27 @@ public class PinotClientRequest {
 
   /**
    * Generate Response object from the BrokerResponse object with 'X-Pinot-Error-Code' header value
+   *
+   * If the query is successful the 'X-Pinot-Error-Code' header value is set to -1
+   * otherwise, the first error code of the broker response exception array will become the header value
+   *
    * @param brokerResponse
    * @return Response
    * @throws Exception
    */
-  private static Response getPinotQueryResponse(BrokerResponse brokerResponse)
+  @VisibleForTesting
+  static Response getPinotQueryResponse(BrokerResponse brokerResponse)
       throws Exception {
-    int headerValue = -1; // default value of the header.
+    int queryErrorCodeHeaderValue = -1; // default value of the header.
 
     if (brokerResponse.getExceptionsSize() != 0) {
       // set the header value as first exception error code value.
-      headerValue = brokerResponse.getProcessingExceptions().get(0).getErrorCode();
+      queryErrorCodeHeaderValue = brokerResponse.getProcessingExceptions().get(0).getErrorCode();
     }
 
     // returning the Response with OK status and header value.
     return Response.ok()
-        .header(PINOT_QUERY_ERROR_CODE_HEADER, headerValue)
+        .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
         .entity(brokerResponse.toJsonString()).build();
   }
 }
