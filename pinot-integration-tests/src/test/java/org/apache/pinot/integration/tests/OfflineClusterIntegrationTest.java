@@ -3195,12 +3195,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     ResultSet resultSet = statement.executeQuery(query);
     resultSet.first();
     Assert.assertTrue(resultSet.getLong(1) > 0);
+    connection.close();
+    Assert.assertTrue(connection.isClosed());
 
     connection = getJDBCConnectionFromBrokers(RANDOM.nextInt(), getRandomBrokerPort());
     statement = connection.createStatement();
     resultSet = statement.executeQuery(query);
     resultSet.first();
     Assert.assertTrue(resultSet.getLong(1) > 0);
+    connection.close();
+    Assert.assertTrue(connection.isClosed());
   }
 
   private java.sql.Connection getJDBCConnectionFromController(int controllerPort)
