@@ -247,7 +247,7 @@ public class PinotConfiguration {
     return relaxPropertyName(propertyEntry.getKey());
   }
 
-  private static String relaxPropertyName(String propertyName) {
+  public static String relaxPropertyName(String propertyName) {
     return propertyName.replace("-", "").replace("_", "").toLowerCase();
   }
 

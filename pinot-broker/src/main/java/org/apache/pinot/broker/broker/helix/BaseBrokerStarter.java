@@ -39,6 +39,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.BrokerAdminApiApplication;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
@@ -136,34 +137,44 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Remove all white-spaces from the list of zkServers (if any).
     _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
-    ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
+    ZkClient zkClient = ServiceStartableUtils.getZKClient(_brokerConf, _zkServers);
+    try {
+      ServiceStartableUtils.applyClusterConfig(_brokerConf, zkClient, _clusterName, ServiceRole.BROKER);
+      _hostname = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
+      if (_hostname == null) {
+        _hostname =
+            _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
+                : NetUtils.getHostAddress();
+      }
 
-    if (_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
-        MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT) == 0) {
-      _brokerConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, NetUtils.findOpenPort());
+      if (_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
+          MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT) == 0) {
+        _brokerConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, NetUtils.findOpenPort());
+      }
+      _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
+
+      // Override multi-stage query runner hostname if not set explicitly
+      if (!_brokerConf.containsKey(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME)) {
+        _brokerConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _hostname);
+      }
+      _port = _listenerConfigs.get(0).getPort();
+
+      _instanceId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID);
+      if (_instanceId == null) {
+        _instanceId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY);
+      }
+      if (_instanceId == null) {
+        _instanceId = Helix.PREFIX_OF_BROKER_INSTANCE + _hostname + "_" + _port;
+      }
+
+      ServiceStartableUtils.applyTenantConfigs(_instanceId, zkClient, _clusterName, _brokerConf);
+    } finally {
+      zkClient.close();
     }
+
     setupHelixSystemProperties();
-    _listenerConfigs = ListenerConfigUtil.buildBrokerConfigs(brokerConf);
-    _hostname = brokerConf.getProperty(Broker.CONFIG_OF_BROKER_HOSTNAME);
-    if (_hostname == null) {
-      _hostname =
-          _brokerConf.getProperty(Helix.SET_INSTANCE_ID_TO_HOSTNAME_KEY, false) ? NetUtils.getHostnameOrAddress()
-              : NetUtils.getHostAddress();
-    }
-    // Override multi-stage query runner hostname if not set explicitly
-    if (!_brokerConf.containsKey(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME)) {
-      _brokerConf.setProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, _hostname);
-    }
-    _port = _listenerConfigs.get(0).getPort();
     _tlsPort = ListenerConfigUtil.findLastTlsPort(_listenerConfigs, -1);
 
-    _instanceId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID);
-    if (_instanceId == null) {
-      _instanceId = _brokerConf.getProperty(Helix.Instance.INSTANCE_ID_KEY);
-    }
-    if (_instanceId == null) {
-      _instanceId = Helix.PREFIX_OF_BROKER_INSTANCE + _hostname + "_" + _port;
-    }
     // NOTE: Force all instances to have the same prefix in order to derive the instance type based on the instance id
     Preconditions.checkState(InstanceTypeUtils.isBroker(_instanceId), "Instance id must have prefix '%s', got '%s'",
         Helix.PREFIX_OF_BROKER_INSTANCE, _instanceId);
