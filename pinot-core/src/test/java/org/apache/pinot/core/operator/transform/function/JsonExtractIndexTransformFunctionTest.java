@@ -213,6 +213,91 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
     return testArguments.toArray(new Object[0][]);
   }
 
+  @Test(dataProvider = "testJsonExtractIndexTransformFunctionForJsonArray")
+  public void testJsonExtractIndexTransformFunctionForJsonArray(String expressionStr, String jsonPathString,
+                                                    DataType resultsDataType, boolean isSingleValue) {
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof JsonExtractIndexTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractIndexTransformFunction.FUNCTION_NAME);
+    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), resultsDataType);
+    Assert.assertEquals(transformFunction.getResultMetadata().isSingleValue(), isSingleValue);
+    JsonPath jsonPath = JsonPathCache.INSTANCE.getOrCompute(jsonPathString);
+    if (isSingleValue) {
+      switch (resultsDataType) {
+        case INT:
+          int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(intValues[i], Integer.parseInt(getValueForKey(_jsonArrayValues[i], jsonPath)));
+          }
+          break;
+        case LONG:
+          long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(longValues[i], Long.parseLong(getValueForKey(_jsonArrayValues[i], jsonPath)));
+          }
+          break;
+        case FLOAT:
+          float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(floatValues[i], Float.parseFloat(getValueForKey(_jsonArrayValues[i], jsonPath)));
+          }
+          break;
+        case DOUBLE:
+          double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(doubleValues[i], Double.parseDouble(getValueForKey(_jsonArrayValues[i], jsonPath)));
+          }
+          break;
+        case BIG_DECIMAL:
+          BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(bigDecimalValues[i], new BigDecimal(getValueForKey(_jsonArrayValues[i], jsonPath)));
+          }
+          break;
+        case STRING:
+          String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(stringValues[i], getValueForKey(_jsonArrayValues[i], jsonPath));
+          }
+          break;
+        default:
+          throw new UnsupportedOperationException("Not support data type - " + resultsDataType);
+      }
+    }
+  }
+
+  @DataProvider(name = "testJsonExtractIndexTransformFunctionForJsonArray")
+  public Object[][] testJsonExtractIndexTransformFunctionForJsonArrayDataProvider() {
+    List<Object[]> testArguments = new ArrayList<>();
+    // Without default value
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','INT')", JSON_STRING_ARRAY_COLUMN,
+                    "$.intVals[0]"), "$.intVals[0]", DataType.INT, true
+    });
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','LONG')", JSON_STRING_ARRAY_COLUMN,
+                    "$.longVals[1]"), "$.longVals[1]", DataType.LONG, true
+    });
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','FLOAT')", JSON_STRING_ARRAY_COLUMN,
+                    "$.floatVals[0]"), "$.floatVals[0]", DataType.FLOAT, true
+    });
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','DOUBLE')", JSON_STRING_ARRAY_COLUMN,
+                    "$.doubleVals[1]"), "$.doubleVals[1]", DataType.DOUBLE, true
+    });
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','BIG_DECIMAL')", JSON_STRING_ARRAY_COLUMN,
+                    "$.bigDecimalVals[0]"), "$.bigDecimalVals[0]", DataType.BIG_DECIMAL, true
+    });
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','STRING')", JSON_STRING_ARRAY_COLUMN,
+                    "$.stringVals[1]"), "$.stringVals[1]", DataType.STRING, true
+    });
+    return testArguments.toArray(new Object[0][]);
+  }
+
   // get value for key, excluding nested
   private String getValueForKey(String blob, JsonPath path) {
     Object out = JSON_PARSER_CONTEXT.parse(blob).read(path);
