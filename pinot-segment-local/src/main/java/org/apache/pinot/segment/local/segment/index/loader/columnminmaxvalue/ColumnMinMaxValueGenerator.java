@@ -43,11 +43,14 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class ColumnMinMaxValueGenerator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ColumnMinMaxValueGenerator.class);
   private final SegmentMetadata _segmentMetadata;
   private final SegmentDirectory.Writer _segmentWriter;
   private final ColumnMinMaxValueGeneratorMode _columnMinMaxValueGeneratorMode;
@@ -341,7 +344,12 @@ public class ColumnMinMaxValueGenerator {
             break;
           }
           default:
-            throw new IllegalStateException("Unsupported data type: " + dataType + " for column: " + columnName);
+            // Support for no dictionary columns was added in https://github.com/apache/pinot/pull/10891,
+            // but it did not take into account all data types. For now, we return early here never setting
+            // min/max values rather than throwing an exception.
+            LOGGER.warn("Unsupported data type: {} for column: {}. Skipping setting min/max values", dataType,
+                columnName);
+            return;
         }
       }
     }

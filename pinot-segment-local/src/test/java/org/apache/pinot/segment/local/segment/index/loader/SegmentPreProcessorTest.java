@@ -1392,6 +1392,87 @@ public class SegmentPreProcessorTest {
   }
 
   @Test
+  public void testColumnMinMaxValueNoDictionary()
+      throws Exception {
+
+    // days is the timeColumn for the table, so it defaults to "now" when null
+    int epochDays = (int) (System.currentTimeMillis() / (24 * 60 * 60 * 1000));
+    Map<String, Object> fieldToExceptedMinMaxValue = Map.of(
+        // This is the table's timeColumn, so it gets a default value
+        "days", epochDays,
+        "ts", 0L,
+        "stringCount", "null",
+        "booleanCount", 0,
+        "jsonCount", "null",
+        "intCount", 0,
+        "longCount", 0L,
+        "doubleCount", 0.0,
+        "floatCount", 0f,
+        "bytesCount", new ByteArray(new byte[]{})
+    );
+
+    _schema = new Schema.SchemaBuilder().setSchemaName(_schema.getSchemaName())
+        .addDateTime("days", FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
+        .addDateTime("ts", DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:DAYS")
+        .addSingleValueDimension("stringCount", DataType.STRING)
+        .addSingleValueDimension("booleanCount", DataType.BOOLEAN)
+        .addSingleValueDimension("jsonCount", DataType.JSON)
+        .addMetric("intCount", FieldSpec.DataType.INT)
+        .addMetric("longCount", FieldSpec.DataType.LONG)
+        .addMetric("floatCount", FieldSpec.DataType.FLOAT)
+        .addMetric("doubleCount", FieldSpec.DataType.DOUBLE)
+        .addMetric("bigDecimalCount", FieldSpec.DataType.BIG_DECIMAL)
+        .addMetric("bytesCount", FieldSpec.DataType.BYTES)
+        .build();
+
+    List<String> allFields = new ArrayList<>(_schema.getColumnNames());
+
+    // Make a new _tableConfig with all columns as noDictionaryColumn
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setRowTimeValueCheck(false);
+    ingestionConfig.setSegmentTimeValueCheck(false);
+    _tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName("days")
+            .setIngestionConfig(ingestionConfig).setNullHandlingEnabled(true).setNoDictionaryColumns(allFields)
+            .build();
+
+    // construct the segment
+    // TODO: use a new a file that actually has data for the columns we are using
+    FileUtils.deleteQuietly(INDEX_DIR);
+    SegmentGeneratorConfig segmentGeneratorConfig =
+        SegmentTestUtils.getSegmentGeneratorConfigWithSchema(_avroFile, INDEX_DIR, "testTable", _tableConfig, _schema);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(segmentGeneratorConfig);
+    driver.build();
+
+    _indexDir = new File(INDEX_DIR, driver.getSegmentName());
+
+    // Remove min/max value from the metadata
+    removeMinMaxValuesFromMetadataFile(_indexDir);
+
+    IndexLoadingConfig indexLoadingConfig = getDefaultIndexLoadingConfig();
+    indexLoadingConfig.setColumnMinMaxValueGeneratorMode(ColumnMinMaxValueGeneratorMode.ALL);
+    try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
+        .load(_indexDir.toURI(),
+            new SegmentDirectoryLoaderContext.Builder().setSegmentDirectoryConfigs(_configuration).build());
+        SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, null)) {
+      processor.process();
+    }
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
+
+    allFields.forEach(field -> {
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(field);
+      if (fieldToExceptedMinMaxValue.containsKey(field)) {
+        assertEquals(columnMetadata.getMinValue(), fieldToExceptedMinMaxValue.get(field), field);
+        assertEquals(columnMetadata.getMaxValue(), fieldToExceptedMinMaxValue.get(field), field);
+      } else {
+        assertNull(columnMetadata.getMinValue(), field);
+        assertNull(columnMetadata.getMaxValue(), field);
+      }
+    });
+  }
+
+  @Test
   public void testV1CleanupIndices()
       throws Exception {
     constructV1Segment(Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
