@@ -44,6 +44,7 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -244,6 +245,55 @@ public class ZookeeperResource {
 
     try {
       boolean result = _pinotHelixResourceManager.setZKData(path, znRecord, expectedVersion, accessOption);
+      if (result) {
+        return new SuccessResponse("Successfully updated path: " + path);
+      } else {
+        throw new ControllerApplicationException(LOGGER, "Failed to update path: " + path,
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to update path: " + path,
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  @POST
+  @Path("/zk/create")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_ZNODE)
+  @Authenticate(AccessType.CREATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Create a node at a given path")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 204, message = "No Content"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public SuccessResponse createNode(
+      @ApiParam(value = "Zookeeper Path, must start with /", required = true) @QueryParam("path") String path,
+      @ApiParam(value = "Content") @QueryParam("data") @Nullable String data,
+      @ApiParam(value = "ttl", defaultValue = "-1") @QueryParam("ttl") @DefaultValue("-1") int ttl,
+      @ApiParam(value = "accessOption", defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1")
+      int accessOption, @Nullable String payload) {
+
+    path = validateAndNormalizeZKPath(path, false);
+
+    if (StringUtils.isEmpty(data)) {
+      data = payload;
+    }
+    if (StringUtils.isEmpty(data)) {
+      throw new ControllerApplicationException(LOGGER, "Must provide data through query parameter or payload",
+          Response.Status.BAD_REQUEST);
+    }
+    ZNRecord znRecord;
+    try {
+      znRecord = MAPPER.readValue(data, ZNRecord.class);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to deserialize the data", Response.Status.BAD_REQUEST,
+          e);
+    }
+
+    try {
+      boolean result = _pinotHelixResourceManager.createZKNode(path, znRecord, accessOption, ttl);
       if (result) {
         return new SuccessResponse("Successfully updated path: " + path);
       } else {
