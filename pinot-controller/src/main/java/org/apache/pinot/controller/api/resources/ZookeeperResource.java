@@ -271,7 +271,7 @@ public class ZookeeperResource {
   public SuccessResponse createNode(
       @ApiParam(value = "Zookeeper Path, must start with /", required = true) @QueryParam("path") String path,
       @ApiParam(value = "Content") @QueryParam("data") @Nullable String data,
-      @ApiParam(value = "TTL of the node, if -1, then no TTL is set. This option only holds for persistent znodes",
+      @ApiParam(value = "TTL of the node, if -1, then no TTL is set. This value is ignored for ephemeral nodes",
           defaultValue = "-1")
       @QueryParam("ttl") @DefaultValue("-1") int ttl,
       @ApiParam(value = "accessOption", defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1")
