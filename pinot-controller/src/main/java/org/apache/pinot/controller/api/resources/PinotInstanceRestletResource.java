@@ -109,6 +109,19 @@ public class PinotInstanceRestletResource {
   }
 
   @GET
+  @Path("/liveinstances")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "List all live instances")
+  @ApiResponses(value = {
+          @ApiResponse(code = 200, message = "Success"),
+          @ApiResponse(code = 500, message = "Internal error")
+  })
+  public Instances getAllLiveInstances() {
+    return new Instances(_pinotHelixResourceManager.getAllLiveInstances());
+  }
+
+  @GET
   @Path("/instances/{instanceName}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
   @Produces(MediaType.APPLICATION_JSON)

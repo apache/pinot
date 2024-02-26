@@ -212,17 +212,23 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     String instanceName = "Server_localhost_" + NUM_SERVER_INSTANCES;
     List<String> allInstances = _helixResourceManager.getAllInstances();
     assertFalse(allInstances.contains(instanceName));
+    List<String> allLiveInstances = _helixResourceManager.getAllInstances();
+    assertFalse(allLiveInstances.contains(instanceName));
 
     Instance instance = new Instance("localhost", NUM_SERVER_INSTANCES, InstanceType.SERVER,
         Collections.singletonList(Helix.UNTAGGED_SERVER_INSTANCE), null, 0, 0, 0, 0, false);
     _helixResourceManager.addInstance(instance, false);
     allInstances = _helixResourceManager.getAllInstances();
     assertTrue(allInstances.contains(instanceName));
+    allLiveInstances = _helixResourceManager.getAllInstances();
+    assertTrue(allLiveInstances.contains(instanceName));
 
     // Remove the added instance
     assertTrue(_helixResourceManager.dropInstance(instanceName).isSuccessful());
     allInstances = _helixResourceManager.getAllInstances();
     assertFalse(allInstances.contains(instanceName));
+    allLiveInstances = _helixResourceManager.getAllInstances();
+    assertFalse(allLiveInstances.contains(instanceName));
   }
 
   @Test
