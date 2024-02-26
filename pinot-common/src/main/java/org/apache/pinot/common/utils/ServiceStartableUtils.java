@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
@@ -30,7 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_TIMEZONE;
-import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_TIMEZONE;
 
 
 public class ServiceStartableUtils {
@@ -102,7 +102,8 @@ public class ServiceStartableUtils {
   }
 
   private static void setupTimezone(PinotConfiguration instanceConfig) {
-    _timeZone = instanceConfig.getProperty(CONFIG_OF_TIMEZONE, DEFAULT_TIMEZONE);
+    TimeZone localTimezone = TimeZone.getDefault();
+    _timeZone = instanceConfig.getProperty(CONFIG_OF_TIMEZONE, localTimezone.getID());
     System.setProperty("user.timezone", _timeZone);
     LOGGER.info("Timezone: {}", _timeZone);
   }

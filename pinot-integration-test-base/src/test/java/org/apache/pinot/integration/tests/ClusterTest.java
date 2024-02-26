@@ -160,7 +160,7 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT,
         NetUtils.findOpenPort(DEFAULT_BROKER_PORT + brokerId + RandomUtils.nextInt(10000)));
     brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
-    brokerConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, CommonConstants.DEFAULT_TIMEZONE);
+    brokerConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     overrideBrokerConf(brokerConf);
     return brokerConf;
   }
@@ -179,9 +179,9 @@ public abstract class ClusterTest extends ControllerTest {
       assertEquals(
           brokerStarter.getConfig().getProperty(
               CommonConstants.CONFIG_OF_TIMEZONE, ""),
-          CommonConstants.DEFAULT_TIMEZONE
+         "UTC"
       );
-      assertEquals(System.getProperty("user.timezone"), CommonConstants.DEFAULT_TIMEZONE);
+      assertEquals(System.getProperty("user.timezone"), "UTC");
 
       _brokerStarters.add(brokerStarter);
       _brokerPorts.add(brokerStarter.getPort());
@@ -261,7 +261,7 @@ public abstract class ClusterTest extends ControllerTest {
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
-    serverConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, CommonConstants.DEFAULT_TIMEZONE);
+    serverConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     overrideServerConf(serverConf);
     return serverConf;
   }
@@ -285,7 +285,7 @@ public abstract class ClusterTest extends ControllerTest {
     HelixServerStarter serverStarter = new HelixServerStarter();
     serverStarter.init(getServerConf(serverId));
     serverStarter.start();
-    assertEquals(System.getProperty("user.timezone"), CommonConstants.DEFAULT_TIMEZONE);
+    assertEquals(System.getProperty("user.timezone"), "UTC");
     return serverStarter;
   }
 
@@ -327,11 +327,11 @@ public abstract class ClusterTest extends ControllerTest {
     minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
     minionConf.setProperty(CommonConstants.Helix.KEY_OF_MINION_PORT,
         NetUtils.findOpenPort(CommonConstants.Minion.DEFAULT_HELIX_PORT));
-    minionConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, CommonConstants.DEFAULT_TIMEZONE);
+    minionConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     _minionStarter = new MinionStarter();
     _minionStarter.init(minionConf);
     _minionStarter.start();
-    assertEquals(System.getProperty("user.timezone"), CommonConstants.DEFAULT_TIMEZONE);
+    assertEquals(System.getProperty("user.timezone"), "UTC");
   }
 
   protected void stopBroker() {

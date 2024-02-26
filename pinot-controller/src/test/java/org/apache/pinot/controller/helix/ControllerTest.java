@@ -221,7 +221,7 @@ public class ControllerTest {
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
     // Enable groovy on the controller
     properties.put(ControllerConf.DISABLE_GROOVY, false);
-    properties.put(CommonConstants.CONFIG_OF_TIMEZONE, CommonConstants.DEFAULT_TIMEZONE);
+    properties.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     overrideControllerConf(properties);
     return properties;
   }
@@ -289,7 +289,7 @@ public class ControllerTest {
     configAccessor.set(scope, Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
     // Set hyperloglog log2m value to 12.
     configAccessor.set(scope, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
-    assertEquals(System.getProperty("user.timezone"), CommonConstants.DEFAULT_TIMEZONE);
+    assertEquals(System.getProperty("user.timezone"), "UTC");
   }
 
   public void stopController() {
