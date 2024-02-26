@@ -21,28 +21,27 @@ package org.apache.pinot.spi.recordenricher;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import org.apache.pinot.spi.annotations.RecordEnricherFactory;
+import java.util.ServiceLoader;
 import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
-import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class RecordEnricherRegistry {
   private static final Logger LOGGER = LoggerFactory.getLogger(RecordEnricherRegistry.class);
-  private static final Map<String, RecordEnricherFactoryInterface> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
+  private static final Map<String, RecordEnricherFactory> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
 
   private RecordEnricherRegistry() {
   }
 
-  public static void validateEnrichmentConfig(EnrichmentConfig enrichmentConfig, boolean disableGroovy) {
+  public static void validateEnrichmentConfig(EnrichmentConfig enrichmentConfig,
+      RecordEnricherValidationConfig config) {
     if (!RECORD_ENRICHER_FACTORY_MAP.containsKey(enrichmentConfig.getEnricherType())) {
       throw new IllegalArgumentException("No record enricher found for type: " + enrichmentConfig.getEnricherType());
     }
 
     RECORD_ENRICHER_FACTORY_MAP.get(enrichmentConfig.getEnricherType())
-        .validateEnrichmentConfig(enrichmentConfig.getProperties(), disableGroovy);
+        .validateEnrichmentConfig(enrichmentConfig.getProperties(), config);
   }
 
   public static RecordEnricher createRecordEnricher(EnrichmentConfig enrichmentConfig)
@@ -55,15 +54,9 @@ public class RecordEnricherRegistry {
   }
 
   static {
-    Set<Class<?>> classes = PinotReflectionUtils.getClassesThroughReflection(".*\\.plugin\\.record\\.enricher..*",
-        RecordEnricherFactory.class);
-    for (Class<?> clazz : classes) {
-      try {
-        RecordEnricherFactoryInterface recordEnricherFactory = (RecordEnricherFactoryInterface) clazz.newInstance();
-        RECORD_ENRICHER_FACTORY_MAP.put(recordEnricherFactory.getEnricherType(), recordEnricherFactory);
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while initializing record enricher factory : {}", clazz, e);
-      }
+    for (RecordEnricherFactory recordEnricherFactory : ServiceLoader.load(RecordEnricherFactory.class)) {
+      LOGGER.info("Registered record enricher factory type: {}", recordEnricherFactory.getEnricherType());
+      RECORD_ENRICHER_FACTORY_MAP.put(recordEnricherFactory.getEnricherType(), recordEnricherFactory);
     }
   }
 }

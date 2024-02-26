@@ -82,6 +82,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.recordenricher.RecordEnricherRegistry;
+import org.apache.pinot.spi.recordenricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -498,7 +499,8 @@ public final class TableConfigUtils {
       List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
       if (enrichmentConfigs != null) {
         for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
-          RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig, disableGroovy);
+          RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
+              new RecordEnricherValidationConfig(disableGroovy));
         }
       }
 

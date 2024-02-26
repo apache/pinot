@@ -22,8 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 
 
-public interface RecordEnricherFactoryInterface {
+public interface RecordEnricherFactory {
   String getEnricherType();
   RecordEnricher createEnricher(JsonNode enricherProps) throws IOException;
-  void validateEnrichmentConfig(JsonNode enricherProps, boolean disableGroovy);
+  void validateEnrichmentConfig(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig);
 }

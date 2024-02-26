@@ -32,6 +32,9 @@ import org.apache.pinot.spi.recordenricher.RecordEnricher;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
+/**
+ * Enriches the record with custom functions.
+ */
 public class CustomFunctionEnricher implements RecordEnricher {
   private final Map<String, FunctionEvaluator> _fieldToFunctionEvaluator;
   private final List<String> _fieldsToExtract;

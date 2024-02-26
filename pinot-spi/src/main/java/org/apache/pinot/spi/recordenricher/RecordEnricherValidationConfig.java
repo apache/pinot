@@ -1,3 +1,5 @@
+package org.apache.pinot.spi.recordenricher;
+
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,25 +18,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.record.enricher.function;
-
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.LinkedHashMap;
 
 /**
- * Configuration for the custom function enricher.
+ * Interface for cluster constrains, which can be used to validate the record enricher configs
  */
-public class CustomFunctionEnricherConfig {
-  private final LinkedHashMap<String, String> _columnToFunctionMap;
+public class RecordEnricherValidationConfig {
+  private final boolean _groovyDisabled;
 
-  @JsonCreator
-  public CustomFunctionEnricherConfig(
-      @JsonProperty("columnToFunctionMap") LinkedHashMap<String, String> columnTofunctionMap) {
-    _columnToFunctionMap = columnTofunctionMap;
+  public RecordEnricherValidationConfig(boolean groovyDisabled) {
+    _groovyDisabled = groovyDisabled;
   }
 
-  public LinkedHashMap<String, String> getColumnTofunctionMap() {
-    return _columnToFunctionMap;
+  public boolean isGroovyDisabled() {
+    return _groovyDisabled;
   }
 }

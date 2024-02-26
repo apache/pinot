@@ -19,13 +19,15 @@
 package org.apache.pinot.plugin.record.enricher.clp;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.auto.service.AutoService;
 import java.io.IOException;
 import org.apache.pinot.spi.recordenricher.RecordEnricher;
-import org.apache.pinot.spi.recordenricher.RecordEnricherFactoryInterface;
+import org.apache.pinot.spi.recordenricher.RecordEnricherFactory;
+import org.apache.pinot.spi.recordenricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
-@org.apache.pinot.spi.annotations.RecordEnricherFactory
-public class CLPEncodingEnricherFactory implements RecordEnricherFactoryInterface {
+@AutoService(RecordEnricherFactory.class)
+public class CLPEncodingEnricherFactory implements RecordEnricherFactory {
   private static final String ENRICHER_TYPE = "clpEnricher";
   @Override
   public String getEnricherType() {
@@ -39,7 +41,7 @@ public class CLPEncodingEnricherFactory implements RecordEnricherFactoryInterfac
   }
 
   @Override
-  public void validateEnrichmentConfig(JsonNode enricherProps, boolean disableGroovy) {
+  public void validateEnrichmentConfig(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig) {
     try {
       ClpEnricherConfig config = JsonUtils.jsonNodeToObject(enricherProps, ClpEnricherConfig.class);
     } catch (IOException e) {
