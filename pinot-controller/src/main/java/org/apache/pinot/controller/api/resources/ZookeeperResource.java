@@ -297,11 +297,11 @@ public class ZookeeperResource {
       if (result) {
         return new SuccessResponse("Successfully updated path: " + path);
       } else {
-        throw new ControllerApplicationException(LOGGER, "Failed to update path: " + path,
+        throw new ControllerApplicationException(LOGGER, "ZNode already exists at path: " + path,
             Response.Status.INTERNAL_SERVER_ERROR);
       }
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Failed to update path: " + path,
+      throw new ControllerApplicationException(LOGGER, "Failed to create znode at path: " + path,
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
