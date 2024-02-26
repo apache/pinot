@@ -99,8 +99,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   @Override
   protected void setUpTask() {
-    LOGGER.info("Initializing table metrics for all the tables.");
-    setStatusToDefault();
   }
 
   @Override
@@ -375,18 +373,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
   }
 
-  private void setStatusToDefault() {
-    List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
-
-    for (String tableName : allTableNames) {
-      removeMetricsForTable(tableName);
-    }
-  }
-
   @Override
   public void cleanUpTask() {
-    LOGGER.info("Resetting table metrics for all the tables.");
-    setStatusToDefault();
   }
 
   @VisibleForTesting
