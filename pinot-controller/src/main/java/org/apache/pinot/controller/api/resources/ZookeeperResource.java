@@ -271,7 +271,9 @@ public class ZookeeperResource {
   public SuccessResponse createNode(
       @ApiParam(value = "Zookeeper Path, must start with /", required = true) @QueryParam("path") String path,
       @ApiParam(value = "Content") @QueryParam("data") @Nullable String data,
-      @ApiParam(value = "ttl", defaultValue = "-1") @QueryParam("ttl") @DefaultValue("-1") int ttl,
+      @ApiParam(value = "TTL of the node, if -1, then no TTL is set. This option only holds for persistent znodes",
+          defaultValue = "-1")
+      @QueryParam("ttl") @DefaultValue("-1") int ttl,
       @ApiParam(value = "accessOption", defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1")
       int accessOption, @Nullable String payload) {
 
@@ -300,7 +302,7 @@ public class ZookeeperResource {
           Response.Status.INTERNAL_SERVER_ERROR, e);
     }
     if (result) {
-      return new SuccessResponse("Successfully updated path: " + path);
+      return new SuccessResponse("Successfully created node at path: " + path);
     } else {
       throw new ControllerApplicationException(LOGGER, "ZNode already exists at path: " + path,
           Response.Status.BAD_REQUEST);
