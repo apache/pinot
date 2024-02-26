@@ -88,18 +88,17 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
    */
   public <A> A foldNotNull(int length, @Nullable IntIterator nullIndexIterator, A initialAcum, Reducer<A> reducer) {
     A acum = initialAcum;
-    int next;
     if (!_nullHandlingEnabled || nullIndexIterator == null || !nullIndexIterator.hasNext()) {
       return reducer.apply(initialAcum, 0, length);
-    } else {
-      int firstNullIdx = nullIndexIterator.next();
-      if (firstNullIdx > 0) {
-        acum = reducer.apply(acum, 0, firstNullIdx);
-      }
-      next = firstNullIdx + 1;
     }
-    while (nullIndexIterator.hasNext()) {
-      int newNullIdx = nullIndexIterator.next();
+
+    int firstNullIdx = nullIndexIterator.next();
+    if (firstNullIdx > 0) {
+      acum = reducer.apply(acum, 0, firstNullIdx);
+    }
+    int next = firstNullIdx + 1;
+    while (nullIndexIterator.hasNext() && next < length) {
+      int newNullIdx = Math.min(nullIndexIterator.next(), length);
       if (newNullIdx > next) {
         acum = reducer.apply(acum, next, newNullIdx);
       }

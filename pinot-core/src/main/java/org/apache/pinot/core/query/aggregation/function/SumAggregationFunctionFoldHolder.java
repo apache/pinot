@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -70,7 +69,6 @@ public class SumAggregationFunctionFoldHolder extends NullableSingleInputAggrega
     if (blockValSet.getNullBitmap() != null && blockValSet.getNullBitmap().getCardinality() >= length) {
       return;
     }
-    double sum = aggregationResultHolder.getDoubleResult();
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
@@ -97,33 +95,17 @@ public class SumAggregationFunctionFoldHolder extends NullableSingleInputAggrega
         break;
       }
       case FLOAT: {
-        float[] values = blockValSet.getFloatValuesSV();
-        for (int i = 0; i < length & i < values.length; i++) {
-          sum += values[i];
-        }
-        break;
+        throw new UnsupportedOperationException();
       }
       case DOUBLE: {
-        double[] values = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length & i < values.length; i++) {
-          sum += values[i];
-        }
-        break;
+        throw new UnsupportedOperationException();
       }
       case BIG_DECIMAL: {
-        BigDecimal decimalSum = BigDecimal.valueOf(sum);
-        BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
-        for (int i = 0; i < length & i < values.length; i++) {
-          decimalSum = decimalSum.add(values[i]);
-        }
-        // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
-        sum = decimalSum.doubleValue();
-        break;
+        throw new UnsupportedOperationException();
       }
       default:
         throw new IllegalStateException("Cannot compute sum for non-numeric type: " + blockValSet.getValueType());
     }
-    aggregationResultHolder.setValue(sum);
   }
 
   @Override
