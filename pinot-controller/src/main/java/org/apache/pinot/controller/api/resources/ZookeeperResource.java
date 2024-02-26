@@ -266,7 +266,7 @@ public class ZookeeperResource {
   @ApiOperation(value = "Create a node at a given path")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 204, message = "No Content"),
-      @ApiResponse(code = 500, message = "Internal server error")
+      @ApiResponse(code = 400, message = "Bad Request"), @ApiResponse(code = 500, message = "Internal server error")
   })
   public SuccessResponse createNode(
       @ApiParam(value = "Zookeeper Path, must start with /", required = true) @QueryParam("path") String path,
@@ -292,17 +292,18 @@ public class ZookeeperResource {
           e);
     }
 
+    boolean result;
     try {
-      boolean result = _pinotHelixResourceManager.createZKNode(path, znRecord, accessOption, ttl);
-      if (result) {
-        return new SuccessResponse("Successfully updated path: " + path);
-      } else {
-        throw new ControllerApplicationException(LOGGER, "ZNode already exists at path: " + path,
-            Response.Status.INTERNAL_SERVER_ERROR);
-      }
+      result = _pinotHelixResourceManager.createZKNode(path, znRecord, accessOption, ttl);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to create znode at path: " + path,
           Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+    if (result) {
+      return new SuccessResponse("Successfully updated path: " + path);
+    } else {
+      throw new ControllerApplicationException(LOGGER, "ZNode already exists at path: " + path,
+          Response.Status.BAD_REQUEST);
     }
   }
 
