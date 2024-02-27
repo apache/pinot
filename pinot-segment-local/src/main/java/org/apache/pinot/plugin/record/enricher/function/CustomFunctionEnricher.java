@@ -43,7 +43,7 @@ public class CustomFunctionEnricher implements RecordEnricher {
     CustomFunctionEnricherConfig config = JsonUtils.jsonNodeToObject(enricherProps, CustomFunctionEnricherConfig.class);
     _fieldToFunctionEvaluator = new LinkedHashMap<>();
     _fieldsToExtract = new ArrayList<>();
-    for (Map.Entry<String, String> entry : config.getColumnTofunctionMap().entrySet()) {
+    for (Map.Entry<String, String> entry : config.getFieldToFunctionMap().entrySet()) {
       String column = entry.getKey();
       String function = entry.getValue();
       FunctionEvaluator functionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(function);

@@ -26,15 +26,15 @@ import java.util.LinkedHashMap;
  * Configuration for the custom function enricher.
  */
 public class CustomFunctionEnricherConfig {
-  private final LinkedHashMap<String, String> _columnToFunctionMap;
+  private final LinkedHashMap<String, String> _fieldToFunctionMap;
 
   @JsonCreator
   public CustomFunctionEnricherConfig(
-      @JsonProperty("columnToFunctionMap") LinkedHashMap<String, String> columnTofunctionMap) {
-    _columnToFunctionMap = columnTofunctionMap;
+      @JsonProperty("fieldToFunctionMap") LinkedHashMap<String, String> columnTofunctionMap) {
+    _fieldToFunctionMap = columnTofunctionMap;
   }
 
-  public LinkedHashMap<String, String> getColumnTofunctionMap() {
-    return _columnToFunctionMap;
+  public LinkedHashMap<String, String> getFieldToFunctionMap() {
+    return _fieldToFunctionMap;
   }
 }

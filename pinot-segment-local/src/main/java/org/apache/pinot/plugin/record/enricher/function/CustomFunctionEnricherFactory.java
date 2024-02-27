@@ -49,7 +49,7 @@ public class CustomFunctionEnricherFactory implements RecordEnricherFactory {
       if (!validationConfig.isGroovyDisabled()) {
         return;
       }
-      for (String function : config.getColumnTofunctionMap().values()) {
+      for (String function : config.getFieldToFunctionMap().values()) {
         if (FunctionEvaluatorFactory.isGroovyExpression(function)) {
           throw new IllegalArgumentException("Groovy expression is not allowed for enrichment");
         }
