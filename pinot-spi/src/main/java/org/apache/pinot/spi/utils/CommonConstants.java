@@ -52,6 +52,7 @@ public class CommonConstants {
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.1.0/";
+  public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
   /**
    * The state of the consumer for a given segment
