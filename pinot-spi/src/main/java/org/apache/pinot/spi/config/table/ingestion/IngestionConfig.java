@@ -39,6 +39,9 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Config related to filtering records during ingestion")
   private FilterConfig _filterConfig;
 
+  @JsonPropertyDescription("Config related to enriching records during ingestion")
+  private List<EnrichmentConfig> _enrichmentConfigs;
+
   @JsonPropertyDescription("Configs related to record transformation functions applied during ingestion")
   private List<TransformConfig> _transformConfigs;
 
@@ -63,12 +66,14 @@ public class IngestionConfig extends BaseJsonConfig {
   @Deprecated
   public IngestionConfig(@Nullable BatchIngestionConfig batchIngestionConfig,
       @Nullable StreamIngestionConfig streamIngestionConfig, @Nullable FilterConfig filterConfig,
+      @Nullable List<EnrichmentConfig> enrichmentConfigs,
       @Nullable List<TransformConfig> transformConfigs, @Nullable ComplexTypeConfig complexTypeConfig,
       @Nullable SchemaConformingTransformerConfig schemaConformingTransformerConfig,
       @Nullable List<AggregationConfig> aggregationConfigs) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;
+    _enrichmentConfigs = enrichmentConfigs;
     _transformConfigs = transformConfigs;
     _complexTypeConfig = complexTypeConfig;
     _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
@@ -91,6 +96,11 @@ public class IngestionConfig extends BaseJsonConfig {
   @Nullable
   public FilterConfig getFilterConfig() {
     return _filterConfig;
+  }
+
+  @Nullable
+  public List<EnrichmentConfig> getEnrichmentConfigs() {
+    return _enrichmentConfigs;
   }
 
   @Nullable
@@ -135,6 +145,10 @@ public class IngestionConfig extends BaseJsonConfig {
 
   public void setFilterConfig(FilterConfig filterConfig) {
     _filterConfig = filterConfig;
+  }
+
+  public void setEnrichmentConfigs(List<EnrichmentConfig> enrichmentConfigs) {
+    _enrichmentConfigs = enrichmentConfigs;
   }
 
   public void setTransformConfigs(List<TransformConfig> transformConfigs) {

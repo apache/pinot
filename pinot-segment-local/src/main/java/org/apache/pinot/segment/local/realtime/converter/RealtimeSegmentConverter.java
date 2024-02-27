@@ -42,6 +42,7 @@ import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 
 
 public class RealtimeSegmentConverter {
@@ -125,7 +126,8 @@ public class RealtimeSegmentConverter {
       recordReader.init(_realtimeSegmentImpl, sortedDocIds);
       RealtimeSegmentSegmentCreationDataSource dataSource =
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
-      driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline());
+      driver.init(genConfig, dataSource, RecordEnricherPipeline.getPassThroughPipeline(),
+          TransformPipeline.getPassThroughPipeline());
 
       if (!_enableColumnMajor) {
         driver.build();
