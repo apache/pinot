@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK 11
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: 11
           distribution: 'adopt'
@@ -93,13 +93,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java }}
           distribution: ${{ matrix.distribution }}
           cache: 'maven'
       # Step that does that actual cache save and restore
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
@@ -139,7 +139,7 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
         run: .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         continue-on-error: true
         timeout-minutes: 5
         with:
@@ -172,13 +172,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java }}
           distribution: ${{ matrix.distribution }}
           cache: 'maven'
       # Step that does that actual cache save and restore
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
@@ -217,7 +217,7 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
         run: .github/workflows/scripts/pr-tests/.pinot_tests_integration.sh
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         continue-on-error: true
         timeout-minutes: 5
         with:
@@ -243,7 +243,7 @@ jobs:
         run: .github/workflows/scripts/pr-tests/.pinot_tests_custom_integration.sh
       - name: Upload coverage to Codecov
         if : ${{ matrix.testset == 1 }}
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         continue-on-error: true
         timeout-minutes: 5
         with:
@@ -267,7 +267,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 11
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: 11
           distribution: 'adopt'
@@ -283,7 +283,7 @@ jobs:
           npm install -g npm@6.10.0
           npm --version
       # Step that does that actual cache save and restore
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
         with:
@@ -325,13 +325,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK ${{ matrix.java }}
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java }}
           distribution: ${{ matrix.distribution }}
           cache: 'maven'
       # Step that does that actual cache save and restore
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: 10
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}

@@ -185,6 +185,8 @@ public class IngestionDelayTracker {
     // If we are removing a partition we should stop reading its ideal state.
     _partitionsMarkedForVerification.remove(partitionGroupId);
     _serverMetrics.removePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
+    _serverMetrics.removePartitionGauge(_metricName, partitionGroupId,
+        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
   }
 
   /*

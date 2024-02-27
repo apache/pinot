@@ -94,6 +94,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.INDEX_SKIP_CONFIG;
 import static org.testng.Assert.*;
 
 
@@ -598,7 +599,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(getTableSize(getTableName()), DISK_SIZE_IN_BYTES);
   }
 
-  private void addInvertedIndex()
+  private void addInvertedIndex(boolean shouldReload)
       throws Exception {
     // Update table config to add inverted index on DivActualElapsedTime column, and
     // reload the table to get config change into effect and add the inverted index.
@@ -610,8 +611,36 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // After all segments are reloaded, the inverted index is added on DivActualElapsedTime.
     // It's expected to have numEntriesScannedInFilter equal to 0, i.e. no docs is scanned
     // at filtering stage when inverted index can answer the predicate directly.
-    reloadAllSegments(TEST_UPDATED_INVERTED_INDEX_QUERY, false, getCountStarResult());
-    assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+    if (shouldReload) {
+      reloadAllSegments(TEST_UPDATED_INVERTED_INDEX_QUERY, false, getCountStarResult());
+      assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+    }
+  }
+  private void addInvertedIndex()
+      throws Exception {
+    addInvertedIndex(true);
+  }
+
+  private void addRangeIndex(boolean shouldReload)
+      throws Exception {
+    // Update table config to add Range index on DivActualElapsedTime column, and
+    // reload the table to get config change into effect and add the Range index.
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setRangeIndexColumns(UPDATED_RANGE_INDEX_COLUMNS);
+    updateTableConfig(tableConfig);
+
+    // It takes a while to reload multiple segments, thus we retry the query for some time.
+    // After all segments are reloaded, the range index is added on DivActualElapsedTime.
+    // It's expected to have numEntriesScannedInFilter equal to 0, i.e. no docs is scanned
+    // at filtering stage when inverted index can answer the predicate directly.
+    if (shouldReload) {
+      reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, false, getCountStarResult());
+      assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+    }
+  }
+
+  private void addRangeIndex() throws Exception {
+    addRangeIndex(true);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -1277,14 +1306,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
 
     // Update table config and trigger reload
-    TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.getIndexingConfig().setRangeIndexColumns(UPDATED_RANGE_INDEX_COLUMNS);
-    updateTableConfig(tableConfig);
-    reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, false, numTotalDocs);
-    assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+    addRangeIndex();
 
     // Update table config to remove the new range index, and check if the new range index is removed
-    tableConfig = getOfflineTableConfig();
+    TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.getIndexingConfig().setRangeIndexColumns(getRangeIndexColumns());
     updateTableConfig(tableConfig);
     reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, true, numTotalDocs);
@@ -3195,12 +3220,16 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     ResultSet resultSet = statement.executeQuery(query);
     resultSet.first();
     Assert.assertTrue(resultSet.getLong(1) > 0);
+    connection.close();
+    Assert.assertTrue(connection.isClosed());
 
     connection = getJDBCConnectionFromBrokers(RANDOM.nextInt(), getRandomBrokerPort());
     statement = connection.createStatement();
     resultSet = statement.executeQuery(query);
     resultSet.first();
     Assert.assertTrue(resultSet.getLong(1) > 0);
+    connection.close();
+    Assert.assertTrue(connection.isClosed());
   }
 
   private java.sql.Connection getJDBCConnectionFromController(int controllerPort)
@@ -3256,5 +3285,59 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     testQuery("SELECT BOOL_AND(CAST(Cancelled AS BOOLEAN)) FROM mytable");
     testQuery("SELECT BOOL_OR(CAST(Diverted AS BOOLEAN)) FROM mytable");
+  }
+
+  private String buildIndexSkipConfig(String columnsAndIndexes) {
+    return "SET " + INDEX_SKIP_CONFIG + "='" + columnsAndIndexes + "'; ";
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testIndexSkipConfig(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    long numTotalDocs = getCountStarResult();
+    assertEquals(postQuery(TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+
+    // Update table config to add range and inverted index, and trigger reload
+    addRangeIndex(false);  // skip segment reload and instead reload after also adding inverted index
+    addInvertedIndex();
+
+    // Ensure inv index is operational
+    assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+
+    // disallow use of range index on DivActualElapsedTime, inverted should be unaffected
+    String indexSkipConf = buildIndexSkipConfig("DivActualElapsedTime=range");
+    assertEquals(postQuery(
+        indexSkipConf + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+    assertEquals(postQuery(
+        indexSkipConf + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+
+    // disallow use of inverted index on DivActualElapsedTime, range should be unaffected
+    indexSkipConf = buildIndexSkipConfig("DivActualElapsedTime=inverted");
+    // Confirm that inverted index is not used
+    assertFalse(postQuery(indexSkipConf + " EXPLAIN PLAN FOR " + TEST_UPDATED_INVERTED_INDEX_QUERY).toString()
+        .contains("FILTER_INVERTED_INDEX"));
+
+    // EQ predicate type allows for using range index if one exists, even if inverted index is skipped. That is why
+    // we still see no docs scanned even though we skip the inverted index. This is a good test to show that using
+    // the indexSkipConfig can allow fine-grained experimentation of index usage at query time.
+    assertEquals(postQuery(
+        indexSkipConf + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+    assertEquals(postQuery(
+        indexSkipConf + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+
+    // disallow use of both range and inverted indexes on DivActualElapsedTime, neither should be used at query time
+    indexSkipConf = buildIndexSkipConfig("DivActualElapsedTime=inverted,range");
+    assertEquals(postQuery(
+        indexSkipConf + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+    assertEquals(postQuery(
+        indexSkipConf + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+
+    // Update table config to remove the new indexes, and check if the new indexes are removed
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.getIndexingConfig().setRangeIndexColumns(getRangeIndexColumns());
+    tableConfig.getIndexingConfig().setInvertedIndexColumns(getInvertedIndexColumns());
+    updateTableConfig(tableConfig);
+    reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, true, numTotalDocs);
   }
 }
