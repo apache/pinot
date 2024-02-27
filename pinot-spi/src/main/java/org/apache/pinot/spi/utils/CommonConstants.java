@@ -44,6 +44,7 @@ public class CommonConstants {
   public static final String UNKNOWN = "unknown";
   public static final String CONFIG_OF_METRICS_FACTORY_CLASS_NAME = "factory.className";
   public static final String CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME = "factory.className";
+  public static final String CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS = "request.context.tracked.header.keys";
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
   public static final String DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME =
@@ -51,6 +52,7 @@ public class CommonConstants {
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.1.0/";
+  public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
   /**
    * The state of the consumer for a given segment
@@ -90,8 +92,6 @@ public class CommonConstants {
 
     public static final String ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive";
     public static final boolean DEFAULT_ENABLE_CASE_INSENSITIVE = true;
-    public static final String ALLOW_TABLE_NAME_WITH_DATABASE = "allow.table.name.with.database";
-    public static final boolean DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE = false;
 
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
@@ -360,6 +360,7 @@ public class CommonConstants {
         public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
+        public static final String INDEX_SKIP_CONFIG = "indexSkipConfig";
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
@@ -568,6 +569,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.server.swagger.use.https";
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
+    public static final String CONFIG_OF_SERVER_RESOURCE_PACKAGES = "server.restlet.api.resource.packages";
+    public static final String DEFAULT_SERVER_RESOURCE_PACKAGES = "org.apache.pinot.server.api.resources";
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
@@ -618,6 +621,11 @@ public class CommonConstants {
     // Use 10 seconds by default so high volume stream are able to catch up.
     // This is also the default in the case a user misconfigures this by setting to <= 0.
     public static final int DEFAULT_STARTUP_REALTIME_MIN_FRESHNESS_MS = 10000;
+
+    // Config for realtime consumption message rate limit
+    public static final String CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT = "pinot.server.consumption.rate.limit";
+    // Default to 0.0 (no limit)
+    public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
 
     public static final String DEFAULT_READ_MODE = "mmap";
     // Whether to reload consuming segment on scheme update

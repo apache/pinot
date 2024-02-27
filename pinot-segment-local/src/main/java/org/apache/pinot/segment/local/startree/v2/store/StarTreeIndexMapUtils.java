@@ -33,7 +33,9 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+
 
 /**
  * The {@code StarTreeIndexMapUtils} class is a utility class to store/load star-tree index map to/from file.
@@ -182,24 +184,29 @@ public class StarTreeIndexMapUtils {
       int starTreeId = Integer.parseInt(split[0]);
       Map<IndexKey, IndexValue> indexMap = indexMaps.get(starTreeId);
 
-      // Handle the case of column name containing '.'
-      String column;
       int columnSplitEndIndex = split.length - 2;
-      if (columnSplitEndIndex == 2) {
-        column = split[1];
-      } else {
-        column = StringUtils.join(split, KEY_SEPARATOR, 1, columnSplitEndIndex);
-      }
-
       IndexType indexType = IndexType.valueOf(split[columnSplitEndIndex]);
       IndexKey indexKey;
       if (indexType == IndexType.STAR_TREE) {
         indexKey = STAR_TREE_INDEX_KEY;
       } else {
+        // Handle the case of column name containing '.'
+        String column;
+        if (columnSplitEndIndex == 2) {
+          column = split[1];
+        } else {
+          column = StringUtils.join(split, KEY_SEPARATOR, 1, columnSplitEndIndex);
+        }
+        // Convert metric (function-column pair) to stored name for backward-compatibility
+        if (column.contains(AggregationFunctionColumnPair.DELIMITER)) {
+          AggregationFunctionColumnPair functionColumnPair = AggregationFunctionColumnPair.fromColumnName(column);
+          column = AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair).toColumnName();
+        }
         indexKey = new IndexKey(IndexType.FORWARD_INDEX, column);
       }
-      IndexValue indexValue = indexMap.computeIfAbsent(indexKey, (k) -> new IndexValue());
+
       long value = configuration.getLong(key);
+      IndexValue indexValue = indexMap.computeIfAbsent(indexKey, k -> new IndexValue());
       if (split[columnSplitEndIndex + 1].equals(OFFSET_SUFFIX)) {
         indexValue._offset = value;
       } else {

@@ -45,7 +45,6 @@ import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-
 /**
  * The IndexCreator for dictionaries.
  *
@@ -86,10 +85,6 @@ public class SegmentDictionaryCreator implements IndexCreator {
     _useVarLengthDictionary = useVarLengthDictionary;
   }
 
-  public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir) {
-    this(fieldSpec, indexDir, false);
-  }
-
   @Override
   public void add(@Nonnull Object value, int dictId)
       throws IOException {
@@ -100,6 +95,10 @@ public class SegmentDictionaryCreator implements IndexCreator {
   public void add(@Nonnull Object[] values, @Nullable int[] dictIds)
       throws IOException {
     throw new UnsupportedOperationException("Dictionaries should not be built as a normal index");
+  }
+
+  public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir) {
+    this(fieldSpec, indexDir, false);
   }
 
   public void build(Object sortedValues)

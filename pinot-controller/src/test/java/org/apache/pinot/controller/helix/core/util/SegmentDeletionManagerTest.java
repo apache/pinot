@@ -45,6 +45,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTime;
@@ -357,6 +358,9 @@ public class SegmentDeletionManagerTest {
     tableDir.mkdir();
     for (String segmentId : segmentIds) {
       createTestFileWithAge(tableDir.getAbsolutePath() + File.separator + segmentId, 0);
+      // Create segment metadata file
+      createTestFileWithAge(
+          tableDir.getAbsolutePath() + File.separator + segmentId + Constants.METADATA_TAR_GZ_FILE_EXT, 0);
     }
   }
 

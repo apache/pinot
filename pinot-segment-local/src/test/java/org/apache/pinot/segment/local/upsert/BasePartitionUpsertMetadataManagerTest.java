@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -36,7 +37,9 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -45,6 +48,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -111,6 +115,34 @@ public class BasePartitionUpsertMetadataManagerTest {
     assertEquals(seg03.loadValidDocIdsFromSnapshot().getCardinality(), 3);
   }
 
+  @Test
+  public void testResolveComparisonTies() {
+    // Build a record info list for testing
+    int[] primaryKeys = new int[]{0, 1, 2, 0, 1, 0};
+    int[] timestamps = new int[]{0, 0, 0, 0, 0, 0};
+    int numRecords = primaryKeys.length;
+    List<RecordInfo> recordInfoList = new ArrayList<>();
+    for (int docId = 0; docId < numRecords; docId++) {
+      recordInfoList.add(new RecordInfo(
+          makePrimaryKey(primaryKeys[docId]), docId, timestamps[docId], false));
+    }
+    // Resolve comparison ties
+    Iterator<RecordInfo> deDuplicatedRecords =
+        BasePartitionUpsertMetadataManager.resolveComparisonTies(recordInfoList.iterator(), HashFunction.NONE);
+    // Ensure we have only 1 record for each unique primary key
+    Map<PrimaryKey, RecordInfo> recordsByPrimaryKeys = new HashMap<>();
+    while (deDuplicatedRecords.hasNext()) {
+      RecordInfo recordInfo = deDuplicatedRecords.next();
+      assertFalse(recordsByPrimaryKeys.containsKey(recordInfo.getPrimaryKey()));
+      recordsByPrimaryKeys.put(recordInfo.getPrimaryKey(), recordInfo);
+    }
+    assertEquals(recordsByPrimaryKeys.size(), 3);
+    // Ensure that to resolve ties, we pick the last docId
+    assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(0)).getDocId(), 5);
+    assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(1)).getDocId(), 4);
+    assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(2)).getDocId(), 2);
+  }
+
   private static ThreadSafeMutableRoaringBitmap createValidDocIds(int... docIds) {
     MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
     bitmap.add(docIds);
@@ -130,6 +162,10 @@ public class BasePartitionUpsertMetadataManagerTest {
         super.persistValidDocIdsSnapshot();
       }
     };
+  }
+
+  private static PrimaryKey makePrimaryKey(int value) {
+    return new PrimaryKey(new Object[]{value});
   }
 
   private static class DummyPartitionUpsertMetadataManager extends BasePartitionUpsertMetadataManager {

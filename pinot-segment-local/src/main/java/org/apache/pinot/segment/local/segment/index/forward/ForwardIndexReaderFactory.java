@@ -47,12 +47,17 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<ForwardIndexConfig, ForwardIndexReader> {
   private static volatile ForwardIndexReaderFactory _instance = new ForwardIndexReaderFactory();
 
+  public static void setInstance(ForwardIndexReaderFactory factory) {
+    _instance = factory;
+  }
+
   public static ForwardIndexReaderFactory getInstance() {
     return _instance;
   }
 
-  public static void setInstance(ForwardIndexReaderFactory factory) {
-    _instance = factory;
+  @Override
+  protected IndexType<ForwardIndexConfig, ForwardIndexReader, ?> getIndexType() {
+    return StandardIndexes.forward();
   }
 
   public static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
@@ -89,8 +94,9 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
       boolean isSingleValue) {
     int version = dataBuffer.getInt(0);
     if (isSingleValue && storedType.isFixedWidth()) {
-      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION ? new FixedBytePower2ChunkSVForwardIndexReader(
-          dataBuffer, storedType) : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
+      return version == FixedBytePower2ChunkSVForwardIndexReader.VERSION
+          ? new FixedBytePower2ChunkSVForwardIndexReader(dataBuffer, storedType)
+          : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
     }
 
     if (version == VarByteChunkForwardIndexWriterV4.VERSION) {
@@ -113,11 +119,6 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
         return new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
       }
     }
-  }
-
-  @Override
-  protected IndexType<ForwardIndexConfig, ForwardIndexReader, ?> getIndexType() {
-    return StandardIndexes.forward();
   }
 
   @Override

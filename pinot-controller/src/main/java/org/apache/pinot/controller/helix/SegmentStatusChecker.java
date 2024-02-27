@@ -38,7 +38,9 @@ import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -77,8 +79,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private TableSizeReader _tableSizeReader;
 
-  private Set<String> _cachedTableNamesWithType = new HashSet<>();
-
   /**
    * Constructs the segment status checker.
    * @param pinotHelixResourceManager The resource checker used to interact with Helix
@@ -99,8 +99,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   @Override
   protected void setUpTask() {
-    LOGGER.info("Initializing table metrics for all the tables.");
-    setStatusToDefault();
   }
 
   @Override
@@ -125,7 +123,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     } catch (Exception e) {
       LOGGER.error("Caught exception while updating segment status for table {}", tableNameWithType, e);
       // Remove the metric for this table
-      resetTableMetrics(tableNameWithType);
+      removeMetricsForTable(tableNameWithType);
     }
     context._processedTables.add(tableNameWithType);
   }
@@ -152,12 +150,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED, 0);
       }
     });
-
-    // Remove metrics for tables that are no longer in the cluster
-    _cachedTableNamesWithType.removeAll(context._processedTables);
-    _cachedTableNamesWithType.forEach(this::removeMetricsForTable);
-    _cachedTableNamesWithType.clear();
-    _cachedTableNamesWithType.addAll(context._processedTables);
   }
 
   /**
@@ -195,7 +187,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
     if (idealState == null) {
       LOGGER.warn("Table {} has null ideal state. Skipping segment status checks", tableNameWithType);
-      resetTableMetrics(tableNameWithType);
+      removeMetricsForTable(tableNameWithType);
       return;
     }
 
@@ -203,7 +195,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       if (context._logDisabledTables) {
         LOGGER.warn("Table {} is disabled. Skipping segment status checks", tableNameWithType);
       }
-      resetTableMetrics(tableNameWithType);
+      removeMetricsForTable(tableNameWithType);
       context._disabledTables.add(tableNameWithType);
       return;
     }
@@ -250,6 +242,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     int nReplicasExternal = -1; // Keeps track of minimum number of replicas in external view
     int nErrors = 0; // Keeps track of number of segments in error state
     int nOffline = 0; // Keeps track of number segments with no online replicas
+    int nNumOfReplicasLessThanIdeal = 0; // Keeps track of number of segments running with less than expected replicas
     int nSegments = 0; // Counts number of segments
     long tableCompressedSize = 0; // Tracks the total compressed segment size in deep store per table
     for (String partitionName : segmentsExcludeReplaced) {
@@ -311,6 +304,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           LOGGER.warn("Segment {} of table {} has no online replicas", partitionName, tableNameWithType);
         }
         nOffline++;
+      } else if (nReplicas < nReplicasIdealMax) {
+        LOGGER.debug("Segment {} of table {} is running with {} replicas which is less than the expected values {}",
+            partitionName, tableNameWithType, nReplicas, nReplicasIdealMax);
+        nNumOfReplicasLessThanIdeal++;
       }
       nReplicasExternal =
           ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
@@ -323,6 +320,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
         (nReplicasIdealMax > 0) ? (nReplicasExternal * 100 / nReplicasIdealMax) : 100);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE, nErrors);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS,
+        nNumOfReplicasLessThanIdeal);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
         (nSegments > 0) ? (nSegments - nOffline) * 100 / nSegments : 100);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_SIZE,
@@ -331,9 +330,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     if (nOffline > 0) {
       LOGGER.warn("Table {} has {} segments with no online replicas", tableNameWithType, nOffline);
     }
+    if (nNumOfReplicasLessThanIdeal > 0) {
+      LOGGER.warn("Table {} has {} segments with number of replicas less than the replication factor",
+          tableNameWithType, nNumOfReplicasLessThanIdeal);
+    }
     if (nReplicasExternal < nReplicasIdealMax) {
-      LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", tableNameWithType, nReplicasExternal,
-          nReplicasIdealMax);
+      LOGGER.warn("Table {} has at least one segment running with only {} replicas, below replication threshold :{}",
+          tableNameWithType, nReplicasExternal, nReplicasIdealMax);
     }
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
@@ -350,41 +353,28 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   }
 
   private void removeMetricsForTable(String tableNameWithType) {
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS);
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS);
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE);
-
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_SIZE);
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.IDEALSTATE_ZNODE_BYTE_SIZE);
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT);
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENT_COUNT_INCLUDING_REPLACED);
-
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE);
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE);
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_DISABLED);
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_CONSUMPTION_PAUSED);
-    _controllerMetrics.removeTableGauge(tableNameWithType, ControllerGauge.TABLE_REBALANCE_IN_PROGRESS);
-  }
-
-  private void setStatusToDefault() {
-    List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
-
-    for (String tableName : allTableNames) {
-      resetTableMetrics(tableName);
+    LOGGER.info("Removing metrics from {} given it is not a table known by Helix", tableNameWithType);
+    for (ControllerGauge metric : ControllerGauge.values()) {
+      if (!metric.isGlobal()) {
+        _controllerMetrics.removeTableGauge(tableNameWithType, metric);
+      }
     }
-  }
 
-  private void resetTableMetrics(String tableName) {
-    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, Long.MIN_VALUE);
-    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, Long.MIN_VALUE);
-    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, Long.MIN_VALUE);
-    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, Long.MIN_VALUE);
+    for (ControllerMeter metric : ControllerMeter.values()) {
+      if (!metric.isGlobal()) {
+        _controllerMetrics.removeTableMeter(tableNameWithType, metric);
+      }
+    }
+
+    for (ControllerTimer metric : ControllerTimer.values()) {
+      if (!metric.isGlobal()) {
+        _controllerMetrics.removeTableTimer(tableNameWithType, metric);
+      }
+    }
   }
 
   @Override
   public void cleanUpTask() {
-    LOGGER.info("Resetting table metrics for all the tables.");
-    setStatusToDefault();
   }
 
   @VisibleForTesting

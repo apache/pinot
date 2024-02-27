@@ -48,7 +48,7 @@ private[reader] class PinotServerDataFetcher(
   private val metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry
   private val brokerMetrics = new BrokerMetrics(metricsRegistry)
   private val pinotConfig = new PinotConfiguration()
-  private val serverRoutingStatsManager = new ServerRoutingStatsManager(pinotConfig)
+  private val serverRoutingStatsManager = new ServerRoutingStatsManager(pinotConfig, brokerMetrics)
   private val queryRouter = new QueryRouter(brokerId, brokerMetrics, serverRoutingStatsManager)
   // TODO add support for TLS-secured server
 

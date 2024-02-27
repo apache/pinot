@@ -146,6 +146,7 @@ public class TransformFunctionFactory {
     typeToImplementation.put(TransformFunctionType.IN_ID_SET, InIdSetTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CLP_DECODE, CLPDecodeTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.CLP_ENCODED_VARS_MATCH, ClpEncodedVarsMatchTransformFunction.class);
 
     typeToImplementation.put(TransformFunctionType.EXTRACT, ExtractTransformFunction.class);
 

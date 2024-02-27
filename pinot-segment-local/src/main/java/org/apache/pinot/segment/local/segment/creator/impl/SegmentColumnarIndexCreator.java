@@ -618,18 +618,31 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       //       null value changes
       defaultNullValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(defaultNullValue);
     }
-    properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+    if (defaultNullValue != null) {
+      properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+    }
   }
 
   public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
       String maxValue, DataType storedType) {
-    properties.setProperty(getKeyFor(column, MIN_VALUE), getValidPropertyValue(minValue, false, storedType));
-    properties.setProperty(getKeyFor(column, MAX_VALUE), getValidPropertyValue(maxValue, true, storedType));
+    String validMinValue = getValidPropertyValue(minValue, false, storedType);
+    if (validMinValue != null) {
+      properties.setProperty(getKeyFor(column, MIN_VALUE), validMinValue);
+    }
+    String validMaxValue = getValidPropertyValue(maxValue, true, storedType);
+    if (validMaxValue != null) {
+      properties.setProperty(getKeyFor(column, MAX_VALUE), validMaxValue);
+    }
+    if (validMinValue == null && validMaxValue == null) {
+      properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
+    }
   }
 
   /**
-   * Helper method to get the valid value for setting min/max.
+   * Helper method to get the valid value for setting min/max. Returns {@code null} if the value is not supported in
+   * {@link PropertiesConfiguration}, e.g. contains character with surrogate.
    */
+  @Nullable
   private static String getValidPropertyValue(String value, boolean isMax, DataType storedType) {
     String valueWithinLengthLimit = getValueWithinLengthLimit(value, isMax, storedType);
     return storedType == DataType.STRING ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(

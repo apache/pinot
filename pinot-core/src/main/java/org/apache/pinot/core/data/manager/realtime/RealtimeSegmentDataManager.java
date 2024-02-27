@@ -55,7 +55,6 @@ import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
 import org.apache.pinot.segment.local.realtime.converter.ColumnIndicesForRealtimeTable;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
-import org.apache.pinot.segment.local.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -76,6 +75,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -300,7 +300,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final boolean _isOffHeap;
   private final boolean _nullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
-  private final ConsumptionRateLimiter _rateLimiter;
+  private final ConsumptionRateLimiter _partitionRateLimiter;
+  private final ConsumptionRateLimiter _serverRateLimiter;
 
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
@@ -518,7 +519,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private boolean processStreamEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
     int messageCount = messagesAndOffsets.getMessageCount();
-    _rateLimiter.throttle(messageCount);
+    _partitionRateLimiter.throttle(messageCount);
+    _serverRateLimiter.throttle(messageCount);
 
     PinotMeter realtimeRowsConsumedMeter = null;
     PinotMeter realtimeRowsDroppedMeter = null;
@@ -608,6 +610,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             realtimeRowsConsumedMeter =
                 _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
                     realtimeRowsConsumedMeter);
+            _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
           } catch (Exception e) {
             _numRowsErrored++;
             String errorMessage = String.format("Caught exception while indexing the record: %s", transformedRow);
@@ -1398,8 +1401,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _memoryManager = new DirectMemoryManager(_segmentNameStr, _serverMetrics);
     }
 
-    _rateLimiter = RealtimeConsumptionRateManager.getInstance()
+    _partitionRateLimiter = RealtimeConsumptionRateManager.getInstance()
         .createRateLimiter(_streamConfig, _tableNameWithType, _serverMetrics, _clientId);
+    _serverRateLimiter = RealtimeConsumptionRateManager.getInstance().getServerRateLimiter();
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     String sortedColumn;

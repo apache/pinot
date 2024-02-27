@@ -35,6 +35,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
   private String[] _sortedValues;
   private boolean _sealed = false;
   private CLPStats _clpStats;
+
   public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
     if (_fieldConfig != null && _fieldConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {

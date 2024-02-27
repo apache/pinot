@@ -89,15 +89,15 @@ public class CompletionServiceHelper {
 
   /**
    * This method makes a MultiPost call to all given URLs and its corresponding bodies.
-   * @param serverURLsAndRequestBodies server urls to send GET request.
+   * @param serverURLsAndRequestBodies server urls to send POST request.
    * @param tableNameWithType table name with type suffix
    * @param multiRequestPerServer it's possible that need to send multiple requests to a same server.
-   *                              If multiRequestPerServer is set as false, return as long as one of the requests get
+   *                              If multiRequestPerServer is set as false, return as long as one of the requests return
    *                              response; If multiRequestPerServer is set as true, wait until all requests
-   *                              get response.
+   *                              return response.
    * @param requestHeaders Headers to be set when making the http calls.
    * @param timeoutMs timeout in milliseconds to wait per request.
-   * @param useCase the use case initiating the multi-get request. If not null and an exception is thrown, only the
+   * @param useCase the use case initiating the multi-post request. If not null and an exception is thrown, only the
    *                error message and the use case are logged instead of the full stack trace.
    * @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
    * multiRequestPerServer is true) to the response from that endpoint.

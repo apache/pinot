@@ -48,9 +48,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 
 public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
-  // version (int, 4) + logType dict offset (int, 4) + logType fwd index offset (int, 4) +
-  // dictVar dict offset (int, 4) + dictVar fwd index offset (int, 4) +
-  public static final byte[] MAGIC_BYTES = "CLP1".getBytes(StandardCharsets.UTF_8);
+  public static final byte[] MAGIC_BYTES = "CLP.v1".getBytes(StandardCharsets.UTF_8);
   private final String _column;
   private final int _numDocs;
   private final File _baseIndexDir;

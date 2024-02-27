@@ -48,6 +48,7 @@ public class StringFunctions {
   private final static Pattern LTRIM = Pattern.compile("^\\s+");
   private final static Pattern RTRIM = Pattern.compile("\\s+$");
 
+
   /**
    * @see StringUtils#reverse(String)
    * @param input
@@ -493,6 +494,15 @@ public class StringFunctions {
   @ScalarFunction
   public static byte[] toAscii(String input) {
     return input.getBytes(StandardCharsets.US_ASCII);
+  }
+
+  /**
+   * @param input bytes
+   * @return ASCII encoded string
+   */
+  @ScalarFunction
+  public static String fromAscii(byte[] input) {
+    return new String(input, StandardCharsets.US_ASCII);
   }
 
   /**

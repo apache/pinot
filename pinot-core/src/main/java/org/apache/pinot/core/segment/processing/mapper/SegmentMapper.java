@@ -30,14 +30,15 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
+import org.apache.pinot.core.segment.processing.genericrow.AdaptiveSizeBasedWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
+import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
-import org.apache.pinot.segment.local.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
@@ -46,8 +47,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
+import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,16 +64,11 @@ import org.slf4j.LoggerFactory;
  */
 public class SegmentMapper {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMapper.class);
-
-  private List<RecordReaderFileConfig> _recordReaderFileConfigs;
-  private List<RecordTransformer> _customRecordTransformers;
   private final SegmentProcessorConfig _processorConfig;
   private final File _mapperOutputDir;
-
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
   private final int _numSortFields;
-
   private final RecordEnricherPipeline _recordEnricherPipeline;
   private final CompositeTransformer _recordTransformer;
   private final TimeHandler _timeHandler;
@@ -80,6 +76,9 @@ public class SegmentMapper {
   private final String[] _partitionsBuffer;
   // NOTE: Use TreeMap so that the order is deterministic
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
+  private AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
+  private List<RecordReaderFileConfig> _recordReaderFileConfigs;
+  private List<RecordTransformer> _customRecordTransformers;
 
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
@@ -110,6 +109,10 @@ public class SegmentMapper {
     LOGGER.info("Initialized mapper with {} record readers, output dir: {}, timeHandler: {}, partitioners: {}",
         _recordReaderFileConfigs.size(), _mapperOutputDir, _timeHandler.getClass(),
         Arrays.stream(_partitioners).map(p -> p.getClass().toString()).collect(Collectors.joining(",")));
+
+    // initialize adaptive writer.
+    _adaptiveSizeBasedWriter =
+        new AdaptiveSizeBasedWriter(processorConfig.getSegmentConfig().getIntermediateFileSizeThreshold());
   }
 
   /**
@@ -121,7 +124,7 @@ public class SegmentMapper {
     try {
       return doMap();
     } catch (Exception e) {
-      // Cleaning up resources created by the mapper, leaving others to the caller like the input _recordReaders.
+      // Cleaning up resources created by the mapper.
       for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
         fileManager.cleanUp();
       }
@@ -132,40 +135,39 @@ public class SegmentMapper {
   private Map<String, GenericRowFileManager> doMap()
       throws Exception {
     Consumer<Object> observer = _processorConfig.getProgressObserver();
-    int totalCount = _recordReaderFileConfigs.size();
     int count = 1;
+    int totalNumRecordReaders = _recordReaderFileConfigs.size();
     GenericRow reuse = new GenericRow();
     for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
-      RecordReader recordReader = recordReaderFileConfig._recordReader;
-      if (recordReader == null) {
-        // We create and use the recordReader here.
-        try {
-          recordReader =
-              RecordReaderFactory.getRecordReader(recordReaderFileConfig._fileFormat, recordReaderFileConfig._dataFile,
-                  recordReaderFileConfig._fieldsToRead, recordReaderFileConfig._recordReaderConfig);
-          mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
-        } finally {
-          if (recordReader != null) {
-            recordReader.close();
-          }
-        }
-      } else {
-        mapAndTransformRow(recordReader, reuse, observer, count, totalCount);
+      RecordReader recordReader = recordReaderFileConfig.getRecordReader();
+
+      // Mapper can terminate midway of reading a file if the intermediate file size has crossed the configured
+      // threshold. Map phase will continue in the next iteration right where we are leaving off in the current
+      // iteration.
+      boolean shouldMapperTerminate =
+          !completeMapAndTransformRow(recordReader, reuse, observer, count, totalNumRecordReaders);
+
+      // Terminate the map phase if intermediate file size has crossed the threshold.
+      if (shouldMapperTerminate) {
+        break;
       }
+      recordReaderFileConfig.closeRecordReader();
       count++;
     }
 
     for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
       fileManager.closeFileWriter();
     }
-
     return _partitionToFileManagerMap;
   }
 
-  private void mapAndTransformRow(RecordReader recordReader, GenericRow reuse,
+
+//   Returns true if the map phase can continue, false if it should terminate based on the configured threshold for
+//   intermediate file size during map phase.
+  private boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
-    while (recordReader.hasNext()) {
+    while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
       reuse = recordReader.next(reuse);
       _recordEnricherPipeline.run(reuse);
 
@@ -187,6 +189,16 @@ public class SegmentMapper {
       }
       reuse.clear();
     }
+    if (recordReader.hasNext() && !_adaptiveSizeBasedWriter.canWrite()) {
+      String logMessage = String.format(
+          "Stopping record readers at index: %d out of %d passed to mapper as size limit reached, bytes written = %d,"
+              + " bytes " + "limit = %d", count, totalCount, _adaptiveSizeBasedWriter.getNumBytesWritten(),
+          _adaptiveSizeBasedWriter.getBytesLimit());
+      observer.accept(logMessage);
+      LOGGER.info(logMessage);
+      return false;
+    }
+    return true;
   }
 
   private void writeRecord(GenericRow row)
@@ -214,6 +226,10 @@ public class SegmentMapper {
       _partitionToFileManagerMap.put(partition, fileManager);
     }
 
-    fileManager.getFileWriter().write(row);
+    // Get the file writer.
+    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+
+    // Write the row.
+    _adaptiveSizeBasedWriter.write(fileWriter, row);
   }
 }

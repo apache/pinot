@@ -42,4 +42,4 @@ This step will generate an `index.yaml` file which contains all the Charts infor
 
 Update generated `index.yaml` accordingly:
 - Revert the changes for all previous Charts;
-- Change `entries.pinot.source` to `https://github.com/apache/pinot/tree/master/kubernetes/helm`.
+- Change `entries.pinot.source` to `https://github.com/apache/pinot/tree/master/helm`.

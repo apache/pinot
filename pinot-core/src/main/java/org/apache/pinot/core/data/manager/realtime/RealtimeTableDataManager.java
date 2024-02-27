@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -170,7 +171,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     File consumerDir = new File(consumerDirPath);
     if (consumerDir.exists()) {
       File[] segmentFiles = consumerDir.listFiles((dir, name) -> !name.equals(STATS_FILE_NAME));
-      Preconditions.checkState(segmentFiles != null, "Failed to list segment files from consumer dir: {} for table: {}",
+      Preconditions.checkState(segmentFiles != null, "Failed to list segment files from consumer dir: %s for table: %s",
           consumerDirPath, _tableNameWithType);
       for (File file : segmentFiles) {
         if (file.delete()) {
@@ -184,10 +185,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Set up dedup/upsert metadata manager
     // NOTE: Dedup/upsert has to be set up when starting the server. Changing the table config without restarting the
     //       server won't enable/disable them on the fly.
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
-
-    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    DedupConfig dedupConfig = _tableConfig.getDedupConfig();
     boolean dedupEnabled = dedupConfig != null && dedupConfig.isDedupEnabled();
     if (dedupEnabled) {
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
@@ -196,10 +194,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(primaryKeyColumns),
           "Primary key columns must be configured for dedup");
-      _tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics);
+      _tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(_tableConfig, schema, this, _serverMetrics);
     }
 
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
     if (upsertConfig != null && upsertConfig.getMode() != UpsertConfig.Mode.NONE) {
       Preconditions.checkState(!dedupEnabled, "Dedup and upsert cannot be both enabled for table: %s",
           _tableUpsertMetadataManager);
@@ -208,8 +206,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // NOTE: Set _tableUpsertMetadataManager before initializing it because when preloading is enabled, we need to
       //       load segments into it
       _tableUpsertMetadataManager =
-          TableUpsertMetadataManagerFactory.create(tableConfig, _instanceDataManagerConfig.getUpsertConfig());
-      _tableUpsertMetadataManager.init(tableConfig, schema, this, _helixManager, _segmentPreloadExecutor);
+          TableUpsertMetadataManagerFactory.create(_tableConfig, _instanceDataManagerConfig.getUpsertConfig());
+      _tableUpsertMetadataManager.init(_tableConfig, schema, this, _helixManager, _segmentPreloadExecutor);
     }
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
@@ -658,11 +656,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "." + System.currentTimeMillis());
       File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-      // First find servers hosting the segment in a ONLINE state.
-      List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
-      // Next download the segment from a randomly chosen server using configured scheme.
-      SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(peerSegmentURIs, segmentTarFile);
-      _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURIs, segmentTarFile,
+      // Next download the segment from a randomly chosen server using configured download scheme (http or https).
+      SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(segmentName,
+          () -> {
+            List<URI> peerServerURIs =
+                PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
+            Collections.shuffle(peerServerURIs);
+            return peerServerURIs;
+          }, segmentTarFile);
+      _logger.info("Fetched segment {} successfully to {} of size {}", segmentName, segmentTarFile,
           segmentTarFile.length());
       untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile, tempRootDir);
     } catch (Exception e) {
@@ -680,7 +682,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     File indexDir = new File(_indexDir, segmentName);
     // Use the latest table config and schema to load the segment
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to get table config for table: {}", _tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to get table config for table: %s", _tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
 
     // Construct a new indexLoadingConfig with the updated tableConfig and schema.
@@ -701,6 +703,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @VisibleForTesting
   public TableUpsertMetadataManager getTableUpsertMetadataManager() {
     return _tableUpsertMetadataManager;
+  }
+
+  /**
+   * Retrieves a mapping of partition id to the primary key count for the partition.
+   *
+   * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition.
+   */
+  public Map<Integer, Long> getUpsertPartitionToPrimaryKeyCount() {
+    if (isUpsertEnabled()) {
+      return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
+    }
+    return Collections.emptyMap();
   }
 
   /**

@@ -129,16 +129,7 @@ abstract class BaseStarTreeV2Test<R, A> {
       throws Exception {
     _valueAggregator = getValueAggregator();
     _aggregatedValueType = _valueAggregator.getAggregatedValueType();
-    AggregationFunctionType aggregationType = _valueAggregator.getAggregationType();
-    if (aggregationType == AggregationFunctionType.COUNT) {
-      _aggregation = "COUNT(*)";
-    } else if (aggregationType == AggregationFunctionType.PERCENTILEEST
-        || aggregationType == AggregationFunctionType.PERCENTILETDIGEST) {
-      // Append a percentile number for percentile functions
-      _aggregation = String.format("%s(%s, 50)", aggregationType.getName(), METRIC);
-    } else {
-      _aggregation = String.format("%s(%s)", aggregationType.getName(), METRIC);
-    }
+    _aggregation = getAggregation(_valueAggregator.getAggregationType());
 
     Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder().addSingleValueDimension(DIMENSION_D1, DataType.INT)
         .addSingleValueDimension(DIMENSION_D2, DataType.INT);
@@ -183,6 +174,18 @@ abstract class BaseStarTreeV2Test<R, A> {
 
     _indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     _starTreeV2 = _indexSegment.getStarTrees().get(0);
+  }
+
+  String getAggregation(AggregationFunctionType aggregationType) {
+    if (aggregationType == AggregationFunctionType.COUNT) {
+      return "COUNT(*)";
+    } else if (aggregationType == AggregationFunctionType.PERCENTILEEST
+        || aggregationType == AggregationFunctionType.PERCENTILETDIGEST) {
+      // Append a percentile number for percentile functions
+      return String.format("%s(%s, 50)", aggregationType.getName(), METRIC);
+    } else {
+      return String.format("%s(%s)", aggregationType.getName(), METRIC);
+    }
   }
 
   @Test

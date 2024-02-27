@@ -132,11 +132,19 @@ public class PredicateComparisonRewriter implements QueryRewriter {
         case VECTOR_SIMILARITY: {
           Preconditions.checkArgument(operands.size() >= 2 && operands.size() <= 3,
               "For %s predicate, the number of operands must be at either 2 or 3, got: %s", filterKind, expression);
-          // Array Literal is a function of type 'ARRAYVALUECONSTRUCTOR' with operands of Float/Double Literals
-          if (operands.get(1).getFunctionCall() == null || !operands.get(1).getFunctionCall().getOperator()
-              .equalsIgnoreCase("arrayvalueconstructor")) {
+          /*
+           * Array Literal could be either:
+           * 1. a function of type 'ARRAYVALUECONSTRUCTOR' with operands of float/double
+           * 2. a float/double array literals
+           * Also check in {@link org.apache.pinot.sql.parsers.CalciteSqlParser#validateFilter(Expression)}}
+           */
+          if ((operands.get(1).getFunctionCall() != null && !operands.get(1).getFunctionCall().getOperator()
+              .equalsIgnoreCase("arrayvalueconstructor"))
+              || (operands.get(1).getLiteral() != null && !operands.get(1).getLiteral().isSetFloatArrayValue()
+                  && !operands.get(1).getLiteral().isSetDoubleArrayValue())) {
             throw new SqlCompilationException(
-                String.format("For %s predicate, the second operand must be a float array literal, got: %s", filterKind,
+                String.format("For %s predicate, the second operand must be a float/double array literal, got: %s",
+                    filterKind,
                     expression));
           }
           if (operands.size() == 3 && operands.get(2).getLiteral() == null) {
@@ -165,7 +173,7 @@ public class PredicateComparisonRewriter implements QueryRewriter {
   /**
    * Rewrite predicates to boolean expressions with EQUALS operator
    *     Example1: "select * from table where col1" converts to
-   *                "select * from table where col1 = true"
+   *               "select * from table where col1 = true"
    *     Example2: "select * from table where startsWith(col1, 'str')" converts to
    *               "select * from table where startsWith(col1, 'str') = true"
    *
