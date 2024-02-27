@@ -1640,25 +1640,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return columnName;
     }
     String columnNameToCheck;
-    String resolvedColumnName = columnName;
-    if (rawTableName.contains(".")) { // table name has database prefix
-      String databaseName = rawTableName.split("\\.")[0];
-      // if column name only has table prefix, we need to append the database prefix as well
-      // to ensure following logic does not break
-      if (columnName.split("\\.").length == 2) {
-        resolvedColumnName = String.format("%s.%s", databaseName, columnName);
-      }
-    } else { // table name does not have database prefix -> table is under "default" database
-      // remove the "default" database prefix from column name if present
-      if (columnName.split("\\.").length == 3 && columnName.startsWith(CommonConstants.DEFAULT_DATABASE + ".")) {
-        resolvedColumnName = columnName.substring(CommonConstants.DEFAULT_DATABASE.length() + 1);
-      }
-    }
-    if (resolvedColumnName.regionMatches(ignoreCase, 0, rawTableName, 0, rawTableName.length())
-        && resolvedColumnName.length() > rawTableName.length()
-        && resolvedColumnName.charAt(rawTableName.length()) == '.') {
-      columnNameToCheck = ignoreCase ? resolvedColumnName.substring(rawTableName.length() + 1).toLowerCase()
-          : resolvedColumnName.substring(rawTableName.length() + 1);
+    String[] tableSplit = rawTableName.split("\\.", 2);
+    String logicalTableName = tableSplit.length == 2 ? tableSplit[1] : null;
+    int withDefaultDBLen = CommonConstants.DEFAULT_DATABASE.length() + rawTableName.length() + 1;
+    if (columnName.regionMatches(ignoreCase, 0, rawTableName, 0, rawTableName.length())
+        && columnName.length() > rawTableName.length() && columnName.charAt(rawTableName.length()) == '.') {
+      columnNameToCheck = ignoreCase ? columnName.substring(rawTableName.length() + 1).toLowerCase()
+          : columnName.substring(rawTableName.length() + 1);
+    } else if (// when table name has the database prefix but column name only has the logical table name as prefix
+        logicalTableName != null
+        && columnName.regionMatches(ignoreCase, 0, logicalTableName, 0, logicalTableName.length())
+        && columnName.length() > logicalTableName.length() && columnName.charAt(logicalTableName.length()) == '.') {
+      columnNameToCheck = ignoreCase ? columnName.substring(logicalTableName.length() + 1).toLowerCase()
+          : columnName.substring(logicalTableName.length() + 1);
+    } else if (// in case the column has "default" database prefix and table name has no database prefix (=default db)
+        columnName.regionMatches(ignoreCase, 0, CommonConstants.DEFAULT_DATABASE + "." + rawTableName, 0,
+        withDefaultDBLen) && columnName.length() > withDefaultDBLen && columnName.charAt(withDefaultDBLen) == '.') {
+      columnNameToCheck = ignoreCase ? columnName.substring(withDefaultDBLen + 1).toLowerCase()
+          : columnName.substring(withDefaultDBLen + 1);
     } else {
       columnNameToCheck = ignoreCase ? columnName.toLowerCase() : columnName;
     }
