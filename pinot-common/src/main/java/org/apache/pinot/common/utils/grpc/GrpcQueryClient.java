@@ -36,7 +36,7 @@ import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

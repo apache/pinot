@@ -38,7 +38,7 @@ import nl.altindag.ssl.SSLFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;

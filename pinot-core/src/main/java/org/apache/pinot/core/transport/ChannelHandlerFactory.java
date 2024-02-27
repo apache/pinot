@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.env.PinotConfiguration;
