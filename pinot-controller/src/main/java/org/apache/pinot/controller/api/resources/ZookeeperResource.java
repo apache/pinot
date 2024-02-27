@@ -53,6 +53,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang.StringUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.introspect.CodehausJacksonIntrospector;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -272,15 +273,15 @@ public class ZookeeperResource {
       @ApiParam(value = "Zookeeper Path, must start with /", required = true) @QueryParam("path") String path,
       @ApiParam(value = "Content") @QueryParam("data") @Nullable String data,
       @ApiParam(value = "TTL of the node, should be > 0. TTL are only honoured for persistent znodes (access option ="
-          + " 0x40)", defaultValue = "-1")
-      @QueryParam("ttl") @DefaultValue("-1") int ttl,
+          + " 0x40)", defaultValue = "-1") @QueryParam("ttl") @DefaultValue("-1") int ttl,
       @ApiParam(value = "accessOption", defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1")
       int accessOption, @Nullable String payload) {
 
     path = validateAndNormalizeZKPath(path, false);
 
     //validate ttl range
-    if (accessOption == 0x40 && ttl <= 0) {
+    if ((accessOption == AccessOption.PERSISTENT_WITH_TTL
+        || accessOption == AccessOption.PERSISTENT_SEQUENTIAL_WITH_TTL) && ttl <= 0) {
       throw new ControllerApplicationException(LOGGER, "TTL for persistent nodes should be > 0",
           Response.Status.BAD_REQUEST);
     }
