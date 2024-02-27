@@ -68,7 +68,7 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
           value = AvroSchemaUtil.applyLogicalType(field, value);
         }
         if (value != null) {
-          value = convert(value);
+          value = transformValue(value, field);
         }
         to.putValue(fieldName, value);
       }
@@ -80,12 +80,16 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
           value = AvroSchemaUtil.applyLogicalType(field, value);
         }
         if (value != null) {
-          value = convert(value);
+          value = transformValue(value, field);
         }
         to.putValue(fieldName, value);
       }
     }
     return to;
+  }
+
+  protected Object transformValue(Object value, Schema.Field field) {
+    return convert(value);
   }
 
   /**
@@ -116,7 +120,7 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
       String fieldName = field.name();
       Object fieldValue = record.get(fieldName);
       if (fieldValue != null) {
-        fieldValue = convert(fieldValue);
+        fieldValue = transformValue(fieldValue, field);
       }
       convertedMap.put(fieldName, fieldValue);
     }

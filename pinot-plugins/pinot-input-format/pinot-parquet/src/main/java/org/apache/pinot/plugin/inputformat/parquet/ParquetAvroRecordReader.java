@@ -25,12 +25,10 @@ import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.hadoop.ParquetReader;
-import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 import org.apache.pinot.spi.data.readers.RecordReaderUtils;
-
 
 /**
  * Avro Record reader for Parquet file. This reader doesn't read parquet file with incompatible Avro schemas,
@@ -44,7 +42,7 @@ public class ParquetAvroRecordReader implements RecordReader {
   private static final String EXTENSION = "parquet";
 
   private Path _dataFilePath;
-  private AvroRecordExtractor _recordExtractor;
+  private ParquetAvroRecordExtractor _recordExtractor;
   private ParquetReader<GenericRecord> _parquetReader;
   private GenericRecord _nextRecord;
 
@@ -54,7 +52,7 @@ public class ParquetAvroRecordReader implements RecordReader {
     File parquetFile = RecordReaderUtils.unpackIfRequired(dataFile, EXTENSION);
     _dataFilePath = new Path(parquetFile.getAbsolutePath());
     _parquetReader = ParquetUtils.getParquetAvroReader(_dataFilePath);
-    _recordExtractor = new AvroRecordExtractor();
+    _recordExtractor = new ParquetAvroRecordExtractor();
     _recordExtractor.init(fieldsToRead, null);
     _nextRecord = _parquetReader.read();
   }

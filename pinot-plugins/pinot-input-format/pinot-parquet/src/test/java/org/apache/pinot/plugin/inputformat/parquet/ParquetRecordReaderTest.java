@@ -125,28 +125,20 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
   @Test
   public void testComparison()
       throws IOException {
-    testComparison(_dataFile, SAMPLE_RECORDS_SIZE, false);
-    testComparison(new File(getClass().getClassLoader().getResource("users.parquet").getFile()), 1, false);
-    testComparison(new File(getClass().getClassLoader().getResource("test-comparison.gz.parquet").getFile()), 363667,
-        false);
-    testComparison(new File(getClass().getClassLoader().getResource("test-comparison.snappy.parquet").getFile()), 2870,
-        false);
-    testComparison(new File(getClass().getClassLoader().getResource("baseballStats.snappy.parquet").getFile()), 97889,
-        false);
-    testComparison(new File(getClass().getClassLoader().getResource("baseballStats.zstd.parquet").getFile()), 97889,
-        false);
-    testComparison(new File(getClass().getClassLoader().getResource("githubEvents.snappy.parquet").getFile()), 10000,
-        false);
-    testComparison(new File(getClass().getClassLoader().getResource("starbucksStores.snappy.parquet").getFile()), 6443,
-        false);
-    testComparison(new File(getClass().getClassLoader().getResource("airlineStats.snappy.parquet").getFile()), 19492,
-        false);
-    testComparison(new File(getClass().getClassLoader().getResource("githubActivities.gz.parquet").getFile()), 2000,
-        false);
-    testComparison(new File(getClass().getClassLoader().getResource("int96AvroParquet.parquet").getFile()), 1, true);
+    testComparison(_dataFile, SAMPLE_RECORDS_SIZE);
+    testComparison(new File(getClass().getClassLoader().getResource("users.parquet").getFile()), 1);
+    testComparison(new File(getClass().getClassLoader().getResource("test-comparison.gz.parquet").getFile()), 363667);
+    testComparison(new File(getClass().getClassLoader().getResource("test-comparison.snappy.parquet").getFile()), 2870);
+    testComparison(new File(getClass().getClassLoader().getResource("baseballStats.snappy.parquet").getFile()), 97889);
+    testComparison(new File(getClass().getClassLoader().getResource("baseballStats.zstd.parquet").getFile()), 97889);
+    testComparison(new File(getClass().getClassLoader().getResource("githubEvents.snappy.parquet").getFile()), 10000);
+    testComparison(new File(getClass().getClassLoader().getResource("starbucksStores.snappy.parquet").getFile()), 6443);
+    testComparison(new File(getClass().getClassLoader().getResource("airlineStats.snappy.parquet").getFile()), 19492);
+    testComparison(new File(getClass().getClassLoader().getResource("githubActivities.gz.parquet").getFile()), 2000);
+    testComparison(new File(getClass().getClassLoader().getResource("int96AvroParquet.parquet").getFile()), 1);
   }
 
-  private void testComparison(File dataFile, int totalRecords, boolean skipIndividualRecordComparison)
+  private void testComparison(File dataFile, int totalRecords)
       throws IOException {
     final ParquetRecordReader avroRecordReader = new ParquetRecordReader();
     ParquetRecordReaderConfig avroRecordReaderConfig = new ParquetRecordReaderConfig();
@@ -159,14 +151,14 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
     Assert.assertTrue(avroRecordReader.useAvroParquetRecordReader());
     Assert.assertFalse(nativeRecordReader.useAvroParquetRecordReader());
 
-    testComparison(avroRecordReader, nativeRecordReader, totalRecords, skipIndividualRecordComparison);
+    testComparison(avroRecordReader, nativeRecordReader, totalRecords);
     avroRecordReader.rewind();
     nativeRecordReader.rewind();
-    testComparison(avroRecordReader, nativeRecordReader, totalRecords, skipIndividualRecordComparison);
+    testComparison(avroRecordReader, nativeRecordReader, totalRecords);
   }
 
   private void testComparison(ParquetRecordReader avroRecordReader, ParquetRecordReader nativeRecordReader,
-      int totalRecords, boolean skipIndividualRecordComparison)
+      int totalRecords)
       throws IOException {
     GenericRow avroReuse = new GenericRow();
     GenericRow nativeReuse = new GenericRow();
@@ -175,10 +167,8 @@ public class ParquetRecordReaderTest extends AbstractRecordReaderTest {
       Assert.assertTrue(nativeRecordReader.hasNext());
       final GenericRow avroReaderRow = avroRecordReader.next(avroReuse);
       final GenericRow nativeReaderRow = nativeRecordReader.next(nativeReuse);
-      if (!skipIndividualRecordComparison) {
-        Assert.assertEquals(nativeReaderRow.toString(), avroReaderRow.toString());
-        Assert.assertTrue(avroReaderRow.equals(nativeReaderRow));
-      }
+      Assert.assertEquals(nativeReaderRow.toString(), avroReaderRow.toString());
+      Assert.assertTrue(avroReaderRow.equals(nativeReaderRow));
       recordsRead++;
     }
     Assert.assertFalse(nativeRecordReader.hasNext());
