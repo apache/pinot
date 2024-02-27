@@ -59,6 +59,7 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -152,7 +153,8 @@ public class FilterPlanNode implements PlanNode {
         findLiteral = true;
       }
     }
-    return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null && findLiteral;
+    return columnName != null && _indexSegment.getDataSource(columnName).getH3Index() != null && findLiteral
+        && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
   }
 
   /**
@@ -182,14 +184,16 @@ public class FilterPlanNode implements PlanNode {
       if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(0).getIdentifier();
-        return _indexSegment.getDataSource(columnName).getH3Index() != null;
+        return _indexSegment.getDataSource(columnName).getH3Index() != null
+            && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
       }
       return false;
     } else {
       if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(1).getIdentifier();
-        return _indexSegment.getDataSource(columnName).getH3Index() != null;
+        return _indexSegment.getDataSource(columnName).getH3Index() != null
+            && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
       }
       return false;
     }
