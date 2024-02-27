@@ -85,6 +85,7 @@ public class DatabaseUtils {
   }
 
   public static boolean isTableNameEquivalent(String name1, String name2) {
-    return Objects.equals(name1, name2) || name1.endsWith("." + name2) || name2.endsWith("." + name1);
+    return Objects.equals(name1, name2)
+        || (name1 != null && name2 != null && (name1.endsWith("." + name2) || name2.endsWith("." + name1)));
   }
 }
