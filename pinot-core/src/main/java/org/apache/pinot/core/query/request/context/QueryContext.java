@@ -40,6 +40,8 @@ import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.spi.config.table.FieldConfig;
 
 
 /**
@@ -123,6 +125,8 @@ public class QueryContext {
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
   private boolean _serverReturnFinalResult;
+  // Collection of index types to skip per column
+  private Map<String, Set<FieldConfig.IndexType>> _indexSkipConfig;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
@@ -426,6 +430,21 @@ public class QueryContext {
         + ", _groupByExpressions=" + _groupByExpressions + ", _havingFilter=" + _havingFilter + ", _orderByExpressions="
         + _orderByExpressions + ", _limit=" + _limit + ", _offset=" + _offset + ", _queryOptions=" + _queryOptions
         + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
+  }
+
+  public void setIndexSkipConfig(Map<String, Set<FieldConfig.IndexType>> indexSkipConfig) {
+    _indexSkipConfig = indexSkipConfig;
+  }
+
+  public boolean isIndexUseAllowed(String columnName, FieldConfig.IndexType indexType) {
+    if (_indexSkipConfig == null) {
+      return true;
+    }
+    return !_indexSkipConfig.getOrDefault(columnName, Collections.EMPTY_SET).contains(indexType);
+  }
+
+  public boolean isIndexUseAllowed(DataSource dataSource, FieldConfig.IndexType indexType) {
+    return isIndexUseAllowed(dataSource.getColumnName(), indexType);
   }
 
   public static class Builder {

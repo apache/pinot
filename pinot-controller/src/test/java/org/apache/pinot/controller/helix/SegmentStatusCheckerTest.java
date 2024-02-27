@@ -452,14 +452,14 @@ public class SegmentStatusCheckerTest {
     _segmentStatusChecker.setTableSizeReader(_tableSizeReader);
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
-    Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
-            ControllerGauge.SEGMENTS_IN_ERROR_STATE), Long.MIN_VALUE);
-    Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
-        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS), Long.MIN_VALUE);
-    Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
-            ControllerGauge.NUMBER_OF_REPLICAS), Long.MIN_VALUE);
-    Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
-            ControllerGauge.PERCENT_OF_REPLICAS), Long.MIN_VALUE);
+    Assert.assertFalse(MetricValueUtils.tableGaugeExists(_controllerMetrics, tableName,
+            ControllerGauge.SEGMENTS_IN_ERROR_STATE));
+    Assert.assertFalse(MetricValueUtils.tableGaugeExists(_controllerMetrics, tableName,
+        ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS));
+    Assert.assertFalse(MetricValueUtils.tableGaugeExists(_controllerMetrics, tableName,
+            ControllerGauge.NUMBER_OF_REPLICAS));
+    Assert.assertFalse(MetricValueUtils.tableGaugeExists(_controllerMetrics, tableName,
+            ControllerGauge.PERCENT_OF_REPLICAS));
     Assert.assertFalse(MetricValueUtils.tableGaugeExists(_controllerMetrics, tableName,
             ControllerGauge.TABLE_COMPRESSED_SIZE));
   }
@@ -820,10 +820,10 @@ public class SegmentStatusCheckerTest {
     _segmentStatusChecker.start();
     _segmentStatusChecker.run();
 
-    Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), Long.MIN_VALUE);
-    Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
-        ControllerGauge.SEGMENTS_IN_ERROR_STATE), Long.MIN_VALUE);
+    Assert.assertFalse(MetricValueUtils.tableGaugeExists(_controllerMetrics, tableName,
+        ControllerGauge.SEGMENTS_IN_ERROR_STATE));
+    Assert.assertFalse(MetricValueUtils.tableGaugeExists(_controllerMetrics, tableName,
+        ControllerGauge.SEGMENTS_IN_ERROR_STATE));
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
         ControllerGauge.NUMBER_OF_REPLICAS), nReplicasExpectedValue);
     Assert.assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, tableName,
