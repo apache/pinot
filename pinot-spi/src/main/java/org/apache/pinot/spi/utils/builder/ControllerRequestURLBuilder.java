@@ -529,6 +529,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "zk/create");
   }
 
+  public String forZkDelete() {
+    return StringUtil.join("/", _baseUrl, "zk/delete");
+  }
+
   public String forZkGet(String path) {
     return StringUtil.join("/", _baseUrl, "zk/get", "?path=" + path);
   }
