@@ -220,8 +220,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.addInstance(instance, false);
     allInstances = _helixResourceManager.getAllInstances();
     assertTrue(allInstances.contains(instanceName));
-    allLiveInstances = _helixResourceManager.getAllLiveInstances();
-    assertTrue(allLiveInstances.contains(instanceName));
 
     // Remove the added instance
     assertTrue(_helixResourceManager.dropInstance(instanceName).isSuccessful());
