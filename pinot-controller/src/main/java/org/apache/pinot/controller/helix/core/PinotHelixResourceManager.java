@@ -415,6 +415,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all live instance Ids.
+   *
+   * @return List of live instance Ids
+   */
+  public List<String> getAllLiveInstances() {
+    return _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
+  }
+
+  /**
    * Returns the config for all the Helix instances in the cluster.
    */
   public List<InstanceConfig> getAllHelixInstanceConfigs() {
