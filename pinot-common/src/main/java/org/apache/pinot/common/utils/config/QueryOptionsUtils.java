@@ -23,8 +23,11 @@ import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
@@ -34,6 +37,7 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOver
  * Utils to parse query options.
  */
 public class QueryOptionsUtils {
+
   private QueryOptionsUtils() {
   }
 
@@ -143,6 +147,34 @@ public class QueryOptionsUtils {
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
+  }
+
+  @Nullable
+  public static Map<String, Set<FieldConfig.IndexType>> getIndexSkipConfig(Map<String, String> queryOptions) {
+    // Example config:  indexSkipConfig='col1=inverted,range&col2=inverted'
+    String indexSkipConfigStr = queryOptions.get(QueryOptionKey.INDEX_SKIP_CONFIG);
+    if (indexSkipConfigStr == null) {
+      return null;
+    }
+
+    String[] perColumnIndexSkip = indexSkipConfigStr.split("&");
+    Map<String, Set<FieldConfig.IndexType>> indexSkipConfig = new HashMap<>();
+    for (String columnConf : perColumnIndexSkip) {
+      String[] conf = columnConf.split("=");
+      if (conf.length != 2) {
+        throw new RuntimeException("Invalid format for " + QueryOptionKey.INDEX_SKIP_CONFIG
+            + ". Example of valid format: SET indexSkipConfig='col1=inverted,range&col2=inverted'");
+      }
+      String columnName = conf[0];
+      String[] indexTypes = conf[1].split(",");
+
+      for (String indexType : indexTypes) {
+        indexSkipConfig.computeIfAbsent(columnName, k -> new HashSet<>())
+            .add(FieldConfig.IndexType.valueOf(indexType.toUpperCase()));
+      }
+    }
+
+    return indexSkipConfig;
   }
 
   @Nullable

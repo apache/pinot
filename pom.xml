@@ -151,7 +151,7 @@
     <lz4-java.version>1.8.0</lz4-java.version>
     <log4j.version>2.22.0</log4j.version>
     <slf4j.version>2.0.9</slf4j.version>
-    <netty.version>4.1.100.Final</netty.version>
+    <netty.version>4.1.107.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
@@ -161,7 +161,7 @@
     <stax2-api.version>4.1</stax2-api.version>
     <aws.sdk.version>2.20.137</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
-    <testng.version>7.8.0</testng.version>
+    <testng.version>7.9.0</testng.version>
     <woodstox.version>6.4.0</woodstox.version>
     <sslcontext.kickstart.version>8.2.0</sslcontext.kickstart.version>
 
@@ -187,7 +187,7 @@
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
     <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
-    <surefire.version>3.1.2</surefire.version>
+    <surefire.version>3.2.5</surefire.version>
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.18</scala.version>
@@ -1280,12 +1280,6 @@
         <artifactId>ipaddress</artifactId>
         <version>5.3.4</version>
       </dependency>
-      <dependency>
-        <groupId>com.mercateo</groupId>
-        <artifactId>test-clock</artifactId>
-        <version>1.0.4</version>
-        <scope>test</scope>
-      </dependency>
 
       <dependency>
         <groupId>net.openhft</groupId>
@@ -1476,7 +1470,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-dependency-plugin</artifactId>
-          <version>2.8</version>
+          <version>3.6.1</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1704,7 +1698,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>3.1.2</version>
+        <version>3.3.1</version>
         <configuration>
           <configLocation>${pinot.root}/config/checkstyle.xml</configLocation>
           <suppressionsLocation>${pinot.root}/config/suppressions.xml</suppressionsLocation>

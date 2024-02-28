@@ -223,8 +223,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
         return false;
       }
       if (!checkSegmentStatusCheckerMetrics(controllerMetrics,
-          TableNameBuilder.OFFLINE.tableNameWithType(disabledTable), null, Long.MIN_VALUE, Long.MIN_VALUE,
-          Long.MIN_VALUE, Long.MIN_VALUE)) {
+          TableNameBuilder.OFFLINE.tableNameWithType(disabledTable), null, 0, 0, 0, 0)) {
         return false;
       }
       String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());

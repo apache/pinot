@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.common.utils.tls;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -382,11 +382,9 @@ public final class TlsUtils {
         null, null, tlsConfig.isInsecure());
   }
 
-  private static void enableAutoRenewalFromFileStoreForSSLFactory(
-      SSLFactory sslFactory,
-      String keyStoreType, String keyStorePath, String keyStorePassword,
-      String trustStoreType, String trustStorePath, String trustStorePassword,
-      String sslContextProtocol, SecureRandom secureRandom, boolean isInsecure) {
+  static void enableAutoRenewalFromFileStoreForSSLFactory(SSLFactory sslFactory, String keyStoreType,
+      String keyStorePath, String keyStorePassword, String trustStoreType, String trustStorePath,
+      String trustStorePassword, String sslContextProtocol, SecureRandom secureRandom, boolean isInsecure) {
     try {
       URL keyStoreURL = keyStorePath == null ? null : makeKeyOrTrustStoreUrl(keyStorePath);
       URL trustStoreURL = trustStorePath == null ? null : makeKeyOrTrustStoreUrl(trustStorePath);
@@ -525,7 +523,6 @@ public final class TlsUtils {
         null, null, true, tlsConfig.isInsecure());
   }
 
-  @VisibleForTesting
   static SSLFactory createSSLFactory(
       String keyStoreType, String keyStorePath, String keyStorePassword,
       String trustStoreType, String trustStorePath, String trustStorePassword,
