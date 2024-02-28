@@ -99,7 +99,7 @@ public class JvmDefaultSslContext {
       String jvmTrustStorePassword =
           Optional.ofNullable(System.getProperty(JVM_TRUST_STORE_PASSWORD))
               .map(String::trim).filter(StringUtils::isNotBlank).orElse(null);
-      TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(jvmSslFactory, jvmKeystoreType, jvmKeyStorePath,
+      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(jvmSslFactory, jvmKeystoreType, jvmKeyStorePath,
           jvmKeystorePassword, jvmTrustStoreType, jvmTrustStorePath, jvmTrustStorePassword, null, null, false);
     }
     _initialized = true;
