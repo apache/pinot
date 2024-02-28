@@ -114,11 +114,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       try {
         byte[] bytes = FileUtils.readFileToByteArray(validDocIdsSnapshotFile);
         MutableRoaringBitmap validDocIds = new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
-        LOGGER.info("Loaded valid doc ids for segment: {} with: {} valid docs", getSegmentName(),
+        LOGGER.info("Loaded validDocIds for segment: {} with: {} valid docs", getSegmentName(),
             validDocIds.getCardinality());
         return validDocIds;
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while loading valid doc ids from snapshot file: {}, ignoring the snapshot",
+        LOGGER.warn("Caught exception while loading validDocIds from snapshot file: {}, ignoring the snapshot",
             validDocIdsSnapshotFile);
       }
     }
@@ -140,10 +140,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       }
       Preconditions.checkState(tmpFile.renameTo(validDocIdsSnapshotFile),
           "Failed to rename tmp snapshot file: %s to snapshot file: %s", tmpFile, validDocIdsSnapshotFile);
-      LOGGER.info("Persisted valid doc ids for segment: {} with: {} valid docs", getSegmentName(),
+      LOGGER.info("Persisted validDocIds for segment: {} with: {} valid docs", getSegmentName(),
           validDocIdsSnapshot.getCardinality());
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while persisting valid doc ids to snapshot file: {}, skipping",
+      LOGGER.warn("Caught exception while persisting validDocIds to snapshot file: {}, skipping",
           validDocIdsSnapshotFile, e);
     }
   }
@@ -157,12 +157,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     if (validDocIdsSnapshotFile.exists()) {
       try {
         if (!FileUtils.deleteQuietly(validDocIdsSnapshotFile)) {
-          LOGGER.warn("Cannot delete old valid doc ids snapshot file: {}, skipping", validDocIdsSnapshotFile);
+          LOGGER.warn("Cannot delete old validDocIds snapshot file: {}, skipping", validDocIdsSnapshotFile);
           return;
         }
-        LOGGER.info("Deleted valid doc ids snapshot for segment: {}", getSegmentName());
+        LOGGER.info("Deleted validDocIds snapshot for segment: {}", getSegmentName());
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while deleting valid doc ids snapshot file: {}, skipping",
+        LOGGER.warn("Caught exception while deleting validDocIds snapshot file: {}, skipping",
             validDocIdsSnapshotFile);
       }
     }

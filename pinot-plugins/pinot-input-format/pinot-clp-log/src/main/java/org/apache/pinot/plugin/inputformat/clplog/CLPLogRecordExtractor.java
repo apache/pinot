@@ -30,7 +30,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
-import org.apache.pinot.sql.parsers.rewriter.CLPDecodeRewriter;
+import org.apache.pinot.sql.parsers.rewriter.ClpRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,8 +159,8 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
       }
     }
 
-    to.putValue(key + CLPDecodeRewriter.LOGTYPE_COLUMN_SUFFIX, logtype);
-    to.putValue(key + CLPDecodeRewriter.DICTIONARY_VARS_COLUMN_SUFFIX, dictVars);
-    to.putValue(key + CLPDecodeRewriter.ENCODED_VARS_COLUMN_SUFFIX, encodedVars);
+    to.putValue(key + ClpRewriter.LOGTYPE_COLUMN_SUFFIX, logtype);
+    to.putValue(key + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX, dictVars);
+    to.putValue(key + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX, encodedVars);
   }
 }

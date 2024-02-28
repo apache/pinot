@@ -52,6 +52,7 @@ public class CommonConstants {
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.1.0/";
+  public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
   /**
    * The state of the consumer for a given segment
@@ -91,8 +92,6 @@ public class CommonConstants {
 
     public static final String ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive";
     public static final boolean DEFAULT_ENABLE_CASE_INSENSITIVE = true;
-    public static final String ALLOW_TABLE_NAME_WITH_DATABASE = "allow.table.name.with.database";
-    public static final boolean DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE = false;
 
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
@@ -361,6 +360,7 @@ public class CommonConstants {
         public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
+        public static final String INDEX_SKIP_CONFIG = "indexSkipConfig";
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 

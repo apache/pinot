@@ -38,21 +38,13 @@
     <phase.prop>package</phase.prop>
   </properties>
   <dependencies>
-    <!-- google cloud storage -->
     <dependency>
       <groupId>com.google.cloud</groupId>
       <artifactId>google-cloud-storage</artifactId>
-      <version>1.113.1</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.guava</groupId>
-          <artifactId>guava</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.j2objc</groupId>
-          <artifactId>j2objc-annotations</artifactId>
-        </exclusion>
-      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>com.google.cloud</groupId>
+      <artifactId>google-cloud-nio</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
@@ -61,18 +53,10 @@
     <dependency>
       <groupId>com.google.api-client</groupId>
       <artifactId>google-api-client</artifactId>
-      <version>1.30.10</version>
     </dependency>
     <dependency>
       <groupId>com.google.http-client</groupId>
       <artifactId>google-http-client</artifactId>
-      <version>1.36.0</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.j2objc</groupId>
-          <artifactId>j2objc-annotations</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <!-- Due to dependency convergence issues with google cloud storage: https://github.com/googleapis/google-cloud-java/issues/4175 -->
     <dependency>
@@ -82,49 +66,14 @@
     <dependency>
       <groupId>com.google.api.grpc</groupId>
       <artifactId>proto-google-iam-v1</artifactId>
-      <version>1.0.0</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.api.grpc</groupId>
-          <artifactId>proto-google-common-protos</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>com.google.apis</groupId>
-      <artifactId>google-api-services-storage</artifactId>
-      <version>v1-rev20200814-1.30.10</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.api-client</groupId>
-          <artifactId>google-api-client</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.google.api</groupId>
       <artifactId>gax-httpjson</artifactId>
-      <version>0.75.2</version>
       <exclusions>
-        <exclusion>
-          <groupId>com.google.http-client</groupId>
-          <artifactId>google-http-client</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>org.threeten</groupId>
           <artifactId>threetenbp</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.api</groupId>
-          <artifactId>api-common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.auth</groupId>
-          <artifactId>google-auth-library-credentials</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.auth</groupId>
-          <artifactId>google-auth-library-oauth2-http</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -135,17 +84,6 @@
     <dependency>
       <groupId>org.glassfish.jersey.core</groupId>
       <artifactId>jersey-server</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.cloud</groupId>
-      <artifactId>google-cloud-nio</artifactId>
-      <version>0.120.0-alpha</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.cloud</groupId>
-          <artifactId>google-cloud-storage</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
   </dependencies>
 </project>

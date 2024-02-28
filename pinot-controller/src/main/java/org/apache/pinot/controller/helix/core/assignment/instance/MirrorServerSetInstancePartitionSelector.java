@@ -76,8 +76,8 @@ public class MirrorServerSetInstancePartitionSelector extends InstancePartitionS
 
   public MirrorServerSetInstancePartitionSelector(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
       String tableNameWithType, @Nullable InstancePartitions existingInstancePartitions,
-      InstancePartitions preConfiguredInstancePartitions) {
-    super(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions);
+      InstancePartitions preConfiguredInstancePartitions, boolean minimizeDataMovement) {
+    super(replicaGroupPartitionConfig, tableNameWithType, existingInstancePartitions, minimizeDataMovement);
     _preConfiguredInstancePartitions = preConfiguredInstancePartitions;
     _numTargetInstancesPerReplicaGroup = _replicaGroupPartitionConfig.getNumInstancesPerReplicaGroup();
     _numTargetReplicaGroups = _replicaGroupPartitionConfig.getNumReplicaGroups();

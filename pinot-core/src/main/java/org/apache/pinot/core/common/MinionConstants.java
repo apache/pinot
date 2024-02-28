@@ -164,5 +164,10 @@ public class MinionConstants {
      * e.g. if the count surpasses 100k, then the segment may be compacted
      */
     public static final String INVALID_RECORDS_THRESHOLD_COUNT = "invalidRecordsThresholdCount";
+
+    /**
+     * Valid doc ids type
+     */
+    public static final String VALID_DOC_IDS_TYPE = "validDocIdsType";
   }
 }

@@ -33,6 +33,7 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -293,6 +294,9 @@ public class TableConfigUtilsTest {
     }
 
     // using a transformation column in an aggregation
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setNoDictionaryColumns(List.of("twiceSum"));
+    tableConfig.setIndexingConfig(indexingConfig);
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("twiceSum", FieldSpec.DataType.DOUBLE).build();
     ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("twice", "col * 2")));
@@ -303,6 +307,7 @@ public class TableConfigUtilsTest {
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
             .build();
+    indexingConfig.setNoDictionaryColumns(List.of("myCol"));
     ingestionConfig.setAggregationConfigs(null);
     ingestionConfig.setTransformConfigs(Collections.singletonList(new TransformConfig("myCol", "reverse(anotherCol)")));
     TableConfigUtils.validate(tableConfig, schema);
@@ -509,6 +514,27 @@ public class TableConfigUtilsTest {
     }
 
     ingestionConfig.setAggregationConfigs(Collections.singletonList(new AggregationConfig("m1", "SUM(m1)")));
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      Assert.fail("Should fail due to noDictionaryColumns being null");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    IndexingConfig indexingConfig = new IndexingConfig();
+    indexingConfig.setNoDictionaryColumns(List.of());
+    tableConfig.setIndexingConfig(indexingConfig);
+
+    try {
+      TableConfigUtils.validateIngestionConfig(tableConfig, schema);
+      Assert.fail("Should fail due to noDictionaryColumns not containing m1");
+    } catch (IllegalStateException e) {
+      // expected
+    }
+
+    indexingConfig.setNoDictionaryColumns(List.of("m1"));
+
+    ingestionConfig.setAggregationConfigs(Collections.singletonList(new AggregationConfig("m1", "SUM(m1)")));
     TableConfigUtils.validateIngestionConfig(tableConfig, schema);
 
     ingestionConfig.setAggregationConfigs(Collections.singletonList(new AggregationConfig("m1", "SUM(s1)")));
@@ -528,7 +554,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+            .setIngestionConfig(ingestionConfig).setNoDictionaryColumns(List.of("d1")).build();
 
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
@@ -549,7 +575,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+            .setIngestionConfig(ingestionConfig).setNoDictionaryColumns(List.of("d1", "d2", "d3", "d4", "d5")).build();
 
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
@@ -567,7 +593,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+            .setIngestionConfig(ingestionConfig).setNoDictionaryColumns(List.of("d1", "d2", "d3", "d4", "d5")).build();
 
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
@@ -582,7 +608,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+            .setIngestionConfig(ingestionConfig).setNoDictionaryColumns(List.of("d1")).build();
 
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
@@ -594,7 +620,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+            .setIngestionConfig(ingestionConfig).setNoDictionaryColumns(List.of("d1")).build();
 
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
@@ -616,7 +642,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+            .setIngestionConfig(ingestionConfig).setNoDictionaryColumns(List.of("d1", "d2", "d3", "d4", "d5")).build();
     TableConfigUtils.validateIngestionConfig(tableConfig, schema);
 
     // with too many arguments should fail
@@ -629,7 +655,7 @@ public class TableConfigUtilsTest {
     ingestionConfig.setAggregationConfigs(aggregationConfigs);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("myTable_REALTIME").setTimeColumnName("timeColumn")
-            .setIngestionConfig(ingestionConfig).build();
+            .setIngestionConfig(ingestionConfig).setNoDictionaryColumns(List.of("d1")).build();
 
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, schema);
@@ -961,33 +987,23 @@ public class TableConfigUtilsTest {
 
   @Test
   public void testTableName() {
-    String[] malformedTableName = {"test.table", "test table"};
+    String[] malformedTableName = {"test.test.table", "test table"};
     for (int i = 0; i < 2; i++) {
       String tableName = malformedTableName[i];
       TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
       try {
-        TableConfigUtils.validateTableName(tableConfig, CommonConstants.Helix.DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE);
+        TableConfigUtils.validateTableName(tableConfig);
         Assert.fail("Should fail for malformed table name : " + tableName);
       } catch (IllegalStateException e) {
         // expected
       }
     }
 
-    String allowedWithConfig = "test.table";
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(allowedWithConfig).build();
-    try {
-      TableConfigUtils.validateTableName(tableConfig, true);
-    } catch (IllegalStateException e) {
-      Assert.fail("Should allow table name with dot if configuration is turned on");
-    }
-
-    String rejected = "test.another.table";
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rejected).build();
-    try {
-      TableConfigUtils.validateTableName(tableConfig, true);
-      Assert.fail("Should fail for malformed table name : " + rejected);
-    } catch (IllegalStateException e) {
-      // expected
+    String[] allowedTableName = {"test.table", "testTable"};
+    for (int i = 0; i < 2; i++) {
+      String tableName = allowedTableName[i];
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build();
+      TableConfigUtils.validateTableName(tableConfig);
     }
   }
 
@@ -2300,8 +2316,10 @@ public class TableConfigUtilsTest {
     Map<String, String> upsertCompactionTaskConfig =
         ImmutableMap.of("bufferTimePeriod", "5d", "invalidRecordsThresholdPercent", "1", "invalidRecordsThresholdCount",
             "1");
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableSnapshot(true);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setUpsertConfig(upsertConfig)
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
         .build();
 
@@ -2310,7 +2328,7 @@ public class TableConfigUtilsTest {
     // test with invalid invalidRecordsThresholdPercents
     upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "0");
     TableConfig zeroPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setUpsertConfig(upsertConfig)
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
         .build();
     Assert.assertThrows(IllegalStateException.class,

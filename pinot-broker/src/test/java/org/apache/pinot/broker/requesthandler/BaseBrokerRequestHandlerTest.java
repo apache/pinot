@@ -48,7 +48,6 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.util.TestUtils;
@@ -142,46 +141,6 @@ public class BaseBrokerRequestHandlerTest {
     String wrongColumnName3 =
         BaseBrokerRequestHandler.getActualColumnName("MYTABLE", "mytable", columnNameMap, true);
     Assert.assertEquals(wrongColumnName3, "mytable");
-  }
-
-  @Test
-  public void testGetActualTableNameBanningDots() {
-    // not allowing dots
-    PinotConfiguration configuration = new PinotConfiguration();
-    configuration.setProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE, false);
-
-    TableCache tableCache = Mockito.mock(TableCache.class);
-    when(tableCache.isIgnoreCase()).thenReturn(true);
-    when(tableCache.getActualTableName("mytable")).thenReturn("mytable");
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("mytable", tableCache), "mytable");
-    when(tableCache.getActualTableName("db.mytable")).thenReturn(null);
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "mytable");
-
-    when(tableCache.isIgnoreCase()).thenReturn(false);
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "mytable");
-  }
-
-  @Test
-  public void testGetActualTableNameAllowingDots() {
-
-    TableCache tableCache = Mockito.mock(TableCache.class);
-    when(tableCache.isIgnoreCase()).thenReturn(true);
-    // the tableCache should have only "db.mytable" in it since this is the only table
-    when(tableCache.getActualTableName("mytable")).thenReturn(null);
-    when(tableCache.getActualTableName("db.mytable")).thenReturn("db.mytable");
-    when(tableCache.getActualTableName("other.mytable")).thenReturn(null);
-    when(tableCache.getActualTableName("test_table")).thenReturn(null);
-
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("test_table", tableCache), "test_table");
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("mytable", tableCache), "mytable");
-
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "db.mytable");
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("other.mytable", tableCache), "other.mytable");
-
-    when(tableCache.isIgnoreCase()).thenReturn(false);
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "db.mytable");
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.namespace.mytable", tableCache),
-        "db.namespace.mytable");
   }
 
   @Test

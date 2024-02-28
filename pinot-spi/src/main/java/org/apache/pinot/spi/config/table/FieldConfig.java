@@ -103,7 +103,7 @@ public class FieldConfig extends BaseJsonConfig {
       @JsonProperty(value = "tierOverwrites") @Nullable JsonNode tierOverwrites) {
     Preconditions.checkArgument(name != null, "'name' must be configured");
     _name = name;
-    _encodingType = encodingType;
+    _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
     _indexTypes = indexTypes != null ? indexTypes : (
         indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
     _compressionCodec = compressionCodec;

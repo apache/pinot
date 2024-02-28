@@ -22,6 +22,8 @@
 
 Before you begin to contribute, make sure you have reviewed [Dev Environment Setup](https://docs.pinot.apache.org/developers/developers-and-contributors/code-setup) and [Code Modules and Organization](https://docs.pinot.apache.org/developers/developers-and-contributors/code-modules-and-organization) sections and that you have created your own fork of the pinot source code.
 
+> If you wish to contribute to the UI codebase, follow [this guide](/pinot-controller/src/main/resources/Readme.md) to setup UI locally for development.
+
 ### Create a design document
 
 If your change is relatively minor, you can skip this step. If you are adding new major feature, we suggest that you add a design document and solicit comments from the community before submitting any code.

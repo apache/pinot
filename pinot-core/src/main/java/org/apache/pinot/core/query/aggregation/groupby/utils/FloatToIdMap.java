@@ -18,18 +18,16 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby.utils;
 
-import it.unimi.dsi.fastutil.floats.Float2IntMap;
 import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
-import it.unimi.dsi.fastutil.floats.FloatList;
 
 
 /**
  * Implementation of {@link ValueToIdMap} for float.
  */
-public class FloatToIdMap extends BaseValueToIdMap {
-  Float2IntMap _valueToIdMap;
-  FloatList _idToValueMap;
+public class FloatToIdMap implements ValueToIdMap {
+  private final Float2IntOpenHashMap _valueToIdMap;
+  private final FloatArrayList _idToValueMap;
 
   public FloatToIdMap() {
     _valueToIdMap = new Float2IntOpenHashMap();
@@ -39,28 +37,31 @@ public class FloatToIdMap extends BaseValueToIdMap {
 
   @Override
   public int put(float value) {
-    int id = _valueToIdMap.get(value);
-    if (id == INVALID_KEY) {
-      id = _idToValueMap.size();
-      _valueToIdMap.put(value, id);
+    int numValues = _valueToIdMap.size();
+    int id = _valueToIdMap.computeIfAbsent(value, k -> numValues);
+    if (id == numValues) {
       _idToValueMap.add(value);
     }
     return id;
   }
 
   @Override
-  public float getFloat(int id) {
-    assert id < _idToValueMap.size();
+  public int put(Object value) {
+    return put((float) value);
+  }
+
+  @Override
+  public int getId(float value) {
+    return _valueToIdMap.get(value);
+  }
+
+  @Override
+  public int getId(Object value) {
+    return getId((float) value);
+  }
+
+  @Override
+  public Float get(int id) {
     return _idToValueMap.getFloat(id);
-  }
-
-  @Override
-  public String getString(int id) {
-    return Float.toString(getFloat(id));
-  }
-
-  @Override
-  public Object get(int id) {
-    return getFloat(id);
   }
 }

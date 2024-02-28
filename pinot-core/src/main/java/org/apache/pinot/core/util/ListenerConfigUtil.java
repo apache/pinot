@@ -34,17 +34,17 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.grizzly.http.server.NetworkListener;
-import org.glassfish.grizzly.ssl.SSLContextConfigurator;
 import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.internal.guava.ThreadFactoryBuilder;
@@ -263,21 +263,8 @@ public final class ListenerConfigUtil {
   }
 
   private static SSLEngineConfigurator buildSSLEngineConfigurator(TlsConfig tlsConfig) {
-    SSLContextConfigurator sslContextConfigurator = new SSLContextConfigurator();
-
-    if (tlsConfig.getKeyStorePath() != null) {
-      Preconditions.checkNotNull(tlsConfig.getKeyStorePassword(), "key store password required");
-      sslContextConfigurator.setKeyStoreFile(cacheInTempFile(tlsConfig.getKeyStorePath()).getAbsolutePath());
-      sslContextConfigurator.setKeyStorePass(tlsConfig.getKeyStorePassword());
-    }
-
-    if (tlsConfig.getTrustStorePath() != null) {
-      Preconditions.checkNotNull(tlsConfig.getKeyStorePassword(), "trust store password required");
-      sslContextConfigurator.setTrustStoreFile(cacheInTempFile(tlsConfig.getTrustStorePath()).getAbsolutePath());
-      sslContextConfigurator.setTrustStorePass(tlsConfig.getTrustStorePassword());
-    }
-
-    return new SSLEngineConfigurator(sslContextConfigurator).setClientMode(false)
+    SSLFactory sslFactory = TlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig);
+    return new SSLEngineConfigurator(sslFactory.getSslContext()).setClientMode(false)
         .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[]{"TLSv1.2"});
   }
 

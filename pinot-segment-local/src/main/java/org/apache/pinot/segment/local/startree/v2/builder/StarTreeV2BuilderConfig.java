@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.segment.local.startree.v2.builder;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -187,6 +189,81 @@ public class StarTreeV2BuilderConfig {
 
     return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), aggregationSpecs,
         DEFAULT_MAX_LEAF_RECORDS);
+  }
+
+  public static StarTreeV2BuilderConfig generateDefaultConfig(Schema schema, JsonNode columnsMetadata) {
+    List<JsonNode> dimensionColumnMetadataList = new ArrayList<>();
+    List<JsonNode> timeColumnMetadataList = new ArrayList<>();
+    List<String> numericMetrics = new ArrayList<>();
+    Preconditions.checkState(!columnsMetadata.isNull(), "columnsMetadata should not be null.");
+    Preconditions.checkState(!columnsMetadata.isEmpty(), "columnsMetadata should not be empty.");
+
+    // Convert columnsMetadata to a map for easy lookup.
+    Map<String, JsonNode> columnMetadataMap = convertJsonNodeToMap(columnsMetadata);
+
+    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      if (!fieldSpec.isSingleValueField() || fieldSpec.isVirtualColumn()) {
+        continue;
+      }
+      String column = fieldSpec.getName();
+      switch (fieldSpec.getFieldType()) {
+        case DIMENSION:
+          JsonNode columnMetadata = columnMetadataMap.get(column);
+          if (columnMetadata.get("hasDictionary").asBoolean()
+              && columnMetadata.get("cardinality").asInt() <= DIMENSION_CARDINALITY_THRESHOLD_FOR_DEFAULT_CONFIG) {
+            dimensionColumnMetadataList.add(columnMetadata);
+          }
+          break;
+        case DATE_TIME:
+        case TIME:
+          columnMetadata = columnMetadataMap.get(column);
+          if (columnMetadata.get("hasDictionary").asBoolean()) {
+            timeColumnMetadataList.add(columnMetadata);
+          }
+          break;
+        case METRIC:
+          if (fieldSpec.getDataType().isNumeric()) {
+            numericMetrics.add(column);
+          }
+          break;
+        default:
+          break;
+      }
+    }
+
+    // Sort all dimensions/time columns with their cardinality in descending order
+    dimensionColumnMetadataList.sort(
+        (o1, o2) -> Integer.compare(o2.get("cardinality").asInt(), o1.get("cardinality").asInt()));
+    timeColumnMetadataList.sort(
+        (o1, o2) -> Integer.compare(o2.get("cardinality").asInt(), o1.get("cardinality").asInt()));
+
+    List<String> dimensionsSplitOrder = new ArrayList<>();
+    for (JsonNode dimensionColumnMetadata : dimensionColumnMetadataList) {
+      dimensionsSplitOrder.add(dimensionColumnMetadata.get("columnName").asText());
+    }
+    for (JsonNode timeColumnMetadata : timeColumnMetadataList) {
+      dimensionsSplitOrder.add(timeColumnMetadata.get("columnName").asText());
+    }
+    Preconditions.checkState(!dimensionsSplitOrder.isEmpty(), "No qualified dimension found for star-tree split order");
+
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
+    aggregationSpecs.put(AggregationFunctionColumnPair.COUNT_STAR, AggregationSpec.DEFAULT);
+    for (String numericMetric : numericMetrics) {
+      aggregationSpecs.put(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, numericMetric),
+          AggregationSpec.DEFAULT);
+    }
+
+    return new StarTreeV2BuilderConfig(dimensionsSplitOrder, Collections.emptySet(), aggregationSpecs,
+        DEFAULT_MAX_LEAF_RECORDS);
+  }
+
+  public static Map<String, JsonNode> convertJsonNodeToMap(JsonNode columnsMetadata) {
+    Map<String, JsonNode> map = new HashMap<>();
+    for (JsonNode columnMetadata : columnsMetadata) {
+      String columnName = columnMetadata.get("columnName").asText();
+      map.put(columnName, columnMetadata);
+    }
+    return map;
   }
 
   private StarTreeV2BuilderConfig(List<String> dimensionsSplitOrder, Set<String> skipStarNodeCreationForDimensions,
