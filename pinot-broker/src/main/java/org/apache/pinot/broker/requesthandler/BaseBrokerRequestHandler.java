@@ -1773,8 +1773,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // BrokerConfig
-    Long maxServerResponseSizeBrokerConfig = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES,
-        Long.class);
+    Long maxServerResponseSizeBrokerConfig =
+        _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES, Long.class);
     Long mBytes = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_MEGA_BYTES, Long.class);
     if (mBytes != null) {
       maxServerResponseSizeBrokerConfig = (maxServerResponseSizeBrokerConfig == null)
@@ -1785,8 +1785,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return;
     }
 
-    Long maxQueryResponseSizeBrokerConfig = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES,
-        Long.class);
+    Long maxQueryResponseSizeBrokerConfig =
+        _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES, Long.class);
     mBytes = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_MEGA_BYTES, Long.class);
     if (mBytes != null) {
       maxQueryResponseSizeBrokerConfig = (maxQueryResponseSizeBrokerConfig == null)
