@@ -39,6 +39,11 @@ public class DatabaseUtils {
 
   private static final List<String> TABLE_NAME_KEYS = List.of("tableName", "tableNameWithType", "schemaName");
 
+  /**
+   * Replace the table/schema name query params of the {@link ContainerRequestContext} requestContext with the
+   * fully qualified table/schema name i.e. {databaseName}.{tableName}
+   * @param requestContext requestContext to update
+   */
   public static void translateTableNameQueryParam(ContainerRequestContext requestContext, TableCache tableCache) {
     MultivaluedMap<String, String> queryParams = requestContext.getUriInfo().getQueryParameters();
     String uri = requestContext.getUriInfo().getRequestUri().toString();
@@ -64,6 +69,15 @@ public class DatabaseUtils {
     }
   }
 
+  /**
+   * Construct the fully qualified table name i.e. {databaseName}.{tableName} from given table name and database name
+   * If table name already has the database prefix then that takes precedence over the provided {@code databaseName}
+   * @param tableName table/schema name
+   * @param databaseName database name
+   * @param tableCache
+   * @return translated table name. If {@code tableCache} is provided the actual table name for the
+   * translated table name is returned if it exists else translated table name itself is returned.
+   */
   public static String translateTableName(String tableName, String databaseName, @Nullable TableCache tableCache) {
     if (tableName != null && databaseName != null) {
       String[] tableSplit = tableName.split("\\.");
@@ -84,6 +98,13 @@ public class DatabaseUtils {
     return actualTableName != null ? actualTableName : tableName;
   }
 
+  /**
+   * Checks the logical table name equivalence. Usually needed when one of the table name is translated while other may
+   * not but soft validation is performed before overwriting the translated name everywhere.
+   * @param name1 table name
+   * @param name2 another table name
+   * @return {@code true} if both are null or both have the same logical table name.
+   */
   public static boolean isTableNameEquivalent(String name1, String name2) {
     return Objects.equals(name1, name2)
         || (name1 != null && name2 != null && (name1.endsWith("." + name2) || name2.endsWith("." + name1)));
