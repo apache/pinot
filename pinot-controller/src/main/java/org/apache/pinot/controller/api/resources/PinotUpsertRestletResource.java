@@ -113,7 +113,7 @@ public class PinotUpsertRestletResource {
           Response.Status.BAD_REQUEST, e);
     }
 
-    String tableName = _pinotHelixResourceManager.getTranslatedTableName(tableSchemaConfig.getTableConfig().getTableName(),
+    String tableName = _pinotHelixResourceManager.translateTableName(tableSchemaConfig.getTableConfig().getTableName(),
         headers.getHeaderString(CommonConstants.DATABASE));
     return estimateHeapUsageV2(tableSchemaConfigStr, tableName, cardinality, primaryKeySize, numPartitions);
   }

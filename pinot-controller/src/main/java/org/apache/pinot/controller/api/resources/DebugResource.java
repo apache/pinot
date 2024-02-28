@@ -132,7 +132,7 @@ public class DebugResource {
       @ApiParam(value = "Verbosity of debug information") @DefaultValue("0") @QueryParam("verbosity") int verbosity,
       @Context HttpHeaders headers)
       throws JsonProcessingException {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTableDebugInfoV2(tableName, tableTypeStr, verbosity);
   }
@@ -184,7 +184,7 @@ public class DebugResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
       @Context HttpHeaders headers)
       throws Exception {
-    tableNameWithType = _pinotHelixResourceManager.getTranslatedTableName(tableNameWithType,
+    tableNameWithType = _pinotHelixResourceManager.translateTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getSegmentDebugInfoV2(tableNameWithType, segmentName);
   }

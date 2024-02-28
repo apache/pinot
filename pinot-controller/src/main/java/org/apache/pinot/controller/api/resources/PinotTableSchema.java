@@ -72,7 +72,7 @@ public class PinotTableSchema {
   public String getTableSchema(
       @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTableSchemaV2(tableName);
   }

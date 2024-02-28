@@ -153,7 +153,7 @@ public class TableConfigsRestletResource {
       @Context HttpHeaders headers) {
     try {
       return getConfig(
-          _pinotHelixResourceManager.getTranslatedTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)));
+          _pinotHelixResourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)));
     } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     }
@@ -206,7 +206,7 @@ public class TableConfigsRestletResource {
       Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      tableName = _pinotHelixResourceManager.getTranslatedTableName(tableConfigs.getTableName(),
+      tableName = _pinotHelixResourceManager.translateTableName(tableConfigs.getTableName(),
           httpHeaders.getHeaderString(CommonConstants.DATABASE));
     } catch (IllegalArgumentException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
@@ -344,7 +344,7 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
           String tableName, @Context HttpHeaders headers) {
     try {
-      tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+      tableName = _pinotHelixResourceManager.translateTableName(tableName,
           headers.getHeaderString(CommonConstants.DATABASE));
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
@@ -416,7 +416,7 @@ public class TableConfigsRestletResource {
       @QueryParam("forceTableSchemaUpdate") boolean forceTableSchemaUpdate,
       String tableConfigsStr, @Context HttpHeaders headers) throws Exception {
     try {
-      tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+      tableName = _pinotHelixResourceManager.translateTableName(tableName,
           headers.getHeaderString(CommonConstants.DATABASE));
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);

@@ -845,7 +845,7 @@ public class PinotHelixResourceManager {
    * @param databaseName database name. It is ignored if {@code tableName} already has the database name prefix
    * @return the translated name
    */
-  public String getTranslatedTableName(String tableName, String databaseName) {
+  public String translateTableName(String tableName, String databaseName) {
     return DatabaseUtils.translateTableName(tableName, databaseName);
   }
 

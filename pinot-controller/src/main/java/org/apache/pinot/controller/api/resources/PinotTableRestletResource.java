@@ -196,7 +196,7 @@ public class PinotTableRestletResource {
     try {
       TableConfig tableConfig = JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class)
           .getLeft();
-      tableName = _pinotHelixResourceManager.getTranslatedTableName(tableConfig.getTableName(),
+      tableName = _pinotHelixResourceManager.translateTableName(tableConfig.getTableName(),
           httpHeaders.getHeaderString(CommonConstants.DATABASE));
     } catch (Exception e) {
       tableName = null;
@@ -240,7 +240,7 @@ public class PinotTableRestletResource {
       // Handling deprecated config
       SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
       if (validationConfig != null && validationConfig.getSchemaName() != null) {
-        validationConfig.setSchemaName(_pinotHelixResourceManager.getTranslatedTableName(validationConfig.getSchemaName(),
+        validationConfig.setSchemaName(_pinotHelixResourceManager.translateTableName(validationConfig.getSchemaName(),
             httpHeaders.getHeaderString(CommonConstants.DATABASE)));
       }
 
@@ -400,7 +400,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
     return listTableConfigs(
-        _pinotHelixResourceManager.getTranslatedTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
+        _pinotHelixResourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
         tableTypeStr);
   }
 
@@ -448,7 +448,7 @@ public class PinotTableRestletResource {
           + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod,
       @Context HttpHeaders headers) {
     return deleteTable(
-        _pinotHelixResourceManager.getTranslatedTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
+        _pinotHelixResourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
         tableTypeStr, retentionPeriod);
   }
   @DELETE
@@ -523,7 +523,7 @@ public class PinotTableRestletResource {
       String tableConfigString)
       throws Exception {
     return updateTableConfig(
-        _pinotHelixResourceManager.getTranslatedTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
+        _pinotHelixResourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
         typesToSkip, tableConfigString, headers);
   }
 
@@ -556,7 +556,7 @@ public class PinotTableRestletResource {
       // Handling deprecated config
       SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
       if (validationConfig != null && validationConfig.getSchemaName() != null) {
-        validationConfig.setSchemaName(_pinotHelixResourceManager.getTranslatedTableName(validationConfig.getSchemaName(),
+        validationConfig.setSchemaName(_pinotHelixResourceManager.translateTableName(validationConfig.getSchemaName(),
             headers.getHeaderString(CommonConstants.DATABASE)));
       }
 
@@ -732,7 +732,7 @@ public class PinotTableRestletResource {
       @Context HttpHeaders headers
       //@formatter:on
   ) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return rebalanceV2(tableName, tableTypeStr, dryRun, reassignInstances, includeConsuming, bootstrap, downtime,
         minAvailableReplicas, lowDiskMode, bestEfforts, externalViewCheckIntervalInMs,
@@ -853,7 +853,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return cancelRebalanceV2(tableName, tableTypeStr);
   }
@@ -940,7 +940,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table to get its state", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTableStateV2(tableName, tableTypeStr);
   }
@@ -982,7 +982,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "enable|disable", required = true) @QueryParam("state") String state,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return toggleTableStateV2(tableName, tableTypeStr, state);
   }
@@ -1034,7 +1034,7 @@ public class PinotTableRestletResource {
   public String getTableStats(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTableStatsV2(tableName, tableTypeStr);
   }
@@ -1096,7 +1096,7 @@ public class PinotTableRestletResource {
   public String getTableStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTableStatusV2(tableName, tableTypeStr);
   }
@@ -1151,7 +1151,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
       List<String> columns, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTableAggregateMetadataV2(tableName, tableTypeStr, columns);
   }
@@ -1204,7 +1204,7 @@ public class PinotTableRestletResource {
       List<String> segmentNames,
       @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType")
       @DefaultValue("SNAPSHOT") ValidDocIdsType validDocIdsType, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTableAggregateValidDocIdMetadataV2(tableName, tableTypeStr, segmentNames, validDocIdsType);
   }
@@ -1258,7 +1258,7 @@ public class PinotTableRestletResource {
   public String getTableIndexes(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTableIndexesV2(tableName, tableTypeStr);
   }
@@ -1356,7 +1356,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Comma separated list of job types") @QueryParam("jobTypes") @Nullable String jobTypesString,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getControllerJobsV2(tableName, tableTypeStr, jobTypesString);
   }
@@ -1405,7 +1405,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
       String tableName, @Context HttpHeaders headers)
       throws Exception {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return setTimeBoundaryV2(tableName);
   }
@@ -1459,7 +1459,7 @@ public class PinotTableRestletResource {
   public SuccessResponse deleteTimeBoundary(
       @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
       String tableName, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return deleteTimeBoundaryV2(tableName);
   }

@@ -153,7 +153,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders)
       throws Exception {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         httpHeaders.getHeaderString(CommonConstants.DATABASE));
     return downloadSegmentV2(tableName, segmentName);
   }
@@ -650,7 +650,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
       @ApiParam(value = "Fields belonging to start replace segment request", required = true)
       StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return startReplaceSegmentsV2(tableName, tableTypeStr, forceCleanup, startReplaceSegmentsRequest);
   }
@@ -698,7 +698,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
       @ApiParam(value = "Fields belonging to end replace segment request")
           EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return endReplaceSegmentsV2(tableName, tableTypeStr, segmentLineageEntryId, endReplaceSegmentsRequest);
   }
@@ -750,7 +750,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert,
       @ApiParam(value = "Fields belonging to revert replace segment request")
       RevertReplaceSegmentsRequest revertReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
+    tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return revertReplaceSegmentsV2(tableName, tableTypeStr, segmentLineageEntryId, forceRevert,
         revertReplaceSegmentsRequest);

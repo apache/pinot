@@ -93,7 +93,7 @@ public class PinotInstanceAssignmentRestletResource {
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED|tier name") @QueryParam("type") @Nullable String type,
       @Context HttpHeaders headers) {
-    tableName = _resourceManager.getTranslatedTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = _resourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
     return getInstancePartitionsV2(tableName, type);
   }
 
@@ -176,7 +176,7 @@ public class PinotInstanceAssignmentRestletResource {
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED|tier name") @QueryParam("type") @Nullable String type,
       @ApiParam(value = "Whether to do dry-run") @DefaultValue("false") @QueryParam("dryRun") boolean dryRun,
       @Context HttpHeaders headers) {
-    tableName = _resourceManager.getTranslatedTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = _resourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
     return assignInstancesV2(tableName, type, dryRun);
   }
 
@@ -347,7 +347,7 @@ public class PinotInstanceAssignmentRestletResource {
   public Map<String, InstancePartitions> setInstancePartitions(
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName, String instancePartitionsStr,
       @Context HttpHeaders headers) {
-    tableName = _resourceManager.getTranslatedTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = _resourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
     return setInstancePartitionsV2(tableName, instancePartitionsStr);
   }
 
@@ -416,7 +416,7 @@ public class PinotInstanceAssignmentRestletResource {
       @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|CONSUMING|COMPLETED|tier name") @QueryParam("type") @Nullable
       String instancePartitionsType, @Context HttpHeaders headers) {
-    tableName = _resourceManager.getTranslatedTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = _resourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
     return removeInstancePartitionsV2(tableName, instancePartitionsType);
   }
 
@@ -487,7 +487,7 @@ public class PinotInstanceAssignmentRestletResource {
           String oldInstanceId,
       @ApiParam(value = "New instance to replace with", required = true) @QueryParam("newInstanceId")
           String newInstanceId, @Context HttpHeaders headers) {
-    tableName = _resourceManager.getTranslatedTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = _resourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
     return replaceInstanceV2(tableName, type, oldInstanceId, newInstanceId);
   }
 
