@@ -274,14 +274,13 @@ public class ZookeeperResource {
       @ApiParam(value = "Content") @QueryParam("data") @Nullable String data,
       @ApiParam(value = "TTL of the node. TTL are only honoured for persistent znodes (access option = 0x40 or 0x80),"
           + " in which case TTL should be > 0. If access option is not 0x40 or 0x80, it will be ignored, and we can "
-          + "set it to any value, or be ignored", defaultValue = "-1")
-      @QueryParam("ttl") @DefaultValue("-1") int ttl,
+          + "set it to any value, or be ignored", defaultValue = "-1") @QueryParam("ttl") @DefaultValue("-1") int ttl,
       @ApiParam(value = "accessOption", defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1")
       int accessOption, @Nullable String payload) {
 
     path = validateAndNormalizeZKPath(path, false);
 
-//    validate ttl range
+    //validate ttl range
     if ((accessOption == AccessOption.PERSISTENT_WITH_TTL
         || accessOption == AccessOption.PERSISTENT_SEQUENTIAL_WITH_TTL) && ttl <= 0) {
       throw new ControllerApplicationException(LOGGER, "TTL for persistent nodes should be > 0",
