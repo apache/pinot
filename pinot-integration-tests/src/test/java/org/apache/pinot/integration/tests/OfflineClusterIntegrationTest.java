@@ -3291,7 +3291,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     return "SET " + SKIP_INDEXES + "='" + columnsAndIndexes + "'; ";
   }
 
-  @Test(dataProvider = "useBothQueryEngines")
+  @Test(dataProvider = "useBothQueryEngines", dependsOnMethods = {"testRangeIndexTriggering",
+      "testInvertedIndexTriggering"})
   public void testSkipIndexes(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
