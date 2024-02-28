@@ -1777,8 +1777,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         Long.class);
     Long mBytes = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_MEGA_BYTES, Long.class);
     if (mBytes != null) {
-      maxServerResponseSizeBrokerConfig = (maxServerResponseSizeBrokerConfig == null) ?
-          mBytes * 1_000_000 : Math.min(maxServerResponseSizeBrokerConfig, mBytes * 1_000_000);
+      maxServerResponseSizeBrokerConfig = (maxServerResponseSizeBrokerConfig == null)
+          ? mBytes * 1_000_000 : Math.min(maxServerResponseSizeBrokerConfig, mBytes * 1_000_000);
     }
     if (maxServerResponseSizeBrokerConfig != null) {
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, Long.toString(maxServerResponseSizeBrokerConfig));
@@ -1789,8 +1789,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         Long.class);
     mBytes = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_MEGA_BYTES, Long.class);
     if (mBytes != null) {
-      maxQueryResponseSizeBrokerConfig = (maxQueryResponseSizeBrokerConfig == null) ?
-          mBytes * 1_000_000 : Math.min(maxQueryResponseSizeBrokerConfig, mBytes * 1_000_000);
+      maxQueryResponseSizeBrokerConfig = (maxQueryResponseSizeBrokerConfig == null)
+          ? mBytes * 1_000_000 : Math.min(maxQueryResponseSizeBrokerConfig, mBytes * 1_000_000);
     }
     if (maxQueryResponseSizeBrokerConfig != null) {
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
