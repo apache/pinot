@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -268,7 +269,7 @@ public class TableCache implements PinotConfigProvider {
     _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
 
     // if the tableName has no database prefix consider is as part of "default" database
-    boolean isDefaultDatabase = tableNameWithType.split("\\.").length == 1;
+    boolean isDefaultDatabase = StringUtils.split(tableNameWithType, '.').length == 1;
 
     String schemaName = tableConfig.getValidationConfig().getSchemaName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);

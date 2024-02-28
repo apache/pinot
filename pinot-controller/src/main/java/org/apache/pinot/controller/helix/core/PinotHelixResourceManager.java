@@ -727,7 +727,7 @@ public class PinotHelixResourceManager {
 
   private boolean isPartOfDatabase(String tableName, String databaseName) {
     if (databaseName == null) {
-      return tableName.split("\\.").length == 1;
+      return StringUtils.split(tableName, '.').length == 1;
     } else {
       return tableName.startsWith(databaseName + ".");
     }
@@ -1454,7 +1454,7 @@ public class PinotHelixResourceManager {
     Set<String> databaseNames = new HashSet<>();
     for (String resourceName : getAllResources()) {
       if (TableNameBuilder.isTableResource(resourceName)) {
-        String[] split = resourceName.split("\\.");
+        String[] split = StringUtils.split(resourceName, '.');
         databaseNames.add(split.length == 2 ? split[0] : CommonConstants.DEFAULT_DATABASE);
       }
     }

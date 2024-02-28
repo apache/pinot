@@ -25,6 +25,7 @@ import java.util.Objects;
 import javax.annotation.Nullable;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedMap;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -79,7 +80,7 @@ public class DatabaseUtils {
    */
   public static String translateTableName(String tableName, String databaseName, @Nullable TableCache tableCache) {
     if (tableName != null && databaseName != null) {
-      String[] tableSplit = tableName.split("\\.");
+      String[] tableSplit = StringUtils.split(tableName, '.');
       if (tableSplit.length > 2) {
         throw new IllegalStateException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
       } else if (tableSplit.length == 2) {
