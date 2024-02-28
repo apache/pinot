@@ -163,6 +163,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, 0);
       return;
     }
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      context._offlineTableCount++;
+    } else {
+      context._realTimeTableCount++;
+    }
     if (tableConfig.isUpsertEnabled()) {
       context._upsertTableCount++;
     }
@@ -181,11 +186,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
    */
   private void updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType == TableType.OFFLINE) {
-      context._offlineTableCount++;
-    } else {
-      context._realTimeTableCount++;
-    }
 
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
 
