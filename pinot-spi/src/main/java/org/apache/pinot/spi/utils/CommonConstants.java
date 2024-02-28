@@ -360,7 +360,7 @@ public class CommonConstants {
         public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
-        public static final String INDEX_SKIP_CONFIG = "indexSkipConfig";
+        public static final String SKIP_INDEXES = "skipIndexes";
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 

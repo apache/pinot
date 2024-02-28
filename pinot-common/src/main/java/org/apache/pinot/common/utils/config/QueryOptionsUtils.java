@@ -151,31 +151,31 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
-  public static Map<String, Set<FieldConfig.IndexType>> getIndexSkipConfig(Map<String, String> queryOptions) {
-    // Example config:  indexSkipConfig='col1=inverted,range&col2=inverted'
-    String indexSkipConfigStr = queryOptions.get(QueryOptionKey.INDEX_SKIP_CONFIG);
-    if (indexSkipConfigStr == null) {
+  public static Map<String, Set<FieldConfig.IndexType>> getSkipIndexes(Map<String, String> queryOptions) {
+    // Example config:  skipIndexes='col1=inverted,range&col2=inverted'
+    String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_INDEXES);
+    if (skipIndexesStr == null) {
       return null;
     }
 
-    String[] perColumnIndexSkip = StringUtils.split(indexSkipConfigStr, '&');
-    Map<String, Set<FieldConfig.IndexType>> indexSkipConfig = new HashMap<>();
+    String[] perColumnIndexSkip = StringUtils.split(skipIndexesStr, '&');
+    Map<String, Set<FieldConfig.IndexType>> skipIndexes = new HashMap<>();
     for (String columnConf : perColumnIndexSkip) {
       String[] conf = StringUtils.split(columnConf, '=');
       if (conf.length != 2) {
-        throw new RuntimeException("Invalid format for " + QueryOptionKey.INDEX_SKIP_CONFIG
-            + ". Example of valid format: SET indexSkipConfig='col1=inverted,range&col2=inverted'");
+        throw new RuntimeException("Invalid format for " + QueryOptionKey.SKIP_INDEXES
+            + ". Example of valid format: SET skipIndexes='col1=inverted,range&col2=inverted'");
       }
       String columnName = conf[0];
       String[] indexTypes = StringUtils.split(conf[1], ',');
 
       for (String indexType : indexTypes) {
-        indexSkipConfig.computeIfAbsent(columnName, k -> new HashSet<>())
+        skipIndexes.computeIfAbsent(columnName, k -> new HashSet<>())
             .add(FieldConfig.IndexType.valueOf(indexType.toUpperCase()));
       }
     }
 
-    return indexSkipConfig;
+    return skipIndexes;
   }
 
   @Nullable
