@@ -96,7 +96,7 @@ public class PinotRealtimeTableResource {
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return pauseConsumptionV2(tableName);
   }
@@ -134,7 +134,7 @@ public class PinotRealtimeTableResource {
           defaultValue = "lastConsumed"
       )
       @QueryParam("consumeFrom") String consumeFrom, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return resumeConsumptionV2(tableName, consumeFrom);
   }
@@ -190,7 +190,7 @@ public class PinotRealtimeTableResource {
       String partitionGroupIds,
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
       String consumingSegments, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return forceCommitV2(tableName, partitionGroupIds, consumingSegments);
   }
@@ -287,7 +287,7 @@ public class PinotRealtimeTableResource {
   public Response getPauseStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getPauseStatusV2(tableName);
   }
@@ -325,7 +325,7 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Realtime table name with or without type", required = true,
           example = "myTable | myTable_REALTIME") @PathParam("tableName") String realtimeTableName,
       @Context HttpHeaders headers) {
-    realtimeTableName = _pinotHelixResourceManager.getActualTableName(realtimeTableName,
+    realtimeTableName = _pinotHelixResourceManager.getTranslatedTableName(realtimeTableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getConsumingSegmentsInfoV2(realtimeTableName);
   }

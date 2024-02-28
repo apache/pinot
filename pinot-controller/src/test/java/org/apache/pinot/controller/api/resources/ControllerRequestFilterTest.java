@@ -51,43 +51,50 @@ public class ControllerRequestFilterTest extends ControllerTest {
     Map<String, String> headers = new HashMap<>();
     headers.put(CommonConstants.DATABASE, DATABASE_NAME);
     // with logical table name param value
-    assertResponse(TABLE_NAME, headers);
+    assertResponse(TABLE_NAME, headers, FULLY_QUALIFIED_TABLE_NAME);
 
     // with fully qualified table name param value. This should take precedence over the database header.
     headers.put(CommonConstants.DATABASE, "randomName");
-    assertResponse(FULLY_QUALIFIED_TABLE_NAME, headers);
+    assertResponse(FULLY_QUALIFIED_TABLE_NAME, headers, FULLY_QUALIFIED_TABLE_NAME);
+
+    // with 'default' database header. Database prefix should be trimmed upon translation.
+    headers.put(CommonConstants.DATABASE, CommonConstants.DEFAULT_DATABASE);
+    assertResponse(TABLE_NAME, headers, TABLE_NAME);
   }
 
   public void testTableNameTranslationWithoutHeader()
       throws IOException {
-    Map<String, String> headers = new HashMap<>();
-    assertResponse(FULLY_QUALIFIED_TABLE_NAME, null);
+    assertResponse(FULLY_QUALIFIED_TABLE_NAME, null, FULLY_QUALIFIED_TABLE_NAME);
 
+    // with 'default' database prefix. Database prefix should be trimmed upon translation.
+    assertResponse(String.format("%s.%s", CommonConstants.DEFAULT_DATABASE, TABLE_NAME), null, TABLE_NAME);
+
+    Map<String, String> headers = new HashMap<>();
     // unsanitized database header values
     headers.put(CommonConstants.DATABASE, null);
-    assertResponse(FULLY_QUALIFIED_TABLE_NAME, headers);
+    assertResponse(FULLY_QUALIFIED_TABLE_NAME, headers, FULLY_QUALIFIED_TABLE_NAME);
     headers.put(CommonConstants.DATABASE, "");
-    assertResponse(FULLY_QUALIFIED_TABLE_NAME, headers);
+    assertResponse(FULLY_QUALIFIED_TABLE_NAME, headers, FULLY_QUALIFIED_TABLE_NAME);
   }
 
-  private void assertResponse(String paramValue, Map<String, String> headers)
+  private void assertResponse(String paramValue, Map<String, String> headers, String fqn)
       throws IOException {
     String uri = String.format("%s/%s", getControllerBaseApiUrl(), "testResource/requestFilter");
     ObjectMapper mapper = new ObjectMapper();
     // when "tableName" query param is passed
     JsonNode resp = mapper.readTree(
         ControllerTest.sendGetRequest(String.format("%s?%s=%s", uri, "tableName", paramValue), headers));
-    assertEquals(resp.get("tableName").asText(), ControllerRequestFilterTest.FULLY_QUALIFIED_TABLE_NAME);
+    assertEquals(resp.get("tableName").asText(), fqn);
 
     // when "tableNameWithType" query param is passed
     resp = mapper.readTree(
         ControllerTest.sendGetRequest(String.format("%s?%s=%s", uri, "tableNameWithType", paramValue), headers));
-    assertEquals(resp.get("tableNameWithType").asText(), ControllerRequestFilterTest.FULLY_QUALIFIED_TABLE_NAME);
+    assertEquals(resp.get("tableNameWithType").asText(), fqn);
 
     // when "schemaName" query param is passed
     resp = mapper.readTree(
         ControllerTest.sendGetRequest(String.format("%s?%s=%s", uri, "schemaName", paramValue), headers));
-    assertEquals(resp.get("schemaName").asText(), ControllerRequestFilterTest.FULLY_QUALIFIED_TABLE_NAME);
+    assertEquals(resp.get("schemaName").asText(), fqn);
   }
 
   @AfterClass

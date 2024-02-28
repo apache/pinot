@@ -55,7 +55,7 @@ public class DatabaseUtils {
     for (String key : TABLE_NAME_KEYS) {
       if (queryParams.containsKey(key)) {
         String tableName = queryParams.getFirst(key);
-        String actualTableName = translateTableName(tableName, databaseName, tableCache);
+        String actualTableName = translateTableName(tableName, databaseName);
         // table is not part of default database
         if (!actualTableName.equals(tableName)) {
           uri = uri.replaceAll(String.format("%s=%s", key, tableName), String.format("%s=%s", key, actualTableName));
@@ -74,28 +74,27 @@ public class DatabaseUtils {
    * If table name already has the database prefix then that takes precedence over the provided {@code databaseName}
    * @param tableName table/schema name
    * @param databaseName database name
-   * @param tableCache
-   * @return translated table name. If {@code tableCache} is provided the actual table name for the
-   * translated table name is returned if it exists else translated table name itself is returned.
+   * @return translated table name
    */
-  public static String translateTableName(String tableName, String databaseName, @Nullable TableCache tableCache) {
-    if (tableName != null && databaseName != null) {
-      String[] tableSplit = StringUtils.split(tableName, '.');
-      if (tableSplit.length > 2) {
-        throw new IllegalStateException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
-      } else if (tableSplit.length == 2) {
-        databaseName = tableSplit[0];
-        tableName = tableSplit[1];
-      }
-      if (databaseName != null && !databaseName.isBlank()) {
-        tableName = String.format("%s.%s", databaseName, tableName);
-      }
+  public static String translateTableName(String tableName, String databaseName) {
+    if (tableName == null) {
+      return null;
     }
-    String actualTableName = null;
-    if (tableCache != null) {
-      actualTableName = tableCache.getActualTableName(tableName);
+    String[] tableSplit = StringUtils.split(tableName, '.');
+    if (tableSplit.length > 2) {
+      throw new IllegalStateException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
+    } else if (tableSplit.length == 2) { // tableName already has database name prefix
+      // if the database name prefix is of 'default' database then only return the table name part
+      if (tableSplit[0].equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
+        return tableSplit[1];
+      }
+      return tableName;
     }
-    return actualTableName != null ? actualTableName : tableName;
+    // do not concat the database name prefix if it's a 'default' database
+    if (StringUtils.isNotEmpty(databaseName) && !databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
+      return String.format("%s.%s", databaseName, tableName);
+    }
+    return tableName;
   }
 
   /**

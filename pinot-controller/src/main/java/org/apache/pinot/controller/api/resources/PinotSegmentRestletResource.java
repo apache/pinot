@@ -211,7 +211,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Whether to exclude the segments overlapping with the timestamps, false by default")
       @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getSegmentsV2(tableName, tableTypeStr, excludeReplacedSegments, startTimestampStr, endTimestampStr,
         excludeOverlapping);
@@ -255,7 +255,7 @@ public class PinotSegmentRestletResource {
   public List<Map<String, Object>> getServerToSegmentsMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getServerToSegmentsMapV2(tableName, tableTypeStr);
   }
@@ -292,7 +292,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return listSegmentLineageV2(tableName, tableTypeStr);
   }
@@ -387,7 +387,7 @@ public class PinotSegmentRestletResource {
   public Map<String, String> getSegmentToCrcMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getSegmentToCrcMapV2(tableName);
   }
@@ -430,7 +430,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") List<String> columns,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getSegmentMetadataV2(tableName, segmentName, columns);
   }
@@ -569,7 +569,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
       @DefaultValue("false") boolean forceDownload, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return reloadSegmentV2(tableName, segmentName, forceDownload);
   }
@@ -648,7 +648,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
           String targetInstance, @Context HttpHeaders headers) {
-    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+    tableNameWithType = _pinotHelixResourceManager.getTranslatedTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE));
     return resetSegmentV2(tableNameWithType, segmentName, targetInstance);
   }
@@ -707,7 +707,7 @@ public class PinotSegmentRestletResource {
           String targetInstance,
       @ApiParam(value = "Whether to reset only segments with error state") @QueryParam("errorSegmentsOnly")
       @DefaultValue("false") boolean errorSegmentsOnly, @Context HttpHeaders headers) {
-    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+    tableNameWithType = _pinotHelixResourceManager.getTranslatedTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE));
     return resetSegmentsV2(tableNameWithType, targetInstance, errorSegmentsOnly);
   }
@@ -902,7 +902,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
       @DefaultValue("false") boolean forceDownload, @Context HttpHeaders headers)
       throws JsonProcessingException {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return reloadAllSegmentsV2(tableName, tableTypeStr, forceDownload);
   }
@@ -1005,7 +1005,7 @@ public class PinotSegmentRestletResource {
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return deleteSegmentV2(tableName, segmentName, retentionPeriod);
   }
@@ -1042,7 +1042,7 @@ public class PinotSegmentRestletResource {
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return deleteAllSegmentsV2(tableName, tableTypeStr, retentionPeriod);
   }
@@ -1085,7 +1085,7 @@ public class PinotSegmentRestletResource {
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod, List<String> segments, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return deleteSegmentsV2(tableName, retentionPeriod, segments);
   }
@@ -1144,7 +1144,7 @@ public class PinotSegmentRestletResource {
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return deleteSegmentsWithTimeWindowV2(tableName, tableTypeStr, excludeReplacedSegments, startTimestampStr,
         endTimestampStr, excludeOverlapping, retentionPeriod);
@@ -1217,7 +1217,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
           List<String> columns, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getServerMetadataV2(tableName, tableTypeStr, columns);
   }
@@ -1260,7 +1260,7 @@ public class PinotSegmentRestletResource {
   public Map<String, Map<String, String>> getZookeeperMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getZookeeperMetadataV2(tableName, tableTypeStr);
   }
@@ -1303,7 +1303,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTableTiersV2(tableName, tableTypeStr);
   }
@@ -1339,7 +1339,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getSegmentTiersV2(tableName, segmentName, tableTypeStr);
   }
@@ -1466,7 +1466,7 @@ public class PinotSegmentRestletResource {
   public SuccessResponse updateTimeIntervalZK(
       @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType, @Context HttpHeaders headers) {
-    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+    tableNameWithType = _pinotHelixResourceManager.getTranslatedTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE));
     return updateTimeIntervalZKV2(tableNameWithType);
   }

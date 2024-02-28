@@ -840,13 +840,13 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Given a table name and database name in any case, returns the actual table name as defined in Helix/Segment/Schema
-   * @param tableName tableName in any case.
-   * @param databaseName databaseName in any case.
-   * @return tableName actually defined in Pinot (matches case) and exists ,else, return the translated value
+   * Given a table name and database name, returns the translated table name i.e. {@code databaseName.tableName}
+   * @param tableName table name.
+   * @param databaseName database name. It is ignored if {@code tableName} already has the database name prefix
+   * @return the translated name
    */
-  public String getActualTableName(String tableName, String databaseName) {
-    return DatabaseUtils.translateTableName(tableName, databaseName, _tableCache);
+  public String getTranslatedTableName(String tableName, String databaseName) {
+    return DatabaseUtils.translateTableName(tableName, databaseName);
   }
 
   /**

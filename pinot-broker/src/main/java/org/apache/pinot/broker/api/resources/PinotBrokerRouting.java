@@ -72,7 +72,7 @@ public class PinotBrokerRouting {
   public String buildRouting(@Context HttpHeaders headers,
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType) {
     return buildRoutingV2(DatabaseUtils.translateTableName(tableNameWithType,
-        headers.getHeaderString(CommonConstants.DATABASE), _tableCache));
+        headers.getHeaderString(CommonConstants.DATABASE)));
   }
 
   @PUT
@@ -103,7 +103,7 @@ public class PinotBrokerRouting {
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
       @ApiParam(value = "Segment name") @PathParam("segmentName") String segmentName) {
     return refreshRoutingV2(DatabaseUtils.translateTableName(tableNameWithType,
-            headers.getHeaderString(CommonConstants.DATABASE), _tableCache), segmentName);
+            headers.getHeaderString(CommonConstants.DATABASE)), segmentName);
   }
 
   @PUT
@@ -134,7 +134,7 @@ public class PinotBrokerRouting {
   public String removeRouting(@Context HttpHeaders headers,
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType) {
     return removeRoutingV2(DatabaseUtils.translateTableName(tableNameWithType,
-        headers.getHeaderString(CommonConstants.DATABASE), _tableCache));
+        headers.getHeaderString(CommonConstants.DATABASE)));
   }
 
   @DELETE

@@ -211,7 +211,7 @@ public class PinotBrokerRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     try {
       List<String> tableNamesWithType = _pinotHelixResourceManager

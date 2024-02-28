@@ -217,7 +217,7 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType, @Context HttpHeaders headers) {
-    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+    tableNameWithType = _pinotHelixResourceManager.getTranslatedTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTaskStatesByTableV2(taskType, tableNameWithType);
   }
@@ -243,7 +243,7 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType, @Context HttpHeaders headers) {
-    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+    tableNameWithType = _pinotHelixResourceManager.getTranslatedTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTaskMetadataByTableV2(taskType, tableNameWithType);
   }
@@ -275,7 +275,7 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType, @Context HttpHeaders headers) {
-    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+    tableNameWithType = _pinotHelixResourceManager.getTranslatedTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE));
     return deleteTaskMetadataByTableV2(taskType, tableNameWithType);
   }
@@ -331,7 +331,7 @@ public class PinotTaskRestletResource {
           + "By default, only prints subtask details for running and error tasks. "
           + "Value of > 0 prints subtask details for all tasks)")
       @DefaultValue("0") @QueryParam("verbosity") int verbosity, @Context HttpHeaders headers) {
-    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+    tableNameWithType = _pinotHelixResourceManager.getTranslatedTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTasksDebugInfoV2(taskType, tableNameWithType, verbosity);
   }
@@ -365,7 +365,7 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Whether to only lookup local cache for logs", defaultValue = "false") @QueryParam("localOnly")
           boolean localOnly)
       throws JsonProcessingException {
-    tableNameWithType = _pinotHelixResourceManager.getActualTableName(tableNameWithType,
+    tableNameWithType = _pinotHelixResourceManager.getTranslatedTableName(tableNameWithType,
         httpHeaders.getHeaderString(CommonConstants.DATABASE));
     return getTaskGenerationDebugIntoV2(httpHeaders, taskType, tableNameWithType, localOnly);
   }

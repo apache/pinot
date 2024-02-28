@@ -124,7 +124,7 @@ public class PinotLeadControllerRestletResource {
   public LeadControllerResponse getLeaderForTable(
       @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getLeaderForTableV2(tableName);
   }

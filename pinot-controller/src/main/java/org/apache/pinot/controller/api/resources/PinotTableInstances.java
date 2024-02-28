@@ -82,7 +82,7 @@ public class PinotTableInstances {
       @ApiParam(value = "Table name without type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Instance type", example = "broker", allowableValues = "BROKER, SERVER") @DefaultValue("")
       @QueryParam("type") String type, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getTableInstancesV2(tableName, type);
   }
@@ -170,7 +170,7 @@ public class PinotTableInstances {
   public List<String> getLiveBrokersForTable(
       @ApiParam(value = "Table name (with or without type)", required = true)
       @PathParam("tableName") String tableName, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.getActualTableName(tableName,
+    tableName = _pinotHelixResourceManager.getTranslatedTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
     return getLiveBrokersForTableV2(tableName);
   }

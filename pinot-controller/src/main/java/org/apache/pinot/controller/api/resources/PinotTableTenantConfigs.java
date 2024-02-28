@@ -80,7 +80,7 @@ public class PinotTableTenantConfigs {
   public SuccessResponse rebuildBrokerResource(
       @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType,
       @Context HttpHeaders headers) {
-    tableNameWithType = _helixResourceManager.getActualTableName(tableNameWithType,
+    tableNameWithType = _helixResourceManager.getTranslatedTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE));
     return rebuildBrokerResourceV2(tableNameWithType);
   }

@@ -322,9 +322,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         compilationStartTimeNs = System.nanoTime();
         pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
         if (pinotQuery.getDataSource() != null) {
-        pinotQuery.getDataSource().setTableName(DatabaseUtils.translateTableName(
-            pinotQuery.getDataSource().getTableName(), httpHeaders.getHeaderString(CommonConstants.DATABASE),
-            _tableCache));
+          String tableName = getActualTableName(DatabaseUtils.translateTableName(
+              pinotQuery.getDataSource().getTableName(), httpHeaders.getHeaderString(CommonConstants.DATABASE)),
+              _tableCache);
+        pinotQuery.getDataSource().setTableName(tableName);
         }
       } catch (Exception e) {
         LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
@@ -378,8 +379,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       }
 
-      String tableName = DatabaseUtils.translateTableName(dataSource.getTableName(),
-          httpHeaders.getHeaderString(CommonConstants.DATABASE), _tableCache);
+      String tableName = getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(),
+          httpHeaders.getHeaderString(CommonConstants.DATABASE)), _tableCache);
       dataSource.setTableName(tableName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       requestContext.setTableName(rawTableName);
@@ -948,6 +949,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         handleSubquery(operand, requestId, jsonRequest, requesterIdentity, requestContext, httpHeaders);
       }
     }
+  }
+
+  /**
+   * Resolves the actual table name for:
+   * - Case-insensitive cluster
+   *
+   * @param tableName the table name in the query
+   * @param tableCache the table case-sensitive cache
+   * @return table name if the table name is found in Pinot registry.
+   */
+  @VisibleForTesting
+  static String getActualTableName(String tableName, TableCache tableCache) {
+    String actualTableName = tableCache.getActualTableName(tableName);
+    if (actualTableName != null) {
+      return actualTableName;
+    }
+    return tableName;
   }
 
   /**

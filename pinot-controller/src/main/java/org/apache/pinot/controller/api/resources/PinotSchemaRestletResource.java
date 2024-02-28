@@ -134,7 +134,7 @@ public class PinotSchemaRestletResource {
   public String getSchema(
       @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName,
       @Context HttpHeaders headers) {
-    return getSchema(_pinotHelixResourceManager.getActualTableName(schemaName,
+    return getSchema(_pinotHelixResourceManager.getTranslatedTableName(schemaName,
         headers.getHeaderString(CommonConstants.DATABASE)));
   }
 
@@ -173,7 +173,7 @@ public class PinotSchemaRestletResource {
   public SuccessResponse deleteSchema(
       @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName,
       @Context HttpHeaders headers) {
-    return deleteSchema(_pinotHelixResourceManager.getActualTableName(schemaName,
+    return deleteSchema(_pinotHelixResourceManager.getTranslatedTableName(schemaName,
         headers.getHeaderString(CommonConstants.DATABASE)));
   }
 
@@ -212,7 +212,7 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload, @Context HttpHeaders headers, FormDataMultiPart multiPart) {
     return updateSchema(
-        _pinotHelixResourceManager.getActualTableName(schemaName, headers.getHeaderString(CommonConstants.DATABASE)),
+        _pinotHelixResourceManager.getTranslatedTableName(schemaName, headers.getHeaderString(CommonConstants.DATABASE)),
         reload, multiPart);
   }
 
@@ -267,7 +267,7 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload, @Context HttpHeaders headers, String schemaJsonString) {
     return updateSchema(
-        _pinotHelixResourceManager.getActualTableName(schemaName, headers.getHeaderString(CommonConstants.DATABASE)),
+        _pinotHelixResourceManager.getTranslatedTableName(schemaName, headers.getHeaderString(CommonConstants.DATABASE)),
         reload, schemaJsonString);
   }
 
@@ -328,7 +328,7 @@ public class PinotSchemaRestletResource {
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
-    String schemaName = _pinotHelixResourceManager.getActualTableName(schema.getSchemaName(),
+    String schemaName = _pinotHelixResourceManager.getTranslatedTableName(schema.getSchemaName(),
         httpHeaders.getHeaderString(CommonConstants.DATABASE));
     String endpointUrl = request.getRequestURL().toString();
     validateSchemaName(schemaName);
@@ -408,7 +408,7 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     Schema schema = schemaAndUnrecognizedProperties.getLeft();
-    String schemaName = _pinotHelixResourceManager.getActualTableName(schema.getSchemaName(),
+    String schemaName = _pinotHelixResourceManager.getTranslatedTableName(schema.getSchemaName(),
         httpHeaders.getHeaderString(CommonConstants.DATABASE));
     String endpointUrl = request.getRequestURL().toString();
     validateSchemaName(schemaName);
