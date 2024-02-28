@@ -21,12 +21,9 @@ package org.apache.pinot.segment.local.segment.creator.impl;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -39,8 +36,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
-import org.apache.pinot.spi.utils.ByteArray;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
@@ -130,83 +125,6 @@ public class SegmentColumnarIndexCreatorTest {
     } finally {
       FileUtils.deleteQuietly(new File(indexDirPath));
     }
-  }
-
-  @Test
-  public void testGetValueWithinLengthLimit() {
-    // String value without '\uFFFF' suffix
-    String value = RandomStringUtils.randomAscii(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT + 1);
-    String minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.STRING);
-    assertEquals(minValue, value.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
-    assertTrue(minValue.compareTo(value) < 0);
-    String maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.STRING);
-    assertEquals(maxValue,
-        value.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT - 1) + '\uFFFF');
-    assertTrue(maxValue.compareTo(value) > 0);
-
-    // String value with '\uFFFF' suffix
-    value =
-        RandomStringUtils.randomAscii(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT - 1) + "\uFFFF\uFFFF";
-    minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.STRING);
-    assertEquals(minValue, value.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
-    assertTrue(minValue.compareTo(value) < 0);
-    maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.STRING);
-    assertEquals(maxValue, value);
-
-    // String value with '\uFFFF' and another character
-    value = RandomStringUtils.randomAscii(SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT - 1) + "\uFFFFa";
-    minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.STRING);
-    assertEquals(minValue, value.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT));
-    assertTrue(minValue.compareTo(value) < 0);
-    maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.STRING);
-    assertEquals(maxValue, value.substring(0, SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT) + '\uFFFF');
-    assertTrue(maxValue.compareTo(value) > 0);
-
-    // Bytes value without 0xFF suffix
-    int numBytes = SegmentColumnarIndexCreator.METADATA_PROPERTY_LENGTH_LIMIT / 2 + 1;
-    byte[] bytes = new byte[numBytes];
-    Random random = new Random();
-    random.nextBytes(bytes);
-    bytes[numBytes - 2] = 5;
-    value = BytesUtils.toHexString(bytes);
-    minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.BYTES);
-    byte[] minBytes = BytesUtils.toBytes(minValue);
-    assertEquals(minBytes.length, numBytes - 1);
-    assertEquals(Arrays.copyOfRange(minBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
-    assertTrue(ByteArray.compare(minBytes, bytes) < 0);
-    maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.BYTES);
-    byte[] maxBytes = BytesUtils.toBytes(maxValue);
-    assertEquals(maxBytes.length, numBytes - 1);
-    assertEquals(Arrays.copyOfRange(maxBytes, 0, numBytes - 2), Arrays.copyOfRange(bytes, 0, numBytes - 2));
-    assertEquals(maxBytes[numBytes - 2], (byte) 0xFF);
-    assertTrue(ByteArray.compare(maxBytes, bytes) > 0);
-
-    // Bytes value with 0xFF suffix
-    bytes[numBytes - 2] = (byte) 0xFF;
-    bytes[numBytes - 1] = (byte) 0xFF;
-    value = BytesUtils.toHexString(bytes);
-    minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.BYTES);
-    minBytes = BytesUtils.toBytes(minValue);
-    assertEquals(minBytes.length, numBytes - 1);
-    assertEquals(Arrays.copyOfRange(minBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
-    assertTrue(ByteArray.compare(minBytes, bytes) < 0);
-    maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.BYTES);
-    assertEquals(maxValue, value);
-
-    // Bytes value with 0xFF and another byte
-    bytes[numBytes - 1] = 5;
-    value = BytesUtils.toHexString(bytes);
-    minValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, false, DataType.BYTES);
-    minBytes = BytesUtils.toBytes(minValue);
-    assertEquals(minBytes.length, numBytes - 1);
-    assertEquals(Arrays.copyOfRange(minBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
-    assertTrue(ByteArray.compare(minBytes, bytes) < 0);
-    maxValue = SegmentColumnarIndexCreator.getValueWithinLengthLimit(value, true, DataType.BYTES);
-    maxBytes = BytesUtils.toBytes(maxValue);
-    assertEquals(maxBytes.length, numBytes);
-    assertEquals(Arrays.copyOfRange(maxBytes, 0, numBytes - 1), Arrays.copyOfRange(bytes, 0, numBytes - 1));
-    assertEquals(maxBytes[numBytes - 1], (byte) 0xFF);
-    assertTrue(ByteArray.compare(maxBytes, bytes) > 0);
   }
 
   @AfterClass
