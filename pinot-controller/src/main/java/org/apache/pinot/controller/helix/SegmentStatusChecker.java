@@ -117,7 +117,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   protected void processTable(String tableNameWithType, Context context) {
     try {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      updateTableConfigMetrics(tableNameWithType, tableConfig);
+      updateTableConfigMetrics(tableNameWithType, tableConfig, context);
       updateSegmentMetrics(tableNameWithType, tableConfig, context);
       updateTableSizeMetrics(tableNameWithType);
     } catch (Exception e) {
@@ -132,6 +132,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   protected void postprocess(Context context) {
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, context._realTimeTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, context._offlineTableCount);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.UPSERT_TABLE_COUNT, context._upsertTableCount);
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, context._disabledTables.size());
 
     //emit a 0 for tables that are not paused/disabled. This makes alert expressions simpler as we don't have to deal
@@ -156,11 +157,19 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
    * Updates metrics related to the table config.
    * If table config not found, resets the metrics
    */
-  private void updateTableConfigMetrics(String tableNameWithType, TableConfig tableConfig) {
+  private void updateTableConfigMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     if (tableConfig == null) {
       LOGGER.warn("Found null table config for table: {}. Resetting table config metrics.", tableNameWithType);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, 0);
       return;
+    }
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      context._offlineTableCount++;
+    } else {
+      context._realTimeTableCount++;
+    }
+    if (tableConfig.isUpsertEnabled()) {
+      context._upsertTableCount++;
     }
     int replication = tableConfig.getReplication();
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.REPLICATION_FROM_CONFIG, replication);
@@ -177,11 +186,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
    */
   private void updateSegmentMetrics(String tableNameWithType, TableConfig tableConfig, Context context) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    if (tableType == TableType.OFFLINE) {
-      context._offlineTableCount++;
-    } else {
-      context._realTimeTableCount++;
-    }
 
     IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
 
@@ -386,6 +390,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     private boolean _logDisabledTables;
     private int _realTimeTableCount;
     private int _offlineTableCount;
+    private int _upsertTableCount;
     private Set<String> _processedTables = new HashSet<>();
     private Set<String> _disabledTables = new HashSet<>();
     private Set<String> _pausedTables = new HashSet<>();
