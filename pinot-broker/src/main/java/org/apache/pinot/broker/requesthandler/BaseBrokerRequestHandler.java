@@ -1773,19 +1773,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // BrokerConfig
-    Long v1 = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES, Long.class);
-    Long v2 = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_MEGA_BYTES, Long.class);
-    v2 = (v2 != null) ? v2 * 1_000_000 : null;
-    Long maxServerResponseSizeBrokerConfig = (v1 != null && v2 != null) ? Math.min(v1, v2) : (v1 != null ? v1 : v2);
+    Long maxServerResponseSizeBrokerConfig = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES,
+        Long.class);
+    Long mBytes = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_MEGA_BYTES, Long.class);
+    if (mBytes != null) {
+      maxServerResponseSizeBrokerConfig = (maxServerResponseSizeBrokerConfig == null) ? mBytes * 1_000_000 : Math.min(maxServerResponseSizeBrokerConfig, mBytes * 1_000_000);
+    }
     if (maxServerResponseSizeBrokerConfig != null) {
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, Long.toString(maxServerResponseSizeBrokerConfig));
       return;
     }
 
-    v1 = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES, Long.class);
-    v2 = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_MEGA_BYTES, Long.class);
-    v2 = (v2 != null) ? v2 * 1_000_000 : null;
-    Long maxQueryResponseSizeBrokerConfig = (v1 != null && v2 != null) ? Math.min(v1, v2) : (v1 != null ? v1 : v2);
+    Long maxQueryResponseSizeBrokerConfig = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES,
+        Long.class);
+    mBytes = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_MEGA_BYTES, Long.class);
+    if (mBytes != null) {
+      maxQueryResponseSizeBrokerConfig = (maxQueryResponseSizeBrokerConfig == null) ? mBytes * 1_000_000 : Math.min(maxQueryResponseSizeBrokerConfig, mBytes * 1_000_000);
+    }
     if (maxQueryResponseSizeBrokerConfig != null) {
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(maxQueryResponseSizeBrokerConfig / numServers));
