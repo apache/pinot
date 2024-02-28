@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -157,16 +158,16 @@ public class QueryOptionsUtils {
       return null;
     }
 
-    String[] perColumnIndexSkip = indexSkipConfigStr.split("&");
+    String[] perColumnIndexSkip = StringUtils.split(indexSkipConfigStr, '&');
     Map<String, Set<FieldConfig.IndexType>> indexSkipConfig = new HashMap<>();
     for (String columnConf : perColumnIndexSkip) {
-      String[] conf = columnConf.split("=");
+      String[] conf = StringUtils.split(columnConf, '=');
       if (conf.length != 2) {
         throw new RuntimeException("Invalid format for " + QueryOptionKey.INDEX_SKIP_CONFIG
             + ". Example of valid format: SET indexSkipConfig='col1=inverted,range&col2=inverted'");
       }
       String columnName = conf[0];
-      String[] indexTypes = conf[1].split(",");
+      String[] indexTypes = StringUtils.split(conf[1], ',');
 
       for (String indexType : indexTypes) {
         indexSkipConfig.computeIfAbsent(columnName, k -> new HashSet<>())
