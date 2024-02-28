@@ -44,6 +44,7 @@ import org.glassfish.jersey.server.ResourceConfig;
 
 public class ControllerAdminApiApplication extends ResourceConfig {
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
+  public static final String START_TIME = "controllerStartTime";
 
   private final String _controllerResourcePackages;
   private final boolean _useHttps;

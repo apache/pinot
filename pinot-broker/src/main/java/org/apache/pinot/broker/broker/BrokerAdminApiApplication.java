@@ -32,7 +32,6 @@ import org.apache.helix.HelixManager;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.pinot.broker.api.resources.PinotBrokerHealthCheck;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -58,6 +57,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class BrokerAdminApiApplication extends ResourceConfig {
+  public static final String START_TIME = "brokerStartTime";
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerAdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String BROKER_INSTANCE_ID = "brokerInstanceId";
@@ -91,8 +91,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         .getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
             CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     connMgr.setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(timeoutMs).build());
-    PinotBrokerHealthCheck pinotBrokerHealthCheck =
-        new PinotBrokerHealthCheck(Instant.now(), instanceId, brokerMetrics);
+    Instant startTime = Instant.now();
     register(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -112,8 +111,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID)).named(BROKER_INSTANCE_ID);
         bind(serverRoutingStatsManager).to(ServerRoutingStatsManager.class);
         bind(accessFactory).to(AccessControlFactory.class);
-        bind(instanceId).named(BrokerAdminApiApplication.BROKER_INSTANCE_ID);
-        bind(pinotBrokerHealthCheck).to(PinotBrokerHealthCheck.class);
+        bind(startTime).named(BrokerAdminApiApplication.START_TIME);
       }
     });
     boolean enableBoundedJerseyThreadPoolExecutor = brokerConf

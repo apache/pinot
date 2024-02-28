@@ -139,7 +139,7 @@ public abstract class BaseResourceTest {
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     _instanceId = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _instanceId);
-    _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory(), serverConf, "", null);
+    _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory(), serverConf);
     _adminApiApplication.start(Collections.singletonList(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
             CommonConstants.HTTP_PROTOCOL, new TlsConfig(), HttpServerThreadPoolConfig.defaultInstance())));

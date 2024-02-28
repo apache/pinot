@@ -38,7 +38,6 @@ import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.server.access.AccessControlFactory;
-import org.apache.pinot.server.api.resources.HealthCheckResource;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -53,6 +52,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class AdminApiApplication extends ResourceConfig {
+  public static final String START_TIME = "serverStartTime";
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String SERVER_INSTANCE_ID = "serverInstanceId";
@@ -64,15 +64,14 @@ public class AdminApiApplication extends ResourceConfig {
 
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
-      PinotConfiguration serverConf, String instanceId, ServerMetrics serverMetrics) {
+      PinotConfiguration serverConf) {
     _serverInstance = instance;
 
     _adminApiResourcePackages = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_RESOURCE_PACKAGES,
         CommonConstants.Server.DEFAULT_SERVER_RESOURCE_PACKAGES);
     packages(_adminApiResourcePackages);
     property(PINOT_CONFIGURATION, serverConf);
-    HealthCheckResource healthCheckResource = new HealthCheckResource(_shutDownInProgress,
-        instanceId, serverMetrics, Instant.now());
+    Instant serverStartTime = Instant.now();
     register(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -82,8 +81,7 @@ public class AdminApiApplication extends ResourceConfig {
         bind(_serverInstance.getServerMetrics()).to(ServerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);
         bind(serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID)).named(SERVER_INSTANCE_ID);
-        bind(instanceId).named(AdminApiApplication.SERVER_INSTANCE_ID);
-        bind(healthCheckResource).to(HealthCheckResource.class);
+        bind(serverStartTime).named(START_TIME);
         String loggerRootDir = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
           bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);

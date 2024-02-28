@@ -24,13 +24,11 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.time.Instant;
 import java.util.List;
-import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.minion.api.resources.HealthCheckResource;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
@@ -49,6 +47,7 @@ import org.glassfish.jersey.server.ResourceConfig;
  * </ul>
  */
 public class MinionAdminApiApplication extends ResourceConfig {
+  public static final String START_TIME = "minionStartTime";
   private static final String RESOURCE_PACKAGE = "org.apache.pinot.minion.api.resources";
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String MINION_INSTANCE_ID = "minionInstanceId";
@@ -56,11 +55,11 @@ public class MinionAdminApiApplication extends ResourceConfig {
   private HttpServer _httpServer;
   private final boolean _useHttps;
 
-  public MinionAdminApiApplication(String instanceId, PinotConfiguration minionConf, MinionMetrics minionMetrics) {
+  public MinionAdminApiApplication(String instanceId, PinotConfiguration minionConf) {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, minionConf);
     _useHttps = Boolean.parseBoolean(minionConf.getProperty(CommonConstants.Minion.CONFIG_OF_SWAGGER_USE_HTTPS));
-    HealthCheckResource healthCheckResource = new HealthCheckResource(instanceId, minionMetrics, Instant.now());
+    Instant minionStartTime = Instant.now();
     register(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -72,7 +71,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
         } else {
           bind(new DummyLogFileServer()).to(LogFileServer.class);
         }
-        bind(healthCheckResource).to(HealthCheckResource.class);
+        bind(minionStartTime).named(START_TIME);
       }
     });
 

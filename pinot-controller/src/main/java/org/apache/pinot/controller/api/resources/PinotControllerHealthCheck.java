@@ -28,6 +28,8 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import javax.ws.rs.GET;
@@ -43,6 +45,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -57,22 +60,19 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Path("/")
 public class PinotControllerHealthCheck {
 
+  @Inject
+  @Named(BaseControllerStarter.CONTROLLER_INSTANCE_ID)
   private String _instanceId;
 
+  @Inject
   ControllerConf _controllerConf;
 
+  @Inject
   private ControllerMetrics _controllerMetrics;
 
-  private final Instant _startTime;
-
-  public PinotControllerHealthCheck(Instant startTime,
-      @Named(BaseControllerStarter.CONTROLLER_INSTANCE_ID) String instanceId,
-      ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
-    _startTime = startTime;
-    _instanceId = instanceId;
-    _controllerConf = controllerConf;
-    _controllerMetrics = controllerMetrics;
-  }
+  @Inject
+  @Named(ControllerAdminApiApplication.START_TIME)
+  private Instant _startTime;
 
   @GET
   @Path("pinot-controller/admin")
@@ -111,19 +111,13 @@ public class PinotControllerHealthCheck {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
   @ApiOperation(value = "Get controller uptime")
   @Produces(MediaType.TEXT_PLAIN)
-  public String getUptime() {
-    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
-    if (status == ServiceStatus.Status.GOOD) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_OK_CALLS, 1);
-      Instant now = Instant.now();
-      Duration uptime = Duration.between(_startTime, now);
-      return "Uptime: " + uptime.getSeconds() + " seconds";
+  public long getUptime() {
+    if (_startTime == null) {
+      return 0;
     }
-    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_BAD_CALLS, 1);
-    String errMessage = String.format("Cannot tell Pinot controller uptime. Pinot controller status is %s", status);
-    Response response =
-        Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
-    throw new WebApplicationException(errMessage, response);
+    Instant now = Instant.now();
+    Duration uptime = Duration.between(_startTime, now);
+    return uptime.getSeconds();
   }
 
   @GET
@@ -132,14 +126,7 @@ public class PinotControllerHealthCheck {
   @ApiOperation(value = "Get controller start time")
   @Produces(MediaType.TEXT_PLAIN)
   public String getStartTime() {
-    ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
-    if (status == ServiceStatus.Status.GOOD) {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_OK_CALLS, 1);
-    } else {
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HEALTHCHECK_BAD_CALLS, 1);
-    }
-    String returnMessage = String.format("Pinot controller started at: %s. "
-        + "Pinot controller status is %s", _startTime, status);
-    return returnMessage;
+    DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
+    return _startTime != null ? formatter.format(_startTime) : "";
   }
 }

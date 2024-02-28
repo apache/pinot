@@ -85,7 +85,6 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
-import org.apache.pinot.controller.api.resources.PinotControllerHealthCheck;
 import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -487,9 +486,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
     // register all the controller objects for injection to jersey resources
+    Instant controllerStartTime = Instant.now();
 
-    PinotControllerHealthCheck pinotControllerHealthCheck =
-        new PinotControllerHealthCheck(Instant.now(), _helixParticipantInstanceId, _config, _controllerMetrics);
     _adminApp.registerBinder(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -510,7 +508,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(_pinotLLCRealtimeSegmentManager).to(PinotLLCRealtimeSegmentManager.class);
         bind(_tenantRebalancer).to(TenantRebalancer.class);
-        bind(pinotControllerHealthCheck).to(PinotControllerHealthCheck.class);
+        bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
           bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);
