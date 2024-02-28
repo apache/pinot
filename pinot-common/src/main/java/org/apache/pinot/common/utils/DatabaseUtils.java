@@ -57,15 +57,14 @@ public class DatabaseUtils {
         String actualTableName = translateTableName(tableName, databaseName, tableCache);
         // table is not part of default database
         if (!actualTableName.equals(tableName)) {
-          uri = uri.replaceAll(String.format("%s=%s", key, tableName),
-              String.format("%s=%s", key, actualTableName));
-          try {
-            requestContext.setRequestUri(new URI(uri));
-          } catch (URISyntaxException e) {
-            LOGGER.error("Unable to translate the table name from {} to {}", tableName, actualTableName);
-          }
+          uri = uri.replaceAll(String.format("%s=%s", key, tableName), String.format("%s=%s", key, actualTableName));
         }
       }
+    }
+    try {
+      requestContext.setRequestUri(new URI(uri));
+    } catch (URISyntaxException e) {
+      LOGGER.error("Unable to translate the uri to {}", uri);
     }
   }
 
