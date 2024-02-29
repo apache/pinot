@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
  * RecordReader can be initialized just when its about to be used, which avoids early/eager
  * initialization/memory allocation.
  */
-public class RecordReaderFileConfig {
+public class RecordReaderFileConfig implements RecordReaderConfig {
   public final FileFormat _fileFormat;
   public final File _dataFile;
   public final Set<String> _fieldsToRead;
