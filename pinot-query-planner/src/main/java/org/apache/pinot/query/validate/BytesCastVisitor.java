@@ -64,7 +64,7 @@ public class BytesCastVisitor extends SqlBasicVisitor<Void> {
         message += " Try to wrap the expression in hexToBytes (like hexToBytes(" + srcNode + "))";
       }
       SqlParserPos pos = call.getParserPosition();
-      RuntimeException ex = new RuntimeException(message);
+      RuntimeException ex = new InvalidCastException(message);
       throw Static.RESOURCE.validatorContext(pos.getLineNum(), pos.getColumnNum(), pos.getEndLineNum(),
           pos.getEndColumnNum()).ex(ex);
     }
