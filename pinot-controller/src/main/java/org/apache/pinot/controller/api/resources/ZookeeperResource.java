@@ -271,12 +271,11 @@ public class ZookeeperResource {
   })
   public SuccessResponse createNode(
       @ApiParam(value = "Zookeeper Path, must start with /", required = true) @QueryParam("path") String path,
-      @ApiParam(value = "Content") @QueryParam("data") @Nullable String data,
       @ApiParam(value = "TTL of the node. TTL are only honoured for persistent znodes (access option = 0x40 or 0x80),"
           + " in which case TTL should be > 0. If access option is not 0x40 or 0x80, it will be ignored, and we can "
-          + "set it to any value, or be ignored", defaultValue = "-1") @QueryParam("ttl") @DefaultValue("-1") int ttl,
-      @ApiParam(value = "accessOption", defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1")
-      int accessOption, @Nullable String payload) {
+          + "set it to any value, or just ignore it", defaultValue = "-1") @QueryParam("ttl") @DefaultValue("-1")
+      int ttl, @ApiParam(value = "accessOption", defaultValue = "1") @QueryParam("accessOption") @DefaultValue("1")
+  int accessOption, String payload) {
 
     path = validateAndNormalizeZKPath(path, false);
 
@@ -286,22 +285,14 @@ public class ZookeeperResource {
       throw new ControllerApplicationException(LOGGER, "TTL for persistent nodes should be > 0",
           Response.Status.BAD_REQUEST);
     }
-    //check if node already exists
-    if (_pinotHelixResourceManager.getZKStat(path) != null) {
-      throw new ControllerApplicationException(LOGGER, "ZNode already exists at path: " + path,
-          Response.Status.BAD_REQUEST);
-    }
 
-    if (StringUtils.isEmpty(data)) {
-      data = payload;
-    }
-    if (StringUtils.isEmpty(data)) {
+    if (StringUtils.isEmpty(payload)) {
       throw new ControllerApplicationException(LOGGER, "Must provide data through query parameter or payload",
           Response.Status.BAD_REQUEST);
     }
     ZNRecord znRecord;
     try {
-      znRecord = MAPPER.readValue(data, ZNRecord.class);
+      znRecord = MAPPER.readValue(payload, ZNRecord.class);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Failed to deserialize the data", Response.Status.BAD_REQUEST,
           e);
@@ -317,8 +308,14 @@ public class ZookeeperResource {
     if (result) {
       return new SuccessResponse("Successfully created node at path: " + path);
     } else {
-      throw new ControllerApplicationException(LOGGER, "Failed to create znode at path: " + path,
-          Response.Status.INTERNAL_SERVER_ERROR);
+      //check if node already exists
+      if (_pinotHelixResourceManager.getZKStat(path) != null) {
+        throw new ControllerApplicationException(LOGGER, "ZNode already exists at path: " + path,
+            Response.Status.BAD_REQUEST);
+      } else {
+        throw new ControllerApplicationException(LOGGER, "Failed to create znode at path: " + path,
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
     }
   }
 
