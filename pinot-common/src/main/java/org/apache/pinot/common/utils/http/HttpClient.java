@@ -479,6 +479,9 @@ public class HttpClient implements AutoCloseable {
     if (httpClientConfig.getMaxConnPerRoute() > 0) {
       httpClientBuilder.setMaxConnPerRoute(httpClientConfig.getMaxConnPerRoute());
     }
+    if (httpClientConfig.isDisableDefaultUserAgent()) {
+      httpClientBuilder.disableDefaultUserAgent();
+    }
     return httpClientBuilder.build();
   }
 
