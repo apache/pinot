@@ -667,13 +667,12 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
-  public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
+  public Map<String, List<String>> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
       @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName) {
     if (taskType != null) {
       // Schedule task for the given task type
-      String taskName = tableName != null ? _pinotTaskManager.scheduleTask(taskType, tableName)
-          : _pinotTaskManager.scheduleTask(taskType);
-      return Collections.singletonMap(taskType, taskName);
+      return Collections.singletonMap(taskType, tableName != null ? _pinotTaskManager.scheduleTask(taskType, tableName)
+          : _pinotTaskManager.scheduleTask(taskType));
     } else {
       // Schedule tasks for all task types
       return tableName != null ? _pinotTaskManager.scheduleTasks(tableName) : _pinotTaskManager.scheduleTasks();
@@ -718,7 +717,7 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Schedule tasks (deprecated)")
-  public Map<String, String> scheduleTasksDeprecated() {
+  public Map<String, List<String>> scheduleTasksDeprecated() {
     return _pinotTaskManager.scheduleTasks();
   }
 
