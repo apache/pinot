@@ -1712,6 +1712,10 @@ public class PinotHelixResourceManager {
     return _helixDataAccessor.getBaseDataAccessor().set(path, record, expectedVersion, accessOption);
   }
 
+  public boolean createZKNode(String path, ZNRecord record, int accessOption, long ttl) {
+    return _helixDataAccessor.getBaseDataAccessor().create(path, record, accessOption, ttl);
+  }
+
   public boolean deleteZKPath(String path) {
     return _helixDataAccessor.getBaseDataAccessor().remove(path, -1);
   }
