@@ -1082,20 +1082,15 @@ public class PinotTableRestletResource {
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
             LOGGER);
-    Set<ControllerJobType> validJobTypes =
-        java.util.Arrays.stream(ControllerJobType.values()).collect(Collectors.toSet());
-    Set<ControllerJobType> jobTypesToFilter = null;
+    Set<String> jobTypesToFilter = null;
     if (StringUtils.isNotEmpty(jobTypesString)) {
-      try {
-        jobTypesToFilter = new HashSet<>(java.util.Arrays.asList(StringUtils.split(jobTypesString, ','))).stream()
-            .map(type -> ControllerJobType.valueOf(type)).collect(Collectors.toSet());
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException("Valid Types are: " + validJobTypes);
-      }
+      jobTypesToFilter = new HashSet<>(java.util.Arrays.asList(StringUtils.split(jobTypesString, ',')))
+          .stream().collect(Collectors.toSet());
     }
     Map<String, Map<String, String>> result = new HashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      result.putAll(_pinotHelixResourceManager.getAllJobs(jobTypesToFilter == null ? validJobTypes : jobTypesToFilter,
+      result.putAll(_pinotHelixResourceManager.getAllJobs(jobTypesToFilter == null
+              ? ControllerJobType.VALID_CONTROLLER_JOB_TYPE : jobTypesToFilter,
           jobMetadata -> jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)
               .equals(tableNameWithType)));
     }
