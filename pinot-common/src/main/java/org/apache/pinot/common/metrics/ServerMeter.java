@@ -34,6 +34,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
   DELETED_SEGMENT_COUNT("segments", false),
   DELETE_TABLE_FAILURES("tables", false),
+  REALTIME_ROWS_FETCHED("rows", false),
   REALTIME_ROWS_CONSUMED("rows", true),
   REALTIME_ROWS_FILTERED("rows", false),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
@@ -41,6 +42,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
+  STREAM_CONSUMER_CREATE_EXCEPTIONS("exceptions", false),
   // number of times partition of a record did not match the partition of the stream
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),

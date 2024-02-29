@@ -427,6 +427,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       try {
         messageBatch =
             _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
+        //track realtime rows fetched on a table level. This included valid + invalid rows
+        _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_ROWS_FETCHED, messageBatch.getMessageCount());
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("message batch received. filtered={} unfiltered={} endOfPartitionGroup={}",
               messageBatch.getMessageCount(), messageBatch.getUnfilteredMessageCount(),
@@ -1671,12 +1673,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Assumes there is a valid instance of {@link PartitionGroupConsumer}
    */
   private void recreateStreamConsumer(String reason) {
-    _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
-    _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
-    closePartitionGroupConsumer();
-    _partitionGroupConsumer =
-        _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-    _partitionGroupConsumer.start(_currentOffset);
+    try {
+      _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
+      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+      closePartitionGroupConsumer();
+      _partitionGroupConsumer = _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+      _partitionGroupConsumer.start(_currentOffset);
+    } catch (Exception e) {
+      _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId, e);
+      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
+    }
   }
 
   /**
