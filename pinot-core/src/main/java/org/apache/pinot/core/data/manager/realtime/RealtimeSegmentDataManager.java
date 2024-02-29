@@ -1666,9 +1666,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       closePartitionGroupConsumer();
     }
     _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
-    _partitionGroupConsumer =
-        _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-    _partitionGroupConsumer.start(_currentOffset);
+    try {
+      _partitionGroupConsumer =
+          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+      _partitionGroupConsumer.start(_currentOffset);
+    } catch (Exception e) {
+      _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {} reason {}",
+          _clientId, reason, e);
+      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
+      throw e;
+    }
   }
 
   /**
@@ -1676,12 +1683,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Assumes there is a valid instance of {@link PartitionGroupConsumer}
    */
   private void recreateStreamConsumer(String reason) {
-    _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
-    _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
-    closePartitionGroupConsumer();
-    _partitionGroupConsumer =
-        _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-    _partitionGroupConsumer.start(_currentOffset);
+    try {
+      _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
+      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+      closePartitionGroupConsumer();
+      _partitionGroupConsumer = _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+      _partitionGroupConsumer.start(_currentOffset);
+    } catch (Exception e) {
+      _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId, e);
+      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
+    }
   }
 
   /**
