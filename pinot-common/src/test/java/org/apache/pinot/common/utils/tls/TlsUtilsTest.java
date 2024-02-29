@@ -188,7 +188,7 @@ public class TlsUtilsTest {
         () -> {
           try {
             RenewableTlsUtils.reloadSslFactoryWhenFileStoreChanges(sslFactory, KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH,
-                PASSWORD, TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, false);
+                PASSWORD, TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, () -> false);
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -241,7 +241,8 @@ public class TlsUtilsTest {
     tlsConfig.setTrustStorePassword(PASSWORD);
     RuntimeException e = null;
     try {
-      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(swappableSslFactory, tlsConfig);
+      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(
+          swappableSslFactory, tlsConfig, () -> false);
     } catch (RuntimeException ex) {
       e = ex;
     }
@@ -253,7 +254,8 @@ public class TlsUtilsTest {
     tlsConfig.setTrustStorePath("ftp://" + TLS_TRUSTSTORE_FILE_PATH);
     e = null;
     try {
-      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(swappableSslFactory, tlsConfig);
+      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(
+          swappableSslFactory, tlsConfig, () -> false);
     } catch (RuntimeException ex) {
       e = ex;
     }
@@ -266,7 +268,8 @@ public class TlsUtilsTest {
     e = null;
     tlsConfig.setTrustStorePath(TLS_TRUSTSTORE_FILE_PATH);
     try {
-      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(nonSwappableSslFactory, tlsConfig);
+      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(
+          nonSwappableSslFactory, tlsConfig, () -> false);
     } catch (RuntimeException ex) {
       e = ex;
     }
@@ -276,7 +279,8 @@ public class TlsUtilsTest {
     tlsConfig.setKeyStorePath(null);
     e = null;
     try {
-      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(nonSwappableSslFactory, tlsConfig);
+      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(
+          nonSwappableSslFactory, tlsConfig, () -> false);
     } catch (RuntimeException ex) {
       e = ex;
     }

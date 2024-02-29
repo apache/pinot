@@ -61,6 +61,7 @@ import org.apache.pinot.common.utils.ServiceStatus.Status;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
@@ -151,6 +152,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
+
+    PinotInsecureMode.setPinotInInsecureMode(
+        Boolean.valueOf(_serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
+            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
 
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
