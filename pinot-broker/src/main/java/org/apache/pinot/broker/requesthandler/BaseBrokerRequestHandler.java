@@ -101,9 +101,9 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -1777,14 +1777,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     String strResponseSize = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES);
     if (strResponseSize != null) {
       Long maxServerResponseSizeBrokerConfig = DataSizeUtils.toBytes(strResponseSize);
-      queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, Long.toString(maxServerResponseSizeBrokerConfig));
+      if (maxServerResponseSizeBrokerConfig != null)
+        queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+           Long.toString(maxServerResponseSizeBrokerConfig));
       return;
     }
 
     strResponseSize = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES);
     if (strResponseSize != null) {
       Long maxQueryResponseSizeBrokerConfig = DataSizeUtils.toBytes(strResponseSize);
-      queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
+      if(maxQueryResponseSizeBrokerConfig != null )
+        queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(maxQueryResponseSizeBrokerConfig / numServers));
     }
   }
