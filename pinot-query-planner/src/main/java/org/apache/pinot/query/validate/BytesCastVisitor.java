@@ -59,7 +59,7 @@ public class BytesCastVisitor extends SqlBasicVisitor<Void> {
       }
       String message = "Cannot cast " + srcNode + " as " + toType + ".";
       if (srcNode instanceof SqlCharStringLiteral) {
-        message += " Try to use binary literal instead (like x" + srcNode + ")";
+        message += " Try to use binary literal instead (like X" + srcNode + ")";
       } else if (fromType != null && SqlTypeUtil.isCharacter(fromType)) {
         message += " Try to wrap the expression in hexToBytes (like hexToBytes(" + srcNode + "))";
       }
