@@ -329,17 +329,13 @@ public class CommonConstants {
 
     // Broker config indicating the maximum serialized response size across all servers for a query. This value is
     // equally divided across all servers processing the query.
-    // If both configs are present, then the "server.response.size" takes precedence over "query.response.size".
-    // For each config, the value can be specified in two ways: raw_bytes and mega_bytes; the smaller takes precedence.
-    // Example of setting to 10MB: "10240000" (in raw byte), or "10" (in mega byte).
+    // The value can be in human readable size (e.g. '150K', '150KB', '0.15MB') or in bytes (e.g. '150000').
     public static final String CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES = "pinot.broker.max.query.response.size.bytes";
-    public static final String CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_MEGA_BYTES =
-        "pinot.broker.max.query.response.size.megabytes";
 
     // Broker config indicating the maximum length of the serialized response per server for a query.
+    // If both "server.response.size" and "query.response.size" are present, then the "server.response.size" takes
+    // precedence over "query.response.size".
     public static final String CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES = "pinot.broker.max.server.response.size.bytes";
-    public static final String CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_MEGA_BYTES =
-        "pinot.broker.max.server.response.size.megabytes";
 
     public static class Request {
       public static final String SQL = "sql";

@@ -103,6 +103,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -1773,26 +1774,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // BrokerConfig
-    Long maxServerResponseSizeBrokerConfig =
-        _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES, Long.class);
-    Long mBytes = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_MEGA_BYTES, Long.class);
-    if (mBytes != null) {
-      maxServerResponseSizeBrokerConfig = (maxServerResponseSizeBrokerConfig == null)
-          ? mBytes * 1_000_000 : Math.min(maxServerResponseSizeBrokerConfig, mBytes * 1_000_000);
-    }
-    if (maxServerResponseSizeBrokerConfig != null) {
+    String strSize = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES);
+    if (strSize != null) {
+      Long maxServerResponseSizeBrokerConfig = DataSizeUtils.toBytes(strSize);
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, Long.toString(maxServerResponseSizeBrokerConfig));
       return;
     }
 
-    Long maxQueryResponseSizeBrokerConfig =
-        _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES, Long.class);
-    mBytes = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_MEGA_BYTES, Long.class);
-    if (mBytes != null) {
-      maxQueryResponseSizeBrokerConfig = (maxQueryResponseSizeBrokerConfig == null)
-          ? mBytes * 1_000_000 : Math.min(maxQueryResponseSizeBrokerConfig, mBytes * 1_000_000);
-    }
-    if (maxQueryResponseSizeBrokerConfig != null) {
+    strSize = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES);
+    if (strSize != null) {
+      Long maxQueryResponseSizeBrokerConfig = DataSizeUtils.toBytes((strSize);
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(maxQueryResponseSizeBrokerConfig / numServers));
     }
