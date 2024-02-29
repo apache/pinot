@@ -68,7 +68,6 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   NETTY_POOLED_CHUNK_SIZE("bytes", true),
   // Ingestion delay metrics
   REALTIME_INGESTION_DELAY_MS("milliseconds", false),
-  REALTIME_LAST_FETCHED_BATCH_SIZE("rows", false),
   END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
   // Needed to track if valid doc id snapshots are present for faster restarts
   UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT("upsertValidDocIdSnapshotCount", false),

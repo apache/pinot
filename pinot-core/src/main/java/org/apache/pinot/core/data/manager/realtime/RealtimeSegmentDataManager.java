@@ -428,7 +428,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         messageBatch =
             _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
         //track realtime rows fetched on a table level. This included valid + invalid rows
-        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.REALTIME_LAST_FETCHED_BATCH_SIZE,
+        _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FETCHED,
             messageBatch.getMessageCount());
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("message batch received. filtered={} unfiltered={} endOfPartitionGroup={}",
@@ -438,14 +438,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _endOfPartitionGroup = messageBatch.isEndOfPartitionGroup();
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
-        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.REALTIME_LAST_FETCHED_BATCH_SIZE, -1);
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
         //track realtime rows fetched on a table level. This included valid + invalid rows
-        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.REALTIME_LAST_FETCHED_BATCH_SIZE, -1);
         // all exceptions but PermanentConsumerException are handled the same way
         // can be a TimeoutException or TransientConsumerException routinely
         // Unknown exception from stream. Treat as a transient exception.
@@ -454,7 +452,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         continue;
       } catch (Throwable t) {
         //track realtime rows fetched on a table level. This included valid + invalid rows
-        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.REALTIME_LAST_FETCHED_BATCH_SIZE, -1);
         _segmentLogger.warn("Stream error when fetching messages, stopping consumption", t);
         throw t;
       }
