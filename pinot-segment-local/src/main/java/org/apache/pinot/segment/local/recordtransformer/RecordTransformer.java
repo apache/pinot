@@ -21,8 +21,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 import java.io.Serializable;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
-
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 /**
  * The record transformer which takes a {@link GenericRow} and transform it based on some custom rules.
@@ -51,8 +50,7 @@ public interface RecordTransformer extends Serializable {
    * @return Transformed record, or {@code null} if the record does not follow certain rules.
    */
   @Nullable
-  default GenericRow transformUsingRecordReaderContext(GenericRow record,
-      RecordReaderFileConfig recordReaderFileConfig) {
+  default GenericRow transform(GenericRow record, RecordReaderConfig recordReaderConfig) {
     return transform(record);
   }
 }

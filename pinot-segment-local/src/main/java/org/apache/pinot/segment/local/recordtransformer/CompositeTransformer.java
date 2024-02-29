@@ -28,8 +28,7 @@ import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
-
+import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 
 /**
  * The {@code CompositeTransformer} class performs multiple transforms based on the inner {@link RecordTransformer}s.
@@ -117,18 +116,18 @@ public class CompositeTransformer implements RecordTransformer {
   @Nullable
   @Override
   public GenericRow transform(GenericRow genericRow) {
-    return transformUsingRecordReaderContext(genericRow, null);
+    return transform(genericRow, null);
   }
 
   @Nullable
   @Override
-  public GenericRow transformUsingRecordReaderContext(GenericRow record,
-      RecordReaderFileConfig recordReaderFileConfig) {
+  public GenericRow transform(GenericRow record,
+      RecordReaderConfig recordReaderConfig) {
     for (RecordTransformer transformer : _transformers) {
       if (!IngestionUtils.shouldIngestRow(record)) {
         return record;
       }
-      record = transformer.transformUsingRecordReaderContext(record, recordReaderFileConfig);
+      record = transformer.transform(record, recordReaderConfig);
       if (record == null) {
         return null;
       }

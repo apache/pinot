@@ -175,13 +175,13 @@ public class SegmentMapper {
       if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
         //noinspection unchecked
         for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-          GenericRow transformedRow = _recordTransformer.transformUsingRecordReaderContext(row, recordReaderFileConfig);
+          GenericRow transformedRow = _recordTransformer.transform(row, recordReaderFileConfig);
           if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
             writeRecord(transformedRow);
           }
         }
       } else {
-        GenericRow transformedRow = _recordTransformer.transformUsingRecordReaderContext(reuse, recordReaderFileConfig);
+        GenericRow transformedRow = _recordTransformer.transform(reuse, recordReaderFileConfig);
         if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
           writeRecord(transformedRow);
         }
