@@ -139,13 +139,11 @@ public class SegmentMapper {
     int totalNumRecordReaders = _recordReaderFileConfigs.size();
     GenericRow reuse = new GenericRow();
     for (RecordReaderFileConfig recordReaderFileConfig : _recordReaderFileConfigs) {
-      RecordReader recordReader = recordReaderFileConfig.getRecordReader();
-
       // Mapper can terminate midway of reading a file if the intermediate file size has crossed the configured
       // threshold. Map phase will continue in the next iteration right where we are leaving off in the current
       // iteration.
       boolean shouldMapperTerminate =
-          !completeMapAndTransformRow(recordReader, reuse, observer, count, totalNumRecordReaders);
+          !completeMapAndTransformRow(recordReaderFileConfig, reuse, observer, count, totalNumRecordReaders);
 
       // Terminate the map phase if intermediate file size has crossed the threshold.
       if (shouldMapperTerminate) {
@@ -164,9 +162,10 @@ public class SegmentMapper {
 
 //   Returns true if the map phase can continue, false if it should terminate based on the configured threshold for
 //   intermediate file size during map phase.
-  private boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse,
+  private boolean completeMapAndTransformRow(RecordReaderFileConfig recordReaderFileConfig, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
+    RecordReader recordReader = recordReaderFileConfig.getRecordReader();
     while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
       reuse = recordReader.next(reuse);
       _recordEnricherPipeline.run(reuse);
@@ -176,13 +175,13 @@ public class SegmentMapper {
       if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
         //noinspection unchecked
         for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-          GenericRow transformedRow = _recordTransformer.transform(row);
+          GenericRow transformedRow = _recordTransformer.transformUsingRecordReaderContext(row, recordReaderFileConfig);
           if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
             writeRecord(transformedRow);
           }
         }
       } else {
-        GenericRow transformedRow = _recordTransformer.transform(reuse);
+        GenericRow transformedRow = _recordTransformer.transformUsingRecordReaderContext(reuse, recordReaderFileConfig);
         if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
           writeRecord(transformedRow);
         }
