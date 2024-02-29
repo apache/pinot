@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.spi.env;
 
-public enum PropertyReaderKind {
-  ConfigFilePropertyReader,
-  SegmentMetadataPropertyReader,
+public enum PropertyIOFactoryKind {
+  ConfigFileIOFactory,
+  SegmentMetadataIOFactory,
 
-  DefaultPropertyReader
+  DefaultPropertyConfigurationIOFactory
 }

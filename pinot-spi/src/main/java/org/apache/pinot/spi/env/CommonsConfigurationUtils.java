@@ -55,7 +55,8 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromFile(File file)
       throws ConfigurationException {
-    return fromFile(file, false, true, PropertyReaderKind.DefaultPropertyReader);
+    return fromFile(file, false, true,
+        PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory, null);
   }
 
   /**
@@ -65,7 +66,7 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromInputStream(InputStream stream)
       throws ConfigurationException {
-    return fromInputStream(stream, false, true, PropertyReaderKind.DefaultPropertyReader);
+    return fromInputStream(stream, false, true, PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
   }
 
   /**
@@ -75,7 +76,7 @@ public class CommonsConfigurationUtils {
    */
   public static PropertiesConfiguration fromPath(String path)
       throws ConfigurationException {
-    return fromPath(path, false, true, PropertyReaderKind.DefaultPropertyReader);
+    return fromPath(path, false, true, PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
   }
 
   /**
@@ -86,7 +87,7 @@ public class CommonsConfigurationUtils {
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromPath(String path, boolean setIOFactory, boolean setDefaultDelimiter,
-      PropertyReaderKind ioFactoryKind)
+      PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, ioFactoryKind);
     FileHandler fileHandler = new FileHandler(config);
@@ -102,12 +103,24 @@ public class CommonsConfigurationUtils {
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromInputStream(InputStream stream, boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyReaderKind ioFactoryKind)
+      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, ioFactoryKind);
     FileHandler fileHandler = new FileHandler(config);
     fileHandler.load(stream);
     return config;
+  }
+
+  public static PropertiesConfiguration segmentMetadataFromFile(File file, boolean setIOFactory,
+      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind, String segmentVersionHeader)
+      throws ConfigurationException {
+    return fromFile(file, setIOFactory, setDefaultDelimiter, ioFactoryKind, segmentVersionHeader);
+  }
+
+  public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
+      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
+      throws ConfigurationException {
+    return fromFile(file, setIOFactory, setDefaultDelimiter, ioFactoryKind, "");
   }
 
   /**
@@ -118,9 +131,10 @@ public class CommonsConfigurationUtils {
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyReaderKind ioFactoryKind)
+      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind, String headerContentToCheck)
       throws ConfigurationException {
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, ioFactoryKind);
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter,
+        ioFactoryKind, headerContentToCheck);
     FileHandler fileHandler = new FileHandler(config);
     // check if file exists, load the properties otherwise set the file.
     if (file.exists()) {
@@ -275,12 +289,17 @@ public class CommonsConfigurationUtils {
   }
 
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyReaderKind ioFactoryKind) {
+      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind) {
+    return createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, ioFactoryKind, null);
+  }
+
+  private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
+      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind, String headerContentToCheck) {
     PropertiesConfiguration config = new PropertiesConfiguration();
 
     // setting IO Reader Factory
     if (setIOFactory) {
-      config.setIOFactory(createPropertiesReader(ioFactoryKind));
+      config.setIOFactory(createPropertyIOFactory(ioFactoryKind, config, headerContentToCheck));
     }
 
     // setting DEFAULT_LIST_DELIMITER
@@ -291,15 +310,26 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
-  private static IOFactory createPropertiesReader(PropertyReaderKind kind) {
-    switch (kind) {
-      case ConfigFilePropertyReader:
-        return new ConfigFilePropertyReaderFactory();
-      case SegmentMetadataPropertyReader:
-        return new SegmentMetadataPropertyReaderFactory();
-      case DefaultPropertyReader:
+  private static IOFactory createPropertyIOFactory(PropertyIOFactoryKind ioFactoryKind,
+      PropertiesConfiguration config, String headerContentToCheck) {
+    switch (ioFactoryKind) {
+      case ConfigFileIOFactory:
+        return new ConfigFilePropertyIOFactory();
+      case SegmentMetadataIOFactory:
+        String headerContent = config.getHeader();
+        boolean skipEscapeUnescapePropertyName =
+            shouldSkipEscapeUnescapePropertyName(headerContent, headerContentToCheck);
+        return new SegmentMetadataPropertyIOFactory(skipEscapeUnescapePropertyName);
+      case DefaultPropertyConfigurationIOFactory:
       default:
         return new PropertiesConfiguration.DefaultIOFactory();
     }
+  }
+
+  private static boolean shouldSkipEscapeUnescapePropertyName(String header, String headerContentToCheck) {
+    if (header != null) {
+      return header.contains(headerContentToCheck);
+    }
+    return false;
   }
 }

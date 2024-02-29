@@ -214,10 +214,10 @@ public class PinotConfiguration {
       if (configPath.startsWith("classpath:")) {
         propertiesConfiguration = CommonsConfigurationUtils.fromInputStream(
             PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())), true, true,
-            PropertyReaderKind.ConfigFilePropertyReader);
+            PropertyIOFactoryKind.ConfigFileIOFactory);
       } else {
         propertiesConfiguration = CommonsConfigurationUtils.fromPath(configPath, true, true,
-            PropertyReaderKind.ConfigFilePropertyReader);
+            PropertyIOFactoryKind.ConfigFileIOFactory);
       }
       return propertiesConfiguration;
     } catch (ConfigurationException e) {

@@ -19,12 +19,13 @@
 package org.apache.pinot.spi.env;
 
 import java.io.Reader;
-import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration.DefaultIOFactory;
+import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
 
 
-class SegmentMetadataPropertyReaderFactory extends PropertiesConfiguration.DefaultIOFactory {
+public class ConfigFilePropertyIOFactory extends DefaultIOFactory {
   @Override
-  public PropertiesConfiguration.PropertiesReader createPropertiesReader(Reader in) {
-    return new SegmentMetadataPropertyReader(in);
+  public PropertiesReader createPropertiesReader(Reader in) {
+    return new ConfigFilePropertyReader(in);
   }
 }
