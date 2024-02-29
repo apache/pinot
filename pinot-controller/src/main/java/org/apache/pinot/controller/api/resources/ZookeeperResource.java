@@ -287,8 +287,7 @@ public class ZookeeperResource {
     }
 
     if (StringUtils.isEmpty(payload)) {
-      throw new ControllerApplicationException(LOGGER, "Must provide data through query parameter or payload",
-          Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Must provide payload", Response.Status.BAD_REQUEST);
     }
     ZNRecord znRecord;
     try {
