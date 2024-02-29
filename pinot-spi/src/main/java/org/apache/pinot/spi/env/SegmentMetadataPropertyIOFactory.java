@@ -19,13 +19,25 @@
 package org.apache.pinot.spi.env;
 
 import java.io.Reader;
-import org.apache.commons.configuration2.PropertiesConfiguration.DefaultIOFactory;
-import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
+import java.io.Writer;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.convert.ListDelimiterHandler;
 
 
-public class ConfigFilePropertyReaderFactory extends DefaultIOFactory {
+class SegmentMetadataPropertyIOFactory extends PropertiesConfiguration.DefaultIOFactory {
+
+  private final boolean _skipEscapeUnescapePropertyName;
+  public SegmentMetadataPropertyIOFactory(boolean unescapePropertyName) {
+      _skipEscapeUnescapePropertyName = unescapePropertyName;
+  }
+
   @Override
-  public PropertiesReader createPropertiesReader(Reader in) {
-    return new ConfigFilePropertyReader(in);
+  public PropertiesConfiguration.PropertiesReader createPropertiesReader(Reader in) {
+    return new SegmentMetadataPropertyReader(in, _skipEscapeUnescapePropertyName);
+  }
+
+  @Override
+  public PropertiesConfiguration.PropertiesWriter createPropertiesWriter(Writer out, ListDelimiterHandler handler) {
+    return new SegmentMetadataPropertyWriter(out, handler, _skipEscapeUnescapePropertyName);
   }
 }

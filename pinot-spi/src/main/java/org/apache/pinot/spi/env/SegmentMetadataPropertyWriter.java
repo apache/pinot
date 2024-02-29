@@ -18,24 +18,25 @@
  */
 package org.apache.pinot.spi.env;
 
-import java.io.Reader;
-import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
+import java.io.Writer;
+import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesWriter;
+import org.apache.commons.configuration2.convert.ListDelimiterHandler;
 
 
-class SegmentMetadataPropertyReader extends PropertiesReader {
+public class SegmentMetadataPropertyWriter extends PropertiesWriter {
+  private final boolean _skipEscapePropertyName;
 
-  private final boolean _skipUnescapePropertyName;
-
-  public SegmentMetadataPropertyReader(Reader reader, boolean skipUnescapePropertyName) {
-    super(reader);
-    _skipUnescapePropertyName = skipUnescapePropertyName;
+  public SegmentMetadataPropertyWriter(final Writer writer, ListDelimiterHandler handler,
+      boolean skipEscapePropertyName) {
+    super(writer, handler);
+    _skipEscapePropertyName = skipEscapePropertyName;
   }
 
   @Override
-  protected String unescapePropertyName(final String name) {
-    if (_skipUnescapePropertyName) {
-      return name;
+  protected String escapeKey(final String key) {
+    if (_skipEscapePropertyName) {
+      return key;
     }
-    return super.unescapePropertyName(name);
+    return super.escapeKey(key);
   }
 }

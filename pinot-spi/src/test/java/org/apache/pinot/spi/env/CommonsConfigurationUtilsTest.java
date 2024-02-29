@@ -112,7 +112,7 @@ public class CommonsConfigurationUtilsTest {
     }
 
     PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true,
-        PropertyReaderKind.DefaultPropertyReader);
+        PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
     configuration.setProperty(PROPERTY_KEY, replacedValue);
     String recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
@@ -120,7 +120,7 @@ public class CommonsConfigurationUtilsTest {
 
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
     configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true,
-        PropertyReaderKind.DefaultPropertyReader);
+        PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
