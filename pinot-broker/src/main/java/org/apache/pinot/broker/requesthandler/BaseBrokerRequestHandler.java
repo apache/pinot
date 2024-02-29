@@ -1774,16 +1774,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // BrokerConfig
-    String strSize = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES);
-    if (strSize != null) {
-      Long maxServerResponseSizeBrokerConfig = DataSizeUtils.toBytes(strSize);
+    String strResponseSize = _config.getProperty(Broker.CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES);
+    if (strResponseSize != null) {
+      Long maxServerResponseSizeBrokerConfig = DataSizeUtils.toBytes(strResponseSize);
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, Long.toString(maxServerResponseSizeBrokerConfig));
       return;
     }
 
-    strSize = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES);
-    if (strSize != null) {
-      Long maxQueryResponseSizeBrokerConfig = DataSizeUtils.toBytes(strSize);
+    strResponseSize = _config.getProperty(Broker.CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES);
+    if (strResponseSize != null) {
+      Long maxQueryResponseSizeBrokerConfig = DataSizeUtils.toBytes(strResponseSize);
       queryOptions.put(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES,
           Long.toString(maxQueryResponseSizeBrokerConfig / numServers));
     }
