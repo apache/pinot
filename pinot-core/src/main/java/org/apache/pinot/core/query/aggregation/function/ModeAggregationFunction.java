@@ -269,8 +269,7 @@ public class ModeAggregationFunction
       int[] dicts = blockValSet.getDictionaryIdsSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          int did = dicts[i];
-          dictIdValueMap.merge(did, 1, Integer::sum);
+          dictIdValueMap.merge(dicts[i], 1, Integer::sum);
         }
       });
       return;
