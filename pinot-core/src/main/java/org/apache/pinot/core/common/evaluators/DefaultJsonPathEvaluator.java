@@ -25,6 +25,7 @@ import com.jayway.jsonpath.InvalidPathException;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
+import com.jayway.jsonpath.TypeRef;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.math.BigDecimal;
@@ -58,6 +59,16 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
   private static final float[] EMPTY_FLOATS = new float[0];
   private static final double[] EMPTY_DOUBLES = new double[0];
   private static final String[] EMPTY_STRINGS = new String[0];
+  private static final TypeRef<List<Integer>> INTEGER_LIST_TYPE = new TypeRef<List<Integer>>() {
+  };
+  private static final TypeRef<List<Long>> LONG_LIST_TYPE = new TypeRef<List<Long>>() {
+  };
+  private static final TypeRef<List<Float>> FLOAT_LIST_TYPE = new TypeRef<List<Float>>() {
+  };
+  private static final TypeRef<List<Double>> DOUBLE_LIST_TYPE = new TypeRef<List<Double>>() {
+  };
+  private static final TypeRef<List<String>> STRING_LIST_TYPE = new TypeRef<List<String>>() {
+  };
 
   public static JsonPathEvaluator create(String jsonPath, @Nullable Object defaultValue) {
     try {
@@ -274,23 +285,23 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
       reader.readDictIds(docIds, length, dictIdsBuffer, context);
       if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
         for (int i = 0; i < length; i++) {
-          processList(i, extractFromBytes(dictionary, dictIdsBuffer[i]), valueBuffer);
+          processList(i, extractFromBytes(dictionary, dictIdsBuffer[i], INTEGER_LIST_TYPE), valueBuffer);
         }
       } else {
         for (int i = 0; i < length; i++) {
-          processList(i, extractFromString(dictionary, dictIdsBuffer[i]), valueBuffer);
+          processList(i, extractFromString(dictionary, dictIdsBuffer[i], INTEGER_LIST_TYPE), valueBuffer);
         }
       }
     } else {
       switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
-            processList(i, extractFromString(reader, context, docIds[i]), valueBuffer);
+            processList(i, extractFromString(reader, context, docIds[i], INTEGER_LIST_TYPE), valueBuffer);
           }
           break;
         case BYTES:
           for (int i = 0; i < length; i++) {
-            processList(i, extractFromBytes(reader, context, docIds[i]), valueBuffer);
+            processList(i, extractFromBytes(reader, context, docIds[i], INTEGER_LIST_TYPE), valueBuffer);
           }
           break;
         default:
@@ -305,23 +316,23 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
       reader.readDictIds(docIds, length, dictIdsBuffer, context);
       if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
         for (int i = 0; i < length; i++) {
-          processList(i, extractFromBytes(dictionary, dictIdsBuffer[i]), valueBuffer);
+          processList(i, extractFromBytes(dictionary, dictIdsBuffer[i], LONG_LIST_TYPE), valueBuffer);
         }
       } else {
         for (int i = 0; i < length; i++) {
-          processList(i, extractFromString(dictionary, dictIdsBuffer[i]), valueBuffer);
+          processList(i, extractFromString(dictionary, dictIdsBuffer[i], LONG_LIST_TYPE), valueBuffer);
         }
       }
     } else {
       switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
-            processList(i, extractFromString(reader, context, docIds[i]), valueBuffer);
+            processList(i, extractFromString(reader, context, docIds[i], LONG_LIST_TYPE), valueBuffer);
           }
           break;
         case BYTES:
           for (int i = 0; i < length; i++) {
-            processList(i, extractFromBytes(reader, context, docIds[i]), valueBuffer);
+            processList(i, extractFromBytes(reader, context, docIds[i], LONG_LIST_TYPE), valueBuffer);
           }
           break;
         default:
@@ -336,23 +347,23 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
       reader.readDictIds(docIds, length, dictIdsBuffer, context);
       if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
         for (int i = 0; i < length; i++) {
-          processList(i, extractFromBytes(dictionary, dictIdsBuffer[i]), valueBuffer);
+          processList(i, extractFromBytes(dictionary, dictIdsBuffer[i], FLOAT_LIST_TYPE), valueBuffer);
         }
       } else {
         for (int i = 0; i < length; i++) {
-          processList(i, extractFromString(dictionary, dictIdsBuffer[i]), valueBuffer);
+          processList(i, extractFromString(dictionary, dictIdsBuffer[i], FLOAT_LIST_TYPE), valueBuffer);
         }
       }
     } else {
       switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
-            processList(i, extractFromString(reader, context, docIds[i]), valueBuffer);
+            processList(i, extractFromString(reader, context, docIds[i], FLOAT_LIST_TYPE), valueBuffer);
           }
           break;
         case BYTES:
           for (int i = 0; i < length; i++) {
-            processList(i, extractFromBytes(reader, context, docIds[i]), valueBuffer);
+            processList(i, extractFromBytes(reader, context, docIds[i], FLOAT_LIST_TYPE), valueBuffer);
           }
           break;
         default:
@@ -367,23 +378,23 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
       reader.readDictIds(docIds, length, dictIdsBuffer, context);
       if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
         for (int i = 0; i < length; i++) {
-          processList(i, extractFromBytes(dictionary, dictIdsBuffer[i]), valueBuffer);
+          processList(i, extractFromBytes(dictionary, dictIdsBuffer[i], DOUBLE_LIST_TYPE), valueBuffer);
         }
       } else {
         for (int i = 0; i < length; i++) {
-          processList(i, extractFromString(dictionary, dictIdsBuffer[i]), valueBuffer);
+          processList(i, extractFromString(dictionary, dictIdsBuffer[i], DOUBLE_LIST_TYPE), valueBuffer);
         }
       }
     } else {
       switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
-            processList(i, extractFromString(reader, context, docIds[i]), valueBuffer);
+            processList(i, extractFromString(reader, context, docIds[i], DOUBLE_LIST_TYPE), valueBuffer);
           }
           break;
         case BYTES:
           for (int i = 0; i < length; i++) {
-            processList(i, extractFromBytes(reader, context, docIds[i]), valueBuffer);
+            processList(i, extractFromBytes(reader, context, docIds[i], DOUBLE_LIST_TYPE), valueBuffer);
           }
           break;
         default:
@@ -398,23 +409,23 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
       reader.readDictIds(docIds, length, dictIdsBuffer, context);
       if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
         for (int i = 0; i < length; i++) {
-          processList(i, extractFromBytes(dictionary, dictIdsBuffer[i]), valueBuffer);
+          processList(i, extractFromBytes(dictionary, dictIdsBuffer[i], STRING_LIST_TYPE), valueBuffer);
         }
       } else {
         for (int i = 0; i < length; i++) {
-          processList(i, extractFromString(dictionary, dictIdsBuffer[i]), valueBuffer);
+          processList(i, extractFromString(dictionary, dictIdsBuffer[i], STRING_LIST_TYPE), valueBuffer);
         }
       }
     } else {
       switch (reader.getStoredType()) {
         case STRING:
           for (int i = 0; i < length; i++) {
-            processList(i, extractFromString(reader, context, docIds[i]), valueBuffer);
+            processList(i, extractFromString(reader, context, docIds[i], STRING_LIST_TYPE), valueBuffer);
           }
           break;
         case BYTES:
           for (int i = 0; i < length; i++) {
-            processList(i, extractFromBytes(reader, context, docIds[i]), valueBuffer);
+            processList(i, extractFromBytes(reader, context, docIds[i], STRING_LIST_TYPE), valueBuffer);
           }
           break;
         default:
@@ -433,10 +444,29 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
   }
 
   @Nullable
+  private <T> T extractFromBytes(Dictionary dictionary, int dictId, TypeRef<T> ref) {
+    try {
+      return JSON_PARSER_CONTEXT.parseUtf8(dictionary.getBytesValue(dictId)).read(_jsonPath, ref);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  @Nullable
   private <T, R extends ForwardIndexReaderContext> T extractFromBytes(ForwardIndexReader<R> reader, R context,
       int docId) {
     try {
       return JSON_PARSER_CONTEXT.parseUtf8(reader.getBytes(docId, context)).read(_jsonPath);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  @Nullable
+  private <T, R extends ForwardIndexReaderContext> T extractFromBytes(ForwardIndexReader<R> reader, R context,
+      int docId, TypeRef<T> ref) {
+    try {
+      return JSON_PARSER_CONTEXT.parseUtf8(reader.getBytes(docId, context)).read(_jsonPath, ref);
     } catch (Exception e) {
       return null;
     }
@@ -471,10 +501,29 @@ public final class DefaultJsonPathEvaluator implements JsonPathEvaluator {
   }
 
   @Nullable
+  private <T> T extractFromString(Dictionary dictionary, int dictId, TypeRef<T> ref) {
+    try {
+      return JSON_PARSER_CONTEXT.parse(dictionary.getStringValue(dictId)).read(_jsonPath, ref);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  @Nullable
   private <T, R extends ForwardIndexReaderContext> T extractFromString(ForwardIndexReader<R> reader, R context,
       int docId) {
     try {
       return JSON_PARSER_CONTEXT.parseUtf8(reader.getBytes(docId, context)).read(_jsonPath);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  @Nullable
+  private <T, R extends ForwardIndexReaderContext> T extractFromString(ForwardIndexReader<R> reader, R context,
+      int docId, TypeRef<T> ref) {
+    try {
+      return JSON_PARSER_CONTEXT.parseUtf8(reader.getBytes(docId, context)).read(_jsonPath, ref);
     } catch (Exception e) {
       return null;
     }
