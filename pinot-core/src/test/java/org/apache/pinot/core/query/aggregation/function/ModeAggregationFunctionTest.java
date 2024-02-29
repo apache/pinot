@@ -65,6 +65,32 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
     }
   }
 
+  @Test(dataProvider = "scenarios")
+  void aggrWithoutNullAndEmptySegments(Scenario scenario) {
+    scenario.getDeclaringTable(false)
+        .onFirstInstance("myField",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null"
+        ).whenQuery("select mode(myField) as mode from testTable")
+        .thenResultIs("DOUBLE", aggrWithoutNullResult(scenario._dataType));
+  }
+
+  @Test(dataProvider = "scenarios")
+  void aggrWithNullAndEmptySegments(Scenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null"
+        ).whenQuery("select mode(myField) as mode from testTable")
+        .thenResultIs("DOUBLE", "null");
+  }
+
   String aggrWithoutNullResult(FieldSpec.DataType dt) {
     switch (dt) {
       case INT: return "-2.147483648E9";
