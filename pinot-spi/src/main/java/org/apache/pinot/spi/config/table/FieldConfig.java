@@ -24,13 +24,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class FieldConfig extends BaseJsonConfig {
@@ -253,24 +251,6 @@ public class FieldConfig extends BaseJsonConfig {
 
     public Builder withTierOverwrites(JsonNode tierOverwrites) {
       _tierOverwrites = tierOverwrites;
-      return this;
-    }
-
-    public Builder withIndex(String indexId, IndexConfig indexConfig) {
-      Map<String, IndexConfig> map = Collections.singletonMap(indexId, indexConfig);
-      if (_indexes == null) {
-        _indexes = JsonUtils.objectToJsonNode(map);
-      } else if (_indexes.isObject()) {
-        try {
-          Map<String, Object> oldValue = JsonUtils.jsonNodeToMap(_indexes);
-          oldValue.putAll(map);
-          _indexes = JsonUtils.objectToJsonNode(oldValue);
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
-      } else {
-        throw new UnsupportedOperationException("Cannot merge objects like " + _indexes);
-      }
       return this;
     }
 
