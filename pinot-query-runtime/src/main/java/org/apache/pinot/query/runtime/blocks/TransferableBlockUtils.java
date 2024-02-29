@@ -30,13 +30,14 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 
 public final class TransferableBlockUtils {
   private static final int MEDIAN_COLUMN_SIZE_BYTES = 8;
+  private static final TransferableBlock EMPTY_EOS = new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
 
   private TransferableBlockUtils() {
     // do not instantiate.
   }
 
   public static TransferableBlock getEndOfStreamTransferableBlock() {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock());
+    return EMPTY_EOS;
   }
 
   public static TransferableBlock getEndOfStreamTransferableBlock(Map<String, String> statsMap) {

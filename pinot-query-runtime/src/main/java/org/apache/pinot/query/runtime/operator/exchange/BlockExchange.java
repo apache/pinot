@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator.exchange;
 import com.google.common.base.Preconditions;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -28,6 +29,7 @@ import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 
 
 /**
@@ -75,24 +77,39 @@ public abstract class BlockExchange {
    */
   public boolean send(TransferableBlock block)
       throws Exception {
-    if (block.isEndOfStreamBlock()) {
+    if (block.isErrorBlock()) {
+      // Send error block to all mailboxes to propagate the error
       for (SendingMailbox sendingMailbox : _sendingMailboxes) {
         sendBlock(sendingMailbox, block);
       }
       return false;
-    } else {
-      boolean isEarlyTerminated = true;
-      for (SendingMailbox sendingMailbox : _sendingMailboxes) {
-        if (!sendingMailbox.isEarlyTerminated()) {
-          isEarlyTerminated = false;
-          break;
-        }
-      }
-      if (!isEarlyTerminated) {
-        route(_sendingMailboxes, block);
-      }
-      return isEarlyTerminated;
     }
+
+    if (block.isSuccessfulEndOfStreamBlock()) {
+      // Send metadata to only one randomly picked mailbox, and empty EOS block to other mailboxes
+      int numMailboxes = _sendingMailboxes.size();
+      int mailboxIdToSendMetadata = ThreadLocalRandom.current().nextInt(numMailboxes);
+      for (int i = 0; i < numMailboxes; i++) {
+        SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
+        TransferableBlock blockToSend =
+            i == mailboxIdToSendMetadata ? block : TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        sendBlock(sendingMailbox, blockToSend);
+      }
+      return false;
+    }
+
+    assert block.isDataBlock();
+    boolean isEarlyTerminated = true;
+    for (SendingMailbox sendingMailbox : _sendingMailboxes) {
+      if (!sendingMailbox.isEarlyTerminated()) {
+        isEarlyTerminated = false;
+        break;
+      }
+    }
+    if (!isEarlyTerminated) {
+      route(_sendingMailboxes, block);
+    }
+    return isEarlyTerminated;
   }
 
   protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block)

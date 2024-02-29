@@ -59,12 +59,10 @@ public final class DataBlockUtils {
   }
 
   public static MetadataBlock getEndOfStreamDataBlock() {
-    // TODO: add query statistics metadata for the block.
     return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
   }
 
   public static MetadataBlock getEndOfStreamDataBlock(Map<String, String> stats) {
-    // TODO: add query statistics metadata for the block.
     return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS, stats);
   }
 

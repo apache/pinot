@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.calcite.util.Pair;
+import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -89,7 +90,7 @@ public class QueryDispatcher {
   }
 
   public ResultTable submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
-      Map<String, String> queryOptions, Map<Integer, ExecutionStatsAggregator> executionStatsAggregator)
+      Map<String, String> queryOptions, @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregator)
       throws Exception {
     long requestId = context.getRequestId();
     try {
@@ -278,20 +279,16 @@ public class QueryDispatcher {
   }
 
   private static void collectStats(DispatchableSubPlan dispatchableSubPlan, OpChainStats opChainStats,
-      @Nullable Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
-    if (executionStatsAggregatorMap != null) {
-      LOGGER.info("Extracting broker query execution stats, Runtime: {}ms", opChainStats.getExecutionTime());
-      for (Map.Entry<String, OperatorStats> entry : opChainStats.getOperatorStatsMap().entrySet()) {
-        OperatorStats operatorStats = entry.getValue();
-        ExecutionStatsAggregator rootStatsAggregator = executionStatsAggregatorMap.get(0);
-        ExecutionStatsAggregator stageStatsAggregator = executionStatsAggregatorMap.get(operatorStats.getStageId());
-        rootStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
+      @Nullable Map<Integer, ExecutionStatsAggregator> statsAggregatorMap) {
+    if (MapUtils.isNotEmpty(statsAggregatorMap)) {
+      for (OperatorStats operatorStats : opChainStats.getOperatorStatsMap().values()) {
+        ExecutionStatsAggregator rootStatsAggregator = statsAggregatorMap.get(0);
+        rootStatsAggregator.aggregate(null, operatorStats.getExecutionStats(), new HashMap<>());
+        ExecutionStatsAggregator stageStatsAggregator = statsAggregatorMap.get(operatorStats.getStageId());
         if (stageStatsAggregator != null) {
-          if (dispatchableSubPlan != null) {
-            OperatorUtils.recordTableName(operatorStats,
-                dispatchableSubPlan.getQueryStageList().get(operatorStats.getStageId()));
-          }
-          stageStatsAggregator.aggregate(null, entry.getValue().getExecutionStats(), new HashMap<>());
+          OperatorUtils.recordTableName(operatorStats,
+              dispatchableSubPlan.getQueryStageList().get(operatorStats.getStageId()));
+          stageStatsAggregator.aggregate(null, operatorStats.getExecutionStats(), new HashMap<>());
         }
       }
     }
