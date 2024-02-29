@@ -93,6 +93,9 @@ rules:
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeOffsetCommits\"><>(\\w+)"
   name: "pinot_server_realtime_offsetCommits_$1"
   cache: true
+- pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.realtimeRowsConsumed\"><>(\\w+)"
+  name: "pinot_server_realtime_rowsConsumed_$1"
+  cache: true
 - pattern: "\"org.apache.pinot.common.metrics\"<type=\"ServerMetrics\", name=\"pinot.server.(\\w+)Exceptions\"><>(\\w+)"
   name: "pinot_server_realtime_exceptions_$1_$2"
   cache: true
