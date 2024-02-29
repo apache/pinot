@@ -20,6 +20,7 @@ package org.apache.pinot.broker.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
@@ -75,6 +76,7 @@ import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Controller.PINOT_QUERY_ERROR_CODE_HEADER;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -125,7 +127,7 @@ public class PinotClientRequest {
         requestJson.put(Request.DEBUG_OPTIONS, debugOptions);
       }
       BrokerResponse brokerResponse = executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders);
-      asyncResponse.resume(brokerResponse.toJsonString());
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -155,7 +157,7 @@ public class PinotClientRequest {
       }
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders);
-      asyncResponse.resume(brokerResponse.toJsonString());
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -189,7 +191,7 @@ public class PinotClientRequest {
       requestJson.put(Request.SQL, query);
       BrokerResponse brokerResponse =
           executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
-      asyncResponse.resume(brokerResponse.toJsonString());
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -219,7 +221,7 @@ public class PinotClientRequest {
       }
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true);
-      asyncResponse.resume(brokerResponse.toJsonString());
+      asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -347,5 +349,31 @@ public class PinotClientRequest {
     identity.setEndpointUrl(context.getRequestURL().toString());
 
     return identity;
+  }
+
+  /**
+   * Generate Response object from the BrokerResponse object with 'X-Pinot-Error-Code' header value
+   *
+   * If the query is successful the 'X-Pinot-Error-Code' header value is set to -1
+   * otherwise, the first error code of the broker response exception array will become the header value
+   *
+   * @param brokerResponse
+   * @return Response
+   * @throws Exception
+   */
+  @VisibleForTesting
+  static Response getPinotQueryResponse(BrokerResponse brokerResponse)
+      throws Exception {
+    int queryErrorCodeHeaderValue = -1; // default value of the header.
+
+    if (brokerResponse.getExceptionsSize() != 0) {
+      // set the header value as first exception error code value.
+      queryErrorCodeHeaderValue = brokerResponse.getProcessingExceptions().get(0).getErrorCode();
+    }
+
+    // returning the Response with OK status and header value.
+    return Response.ok()
+        .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
+        .entity(brokerResponse.toJsonString()).build();
   }
 }
