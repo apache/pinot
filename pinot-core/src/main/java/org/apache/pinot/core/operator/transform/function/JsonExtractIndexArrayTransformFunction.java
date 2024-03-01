@@ -105,7 +105,7 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
       } catch (Exception e) {
         throw new IllegalArgumentException("JSON path argument is not a valid JSON path");
       }
-      _filterJsonPathString = inputJsonPath.substring(1); // remove $ prefix
+      _filterJsonPathString = filterJsonPath;
     }
 
     _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);

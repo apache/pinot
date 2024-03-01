@@ -4,9 +4,17 @@ import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
+import com.jayway.jsonpath.TypeRef;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import org.apache.pinot.common.function.JsonPathCache;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -37,6 +45,19 @@ public class JsonExtractArrayIndexTransformFunctionTest extends BaseTransformFun
   @Test
   public void testJsonExtractArrayIndexTransformFunction() {
 //    String expressionStr, String jsonPathString, FieldSpec.DataType resultsDataType, boolean isSingleValue
-    String expressionStr = "jsonExtractArrayIndex(jsonSV, '$.')";
+    String expressionStr = "jsonExtractArrayIndex(jsonSV, '$.intArrayVal', 'INT_ARRAY', 0)";
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof JsonExtractIndexArrayTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractIndexArrayTransformFunction.FUNCTION_NAME);
+
+    int[][] values = transformFunction.transformToIntValuesMV(_projectionBlock);
+    JsonPath jsonPath = JsonPathCache.INSTANCE.getOrCompute("$.intArrayVal");
+    for (int i = 0; i < values.length; i++) {
+      List<Integer> data = JSON_PARSER_CONTEXT.parse(_jsonSVValues[i]).read(jsonPath, new TypeRef<List<Integer>>(){});
+      for (int j = 0; j < values[i].length; j++) {
+        Assert.assertEquals(values[i][j], data.get(j).intValue());
+      }
+    }
   }
 }
