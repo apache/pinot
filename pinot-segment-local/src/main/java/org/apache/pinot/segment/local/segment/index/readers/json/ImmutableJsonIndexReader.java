@@ -38,6 +38,7 @@ import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
@@ -321,6 +322,41 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
           }
         }
       }
+      if (result == null) {
+        return new MutableRoaringBitmap();
+      } else {
+        if (matchingDocIds == null) {
+          return result;
+        } else {
+          matchingDocIds.and(result);
+          return matchingDocIds;
+        }
+      }
+    } else if (predicateType == Predicate.Type.RANGE) {
+      RangePredicate rangePredicate = (RangePredicate) predicate;
+      boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
+      boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
+      boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
+      boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+      Double lowerBound = lowerUnbounded ? Double.NEGATIVE_INFINITY : Double.parseDouble(rangePredicate.getLowerBound());
+      Double upperBound = upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(rangePredicate.getUpperBound());
+
+      int[] dictIds = getDictIdRangeForKey(key);
+      MutableRoaringBitmap result = null;
+      for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
+        String value = _dictionary.getStringValue(dictId).substring(key.length() + 1);
+        // TODO only supported for numeric values as of now
+        double doubleValue = Double.parseDouble(value);
+        if ((lowerUnbounded || (lowerInclusive ? doubleValue >= lowerBound : doubleValue > lowerBound))
+            && (upperUnbounded || (upperInclusive ? doubleValue <= upperBound : doubleValue < upperBound))) {
+          if (result == null) {
+            result = _invertedIndex.getDocIds(dictId).toMutableRoaringBitmap();
+          } else {
+            result.or(_invertedIndex.getDocIds(dictId));
+          }
+        }
+      }
+
       if (result == null) {
         return new MutableRoaringBitmap();
       } else {
