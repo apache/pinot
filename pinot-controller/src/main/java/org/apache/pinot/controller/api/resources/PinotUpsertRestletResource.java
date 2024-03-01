@@ -113,60 +113,9 @@ public class PinotUpsertRestletResource {
           Response.Status.BAD_REQUEST, e);
     }
 
-    String tableName = _pinotHelixResourceManager.translateTableName(tableSchemaConfig.getTableConfig().getTableName(),
-        headers.getHeaderString(CommonConstants.DATABASE));
-    return estimateHeapUsageV2(tableSchemaConfigStr, tableName, cardinality, primaryKeySize, numPartitions);
-  }
-
-  /**
-   * The API to estimate heap usage for a Pinot upsert table.
-   *
-   * Sample usage: provide tableConfig, tableSchema, and ColumnStats payload.
-   *
-   * The tool calculates heap usage by estimating total Key/Value space based on unique key combinations.
-   * It used the following formula
-   * ```
-   * TotalHeapSize = uniqueCombinations * (BytesPerKey + BytesPerValue).
-   * ```
-   * The following params need to be provided:
-   * ```
-   * -schemaFile, it contains primary key information.
-   * -tableConfigFile, it contains upsertConfig, tablePartitionConfig etc.
-   * -columnStats, which stores column information, collected from kafka or staging pinot table.
-   * ```
-   * For columns stats, we need to gather the following stats
-   * ```
-   * -cardinality, a required information unique combination of primary keys.
-   * -primaryKeySize, it uses for calculating BytesPerKey.
-   * -comparisonColSize, it uses for calculating BytesPerValue.
-   * -partitionNums(optional), it uses for host assignment calculation.
-   * ```
-   */
-  @POST
-  @Path("/v2/upsert/estimateHeapUsage")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.ESTIMATE_UPSERT_MEMORY)
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Estimate memory usage for an upsert table", notes =
-      "This API returns the estimated heap usage based on primary key column stats."
-          + " This allows us to estimate table size before onboarding.")
-  public String estimateHeapUsageV2(String tableSchemaConfigStr,
-      @ApiParam(value = "tableName", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "cardinality", required = true) @QueryParam("cardinality") long cardinality,
-      @ApiParam(value = "primaryKeySize", defaultValue = "-1") @QueryParam("primaryKeySize") int primaryKeySize,
-      @ApiParam(value = "numPartitions", defaultValue = "-1") @QueryParam("numPartitions") int numPartitions) {
-    ObjectNode resultData = JsonUtils.newObjectNode();
-    TableAndSchemaConfig tableSchemaConfig;
-
-    try {
-      tableSchemaConfig = JsonUtils.stringToObject(tableSchemaConfigStr, TableAndSchemaConfig.class);
-    } catch (IOException e) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableSchemaConfigs json string: %s", tableSchemaConfigStr),
-          Response.Status.BAD_REQUEST, e);
-    }
-
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
+    String tableName = _pinotHelixResourceManager.translateTableName(tableConfig.getTableName(),
+        headers.getHeaderString(CommonConstants.DATABASE));
     tableConfig.setTableName(tableName);
     Schema schema = tableSchemaConfig.getSchema();
 

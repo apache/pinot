@@ -134,24 +134,6 @@ public class DebugResource {
       throws JsonProcessingException {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getTableDebugInfoV2(tableName, tableTypeStr, verbosity);
-  }
-
-  @GET
-  @Path("/v2/debug/tables")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get debug information for table.", notes = "Debug information for table.")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public String getTableDebugInfoV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Verbosity of debug information") @DefaultValue("0") @QueryParam("verbosity") int verbosity)
-      throws JsonProcessingException {
     ObjectNode root = JsonUtils.newObjectNode();
     root.put("clusterName", _pinotHelixResourceManager.getHelixClusterName());
 
@@ -186,23 +168,6 @@ public class DebugResource {
       throws Exception {
     tableNameWithType = _pinotHelixResourceManager.translateTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getSegmentDebugInfoV2(tableNameWithType, segmentName);
-  }
-
-  @GET
-  @Path("/v2/debug/segments/{segmentName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get debug information for segment.", notes = "Debug information for segment.")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 404, message = "Segment not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public TableDebugInfo.SegmentDebugInfo getSegmentDebugInfoV2(
-      @ApiParam(value = "Name of the table (with type)", required = true) @QueryParam("tableName")
-      String tableNameWithType,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName)
-      throws Exception {
     return debugSegment(tableNameWithType, segmentName);
   }
 

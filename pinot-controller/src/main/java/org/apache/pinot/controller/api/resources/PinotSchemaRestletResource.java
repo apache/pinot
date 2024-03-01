@@ -57,7 +57,6 @@ import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -134,22 +133,8 @@ public class PinotSchemaRestletResource {
   public String getSchema(
       @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName,
       @Context HttpHeaders headers) {
-    return getSchema(_pinotHelixResourceManager.translateTableName(schemaName,
-        headers.getHeaderString(CommonConstants.DATABASE)));
-  }
-
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/v2/schemas")
-  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.GET_SCHEMA)
-  @ApiOperation(value = "Get a schema", notes = "Gets a schema by name")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Schema not found"),
-      @ApiResponse(code = 500, message = "Internal error")
-  })
-  public String getSchema(
-      @ApiParam(value = "Schema name", required = true) @QueryParam("schemaName") String schemaName) {
+    schemaName = _pinotHelixResourceManager.translateTableName(schemaName,
+        headers.getHeaderString(CommonConstants.DATABASE));
     LOGGER.info("looking for schema {}", schemaName);
     Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
     if (schema == null) {
@@ -173,24 +158,8 @@ public class PinotSchemaRestletResource {
   public SuccessResponse deleteSchema(
       @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName,
       @Context HttpHeaders headers) {
-    return deleteSchema(_pinotHelixResourceManager.translateTableName(schemaName,
-        headers.getHeaderString(CommonConstants.DATABASE)));
-  }
-
-  @DELETE
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/v2/schemas")
-  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.DELETE_SCHEMA)
-  @Authenticate(AccessType.DELETE)
-  @ApiOperation(value = "Delete a schema", notes = "Deletes a schema by name")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully deleted schema"),
-      @ApiResponse(code = 404, message = "Schema not found"),
-      @ApiResponse(code = 409, message = "Schema is in use"),
-      @ApiResponse(code = 500, message = "Error deleting schema")
-  })
-  public SuccessResponse deleteSchema(
-      @ApiParam(value = "Schema name", required = true) @QueryParam("schemaName") String schemaName) {
+    schemaName = _pinotHelixResourceManager.translateTableName(schemaName,
+        headers.getHeaderString(CommonConstants.DATABASE));
     deleteSchemaInternal(schemaName);
     return new SuccessResponse("Schema " + schemaName + " deleted");
   }
@@ -211,40 +180,18 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload, @Context HttpHeaders headers, FormDataMultiPart multiPart) {
-    return updateSchema(
-        _pinotHelixResourceManager.translateTableName(schemaName, headers.getHeaderString(CommonConstants.DATABASE)),
-        reload, multiPart);
-  }
-
-  @PUT
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/v2/schemas")
-  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.UPDATE_SCHEMA)
-  @Authenticate(AccessType.UPDATE)
-  @ApiOperation(value = "Update a schema", notes = "Updates a schema")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully updated schema"),
-      @ApiResponse(code = 404, message = "Schema not found"),
-      @ApiResponse(code = 400, message = "Missing or invalid request body"),
-      @ApiResponse(code = 500, message = "Internal error")
-  })
-  public ConfigSuccessResponse updateSchema(
-      @ApiParam(value = "Name of the schema", required = true) @QueryParam("schemaName") String schemaName,
-      @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
-      @QueryParam("reload") boolean reload, FormDataMultiPart multiPart) {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps;
-    try {
-      schemaAndUnrecognizedProps = getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
-    } finally {
-      multiPart.cleanup();
-    }
+    String translatedSchemaName = _pinotHelixResourceManager.translateTableName(schemaName,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
+        getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
-    if (!DatabaseUtils.isTableNameEquivalent(schema.getSchemaName(), schemaName)) {
+    if (!_pinotHelixResourceManager.translateTableName(schema.getSchemaName(),
+        headers.getHeaderString(CommonConstants.DATABASE)).equals(translatedSchemaName)) {
       throw new ControllerApplicationException(LOGGER,
           "Schema name mismatch: " + schema.getSchemaName() + " is not equivalent to " + schemaName,
           Response.Status.BAD_REQUEST);
     }
-    schema.setSchemaName(schemaName);
+    schema.setSchemaName(translatedSchemaName);
     SuccessResponse successResponse = updateSchema(schema, reload);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
@@ -266,29 +213,7 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload, @Context HttpHeaders headers, String schemaJsonString) {
-    return updateSchema(
-        _pinotHelixResourceManager.translateTableName(schemaName, headers.getHeaderString(CommonConstants.DATABASE)),
-        reload, schemaJsonString);
-  }
-
-  @PUT
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.APPLICATION_JSON)
-  @Path("/v2/schemas")
-  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.UPDATE_SCHEMA)
-  @Authenticate(AccessType.UPDATE)
-  @ApiOperation(value = "Update a schema", notes = "Updates a schema")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully updated schema"),
-      @ApiResponse(code = 404, message = "Schema not found"),
-      @ApiResponse(code = 400, message = "Missing or invalid request body"),
-      @ApiResponse(code = 500, message = "Internal error")
-  })
-  public ConfigSuccessResponse updateSchema(
-      @ApiParam(value = "Name of the schema", required = true) @QueryParam("schemaName") String schemaName,
-      @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
-      @QueryParam("reload") boolean reload, String schemaJsonString) {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps = null;
+    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps;
     try {
       schemaAndUnrecognizedProps = JsonUtils.stringToObjectAndUnrecognizedProperties(schemaJsonString, Schema.class);
     } catch (Exception e) {
@@ -296,12 +221,15 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     Schema schema = schemaAndUnrecognizedProps.getLeft();
-    if (!DatabaseUtils.isTableNameEquivalent(schema.getSchemaName(), schemaName)) {
+    String translatedSchemaName = _pinotHelixResourceManager.translateTableName(schemaName,
+        headers.getHeaderString(CommonConstants.DATABASE));
+    if (!_pinotHelixResourceManager.translateTableName(schema.getSchemaName(),
+        headers.getHeaderString(CommonConstants.DATABASE)).equals(translatedSchemaName)) {
       throw new ControllerApplicationException(LOGGER,
           "Schema name mismatch: " + schema.getSchemaName() + " is not equivalent to " + schemaName,
           Response.Status.BAD_REQUEST);
     }
-    schema.setSchemaName(schemaName);
+    schema.setSchemaName(translatedSchemaName);
     SuccessResponse successResponse = updateSchema(schema, reload);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
@@ -337,42 +265,6 @@ public class PinotSchemaRestletResource {
     if (!_accessControlFactory.create()
         .hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.CREATE_SCHEMA)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-    }
-    return addSchema(schemaName, override, force, multiPart, httpHeaders, request);
-  }
-
-  @POST
-  @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.CREATE_SCHEMA)
-  @Path("/v2/schemas")
-  @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully created schema"),
-      @ApiResponse(code = 409, message = "Schema already exists"),
-      @ApiResponse(code = 400, message = "Missing or invalid request body"),
-      @ApiResponse(code = 500, message = "Internal error")
-  })
-  public ConfigSuccessResponse addSchema(
-      @ApiParam(value = "Schema name for the schema to create", required = true)
-      @QueryParam("schemaName") String schemaName,
-      @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true")
-      @QueryParam("override") boolean override,
-      @ApiParam(value = "Whether to force overriding the schema if the schema exists") @DefaultValue("false")
-      @QueryParam("force") boolean force,
-      FormDataMultiPart multiPart,
-      @Context HttpHeaders httpHeaders,
-      @Context Request request) {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps;
-    try {
-      schemaAndUnrecognizedProps = getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
-    } finally {
-      multiPart.cleanup();
-    }
-    Schema schema = schemaAndUnrecognizedProps.getLeft();
-    if (!DatabaseUtils.isTableNameEquivalent(schema.getSchemaName(), schemaName)) {
-      throw new ControllerApplicationException(LOGGER,
-          "Schema name mismatch: " + schema.getSchemaName() + " is not equivalent to " + schemaName,
-          Response.Status.BAD_REQUEST);
     }
     schema.setSchemaName(schemaName);
     SuccessResponse successResponse = addSchema(schema, override, force);
@@ -418,45 +310,6 @@ public class PinotSchemaRestletResource {
         .hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.CREATE_SCHEMA)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
-    return addSchema(schemaName, override, force, schemaJsonString, httpHeaders, request);
-  }
-
-  @POST
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.TABLE, paramName = "schemaName", action = Actions.Table.CREATE_SCHEMA)
-  @Path("/v2/schemas")
-  @ApiOperation(value = "Add a new schema", notes = "Adds a new schema")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully created schema"),
-      @ApiResponse(code = 409, message = "Schema already exists"),
-      @ApiResponse(code = 400, message = "Missing or invalid request body"),
-      @ApiResponse(code = 500, message = "Internal error")
-  })
-  public ConfigSuccessResponse addSchema(
-      @ApiParam(value = "Schema name for the schema to create", required = true)
-      @QueryParam("schemaName") String schemaName,
-      @ApiParam(value = "Whether to override the schema if the schema exists") @DefaultValue("true")
-      @QueryParam("override") boolean override,
-      @ApiParam(value = "Whether to force overriding the schema if the schema exists") @DefaultValue("false")
-      @QueryParam("force") boolean force,
-      String schemaJsonString,
-      @Context HttpHeaders httpHeaders,
-      @Context Request request) {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProperties;
-    try {
-      schemaAndUnrecognizedProperties =
-          JsonUtils.stringToObjectAndUnrecognizedProperties(schemaJsonString, Schema.class);
-    } catch (Exception e) {
-      String msg = String.format("Invalid schema config json string: %s", schemaJsonString);
-      throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
-    }
-    Schema schema = schemaAndUnrecognizedProperties.getLeft();
-    if (!DatabaseUtils.isTableNameEquivalent(schema.getSchemaName(), schemaName)) {
-      throw new ControllerApplicationException(LOGGER,
-          "Schema name mismatch: " + schema.getSchemaName() + " is not equivalent to " + schemaName,
-          Response.Status.BAD_REQUEST);
-    }
     schema.setSchemaName(schemaName);
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProperties.getRight());
@@ -475,12 +328,8 @@ public class PinotSchemaRestletResource {
   @ManualAuthorization // performed after parsing schema
   public String validateSchema(FormDataMultiPart multiPart, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps;
-    try {
-      schemaAndUnrecognizedProps = getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
-    } finally {
-      multiPart.cleanup();
-    }
+    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
+        getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
     String endpointUrl = request.getRequestURL().toString();
     validateSchemaInternal(schema);
@@ -642,18 +491,22 @@ public class PinotSchemaRestletResource {
 
   private Pair<Schema, Map<String, Object>> getSchemaAndUnrecognizedPropertiesFromMultiPart(
       FormDataMultiPart multiPart) {
-    Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-    if (!PinotSegmentUploadDownloadRestletResource.validateMultiPart(map, null)) {
-      throw new ControllerApplicationException(LOGGER, "Found not exactly one file from the multi-part fields",
-          Response.Status.BAD_REQUEST);
-    }
-    FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
-    try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
-      return Schema.parseSchemaAndUnrecognizedPropsfromInputStream(inputStream);
-    } catch (IOException e) {
-      throw new ControllerApplicationException(LOGGER,
-          "Caught exception while de-serializing the schema from request body: " + e.getMessage(),
-          Response.Status.BAD_REQUEST);
+    try {
+      Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
+      if (!PinotSegmentUploadDownloadRestletResource.validateMultiPart(map, null)) {
+        throw new ControllerApplicationException(LOGGER, "Found not exactly one file from the multi-part fields",
+            Response.Status.BAD_REQUEST);
+      }
+      FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
+      try (InputStream inputStream = bodyPart.getValueAs(InputStream.class)) {
+        return Schema.parseSchemaAndUnrecognizedPropsfromInputStream(inputStream);
+      } catch (IOException e) {
+        throw new ControllerApplicationException(LOGGER,
+            "Caught exception while de-serializing the schema from request body: " + e.getMessage(),
+            Response.Status.BAD_REQUEST);
+      }
+    } finally {
+      multiPart.cleanup();
     }
   }
 

@@ -152,28 +152,8 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     try {
-      return getConfig(
-          _pinotHelixResourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)));
-    } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
-    }
-  }
-
-  /**
-   * Gets the {@link TableConfigs} for the provided raw tableName, by fetching the offline table config for
-   * tableName_OFFLINE, realtime table config for tableName_REALTIME and schema for tableName
-   */
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/v2/tableConfigs")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIGS)
-  @Authenticate(AccessType.READ)
-  @ApiOperation(value = "Get the TableConfigs for a given raw tableName",
-      notes = "Get the TableConfigs for a given raw tableName")
-  public String getConfig(
-      @ApiParam(value = "Raw table name", required = true) @QueryParam("tableName") String tableName) {
-
-    try {
+      tableName = _pinotHelixResourceManager.translateTableName(tableName,
+          headers.getHeaderString(CommonConstants.DATABASE));
       Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
       TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
@@ -200,75 +180,15 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    TableConfigs tableConfigs;
-    String tableName;
-    try {
-      Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps =
-          JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
-      tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      tableName = _pinotHelixResourceManager.translateTableName(tableConfigs.getTableName(),
-          httpHeaders.getHeaderString(CommonConstants.DATABASE));
-    } catch (IllegalArgumentException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs. %s", e.getMessage()),
-          Response.Status.BAD_REQUEST, e);
-    }
-
-    // validate permission
-    TableConfig offlineTableConfig = tableConfigs.getOffline();
-    TableConfig realtimeTableConfig = tableConfigs.getRealtime();
-    Schema schema = tableConfigs.getSchema();
-    String endpointUrl = request.getRequestURL().toString();
-    AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils
-        .validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
-    if (offlineTableConfig != null) {
-      AccessControlUtils
-          .validatePermission(offlineTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
-              accessControl);
-    }
-    if (realtimeTableConfig != null) {
-      AccessControlUtils
-          .validatePermission(realtimeTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
-              accessControl);
-    }
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.CREATE_TABLE)) {
-      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-    }
-
-    return addConfig(tableConfigsStr, tableName, typesToSkip, httpHeaders, request);
-  }
-
-  /**
-   * Creates a {@link TableConfigs} using the <code>tableConfigsStr</code>, by creating the schema,
-   * followed by the realtime tableConfig and offline tableConfig as applicable, from the {@link TableConfigs}.
-   * Validates the configs before applying.
-   */
-  @POST
-  @Produces(MediaType.APPLICATION_JSON)
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.CREATE_TABLE)
-  @Path("/v2/tableConfigs")
-  @ApiOperation(value = "Add the TableConfigs using the tableConfigsStr json",
-      notes = "Add the TableConfigs using the tableConfigsStr json")
-  public ConfigSuccessResponse addConfig(
-      String tableConfigsStr,
-      @ApiParam(value = "Raw table name of the table to create", required = true)
-      @QueryParam("tableName") @Nullable String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
-      @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     TableConfigs tableConfigs;
+    String tableName;
     try {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      if (!DatabaseUtils.isTableNameEquivalent(tableConfigs.getTableName(), tableName)) {
-        throw new ControllerApplicationException(LOGGER,
-            "Request table " + tableName + " does not match table name in the body " + tableConfigs.getTableName(),
-            Response.Status.BAD_REQUEST);
-      }
+      tableName = _pinotHelixResourceManager.translateTableName(tableConfigs.getTableName(),
+          httpHeaders.getHeaderString(CommonConstants.DATABASE));
       validateConfig(tableConfigs, typesToSkip);
       tableConfigs.setTableName(tableName);
     } catch (Exception e) {
@@ -346,32 +266,9 @@ public class TableConfigsRestletResource {
     try {
       tableName = _pinotHelixResourceManager.translateTableName(tableName,
           headers.getHeaderString(CommonConstants.DATABASE));
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
-    }
-    return deleteConfig(tableName);
-  }
-
-  /**
-   * Deletes the {@link TableConfigs} by deleting the schema tableName, the offline table config for
-   * tableName_OFFLINE and
-   * the realtime table config for tableName_REALTIME
-   */
-  @DELETE
-  @Path("/v2/tableConfigs")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_TABLE)
-  @Authenticate(AccessType.DELETE)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Delete the TableConfigs", notes = "Delete the TableConfigs")
-  public SuccessResponse deleteConfig(
-      @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @QueryParam("tableName")
-      String tableName) {
-    try {
-      boolean tableExists = false;
-      if (_pinotHelixResourceManager.hasRealtimeTable(tableName) || _pinotHelixResourceManager
-          .hasOfflineTable(tableName)) {
-        tableExists = true;
-      }
+      boolean tableExists =
+          _pinotHelixResourceManager.hasRealtimeTable(tableName) || _pinotHelixResourceManager.hasOfflineTable(
+              tableName);
       // Delete whether tables exist or not
       _pinotHelixResourceManager.deleteRealtimeTable(tableName);
       LOGGER.info("Deleted realtime table: {}", tableName);
@@ -415,59 +312,29 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "Force update the table schema") @DefaultValue("false")
       @QueryParam("forceTableSchemaUpdate") boolean forceTableSchemaUpdate,
       String tableConfigsStr, @Context HttpHeaders headers) throws Exception {
-    try {
-      tableName = _pinotHelixResourceManager.translateTableName(tableName,
-          headers.getHeaderString(CommonConstants.DATABASE));
-    } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
-    }
-    return updateConfig(tableName, typesToSkip, reload, forceTableSchemaUpdate, tableConfigsStr);
-  }
-
-  /**
-   * Updated the {@link TableConfigs} by updating the schema tableName,
-   * then updating the offline tableConfig or creating a new one if it doesn't already exist in the cluster,
-   * then updating the realtime tableConfig or creating a new one if it doesn't already exist in the cluster.
-   *
-   * The option to skip table config validation (validationTypesToSkip) and force update the table schema
-   * (forceTableSchemaUpdate) are provided for testing purposes and should be used with caution.
-   */
-  @PUT
-  @Path("/v2/tableConfigs")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIGS)
-  @Authenticate(AccessType.UPDATE)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Update the TableConfigs provided by the tableConfigsStr json",
-      notes = "Update the TableConfigs provided by the tableConfigsStr json")
-  public ConfigSuccessResponse updateConfig(
-      @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @QueryParam("tableName")
-      String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
-      @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
-      @QueryParam("reload") boolean reload,
-      @ApiParam(value = "Force update the table schema") @DefaultValue("false")
-      @QueryParam("forceTableSchemaUpdate") boolean forceTableSchemaUpdate,
-      String tableConfigsStr) throws Exception {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     TableConfigs tableConfigs;
+    String translatedTableName;
     try {
+      translatedTableName = _pinotHelixResourceManager.translateTableName(tableName,
+          headers.getHeaderString(CommonConstants.DATABASE));
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      if (!DatabaseUtils.isTableNameEquivalent(tableConfigs.getTableName(), tableName)) {
+      if (!_pinotHelixResourceManager.translateTableName(tableConfigs.getTableName(),
+          headers.getHeaderString(CommonConstants.DATABASE)).equals(translatedTableName)) {
         throw new IllegalArgumentException(
             "Table name mismatch: " + tableConfigs.getTableName() + " is not equivalent to " + tableName);
       }
       validateConfig(tableConfigs, typesToSkip);
-      tableConfigs.setTableName(tableName);
+      tableConfigs.setTableName(translatedTableName);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s", tableName),
           Response.Status.BAD_REQUEST, e);
     }
 
-    if (!_pinotHelixResourceManager.hasOfflineTable(tableName) && !_pinotHelixResourceManager
-        .hasRealtimeTable(tableName)) {
+    if (!_pinotHelixResourceManager.hasOfflineTable(translatedTableName) && !_pinotHelixResourceManager
+        .hasRealtimeTable(translatedTableName)) {
       throw new ControllerApplicationException(LOGGER,
           String.format("TableConfigs: %s does not exist. Use POST to create it first.", tableName),
           Response.Status.BAD_REQUEST);
@@ -483,7 +350,7 @@ public class TableConfigsRestletResource {
 
       if (offlineTableConfig != null) {
         tuneConfig(offlineTableConfig, schema);
-        if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
+        if (_pinotHelixResourceManager.hasOfflineTable(translatedTableName)) {
           _pinotHelixResourceManager.updateTableConfig(offlineTableConfig);
           LOGGER.info("Updated offline table config: {}", tableName);
         } else {
@@ -493,7 +360,7 @@ public class TableConfigsRestletResource {
       }
       if (realtimeTableConfig != null) {
         tuneConfig(realtimeTableConfig, schema);
-        if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        if (_pinotHelixResourceManager.hasRealtimeTable(translatedTableName)) {
           _pinotHelixResourceManager.updateTableConfig(realtimeTableConfig);
           LOGGER.info("Updated realtime table config: {}", tableName);
         } else {

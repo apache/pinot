@@ -39,7 +39,6 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -126,16 +125,6 @@ public class PinotLeadControllerRestletResource {
       @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getLeaderForTableV2(tableName);
-  }
-
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/v2/leader/tables")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_LEADER)
-  @ApiOperation(value = "Gets leader for a given table", notes = "Gets leader for a given table")
-  public LeadControllerResponse getLeaderForTableV2(
-      @ApiParam(value = "Table name", required = true) @QueryParam("tableName") String tableName) {
     Map<String, LeadControllerEntry> leadControllerEntryMap = new HashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
     boolean isLeadControllerResourceEnabled;

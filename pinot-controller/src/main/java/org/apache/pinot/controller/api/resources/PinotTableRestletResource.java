@@ -81,7 +81,6 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
-import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -192,50 +191,28 @@ public class PinotTableRestletResource {
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    String tableName;
-    try {
-      TableConfig tableConfig = JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class)
-          .getLeft();
-      tableName = _pinotHelixResourceManager.translateTableName(tableConfig.getTableName(),
-          httpHeaders.getHeaderString(CommonConstants.DATABASE));
-    } catch (Exception e) {
-      tableName = null;
-    }
-    // validate permission
-    String endpointUrl = request.getRequestURL().toString();
-    AccessControlUtils.validatePermission(tableName, AccessType.CREATE, httpHeaders, endpointUrl,
-        _accessControlFactory.create());
-    if (!_accessControlFactory.create()
-        .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.CREATE_TABLE)) {
-      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-    }
-    return addTable(tableConfigStr, tableName, typesToSkip, httpHeaders, request);
-  }
-
-  @POST
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.CREATE_TABLE)
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/v2/tables")
-  @ApiOperation(value = "Adds a table to given database", notes = "Adds a table to given database")
-  public ConfigSuccessResponse addTable(String tableConfigStr,
-      @ApiParam(value = "Name of the table to create", required = true)
-      @QueryParam("tableName") String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
-      @Context Request request) {
     // TODO introduce a table config ctor with json string.
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
+    String tableName;
+    String translatedTableName;
     try {
       tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
-      String tableNameWithType = TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName);
-      if (!DatabaseUtils.isTableNameEquivalent(tableConfig.getTableName(), tableNameWithType)) {
-        throw new ControllerApplicationException(LOGGER,
-            "Request table " + tableName + " does not match table name in the body " + tableConfig.getTableName(),
-            Response.Status.BAD_REQUEST);
+      tableName = tableConfig.getTableName();
+      translatedTableName = _pinotHelixResourceManager.translateTableName(tableConfig.getTableName(),
+          httpHeaders.getHeaderString(CommonConstants.DATABASE));
+      // validate permission
+      String endpointUrl = request.getRequestURL().toString();
+      AccessControlUtils.validatePermission(translatedTableName, AccessType.CREATE, httpHeaders, endpointUrl,
+          _accessControlFactory.create());
+      if (!_accessControlFactory.create()
+          .hasAccess(httpHeaders, TargetType.TABLE, translatedTableName, Actions.Table.CREATE_TABLE)) {
+        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
+      String tableNameWithType = TableNameBuilder.forType(tableConfig.getTableType())
+          .tableNameWithType(translatedTableName);
       tableConfig.setTableName(tableNameWithType);
       // Handling deprecated config
       SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
@@ -258,7 +235,7 @@ public class PinotTableRestletResource {
       try {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
-        checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableName), tableConfig);
+        checkHybridTableConfig(TableNameBuilder.extractRawTableName(translatedTableName), tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -399,20 +376,9 @@ public class PinotTableRestletResource {
   public String listTableConfigs(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    return listTableConfigs(
-        _pinotHelixResourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
-        tableTypeStr);
-  }
-
-  @GET
-  @Path("/v2/tables")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_CONFIG)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Lists the table configs")
-  public String listTableConfigs(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
+      tableName = _pinotHelixResourceManager.translateTableName(tableName,
+          headers.getHeaderString(CommonConstants.DATABASE));
       ObjectNode ret = JsonUtils.newObjectNode();
 
       if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
@@ -447,26 +413,12 @@ public class PinotTableRestletResource {
           + "will default to the first config that's not null: the cluster setting, then '7d'. Using 0d or -1d will "
           + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod,
       @Context HttpHeaders headers) {
-    return deleteTable(
-        _pinotHelixResourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
-        tableTypeStr, retentionPeriod);
-  }
-  @DELETE
-  @Path("/v2/tables")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_TABLE)
-  @Authenticate(AccessType.DELETE)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Deletes a table", notes = "Deletes a table")
-  public SuccessResponse deleteTable(
-      @ApiParam(value = "Name of the table to delete", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
-          + "will default to the first config that's not null: the cluster setting, then '7d'. Using 0d or -1d will "
-          + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
     List<String> tablesDeleted = new LinkedList<>();
     try {
+      tableName = _pinotHelixResourceManager.translateTableName(tableName,
+          headers.getHeaderString(CommonConstants.DATABASE));
       boolean tableExist = false;
       if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
         tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
@@ -522,32 +474,20 @@ public class PinotTableRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders headers,
       String tableConfigString)
       throws Exception {
-    return updateTableConfig(
-        _pinotHelixResourceManager.translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE)),
-        typesToSkip, tableConfigString, headers);
-  }
-
-  @PUT
-  @Path("/v2/tables")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIG)
-  @Authenticate(AccessType.UPDATE)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Updates table config for a table", notes = "Updates table config for a table")
-  public ConfigSuccessResponse updateTableConfig(
-      @ApiParam(value = "Name of the table to update", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, String tableConfigString,
-      @Context HttpHeaders headers)
-    throws Exception {
     Pair<TableConfig, Map<String, Object>> tableConfigJsonPojoWithUnparsableProps;
     TableConfig tableConfig;
     String tableNameWithType;
+    String translatedTableName;
     try {
       tableConfigJsonPojoWithUnparsableProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigString, TableConfig.class);
       tableConfig = tableConfigJsonPojoWithUnparsableProps.getLeft();
-      tableNameWithType = TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName);
-      if (!DatabaseUtils.isTableNameEquivalent(tableConfig.getTableName(), tableNameWithType)) {
+      tableNameWithType = _pinotHelixResourceManager.translateTableName(tableConfig.getTableName(),
+          headers.getHeaderString(CommonConstants.DATABASE));
+      translatedTableName = _pinotHelixResourceManager.translateTableName(
+          TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName),
+          headers.getHeaderString(CommonConstants.DATABASE));
+      if (!translatedTableName.equals(tableNameWithType)) {
         throw new ControllerApplicationException(LOGGER,
             "Request table " + tableName + " does not match table name in the body " + tableConfig.getTableName(),
             Response.Status.BAD_REQUEST);
@@ -576,7 +516,7 @@ public class PinotTableRestletResource {
       try {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
-        checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableName), tableConfig);
+        checkHybridTableConfig(TableNameBuilder.extractRawTableName(translatedTableName), tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -734,60 +674,6 @@ public class PinotTableRestletResource {
   ) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return rebalanceV2(tableName, tableTypeStr, dryRun, reassignInstances, includeConsuming, bootstrap, downtime,
-        minAvailableReplicas, lowDiskMode, bestEfforts, externalViewCheckIntervalInMs,
-        externalViewStabilizationTimeoutInMs, heartbeatIntervalInMs, heartbeatTimeoutInMs, maxAttempts,
-        retryInitialDelayInMs, updateTargetTier);
-  }
-
-  @POST
-  @Produces(MediaType.APPLICATION_JSON)
-  @Authenticate(AccessType.UPDATE)
-  @Path("/v2/tables/rebalance")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REBALANCE_TABLE)
-  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
-      notes = "Rebalances a table (reassign instances and segments for a table)")
-  public RebalanceResult rebalanceV2(
-      //@formatter:off
-      @ApiParam(value = "Name of the table to rebalance", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun")
-      boolean dryRun,
-      @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false")
-      @QueryParam("reassignInstances") boolean reassignInstances,
-      @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("false")
-      @QueryParam("includeConsuming") boolean includeConsuming,
-      @ApiParam(value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, "
-          + "reassign all segments in a round-robin fashion as if adding new segments to an empty table)")
-      @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
-      @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
-      boolean downtime,
-      @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or "
-          + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
-      @QueryParam("minAvailableReplicas") int minAvailableReplicas,
-      @ApiParam(value = "For no-downtime rebalance, whether to enable low disk mode during rebalance. When enabled, "
-          + "segments will first be offloaded from servers, then added to servers after offload is done while "
-          + "maintaining the min available replicas. It may increase the total time of the rebalance, but can be "
-          + "useful when servers are low on disk space, and we want to scale up the cluster and rebalance the table to "
-          + "more servers.") @DefaultValue("false") @QueryParam("lowDiskMode") boolean lowDiskMode,
-      @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime "
-          + "contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
-      @ApiParam(value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
-      @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
-      @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
-      @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs,
-      @ApiParam(value = "How often to make a status update (i.e. heartbeat)") @DefaultValue("300000")
-      @QueryParam("heartbeatIntervalInMs") long heartbeatIntervalInMs,
-      @ApiParam(value = "How long to wait for next status update (i.e. heartbeat) before the job is considered failed")
-      @DefaultValue("3600000") @QueryParam("heartbeatTimeoutInMs") long heartbeatTimeoutInMs,
-      @ApiParam(value = "Max number of attempts to rebalance") @DefaultValue("3") @QueryParam("maxAttempts")
-      int maxAttempts,
-      @ApiParam(value = "Initial delay to exponentially backoff retry") @DefaultValue("300000")
-      @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
-      @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
-      @QueryParam("updateTargetTier") boolean updateTargetTier
-      //@formatter:on
-  ) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
@@ -855,19 +741,6 @@ public class PinotTableRestletResource {
       @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return cancelRebalanceV2(tableName, tableTypeStr);
-  }
-
-  @DELETE
-  @Produces(MediaType.APPLICATION_JSON)
-  @Authenticate(AccessType.UPDATE)
-  @Path("/v2/tables/rebalance")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.CANCEL_REBALANCE)
-  @ApiOperation(value = "Cancel all rebalance jobs for the given table, and noop if no rebalance is running", notes =
-      "Cancel all rebalance jobs for the given table, and noop if no rebalance is running")
-  public List<String> cancelRebalanceV2(
-      @ApiParam(value = "Name of the table to rebalance", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     List<String> cancelledJobIds = new ArrayList<>();
     boolean updated =
@@ -942,18 +815,6 @@ public class PinotTableRestletResource {
       @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getTableStateV2(tableName, tableTypeStr);
-  }
-
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/v2/tables/state")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_STATE)
-  @ApiOperation(value = "Get current table state", notes = "Get current table state")
-  public String getTableStateV2(
-      @ApiParam(value = "Name of the table to get its state", required = true) @QueryParam("tableName")
-      String tableName,
-      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     try {
       ObjectNode data = JsonUtils.newObjectNode();
@@ -984,25 +845,6 @@ public class PinotTableRestletResource {
       @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return toggleTableStateV2(tableName, tableTypeStr, state);
-  }
-
-  @PUT
-  @Path("/v2/tables/state")
-  @Authenticate(AccessType.UPDATE)
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Enable/disable a table", notes = "Enable/disable a table")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 400, message = "Bad Request"),
-      @ApiResponse(code = 404, message = "Table not found"),
-      @ApiResponse(code = 500, message = "Internal error")
-  })
-  public SuccessResponse toggleTableStateV2(
-      @ApiParam(value = "Table name", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "enable|disable", required = true) @QueryParam("state") String state) {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     StateType stateType;
     if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
@@ -1036,17 +878,6 @@ public class PinotTableRestletResource {
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getTableStatsV2(tableName, tableTypeStr);
-  }
-
-  @GET
-  @Path("/v2/tables/stats")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "table stats", notes = "Provides metadata info/stats about the table.")
-  public String getTableStatsV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     ObjectNode ret = JsonUtils.newObjectNode();
     if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
         && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
@@ -1098,17 +929,6 @@ public class PinotTableRestletResource {
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getTableStatusV2(tableName, tableTypeStr);
-  }
-
-  @GET
-  @Path("/v2/tables/status")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "table status", notes = "Provides status of the table including ingestion status")
-  public String getTableStatusV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
       TableType tableType = Constants.validateTableType(tableTypeStr);
       if (tableType == null) {
@@ -1153,20 +973,6 @@ public class PinotTableRestletResource {
       List<String> columns, @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getTableAggregateMetadataV2(tableName, tableTypeStr, columns);
-  }
-
-  @GET
-  @Path("/v2/tables/metadata")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the aggregate metadata of all segments for a table",
-      notes = "Get the aggregate metadata of all segments for a table")
-  public String getTableAggregateMetadataV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns) {
     LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.REALTIME) {
@@ -1206,22 +1012,6 @@ public class PinotTableRestletResource {
       @DefaultValue("SNAPSHOT") ValidDocIdsType validDocIdsType, @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getTableAggregateValidDocIdMetadataV2(tableName, tableTypeStr, segmentNames, validDocIdsType);
-  }
-
-  @GET
-  @Path("/v2/tables/validDocIdMetadata")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the aggregate valid doc id metadata of all segments for a table", notes = "Get the "
-      + "aggregate valid doc id metadata of all segments for a table")
-  public String getTableAggregateValidDocIdMetadataV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "A list of segments", allowMultiple = true) @QueryParam("segmentNames")
-      List<String> segmentNames,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") @DefaultValue("SNAPSHOT") ValidDocIdsType validDocIdsType) {
     LOGGER.info("Received a request to fetch aggregate validDocIds metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.OFFLINE) {
@@ -1260,18 +1050,6 @@ public class PinotTableRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getTableIndexesV2(tableName, tableTypeStr);
-  }
-
-  @GET
-  @Path("/v2/tables/indexes")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the aggregate index details of all segments for a table", notes = "Get the aggregate "
-      + "index details of all segments for a table")
-  public String getTableIndexesV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr) {
     LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     String tableNameWithType =
@@ -1358,19 +1136,6 @@ public class PinotTableRestletResource {
       @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getControllerJobsV2(tableName, tableTypeStr, jobTypesString);
-  }
-
-  @GET
-  @Path("/v2/table/jobs")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_CONTROLLER_JOBS)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get list of controller jobs for this table",
-      notes = "Get list of controller jobs for this table")
-  public Map<String, Map<String, String>> getControllerJobsV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Comma separated list of job types") @QueryParam("jobTypes") @Nullable String jobTypesString) {
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
@@ -1407,19 +1172,6 @@ public class PinotTableRestletResource {
       throws Exception {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return setTimeBoundaryV2(tableName);
-  }
-
-  @POST
-  @Path("/v2/tables/timeBoundary")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIG)
-  @ApiOperation(value = "Set hybrid table query time boundary based on offline segments' metadata", notes = "Set "
-      + "hybrid table query time boundary based on offline segments' metadata")
-  @Produces(MediaType.APPLICATION_JSON)
-  public SuccessResponse setTimeBoundaryV2(
-      @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @QueryParam("tableName")
-      String tableName)
-      throws Exception {
     // Validate its a hybrid table
     if (!_pinotHelixResourceManager.hasRealtimeTable(tableName) || !_pinotHelixResourceManager.hasOfflineTable(
         tableName)) {
@@ -1461,17 +1213,6 @@ public class PinotTableRestletResource {
       String tableName, @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return deleteTimeBoundaryV2(tableName);
-  }
-
-  @DELETE
-  @Path("/v2/tables/timeBoundary")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_TIME_BOUNDARY)
-  @ApiOperation(value = "Delete hybrid table query time boundary", notes = "Delete hybrid table query time boundary")
-  @Produces(MediaType.APPLICATION_JSON)
-  public SuccessResponse deleteTimeBoundaryV2(
-      @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @QueryParam("tableName")
-      String tableName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     if (!_pinotHelixResourceManager.hasTable(offlineTableName)) {
       throw new ControllerApplicationException(LOGGER, "Failed to find table: " + offlineTableName,

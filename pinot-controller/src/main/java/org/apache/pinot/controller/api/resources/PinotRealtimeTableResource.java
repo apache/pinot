@@ -98,16 +98,6 @@ public class PinotRealtimeTableResource {
       @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return pauseConsumptionV2(tableName);
-  }
-
-  @POST
-  @Path("/v2/tables/pauseConsumption")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.PAUSE_CONSUMPTION)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Pause consumption of a realtime table", notes = "Pause the consumption of a realtime table")
-  public Response pauseConsumptionV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     try {
@@ -136,26 +126,6 @@ public class PinotRealtimeTableResource {
       @QueryParam("consumeFrom") String consumeFrom, @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return resumeConsumptionV2(tableName, consumeFrom);
-  }
-
-  @POST
-  @Path("/v2/tables/resumeConsumption")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RESUME_CONSUMPTION)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Resume consumption of a realtime table", notes =
-      "Resume the consumption for a realtime table. ConsumeFrom parameter indicates from which offsets "
-          + "consumption should resume. Recommended value is 'lastConsumed', which indicates consumption should "
-          + "continue based on the offsets in segment ZK metadata, and in case the offsets are already gone, the first "
-          + "available offsets are picked to minimize the data loss.")
-  public Response resumeConsumptionV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(
-          value = "lastConsumed (safer) | smallest (repeat rows) | largest (miss rows)",
-          allowableValues = "lastConsumed, smallest, largest",
-          defaultValue = "lastConsumed"
-      )
-      @QueryParam("consumeFrom") String consumeFrom) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     if ("lastConsumed".equalsIgnoreCase(consumeFrom)) {
@@ -192,26 +162,6 @@ public class PinotRealtimeTableResource {
       String consumingSegments, @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return forceCommitV2(tableName, partitionGroupIds, consumingSegments);
-  }
-
-  @POST
-  @Path("/v2/tables/forceCommit")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.FORCE_COMMIT)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Force commit the current consuming segments",
-      notes = "Force commit the current segments in consuming state and restart consumption. "
-          + "This should be used after schema/table config changes. "
-          + "Please note that this is an asynchronous operation, "
-          + "and 200 response does not mean it has actually been done already."
-          + "If specific partitions or consuming segments are provided, "
-          + "only those partitions or consuming segments will be force committed.")
-  public Map<String, String> forceCommitV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName,
-      @ApiParam(value = "Comma separated list of partition group IDs to be committed") @QueryParam("partitions")
-      String partitionGroupIds,
-      @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
-      String consumingSegments) {
     if (partitionGroupIds != null && consumingSegments != null) {
       throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
           Response.Status.BAD_REQUEST);
@@ -289,17 +239,6 @@ public class PinotRealtimeTableResource {
       @Context HttpHeaders headers) {
     tableName = _pinotHelixResourceManager.translateTableName(tableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getPauseStatusV2(tableName);
-  }
-
-  @GET
-  @Path("/v2/tables/pauseStatus")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_PAUSE_STATUS)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Return pause status of a realtime table",
-      notes = "Return pause status of a realtime table along with list of consuming segments.")
-  public Response getPauseStatusV2(
-      @ApiParam(value = "Name of the table", required = true) @QueryParam("tableName") String tableName) {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     try {
@@ -327,24 +266,6 @@ public class PinotRealtimeTableResource {
       @Context HttpHeaders headers) {
     realtimeTableName = _pinotHelixResourceManager.translateTableName(realtimeTableName,
         headers.getHeaderString(CommonConstants.DATABASE));
-    return getConsumingSegmentsInfoV2(realtimeTableName);
-  }
-
-  @GET
-  @Path("/v2/tables/consumingSegmentsInfo")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_CONSUMING_SEGMENTS)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Returns state of consuming segments", notes = "Gets the status of consumers from all servers."
-      + "Note that the partitionToOffsetMap has been deprecated and will be removed in the next release. The info is "
-      + "now embedded within each partition's state as currentOffsetsMap.")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap getConsumingSegmentsInfoV2(
-      @ApiParam(value = "Realtime table name with or without type", required = true,
-          example = "myTable | myTable_REALTIME") @QueryParam("tableName") String realtimeTableName) {
     try {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
       if (TableType.OFFLINE == tableType) {

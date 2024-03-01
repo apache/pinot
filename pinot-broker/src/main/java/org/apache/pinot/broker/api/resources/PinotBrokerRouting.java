@@ -33,12 +33,10 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
-import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -57,9 +55,6 @@ public class PinotBrokerRouting {
   @Inject
   BrokerRoutingManager _routingManager;
 
-  @Inject
-  TableCache _tableCache;
-
   @PUT
   @Produces(MediaType.TEXT_PLAIN)
   @Path("/routing/{tableName}")
@@ -69,24 +64,11 @@ public class PinotBrokerRouting {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public String buildRouting(@Context HttpHeaders headers,
-      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType) {
-    return buildRoutingV2(DatabaseUtils.translateTableName(tableNameWithType,
+  public String buildRouting(
+      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
+      @Context HttpHeaders headers) {
+    _routingManager.buildRouting(DatabaseUtils.translateTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE)));
-  }
-
-  @PUT
-  @Produces(MediaType.TEXT_PLAIN)
-  @Path("/v2/routing")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.BUILD_ROUTING)
-  @ApiOperation(value = "Build/rebuild the routing for a table", notes = "Build/rebuild the routing for a table")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public String buildRoutingV2(
-      @ApiParam(value = "Table name (with type)") @QueryParam("tableName") String tableNameWithType) {
-    _routingManager.buildRouting(tableNameWithType);
     return "Success";
   }
 
@@ -99,26 +81,12 @@ public class PinotBrokerRouting {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public String refreshRouting(@Context HttpHeaders headers,
+  public String refreshRouting(
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
-      @ApiParam(value = "Segment name") @PathParam("segmentName") String segmentName) {
-    return refreshRoutingV2(DatabaseUtils.translateTableName(tableNameWithType,
-            headers.getHeaderString(CommonConstants.DATABASE)), segmentName);
-  }
-
-  @PUT
-  @Produces(MediaType.TEXT_PLAIN)
-  @Path("/v2/routing/refresh/{segmentName}")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REFRESH_ROUTING)
-  @ApiOperation(value = "Refresh the routing for a segment", notes = "Refresh the routing for a segment")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public String refreshRoutingV2(
-      @ApiParam(value = "Table name (with type)") @QueryParam("tableName") String tableNameWithType,
-      @ApiParam(value = "Segment name") @PathParam("segmentName") String segmentName) {
-    _routingManager.refreshSegment(tableNameWithType, segmentName);
+      @ApiParam(value = "Segment name") @PathParam("segmentName") String segmentName,
+      @Context HttpHeaders headers) {
+    _routingManager.refreshSegment(DatabaseUtils.translateTableName(tableNameWithType,
+        headers.getHeaderString(CommonConstants.DATABASE)), segmentName);
     return "Success";
   }
 
@@ -131,24 +99,11 @@ public class PinotBrokerRouting {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Internal server error")
   })
-  public String removeRouting(@Context HttpHeaders headers,
-      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType) {
-    return removeRoutingV2(DatabaseUtils.translateTableName(tableNameWithType,
+  public String removeRouting(
+      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
+      @Context HttpHeaders headers) {
+    _routingManager.removeRouting(DatabaseUtils.translateTableName(tableNameWithType,
         headers.getHeaderString(CommonConstants.DATABASE)));
-  }
-
-  @DELETE
-  @Produces(MediaType.TEXT_PLAIN)
-  @Path("/v2/routing")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_ROUTING)
-  @ApiOperation(value = "Remove the routing for a table", notes = "Remove the routing for a table")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error")
-  })
-  public String removeRoutingV2(
-      @ApiParam(value = "Table name (with type)") @QueryParam("tableName") String tableNameWithType) {
-    _routingManager.removeRouting(tableNameWithType);
     return "Success";
   }
 }
