@@ -41,7 +41,6 @@ public class BytesCastVisitor extends SqlBasicVisitor<Void> {
     _originalValidator = originalValidator;
   }
 
-  @SuppressWarnings("checkstyle:WhitespaceAround")
   @Override
   public Void visit(SqlCall call) {
     if (call.getOperator() instanceof SqlCastFunction) {
