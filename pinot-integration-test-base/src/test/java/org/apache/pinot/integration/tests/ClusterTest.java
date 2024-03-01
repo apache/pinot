@@ -97,6 +97,7 @@ import static org.testng.Assert.assertTrue;
 public abstract class ClusterTest extends ControllerTest {
   protected static final int DEFAULT_BROKER_PORT = 18099;
   protected static final Random RANDOM = new Random(System.currentTimeMillis());
+  private static final boolean NETTY_CONFIG_NATIVE_TRANSPORTS_ENABLED = true;
 
   protected List<BaseBrokerStarter> _brokerStarters;
   protected List<BaseServerStarter> _serverStarters;
@@ -147,7 +148,9 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected PinotConfiguration getDefaultBrokerConfiguration() {
-    return new PinotConfiguration();
+    PinotConfiguration config = new PinotConfiguration();
+    config.setProperty("pinot.broker.netty.native.transports.enabled", NETTY_CONFIG_NATIVE_TRANSPORTS_ENABLED);
+    return config;
   }
 
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
@@ -254,6 +257,9 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, _serverNettyPort);
     _serverGrpcPort = NetUtils.findOpenPort(Server.DEFAULT_GRPC_PORT + new Random().nextInt(10000) + serverId);
     serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, _serverGrpcPort);
+
+    serverConf.setProperty(Server.SERVER_NETTY_PREFIX + ".native.transports.enabled",
+        NETTY_CONFIG_NATIVE_TRANSPORTS_ENABLED);
 
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
