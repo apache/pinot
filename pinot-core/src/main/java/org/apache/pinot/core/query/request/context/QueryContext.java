@@ -126,7 +126,7 @@ public class QueryContext {
   // Whether server returns the final result
   private boolean _serverReturnFinalResult;
   // Collection of index types to skip per column
-  private Map<String, Set<FieldConfig.IndexType>> _indexSkipConfig;
+  private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
@@ -432,15 +432,15 @@ public class QueryContext {
         + ", _expressionOverrideHints=" + _expressionOverrideHints + ", _explain=" + _explain + '}';
   }
 
-  public void setIndexSkipConfig(Map<String, Set<FieldConfig.IndexType>> indexSkipConfig) {
-    _indexSkipConfig = indexSkipConfig;
+  public void setSkipIndexes(Map<String, Set<FieldConfig.IndexType>> skipIndexes) {
+    _skipIndexes = skipIndexes;
   }
 
   public boolean isIndexUseAllowed(String columnName, FieldConfig.IndexType indexType) {
-    if (_indexSkipConfig == null) {
+    if (_skipIndexes == null) {
       return true;
     }
-    return !_indexSkipConfig.getOrDefault(columnName, Collections.EMPTY_SET).contains(indexType);
+    return !_skipIndexes.getOrDefault(columnName, Collections.EMPTY_SET).contains(indexType);
   }
 
   public boolean isIndexUseAllowed(DataSource dataSource, FieldConfig.IndexType indexType) {
