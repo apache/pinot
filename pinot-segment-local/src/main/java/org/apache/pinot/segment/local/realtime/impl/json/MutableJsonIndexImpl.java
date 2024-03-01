@@ -40,6 +40,7 @@ import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
@@ -299,8 +300,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       }
     } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
       Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
-      _readLock.lock();
       MutableRoaringBitmap result = null;
+      _readLock.lock();
       try {
         for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
           if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR) || !pattern.matcher(
@@ -311,6 +312,48 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
             result = entry.getValue().toMutableRoaringBitmap();
           } else {
             result.or(entry.getValue().toMutableRoaringBitmap());
+          }
+        }
+      } finally {
+        _readLock.unlock();
+      }
+
+      if (result == null) {
+        return new RoaringBitmap();
+      } else {
+        if (matchingDocIds == null) {
+          return result.toRoaringBitmap();
+        } else {
+          matchingDocIds.and(result.toRoaringBitmap());
+          return matchingDocIds;
+        }
+      }
+    } else if (predicateType == Predicate.Type.RANGE) {
+      RangePredicate rangePredicate = (RangePredicate) predicate;
+      boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
+      boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
+      boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
+      boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+      Double lowerBound =
+          lowerUnbounded ? Double.NEGATIVE_INFINITY : Double.parseDouble(rangePredicate.getLowerBound());
+      Double upperBound =
+          upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(rangePredicate.getUpperBound());
+      MutableRoaringBitmap result = null;
+
+      _readLock.lock();
+      try {
+        for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
+          if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
+            continue;
+          }
+          Double doubleValue = Double.parseDouble(entry.getKey().substring(key.length() + 1));
+          if ((lowerUnbounded || (lowerInclusive ? doubleValue >= lowerBound : doubleValue > lowerBound)) && (
+              upperUnbounded || (upperInclusive ? doubleValue <= upperBound : doubleValue < upperBound))) {
+            if (result == null) {
+              result = entry.getValue().toMutableRoaringBitmap();
+            } else {
+              result.or(entry.getValue().toMutableRoaringBitmap());
+            }
           }
         }
       } finally {
@@ -359,6 +402,23 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   @Override
   public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String key, @Nullable String filterString) {
     Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
+    MutableRoaringBitmap matchingFlattenedDocIds = null;
+    if (filterString != null) {
+      FilterContext filter;
+      try {
+        filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+        Preconditions.checkArgument(!filter.isConstant());
+      } catch (Exception e) {
+        throw new BadQueryRequestException("Invalid json match filter: " + filterString);
+      }
+
+      _readLock.lock();
+      try {
+        matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter).toMutableRoaringBitmap();
+      } finally {
+        _readLock.unlock();
+      }
+    }
     _readLock.lock();
     try {
       for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
@@ -366,6 +426,9 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
           continue;
         }
         MutableRoaringBitmap flattenedDocIds = entry.getValue().toMutableRoaringBitmap();
+        if (matchingFlattenedDocIds != null) {
+          flattenedDocIds.and(matchingFlattenedDocIds);
+        }
         String val = entry.getKey().substring(key.length() + 1);
         matchingDocsMap.put(val, flattenedDocIds.toRoaringBitmap());
       }

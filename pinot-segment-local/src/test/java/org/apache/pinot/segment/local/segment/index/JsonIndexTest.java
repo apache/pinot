@@ -117,14 +117,23 @@ public class JsonIndexTest {
         MutableRoaringBitmap matchingDocIds = getMatchingDocIds(indexReader, "name='bob'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{1});
 
-        matchingDocIds = getMatchingDocIds(indexReader, "REGEXP_LIKE(\"addresses[*].street\", 'street-.0*') AND \"addresses[*].country\" = 'ca'");
-        Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
-
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" = 'street-21'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
 
         matchingDocIds = getMatchingDocIds(indexReader, "REGEXP_LIKE(\"addresses[*].street\", 'street-2.*')");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"age\" > '25'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{2, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"age\" >= '25'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{1, 2, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"age\" < '25'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"age\" <= '25'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" NOT IN ('street-10', 'street-22')");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 3});

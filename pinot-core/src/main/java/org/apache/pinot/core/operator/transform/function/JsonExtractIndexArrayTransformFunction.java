@@ -84,7 +84,8 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
     }
     String resultsType = ((LiteralTransformFunction) thirdArgument).getStringLiteral().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
-    FieldSpec.DataType dataType = FieldSpec.DataType.valueOf(isSingleValue ? resultsType : resultsType.substring(0, resultsType.length() - 6));
+    FieldSpec.DataType dataType =
+        FieldSpec.DataType.valueOf(isSingleValue ? resultsType : resultsType.substring(0, resultsType.length() - 6));
 
     if (arguments.size() >= 4) {
       TransformFunction fourthArgument = arguments.get(3);
@@ -244,9 +245,7 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
             String.format("Illegal Json Path: [%s], for docId [%s]", _jsonPathString, inputDocIds[i]));
       } else {
         _stringValuesMV[i] = new String[value.length];
-        for (int j = 0; j < value.length; j++) {
-          _stringValuesMV[i][j] = value[j];
-        }
+        System.arraycopy(value, 0, _stringValuesMV[i], 0, value.length);
       }
     }
     return _stringValuesMV;

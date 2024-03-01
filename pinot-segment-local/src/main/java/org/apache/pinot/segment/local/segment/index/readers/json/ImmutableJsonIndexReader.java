@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -338,8 +337,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
       boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
       boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
-      Double lowerBound = lowerUnbounded ? Double.NEGATIVE_INFINITY : Double.parseDouble(rangePredicate.getLowerBound());
-      Double upperBound = upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(rangePredicate.getUpperBound());
+      Double lowerBound =
+          lowerUnbounded ? Double.NEGATIVE_INFINITY : Double.parseDouble(rangePredicate.getLowerBound());
+      Double upperBound =
+          upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(rangePredicate.getUpperBound());
 
       int[] dictIds = getDictIdRangeForKey(key);
       MutableRoaringBitmap result = null;
@@ -347,8 +348,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         String value = _dictionary.getStringValue(dictId).substring(key.length() + 1);
         // TODO only supported for numeric values as of now
         double doubleValue = Double.parseDouble(value);
-        if ((lowerUnbounded || (lowerInclusive ? doubleValue >= lowerBound : doubleValue > lowerBound))
-            && (upperUnbounded || (upperInclusive ? doubleValue <= upperBound : doubleValue < upperBound))) {
+        if ((lowerUnbounded || (lowerInclusive ? doubleValue >= lowerBound : doubleValue > lowerBound)) && (
+            upperUnbounded || (upperInclusive ? doubleValue <= upperBound : doubleValue < upperBound))) {
           if (result == null) {
             result = _invertedIndex.getDocIds(dictId).toMutableRoaringBitmap();
           } else {
@@ -418,7 +419,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       if (matchingFlattenedDocIds != null) {
         flattenedDocIds.and(matchingFlattenedDocIds.toImmutableRoaringBitmap());
       }
-      matchingDocsMap.put(_dictionary.getStringValue(dictId).substring(key.length() + 1), flattenedDocIds.toRoaringBitmap());
+      matchingDocsMap.put(_dictionary.getStringValue(dictId).substring(key.length() + 1),
+          flattenedDocIds.toRoaringBitmap());
     }
 
     return matchingDocsMap;

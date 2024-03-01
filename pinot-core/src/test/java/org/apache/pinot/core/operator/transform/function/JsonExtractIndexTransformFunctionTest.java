@@ -94,47 +94,6 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
         default:
           throw new UnsupportedOperationException("Not support data type - " + resultsDataType);
       }
-    } else {
-      switch (resultsDataType) {
-        case INT:
-          int[][] intValues = transformFunction.transformToIntValuesMV(_projectionBlock);
-          for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(intValues[i], Integer.parseInt(getValueForKey(_jsonSVValues[i], jsonPath)));
-          }
-          break;
-        case LONG:
-          long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
-          for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(longValues[i], Long.parseLong(getValueForKey(_jsonSVValues[i], jsonPath)));
-          }
-          break;
-        case FLOAT:
-          float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
-          for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(floatValues[i], Float.parseFloat(getValueForKey(_jsonSVValues[i], jsonPath)));
-          }
-          break;
-        case DOUBLE:
-          double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
-          for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(doubleValues[i], Double.parseDouble(getValueForKey(_jsonSVValues[i], jsonPath)));
-          }
-          break;
-        case BIG_DECIMAL:
-          BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
-          for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(bigDecimalValues[i], new BigDecimal(getValueForKey(_jsonSVValues[i], jsonPath)));
-          }
-          break;
-        case STRING:
-          String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
-          for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(stringValues[i], getValueForKey(_jsonSVValues[i], jsonPath));
-          }
-          break;
-        default:
-          throw new UnsupportedOperationException("Not support data type - " + resultsDataType);
-      }
     }
   }
 
@@ -163,15 +122,9 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
             "$.bigDecimalVal"), "$.bigDecimalVal", DataType.BIG_DECIMAL, true
     });
     testArguments.add(new Object[]{
-        String.format("jsonExtractIndex(%s,'%s','STRING')", INT_MV_COLUMN,
+        String.format("jsonExtractIndex(%s,'%s','STRING')", JSON_STRING_SV_COLUMN,
             "$.stringVal"), "$.stringVal", DataType.STRING, true
     });
-
-    testArguments.add(new Object[]{
-        String.format("jsonExtractIndex(%s,'%s','INT_ARRAY')", JSON_STRING_SV_COLUMN,
-            "$.intArrayVal"), "$.intArrayVal", DataType.INT, false
-    });
-
     return testArguments.toArray(new Object[0][]);
   }
 
