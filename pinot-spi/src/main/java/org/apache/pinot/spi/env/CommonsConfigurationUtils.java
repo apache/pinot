@@ -137,6 +137,7 @@ public class CommonsConfigurationUtils {
    * @param file containing properties
    * @param setIOFactory representing to set the IOFactory or not
    * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @param headerContentToCheck validates property configuration header content based on presence.
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromFile(@Nullable File file, boolean setIOFactory, boolean setDefaultDelimiter)
@@ -300,6 +301,17 @@ public class CommonsConfigurationUtils {
     return createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, ioFactoryKind, null);
   }
 
+  /**
+   * creates the instance of the {@link org.apache.commons.configuration2.PropertiesConfiguration}
+   * with custom od default {@link org.apache.commons.configuration2.PropertiesConfiguration.IOFactory}
+   * and legacy list delimiter {@link org.apache.commons.configuration2.convert.LegacyListDelimiterHandler}
+   *
+   * @param setIOFactory sets the IOFactory
+   * @param setDefaultDelimiter sets the default list delimiter.
+   * @param ioFactoryKind IOFactory kind
+   * @param headerContentToCheck header content to validate.
+   * @return PropertiesConfiguration
+   */
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
       boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind, String headerContentToCheck) {
     PropertiesConfiguration config = new PropertiesConfiguration();
@@ -317,6 +329,14 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
+  /**
+   * Creates the IOFactory based on the provided kind.
+   *
+   * @param ioFactoryKind IOFactory kind
+   * @param config to get the header content from the property configuration
+   * @param headerContentToCheck header content to validate.
+   * @return IOFactory
+   */
   private static IOFactory createPropertyIOFactory(PropertyIOFactoryKind ioFactoryKind,
       PropertiesConfiguration config, String headerContentToCheck) {
     switch (ioFactoryKind) {
