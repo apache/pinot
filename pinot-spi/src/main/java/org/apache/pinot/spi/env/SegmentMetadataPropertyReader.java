@@ -23,12 +23,24 @@ import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReade
 
 
 class SegmentMetadataPropertyReader extends PropertiesReader {
-
   private final boolean _skipUnescapePropertyName;
 
   public SegmentMetadataPropertyReader(Reader reader, boolean skipUnescapePropertyName) {
     super(reader);
     _skipUnescapePropertyName = skipUnescapePropertyName;
+  }
+
+  @Override
+  protected void parseProperty(final String line) {
+    if (_skipUnescapePropertyName) {
+      String regex = "[" + getPropertySeparator() + "]";
+      String[] keyValue = line.split(regex);
+      initPropertyName(keyValue[0]);
+      initPropertyValue(keyValue[1]);
+      initPropertySeparator(regex);
+    } else {
+      super.parseProperty(line);
+    }
   }
 
   @Override
