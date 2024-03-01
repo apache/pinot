@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -29,30 +30,34 @@ public class DatabaseUtils {
 
   /**
    * Construct the fully qualified table name i.e. {databaseName}.{tableName} from given table name and database name
-   * If table name already has the database prefix then that takes precedence over the provided {@code databaseName}
    * @param tableName table/schema name
    * @param databaseName database name
-   * @return translated table name
+   * @return translated table name. Throws {@link IllegalStateException} if {@code tableName} contains more than 1 dot
+   * or if {@code tableName} has database prefix, and it does not match with {@code databaseName}
    */
-  public static String translateTableName(String tableName, String databaseName) {
+  public static String translateTableName(String tableName, @Nullable String databaseName) {
     if (tableName == null) {
-      return null;
+      throw new IllegalArgumentException("'tableName' cannot be null");
     }
     String[] tableSplit = StringUtils.split(tableName, '.');
-    if (tableSplit.length > 2) {
-      throw new IllegalStateException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
-    } else if (tableSplit.length == 2) { // tableName already has database name prefix
-      // if the database name prefix is of 'default' database then only return the table name part
-      if (tableSplit[0].equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-        return tableSplit[1];
-      }
-      return tableName;
+    switch (tableSplit.length) {
+      case 1:
+        // do not concat the database name prefix if it's a 'default' database
+        if (StringUtils.isNotEmpty(databaseName) && !databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
+          return String.format("%s.%s", databaseName, tableName);
+        }
+        return tableName;
+      case 2:
+        String databasePrefix = tableSplit[0];
+        if (StringUtils.isNotEmpty(databaseName) && !databaseName.equals(databasePrefix)) {
+          throw new IllegalArgumentException("Database name '" + databasePrefix
+              + "' from table prefix does not match database name '" + databaseName + "' from header");
+        }
+        // skip database name prefix if it's a 'default' database
+        return databasePrefix.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE) ? tableSplit[1] : tableName;
+      default:
+      throw new IllegalArgumentException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
     }
-    // do not concat the database name prefix if it's a 'default' database
-    if (StringUtils.isNotEmpty(databaseName) && !databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-      return String.format("%s.%s", databaseName, tableName);
-    }
-    return tableName;
   }
 
   /**

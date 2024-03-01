@@ -321,7 +321,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         // Compile the request into PinotQuery
         compilationStartTimeNs = System.nanoTime();
         pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
-        if (pinotQuery.getDataSource() != null) {
+        if (pinotQuery.getDataSource() != null && pinotQuery.getDataSource().getTableName() != null) {
           String tableName = getActualTableName(DatabaseUtils.translateTableName(
               pinotQuery.getDataSource().getTableName(), httpHeaders.getHeaderString(CommonConstants.DATABASE)),
               _tableCache);
