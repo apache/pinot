@@ -179,11 +179,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   @Override
-  public void preloadSegments(TableDataManager tableDataManager, IndexLoadingConfig indexLoadingConfig,
-      HelixManager helixManager, ExecutorService segmentPreloadExecutor) {
+  public void preloadSegments(IndexLoadingConfig indexLoadingConfig) {
     if (!_isPreloading) {
       return;
     }
+    TableDataManager tableDataManager = _context.getTableDataManager();
+    Preconditions.checkNotNull(tableDataManager, "Preloading segments requires tableDataManager");
+    HelixManager helixManager = tableDataManager.getHelixManager();
+    ExecutorService segmentPreloadExecutor = tableDataManager.getSegmentPreloadExecutor();
     // Preloading the segments with the snapshots of validDocIds for fast upsert metadata recovery.
     // Note that there is a waiting logic between the thread pool doing the segment preloading here and the
     // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).

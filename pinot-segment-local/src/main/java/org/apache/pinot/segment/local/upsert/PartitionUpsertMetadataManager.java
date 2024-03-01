@@ -20,10 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.io.Closeable;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.helix.HelixManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -71,8 +68,7 @@ public interface PartitionUpsertMetadataManager extends Closeable {
   /**
    * Preload segments for the table partition. Segments can be added differently during preloading.
    */
-  void preloadSegments(TableDataManager tableDataManager, IndexLoadingConfig indexLoadingConfig,
-      HelixManager helixManager, ExecutorService segmentPreloadExecutor);
+  void preloadSegments(IndexLoadingConfig indexLoadingConfig);
 
   boolean isPreloading();
 

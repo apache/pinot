@@ -95,9 +95,11 @@ public class BasePartitionUpsertMetadataManagerTest {
     Map<String, SegmentZKMetadata> segmentMetadataMap = new HashMap<>();
     Set<String> preloadedSegments = new HashSet<>();
     AtomicBoolean wasPreloading = new AtomicBoolean(false);
+    TableDataManager tableDataManager = mock(TableDataManager.class);
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.isSnapshotEnabled()).thenReturn(true);
     when(upsertContext.isPreloadEnabled()).thenReturn(true);
+    when(upsertContext.getTableDataManager()).thenReturn(tableDataManager);
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager(realtimeTableName, 0, upsertContext) {
 
@@ -161,8 +163,10 @@ public class BasePartitionUpsertMetadataManagerTest {
     segmentMetadataMap.put(seg03Name, zkMetadata);
 
     // Setup mocks to get file path to validDocIds snapshot.
+    ExecutorService segmentPreloadExecutor = Executors.newFixedThreadPool(1);
     File tableDataDir = new File(TEMP_DIR, realtimeTableName);
-    TableDataManager tableDataManager = mock(TableDataManager.class);
+    when(tableDataManager.getHelixManager()).thenReturn(helixManager);
+    when(tableDataManager.getSegmentPreloadExecutor()).thenReturn(segmentPreloadExecutor);
     when(tableDataManager.getTableDataDir()).thenReturn(tableDataDir);
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceId()).thenReturn(instanceId);
@@ -178,11 +182,10 @@ public class BasePartitionUpsertMetadataManagerTest {
     FileUtils.touch(new File(new File(seg02IdxDir, "v3"), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     when(tableDataManager.getSegmentDataDir(seg02Name, null, tableConfig)).thenReturn(seg02IdxDir);
 
-    ExecutorService segmentPreloadExecutor = Executors.newFixedThreadPool(1);
     try {
       // If preloading is enabled, the _isPreloading flag is true initially, until preloading is done.
       assertTrue(upsertMetadataManager.isPreloading());
-      upsertMetadataManager.preloadSegments(tableDataManager, indexLoadingConfig, helixManager, segmentPreloadExecutor);
+      upsertMetadataManager.preloadSegments(indexLoadingConfig);
       assertEquals(preloadedSegments.size(), 1);
       assertTrue(preloadedSegments.contains(seg02Name));
       assertTrue(wasPreloading.get());

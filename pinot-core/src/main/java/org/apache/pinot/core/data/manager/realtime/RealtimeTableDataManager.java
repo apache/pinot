@@ -392,7 +392,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
               _tableNameWithType));
       PartitionUpsertMetadataManager partitionUpsertMetadataManager =
           _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
-      partitionUpsertMetadataManager.preloadSegments(this, indexLoadingConfig, _helixManager, _segmentPreloadExecutor);
+      partitionUpsertMetadataManager.preloadSegments(indexLoadingConfig);
       // Continue to add segment after preloading, as the segment might not be added by preloading.
     }
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
