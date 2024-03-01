@@ -54,7 +54,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: 11
-          distribution: 'adopt'
+          distribution: 'temurin'
           cache: 'maven'
       - name: Linter Test
         env:
@@ -270,7 +270,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: 11
-          distribution: 'adopt'
+          distribution: 'temurin'
           cache: 'maven'
       - name: Setup node
         uses: actions/setup-node@v3
