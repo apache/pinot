@@ -64,7 +64,7 @@ public class SegmentMetadataPropertyReaderTest {
     }
     // recovered keys from the configuration.
     List<String> recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY, false);
+    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
 
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE); // save the configuration.
 
@@ -72,7 +72,7 @@ public class SegmentMetadataPropertyReaderTest {
     configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true, true,
         PropertyIOFactoryKind.SegmentMetadataIOFactory, "");
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY, false);
+    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
 
     FileUtils.deleteDirectory(TEMP_DIR); // clearing for next test.
   }
@@ -91,7 +91,7 @@ public class SegmentMetadataPropertyReaderTest {
     }
     // recovered keys from the configuration.
     List<String> recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY, false);
+    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
 
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE); // save the configuration.
 
@@ -99,7 +99,7 @@ public class SegmentMetadataPropertyReaderTest {
     configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true, true,
         PropertyIOFactoryKind.SegmentMetadataIOFactory, "segment.metadata.version");
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY, false);
+    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
 
     FileUtils.deleteDirectory(TEMP_DIR); // clearing for next test.
   }
@@ -116,7 +116,7 @@ public class SegmentMetadataPropertyReaderTest {
     }
     // recovered keys from the configuration.
     List<String> recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR, false);
+    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR);
 
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE); // save the configuration.
 
@@ -124,18 +124,15 @@ public class SegmentMetadataPropertyReaderTest {
     configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true, true,
         PropertyIOFactoryKind.SegmentMetadataIOFactory, "segment.metadata.version");
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR, true); // require escaping.
+    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR); // require escaping.
 
     FileUtils.deleteDirectory(TEMP_DIR); // clearing for next test.
   }
 
-  private static void testPropertyKeys(List<String> recoveredKeys, String[] actualKeys, boolean escapeKeys) {
+  private static void testPropertyKeys(List<String> recoveredKeys, String[] actualKeys) {
     assertEquals(recoveredKeys.size(), actualKeys.length);
     for (int i = 1; i < recoveredKeys.size(); i++) {
       String recoveredValue = recoveredKeys.get(i);
-      if (escapeKeys) {
-        recoveredValue = StringEscapeUtils.unescapeJava(recoveredValue);
-      }
       assertEquals(recoveredValue, actualKeys[i]);
     }
   }
