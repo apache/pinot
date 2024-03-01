@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.regex.Pattern;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -35,6 +36,7 @@ import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
@@ -290,6 +292,36 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         }
       } else {
         return new RoaringBitmap();
+      }
+    } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
+      Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
+      _readLock.lock();
+      MutableRoaringBitmap result = null;
+      try {
+        for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
+          if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR) || !pattern.matcher(
+              entry.getKey().substring(key.length() + 1)).matches()) {
+            continue;
+          }
+          if (result == null) {
+            result = entry.getValue().toMutableRoaringBitmap();
+          } else {
+            result.or(entry.getValue().toMutableRoaringBitmap());
+          }
+        }
+      } finally {
+        _readLock.unlock();
+      }
+
+      if (result == null) {
+        return new RoaringBitmap();
+      } else {
+        if (matchingDocIds == null) {
+          return result.toRoaringBitmap();
+        } else {
+          matchingDocIds.and(result.toRoaringBitmap());
+          return matchingDocIds;
+        }
       }
     } else {
       throw new IllegalStateException("Unsupported json_match predicate type: " + predicate);

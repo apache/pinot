@@ -24,6 +24,7 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -32,6 +33,7 @@ import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
@@ -296,6 +298,31 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         return matchingDocIds;
       } else {
         return new MutableRoaringBitmap();
+      }
+    } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
+      Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
+      int[] dictIds = getDictIdRangeForKey(key);
+
+      MutableRoaringBitmap result = null;
+      for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
+        String value = _dictionary.getStringValue(dictId).substring(key.length() + 1);
+        if (pattern.matcher(value).matches()) {
+          if (result == null) {
+            result = _invertedIndex.getDocIds(dictId).toMutableRoaringBitmap();
+          } else {
+            result.or(_invertedIndex.getDocIds(dictId));
+          }
+        }
+      }
+      if (result == null) {
+        return new MutableRoaringBitmap();
+      } else {
+        if (matchingDocIds == null) {
+          return result;
+        } else {
+          matchingDocIds.and(result);
+          return matchingDocIds;
+        }
       }
     } else {
       throw new IllegalStateException("Unsupported json_match predicate type: " + predicate);

@@ -117,7 +117,13 @@ public class JsonIndexTest {
         MutableRoaringBitmap matchingDocIds = getMatchingDocIds(indexReader, "name='bob'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{1});
 
+        matchingDocIds = getMatchingDocIds(indexReader, "REGEXP_LIKE(\"addresses[*].street\", 'street-.0*') AND \"addresses[*].country\" = 'ca'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
+
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" = 'street-21'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "REGEXP_LIKE(\"addresses[*].street\", 'street-2.*')");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" NOT IN ('street-10', 'street-22')");
