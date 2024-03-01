@@ -21,10 +21,15 @@ package org.apache.pinot.segment.local.segment.index.readers.json;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -58,6 +63,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   private final int _version;
   private final StringDictionary _dictionary;
   private final BitmapInvertedIndexReader _invertedIndex;
+  private final long _numFlattenedDocs;
   private final PinotDataBuffer _docIdMapping;
 
   public ImmutableJsonIndexReader(PinotDataBuffer dataBuffer, int numDocs) {
@@ -80,6 +86,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     _invertedIndex = new BitmapInvertedIndexReader(
         dataBuffer.view(dictionaryEndOffset, invertedIndexEndOffset, ByteOrder.BIG_ENDIAN), _dictionary.length());
     long docIdMappingEndOffset = invertedIndexEndOffset + docIdMappingLength;
+    _numFlattenedDocs = (docIdMappingLength / Integer.BYTES);
     _docIdMapping = dataBuffer.view(invertedIndexEndOffset, docIdMappingEndOffset, ByteOrder.LITTLE_ENDIAN);
   }
 
@@ -353,6 +360,35 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   }
 
   @Override
+  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String key, @Nullable String filterString) {
+    MutableRoaringBitmap matchingFlattenedDocIds = null;
+    if (filterString != null) {
+      FilterContext filter;
+      try {
+        filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+        Preconditions.checkArgument(!filter.isConstant());
+      } catch (Exception e) {
+        throw new BadQueryRequestException("Invalid json match filter: " + filterString);
+      }
+
+      matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter);
+    }
+
+    Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
+    int[] dictIds = getDictIdRangeForKey(key);
+
+    for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
+      MutableRoaringBitmap flattenedDocIds = _invertedIndex.getDocIds(dictId).toMutableRoaringBitmap();
+      if (matchingFlattenedDocIds != null) {
+        flattenedDocIds.and(matchingFlattenedDocIds.toImmutableRoaringBitmap());
+      }
+      matchingDocsMap.put(_dictionary.getStringValue(dictId).substring(key.length() + 1), flattenedDocIds.toRoaringBitmap());
+    }
+
+    return matchingDocsMap;
+  }
+
+  @Override
   public String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> matchingDocsMap) {
     Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
     RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
@@ -372,6 +408,46 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       values[i] = docIdToValues.get(docIds[i]);
     }
     return values;
+  }
+
+  @Override
+  public String[][] getValuesForKeyAndFlattenedDocs(int[] docIds, Map<String, RoaringBitmap> matchingDocsMap) {
+    // TODO improve this
+    List<List<String>> values = new ArrayList<>(docIds.length);
+    for (int i = 0; i < docIds.length; i++) {
+      values.add(new ArrayList<>());
+    }
+
+    Set<Integer> docIdSet = new HashSet<>();
+    for (int docId : docIds) {
+      docIdSet.add(docId);
+    }
+
+    for (Map.Entry<String, RoaringBitmap> entry : matchingDocsMap.entrySet()) {
+      entry.getValue().forEach((IntConsumer) flattenedDocId -> {
+        int docId = getDocId(flattenedDocId);
+        if (docIdSet.contains(docId)) {
+          List<String> valueList = values.get(docId);
+          if (valueList == null) {
+            valueList = new ArrayList<>();
+            values.set(docId, valueList);
+          }
+          valueList.add(entry.getKey());
+        }
+      });
+    }
+
+    String[][] result = new String[docIds.length][];
+    for (int i = 0; i < docIds.length; i++) {
+      List<String> valueList = values.get(i);
+      if (valueList == null) {
+        result[i] = new String[0];
+      } else {
+        result[i] = valueList.toArray(new String[0]);
+      }
+    }
+
+    return result;
   }
 
   /**

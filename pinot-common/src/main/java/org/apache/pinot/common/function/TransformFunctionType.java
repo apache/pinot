@@ -118,6 +118,12 @@ public enum TransformFunctionType {
           SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
           SqlTypeFamily.CHARACTER), ordinal -> ordinal > 2), "json_extract_index"),
+
+  JSON_EXTRACT_ARRAY_INDEX("jsonExtractArrayIndex",
+      ReturnTypes.cascade(opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2,
+          SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE),
+      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 5), "json_extract_array_index"),
   JSON_EXTRACT_KEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), "json_extract_key"),
 

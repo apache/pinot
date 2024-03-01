@@ -128,6 +128,7 @@ public class TransformFunctionFactory {
         DateTimeConversionHopTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.DATE_TRUNC, DateTruncTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_INDEX, JsonExtractIndexTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_ARRAY_INDEX, JsonExtractIndexArrayTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.YEAR, DateTimeTransformFunction.Year.class);
     typeToImplementation.put(TransformFunctionType.YEAR_OF_WEEK, DateTimeTransformFunction.YearOfWeek.class);
     typeToImplementation.put(TransformFunctionType.QUARTER, DateTimeTransformFunction.Quarter.class);

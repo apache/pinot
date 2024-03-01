@@ -23,11 +23,15 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -350,6 +354,66 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       _readLock.unlock();
     }
     return matchingDocsMap;
+  }
+
+  @Override
+  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String key, @Nullable String filterString) {
+    Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
+    _readLock.lock();
+    try {
+      for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
+        if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
+          continue;
+        }
+        MutableRoaringBitmap flattenedDocIds = entry.getValue().toMutableRoaringBitmap();
+        String val = entry.getKey().substring(key.length() + 1);
+        matchingDocsMap.put(val, flattenedDocIds.toRoaringBitmap());
+      }
+    } finally {
+      _readLock.unlock();
+    }
+    return matchingDocsMap;
+  }
+
+
+  @Override
+  public String[][] getValuesForKeyAndFlattenedDocs(int[] docIds, Map<String, RoaringBitmap> context) {
+    // TODO improve this
+    List<List<String>> values = new ArrayList<>(docIds.length);
+    for (int i = 0; i < docIds.length; i++) {
+      values.add(new ArrayList<>());
+    }
+
+    Set<Integer> docIdSet = new HashSet<>();
+    for (int docId : docIds) {
+      docIdSet.add(docId);
+    }
+
+    for (Map.Entry<String, RoaringBitmap> entry : context.entrySet()) {
+      entry.getValue().forEach((IntConsumer) flattenedDocId -> {
+        int docId = _docIdMapping.getInt(flattenedDocId);
+        if (docIdSet.contains(docId)) {
+          List<String> valueList = values.get(docId);
+          if (valueList == null) {
+            valueList = new ArrayList<>();
+            values.set(docId, valueList);
+          }
+          valueList.add(entry.getKey());
+        }
+      });
+    }
+
+    String[][] result = new String[docIds.length][];
+    for (int i = 0; i < docIds.length; i++) {
+      List<String> valueList = values.get(i);
+      if (valueList == null) {
+        result[i] = new String[0];
+      } else {
+        result[i] = valueList.toArray(new String[0]);
+      }
+    }
+
+    return result;
   }
 
   @Override
