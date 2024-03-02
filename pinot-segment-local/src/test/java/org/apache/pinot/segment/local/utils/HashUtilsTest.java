@@ -38,6 +38,12 @@ public class HashUtilsTest {
   public void testHashUUIDv4() {
     testHashUUIDv4(new UUID[]{UUID.randomUUID()});
     testHashUUIDv4(new UUID[]{UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()});
+
+    // Test failure scenario
+    byte[] invalidType4UUID = new byte[8];
+    // Set byte 0 to an arbitrary value. Hash function below should return the input array as is.
+    invalidType4UUID[0] = 0x10;
+    Assert.assertEquals(HashUtils.hashUUIDv4(invalidType4UUID), invalidType4UUID);
   }
 
   private void testHashUUIDv4(UUID[] uuids) {

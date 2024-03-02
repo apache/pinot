@@ -57,9 +57,9 @@ public class HashUtils {
       UUID uuid;
       try {
         uuid = UUID.fromString(new String(tempBytes, StandardCharsets.UTF_8));
-      } catch (Exception ignored) {
-        // All bytes of the UUID in case of failures will be set to 0
-        uuid = new UUID(0L, 0L);
+      } catch (Exception e) {
+        // In case of failures, make the hash no-op.
+        return bytes;
       }
       long lsb = uuid.getLeastSignificantBits();
       long msb = uuid.getMostSignificantBits();
