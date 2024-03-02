@@ -55,14 +55,15 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * </ul>
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<Map<? extends Number, Long>, Double> {
+public class ModeAggregationFunction2
+    extends NullableSingleInputAggregationFunction<Map<? extends Number, Long>, Double> {
 
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   private final MultiModeReducerType _multiModeReducerType;
 
-  public ModeAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public ModeAggregationFunction2(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
 
     int numArguments = arguments.size();
 //    Preconditions.checkArgument(numArguments <= 2, "Mode expects at most 2 arguments, got: %s", numArguments);
@@ -157,9 +158,9 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
    */
   protected static Int2IntOpenHashMap getDictIdCountMap(AggregationResultHolder aggregationResultHolder,
       Dictionary dictionary) {
-    ModeAggregationFunction.DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
+    ModeAggregationFunction2.DictIdsWrapper dictIdsWrapper = aggregationResultHolder.getResult();
     if (dictIdsWrapper == null) {
-      dictIdsWrapper = new ModeAggregationFunction.DictIdsWrapper(dictionary);
+      dictIdsWrapper = new ModeAggregationFunction2.DictIdsWrapper(dictionary);
       aggregationResultHolder.setValue(dictIdsWrapper);
     }
     return dictIdsWrapper._dictIdCountMap;
@@ -170,9 +171,9 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
    */
   protected static Int2IntOpenHashMap getDictIdCountMap(GroupByResultHolder groupByResultHolder, int groupKey,
       Dictionary dictionary) {
-    ModeAggregationFunction.DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
+    ModeAggregationFunction2.DictIdsWrapper dictIdsWrapper = groupByResultHolder.getResult(groupKey);
     if (dictIdsWrapper == null) {
-      dictIdsWrapper = new ModeAggregationFunction.DictIdsWrapper(dictionary);
+      dictIdsWrapper = new ModeAggregationFunction2.DictIdsWrapper(dictionary);
       groupByResultHolder.setValueForKey(groupKey, dictIdsWrapper);
     }
     return dictIdsWrapper._dictIdCountMap;
@@ -262,11 +263,8 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     // For dictionary-encoded expression, store dictionary ids into the dictId map
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      int[] dictIds = blockValSet.getDictionaryIdsSV();
       Int2IntOpenHashMap dictIdValueMap = getDictIdCountMap(aggregationResultHolder, dictionary);
-      for (int i = 0; i < length; i++) {
-        dictIdValueMap.merge(dictIds[i], 1, Integer::sum);
-      }
+      forEachNotNullDictId(length, blockValSet, did -> dictIdValueMap.merge(did, 1, Integer::sum));
       return;
     }
 
@@ -276,31 +274,19 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     switch (storedType) {
       case INT:
         Int2LongOpenHashMap intMap = (Int2LongOpenHashMap) valueMap;
-        int[] intValues = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length; i++) {
-          intMap.merge(intValues[i], 1, Long::sum);
-        }
+        forEachNotNullInt(length, blockValSet, value -> intMap.merge(value, 1, Long::sum));
         break;
       case LONG:
         Long2LongOpenHashMap longMap = (Long2LongOpenHashMap) valueMap;
-        long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          longMap.merge(longValues[i], 1, Long::sum);
-        }
+        forEachNotNullLong(length, blockValSet, value -> longMap.merge(value, 1, Long::sum));
         break;
       case FLOAT:
         Float2LongOpenHashMap floatMap = (Float2LongOpenHashMap) valueMap;
-        float[] floatValues = blockValSet.getFloatValuesSV();
-        for (int i = 0; i < length; i++) {
-          floatMap.merge(floatValues[i], 1, Long::sum);
-        }
+        forEachNotNullFloat(length, blockValSet, value -> floatMap.merge(value, 1, Long::sum));
         break;
       case DOUBLE:
         Double2LongOpenHashMap doubleMap = (Double2LongOpenHashMap) valueMap;
-        double[] doubleValues = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length; i++) {
-          doubleMap.merge(doubleValues[i], 1, Long::sum);
-        }
+        forEachNotNullDouble(length, blockValSet, value -> doubleMap.merge(value, 1, Long::sum));
         break;
       default:
         throw new IllegalStateException("Illegal data type for MODE aggregation function: " + storedType);
@@ -315,10 +301,10 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     // For dictionary-encoded expression, store dictionary ids into the dictId map
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      int[] dictIds = blockValSet.getDictionaryIdsSV();
-      for (int i = 0; i < length; i++) {
-        getDictIdCountMap(groupByResultHolder, groupKeyArray[i], dictionary).merge(dictIds[i], 1, Integer::sum);
-      }
+      forEachNotNullDictId(length, blockValSet, (i, did) -> {
+        Int2IntOpenHashMap dictIdCountMap = getDictIdCountMap(groupByResultHolder, groupKeyArray[i], dictionary);
+        dictIdCountMap.merge(did, 1, Integer::sum);
+      });
       return;
     }
 
@@ -326,28 +312,24 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     DataType storedType = blockValSet.getValueType().getStoredType();
     switch (storedType) {
       case INT:
-        int[] intValues = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeyArray[i], intValues[i]);
-        }
+        forEachNotNullInt(length, blockValSet, (i, value) -> {
+          setValueForGroupKeys(groupByResultHolder, groupKeyArray[i], value);
+        });
         break;
       case LONG:
-        long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeyArray[i], longValues[i]);
-        }
+        forEachNotNullLong(length, blockValSet, (i, value) -> {
+          setValueForGroupKeys(groupByResultHolder, groupKeyArray[i], value);
+        });
         break;
       case FLOAT:
-        float[] floatValues = blockValSet.getFloatValuesSV();
-        for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeyArray[i], floatValues[i]);
-        }
+        forEachNotNullFloat(length, blockValSet, (i, value) -> {
+          setValueForGroupKeys(groupByResultHolder, groupKeyArray[i], value);
+        });
         break;
       case DOUBLE:
-        double[] doubleValues = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length; i++) {
-          setValueForGroupKeys(groupByResultHolder, groupKeyArray[i], doubleValues[i]);
-        }
+        forEachNotNullDouble(length, blockValSet, (i, value) -> {
+          setValueForGroupKeys(groupByResultHolder, groupKeyArray[i], value);
+        });
         break;
       default:
         throw new IllegalStateException("Illegal data type for MODE aggregation function: " + storedType);
@@ -362,12 +344,11 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     // For dictionary-encoded expression, store dictionary ids into the dictId map
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      int[] dictIds = blockValSet.getDictionaryIdsSV();
-      for (int i = 0; i < length; i++) {
+      forEachNotNullDictId(length, blockValSet, (i, did) -> {
         for (int groupKey : groupKeysArray[i]) {
-          getDictIdCountMap(groupByResultHolder, groupKey, dictionary).merge(dictIds[i], 1, Integer::sum);
+          getDictIdCountMap(groupByResultHolder, groupKey, dictionary).merge(did, 1, Integer::sum);
         }
-      }
+      });
       return;
     }
 
@@ -375,36 +356,32 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
     DataType storedType = blockValSet.getValueType().getStoredType();
     switch (storedType) {
       case INT:
-        int[] intValues = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length; i++) {
+        forEachNotNullInt(length, blockValSet, (i, value) -> {
           for (int groupKey : groupKeysArray[i]) {
-            setValueForGroupKeys(groupByResultHolder, groupKey, intValues[i]);
+            setValueForGroupKeys(groupByResultHolder, groupKey, value);
           }
-        }
+        });
         break;
       case LONG:
-        long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
+        forEachNotNullLong(length, blockValSet, (i, value) -> {
           for (int groupKey : groupKeysArray[i]) {
-            setValueForGroupKeys(groupByResultHolder, groupKey, longValues[i]);
+            setValueForGroupKeys(groupByResultHolder, groupKey, value);
           }
-        }
+        });
         break;
       case FLOAT:
-        float[] floatValues = blockValSet.getFloatValuesSV();
-        for (int i = 0; i < length; i++) {
+        forEachNotNullFloat(length, blockValSet, (i, value) -> {
           for (int groupKey : groupKeysArray[i]) {
-            setValueForGroupKeys(groupByResultHolder, groupKey, floatValues[i]);
+            setValueForGroupKeys(groupByResultHolder, groupKey, value);
           }
-        }
+        });
         break;
       case DOUBLE:
-        double[] doubleValues = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length; i++) {
+        forEachNotNullDouble(length, blockValSet, (i, value) -> {
           for (int groupKey : groupKeysArray[i]) {
-            setValueForGroupKeys(groupByResultHolder, groupKey, doubleValues[i]);
+            setValueForGroupKeys(groupByResultHolder, groupKey, value);
           }
-        }
+        });
         break;
       default:
         throw new IllegalStateException("Illegal data type for MODE aggregation function: " + storedType);
@@ -466,7 +443,11 @@ public class ModeAggregationFunction extends BaseSingleInputAggregationFunction<
   @Override
   public Double extractFinalResult(Map<? extends Number, Long> intermediateResult) {
     if (intermediateResult.isEmpty()) {
-      return DEFAULT_FINAL_RESULT;
+      if (_nullHandlingEnabled) {
+        return null;
+      } else {
+        return DEFAULT_FINAL_RESULT;
+      }
     } else if (intermediateResult instanceof Int2LongOpenHashMap) {
       return extractFinalResult((Int2LongOpenHashMap) intermediateResult);
     } else if (intermediateResult instanceof Long2LongOpenHashMap) {

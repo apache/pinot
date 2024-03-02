@@ -23,6 +23,9 @@ package org.apache.pinot.core.query.aggregation;
  *
  */
 public interface AggregationResultHolder {
+  default boolean isNull() {
+    return false;
+  }
 
   /**
    * Set the 'primitive double' aggregation result.

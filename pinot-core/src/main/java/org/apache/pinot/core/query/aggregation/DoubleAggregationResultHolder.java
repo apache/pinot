@@ -24,13 +24,23 @@ package org.apache.pinot.core.query.aggregation;
  */
 public class DoubleAggregationResultHolder implements AggregationResultHolder {
   double _value;
+  boolean _isNull;
 
   /**
    * Constructor for the class.
    * @param defaultValue
    */
   public DoubleAggregationResultHolder(double defaultValue) {
+    this(defaultValue, false);
+  }
+
+  public DoubleAggregationResultHolder(double defaultValue, boolean isNull) {
     _value = defaultValue;
+  }
+
+  @Override
+  public boolean isNull() {
+    return _isNull;
   }
 
   /**

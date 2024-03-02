@@ -82,6 +82,10 @@ public abstract class BaseQueriesTest {
     return Collections.singletonList(getIndexSegments());
   }
 
+  public final void shutdownExecutor() {
+    EXECUTOR_SERVICE.shutdownNow();
+  }
+
   /**
    * Run query on single index segment.
    * <p>Use this to test a single operator.
