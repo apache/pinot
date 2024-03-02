@@ -24,10 +24,8 @@ import javax.annotation.Nullable;
 
 
 /**
- * Wraps RecordReader info to instantiate a reader. Users can either pass in the
- * RecordReader instance directly or the info required to initialize the RecordReader, so that the
- * RecordReader can be initialized just when its about to be used, which avoids early/eager
- * initialization/memory allocation.
+ * Placeholder for all RecordReader configs. Manages the lifecycle of a RecordReader by initing/closing within the
+ * Segment creation framework.
  */
 public class RecordReaderFileConfig {
   public final FileFormat _fileFormat;
@@ -44,20 +42,22 @@ public class RecordReaderFileConfig {
 
   // Pass in the info needed to initialize the reader
   public RecordReaderFileConfig(FileFormat fileFormat, File dataFile, Set<String> fieldsToRead,
-      @Nullable RecordReaderConfig recordReaderConfig) {
+      @Nullable RecordReaderConfig recordReaderConfig, @Nullable RecordReader recordReader) {
     _fileFormat = fileFormat;
     _dataFile = dataFile;
     _fieldsToRead = fieldsToRead;
     _recordReaderConfig = recordReaderConfig;
-    _recordReader = null;
-    // This is not a delegate RecordReader i.e. RecordReaderFileConfig owns the RecordReader, so it should be closed
-    // by RecordReaderFileConfig as well.
+    // Users can pass in custom readers
+    _recordReader = recordReader;
+    // RecordReaderFileConfig owns the lifecycle of RecordReader, to be inited and closed.
     _isDelegateReader = false;
     _isRecordReaderInitialized = false;
     _isRecordReaderClosed = false;
   }
 
-  // Pass in the reader instance directly
+  // Keeping this for backwards compatibility. We want the lifecycle of the reader to be managed internally
+  // (inited/closed) by SegmentProcessorFramework.
+  @Deprecated
   public RecordReaderFileConfig(RecordReader recordReader) {
     _recordReader = recordReader;
     _fileFormat = null;
@@ -76,7 +76,12 @@ public class RecordReaderFileConfig {
   public RecordReader getRecordReader()
       throws Exception {
     if (!_isRecordReaderInitialized) {
-      _recordReader = RecordReaderFactory.getRecordReader(_fileFormat, _dataFile, _fieldsToRead, _recordReaderConfig);
+      if (_recordReader == null) {
+        // Record reader instance to be created and inited
+        _recordReader = RecordReaderFactory.getRecordReader(_fileFormat, _dataFile, _fieldsToRead, _recordReaderConfig);
+      } else {
+        _recordReader.init(_dataFile, _fieldsToRead, _recordReaderConfig);
+      }
       _isRecordReaderInitialized = true;
     }
     return _recordReader;
