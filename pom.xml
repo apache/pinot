@@ -193,10 +193,6 @@
     <scala.version>2.12.18</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
-    <!-- Configuration for Scala -->
-    <scala.version>2.12.18</scala.version>
-    <scala.compat.version>2.12</scala.compat.version>
-
     <flink.version>1.14.6</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
 
