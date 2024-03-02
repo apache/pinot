@@ -799,7 +799,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
               return recordInfo;
             }
             int comparisonResult = newComparisonValue.compareTo(maxComparisonValueRecordInfo.getComparisonValue());
-            if (comparisonResult >= 0) {
+            if (comparisonResult > 0) {
+              return recordInfo;
+            }
+            if (comparisonResult == 0 && recordInfo.getDocId() > maxComparisonValueRecordInfo.getDocId()) {
               return recordInfo;
             }
             return maxComparisonValueRecordInfo;
