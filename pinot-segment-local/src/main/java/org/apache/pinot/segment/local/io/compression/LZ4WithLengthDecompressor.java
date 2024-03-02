@@ -41,7 +41,11 @@ class LZ4WithLengthDecompressor implements ChunkDecompressor {
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
-    _decompressor.decompress(compressedInput, decompressedOutput);
+    // LZ4DecompressorWithLength.decompress(src, out) should not be called directly as it can move src.position
+    // beyond src.limit(). This implementation only moves dest.position
+    _decompressor.decompress(compressedInput, compressedInput.position(), decompressedOutput,
+        decompressedOutput.position());
+    decompressedOutput.position(decompressedOutput.position() + decompressedLength(compressedInput));
     decompressedOutput.flip();
     return decompressedOutput.limit();
   }
