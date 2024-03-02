@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -30,5 +32,40 @@ public class HashUtilsTest {
         "5eb63bbbe01eeed093cb22bb8f5acdc3");
     Assert.assertEquals(BytesUtils.toHexString(HashUtils.hashMurmur3("hello world".getBytes())),
         "0e617feb46603f53b163eb607d4697ab");
+  }
+
+  @Test
+  public void testHashUUIDv4() {
+    testHashUUIDv4(new UUID[]{UUID.randomUUID()});
+    testHashUUIDv4(new UUID[]{UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()});
+  }
+
+  private void testHashUUIDv4(UUID[] uuids) {
+    StringBuilder concatenatedUUID = new StringBuilder();
+    for (UUID uuid : uuids) {
+      concatenatedUUID.append(uuid);
+    }
+    byte[] inputBytes = concatenatedUUID.toString().getBytes(StandardCharsets.UTF_8);
+    // Ensure test data is valid. Each UUID in string form should be 36 bytes.
+    Assert.assertEquals(inputBytes.length, 36 * uuids.length);
+    byte[] convertedBytes = HashUtils.hashUUIDv4(inputBytes);
+    // After hashing, each UUID should take 16 bytes.
+    Assert.assertEquals(convertedBytes.length, 16 * uuids.length);
+    // Below we reconstruct each UUID from the reduced 16-byte representation, and ensure it is the same as the input.
+    int convertedByteIndex = 0;
+    int uuidIndex = 0;
+    while (convertedByteIndex < convertedBytes.length) {
+      long msb = 0;
+      long lsb = 0;
+      for (int i = 0; i < 8; i++, convertedByteIndex++) {
+        msb = (msb << 8) | (convertedBytes[convertedByteIndex] & 0xFF);
+      }
+      for (int i = 0; i < 8; i++, convertedByteIndex++) {
+        lsb = (lsb << 8) | (convertedBytes[convertedByteIndex] & 0xFF);
+      }
+      UUID reconstructedUUID = new UUID(msb, lsb);
+      Assert.assertEquals(reconstructedUUID, uuids[uuidIndex]);
+      uuidIndex++;
+    }
   }
 }

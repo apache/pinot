@@ -19,6 +19,10 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.google.common.hash.Hashing;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -36,6 +40,35 @@ public class HashUtils {
     return Hashing.md5().hashBytes(bytes).asBytes();
   }
 
+  /**
+   * For use-cases where the primary-key is set to columns that are guaranteed to be type-4 UUIDs, this hash-function
+   * will reduce the number of bytes required from 36 to 16 for each UUID, without losing any precision. This leverages
+   * the fact that a type-4 UUID is essentially a 16-byte value.
+   */
+  public static byte[] hashUUIDv4(byte[] bytes) {
+    if (bytes.length % 36 != 0) {
+      return bytes;
+    }
+    byte[] resultBytes = new byte[(bytes.length / 36) * 16];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(resultBytes).order(ByteOrder.BIG_ENDIAN);
+    for (int chunk = 0; chunk < bytes.length; chunk += 36) {
+      byte[] tempBytes = new byte[36];
+      System.arraycopy(bytes, chunk, tempBytes, 0, tempBytes.length);
+      UUID uuid;
+      try {
+        uuid = UUID.fromString(new String(tempBytes, StandardCharsets.UTF_8));
+      } catch (Exception ignored) {
+        // All bytes of the UUID in case of failures will be set to 0
+        uuid = new UUID(0L, 0L);
+      }
+      long lsb = uuid.getLeastSignificantBits();
+      long msb = uuid.getMostSignificantBits();
+      byteBuffer.putLong(msb);
+      byteBuffer.putLong(lsb);
+    }
+    return resultBytes;
+  }
+
   public static Object hashPrimaryKey(PrimaryKey primaryKey, HashFunction hashFunction) {
     switch (hashFunction) {
       case NONE:
@@ -44,6 +77,8 @@ public class HashUtils {
         return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
       case MURMUR3:
         return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
+      case UUID_V4:
+        return new ByteArray(HashUtils.hashUUIDv4(primaryKey.asBytes()));
       default:
         throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
     }
