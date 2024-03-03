@@ -355,10 +355,13 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
             continue;
           }
           Object valueObj = rangeDataType.convert(entry.getKey().substring(key.length() + 1));
-          int lowerCompareResult = rangeDataType.compare(valueObj, lowerBound);
-          int upperCompareResult = rangeDataType.compare(valueObj, upperBound);
-          if ((lowerUnbounded || (lowerInclusive ? lowerCompareResult >= 0 : lowerCompareResult > 0)) && (upperUnbounded
-              || (upperInclusive ? upperCompareResult <= 0 : upperCompareResult < 0))) {
+          boolean lowerCompareResult =
+              lowerUnbounded || (lowerInclusive ? rangeDataType.compare(valueObj, lowerBound) >= 0
+                  : rangeDataType.compare(valueObj, lowerBound) > 0);
+          boolean upperCompareResult =
+              upperUnbounded || (upperInclusive ? rangeDataType.compare(valueObj, upperBound) <= 0
+                  : rangeDataType.compare(valueObj, upperBound) < 0);
+          if (lowerCompareResult && upperCompareResult) {
             if (result == null) {
               result = entry.getValue().toMutableRoaringBitmap();
             } else {
