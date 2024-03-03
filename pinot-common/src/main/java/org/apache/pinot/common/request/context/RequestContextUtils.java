@@ -401,23 +401,23 @@ public class RequestContextUtils {
       case GREATER_THAN:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), false, getStringValue(operands.get(1)), false, RangePredicate.UNBOUNDED,
-                operands.get(2).getLiteral().getType()));
+                operands.get(1).getLiteral().getType()));
       case GREATER_THAN_OR_EQUAL:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), false, RangePredicate.UNBOUNDED,
-                operands.get(2).getLiteral().getType()));
+                operands.get(1).getLiteral().getType()));
       case LESS_THAN:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, false, getStringValue(operands.get(1)),
-                operands.get(2).getLiteral().getType()));
+                operands.get(1).getLiteral().getType()));
       case LESS_THAN_OR_EQUAL:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, true, getStringValue(operands.get(1)),
-                operands.get(2).getLiteral().getType()));
+                operands.get(1).getLiteral().getType()));
       case BETWEEN:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), true,
-                getStringValue(operands.get(2)), operands.get(2).getLiteral().getType()));
+                getStringValue(operands.get(2)), operands.get(1).getLiteral().getType()));
       case RANGE:
         return FilterContext.forPredicate(new RangePredicate(operands.get(0), getStringValue(operands.get(1))));
       case REGEXP_LIKE:
