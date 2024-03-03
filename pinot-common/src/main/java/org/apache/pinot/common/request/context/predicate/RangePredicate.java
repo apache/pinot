@@ -21,6 +21,7 @@ package org.apache.pinot.common.request.context.predicate;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 
 
@@ -43,6 +44,7 @@ public class RangePredicate extends BasePredicate {
   private final String _lowerBound;
   private final boolean _upperInclusive;
   private final String _upperBound;
+  private final FieldSpec.DataType _rangeDataType;
 
   /**
    * The range is formatted as 5 parts:
@@ -67,15 +69,17 @@ public class RangePredicate extends BasePredicate {
     int upperLength = upper.length();
     _upperInclusive = upper.charAt(upperLength - 1) == UPPER_INCLUSIVE;
     _upperBound = upper.substring(0, upperLength - 1);
+    _rangeDataType = null;
   }
 
   public RangePredicate(ExpressionContext lhs, boolean lowerInclusive, String lowerBound, boolean upperInclusive,
-      String upperBound) {
+      String upperBound, FieldSpec.DataType rangeDataType) {
     super(lhs);
     _lowerInclusive = lowerInclusive;
     _lowerBound = lowerBound;
     _upperInclusive = upperInclusive;
     _upperBound = upperBound;
+    _rangeDataType = rangeDataType;
   }
 
   @Override
@@ -99,6 +103,10 @@ public class RangePredicate extends BasePredicate {
     return _upperBound;
   }
 
+  public FieldSpec.DataType getRangeDataType() {
+    return _rangeDataType;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -110,12 +118,12 @@ public class RangePredicate extends BasePredicate {
     RangePredicate that = (RangePredicate) o;
     return _lowerInclusive == that._lowerInclusive && _upperInclusive == that._upperInclusive && Objects
         .equals(_lhs, that._lhs) && Objects.equals(_lowerBound, that._lowerBound) && Objects
-        .equals(_upperBound, that._upperBound);
+        .equals(_upperBound, that._upperBound) && _rangeDataType == that._rangeDataType;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_lhs, _lowerInclusive, _lowerBound, _upperInclusive, _upperBound);
+    return Objects.hash(_lhs, _lowerInclusive, _lowerBound, _upperInclusive, _upperBound, _rangeDataType);
   }
 
   @Override

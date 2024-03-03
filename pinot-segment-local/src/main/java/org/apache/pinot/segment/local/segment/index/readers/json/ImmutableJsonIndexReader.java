@@ -45,6 +45,7 @@ import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexR
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -342,23 +343,24 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       }
     } else if (predicateType == Predicate.Type.RANGE) {
       RangePredicate rangePredicate = (RangePredicate) predicate;
+      FieldSpec.DataType rangeDataType = rangePredicate.getRangeDataType();
       boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
       boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
       boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
       boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
-      Double lowerBound =
-          lowerUnbounded ? Double.NEGATIVE_INFINITY : Double.parseDouble(rangePredicate.getLowerBound());
-      Double upperBound =
-          upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(rangePredicate.getUpperBound());
+      Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
+      Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
 
       int[] dictIds = getDictIdRangeForKey(key);
       MutableRoaringBitmap result = null;
       for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
         String value = _dictionary.getStringValue(dictId).substring(key.length() + 1);
         // TODO only supported for numeric values as of now
-        double doubleValue = Double.parseDouble(value);
-        if ((lowerUnbounded || (lowerInclusive ? doubleValue >= lowerBound : doubleValue > lowerBound)) && (
-            upperUnbounded || (upperInclusive ? doubleValue <= upperBound : doubleValue < upperBound))) {
+        Object valueObj = rangeDataType.convert(value);
+        int lowerCompareResult = rangeDataType.compare(valueObj, lowerBound);
+        int upperCompareResult = rangeDataType.compare(valueObj, upperBound);
+        if ((lowerUnbounded || (lowerInclusive ? lowerCompareResult >= 0 : lowerCompareResult > 0)) && (upperUnbounded
+            || (upperInclusive ? upperCompareResult <= 0 : upperCompareResult < 0))) {
           if (result == null) {
             result = _invertedIndex.getDocIds(dictId).toMutableRoaringBitmap();
           } else {

@@ -47,6 +47,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonInde
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -338,14 +339,13 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       }
     } else if (predicateType == Predicate.Type.RANGE) {
       RangePredicate rangePredicate = (RangePredicate) predicate;
+      FieldSpec.DataType rangeDataType = rangePredicate.getRangeDataType();
       boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
       boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
       boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
       boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
-      Double lowerBound =
-          lowerUnbounded ? Double.NEGATIVE_INFINITY : Double.parseDouble(rangePredicate.getLowerBound());
-      Double upperBound =
-          upperUnbounded ? Double.POSITIVE_INFINITY : Double.parseDouble(rangePredicate.getUpperBound());
+      Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
+      Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
       MutableRoaringBitmap result = null;
 
       _readLock.lock();
@@ -354,9 +354,11 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
           if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
             continue;
           }
-          Double doubleValue = Double.parseDouble(entry.getKey().substring(key.length() + 1));
-          if ((lowerUnbounded || (lowerInclusive ? doubleValue >= lowerBound : doubleValue > lowerBound)) && (
-              upperUnbounded || (upperInclusive ? doubleValue <= upperBound : doubleValue < upperBound))) {
+          Object valueObj = rangeDataType.convert(entry.getKey().substring(key.length() + 1));
+          int lowerCompareResult = rangeDataType.compare(valueObj, lowerBound);
+          int upperCompareResult = rangeDataType.compare(valueObj, upperBound);
+          if ((lowerUnbounded || (lowerInclusive ? lowerCompareResult >= 0 : lowerCompareResult > 0)) && (upperUnbounded
+              || (upperInclusive ? upperCompareResult <= 0 : upperCompareResult < 0))) {
             if (result == null) {
               result = entry.getValue().toMutableRoaringBitmap();
             } else {

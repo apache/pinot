@@ -27,7 +27,9 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -561,6 +563,39 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         }
       } catch (Exception e) {
         throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
+      }
+    }
+
+    /**
+     * Compares the given values of the data type.
+     *
+     * return 0 if the values are equal
+     * return -1 if value1 is less than value2
+     * return 1 if value1 is greater than value2
+     */
+    public int compare(Object value1, Object value2) {
+      switch (this) {
+        case INT:
+          return Integer.compare((int) value1, (int) value2);
+        case LONG:
+          return Long.compare((long) value1, (long) value2);
+        case FLOAT:
+          return Float.compare((float) value1, (float) value2);
+        case DOUBLE:
+          return Double.compare((double) value1, (double) value2);
+        case BIG_DECIMAL:
+          return ((BigDecimal) value1).compareTo((BigDecimal) value2);
+        case BOOLEAN:
+          return Boolean.compare((boolean) value1, (boolean) value2);
+        case TIMESTAMP:
+          return Long.compare((long) value1, (long) value2);
+        case STRING:
+        case JSON:
+          return StringUtils.compare((String) value1, (String) value2);
+        case BYTES:
+          return new ByteArray((byte[]) value1).compareTo(new ByteArray((byte[]) value2));
+        default:
+          throw new IllegalStateException();
       }
     }
 
