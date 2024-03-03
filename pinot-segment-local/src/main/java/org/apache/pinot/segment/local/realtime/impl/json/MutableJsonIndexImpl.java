@@ -24,14 +24,15 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.PriorityQueue;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -52,6 +53,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -166,6 +168,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
    * Returns the matching flattened doc ids for the given filter.
    */
   private RoaringBitmap getMatchingFlattenedDocIds(FilterContext filter) {
+    return getMatchingFlattenedDocIds(filter, false);
+  }
+
+  private RoaringBitmap getMatchingFlattenedDocIds(FilterContext filter, boolean allowNestedExclusivePredicate) {
     switch (filter.getType()) {
       case AND: {
         List<FilterContext> children = filter.getChildren();
@@ -187,8 +193,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       }
       case PREDICATE: {
         Predicate predicate = filter.getPredicate();
-        Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
-            predicate);
+        if (!allowNestedExclusivePredicate) {
+          Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
+              predicate);
+        }
         return getMatchingFlattenedDocIds(predicate);
       }
       default:
@@ -400,86 +408,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   @Override
-  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String key, @Nullable String filterString) {
-    Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
-    MutableRoaringBitmap matchingFlattenedDocIds = null;
-    if (filterString != null) {
-      FilterContext filter;
-      try {
-        filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
-        Preconditions.checkArgument(!filter.isConstant());
-      } catch (Exception e) {
-        throw new BadQueryRequestException("Invalid json match filter: " + filterString);
-      }
-
-      _readLock.lock();
-      try {
-        matchingFlattenedDocIds = getMatchingFlattenedDocIds(filter).toMutableRoaringBitmap();
-      } finally {
-        _readLock.unlock();
-      }
-    }
-    _readLock.lock();
-    try {
-      for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
-        if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
-          continue;
-        }
-        MutableRoaringBitmap flattenedDocIds = entry.getValue().toMutableRoaringBitmap();
-        if (matchingFlattenedDocIds != null) {
-          flattenedDocIds.and(matchingFlattenedDocIds);
-        }
-        String val = entry.getKey().substring(key.length() + 1);
-        matchingDocsMap.put(val, flattenedDocIds.toRoaringBitmap());
-      }
-    } finally {
-      _readLock.unlock();
-    }
-    return matchingDocsMap;
-  }
-
-
-  @Override
-  public String[][] getValuesForKeyAndFlattenedDocs(int[] docIds, Map<String, RoaringBitmap> context) {
-    // TODO improve this
-    List<List<String>> values = new ArrayList<>(docIds.length);
-    for (int i = 0; i < docIds.length; i++) {
-      values.add(new ArrayList<>());
-    }
-
-    Set<Integer> docIdSet = new HashSet<>();
-    for (int docId : docIds) {
-      docIdSet.add(docId);
-    }
-
-    for (Map.Entry<String, RoaringBitmap> entry : context.entrySet()) {
-      entry.getValue().forEach((IntConsumer) flattenedDocId -> {
-        int docId = _docIdMapping.getInt(flattenedDocId);
-        if (docIdSet.contains(docId)) {
-          List<String> valueList = values.get(docId);
-          if (valueList == null) {
-            valueList = new ArrayList<>();
-            values.set(docId, valueList);
-          }
-          valueList.add(entry.getKey());
-        }
-      });
-    }
-
-    String[][] result = new String[docIds.length][];
-    for (int i = 0; i < docIds.length; i++) {
-      List<String> valueList = values.get(i);
-      if (valueList == null) {
-        result[i] = new String[0];
-      } else {
-        result[i] = valueList.toArray(new String[0]);
-      }
-    }
-
-    return result;
-  }
-
-  @Override
   public String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> matchingDocsMap) {
     Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
     RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
@@ -499,6 +427,82 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       values[i] = docIdToValues.get(docIds[i]);
     }
     return values;
+  }
+
+  @Override
+  public Map<String, ImmutableRoaringBitmap> getValueToMatchingFlattenedDocIdsMap(String jsonPathKey) {
+    Map<String, ImmutableRoaringBitmap> valueToMatchingFlattenedDocIdsMap = new HashMap<>();
+    _readLock.lock();
+    try {
+      for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
+        if (!entry.getKey().startsWith(jsonPathKey + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
+          continue;
+        }
+        ImmutableRoaringBitmap flattenedDocIds = entry.getValue().toMutableRoaringBitmap().toImmutableRoaringBitmap();
+        valueToMatchingFlattenedDocIdsMap.put(entry.getKey().substring(jsonPathKey.length() + 1), flattenedDocIds);
+      }
+    } finally {
+      _readLock.unlock();
+    }
+    return valueToMatchingFlattenedDocIdsMap;
+  }
+
+  @Override
+  public ImmutableRoaringBitmap getMatchingFlattenedDocIds(String filterString) {
+    FilterContext filter;
+    try {
+      filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+      Preconditions.checkArgument(!filter.isConstant());
+    } catch (Exception e) {
+      throw new BadQueryRequestException("Invalid json match filter: " + filterString);
+    }
+
+    _readLock.lock();
+    try {
+      return getMatchingFlattenedDocIds(filter).toMutableRoaringBitmap().toImmutableRoaringBitmap();
+    } finally {
+      _readLock.unlock();
+    }
+  }
+
+  public String[][] getValuesForArrayKeyWithFilter(int[] docIds, int length,
+      Map<String, ImmutableRoaringBitmap> valueToMatchingFlattenedDocs,
+      @Nullable ImmutableRoaringBitmap filteredFlattenedDocIds) {
+    String[][] result = new String[length][];
+    List<PriorityQueue<Pair<String, Integer>>> docIdToFlattenedDocIdsAndValues = new ArrayList<>();
+    for (int i = 0; i < length; i++) {
+      // Sort based on flattened doc id
+      docIdToFlattenedDocIdsAndValues.add(new PriorityQueue<>(Comparator.comparingInt(Pair::getRight)));
+    }
+    Map<Integer, Integer> docIdToPos = new HashMap<>();
+    for (int i = 0; i < length; i++) {
+      docIdToPos.put(docIds[i], i);
+    }
+
+    for (Map.Entry<String, ImmutableRoaringBitmap> entry : valueToMatchingFlattenedDocs.entrySet()) {
+      String value = entry.getKey();
+      MutableRoaringBitmap matchingFlattenedDocIds = entry.getValue().toMutableRoaringBitmap();
+      if (filteredFlattenedDocIds != null) {
+        matchingFlattenedDocIds.and(filteredFlattenedDocIds);
+      }
+      matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> {
+        int docId = _docIdMapping.getInt(flattenedDocId);
+        if (docIdToPos.containsKey(docId)) {
+          docIdToFlattenedDocIdsAndValues.get(docIdToPos.get(docId)).add(Pair.of(value, flattenedDocId));
+        }
+      });
+    }
+
+    for (int i = 0; i < length; i++) {
+      PriorityQueue<Pair<String, Integer>> pq = docIdToFlattenedDocIdsAndValues.get(i);
+      result[i] = new String[pq.size()];
+      int j = 0;
+      while (!pq.isEmpty()) {
+        result[i][j++] = pq.poll().getLeft();
+      }
+    }
+
+    return result;
   }
 
   @Override

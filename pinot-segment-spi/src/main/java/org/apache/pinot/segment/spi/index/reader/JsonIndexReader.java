@@ -22,6 +22,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -43,17 +44,17 @@ public interface JsonIndexReader extends IndexReader {
    */
   String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> context);
 
-  String[][] getValuesForKeyAndFlattenedDocs(int[] docIds, Map<String, RoaringBitmap> context);
+  Map<String, ImmutableRoaringBitmap> getValueToMatchingFlattenedDocIdsMap(String jsonPathKey);
+
+  ImmutableRoaringBitmap getMatchingFlattenedDocIds(String filterString);
+
+  String[][] getValuesForArrayKeyWithFilter(int[] docIds, int length,
+      Map<String, ImmutableRoaringBitmap> matchingValueToFlattenedDocs,
+      @Nullable ImmutableRoaringBitmap filteredFlattenedDocIds);
 
   /**
    * For a JSON key, returns a Map from each value to the docId posting list. This map should be  used to avoid reading
    * and converting the posting list of flattened docIds to real docIds
    */
   Map<String, RoaringBitmap> getMatchingDocsMap(String key);
-
-  /**
-   * For a JSON key, returns a Map from each value to the flattened docId posting list.
-   * This map should be  used to avoid reading and converting the posting list of flattened docIds to real docIds
-   */
-  Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String key, @Nullable String filterString);
 }

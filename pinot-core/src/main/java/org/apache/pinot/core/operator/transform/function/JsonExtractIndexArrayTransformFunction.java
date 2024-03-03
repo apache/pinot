@@ -26,19 +26,16 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractIndexArray";
-
-  private TransformFunction _jsonFieldTransformFunction;
-  private String _jsonPathString;
-  private String _filterJsonPathString;
   private TransformResultMetadata _resultMetadata;
   private JsonIndexReader _jsonIndexReader;
   private Object _defaultValue;
-  private Map<String, RoaringBitmap> _matchingDocsMap;
+  private Map<String, ImmutableRoaringBitmap> _valueToMatchingFlattenedDocIdsMap;
+  private ImmutableRoaringBitmap _filteredFlattenedDocIds;
 
   @Override
   public String getName() {
@@ -50,8 +47,8 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
     // Check that there are exactly 3, 4 or 5 arguments
     if (arguments.size() < 3 || arguments.size() > 5) {
       throw new IllegalArgumentException(
-          "Expected 3/4 arguments for transform function: jsonExtractIndex(jsonFieldName, 'jsonPath', 'resultsType',"
-              + "['defaultValue'], [jsonFilterExpression])");
+          "Expected 3/4/5 arguments for transform function: jsonExtractIndexArray(jsonFieldName, 'jsonPath', "
+              + "'resultsType', ['defaultValue'], [jsonFilterExpression])");
     }
 
     TransformFunction firstArgument = arguments.get(0);
@@ -59,12 +56,11 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
       String columnName = ((IdentifierTransformFunction) firstArgument).getColumnName();
       _jsonIndexReader = columnContextMap.get(columnName).getDataSource().getJsonIndex();
       if (_jsonIndexReader == null) {
-        throw new IllegalStateException("jsonExtractIndex can only be applied on a column with JSON index");
+        throw new IllegalStateException("jsonExtractIndexArray can only be applied on a column with JSON index");
       }
     } else {
-      throw new IllegalArgumentException("jsonExtractIndex can only be applied to a raw column");
+      throw new IllegalArgumentException("jsonExtractIndexArray can only be applied to a raw column");
     }
-    _jsonFieldTransformFunction = firstArgument;
 
     TransformFunction secondArgument = arguments.get(1);
     if (!(secondArgument instanceof LiteralTransformFunction)) {
@@ -76,7 +72,8 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
     } catch (Exception e) {
       throw new IllegalArgumentException("JSON path argument is not a valid JSON path");
     }
-    _jsonPathString = inputJsonPath.substring(1); // remove $ prefix
+    _valueToMatchingFlattenedDocIdsMap =
+        _jsonIndexReader.getValueToMatchingFlattenedDocIdsMap(inputJsonPath.substring(1)); // remove $ prefix
 
     TransformFunction thirdArgument = arguments.get(2);
     if (!(thirdArgument instanceof LiteralTransformFunction)) {
@@ -84,8 +81,10 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
     }
     String resultsType = ((LiteralTransformFunction) thirdArgument).getStringLiteral().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
-    FieldSpec.DataType dataType =
-        FieldSpec.DataType.valueOf(isSingleValue ? resultsType : resultsType.substring(0, resultsType.length() - 6));
+    if (isSingleValue) {
+      throw new IllegalArgumentException("jsonExtractIndexArray can only be applied to array types");
+    }
+    FieldSpec.DataType dataType = FieldSpec.DataType.valueOf(resultsType.substring(0, resultsType.length() - 6));
 
     if (arguments.size() >= 4) {
       TransformFunction fourthArgument = arguments.get(3);
@@ -101,16 +100,10 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
         throw new IllegalArgumentException("JSON path filter argument must be a literal");
       }
       String filterJsonPath = ((LiteralTransformFunction) fifthArgument).getStringLiteral();
-      try {
-        JsonPathCache.INSTANCE.getOrCompute(filterJsonPath);
-      } catch (Exception e) {
-        throw new IllegalArgumentException("JSON path argument is not a valid JSON path");
-      }
-      _filterJsonPathString = filterJsonPath;
+      _filteredFlattenedDocIds = _jsonIndexReader.getMatchingFlattenedDocIds(filterJsonPath);
     }
 
-    _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
-    _matchingDocsMap = _jsonIndexReader.getMatchingFlattenedDocsMap(_jsonPathString, _filterJsonPathString);
+    _resultMetadata = new TransformResultMetadata(dataType, false, false);
   }
 
   @Override
@@ -121,20 +114,20 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   @Override
   public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    int[] inputDocIds = valueBlock.getDocIds();
     initIntValuesMV(numDocs);
     String[][] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndFlattenedDocs(valueBlock.getDocIds(), _matchingDocsMap);
+        _jsonIndexReader.getValuesForArrayKeyWithFilter(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+            _valueToMatchingFlattenedDocIdsMap, _filteredFlattenedDocIds);
+
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
 
-      if (value == null) {
+      if (value == null || value.length == 0) {
         if (_defaultValue != null) {
           _intValuesMV[i] = new int[]{(int) _defaultValue};
-          continue;
+        } else {
+          _intValuesMV[i] = new int[0];
         }
-        throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], for docId [%s]", _jsonPathString, inputDocIds[i]));
       } else {
         _intValuesMV[i] = new int[value.length];
         for (int j = 0; j < value.length; j++) {
@@ -148,20 +141,19 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   @Override
   public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    int[] inputDocIds = valueBlock.getDocIds();
     initLongValuesMV(numDocs);
     String[][] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndFlattenedDocs(valueBlock.getDocIds(), _matchingDocsMap);
+        _jsonIndexReader.getValuesForArrayKeyWithFilter(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+            _valueToMatchingFlattenedDocIdsMap, _filteredFlattenedDocIds);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
 
       if (value == null) {
         if (_defaultValue != null) {
           _longValuesMV[i] = new long[]{(long) _defaultValue};
-          continue;
+        } else {
+          _longValuesMV[i] = new long[0];
         }
-        throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], for docId [%s]", _jsonPathString, inputDocIds[i]));
       } else {
         _longValuesMV[i] = new long[value.length];
         for (int j = 0; j < value.length; j++) {
@@ -175,20 +167,19 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   @Override
   public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    int[] inputDocIds = valueBlock.getDocIds();
     initFloatValuesMV(numDocs);
     String[][] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndFlattenedDocs(valueBlock.getDocIds(), _matchingDocsMap);
+        _jsonIndexReader.getValuesForArrayKeyWithFilter(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+            _valueToMatchingFlattenedDocIdsMap, _filteredFlattenedDocIds);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
 
       if (value == null) {
         if (_defaultValue != null) {
           _floatValuesMV[i] = new float[]{(float) _defaultValue};
-          continue;
+        } else {
+          _floatValuesMV[i] = new float[0];
         }
-        throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], for docId [%s]", _jsonPathString, inputDocIds[i]));
       } else {
         _floatValuesMV[i] = new float[value.length];
         for (int j = 0; j < value.length; j++) {
@@ -202,20 +193,19 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   @Override
   public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    int[] inputDocIds = valueBlock.getDocIds();
     initDoubleValuesMV(numDocs);
     String[][] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndFlattenedDocs(valueBlock.getDocIds(), _matchingDocsMap);
+        _jsonIndexReader.getValuesForArrayKeyWithFilter(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+            _valueToMatchingFlattenedDocIdsMap, _filteredFlattenedDocIds);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
 
       if (value == null) {
         if (_defaultValue != null) {
           _doubleValuesMV[i] = new double[]{(double) _defaultValue};
-          continue;
+        } else {
+          _doubleValuesMV[i] = new double[0];
         }
-        throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], for docId [%s]", _jsonPathString, inputDocIds[i]));
       } else {
         _doubleValuesMV[i] = new double[value.length];
         for (int j = 0; j < value.length; j++) {
@@ -229,20 +219,19 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    int[] inputDocIds = valueBlock.getDocIds();
     initStringValuesMV(numDocs);
     String[][] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndFlattenedDocs(valueBlock.getDocIds(), _matchingDocsMap);
+        _jsonIndexReader.getValuesForArrayKeyWithFilter(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+            _valueToMatchingFlattenedDocIdsMap, _filteredFlattenedDocIds);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
 
       if (value == null) {
         if (_defaultValue != null) {
           _stringValuesMV[i] = new String[]{(String) _defaultValue};
-          continue;
+        } else {
+          _stringValuesMV[i] = new String[0];
         }
-        throw new RuntimeException(
-            String.format("Illegal Json Path: [%s], for docId [%s]", _jsonPathString, inputDocIds[i]));
       } else {
         _stringValuesMV[i] = new String[value.length];
         System.arraycopy(value, 0, _stringValuesMV[i], 0, value.length);
