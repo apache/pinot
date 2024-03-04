@@ -91,7 +91,11 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
       if (!(fourthArgument instanceof LiteralTransformFunction)) {
         throw new IllegalArgumentException("Default value must be a literal");
       }
-      _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
+      if (((LiteralTransformFunction) fourthArgument).getStringLiteral().equals("null")) {
+        _defaultValue = null;
+      } else {
+        _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
+      }
     }
 
     if (arguments.size() == 5) {
