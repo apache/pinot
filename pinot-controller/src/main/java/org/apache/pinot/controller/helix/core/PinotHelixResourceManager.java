@@ -415,6 +415,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get all live instance Ids.
+   *
+   * @return List of live instance Ids
+   */
+  public List<String> getAllLiveInstances() {
+    return _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
+  }
+
+  /**
    * Returns the config for all the Helix instances in the cluster.
    */
   public List<InstanceConfig> getAllHelixInstanceConfigs() {
@@ -1703,6 +1712,10 @@ public class PinotHelixResourceManager {
     return _helixDataAccessor.getBaseDataAccessor().set(path, record, expectedVersion, accessOption);
   }
 
+  public boolean createZKNode(String path, ZNRecord record, int accessOption, long ttl) {
+    return _helixDataAccessor.getBaseDataAccessor().create(path, record, accessOption, ttl);
+  }
+
   public boolean deleteZKPath(String path) {
     return _helixDataAccessor.getBaseDataAccessor().remove(path, -1);
   }
@@ -2027,7 +2040,7 @@ public class PinotHelixResourceManager {
    * @return Map representing the job's ZK properties
    */
   @Nullable
-  public Map<String, String> getControllerJobZKMetadata(String jobId, ControllerJobType jobType) {
+  public Map<String, String> getControllerJobZKMetadata(String jobId, String jobType) {
     String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
     ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
     return jobsZnRecord != null ? jobsZnRecord.getMapFields().get(jobId) : null;
@@ -2037,10 +2050,10 @@ public class PinotHelixResourceManager {
    * Returns a Map of jobId to job's ZK metadata that passes the checker, like for specific tables.
    * @return A Map of jobId to job properties
    */
-  public Map<String, Map<String, String>> getAllJobs(Set<ControllerJobType> jobTypes,
+  public Map<String, Map<String, String>> getAllJobs(Set<String> jobTypes,
       Predicate<Map<String, String>> jobMetadataChecker) {
     Map<String, Map<String, String>> controllerJobs = new HashMap<>();
-    for (ControllerJobType jobType : jobTypes) {
+    for (String jobType : jobTypes) {
       String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
       ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, null, AccessOption.PERSISTENT);
       if (jobsZnRecord == null) {
@@ -2050,8 +2063,8 @@ public class PinotHelixResourceManager {
       for (Map.Entry<String, Map<String, String>> jobMetadataEntry : jobMetadataMap.entrySet()) {
         String jobId = jobMetadataEntry.getKey();
         Map<String, String> jobMetadata = jobMetadataEntry.getValue();
-        Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType.name()),
-            "Got unexpected jobType: %s at jobResourcePath: %s with jobId: %s", jobType.name(), jobResourcePath, jobId);
+        Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.JOB_TYPE).equals(jobType),
+            "Got unexpected jobType: %s at jobResourcePath: %s with jobId: %s", jobType, jobResourcePath, jobId);
         if (jobMetadataChecker.test(jobMetadata)) {
           controllerJobs.put(jobId, jobMetadata);
         }
@@ -2074,7 +2087,7 @@ public class PinotHelixResourceManager {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT.toString());
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numMessagesSent));
     jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentName);
@@ -2087,7 +2100,7 @@ public class PinotHelixResourceManager {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.FORCE_COMMIT.toString());
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.FORCE_COMMIT);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST,
         JsonUtils.objectToString(consumingSegmentsCommitted));
@@ -2107,7 +2120,7 @@ public class PinotHelixResourceManager {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT.toString());
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
@@ -2120,7 +2133,7 @@ public class PinotHelixResourceManager {
    * @param jobType the type of the job to figure out where job metadata is kept in ZK
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, ControllerJobType jobType) {
+  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobType) {
     return addControllerJobToZK(jobId, jobMetadata, jobType, prev -> true);
   }
 
@@ -2132,7 +2145,7 @@ public class PinotHelixResourceManager {
    * @param prevJobMetadataChecker to check the previous job metadata before adding new one
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, ControllerJobType jobType,
+  public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, String jobType,
       Predicate<Map<String, String>> prevJobMetadataChecker) {
     Preconditions.checkState(jobMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS) != null,
         "Submission Time in JobMetadata record not set. Cannot expire these records");
@@ -2169,7 +2182,7 @@ public class PinotHelixResourceManager {
    * @param updater to modify the job metadata in place
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean updateJobsForTable(String tableNameWithType, ControllerJobType jobType,
+  public boolean updateJobsForTable(String tableNameWithType, String jobType,
       Consumer<Map<String, String>> updater) {
     String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
     Stat stat = new Stat();

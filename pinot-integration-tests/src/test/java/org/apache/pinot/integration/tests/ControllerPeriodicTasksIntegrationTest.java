@@ -19,8 +19,10 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +42,7 @@ import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -75,9 +78,16 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
 
   private String _currentTable = DEFAULT_TABLE_NAME;
 
+  private String _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
+
   @Override
   protected String getTableName() {
     return _currentTable;
+  }
+
+  @Override
+  protected String getSchemaFileName() {
+    return _schemaFileName;
   }
 
   @Override
@@ -182,6 +192,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     String emptyTable = "emptyTable";
     String disabledTable = "disabledTable";
     String tableWithOfflineSegment = "tableWithOfflineSegment";
+    String upsertTable = "upsertTable";
 
     Schema schema = createSchema();
     _currentTable = emptyTable;
@@ -194,6 +205,11 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     addSchema(schema);
     addTableConfig(createOfflineTableConfig());
     _helixAdmin.enableResource(getHelixClusterName(), TableNameBuilder.OFFLINE.tableNameWithType(disabledTable), false);
+
+    _currentTable = upsertTable;
+    _schemaFileName = UpsertTableIntegrationTest.UPSERT_SCHEMA_FILE_NAME;
+    setupUpsertTable();
+    _schemaFileName = DEFAULT_SCHEMA_FILE_NAME;
 
     _currentTable = tableWithOfflineSegment;
     schema.setSchemaName(_currentTable);
@@ -211,7 +227,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
 
     _currentTable = DEFAULT_TABLE_NAME;
 
-    int numTables = 5;
+    int numTables = 6;
     ControllerMetrics controllerMetrics = _controllerStarter.getControllerMetrics();
     TestUtils.waitForCondition(aVoid -> {
       if (MetricValueUtils.getGlobalGaugeValue(controllerMetrics, "SegmentStatusChecker",
@@ -246,8 +262,9 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
         return false;
       }
       return MetricValueUtils.getGlobalGaugeValue(controllerMetrics, ControllerGauge.OFFLINE_TABLE_COUNT) == 4
-          && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, ControllerGauge.REALTIME_TABLE_COUNT) == 1
-          && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, ControllerGauge.DISABLED_TABLE_COUNT) == 1;
+          && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, ControllerGauge.REALTIME_TABLE_COUNT) == 2
+          && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, ControllerGauge.DISABLED_TABLE_COUNT) == 1
+          && MetricValueUtils.getGlobalGaugeValue(controllerMetrics, ControllerGauge.UPSERT_TABLE_COUNT) == 1;
     }, 60_000, "Timed out waiting for SegmentStatusChecker");
 
     dropOfflineTable(emptyTable);
@@ -256,6 +273,19 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
     deleteSchema(emptyTable);
     deleteSchema(disabledTable);
     deleteSchema(tableWithOfflineSegment);
+  }
+
+  private void setupUpsertTable()
+      throws IOException {
+    Schema upsertSchema = createSchema();
+    upsertSchema.setSchemaName(getTableName());
+    upsertSchema.getDateTimeFieldSpecs().get(0).setName(UpsertTableIntegrationTest.TIME_COL_NAME);
+    addSchema(upsertSchema);
+    TableConfig tableConfig =
+        createCSVUpsertTableConfig(getTableName(), getKafkaTopic(), getNumKafkaPartitions(), new HashMap<>(),
+            new UpsertConfig(UpsertConfig.Mode.FULL), UpsertTableIntegrationTest.PRIMARY_KEY_COL);
+    tableConfig.getValidationConfig().setTimeColumnName(UpsertTableIntegrationTest.TIME_COL_NAME);
+    addTableConfig(tableConfig);
   }
 
   private boolean checkSegmentStatusCheckerMetrics(ControllerMetrics controllerMetrics, String tableNameWithType,

@@ -48,6 +48,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -194,9 +195,11 @@ public class SegmentProcessorFrameworkTest {
     FileUtils.forceMkdir(workingDir);
     ClassLoader classLoader = getClass().getClassLoader();
     URL resource = classLoader.getResource("data/dimBaseballTeams.csv");
-    RecordReaderFileConfig reader = new RecordReaderFileConfig(FileFormat.CSV,
-        new File(resource.toURI()),
+    RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.CSV, new File(resource.toURI()),
         null, null);
+    RecordReaderFileConfig recordReaderFileConfig = new RecordReaderFileConfig(FileFormat.CSV,
+        new File(resource.toURI()),
+        null, null, recordReader);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").
         setTimeColumnName("time").build();
 
@@ -208,13 +211,15 @@ public class SegmentProcessorFrameworkTest {
 
     SegmentProcessorConfig config =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema).build();
-    SegmentProcessorFramework framework = new SegmentProcessorFramework(config, workingDir, ImmutableList.of(reader),
-        Collections.emptyList(), null);
+    SegmentProcessorFramework framework = new SegmentProcessorFramework(config, workingDir,
+        ImmutableList.of(recordReaderFileConfig), Collections.emptyList(), null);
     List<File> outputSegments = framework.process();
     assertEquals(outputSegments.size(), 1);
     ImmutableSegment segment = ImmutableSegmentLoader.load(outputSegments.get(0), ReadMode.mmap);
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
     assertEquals(segmentMetadata.getTotalDocs(), 52);
+    // Verify reader is closed
+    assertEquals(recordReaderFileConfig.isRecordReaderClosedFromRecordReaderFileConfig(), true);
   }
 
   @Test
@@ -686,7 +691,7 @@ public class SegmentProcessorFrameworkTest {
     ClassLoader classLoader = getClass().getClassLoader();
     URL resource = classLoader.getResource("data/dimBaseballTeams.csv");
     RecordReaderFileConfig recordReaderFileConfig =
-        new RecordReaderFileConfig(FileFormat.CSV, new File(resource.toURI()), null, null);
+        new RecordReaderFileConfig(FileFormat.CSV, new File(resource.toURI()), null, null, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("time").build();
     Schema schema =
@@ -738,7 +743,7 @@ public class SegmentProcessorFrameworkTest {
     // output size threshold configured).
 
     expectedTotalDocsCount = 52;
-    recordReaderFileConfig = new RecordReaderFileConfig(FileFormat.CSV, new File(resource.toURI()), null, null);
+    recordReaderFileConfig = new RecordReaderFileConfig(FileFormat.CSV, new File(resource.toURI()), null, null, null);
 
     segmentConfig = new SegmentConfig.Builder().setIntermediateFileSizeThreshold(19).setSegmentNamePrefix("testPrefix")
         .setSegmentNamePostfix("testPostfix").build();
