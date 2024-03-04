@@ -155,7 +155,11 @@ public abstract class BaseTransformFunctionTest {
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
       _jsonSVValues[i] = String.format(
           "{\"intVal\":%s, \"longVal\":%s, \"floatVal\":%s, \"doubleVal\":%s, \"bigDecimalVal\":%s, "
-              + "\"stringVal\":\"%s\"}", RANDOM.nextInt(), RANDOM.nextLong(), RANDOM.nextFloat(), RANDOM.nextDouble(),
+              + "\"stringVal\":\"%s\", \"arrayField\": [{\"arrIntField\": 1, \"arrStringField\": \"abc\"}, "
+              + "{\"arrIntField\": 2, \"arrStringField\": \"xyz\"},"
+              + "{\"arrIntField\": 5, \"arrStringField\": \"wxy\"},"
+              + "{\"arrIntField\": 0, \"arrStringField\": \"zzz\"}]}",
+          RANDOM.nextInt(), RANDOM.nextLong(), RANDOM.nextFloat(), RANDOM.nextDouble(),
           BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(RANDOM.nextInt())),
           df.format(RANDOM.nextInt() * RANDOM.nextDouble()));
       _stringAlphaNumericSVValues[i] = RandomStringUtils.randomAlphanumeric(26);
