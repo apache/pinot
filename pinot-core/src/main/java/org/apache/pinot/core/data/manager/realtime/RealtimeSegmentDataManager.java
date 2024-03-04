@@ -1694,6 +1694,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId,
           e);
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
+      throw e;
     }
   }
 
