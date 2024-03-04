@@ -840,16 +840,6 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Given a table name and database name, returns the translated table name i.e. {@code databaseName.tableName}
-   * @param tableName table name.
-   * @param databaseName database name. It is ignored if {@code tableName} already has the database name prefix
-   * @return the translated name
-   */
-  public String translateTableName(String tableName, String databaseName) {
-    return DatabaseUtils.translateTableName(tableName, databaseName);
-  }
-
-  /**
    * Table related APIs
    */
   // TODO: move table related APIs here

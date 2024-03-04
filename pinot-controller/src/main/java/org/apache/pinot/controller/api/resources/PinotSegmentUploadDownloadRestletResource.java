@@ -72,6 +72,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.RevertReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.URIUtils;
@@ -153,8 +154,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders)
       throws Exception {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        httpHeaders.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, httpHeaders);
     segmentName = URIUtils.decode(segmentName);
     URI dataDirURI = ControllerFilePathProvider.getInstance().getDataDirURI();
     Response.ResponseBuilder builder = Response.ok();
@@ -635,8 +635,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
       @ApiParam(value = "Fields belonging to start replace segment request", required = true)
       StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -668,8 +667,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
       @ApiParam(value = "Fields belonging to end replace segment request")
           EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -704,8 +702,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert,
       @ApiParam(value = "Fields belonging to revert replace segment request")
       RevertReplaceSegmentsRequest revertReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",

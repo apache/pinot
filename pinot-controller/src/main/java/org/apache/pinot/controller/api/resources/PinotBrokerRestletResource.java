@@ -48,6 +48,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -211,8 +212,7 @@ public class PinotBrokerRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     try {
       List<String> tableNamesWithType = _pinotHelixResourceManager
           .getExistingTableNamesWithType(tableName, Constants.validateTableType(tableTypeStr));

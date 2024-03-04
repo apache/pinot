@@ -67,8 +67,7 @@ public class PinotBrokerRouting {
   public String buildRouting(
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
       @Context HttpHeaders headers) {
-    _routingManager.buildRouting(DatabaseUtils.translateTableName(tableNameWithType,
-        headers.getHeaderString(CommonConstants.DATABASE)));
+    _routingManager.buildRouting(DatabaseUtils.translateTableName(tableNameWithType, headers));
     return "Success";
   }
 
@@ -85,8 +84,7 @@ public class PinotBrokerRouting {
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
       @ApiParam(value = "Segment name") @PathParam("segmentName") String segmentName,
       @Context HttpHeaders headers) {
-    _routingManager.refreshSegment(DatabaseUtils.translateTableName(tableNameWithType,
-        headers.getHeaderString(CommonConstants.DATABASE)), segmentName);
+    _routingManager.refreshSegment(DatabaseUtils.translateTableName(tableNameWithType, headers), segmentName);
     return "Success";
   }
 
@@ -102,8 +100,7 @@ public class PinotBrokerRouting {
   public String removeRouting(
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
       @Context HttpHeaders headers) {
-    _routingManager.removeRouting(DatabaseUtils.translateTableName(tableNameWithType,
-        headers.getHeaderString(CommonConstants.DATABASE)));
+    _routingManager.removeRouting(DatabaseUtils.translateTableName(tableNameWithType, headers));
     return "Success";
   }
 }

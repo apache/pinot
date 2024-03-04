@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils;
 
 import java.util.Objects;
 import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -58,6 +59,17 @@ public class DatabaseUtils {
       default:
       throw new IllegalArgumentException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
     }
+  }
+
+  /**
+   * Utility to get fully qualified table name i.e. {databaseName}.{tableName} from given table name and http headers
+   * @param tableName table/schema name
+   * @param headers http headers
+   * @return translated table name. Throws {@link IllegalStateException} if {@code tableName} contains more than 1 dot
+   * or if {@code tableName} has database prefix, and it does not match with the 'database' header
+   */
+  public static String translateTableName(String tableName, HttpHeaders headers) {
+    return translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
   }
 
   /**

@@ -37,6 +37,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -79,8 +80,7 @@ public class PinotTableTenantConfigs {
   public SuccessResponse rebuildBrokerResource(
       @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType,
       @Context HttpHeaders headers) {
-    tableNameWithType = _helixResourceManager.translateTableName(tableNameWithType,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
       final PinotResourceManagerResponse pinotResourceManagerResponse =
           _helixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);

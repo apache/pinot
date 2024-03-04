@@ -48,6 +48,7 @@ import javax.ws.rs.core.Response;
 import org.apache.helix.model.IdealState;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -96,8 +97,7 @@ public class PinotRealtimeTableResource {
   public Response pauseConsumption(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     try {
@@ -124,8 +124,7 @@ public class PinotRealtimeTableResource {
           defaultValue = "lastConsumed"
       )
       @QueryParam("consumeFrom") String consumeFrom, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     if ("lastConsumed".equalsIgnoreCase(consumeFrom)) {
@@ -160,8 +159,7 @@ public class PinotRealtimeTableResource {
       String partitionGroupIds,
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
       String consumingSegments, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
       throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
           Response.Status.BAD_REQUEST);
@@ -237,8 +235,7 @@ public class PinotRealtimeTableResource {
   public Response getPauseStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     validateTable(tableNameWithType);
     try {
@@ -264,8 +261,7 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Realtime table name with or without type", required = true,
           example = "myTable | myTable_REALTIME") @PathParam("tableName") String realtimeTableName,
       @Context HttpHeaders headers) {
-    realtimeTableName = _pinotHelixResourceManager.translateTableName(realtimeTableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
     try {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
       if (TableType.OFFLINE == tableType) {

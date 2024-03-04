@@ -323,8 +323,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
         if (pinotQuery.getDataSource() != null && pinotQuery.getDataSource().getTableName() != null) {
           String tableName = getActualTableName(DatabaseUtils.translateTableName(
-              pinotQuery.getDataSource().getTableName(), httpHeaders.getHeaderString(CommonConstants.DATABASE)),
-              _tableCache);
+              pinotQuery.getDataSource().getTableName(), httpHeaders), _tableCache);
         pinotQuery.getDataSource().setTableName(tableName);
         }
       } catch (Exception e) {
@@ -379,8 +378,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       }
 
-      String tableName = getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(),
-          httpHeaders.getHeaderString(CommonConstants.DATABASE)), _tableCache);
+      String tableName = getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders),
+          _tableCache);
       dataSource.setTableName(tableName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       requestContext.setTableName(rawTableName);

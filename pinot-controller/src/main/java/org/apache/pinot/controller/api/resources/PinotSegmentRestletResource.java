@@ -70,6 +70,7 @@ import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -211,8 +212,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Whether to exclude the segments overlapping with the timestamps, false by default")
       @QueryParam("excludeOverlapping") @DefaultValue("false") boolean excludeOverlapping,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     boolean shouldExcludeReplacedSegments = Boolean.parseBoolean(excludeReplacedSegments);
     return selectSegments(tableName, tableTypeStr, shouldExcludeReplacedSegments,
         startTimestampStr, endTimestampStr, excludeOverlapping)
@@ -230,8 +230,7 @@ public class PinotSegmentRestletResource {
   public List<Map<String, Object>> getServerToSegmentsMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     List<String> tableNamesWithType = ResourceUtils
         .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableTypeStr),
             LOGGER);
@@ -255,8 +254,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -338,8 +336,7 @@ public class PinotSegmentRestletResource {
   public Map<String, String> getSegmentToCrcMap(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String offlineTableName =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, TableType.OFFLINE, LOGGER)
             .get(0);
@@ -370,8 +367,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") List<String> columns,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     segmentName = URIUtils.decode(segmentName);
     Map<String, String> segmentMetadata = null;
     if (TableNameBuilder.getTableTypeFromTableName(tableName) != null) {
@@ -497,8 +493,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
       @DefaultValue("false") boolean forceDownload, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     long startTimeMs = System.currentTimeMillis();
     segmentName = URIUtils.decode(segmentName);
     String tableNameWithType = getExistingTable(tableName, segmentName);
@@ -562,8 +557,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Name of the target instance to reset") @QueryParam("targetInstance") @Nullable
           String targetInstance, @Context HttpHeaders headers) {
-    tableNameWithType = _pinotHelixResourceManager.translateTableName(tableNameWithType,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     segmentName = URIUtils.decode(segmentName);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
@@ -604,8 +598,7 @@ public class PinotSegmentRestletResource {
           String targetInstance,
       @ApiParam(value = "Whether to reset only segments with error state") @QueryParam("errorSegmentsOnly")
       @DefaultValue("false") boolean errorSegmentsOnly, @Context HttpHeaders headers) {
-    tableNameWithType = _pinotHelixResourceManager.translateTableName(tableNameWithType,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     try {
       Preconditions.checkState(tableType != null, "Must provide table name with type: %s", tableNameWithType);
@@ -774,8 +767,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
       @DefaultValue("false") boolean forceDownload, @Context HttpHeaders headers)
       throws JsonProcessingException {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     long startTimeMs = System.currentTimeMillis();
     TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
@@ -862,8 +854,7 @@ public class PinotSegmentRestletResource {
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     segmentName = URIUtils.decode(segmentName);
     String tableNameWithType = getExistingTable(tableName, segmentName);
     deleteSegmentsInternal(tableNameWithType, Collections.singletonList(segmentName), retentionPeriod);
@@ -883,8 +874,7 @@ public class PinotSegmentRestletResource {
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type must not be null", Status.BAD_REQUEST);
@@ -910,8 +900,7 @@ public class PinotSegmentRestletResource {
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod, List<String> segments, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     int numSegments = segments.size();
     if (numSegments == 0) {
       throw new ControllerApplicationException(LOGGER, "Segments must be provided", Status.BAD_REQUEST);
@@ -952,8 +941,7 @@ public class PinotSegmentRestletResource {
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (Strings.isNullOrEmpty(startTimestampStr) || Strings.isNullOrEmpty(endTimestampStr)) {
       throw new ControllerApplicationException(LOGGER, "start and end timestamp must by non empty", Status.BAD_REQUEST);
     }
@@ -994,8 +982,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
           List<String> columns, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
@@ -1023,8 +1010,7 @@ public class PinotSegmentRestletResource {
   public Map<String, Map<String, String>> getZookeeperMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch zookeeper metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
@@ -1054,8 +1040,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to get storage tier for all segments for table {}", tableName);
     return getTableTierInternal(tableName, null, tableTypeStr);
   }
@@ -1074,8 +1059,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to get storage tier for segment {} in table {}", segmentName, tableName);
     return getTableTierInternal(tableName, segmentName, tableTypeStr);
@@ -1185,8 +1169,7 @@ public class PinotSegmentRestletResource {
   public SuccessResponse updateTimeIntervalZK(
       @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType, @Context HttpHeaders headers) {
-    tableNameWithType = _pinotHelixResourceManager.translateTableName(tableNameWithType,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER,

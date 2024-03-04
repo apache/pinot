@@ -38,6 +38,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -114,8 +115,7 @@ public class PinotUpsertRestletResource {
     }
 
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
-    String tableName = _pinotHelixResourceManager.translateTableName(tableConfig.getTableName(),
-        headers.getHeaderString(CommonConstants.DATABASE));
+    String tableName = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
     tableConfig.setTableName(tableName);
     Schema schema = tableSchemaConfig.getSchema();
 

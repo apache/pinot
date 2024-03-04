@@ -46,6 +46,7 @@ import javax.ws.rs.core.Response;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -123,8 +124,7 @@ public class PinotLeadControllerRestletResource {
   public LeadControllerResponse getLeaderForTable(
       @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     Map<String, LeadControllerEntry> leadControllerEntryMap = new HashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
     boolean isLeadControllerResourceEnabled;

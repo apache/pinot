@@ -85,13 +85,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  * Endpoints for CRUD of {@link TableConfigs}.
  * {@link TableConfigs} is a group of the offline table config, realtime table config and schema for the same tableName.
  */
-@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = CommonConstants.DATABASE)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
-    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
-    @ApiKeyAuthDefinition(name = CommonConstants.DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = CommonConstants.DATABASE)}))
+@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("/")
 public class TableConfigsRestletResource {
 
@@ -152,8 +148,7 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "Raw table name", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     try {
-      tableName = _pinotHelixResourceManager.translateTableName(tableName,
-          headers.getHeaderString(CommonConstants.DATABASE));
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
       Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
       TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
       TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
@@ -187,8 +182,7 @@ public class TableConfigsRestletResource {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      tableName = _pinotHelixResourceManager.translateTableName(tableConfigs.getTableName(),
-          httpHeaders.getHeaderString(CommonConstants.DATABASE));
+      tableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), httpHeaders);
       validateConfig(tableConfigs, typesToSkip);
       tableConfigs.setTableName(tableName);
     } catch (Exception e) {
@@ -264,8 +258,7 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
           String tableName, @Context HttpHeaders headers) {
     try {
-      tableName = _pinotHelixResourceManager.translateTableName(tableName,
-          headers.getHeaderString(CommonConstants.DATABASE));
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
       boolean tableExists =
           _pinotHelixResourceManager.hasRealtimeTable(tableName) || _pinotHelixResourceManager.hasOfflineTable(
               tableName);
@@ -316,13 +309,11 @@ public class TableConfigsRestletResource {
     TableConfigs tableConfigs;
     String translatedTableName;
     try {
-      translatedTableName = _pinotHelixResourceManager.translateTableName(tableName,
-          headers.getHeaderString(CommonConstants.DATABASE));
+      translatedTableName = DatabaseUtils.translateTableName(tableName, headers);
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      if (!_pinotHelixResourceManager.translateTableName(tableConfigs.getTableName(),
-          headers.getHeaderString(CommonConstants.DATABASE)).equals(translatedTableName)) {
+      if (!DatabaseUtils.translateTableName(tableConfigs.getTableName(), headers).equals(translatedTableName)) {
         throw new IllegalArgumentException(
             "Table name mismatch: " + tableConfigs.getTableName() + " is not equivalent to " + tableName);
       }

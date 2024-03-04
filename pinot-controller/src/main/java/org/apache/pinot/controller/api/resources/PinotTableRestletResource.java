@@ -81,6 +81,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -201,8 +202,7 @@ public class PinotTableRestletResource {
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
       tableName = tableConfig.getTableName();
-      translatedTableName = _pinotHelixResourceManager.translateTableName(tableConfig.getTableName(),
-          httpHeaders.getHeaderString(CommonConstants.DATABASE));
+      translatedTableName = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
       // validate permission
       String endpointUrl = request.getRequestURL().toString();
       AccessControlUtils.validatePermission(translatedTableName, AccessType.CREATE, httpHeaders, endpointUrl,
@@ -217,8 +217,7 @@ public class PinotTableRestletResource {
       // Handling deprecated config
       SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
       if (validationConfig != null && validationConfig.getSchemaName() != null) {
-        validationConfig.setSchemaName(_pinotHelixResourceManager.translateTableName(validationConfig.getSchemaName(),
-            httpHeaders.getHeaderString(CommonConstants.DATABASE)));
+        validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
       }
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
@@ -377,8 +376,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
     try {
-      tableName = _pinotHelixResourceManager.translateTableName(tableName,
-          headers.getHeaderString(CommonConstants.DATABASE));
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
       ObjectNode ret = JsonUtils.newObjectNode();
 
       if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
@@ -417,8 +415,7 @@ public class PinotTableRestletResource {
 
     List<String> tablesDeleted = new LinkedList<>();
     try {
-      tableName = _pinotHelixResourceManager.translateTableName(tableName,
-          headers.getHeaderString(CommonConstants.DATABASE));
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
       boolean tableExist = false;
       if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
         tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
@@ -482,11 +479,9 @@ public class PinotTableRestletResource {
       tableConfigJsonPojoWithUnparsableProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigString, TableConfig.class);
       tableConfig = tableConfigJsonPojoWithUnparsableProps.getLeft();
-      tableNameWithType = _pinotHelixResourceManager.translateTableName(tableConfig.getTableName(),
-          headers.getHeaderString(CommonConstants.DATABASE));
-      translatedTableName = _pinotHelixResourceManager.translateTableName(
-          TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName),
-          headers.getHeaderString(CommonConstants.DATABASE));
+      tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
+      translatedTableName = DatabaseUtils.translateTableName(
+          TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName), headers);
       if (!translatedTableName.equals(tableNameWithType)) {
         throw new ControllerApplicationException(LOGGER,
             "Request table " + tableName + " does not match table name in the body " + tableConfig.getTableName(),
@@ -496,8 +491,7 @@ public class PinotTableRestletResource {
       // Handling deprecated config
       SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
       if (validationConfig != null && validationConfig.getSchemaName() != null) {
-        validationConfig.setSchemaName(_pinotHelixResourceManager.translateTableName(validationConfig.getSchemaName(),
-            headers.getHeaderString(CommonConstants.DATABASE)));
+        validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), headers));
       }
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
@@ -672,8 +666,7 @@ public class PinotTableRestletResource {
       @Context HttpHeaders headers
       //@formatter:on
   ) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
@@ -739,8 +732,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     List<String> cancelledJobIds = new ArrayList<>();
     boolean updated =
@@ -813,8 +805,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table to get its state", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     try {
       ObjectNode data = JsonUtils.newObjectNode();
@@ -843,8 +834,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "realtime|offline", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "enable|disable", required = true) @QueryParam("state") String state,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     StateType stateType;
     if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
@@ -876,8 +866,7 @@ public class PinotTableRestletResource {
   public String getTableStats(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     ObjectNode ret = JsonUtils.newObjectNode();
     if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
         && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
@@ -927,8 +916,7 @@ public class PinotTableRestletResource {
   public String getTableStatus(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     try {
       TableType tableType = Constants.validateTableType(tableTypeStr);
       if (tableType == null) {
@@ -971,8 +959,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
       List<String> columns, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.REALTIME) {
@@ -1010,8 +997,7 @@ public class PinotTableRestletResource {
       List<String> segmentNames,
       @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType")
       @DefaultValue("SNAPSHOT") ValidDocIdsType validDocIdsType, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch aggregate validDocIds metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == TableType.OFFLINE) {
@@ -1048,8 +1034,7 @@ public class PinotTableRestletResource {
   public String getTableIndexes(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch aggregate metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     String tableNameWithType =
@@ -1134,8 +1119,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Comma separated list of job types") @QueryParam("jobTypes") @Nullable String jobTypesString,
       @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
@@ -1170,8 +1154,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
       String tableName, @Context HttpHeaders headers)
       throws Exception {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     // Validate its a hybrid table
     if (!_pinotHelixResourceManager.hasRealtimeTable(tableName) || !_pinotHelixResourceManager.hasOfflineTable(
         tableName)) {
@@ -1211,8 +1194,7 @@ public class PinotTableRestletResource {
   public SuccessResponse deleteTimeBoundary(
       @ApiParam(value = "Name of the hybrid table (without type suffix)", required = true) @PathParam("tableName")
       String tableName, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     if (!_pinotHelixResourceManager.hasTable(offlineTableName)) {
       throw new ControllerApplicationException(LOGGER, "Failed to find table: " + offlineTableName,

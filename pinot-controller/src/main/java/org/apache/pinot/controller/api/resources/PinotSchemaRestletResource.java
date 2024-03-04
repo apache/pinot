@@ -57,6 +57,7 @@ import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -133,8 +134,7 @@ public class PinotSchemaRestletResource {
   public String getSchema(
       @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName,
       @Context HttpHeaders headers) {
-    schemaName = _pinotHelixResourceManager.translateTableName(schemaName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    schemaName = DatabaseUtils.translateTableName(schemaName, headers);
     LOGGER.info("looking for schema {}", schemaName);
     Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
     if (schema == null) {
@@ -411,7 +411,7 @@ public class PinotSchemaRestletResource {
    */
   private SuccessResponse addSchema(Schema schema, String database, boolean override, boolean force) {
     String schemaName = schema.getSchemaName();
-    String translatedSchemaName = _pinotHelixResourceManager.translateTableName(schemaName, database);
+    String translatedSchemaName = DatabaseUtils.translateTableName(schemaName, database);
     schema.setSchemaName(translatedSchemaName);
     validateSchemaInternal(schema);
 
@@ -445,8 +445,8 @@ public class PinotSchemaRestletResource {
    */
   private SuccessResponse updateSchema(String schemaName, Schema schema, String database, boolean reload) {
     validateSchemaInternal(schema);
-    String translatedSchemaName = _pinotHelixResourceManager.translateTableName(schemaName, database);
-    String payloadSchemaName = _pinotHelixResourceManager.translateTableName(schema.getSchemaName(), database);
+    String translatedSchemaName = DatabaseUtils.translateTableName(schemaName, database);
+    String payloadSchemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), database);
 
     if (!payloadSchemaName.equals(translatedSchemaName)) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
@@ -504,7 +504,7 @@ public class PinotSchemaRestletResource {
   }
 
   private void deleteSchemaInternal(String schemaName, String database) {
-    String translatedSchemaName = _pinotHelixResourceManager.translateTableName(schemaName, database);
+    String translatedSchemaName = DatabaseUtils.translateTableName(schemaName, database);
     Schema schema = _pinotHelixResourceManager.getSchema(translatedSchemaName);
     if (schema == null) {
       throw new ControllerApplicationException(LOGGER, String.format("Schema %s not found", schemaName),

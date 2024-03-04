@@ -63,6 +63,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.debug.TableDebugInfo;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -132,8 +133,7 @@ public class DebugResource {
       @ApiParam(value = "Verbosity of debug information") @DefaultValue("0") @QueryParam("verbosity") int verbosity,
       @Context HttpHeaders headers)
       throws JsonProcessingException {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     ObjectNode root = JsonUtils.newObjectNode();
     root.put("clusterName", _pinotHelixResourceManager.getHelixClusterName());
 
@@ -166,8 +166,7 @@ public class DebugResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
       @Context HttpHeaders headers)
       throws Exception {
-    tableNameWithType = _pinotHelixResourceManager.translateTableName(tableNameWithType,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     return debugSegment(tableNameWithType, segmentName);
   }
 

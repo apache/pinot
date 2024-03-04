@@ -43,6 +43,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -82,8 +83,7 @@ public class PinotTableInstances {
       @ApiParam(value = "Table name without type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Instance type", example = "broker", allowableValues = "BROKER, SERVER") @DefaultValue("")
       @QueryParam("type") String type, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     ObjectNode ret = JsonUtils.newObjectNode();
     ret.put("tableName", tableName);
     ArrayNode brokers = JsonUtils.newArrayNode();
@@ -153,8 +153,7 @@ public class PinotTableInstances {
   public List<String> getLiveBrokersForTable(
       @ApiParam(value = "Table name (with or without type)", required = true)
       @PathParam("tableName") String tableName, @Context HttpHeaders headers) {
-    tableName = _pinotHelixResourceManager.translateTableName(tableName,
-        headers.getHeaderString(CommonConstants.DATABASE));
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     try {
       return _pinotHelixResourceManager.getLiveBrokersForTable(tableName);
     } catch (TableNotFoundException e) {
