@@ -161,7 +161,12 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
           Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
               predicate);
         }
-        return getMatchingFlattenedDocIds(predicate);
+
+        MutableRoaringBitmap matchingFlattenedDocs = getMatchingFlattenedDocIds(predicate);
+        if (isExclusive(predicate.getType())) {
+          matchingFlattenedDocs.flip(0L, _numFlattenedDocs);
+        }
+        return matchingFlattenedDocs;
       }
       default:
         throw new IllegalStateException();
@@ -411,33 +416,36 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   }
 
   @Override
-  public Map<String, ImmutableRoaringBitmap> getValueToMatchingFlattenedDocIdsMap(String jsonPathKey) {
+  public Map<String, ImmutableRoaringBitmap> getValueToMatchingFlattenedDocIdsMap(String jsonPathKey,
+      @Nullable String filterString) {
+    ImmutableRoaringBitmap filteredFlattenedDocIds = null;
+    if (filterString != null) {
+      FilterContext filter;
+      try {
+        filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+        Preconditions.checkArgument(!filter.isConstant());
+      } catch (Exception e) {
+        throw new BadQueryRequestException("Invalid json match filter: " + filterString);
+      }
+      filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter, true).toImmutableRoaringBitmap();
+    }
     Map<String, ImmutableRoaringBitmap> result = new HashMap<>();
     int[] dictIds = getDictIdRangeForKey(jsonPathKey);
     for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
-      result.put(_dictionary.getStringValue(dictId).substring(jsonPathKey.length() + 1),
-          _invertedIndex.getDocIds(dictId));
+      String key = _dictionary.getStringValue(dictId);
+      MutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId).toMutableRoaringBitmap();
+      if (filteredFlattenedDocIds != null) {
+        docIds.and(filteredFlattenedDocIds);
+      }
+      result.put(key, docIds.toImmutableRoaringBitmap());
     }
 
     return result;
   }
 
   @Override
-  public ImmutableRoaringBitmap getMatchingFlattenedDocIds(String filterString) {
-    FilterContext filter;
-    try {
-      filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
-      Preconditions.checkArgument(!filter.isConstant());
-    } catch (Exception e) {
-      throw new BadQueryRequestException("Invalid json match filter: " + filterString);
-    }
-    return getMatchingFlattenedDocIds(filter, true).toImmutableRoaringBitmap();
-  }
-
-  @Override
-  public String[][] getValuesForArrayKeyWithFilter(int[] docIds, int length,
-      Map<String, ImmutableRoaringBitmap> valueToMatchingFlattenedDocs,
-      @Nullable ImmutableRoaringBitmap filteredFlattenedDocIds) {
+  public String[][] getValuesForMv(int[] docIds, int length,
+      Map<String, ImmutableRoaringBitmap> valueToMatchingFlattenedDocs) {
     String[][] result = new String[length][];
     List<PriorityQueue<Pair<String, Integer>>> docIdToFlattenedDocIdsAndValues = new ArrayList<>();
     for (int i = 0; i < length; i++) {
@@ -451,10 +459,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
     for (Map.Entry<String, ImmutableRoaringBitmap> entry : valueToMatchingFlattenedDocs.entrySet()) {
       String value = entry.getKey();
-      MutableRoaringBitmap matchingFlattenedDocIds = entry.getValue().toMutableRoaringBitmap();
-      if (filteredFlattenedDocIds != null) {
-        matchingFlattenedDocIds.and(filteredFlattenedDocIds);
-      }
+      ImmutableRoaringBitmap matchingFlattenedDocIds = entry.getValue();
       matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> {
         int docId = getDocId(flattenedDocId);
         if (docIdToPos.containsKey(docId)) {

@@ -35,8 +35,6 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   private JsonIndexReader _jsonIndexReader;
   private Object _defaultValue;
   private Map<String, ImmutableRoaringBitmap> _valueToMatchingFlattenedDocIdsMap;
-  private ImmutableRoaringBitmap _filteredFlattenedDocIds;
-
   @Override
   public String getName() {
     return FUNCTION_NAME;
@@ -72,8 +70,6 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
     } catch (Exception e) {
       throw new IllegalArgumentException("JSON path argument is not a valid JSON path");
     }
-    _valueToMatchingFlattenedDocIdsMap =
-        _jsonIndexReader.getValueToMatchingFlattenedDocIdsMap(inputJsonPath.substring(1)); // remove $ prefix
 
     TransformFunction thirdArgument = arguments.get(2);
     if (!(thirdArgument instanceof LiteralTransformFunction)) {
@@ -98,15 +94,18 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
       }
     }
 
+    String filterJsonPath = null;
     if (arguments.size() == 5) {
       TransformFunction fifthArgument = arguments.get(4);
       if (!(fifthArgument instanceof LiteralTransformFunction)) {
         throw new IllegalArgumentException("JSON path filter argument must be a literal");
       }
-      String filterJsonPath = ((LiteralTransformFunction) fifthArgument).getStringLiteral();
-      _filteredFlattenedDocIds = _jsonIndexReader.getMatchingFlattenedDocIds(filterJsonPath);
+      filterJsonPath = ((LiteralTransformFunction) fifthArgument).getStringLiteral();
     }
 
+    _valueToMatchingFlattenedDocIdsMap =
+        _jsonIndexReader.getValueToMatchingFlattenedDocIdsMap(inputJsonPath.substring(1),
+            filterJsonPath); // remove $ prefix
     _resultMetadata = new TransformResultMetadata(dataType, false, false);
   }
 
@@ -119,9 +118,8 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initIntValuesMV(numDocs);
-    String[][] valuesFromIndex =
-        _jsonIndexReader.getValuesForArrayKeyWithFilter(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-            _valueToMatchingFlattenedDocIdsMap, _filteredFlattenedDocIds);
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
 
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
@@ -146,9 +144,8 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initLongValuesMV(numDocs);
-    String[][] valuesFromIndex =
-        _jsonIndexReader.getValuesForArrayKeyWithFilter(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-            _valueToMatchingFlattenedDocIdsMap, _filteredFlattenedDocIds);
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
 
@@ -172,9 +169,8 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initFloatValuesMV(numDocs);
-    String[][] valuesFromIndex =
-        _jsonIndexReader.getValuesForArrayKeyWithFilter(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-            _valueToMatchingFlattenedDocIdsMap, _filteredFlattenedDocIds);
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
 
@@ -198,9 +194,8 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initDoubleValuesMV(numDocs);
-    String[][] valuesFromIndex =
-        _jsonIndexReader.getValuesForArrayKeyWithFilter(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-            _valueToMatchingFlattenedDocIdsMap, _filteredFlattenedDocIds);
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
 
@@ -224,9 +219,8 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initStringValuesMV(numDocs);
-    String[][] valuesFromIndex =
-        _jsonIndexReader.getValuesForArrayKeyWithFilter(valueBlock.getDocIds(), valueBlock.getNumDocs(),
-            _valueToMatchingFlattenedDocIdsMap, _filteredFlattenedDocIds);
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
 
