@@ -318,7 +318,7 @@ public class CommonsConfigurationUtils {
 
     // setting IO Reader Factory
     if (setIOFactory) {
-      config.setIOFactory(createPropertyIOFactory(ioFactoryKind, config, headerContentToCheck));
+      config.setIOFactory(createPropertyIOFactory(ioFactoryKind, headerContentToCheck));
     }
 
     // setting DEFAULT_LIST_DELIMITER
@@ -333,30 +333,18 @@ public class CommonsConfigurationUtils {
    * Creates the IOFactory based on the provided kind.
    *
    * @param ioFactoryKind IOFactory kind
-   * @param config to get the header content from the property configuration
    * @param headerContentToCheck header content to validate.
    * @return IOFactory
    */
-  private static IOFactory createPropertyIOFactory(PropertyIOFactoryKind ioFactoryKind,
-      PropertiesConfiguration config, String headerContentToCheck) {
+  private static IOFactory createPropertyIOFactory(PropertyIOFactoryKind ioFactoryKind, String headerContentToCheck) {
     switch (ioFactoryKind) {
       case ConfigFileIOFactory:
         return new ConfigFilePropertyIOFactory();
       case SegmentMetadataIOFactory:
-        String headerContent = config.getHeader();
-        boolean skipEscapeUnescapePropertyName =
-            shouldSkipEscapeUnescapePropertyName(headerContent, headerContentToCheck);
-        return new SegmentMetadataPropertyIOFactory(skipEscapeUnescapePropertyName);
+        return new SegmentMetadataPropertyIOFactory(headerContentToCheck);
       case DefaultPropertyConfigurationIOFactory:
       default:
         return new PropertiesConfiguration.DefaultIOFactory();
     }
-  }
-
-  private static boolean shouldSkipEscapeUnescapePropertyName(String header, String headerContentToCheck) {
-    if (header != null) {
-      return header.contains(headerContentToCheck);
-    }
-    return false;
   }
 }
