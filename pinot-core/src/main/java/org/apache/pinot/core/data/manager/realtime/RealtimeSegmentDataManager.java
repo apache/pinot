@@ -427,6 +427,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       try {
         messageBatch =
             _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
+        //track realtime rows fetched on a table level. This included valid + invalid rows
+        _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FETCHED,
+            messageBatch.getUnfilteredMessageCount());
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("message batch received. filtered={} unfiltered={} endOfPartitionGroup={}",
               messageBatch.getMessageCount(), messageBatch.getUnfilteredMessageCount(),
@@ -436,11 +439,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _consecutiveErrorCount = 0;
       } catch (PermanentConsumerException e) {
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
-        _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
-            1L);
+        _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         _segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
+        //track realtime rows fetched on a table level. This included valid + invalid rows
         // all exceptions but PermanentConsumerException are handled the same way
         // can be a TimeoutException or TransientConsumerException routinely
         // Unknown exception from stream. Treat as a transient exception.
@@ -448,6 +451,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         handleTransientStreamErrors(e);
         continue;
       } catch (Throwable t) {
+        //track realtime rows fetched on a table level. This included valid + invalid rows
         _segmentLogger.warn("Stream error when fetching messages, stopping consumption", t);
         throw t;
       }
@@ -1167,6 +1171,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       return response;
     }
   }
+
   // Inform the controller that the server had to stop consuming due to an error.
   protected void postStopConsumedMsg(String reason) {
     ConsumptionStopIndicator indicator = new ConsumptionStopIndicator(_currentOffset,
@@ -1661,9 +1666,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       closePartitionGroupConsumer();
     }
     _segmentLogger.info("Creating new stream consumer for topic partition {} , reason: {}", _clientId, reason);
-    _partitionGroupConsumer =
-        _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-    _partitionGroupConsumer.start(_currentOffset);
+    try {
+      _partitionGroupConsumer =
+          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+      _partitionGroupConsumer.start(_currentOffset);
+    } catch (Exception e) {
+      _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {} reason {}",
+          _clientId, reason, e);
+      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
+      throw e;
+    }
   }
 
   /**
@@ -1671,12 +1683,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Assumes there is a valid instance of {@link PartitionGroupConsumer}
    */
   private void recreateStreamConsumer(String reason) {
-    _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
-    _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
-    closePartitionGroupConsumer();
-    _partitionGroupConsumer =
-        _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
-    _partitionGroupConsumer.start(_currentOffset);
+      _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
+      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+      closePartitionGroupConsumer();
+    try {
+      _partitionGroupConsumer =
+          _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
+      _partitionGroupConsumer.start(_currentOffset);
+    } catch (Exception e) {
+      _segmentLogger.error("Faced exception while trying to recreate stream consumer for topic partition {}", _clientId,
+          e);
+      _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, 1L);
+      throw e;
+    }
   }
 
   /**

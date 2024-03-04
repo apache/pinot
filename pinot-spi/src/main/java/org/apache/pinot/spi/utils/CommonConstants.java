@@ -363,7 +363,7 @@ public class CommonConstants {
         public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
-        public static final String INDEX_SKIP_CONFIG = "indexSkipConfig";
+        public static final String SKIP_INDEXES = "skipIndexes";
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
@@ -768,6 +768,7 @@ public class CommonConstants {
     public static final String VERSION_HTTP_HEADER = "Pinot-Controller-Version";
     public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
     public static final String TABLE_NAME_HTTP_HEADER = "Pinot-Table-Name";
+    public static final String PINOT_QUERY_ERROR_CODE_HEADER = "X-Pinot-Error-Code";
     public static final String INGESTION_DESCRIPTOR = "Pinot-Ingestion-Descriptor";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.controller.crypter";
 

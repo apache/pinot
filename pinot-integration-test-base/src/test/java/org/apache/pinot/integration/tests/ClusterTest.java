@@ -178,11 +178,7 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerPorts = new ArrayList<>();
     for (int i = 0; i < numBrokers; i++) {
       BaseBrokerStarter brokerStarter = startOneBroker(i);
-      assertEquals(
-          brokerStarter.getConfig().getProperty(
-              CommonConstants.CONFIG_OF_TIMEZONE, ""),
-         "UTC"
-      );
+      assertEquals(brokerStarter.getConfig().getProperty(CommonConstants.CONFIG_OF_TIMEZONE, ""), "UTC");
       assertEquals(System.getProperty("user.timezone"), "UTC");
 
       _brokerStarters.add(brokerStarter);
@@ -256,8 +252,7 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, _serverAdminApiPort);
     _serverNettyPort = NetUtils.findOpenPort(Helix.DEFAULT_SERVER_NETTY_PORT + new Random().nextInt(10000) + serverId);
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, _serverNettyPort);
-    _serverGrpcPort =
-        NetUtils.findOpenPort(Server.DEFAULT_GRPC_PORT + new Random().nextInt(10000) + serverId);
+    _serverGrpcPort = NetUtils.findOpenPort(Server.DEFAULT_GRPC_PORT + new Random().nextInt(10000) + serverId);
     serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, _serverGrpcPort);
 
     // Thread time measurement is disabled by default, enable it in integration tests.
@@ -622,17 +617,14 @@ public abstract class ClusterTest extends ControllerTest {
   @DataProvider(name = "systemColumns")
   public Object[][] systemColumns() {
     return new Object[][]{
-        {"$docId"},
-        {"$hostName"},
-        {"$segmentName"}
+        {"$docId"}, {"$hostName"}, {"$segmentName"}
     };
   }
 
   @DataProvider(name = "useBothQueryEngines")
   public Object[][] useBothQueryEngines() {
     return new Object[][]{
-        {false},
-        {true}
+        {false}, {true}
     };
   }
 

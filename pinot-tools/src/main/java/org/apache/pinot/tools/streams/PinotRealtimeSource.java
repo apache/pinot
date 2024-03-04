@@ -121,7 +121,7 @@ public class PinotRealtimeSource implements AutoCloseable {
     }
     @Override
     public void acquire(int permits) {
-      _rateLimiter.acquire();
+      _rateLimiter.acquire(permits);
     }
   }
 

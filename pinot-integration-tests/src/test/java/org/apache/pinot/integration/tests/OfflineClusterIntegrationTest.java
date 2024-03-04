@@ -94,7 +94,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_CHECK_INTERVAL_MS;
 import static org.apache.pinot.controller.helix.core.PinotHelixResourceManager.EXTERNAL_VIEW_ONLINE_SEGMENTS_MAX_WAIT_MS;
-import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.INDEX_SKIP_CONFIG;
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.SKIP_INDEXES;
 import static org.testng.Assert.*;
 
 
@@ -3287,12 +3287,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery("SELECT BOOL_OR(CAST(Diverted AS BOOLEAN)) FROM mytable");
   }
 
-  private String buildIndexSkipConfig(String columnsAndIndexes) {
-    return "SET " + INDEX_SKIP_CONFIG + "='" + columnsAndIndexes + "'; ";
+  private String buildSkipIndexesOption(String columnsAndIndexes) {
+    return "SET " + SKIP_INDEXES + "='" + columnsAndIndexes + "'; ";
   }
 
   @Test(dataProvider = "useBothQueryEngines")
-  public void testIndexSkipConfig(boolean useMultiStageQueryEngine)
+  public void testSkipIndexes(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     long numTotalDocs = getCountStarResult();
@@ -3306,32 +3306,32 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
 
     // disallow use of range index on DivActualElapsedTime, inverted should be unaffected
-    String indexSkipConf = buildIndexSkipConfig("DivActualElapsedTime=range");
+    String skipIndexes = buildSkipIndexesOption("DivActualElapsedTime=range");
     assertEquals(postQuery(
-        indexSkipConf + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+        skipIndexes + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
     assertEquals(postQuery(
-        indexSkipConf + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+        skipIndexes + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
 
     // disallow use of inverted index on DivActualElapsedTime, range should be unaffected
-    indexSkipConf = buildIndexSkipConfig("DivActualElapsedTime=inverted");
+    skipIndexes = buildSkipIndexesOption("DivActualElapsedTime=inverted");
     // Confirm that inverted index is not used
-    assertFalse(postQuery(indexSkipConf + " EXPLAIN PLAN FOR " + TEST_UPDATED_INVERTED_INDEX_QUERY).toString()
+    assertFalse(postQuery(skipIndexes + " EXPLAIN PLAN FOR " + TEST_UPDATED_INVERTED_INDEX_QUERY).toString()
         .contains("FILTER_INVERTED_INDEX"));
 
     // EQ predicate type allows for using range index if one exists, even if inverted index is skipped. That is why
     // we still see no docs scanned even though we skip the inverted index. This is a good test to show that using
-    // the indexSkipConfig can allow fine-grained experimentation of index usage at query time.
+    // the skipIndexes can allow fine-grained experimentation of index usage at query time.
     assertEquals(postQuery(
-        indexSkipConf + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+        skipIndexes + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
     assertEquals(postQuery(
-        indexSkipConf + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
+        skipIndexes + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), 0L);
 
     // disallow use of both range and inverted indexes on DivActualElapsedTime, neither should be used at query time
-    indexSkipConf = buildIndexSkipConfig("DivActualElapsedTime=inverted,range");
+    skipIndexes = buildSkipIndexesOption("DivActualElapsedTime=inverted,range");
     assertEquals(postQuery(
-        indexSkipConf + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+        skipIndexes + TEST_UPDATED_INVERTED_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
     assertEquals(postQuery(
-        indexSkipConf + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
+        skipIndexes + TEST_UPDATED_RANGE_INDEX_QUERY).get("numEntriesScannedInFilter").asLong(), numTotalDocs);
 
     // Update table config to remove the new indexes, and check if the new indexes are removed
     TableConfig tableConfig = getOfflineTableConfig();
