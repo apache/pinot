@@ -355,7 +355,6 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       MutableRoaringBitmap result = null;
       for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
         String value = _dictionary.getStringValue(dictId).substring(key.length() + 1);
-        // TODO only supported for numeric values as of now
         Object valueObj = rangeDataType.convert(value);
         boolean lowerCompareResult =
             lowerUnbounded || (lowerInclusive ? rangeDataType.compare(valueObj, lowerBound) >= 0
