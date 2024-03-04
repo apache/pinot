@@ -697,8 +697,10 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
         }
         Object[] row = rows.get(index);
         assertEquals(row.length, 3);
-        assertTrue(Math.abs((Double) row[0] - (baseValue.doubleValue() + i)) < 1e-1);
-        assertTrue(Math.abs((Double) row[1] - (baseValue.doubleValue() + i)) < 1e-1);
+
+        double expected = baseValue.doubleValue() + i;
+        assertTrue(Math.abs((Double) row[0] - expected) < 1e-1, "Col 0: Expected " + expected + " found " + row[0]);
+        assertTrue(Math.abs((Double) row[1] - expected) < 1e-1, "Col 1: Expected " + expected + " found " + row[1]);
         assertEquals(row[2], 1);
         i++;
       }

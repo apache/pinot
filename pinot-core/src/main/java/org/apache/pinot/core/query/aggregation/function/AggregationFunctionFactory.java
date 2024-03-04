@@ -49,7 +49,7 @@ public class AggregationFunctionFactory {
 
   /**
    * Given the function information, returns a new instance of the corresponding aggregation function.
-   * <p>NOTE: Underscores in the function name are ignored.
+   * <p>NOTE: Underscores in the function name are ignored in V1.
    */
   public static AggregationFunction getAggregationFunction(FunctionContext function, boolean nullHandlingEnabled) {
     try {
@@ -208,7 +208,7 @@ public class AggregationFunctionFactory {
           case AVG:
             return new AvgAggregationFunction(arguments, nullHandlingEnabled);
           case MODE:
-            return new ModeAggregationFunction(arguments);
+            return new ModeAggregationFunction(arguments, nullHandlingEnabled);
           case FIRSTWITHTIME: {
             Preconditions.checkArgument(numArguments == 3,
                 "FIRST_WITH_TIME expects 3 arguments, got: %s. The function can be used as "
