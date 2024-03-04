@@ -1683,10 +1683,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Assumes there is a valid instance of {@link PartitionGroupConsumer}
    */
   private void recreateStreamConsumer(String reason) {
-    try {
       _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
       _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
       closePartitionGroupConsumer();
+    try {
       _partitionGroupConsumer =
           _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
       _partitionGroupConsumer.start(_currentOffset);
