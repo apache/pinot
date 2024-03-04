@@ -266,10 +266,10 @@ public class ModeAggregationFunction
     if (dictionary != null) {
 
       Int2IntOpenHashMap dictIdValueMap = getDictIdCountMap(aggregationResultHolder, dictionary);
-      int[] dicts = blockValSet.getDictionaryIdsSV();
+      int[] dictIds = blockValSet.getDictionaryIdsSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
-          dictIdValueMap.merge(dicts[i], 1, Integer::sum);
+          dictIdValueMap.merge(dictIds[i], 1, Integer::sum);
         }
       });
       return;
@@ -328,11 +328,11 @@ public class ModeAggregationFunction
     // For dictionary-encoded expression, store dictionary ids into the dictId map
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      int[] dicts = blockValSet.getDictionaryIdsSV();
+      int[] dictIds = blockValSet.getDictionaryIdsSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
           Int2IntOpenHashMap dictIdCountMap = getDictIdCountMap(groupByResultHolder, groupKeyArray[i], dictionary);
-          dictIdCountMap.merge(dicts[i], 1, Integer::sum);
+          dictIdCountMap.merge(dictIds[i], 1, Integer::sum);
         }
       });
       return;
