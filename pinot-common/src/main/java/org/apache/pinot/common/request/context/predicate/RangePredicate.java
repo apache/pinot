@@ -118,12 +118,12 @@ public class RangePredicate extends BasePredicate {
     RangePredicate that = (RangePredicate) o;
     return _lowerInclusive == that._lowerInclusive && _upperInclusive == that._upperInclusive && Objects
         .equals(_lhs, that._lhs) && Objects.equals(_lowerBound, that._lowerBound) && Objects
-        .equals(_upperBound, that._upperBound) && _rangeDataType == that._rangeDataType;
+        .equals(_upperBound, that._upperBound);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_lhs, _lowerInclusive, _lowerBound, _upperInclusive, _upperBound, _rangeDataType);
+    return Objects.hash(_lhs, _lowerInclusive, _lowerBound, _upperInclusive, _upperBound);
   }
 
   @Override
