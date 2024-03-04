@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
-import java.util.Queue;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.stream.buffer.MessageBatchBuffer;

@@ -48,7 +48,7 @@ public class KinesisConsumerFactory extends StreamConsumerFactory {
   @Override
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
-    return new KinesisConsumer(new KinesisConfig(_streamConfig));
+    return new KinesisConsumerV2(new KinesisConfig(_streamConfig));
   }
 
   @Override

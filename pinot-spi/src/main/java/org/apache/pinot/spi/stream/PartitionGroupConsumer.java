@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
-import java.util.Queue;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.stream.buffer.MessageBatchBuffer;
 
