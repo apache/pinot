@@ -33,18 +33,18 @@ import org.apache.commons.configuration2.convert.ListDelimiterHandler;
  */
 class SegmentMetadataPropertyIOFactory extends DefaultIOFactory {
 
-  private final boolean _skipEscapeUnescapePropertyName;
-  public SegmentMetadataPropertyIOFactory(boolean unescapePropertyName) {
-      _skipEscapeUnescapePropertyName = unescapePropertyName;
+  private final String _segmentMetadataVersionHeader;
+  public SegmentMetadataPropertyIOFactory(String segmentMetadataVersionHeader) {
+    _segmentMetadataVersionHeader = segmentMetadataVersionHeader;
   }
 
   @Override
   public PropertiesReader createPropertiesReader(Reader in) {
-    return new SegmentMetadataPropertyReader(in, _skipEscapeUnescapePropertyName);
+    return new SegmentMetadataPropertyReader(in, _segmentMetadataVersionHeader);
   }
 
   @Override
   public PropertiesWriter createPropertiesWriter(Writer out, ListDelimiterHandler handler) {
-    return new SegmentMetadataPropertyWriter(out, handler, _skipEscapeUnescapePropertyName);
+    return new SegmentMetadataPropertyWriter(out, handler, _segmentMetadataVersionHeader);
   }
 }

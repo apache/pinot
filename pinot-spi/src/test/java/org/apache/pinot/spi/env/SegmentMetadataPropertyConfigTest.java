@@ -26,14 +26,16 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
-public class SegmentMetadataPropertyReaderTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentMetadataPropertyReaderTest");
+public class SegmentMetadataPropertyConfigTest {
+  private static final String SEGMENT_VERSION_IDENTIFIER = "segment.metadata.version";
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentMetadataPropertyConfigTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
   private static final String[] TEST_PROPERTY_KEY = { "test1", "test2_key", "test3_key_", "test3_key_1234" };
   private static final String[] TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR = { "test:1", "test2=key",
@@ -46,6 +48,7 @@ public class SegmentMetadataPropertyReaderTest {
   }
 
   @AfterClass
+  @AfterMethod
   public void tearDown()
       throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
@@ -53,7 +56,7 @@ public class SegmentMetadataPropertyReaderTest {
 
   @Test
   public void testSegmentMetadataPropertyConfiguration()
-      throws ConfigurationException, IOException {
+      throws ConfigurationException {
     PropertiesConfiguration configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true,
         PropertyIOFactoryKind.SegmentMetadataIOFactory, "");
 
@@ -68,20 +71,17 @@ public class SegmentMetadataPropertyReaderTest {
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE); // save the configuration.
 
     // reading the configuration from saved file.
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true, true,
+    configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true,
         PropertyIOFactoryKind.SegmentMetadataIOFactory, "");
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
     testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
-
-    FileUtils.deleteDirectory(TEMP_DIR); // clearing for next test.
   }
 
   @Test
   public void testSegmentMetadataPropertyConfigurationWithHeader()
-      throws ConfigurationException, IOException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true, true,
-        PropertyIOFactoryKind.SegmentMetadataIOFactory, "segment.metadata.version");
-
+      throws ConfigurationException {
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true,
+        PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
     configuration.setHeader("segment.metadata.version=version1");
 
     // setting the random value of the test keys
@@ -95,19 +95,17 @@ public class SegmentMetadataPropertyReaderTest {
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE); // save the configuration.
 
     // reading the configuration from saved file.
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true, true,
-        PropertyIOFactoryKind.SegmentMetadataIOFactory, "segment.metadata.version");
+    configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true,
+        PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
     testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
-
-    FileUtils.deleteDirectory(TEMP_DIR); // clearing for next test.
   }
 
   @Test
   public void testSegmentMetadataReaderWithSpecialChars()
-      throws ConfigurationException, IOException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true, true,
-        PropertyIOFactoryKind.SegmentMetadataIOFactory, "segment.metadata.version");
+      throws ConfigurationException {
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true,
+        PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
 
     // setting the random value of the test keys
     for (String key: TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR) {
@@ -120,12 +118,10 @@ public class SegmentMetadataPropertyReaderTest {
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE); // save the configuration.
 
     // reading the configuration from saved file.
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, true, true,
-        PropertyIOFactoryKind.SegmentMetadataIOFactory, "segment.metadata.version");
+    configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true,
+        PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
-    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR); // require escaping.
-
-    FileUtils.deleteDirectory(TEMP_DIR); // clearing for next test.
+    testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR);
   }
 
   private static void testPropertyKeys(List<String> recoveredKeys, String[] actualKeys) {

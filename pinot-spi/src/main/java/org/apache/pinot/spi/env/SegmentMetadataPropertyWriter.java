@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.env;
 
+import java.io.IOException;
 import java.io.Writer;
 import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesWriter;
 import org.apache.commons.configuration2.convert.ListDelimiterHandler;
@@ -29,12 +30,13 @@ import org.apache.commons.configuration2.convert.ListDelimiterHandler;
  * Purpose: custom property writer for writing the segment metadata faster by skipping the escaping of key.
  */
 public class SegmentMetadataPropertyWriter extends PropertiesWriter {
-  private final boolean _skipEscapePropertyName;
+  private boolean _skipEscapePropertyName;
+  private final String _segmentMetadataVersionHeader;
 
   public SegmentMetadataPropertyWriter(final Writer writer, ListDelimiterHandler handler,
-      boolean skipEscapePropertyName) {
+      String segmentMetadataVersionHeader) {
     super(writer, handler);
-    _skipEscapePropertyName = skipEscapePropertyName;
+    _segmentMetadataVersionHeader = segmentMetadataVersionHeader;
   }
 
   @Override
@@ -45,5 +47,21 @@ public class SegmentMetadataPropertyWriter extends PropertiesWriter {
       return key;
     }
     return super.escapeKey(key);
+  }
+
+  @Override
+  public void writeln(final String s) throws IOException {
+    // check if the header is present for segment metadata property config
+    // and if present set the `_skipEscapePropertyName` flag as true.
+    if (s != null && !_skipEscapePropertyName) {
+      setSkipEscapePropertyNameFlag(s);
+    }
+   super.writeln(s);
+  }
+
+  private void setSkipEscapePropertyNameFlag(String s) {
+    if (s.contains(_segmentMetadataVersionHeader)) {
+      _skipEscapePropertyName = true;
+    }
   }
 }
