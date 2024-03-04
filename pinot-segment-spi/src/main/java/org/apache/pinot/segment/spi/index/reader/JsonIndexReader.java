@@ -44,7 +44,7 @@ public interface JsonIndexReader extends IndexReader {
    */
   String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> context);
 
-  Map<String, ImmutableRoaringBitmap> getValueToMatchingFlattenedDocIdsMap(String jsonPathKey,
+  Map<String, ImmutableRoaringBitmap> getValueToFlattenedDocIdsMap(String jsonPathKey,
       @Nullable String filterJsonString);
 
   String[][] getValuesForMv(int[] docIds, int length, Map<String, ImmutableRoaringBitmap> matchingValueToFlattenedDocs);

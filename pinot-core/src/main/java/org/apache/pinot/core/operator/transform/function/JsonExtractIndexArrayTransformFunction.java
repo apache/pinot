@@ -104,7 +104,7 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
     }
 
     _valueToMatchingFlattenedDocIdsMap =
-        _jsonIndexReader.getValueToMatchingFlattenedDocIdsMap(inputJsonPath.substring(1),
+        _jsonIndexReader.getValueToFlattenedDocIdsMap(inputJsonPath.substring(1),
             filterJsonPath); // remove $ prefix
     _resultMetadata = new TransformResultMetadata(dataType, false, false);
   }

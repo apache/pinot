@@ -133,24 +133,30 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return getMatchingFlattenedDocIds(filter, false);
   }
 
+  /**
+   * When operator requires flattened doc IDs (eg: jsonExtractIndexArray), nested exclusive predicates are allowed.
+   * When operator requires unflattened doc IDs, nested exclusive predicates are not allowed.
+   */
   private MutableRoaringBitmap getMatchingFlattenedDocIds(FilterContext filter,
       boolean allowNestedExclusivePredicates) {
     switch (filter.getType()) {
       case AND: {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
-        MutableRoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0));
+        MutableRoaringBitmap matchingDocIds =
+            getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicates);
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i)));
+          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicates));
         }
         return matchingDocIds;
       }
       case OR: {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
-        MutableRoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0));
+        MutableRoaringBitmap matchingDocIds =
+            getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicates);
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i)));
+          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicates));
         }
         return matchingDocIds;
       }
@@ -416,7 +422,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   }
 
   @Override
-  public Map<String, ImmutableRoaringBitmap> getValueToMatchingFlattenedDocIdsMap(String jsonPathKey,
+  public Map<String, ImmutableRoaringBitmap> getValueToFlattenedDocIdsMap(String jsonPathKey,
       @Nullable String filterString) {
     ImmutableRoaringBitmap filteredFlattenedDocIds = null;
     if (filterString != null) {
@@ -437,7 +443,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       if (filteredFlattenedDocIds != null) {
         docIds.and(filteredFlattenedDocIds);
       }
-      result.put(key, docIds.toImmutableRoaringBitmap());
+      result.put(key.substring(jsonPathKey.length() + 1), docIds.toImmutableRoaringBitmap());
     }
 
     return result;

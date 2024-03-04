@@ -177,18 +177,18 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       case AND: {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
-        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0));
+        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicate);
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i)));
+          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicate));
         }
         return matchingDocIds;
       }
       case OR: {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
-        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0));
+        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicate);
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i)));
+          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicate));
         }
         return matchingDocIds;
       }
@@ -429,7 +429,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   @Override
-  public Map<String, ImmutableRoaringBitmap> getValueToMatchingFlattenedDocIdsMap(String jsonPathKey,
+  public Map<String, ImmutableRoaringBitmap> getValueToFlattenedDocIdsMap(String jsonPathKey,
       @Nullable String filterString) {
     Map<String, ImmutableRoaringBitmap> valueToMatchingFlattenedDocIdsMap = new HashMap<>();
     _readLock.lock();
@@ -439,7 +439,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       if (filterString != null) {
         filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
         Preconditions.checkArgument(!filter.isConstant(), "Invalid json match filter: " + filterString);
-        filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter).toMutableRoaringBitmap();
+        filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter, true).toMutableRoaringBitmap();
       }
 
       for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
