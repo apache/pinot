@@ -51,7 +51,6 @@
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
     <commons-collections.version>4.4</commons-collections.version>
     <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
-    <okio.version>1.6.0</okio.version>
   </properties>
 
   <dependencies>
@@ -164,7 +163,6 @@
     <dependency>
       <groupId>com.squareup.okio</groupId>
       <artifactId>okio</artifactId>
-      <version>${okio.version}</version>
     </dependency>
     <dependency>
       <groupId>io.prometheus</groupId>
