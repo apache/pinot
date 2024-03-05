@@ -21,6 +21,7 @@ package org.apache.pinot.spi.data.readers;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import nl.jqno.equalsverifier.EqualsVerifier;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.testng.annotations.Test;
@@ -41,6 +42,11 @@ public class PrimaryKeyTest {
     right = new PrimaryKey(new Object[]{"222", 2});
     assertNotEquals(left, right);
     assertNotEquals(left.hashCode(), right.hashCode());
+  }
+
+  @Test
+  public void equalsVerifier() {
+    EqualsVerifier.forClass(PrimaryKey.class).verify();
   }
 
   @Test
