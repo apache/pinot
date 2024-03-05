@@ -736,6 +736,9 @@ public class PinotHelixResourceManager {
   private boolean isPartOfDatabase(String tableName, String databaseName) {
     if (databaseName == null) {
       return StringUtils.split(tableName, '.').length == 1;
+    } else if (databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
+      String[] split = StringUtils.split(tableName, '.');
+      return split.length == 1 || split[0].equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE);
     } else {
       return tableName.startsWith(databaseName + ".");
     }
