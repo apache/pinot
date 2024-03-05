@@ -157,10 +157,6 @@
       <scope>runtime</scope>
       <exclusions>
         <exclusion>
-          <groupId>javax.xml.bind</groupId>
-          <artifactId>jaxb-api</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>com.google.errorprone</groupId>
           <artifactId>error_prone_annotations</artifactId>
         </exclusion>
