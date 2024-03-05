@@ -408,6 +408,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
+  public HelixManager getHelixManager() {
+    return _helixManager;
+  }
+
+  @Override
+  public ExecutorService getSegmentPreloadExecutor() {
+    return _segmentPreloadExecutor;
+  }
+
+  @Override
   public void addSegmentError(String segmentName, SegmentErrorInfo segmentErrorInfo) {
     _errorCache.put(Pair.of(_tableNameWithType, segmentName), segmentErrorInfo);
   }
