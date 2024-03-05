@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Pinot Linter Test Set
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
@@ -92,7 +92,7 @@ jobs:
             skip_bytebuffer: true
     name: Pinot Unit Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with skip bytebuffers:${{matrix.skip_bytebuffer}}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
         uses: actions/setup-java@v4
         with:
@@ -173,7 +173,7 @@ jobs:
             skip_bytebuffer: true
     name: Pinot Integration Test Set ${{ matrix.testset }} (${{matrix.distribution}}-${{matrix.java}}) with skip bytebuffers:${{matrix.skip_bytebuffer}}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up JDK ${{ matrix.java }}-${{ matrix.distribution }}
         uses: actions/setup-java@v4
         with:
@@ -330,7 +330,7 @@ jobs:
             skip_bytebuffer: true
     name: Pinot Quickstart on JDK ${{ matrix.java }}-${{ matrix.distribution }} with skip bytebuffers:${{matrix.skip_bytebuffer}}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v4
         with:
