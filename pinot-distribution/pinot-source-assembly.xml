@@ -40,6 +40,7 @@
         <exclude>.codecov*</exclude>
         <exclude>.gitignore</exclude>
         <exclude>.trivyignore</exclude>
+        <exclude>.mvn/**</exclude>
 
         <!-- Do not inclue node_modules in pinot-controller -->
         <exclude>pinot-controller/src/main/resources/node_modules/**</exclude>
@@ -53,6 +54,7 @@
         <exclude>kubernetes/**</exclude>
         <exclude>docker/**</exclude>
         <exclude>contrib/pinot-druid-benchmark/**</exclude>
+        <exclude>thirdeye/**</exclude>
         <exclude>thirdeye/**</exclude>
       </excludes>
     </fileSet>
