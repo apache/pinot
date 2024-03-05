@@ -198,7 +198,7 @@ public class StarTreeIndexMapUtils {
           column = StringUtils.join(split, KEY_SEPARATOR, 1, columnSplitEndIndex);
         }
         // Convert metric (function-column pair) to stored name for backward-compatibility
-        if (column.contains(AggregationFunctionColumnPair.DELIMITER)) {
+        if (AggregationFunctionColumnPair.accept(column)) {
           AggregationFunctionColumnPair functionColumnPair = AggregationFunctionColumnPair.fromColumnName(column);
           column = AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair).toColumnName();
         }

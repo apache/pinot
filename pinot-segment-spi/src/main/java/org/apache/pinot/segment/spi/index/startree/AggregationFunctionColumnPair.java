@@ -57,6 +57,16 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     return functionType.getName() + DELIMITER + column;
   }
 
+  public static boolean accept(String columnName) {
+    try {
+      String[] parts = columnName.split(DELIMITER, 2);
+      fromFunctionAndColumnName(parts[0], parts[1]);
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
   public static AggregationFunctionColumnPair fromColumnName(String columnName) {
     String[] parts = columnName.split(DELIMITER, 2);
     return fromFunctionAndColumnName(parts[0], parts[1]);
