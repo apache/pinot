@@ -197,7 +197,7 @@
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
 
     <kotlin.stdlib.version>1.7.22</kotlin.stdlib.version>
-    <okio.version>2.10.0</okio.version>
+    <okio.version>3.4.0</okio.version>
     <reload4j.version>1.2.25</reload4j.version>
     <javax.xml.bind.version>2.3.1</javax.xml.bind.version>
   </properties>
