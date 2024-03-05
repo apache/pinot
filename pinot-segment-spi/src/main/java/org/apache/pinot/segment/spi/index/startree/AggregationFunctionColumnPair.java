@@ -60,6 +60,9 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
   public static boolean accept(String columnName) {
     try {
       String[] parts = columnName.split(DELIMITER, 2);
+      if (parts.length != 2) {
+        return false;
+      }
       fromFunctionAndColumnName(parts[0], parts[1]);
       return true;
     } catch (IllegalArgumentException e) {
