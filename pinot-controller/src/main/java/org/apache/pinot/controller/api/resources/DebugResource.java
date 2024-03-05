@@ -95,7 +95,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Api(tags = Constants.CLUSTER_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
-@Path("/")
+@Path("/debug/")
 public class DebugResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(DebugResource.class);
 
@@ -118,7 +118,7 @@ public class DebugResource {
   ControllerConf _controllerConf;
 
   @GET
-  @Path("/debug/tables/{tableName}")
+  @Path("tables/{tableName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for table.", notes = "Debug information for table.")
@@ -152,7 +152,7 @@ public class DebugResource {
   }
 
   @GET
-  @Path("/debug/segments/{tableName}/{segmentName}")
+  @Path("segments/{tableName}/{segmentName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_DEBUG_INFO)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get debug information for segment.", notes = "Debug information for segment.")
