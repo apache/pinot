@@ -40,6 +40,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.RoaringBitmap;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -317,22 +318,92 @@ public class JsonIndexTest {
   }
 
   @Test
+  public void testGetValueToFlattenedDocIdsMap()
+      throws Exception {
+    // @formatter: off
+    // CHECKSTYLE:OFF
+    String[] records = new String[]{
+        "{\"arrField\": " + "[{\"intKey01\": 1, \"stringKey01\": \"abc\"},"
+            + " {\"intKey01\": 1, \"stringKey01\": \"foo\"}, " + " {\"intKey01\": 3, \"stringKey01\": \"bar\"},"
+            + " {\"intKey01\": 5, \"stringKey01\": \"fuzz\"}]}",
+        "{\"arrField\": " + "[{\"intKey01\": 1, \"stringKey01\": \"pqr\"},"
+            + " {\"intKey01\": 1, \"stringKey01\": \"foo\"}, " + " {\"intKey01\": 6, \"stringKey01\": \"test\"},"
+            + " {\"intKey01\": 3, \"stringKey01\": \"testf2\"}]}",
+    };
+    // CHECKSTYLE:ON
+    // @formatter: on
+
+    String[][] testKeys = new String[][]{
+        // Without filter
+        {".arrField..intKey01", null},
+
+        // With regexp filter
+        {".arrField..intKey01", "REGEXP_LIKE(\"arrField..stringKey01\", '.*f.*')"},
+
+        // With range filter
+        {".arrField..intKey01", "\"arrField..intKey01\" > 2"},
+
+        // With AND filters
+        {".arrField..intKey01", "\"arrField..intKey01\" > 2 AND REGEXP_LIKE(\"arrField..stringKey01\", "
+            + "'[a-b][a-b].*')"},
+    };
+
+    String colName = "col";
+    try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, new JsonIndexConfig());
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig())) {
+      for (String record : records) {
+        offHeapIndexCreator.add(record);
+        mutableJsonIndex.add(record);
+      }
+      offHeapIndexCreator.seal();
+
+      File offHeapIndexFile = new File(INDEX_DIR, colName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+      Assert.assertTrue(offHeapIndexFile.exists());
+
+      try (PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+          ImmutableJsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer,
+              records.length)) {
+
+        // No filtering
+        int[] docMask = new int[]{0, 1};
+        String[][][] expectedValues = new String[][][]{
+            {{"1", "1", "3", "5"}, {"1", "1", "6", "3"}},
+            {{"1", "5"}, {"1", "3"}},
+            {{"3", "5"}, {"6", "3"}},
+            {{"3"}, {}}
+        };
+        for (int i = 0; i < testKeys.length; i++) {
+          Map<String, ImmutableRoaringBitmap> context =
+              offHeapIndexReader.getValueToFlattenedDocIdsMap(testKeys[i][0], testKeys[i][1]);
+          String[][] values = offHeapIndexReader.getValuesForMv(docMask, 2, context);
+
+          for (int j = 0; j < docMask.length; j++) {
+            Assert.assertEquals(values[j], expectedValues[i][j]);
+          }
+
+          context = mutableJsonIndex.getValueToFlattenedDocIdsMap(testKeys[i][0], testKeys[i][1]);
+          values = mutableJsonIndex.getValuesForMv(docMask, 2, context);
+          Assert.assertEquals(values, expectedValues[i]);
+        }
+      }
+    }
+  }
+
+  @Test
   public void testGetValuesForKeyAndDocs()
       throws Exception {
     // @formatter: off
     // CHECKSTYLE:OFF
-    String[] records = new String[] {
-        "{\"field1\":\"value1\",\"field2\":\"value2\",\"field3\":\"value3\"}",
-        "{\"field1\":\"value2\", \"field2\":[\"value1\",\"value2\"]}",
-        "{\"field1\":\"value1\",\"field2\":\"value4\"}",
+    String[] records = new String[]{
+        "{\"field1\":\"value1\",\"field2\":\"value2\",\"field3\":\"value3\"}", "{\"field1\":\"value2\", "
+        + "\"field2\":[\"value1\",\"value2\"]}", "{\"field1\":\"value1\",\"field2\":\"value4\"}",
     };
     // CHECKSTYLE:ON
     // @formatter: on
     String[] testKeys = new String[]{".field1", ".field2", ".field3", ".field4"};
 
     String colName = "col";
-    try (
-        JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, new JsonIndexConfig());
+    try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, new JsonIndexConfig());
         MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig())) {
       for (String record : records) {
         offHeapIndexCreator.add(record);

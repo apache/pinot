@@ -44,9 +44,23 @@ public interface JsonIndexReader extends IndexReader {
    */
   String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> context);
 
+  /**
+   * For a JSON key, returns a Map from each value to the flattened docId posting list.
+   * @param jsonPathKey the JSONPath key to extract
+   * @param filterJsonString The filter to apply on the flattened docs
+   * @return Map from each unique value for the jsonPathKey value to the flattened docId posting list
+   */
   Map<String, ImmutableRoaringBitmap> getValueToFlattenedDocIdsMap(String jsonPathKey,
       @Nullable String filterJsonString);
 
+  /**
+   * For an array of docIds and context specific to a JSON key, returns the corresponding mv array for each docId.
+   * @param docIds array of docIds
+   * @param length length of the array
+   * @param matchingValueToFlattenedDocs Map from each unique value for the jsonPathKey value to the flattened docId
+   *                                     posting list
+   * @return String[][] where String[i] is the mv array for docIds[i]
+   */
   String[][] getValuesForMv(int[] docIds, int length, Map<String, ImmutableRoaringBitmap> matchingValueToFlattenedDocs);
 
   /**
