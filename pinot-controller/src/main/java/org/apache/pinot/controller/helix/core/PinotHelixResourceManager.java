@@ -1604,7 +1604,13 @@ public class PinotHelixResourceManager {
     if (!ZKMetadataProvider.createTableConfig(_propertyStore, tableConfig)) {
       throw new RuntimeException("Failed to create table config for table: " + tableNameWithType);
     }
+
     try {
+      // Read table config from ZK to ensure we get consistent view across all APIs (e.g. environment variables applied,
+      // unknown fields dropped)
+      tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      Preconditions.checkState(tableConfig != null, "Failed to read table config for table: %s", tableNameWithType);
+
       // Assign instances
       assignInstances(tableConfig, true);
       LOGGER.info("Adding table {}: Assigned instances", tableNameWithType);
@@ -1619,7 +1625,7 @@ public class PinotHelixResourceManager {
         LOGGER.info("Adding table {}: Added ideal state with first consuming segment", tableNameWithType);
       }
     } catch (Exception e) {
-      LOGGER.error("Caught exception during offline table setup. Cleaning up table {}", tableNameWithType, e);
+      LOGGER.error("Caught exception while setting up table: {}, cleaning it up", tableNameWithType, e);
       deleteTable(tableNameWithType, tableType, null);
       throw e;
     }
@@ -1856,8 +1862,9 @@ public class PinotHelixResourceManager {
       throws IOException {
     String tableNameWithType = tableConfig.getTableName();
     if (!ZKMetadataProvider.setTableConfig(_propertyStore, tableConfig, expectedVersion)) {
-      throw new RuntimeException("Failed to update table config in Zookeeper for table: " + tableNameWithType + " with"
-          + " expected version: " + expectedVersion);
+      throw new RuntimeException(
+          "Failed to update table config in Zookeeper for table: " + tableNameWithType + " with" + " expected version: "
+              + expectedVersion);
     }
 
     // Update IdealState replication
@@ -2182,8 +2189,7 @@ public class PinotHelixResourceManager {
    * @param updater to modify the job metadata in place
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean updateJobsForTable(String tableNameWithType, String jobType,
-      Consumer<Map<String, String>> updater) {
+  public boolean updateJobsForTable(String tableNameWithType, String jobType, Consumer<Map<String, String>> updater) {
     String jobResourcePath = ZKMetadataProvider.constructPropertyStorePathForControllerJob(jobType);
     Stat stat = new Stat();
     ZNRecord jobsZnRecord = _propertyStore.get(jobResourcePath, stat, AccessOption.PERSISTENT);
