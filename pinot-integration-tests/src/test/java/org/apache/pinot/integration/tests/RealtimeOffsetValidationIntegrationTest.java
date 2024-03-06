@@ -43,7 +43,6 @@ import org.apache.pinot.controller.api.debug.TableDebugInfo;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -96,8 +95,6 @@ public class RealtimeOffsetValidationIntegrationTest extends BaseClusterIntegrat
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     indexingConfig.setSegmentPartitionConfig(new SegmentPartitionConfig(
         Collections.singletonMap(PARTITION_COLUMN, new ColumnPartitionConfig("murmur", 2))));
-    tableConfig.setRoutingConfig(
-        new RoutingConfig(null, Collections.singletonList(RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE), null));
     addTableConfig(tableConfig);
 
     // Push data into Kafka (only ingest the first Avro file)
