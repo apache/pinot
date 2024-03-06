@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -57,7 +59,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public class MutableJsonIndexImpl implements MutableJsonIndex {
   private final JsonIndexConfig _jsonIndexConfig;
-  private final Map<String, RoaringBitmap> _postingListMap;
+  private final TreeMap<String, RoaringBitmap> _postingListMap;
   private final IntList _docIdMapping;
   private final ReentrantReadWriteLock.ReadLock _readLock;
   private final ReentrantReadWriteLock.WriteLock _writeLock;
@@ -67,7 +69,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
 
   public MutableJsonIndexImpl(JsonIndexConfig jsonIndexConfig) {
     _jsonIndexConfig = jsonIndexConfig;
-    _postingListMap = new HashMap<>();
+    _postingListMap = new TreeMap<>();
     _docIdMapping = new IntArrayList();
 
     ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
@@ -296,11 +298,20 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         return new RoaringBitmap();
       }
     } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
+      String ceilingKey = _postingListMap.ceilingKey(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR);
+      if (ceilingKey == null || !ceilingKey.startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
+        // No values with this key exist
+        return new RoaringBitmap();
+      }
+
       Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
       MutableRoaringBitmap result = null;
-      for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
-        if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR) || !pattern.matcher(
-            entry.getKey().substring(key.length() + 1)).matches()) {
+      char nextChar = BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + 1;
+      SortedMap<String, RoaringBitmap> subMap =
+          _postingListMap.subMap(ceilingKey, true, _postingListMap.floorKey(key + nextChar), true);
+
+      for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
+        if (!pattern.matcher(entry.getKey().substring(key.length() + 1)).matches()) {
           continue;
         }
         if (result == null) {
@@ -321,6 +332,17 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         }
       }
     } else if (predicateType == Predicate.Type.RANGE) {
+      String ceilingKey = _postingListMap.ceilingKey(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR);
+      if (ceilingKey == null || !ceilingKey.startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
+        // No values with this key exist
+        return new RoaringBitmap();
+      }
+
+      MutableRoaringBitmap result = null;
+      char nextChar = BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + 1;
+      SortedMap<String, RoaringBitmap> subMap =
+          _postingListMap.subMap(ceilingKey, true, _postingListMap.floorKey(key + nextChar), true);
+
       RangePredicate rangePredicate = (RangePredicate) predicate;
       FieldSpec.DataType rangeDataType = rangePredicate.getRangeDataType();
       boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
@@ -329,11 +351,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
       Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
       Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
-      MutableRoaringBitmap result = null;
-      for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
-        if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
-          continue;
-        }
+
+      for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
         Object valueObj = rangeDataType.convert(entry.getKey().substring(key.length() + 1));
         boolean lowerCompareResult =
             lowerUnbounded || (lowerInclusive ? rangeDataType.compare(valueObj, lowerBound) >= 0
@@ -370,10 +389,16 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
     _readLock.lock();
     try {
-      for (Map.Entry<String, RoaringBitmap> entry : _postingListMap.entrySet()) {
-        if (!entry.getKey().startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
-          continue;
-        }
+      String ceilingKey = _postingListMap.ceilingKey(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR);
+      if (ceilingKey == null || !ceilingKey.startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
+        // No values with this key exist
+        return matchingDocsMap;
+      }
+      char nextChar = BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + 1;
+      SortedMap<String, RoaringBitmap> subMap =
+          _postingListMap.subMap(ceilingKey, true, _postingListMap.floorKey(key + nextChar), true);
+
+      for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
         MutableRoaringBitmap flattenedDocIds = entry.getValue().toMutableRoaringBitmap();
         PeekableIntIterator it = flattenedDocIds.getIntIterator();
         MutableRoaringBitmap postingList = new MutableRoaringBitmap();
