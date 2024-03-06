@@ -26,7 +26,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public class NettyConfig {
   private static final String NATIVE_TRANSPORTS_ENABLED = "native.transports.enabled";
-  private boolean _nativeTransportsEnabled = false;
+  private boolean _nativeTransportsEnabled = true;
 
   private static String key(String namespace, String suffix) {
     return namespace + "." + suffix;
