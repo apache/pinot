@@ -51,6 +51,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.GrpcRequesterIdentity;
+import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -146,6 +147,8 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
       responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
       return;
     }
+
+    Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
 
     // Table level access control
     GrpcRequesterIdentity requestIdentity = new GrpcRequesterIdentity(request.getMetadataMap());
