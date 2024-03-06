@@ -329,6 +329,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
       }
 
+      if (pinotQuery.isShowTables()) {
+        return processShowTablesQuery(pinotQuery, compilationStartTimeNs, requestContext);
+      }
+      if (pinotQuery.isDescribeTable()) {
+        return processDescribeTableQuery(pinotQuery, compilationStartTimeNs, requestContext);
+      }
+
       if (isLiteralOnlyQuery(pinotQuery)) {
         LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
         try {
@@ -1543,6 +1550,60 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       default:
         throw new IllegalStateException("Unsupported literal: " + literal);
     }
+  }
+
+  private BrokerResponseNative processShowTablesQuery(PinotQuery pinotQuery, long compilationStartTimeNs,
+      RequestContext requestContext) {
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    String[] columnNames = {"Tables"};
+    DataSchema.ColumnDataType[] columnTypes = {DataSchema.ColumnDataType.STRING};
+
+
+    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
+    List<Object[]> rows = new ArrayList<>();
+    _tableCache.getTableConfigs().stream().map(TableConfig::getTableName).sorted().forEach(a -> {
+      a = a.replace("_OFFLINE", "").replace("_REALTIME", "");
+      rows.add(new String[] {a});
+    });
+    ResultTable resultTable = new ResultTable(dataSchema, rows);
+    brokerResponse.setResultTable(resultTable);
+
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - compilationStartTimeNs);
+    brokerResponse.setTimeUsedMs(totalTimeMs);
+    requestContext.setQueryProcessingTime(totalTimeMs);
+    augmentStatistics(requestContext, brokerResponse);
+    return brokerResponse;
+  }
+
+  private BrokerResponseNative processDescribeTableQuery(PinotQuery pinotQuery, long compilationStartTimeNs,
+      RequestContext requestContext) {
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    String[] columnNames = {"Field", "Type", "Nullable", "Default"};
+    DataSchema.ColumnDataType[] columnTypes = {DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING};
+
+    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
+    List<Object[]> rows = new ArrayList<>();
+    _tableCache.getSchema(pinotQuery.getDataSource().getTableName()).getAllFieldSpecs()
+        .stream()
+        .filter(a -> !a.getName().startsWith("$"))
+        .forEach(fieldSpec -> {
+          String[] row = new String[] {
+              fieldSpec.getName(),
+              fieldSpec.getDataType().toString(),
+              String.valueOf(fieldSpec.isNullable()),
+              fieldSpec.getDefaultNullValueString()
+          };
+          rows.add(row);
+        }
+        );
+    ResultTable resultTable = new ResultTable(dataSchema, rows);
+    brokerResponse.setResultTable(resultTable);
+
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - compilationStartTimeNs);
+    brokerResponse.setTimeUsedMs(totalTimeMs);
+    requestContext.setQueryProcessingTime(totalTimeMs);
+    augmentStatistics(requestContext, brokerResponse);
+    return brokerResponse;
   }
 
   /**

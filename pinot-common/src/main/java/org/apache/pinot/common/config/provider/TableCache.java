@@ -395,7 +395,7 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
-  private List<TableConfig> getTableConfigs() {
+  public List<TableConfig> getTableConfigs() {
     List<TableConfig> tableConfigs = new ArrayList<>(_tableConfigInfoMap.size());
     for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
       tableConfigs.add(tableConfigInfo._tableConfig);

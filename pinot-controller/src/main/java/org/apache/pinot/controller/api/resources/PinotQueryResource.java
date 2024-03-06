@@ -56,6 +56,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -243,9 +244,15 @@ public class PinotQueryResource {
     // Get resource table name.
     String tableName;
     try {
-      String inputTableName =
-          sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
-              .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
+      String inputTableName;
+      if (sqlNode != null) {
+        PinotQuery pinotQuery = CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode);
+        inputTableName = pinotQuery.isShowTables() ? "*"
+            : RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
+            .next();
+      } else {
+        inputTableName = CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
+      }
       tableName = _pinotHelixResourceManager.getActualTableName(inputTableName,
           httpHeaders.getHeaderString(CommonConstants.DATABASE));
     } catch (Exception e) {
