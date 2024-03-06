@@ -91,6 +91,8 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   private static final int NUM_SEGMENT_RECORDS = 100_000;
   private static final int MAX_LEAF_RECORDS = RANDOM.nextInt(100) + 1;
+  // Using column names with '__' to make sure regular table columns with '__' in the name aren't wrongly interpreted
+  // as AggregationFunctionColumnPair
   private static final String DIMENSION_D1 = "d1__COLUMN_NAME";
   private static final String DIMENSION_D2 = "__d2";
   private static final int DIMENSION_CARDINALITY = 100;
