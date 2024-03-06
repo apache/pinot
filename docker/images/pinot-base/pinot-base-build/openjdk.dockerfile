@@ -42,7 +42,7 @@ RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
 
 
 # install thrift
-RUN  wget http://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
+RUN  wget https://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
   tar xfz /tmp/thrift-0.12.0.tar.gz --directory /tmp && \
   base_dir=`pwd` && \
   cd /tmp/thrift-0.12.0 && \
