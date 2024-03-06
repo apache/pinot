@@ -63,8 +63,9 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     // test controller
     String response = sendGetRequest(getControllerBaseApiUrl() + "/help");
-    String expected = IOUtils
-        .toString(ControllerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"), "UTF-8");
+    String expected =
+        IOUtils.toString(ControllerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"),
+            "UTF-8");
     Assert.assertEquals(response, expected);
     // help and api map to the same content
     response = sendGetRequest(getControllerBaseApiUrl() + "/api");
@@ -72,8 +73,8 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
 
     // test broker
     response = sendGetRequest(getBrokerBaseApiUrl() + "/help");
-    expected = IOUtils
-        .toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"), "UTF-8");
+    expected = IOUtils.toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"),
+        "UTF-8");
     Assert.assertEquals(response, expected);
     // help and api map to the same content
     response = sendGetRequest(getBrokerBaseApiUrl() + "/api");
@@ -81,8 +82,8 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
     String serverBaseApiUrl = "http://localhost:" + getServerAdminApiPort();
     // test server
     response = sendGetRequest(serverBaseApiUrl + "/help");
-    expected = IOUtils
-        .toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"), "UTF-8");
+    expected = IOUtils.toString(BrokerAdminApiApplication.class.getClassLoader().getResourceAsStream("api/index.html"),
+        "UTF-8");
     Assert.assertEquals(response, expected);
 
     // help and api map to the same content
