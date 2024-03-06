@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.spi.index.startree;
 
 import java.util.Comparator;
+import java.util.Optional;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 
@@ -57,16 +58,16 @@ public class AggregationFunctionColumnPair implements Comparable<AggregationFunc
     return functionType.getName() + DELIMITER + column;
   }
 
-  public static boolean accept(String columnName) {
+  public static Optional<AggregationFunctionColumnPair> accept(String columnName) {
     try {
       String[] parts = columnName.split(DELIMITER, 2);
       if (parts.length != 2) {
-        return false;
+        return Optional.empty();
       }
-      fromFunctionAndColumnName(parts[0], parts[1]);
-      return true;
+      AggregationFunctionColumnPair result = fromFunctionAndColumnName(parts[0], parts[1]);
+      return Optional.of(result);
     } catch (IllegalArgumentException e) {
-      return false;
+      return Optional.empty();
     }
   }
 

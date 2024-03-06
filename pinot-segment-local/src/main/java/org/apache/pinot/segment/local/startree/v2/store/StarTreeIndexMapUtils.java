@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -198,9 +199,9 @@ public class StarTreeIndexMapUtils {
           column = StringUtils.join(split, KEY_SEPARATOR, 1, columnSplitEndIndex);
         }
         // Convert metric (function-column pair) to stored name for backward-compatibility
-        if (AggregationFunctionColumnPair.accept(column)) {
-          AggregationFunctionColumnPair functionColumnPair = AggregationFunctionColumnPair.fromColumnName(column);
-          column = AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair).toColumnName();
+        Optional<AggregationFunctionColumnPair> functionColumnPair = AggregationFunctionColumnPair.accept(column);
+        if (functionColumnPair.isPresent()) {
+          column = AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair.get()).toColumnName();
         }
         indexKey = new IndexKey(IndexType.FORWARD_INDEX, column);
       }
