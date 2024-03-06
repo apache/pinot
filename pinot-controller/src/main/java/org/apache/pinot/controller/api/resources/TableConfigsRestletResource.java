@@ -428,6 +428,8 @@ public class TableConfigsRestletResource {
     }
 
     TableConfigs validatedTableConfigs = validateConfig(tableConfigs, typesToSkip);
+    validatedTableConfigs.setTableName(DatabaseUtils.translateTableName(tableConfigs.getTableName(), httpHeaders));
+
     ObjectNode response = JsonUtils.objectToJsonNode(validatedTableConfigs).deepCopy();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));
     return response.toString();
@@ -451,19 +453,19 @@ public class TableConfigsRestletResource {
       Preconditions.checkState(schema != null, "Must provide 'schema' for adding TableConfigs: %s", rawTableName);
       Preconditions.checkState(!rawTableName.isEmpty(), "'tableName' cannot be empty in TableConfigs");
 
-      Preconditions.checkState(DatabaseUtils.isTableNameEquivalent(rawTableName, schema.getSchemaName()),
+      Preconditions.checkState(rawTableName.equals(schema.getSchemaName()),
           "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
       SchemaUtils.validate(schema);
       if (offlineTableConfig != null) {
         String offlineRawTableName = TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName());
-        Preconditions.checkState(DatabaseUtils.isTableNameEquivalent(offlineRawTableName, rawTableName),
+        Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
         TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
       }
       if (realtimeTableConfig != null) {
         String realtimeRawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
-        Preconditions.checkState(DatabaseUtils.isTableNameEquivalent(realtimeRawTableName, rawTableName),
+        Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
         TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());

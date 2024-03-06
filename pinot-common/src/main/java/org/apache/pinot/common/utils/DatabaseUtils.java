@@ -71,16 +71,4 @@ public class DatabaseUtils {
   public static String translateTableName(String tableName, HttpHeaders headers) {
     return translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
   }
-
-  /**
-   * Checks the logical table name equivalence. Usually needed when one of the table name is translated while other may
-   * not but soft validation is performed before overwriting the translated name everywhere.
-   * @param name1 table name
-   * @param name2 another table name
-   * @return {@code true} if both are null or both have the same logical table name.
-   */
-  public static boolean isTableNameEquivalent(String name1, String name2) {
-    return Objects.equals(name1, name2)
-        || (name1 != null && name2 != null && (name1.endsWith("." + name2) || name2.endsWith("." + name1)));
-  }
 }

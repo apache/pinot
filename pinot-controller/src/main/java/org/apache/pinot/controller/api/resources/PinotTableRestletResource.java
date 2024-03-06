@@ -538,16 +538,24 @@ public class PinotTableRestletResource {
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
-    Pair<TableConfig, Map<String, Object>> tableConfig;
+    Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     try {
-      tableConfig = JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
+      tableConfigAndUnrecognizedProperties =
+          JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
     } catch (IOException e) {
       String msg = String.format("Invalid table config json string: %s", tableConfigStr);
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
+    TableConfig tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
+    String tableName = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
+    tableConfig.setTableName(tableName);
+    // Handling deprecated config
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig != null && validationConfig.getSchemaName() != null) {
+      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
+    }
 
     // validate permission
-    String tableName = tableConfig.getLeft().getTableName();
     String endpointUrl = request.getRequestURL().toString();
     AccessControlUtils.validatePermission(tableName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
@@ -557,9 +565,10 @@ public class PinotTableRestletResource {
     }
 
     ObjectNode validationResponse =
-        validateConfig(tableConfig.getLeft(), _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig.getLeft()),
+        validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig),
             typesToSkip);
-    validationResponse.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfig.getRight()));
+    validationResponse.set("unrecognizedProperties",
+        JsonUtils.objectToJsonNode(tableConfigAndUnrecognizedProperties.getRight()));
     return validationResponse;
   }
 

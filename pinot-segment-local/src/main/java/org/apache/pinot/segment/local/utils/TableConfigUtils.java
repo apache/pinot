@@ -224,7 +224,7 @@ public final class TableConfigUtils {
     // Ensure that table is not created if schema is not present
     String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
     String schemaName = tableConfig.getValidationConfig().getSchemaName();
-    if (schemaName != null && !DatabaseUtils.isTableNameEquivalent(schemaName, rawTableName)) {
+    if (schemaName != null && !schemaName.equals(rawTableName)) {
       throw new IllegalStateException("Schema name: " + schemaName + " does not match table name: " + rawTableName);
     }
   }
