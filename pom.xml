@@ -199,9 +199,10 @@
     <kotlin.stdlib.version>1.9.22</kotlin.stdlib.version>
     <okio.version>3.8.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
-    <jline.version>3.22.0</jline.version>
-    <wildfly.version>1.5.4.Final</wildfly.version>
-    <jettison.version>1.4.0</jettison.version>
+    <!-- Newer version jline requires java 21 -->
+    <jline.version>3.24.1</jline.version>
+    <wildfly.version>1.7.0.Final</wildfly.version>
+    <jettison.version>1.5.4</jettison.version>
   </properties>
 
   <profiles>
@@ -673,10 +674,6 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>org.apache.yetus</groupId>
-            <artifactId>audience-annotations</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -782,20 +779,8 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.apache.yetus</groupId>
-            <artifactId>audience-annotations</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.codehaus.woodstox</groupId>
-            <artifactId>stax2-api</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-configuration2</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.apache.commons</groupId>
@@ -957,6 +942,7 @@
         <artifactId>jaxb-api</artifactId>
         <version>2.3.1</version>
       </dependency>
+      <!-- The following dependencies are added to solve the vulnerabilities of the old version -->
       <dependency>
         <groupId>org.apache.kerby</groupId>
         <artifactId>kerb-core</artifactId>
