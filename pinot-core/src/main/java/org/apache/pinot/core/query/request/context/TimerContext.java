@@ -25,10 +25,11 @@ import org.apache.pinot.common.metrics.ServerQueryPhase;
 
 
 public class TimerContext {
+  private static final int SERVER_QUERY_PHASE_COUNT = ServerQueryPhase.values().length;
   private final String _tableNameWithType;
   private final ServerMetrics _serverMetrics;
   private final long _queryArrivalTimeMs;
-  private final Timer[] _phaseTimers = new Timer[ServerQueryPhase.values().length];
+  private final Timer[] _phaseTimers = new Timer[SERVER_QUERY_PHASE_COUNT];
 
   public class Timer {
     private final ServerQueryPhase _queryPhase;
