@@ -199,8 +199,12 @@ public class StarTreeIndexMapUtils {
         }
         // Convert metric (function-column pair) to stored name for backward-compatibility
         if (column.contains(AggregationFunctionColumnPair.DELIMITER)) {
-          AggregationFunctionColumnPair functionColumnPair = AggregationFunctionColumnPair.fromColumnName(column);
-          column = AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair).toColumnName();
+          try {
+            AggregationFunctionColumnPair functionColumnPair = AggregationFunctionColumnPair.fromColumnName(column);
+            column = AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair).toColumnName();
+          } catch (Exception e) {
+            // Ignoring this exception for columns that are not metric (function-column pair)
+          }
         }
         indexKey = new IndexKey(IndexType.FORWARD_INDEX, column);
       }
