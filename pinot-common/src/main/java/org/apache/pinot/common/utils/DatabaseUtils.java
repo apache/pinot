@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
-import java.util.Objects;
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
@@ -33,19 +33,17 @@ public class DatabaseUtils {
    * Construct the fully qualified table name i.e. {databaseName}.{tableName} from given table name and database name
    * @param tableName table/schema name
    * @param databaseName database name
-   * @return translated table name. Throws {@link IllegalStateException} if {@code tableName} contains more than 1 dot
-   * or if {@code tableName} has database prefix, and it does not match with {@code databaseName}
+   * @return translated table name. Throws {@link IllegalArgumentException} if {@code tableName} contains
+   * more than 1 dot or if {@code tableName} has database prefix, and it does not match with {@code databaseName}
    */
   public static String translateTableName(String tableName, @Nullable String databaseName) {
-    if (tableName == null) {
-      throw new IllegalArgumentException("'tableName' cannot be null");
-    }
+    Preconditions.checkArgument(tableName != null, "'tableName' cannot be null");
     String[] tableSplit = StringUtils.split(tableName, '.');
     switch (tableSplit.length) {
       case 1:
         // do not concat the database name prefix if it's a 'default' database
         if (StringUtils.isNotEmpty(databaseName) && !databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-          return String.format("%s.%s", databaseName, tableName);
+          return databaseName + "." + tableName;
         }
         return tableName;
       case 2:

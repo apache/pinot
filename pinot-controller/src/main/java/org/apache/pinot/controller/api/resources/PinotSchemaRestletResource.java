@@ -115,8 +115,10 @@ public class PinotSchemaRestletResource {
         headers.getHeaderString(CommonConstants.DATABASE));
     ArrayNode ret = JsonUtils.newArrayNode();
 
-    for (String schema : schemaNames) {
-      ret.add(schema);
+    if (schemaNames != null) {
+      for (String schema : schemaNames) {
+        ret.add(schema);
+      }
     }
     return ret.toString();
   }

@@ -65,7 +65,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @Api(tags = Constants.LEAD_CONTROLLER_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
-@Path("/")
+@Path("/leader")
 public class PinotLeadControllerRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLeadControllerRestletResource.class);
 
@@ -74,7 +74,7 @@ public class PinotLeadControllerRestletResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/leader/tables")
+  @Path("/tables")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_LEADER)
   @ApiOperation(value = "Gets leaders for all tables", notes = "Gets leaders for all tables")
   public LeadControllerResponse getLeadersForAllTables(@Context HttpHeaders headers) {
@@ -118,7 +118,7 @@ public class PinotLeadControllerRestletResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/leader/tables/{tableName}")
+  @Path("/tables/{tableName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_LEADER)
   @ApiOperation(value = "Gets leader for a given table", notes = "Gets leader for a given table")
   public LeadControllerResponse getLeaderForTable(

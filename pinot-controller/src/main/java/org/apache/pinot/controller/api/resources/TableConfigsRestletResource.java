@@ -197,15 +197,32 @@ public class TableConfigsRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
+    // validate permission
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
     Schema schema = tableConfigs.getSchema();
+
     try {
+      String endpointUrl = request.getRequestURL().toString();
+      AccessControl accessControl = _accessControlFactory.create();
+      AccessControlUtils
+          .validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
+
       if (offlineTableConfig != null) {
         tuneConfig(offlineTableConfig, schema);
+        AccessControlUtils
+            .validatePermission(offlineTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
+                accessControl);
       }
       if (realtimeTableConfig != null) {
         tuneConfig(realtimeTableConfig, schema);
+        AccessControlUtils
+            .validatePermission(realtimeTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
+                accessControl);
+      }
+
+      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.CREATE_TABLE)) {
+        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
       try {
@@ -272,8 +289,8 @@ public class TableConfigsRestletResource {
       if (tableExists || schemaExists) {
         return new SuccessResponse("Deleted TableConfigs: " + tableName);
       } else {
-        return new SuccessResponse("TableConfigs: " + tableName
-            + " don't exist. Invoked delete anyway to clean stale metadata/segments");
+        return new SuccessResponse(
+            "TableConfigs: " + tableName + " don't exist. Invoked delete anyway to clean stale metadata/segments");
       }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -313,10 +330,9 @@ public class TableConfigsRestletResource {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      if (!DatabaseUtils.translateTableName(tableConfigs.getTableName(), headers).equals(translatedTableName)) {
-        throw new IllegalArgumentException(
-            "Table name mismatch: " + tableConfigs.getTableName() + " is not equivalent to " + tableName);
-      }
+      Preconditions.checkState(
+          DatabaseUtils.translateTableName(tableConfigs.getTableName(), headers).equals(translatedTableName),
+          "Table name mismatch: %s is not equivalent to %s", tableConfigs.getTableName(), tableName);
       validateConfig(tableConfigs, typesToSkip);
       tableConfigs.setTableName(translatedTableName);
     } catch (Exception e) {

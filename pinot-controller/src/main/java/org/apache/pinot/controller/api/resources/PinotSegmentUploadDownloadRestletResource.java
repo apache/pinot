@@ -79,6 +79,7 @@ import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -155,6 +156,19 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders httpHeaders)
       throws Exception {
     tableName = DatabaseUtils.translateTableName(tableName, httpHeaders);
+    // Validate data access
+    boolean hasDataAccess;
+    try {
+      AccessControl accessControl = _accessControlFactory.create();
+      hasDataAccess = accessControl.hasDataAccess(httpHeaders, tableName);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Caught exception while validating access to table: " + tableName, Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+    if (!hasDataAccess) {
+      throw new ControllerApplicationException(LOGGER, "No data access to table: " + tableName,
+          Response.Status.FORBIDDEN);
+    }
     segmentName = URIUtils.decode(segmentName);
     URI dataDirURI = ControllerFilePathProvider.getInstance().getDataDirURI();
     Response.ResponseBuilder builder = Response.ok();

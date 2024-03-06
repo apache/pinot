@@ -291,15 +291,15 @@ public class PinotTableRestletResource {
       }
       SortType sortType = sortTypeStr != null ? SortType.valueOf(sortTypeStr.toUpperCase()) : SortType.NAME;
 
-      String databaseId = headers.getHeaderString(CommonConstants.DATABASE);
+      String database = headers.getHeaderString(CommonConstants.DATABASE);
 
       // If tableTypeStr is dimension, then tableType is set to TableType.OFFLINE.
       // So, checking the isDimensionTable to get the list of dimension tables only.
       List<String> tableNamesWithType =
-          isDimensionTable ? _pinotHelixResourceManager.getAllDimensionTables(databaseId)
-              : tableType == null ? _pinotHelixResourceManager.getAllTables(databaseId)
-                  : (tableType == TableType.REALTIME ? _pinotHelixResourceManager.getAllRealtimeTables(databaseId)
-                      : _pinotHelixResourceManager.getAllOfflineTables(databaseId));
+          isDimensionTable ? _pinotHelixResourceManager.getAllDimensionTables(database)
+              : tableType == null ? _pinotHelixResourceManager.getAllTables(database)
+                  : (tableType == TableType.REALTIME ? _pinotHelixResourceManager.getAllRealtimeTables(database)
+                      : _pinotHelixResourceManager.getAllOfflineTables(database));
 
       if (StringUtils.isNotBlank(taskType)) {
         Set<String> tableNamesForTaskType = new HashSet<>();

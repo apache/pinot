@@ -40,7 +40,6 @@ import javax.ws.rs.core.UriInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.Request;
 
 
@@ -101,7 +100,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     String tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
     if (tableName != null) {
       // If table name is present translat it to the fully qualified name based on database header.
-      tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders.getHeaderString(CommonConstants.DATABASE));
+      tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
     }
     AccessType accessType = extractAccessType(endpointMethod);
     AccessControlUtils.validatePermission(tableName, accessType, _httpHeaders, endpointUrl, accessControl);

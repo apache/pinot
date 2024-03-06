@@ -321,11 +321,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         // Compile the request into PinotQuery
         compilationStartTimeNs = System.nanoTime();
         pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
-        if (pinotQuery.getDataSource() != null && pinotQuery.getDataSource().getTableName() != null) {
-          String tableName = getActualTableName(DatabaseUtils.translateTableName(
-              pinotQuery.getDataSource().getTableName(), httpHeaders), _tableCache);
-        pinotQuery.getDataSource().setTableName(tableName);
-        }
       } catch (Exception e) {
         LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
@@ -1647,8 +1642,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Returns the actual column name for the given column name for:
    * - Case-insensitive cluster
-   * - Column name in the format of [table_name].[column_name]
-   * - Column name in the format of [database_name].[table_name].[column_name]
+   * - Column name in the format of [{@code rawTableName}].[column_name]
+   * - Column name in the format of [logical_table_name].[column_name] while {@code rawTableName} is a translated name
    */
   @VisibleForTesting
   static String getActualColumnName(String rawTableName, String columnName, @Nullable Map<String, String> columnNameMap,
@@ -1657,9 +1652,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return columnName;
     }
     String columnNameToCheck;
-    String[] tableSplit = rawTableName.split("\\.", 2);
+    String[] tableSplit = StringUtils.split(rawTableName, ".", 2);
     String logicalTableName = tableSplit.length == 2 ? tableSplit[1] : null;
-    int withDefaultDBLen = CommonConstants.DEFAULT_DATABASE.length() + rawTableName.length() + 1;
     if (columnName.regionMatches(ignoreCase, 0, rawTableName, 0, rawTableName.length())
         && columnName.length() > rawTableName.length() && columnName.charAt(rawTableName.length()) == '.') {
       columnNameToCheck = ignoreCase ? columnName.substring(rawTableName.length() + 1).toLowerCase()
@@ -1670,11 +1664,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         && columnName.length() > logicalTableName.length() && columnName.charAt(logicalTableName.length()) == '.') {
       columnNameToCheck = ignoreCase ? columnName.substring(logicalTableName.length() + 1).toLowerCase()
           : columnName.substring(logicalTableName.length() + 1);
-    } else if (// in case the column has "default" database prefix and table name has no database prefix (=default db)
-        columnName.regionMatches(ignoreCase, 0, CommonConstants.DEFAULT_DATABASE + "." + rawTableName, 0,
-        withDefaultDBLen) && columnName.length() > withDefaultDBLen && columnName.charAt(withDefaultDBLen) == '.') {
-      columnNameToCheck = ignoreCase ? columnName.substring(withDefaultDBLen + 1).toLowerCase()
-          : columnName.substring(withDefaultDBLen + 1);
     } else {
       columnNameToCheck = ignoreCase ? columnName.toLowerCase() : columnName;
     }

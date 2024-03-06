@@ -93,9 +93,6 @@ public class BaseBrokerRequestHandlerTest {
         BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable.student_name", columnNameMap, false);
     Assert.assertEquals(actualColumnName, "student_name");
     Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualColumnName("mytable", "default.mytable.student_name", columnNameMap, false),
-        "student_name");
-    Assert.assertEquals(
         BaseBrokerRequestHandler.getActualColumnName("db1.mytable", "db1.mytable.student_name", columnNameMap, false),
         "student_name");
     Assert.assertEquals(
@@ -135,9 +132,6 @@ public class BaseBrokerRequestHandlerTest {
     String actualColumnName =
         BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE.student_name", columnNameMap, true);
     Assert.assertEquals(actualColumnName, "student_name");
-    Assert.assertEquals(
-        BaseBrokerRequestHandler.getActualColumnName("MYTABLE", "DEFAULT.mytable.student_name", columnNameMap, true),
-        "student_name");
     Assert.assertEquals(
         BaseBrokerRequestHandler.getActualColumnName("db1.MYTABLE", "DB1.mytable.student_name", columnNameMap, true),
         "student_name");

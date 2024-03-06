@@ -51,7 +51,7 @@ public class DatabaseUtilsTest {
     check(DEFAULT_DATABASE_NAME + "." + LOGICAL_TABLE_NAME, null, LOGICAL_TABLE_NAME);
     check(DEFAULT_DATABASE_NAME + "." + LOGICAL_TABLE_NAME, DEFAULT_DATABASE_NAME, LOGICAL_TABLE_NAME);
 
-    // error cases with non-default database
+    // error cases with default database
     error(null, DEFAULT_DATABASE_NAME);
     error(FULLY_QUALIFIED_TABLE_NAME, DEFAULT_DATABASE_NAME);
     error(DEFAULT_DATABASE_NAME + "." + LOGICAL_TABLE_NAME, DATABASE_NAME);
