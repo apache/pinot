@@ -27,7 +27,6 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.http.apache.ApacheSdkHttpService;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.KinesisClientBuilder;
@@ -133,7 +132,7 @@ public class KinesisConnectionHandler {
           KinesisClient.builder()
               .region(Region.of(_region))
               .credentialsProvider(awsCredentialsProvider)
-              .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
+              .httpClientBuilder(AwsSdkUtil.createSdkHttpService().createHttpClientBuilder());
 
       if (StringUtils.isNotBlank(_endpoint)) {
         try {
