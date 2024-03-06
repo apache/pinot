@@ -65,8 +65,8 @@
       <artifactId>stax2-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
+      <groupId>org.apache.hadoop.thirdparty</groupId>
+      <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
     </dependency>
   </dependencies>
 </project>
