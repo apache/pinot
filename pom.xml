@@ -201,7 +201,7 @@
     <kerby.version>2.0.3</kerby.version>
     <jline.version>3.22.0</jline.version>
     <wildfly.version>1.5.4.Final</wildfly.version>
-    <jettison.version>1.4.0</jettison.version>
+    <jettison.version>1.5.4</jettison.version>
   </properties>
 
   <profiles>
