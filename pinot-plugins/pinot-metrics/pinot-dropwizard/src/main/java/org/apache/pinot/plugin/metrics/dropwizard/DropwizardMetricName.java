@@ -18,10 +18,11 @@
  */
 package org.apache.pinot.plugin.metrics.dropwizard;
 
+import java.util.Objects;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 
 
-public class DropwizardMetricName implements PinotMetricName {
+public final class DropwizardMetricName implements PinotMetricName {
   private final String _metricName;
 
   public DropwizardMetricName(Class<?> klass, String name) {
@@ -49,7 +50,7 @@ public class DropwizardMetricName implements PinotMetricName {
       return false;
     }
     DropwizardMetricName that = (DropwizardMetricName) obj;
-    return _metricName.equals(that._metricName);
+    return Objects.equals(_metricName, that._metricName);
   }
 
   /**
@@ -57,7 +58,7 @@ public class DropwizardMetricName implements PinotMetricName {
    */
   @Override
   public int hashCode() {
-    return _metricName.hashCode();
+    return Objects.hashCode(_metricName);
   }
 
   @Override
