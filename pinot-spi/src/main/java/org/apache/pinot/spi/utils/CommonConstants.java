@@ -337,7 +337,6 @@ public class CommonConstants {
     // precedence over "query.response.size" (i.e., "query.response.size" will be ignored).
     public static final String CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES = "pinot.broker.max.server.response.size.bytes";
 
-    
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
