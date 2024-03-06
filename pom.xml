@@ -201,6 +201,7 @@
     <kerby.version>2.0.3</kerby.version>
     <jline.version>3.22.0</jline.version>
     <wildfly.version>1.5.4.Final</wildfly.version>
+    <jettison.version>1.4.0</jettison.version>
   </properties>
 
   <profiles>
@@ -975,6 +976,11 @@
         <groupId>org.wildfly.common</groupId>
         <artifactId>wildfly-common</artifactId>
         <version>${wildfly.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.jettison</groupId>
+        <artifactId>jettison</artifactId>
+        <version>${jettison.version}</version>
       </dependency>
 
       <!-- Metrics -->
