@@ -25,12 +25,19 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
@@ -47,6 +54,8 @@ import static org.testng.Assert.assertTrue;
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
+  private String _tableName = DEFAULT_TABLE_NAME;
+  private List<File> _avroFiles = new ArrayList<>();
 
   @Override
   protected String getSchemaFileName() {
@@ -72,17 +81,17 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     addTableConfig(tableConfig);
 
     // Unpack the Avro files
-    List<File> avroFiles = unpackAvroData(_tempDir);
+    _avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(_avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
     // Set up the H2 connection
-    setUpH2Connection(avroFiles);
+    setUpH2Connection(_avroFiles);
 
     // Initialize the query generator
-    setUpQueryGenerator(avroFiles);
+    setUpQueryGenerator(_avroFiles);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
@@ -747,6 +756,76 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
+  }
+
+  @Override
+  protected String getTableName() {
+    return _tableName;
+  }
+
+  @Test
+  public void testWithDatabaseContext()
+      throws Exception {
+    try {
+      _tableName = "db1." + DEFAULT_TABLE_NAME;
+      String defaultCol = "ActualElapsedTime";
+      String customCol = "ActualElapsedTime_2";
+      Schema schema = createSchema();
+      schema.addField(new MetricFieldSpec(customCol, FieldSpec.DataType.INT));
+      addSchema(schema);
+      TableConfig tableConfig = createOfflineTableConfig();
+      assert tableConfig.getIndexingConfig().getNoDictionaryColumns() != null;
+      List<String> noDicCols = new ArrayList<>(DEFAULT_NO_DICTIONARY_COLUMNS);
+      noDicCols.add(customCol);
+      tableConfig.getIndexingConfig().setNoDictionaryColumns(noDicCols);
+      IngestionConfig ingestionConfig = new IngestionConfig();
+      ingestionConfig.setTransformConfigs(List.of(new TransformConfig(customCol, defaultCol)));
+      tableConfig.setIngestionConfig(ingestionConfig);
+      addTableConfig(tableConfig);
+
+      // Create and upload segments to 'db1.mytable'
+      TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
+      ClusterIntegrationTestUtils.buildSegmentsFromAvro(_avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
+      uploadSegments(getTableName(), _tarDir);
+
+      // Wait for all documents loaded
+      waitForAllDocsLoaded(600_000L);
+
+      // default database check. No database context passed
+      checkQueryResultForDBTest(defaultCol, DEFAULT_TABLE_NAME);
+
+      // default database check. Default database context passed as table prefix
+      checkQueryResultForDBTest(defaultCol, "default." + DEFAULT_TABLE_NAME);
+
+      // default database check. Default database context passed as SET database='dbName'
+      checkQueryResultForDBTest(defaultCol, DEFAULT_TABLE_NAME, "default");
+
+      // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
+      // custom database check. Database context passed as table prefix
+      checkQueryResultForDBTest(customCol, _tableName);
+
+      // custom database check. Database context passed as SET database='dbName'
+      checkQueryResultForDBTest(customCol, DEFAULT_TABLE_NAME, "db1");
+    } finally {
+      dropOfflineTable(_tableName);
+      _tableName = DEFAULT_TABLE_NAME;
+    }
+  }
+
+  private void checkQueryResultForDBTest(String column, String tableName)
+      throws Exception {
+    checkQueryResultForDBTest(column, tableName, null);
+  }
+
+  private void checkQueryResultForDBTest(String column, String tableName, @Nullable String database)
+      throws Exception {
+    String query = (StringUtils.isNotBlank(database) ? "SET database='" + database + "'; " : "") +
+        "select max(" + column + ") from " + tableName + ";";
+    // max value of 'ActualElapsedTime'
+    long expectedValue = 678;
+    JsonNode jsonNode = postQuery(query);
+    long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+    assertEquals(result, expectedValue);
   }
 
   @AfterClass
