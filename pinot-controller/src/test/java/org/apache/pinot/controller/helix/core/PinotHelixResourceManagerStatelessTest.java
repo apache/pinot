@@ -422,7 +422,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     }, 60_000L, "Failed to get all brokers DROPPED");
   }
 
-
   private void waitForTableOnlineInBrokerResourceEV(String tableNameWithType) {
     TestUtils.waitForCondition(aVoid -> {
       ExternalView externalView = _helixAdmin.getResourceExternalView(_clusterName, Helix.BROKER_RESOURCE_INSTANCE);
@@ -1389,8 +1388,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
   }
-
-
 
   private static void assertSetEquals(Collection<String> actual, String... expected) {
     Set<String> actualSet = actual instanceof Set ? (Set<String>) actual : new HashSet<>(actual);
