@@ -147,6 +147,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(_helixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 0);
   }
 
+  @Test
   public void testGetInstancesByTag() {
     List<String> controllersByTag = _helixResourceManager.getAllInstancesWithTag("controller");
     List<InstanceConfig> controllerConfigs = _helixResourceManager.getAllControllerInstanceConfigs();
