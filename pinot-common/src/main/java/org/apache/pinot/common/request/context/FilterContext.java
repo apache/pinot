@@ -30,7 +30,7 @@ import org.apache.pinot.common.request.context.predicate.Predicate;
  * The {@code FilterContext} class encapsulates the information of a filter in the query. Both WHERE clause and HAVING
  * clause are modeled as a filter.
  */
-public class FilterContext {
+public final class FilterContext {
   public static final FilterContext CONSTANT_TRUE = new FilterContext(Type.CONSTANT, null, null, true);
   public static final FilterContext CONSTANT_FALSE = new FilterContext(Type.CONSTANT, null, null, false);
 
