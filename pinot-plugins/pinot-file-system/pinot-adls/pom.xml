@@ -74,7 +74,7 @@
       <dependency>
         <groupId>io.projectreactor</groupId>
         <artifactId>reactor-core</artifactId>
-        <version>3.4.27</version>
+        <version>3.6.2</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
