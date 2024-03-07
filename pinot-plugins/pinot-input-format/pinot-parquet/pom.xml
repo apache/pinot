@@ -56,17 +56,19 @@
       <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-mapreduce-client-core</artifactId>
-      <scope>${hadoop.dependencies.scope}</scope>
-    </dependency>
-    <dependency>
       <groupId>org.codehaus.woodstox</groupId>
       <artifactId>stax2-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop.thirdparty</groupId>
       <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
+    </dependency>
+
+    <!-- Used for Parquet Writer in tests -->
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-mapreduce-client-core</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

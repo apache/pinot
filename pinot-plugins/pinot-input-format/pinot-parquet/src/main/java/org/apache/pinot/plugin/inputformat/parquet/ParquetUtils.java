@@ -26,13 +26,11 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
-import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.avro.AvroReadSupport;
 import org.apache.parquet.avro.AvroSchemaConverter;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.ParquetReader;
-import org.apache.parquet.hadoop.ParquetWriter;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.MessageType;
 
@@ -53,15 +51,6 @@ public class ParquetUtils {
     //noinspection unchecked
     return AvroParquetReader.<GenericRecord>builder(path).disableCompatibility().withDataModel(GenericData.get())
         .withConf(getParquetHadoopConfiguration()).build();
-  }
-
-  /**
-   * Returns a ParquetWriter with the given path and schema.
-   */
-  public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
-      throws IOException {
-    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema).withConf(getParquetHadoopConfiguration())
-        .build();
   }
 
   /**
