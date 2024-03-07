@@ -426,14 +426,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   private Map<String, RoaringBitmap> getMatchingKeysMap(String key) {
-    String startingKey = _postingListMap.ceilingKey(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR);
-    if (startingKey == null || !startingKey.startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
-      // No values with this key exist
-      return Collections.emptyMap();
-    }
-
-    return _postingListMap.subMap(startingKey, true,
-        _postingListMap.floorKey(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR_NEXT_CHAR), true);
+    return _postingListMap.subMap(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR, false,
+        key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR_NEXT_CHAR, false);
   }
 
   @Override
