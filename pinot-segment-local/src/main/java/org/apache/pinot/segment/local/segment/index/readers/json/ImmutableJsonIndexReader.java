@@ -329,6 +329,13 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     } else if (predicateType == Predicate.Type.RANGE) {
       RangePredicate rangePredicate = (RangePredicate) predicate;
       FieldSpec.DataType rangeDataType = rangePredicate.getRangeDataType();
+      // Simplify to only support numeric and string types
+      if (rangeDataType.isNumeric()) {
+        rangeDataType = FieldSpec.DataType.DOUBLE;
+      } else {
+        rangeDataType = FieldSpec.DataType.STRING;
+      }
+
       boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
       boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
       boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();

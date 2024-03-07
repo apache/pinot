@@ -69,7 +69,7 @@ public class RangePredicate extends BasePredicate {
     int upperLength = upper.length();
     _upperInclusive = upper.charAt(upperLength - 1) == UPPER_INCLUSIVE;
     _upperBound = upper.substring(0, upperLength - 1);
-    _rangeDataType = null;
+    _rangeDataType = FieldSpec.DataType.UNKNOWN;
   }
 
   public RangePredicate(ExpressionContext lhs, boolean lowerInclusive, String lowerBound, boolean upperInclusive,

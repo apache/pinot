@@ -23,10 +23,10 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
@@ -298,26 +298,21 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         return new RoaringBitmap();
       }
     } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
-      String ceilingKey = _postingListMap.ceilingKey(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR);
-      if (ceilingKey == null || !ceilingKey.startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
-        // No values with this key exist
+      Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
+      if (subMap.isEmpty()) {
         return new RoaringBitmap();
       }
-
       Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
-      MutableRoaringBitmap result = null;
-      char nextChar = BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + 1;
-      SortedMap<String, RoaringBitmap> subMap =
-          _postingListMap.subMap(ceilingKey, true, _postingListMap.floorKey(key + nextChar), true);
+      RoaringBitmap result = null;
 
       for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
         if (!pattern.matcher(entry.getKey().substring(key.length() + 1)).matches()) {
           continue;
         }
         if (result == null) {
-          result = entry.getValue().toMutableRoaringBitmap();
+          result = entry.getValue().clone();
         } else {
-          result.or(entry.getValue().toMutableRoaringBitmap());
+          result.or(entry.getValue());
         }
       }
 
@@ -325,26 +320,28 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         return new RoaringBitmap();
       } else {
         if (matchingDocIds == null) {
-          return result.toRoaringBitmap();
+          return result;
         } else {
-          matchingDocIds.and(result.toRoaringBitmap());
+          matchingDocIds.and(result);
           return matchingDocIds;
         }
       }
     } else if (predicateType == Predicate.Type.RANGE) {
-      String ceilingKey = _postingListMap.ceilingKey(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR);
-      if (ceilingKey == null || !ceilingKey.startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
-        // No values with this key exist
+      Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
+      if (subMap.isEmpty()) {
         return new RoaringBitmap();
       }
-
-      MutableRoaringBitmap result = null;
-      char nextChar = BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + 1;
-      SortedMap<String, RoaringBitmap> subMap =
-          _postingListMap.subMap(ceilingKey, true, _postingListMap.floorKey(key + nextChar), true);
+      RoaringBitmap result = null;
 
       RangePredicate rangePredicate = (RangePredicate) predicate;
       FieldSpec.DataType rangeDataType = rangePredicate.getRangeDataType();
+      // Simplify to only support numeric and string types
+      if (rangeDataType.isNumeric()) {
+        rangeDataType = FieldSpec.DataType.DOUBLE;
+      } else {
+        rangeDataType = FieldSpec.DataType.STRING;
+      }
+
       boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
       boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
       boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
@@ -362,9 +359,9 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
                 : rangeDataType.compare(valueObj, upperBound) < 0);
         if (lowerCompareResult && upperCompareResult) {
           if (result == null) {
-            result = entry.getValue().toMutableRoaringBitmap();
+            result = entry.getValue().clone();
           } else {
-            result.or(entry.getValue().toMutableRoaringBitmap());
+            result.or(entry.getValue());
           }
         }
       }
@@ -373,9 +370,9 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         return new RoaringBitmap();
       } else {
         if (matchingDocIds == null) {
-          return result.toRoaringBitmap();
+          return result;
         } else {
-          matchingDocIds.and(result.toRoaringBitmap());
+          matchingDocIds.and(result);
           return matchingDocIds;
         }
       }
@@ -389,15 +386,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
     _readLock.lock();
     try {
-      String ceilingKey = _postingListMap.ceilingKey(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR);
-      if (ceilingKey == null || !ceilingKey.startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
-        // No values with this key exist
-        return matchingDocsMap;
-      }
-      char nextChar = BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + 1;
-      SortedMap<String, RoaringBitmap> subMap =
-          _postingListMap.subMap(ceilingKey, true, _postingListMap.floorKey(key + nextChar), true);
-
+      Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
       for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
         MutableRoaringBitmap flattenedDocIds = entry.getValue().toMutableRoaringBitmap();
         PeekableIntIterator it = flattenedDocIds.getIntIterator();
@@ -434,6 +423,17 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       values[i] = docIdToValues.get(docIds[i]);
     }
     return values;
+  }
+
+  private Map<String, RoaringBitmap> getMatchingKeysMap(String key) {
+    String startingKey = _postingListMap.ceilingKey(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR);
+    if (startingKey == null || !startingKey.startsWith(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR)) {
+      // No values with this key exist
+      return Collections.emptyMap();
+    }
+
+    return _postingListMap.subMap(startingKey, true,
+        _postingListMap.floorKey(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR_NEXT_CHAR), true);
   }
 
   @Override
