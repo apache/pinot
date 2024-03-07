@@ -188,7 +188,8 @@ public class BitSlicedRangeIndexReader implements RangeIndexReader<ImmutableRoar
         if (min == max) {
           return rangeBitmap.eq(min).toMutableRoaringBitmap();
         }
-        return rangeBitmap.between(min, max).toMutableRoaringBitmap();
+        // TODO: found bug in between() and use gte(lte) as a workaround for now.
+        return rangeBitmap.gte(min, rangeBitmap.lte(max)).toMutableRoaringBitmap();
       }
       return rangeBitmap.lte(max).toMutableRoaringBitmap();
     } else {
