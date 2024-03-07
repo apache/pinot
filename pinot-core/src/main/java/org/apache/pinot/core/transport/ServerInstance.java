@@ -161,13 +161,13 @@ public final class ServerInstance {
     }
     ServerInstance that = (ServerInstance) o;
     // Only check instanceId because it can identify an instance within the same query
-    return Objects.equals(_instanceId, that._instanceId);
+    return _instanceId.equals(that._instanceId);
   }
 
   @Override
   public int hashCode() {
     // Only hash instanceId because it can identify an instance within the same query
-    return Objects.hashCode(_instanceId);
+    return _instanceId.hashCode();
   }
 
   @Override

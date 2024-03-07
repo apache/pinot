@@ -25,6 +25,7 @@ import org.testng.annotations.Test;
 public class ServerInstanceTest {
   @Test
   public void equalsVerifier() {
-    EqualsVerifier.configure().forClass(ServerInstance.class).withOnlyTheseFields("_instanceId").verify();
+    EqualsVerifier.configure().forClass(ServerInstance.class).withOnlyTheseFields("_instanceId")
+        .withNonnullFields("_instanceId").verify();
   }
 }
