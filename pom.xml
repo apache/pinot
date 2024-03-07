@@ -203,6 +203,7 @@
     <jline.version>3.24.1</jline.version>
     <wildfly.version>1.7.0.Final</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
+    <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
   </properties>
 
   <profiles>
@@ -972,6 +973,45 @@
         <artifactId>jettison</artifactId>
         <version>${jettison.version}</version>
       </dependency>
+
+      <!-- Consolidate eclipse jetty dependencies for hadoop/spark/pulsar -->
+      <dependency>
+        <groupId>org.eclipse.jetty.websocket</groupId>
+        <artifactId>websocket-client</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-server</artifactId>
+        <version>${eclipse.jetty.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-servlet</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util-ajax</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-webapp</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+
       <!-- Upgrade hadoop-common dependency from hadoop-shaded-protobuf_3_7 to hadoop-shaded-protobuf_3_21 -->
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
