@@ -61,4 +61,15 @@ public class CalciteSchemaBuilder {
     }
     return rootSchema;
   }
+
+  public static CalciteSchema asSubSchema(Schema root, String name) {
+    CalciteSchema subSchema = CalciteSchema.createRootSchema(false, false, name, root);
+    SchemaPlus schemaPlus = subSchema.plus();
+    for (Map.Entry<String, List<Function>> e : FunctionRegistry.getRegisteredCalciteFunctionMap().entrySet()) {
+      for (Function f : e.getValue()) {
+        schemaPlus.add(e.getKey(), f);
+      }
+    }
+    return subSchema;
+  }
 }

@@ -20,8 +20,13 @@ package org.apache.pinot.query.catalog;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.jdbc.CalciteSchema;
+import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelProtoDataType;
 import org.apache.calcite.schema.Function;
@@ -30,6 +35,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -44,7 +50,13 @@ import static java.util.Objects.requireNonNull;
  */
 public class PinotCatalog implements Schema {
 
+  public static final String DEFAULT_DB_NAME = "default";
+
   private final TableCache _tableCache;
+
+  private final Map<String, CalciteSchema> _subCatalog;
+
+  private final String _databaseName;
 
   /**
    * PinotCatalog needs have access to the actual {@link TableCache} object because TableCache hosts the actual
@@ -52,6 +64,32 @@ public class PinotCatalog implements Schema {
    */
   public PinotCatalog(TableCache tableCache) {
     _tableCache = tableCache;
+    _databaseName = null;
+    // create all databases
+    // TODO: we need to monitor table cache changes to register newly created databases
+    // TODO: we also need to monitor table that needs to be put into the right places
+    _subCatalog = constructSubCatalogs(_tableCache);
+  }
+
+  private PinotCatalog(String databaseName, TableCache tableCache) {
+    _tableCache = tableCache;
+    _databaseName = databaseName;
+    _subCatalog = null;
+  }
+
+  private Map<String, CalciteSchema> constructSubCatalogs(TableCache tableCache) {
+    Map<String, CalciteSchema> subCatalog = new HashMap<>();
+    for (String physicalTableName : tableCache.getTableNameMap().keySet()) {
+      String[] nameSplit = StringUtils.split(physicalTableName, '.');
+      if (nameSplit.length > 1) {
+        String databaseName = nameSplit[0];
+        subCatalog.putIfAbsent(databaseName,
+            CalciteSchemaBuilder.asSubSchema(new PinotCatalog(databaseName, tableCache), databaseName));
+      }
+    }
+    subCatalog.put(DEFAULT_DB_NAME,
+        CalciteSchemaBuilder.asSubSchema(new PinotCatalog(DEFAULT_DB_NAME, tableCache), DEFAULT_DB_NAME));
+    return subCatalog;
   }
 
   /**
@@ -61,12 +99,22 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Table getTable(String name) {
-    String tableName = TableNameBuilder.extractRawTableName(name);
+    String rawTableName = TableNameBuilder.extractRawTableName(name);
+    String tableName;
+    if (_databaseName != null) {
+      tableName = constructPhysicalTableName(_databaseName, rawTableName);
+    } else {
+      tableName = rawTableName;
+    }
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
     if (schema == null) {
       throw new IllegalArgumentException(String.format("Could not find schema for table: '%s'", tableName));
     }
     return new PinotTable(schema);
+  }
+
+  public static String constructPhysicalTableName(String databaseName, String tableName) {
+    return databaseName.equals(DEFAULT_DB_NAME) ? tableName : databaseName + "." + tableName;
   }
 
   /**
@@ -75,7 +123,14 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    return _tableCache.getTableNameMap().keySet();
+    if (_databaseName != null) {
+      return _databaseName.equals(DEFAULT_DB_NAME) ? _tableCache.getTableNameMap().keySet().stream()
+          .filter(n -> StringUtils.split(n, '.').length == 1).collect(Collectors.toSet())
+          : _tableCache.getTableNameMap().keySet().stream().filter(n -> n.startsWith(_databaseName))
+              .collect(Collectors.toSet());
+    } else {
+      return Collections.emptySet();
+    }
   }
 
   @Override
@@ -108,12 +163,16 @@ public class PinotCatalog implements Schema {
 
   @Override
   public Schema getSubSchema(String name) {
-    return null;
+    if (_subCatalog != null && _subCatalog.containsKey(name)) {
+      return _subCatalog.get(name).schema;
+    } else {
+      return null;
+    }
   }
 
   @Override
   public Set<String> getSubSchemaNames() {
-    return Collections.emptySet();
+    return _subCatalog.keySet();
   }
 
   @Override
