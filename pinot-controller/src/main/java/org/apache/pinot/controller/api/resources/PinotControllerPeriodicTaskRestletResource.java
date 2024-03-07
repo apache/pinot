@@ -32,9 +32,11 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -68,7 +70,7 @@ public class PinotControllerPeriodicTaskRestletResource {
   public Response runPeriodicTask(
       @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
       @ApiParam(value = "Name of the table") @QueryParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType) {
+      @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType, @Context HttpHeaders headers) {
 
     if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
       throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
@@ -76,7 +78,7 @@ public class PinotControllerPeriodicTaskRestletResource {
     }
 
     if (tableName != null) {
-      tableName = tableName.trim();
+      tableName = DatabaseUtils.translateTableName(tableName, headers).trim();
       List<String> matchingTableNamesWithType = ResourceUtils
           .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableType),
               LOGGER);

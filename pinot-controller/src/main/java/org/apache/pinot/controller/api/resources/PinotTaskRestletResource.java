@@ -615,12 +615,13 @@ public class PinotTaskRestletResource {
   @ApiOperation("Fetch cron scheduler job keys")
   public Map<String, Object> getCronSchedulerJobDetails(
       @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
-      @ApiParam(value = "Task type") @QueryParam("taskType") String taskType)
+      @ApiParam(value = "Task type") @QueryParam("taskType") String taskType, @Context HttpHeaders headers)
       throws SchedulerException {
     Scheduler scheduler = _pinotTaskManager.getScheduler();
     if (scheduler == null) {
       throw new NotFoundException("Task scheduler is disabled");
     }
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     JobKey jobKey = JobKey.jobKey(tableName, taskType);
     if (!scheduler.checkExists(jobKey)) {
       throw new NotFoundException(

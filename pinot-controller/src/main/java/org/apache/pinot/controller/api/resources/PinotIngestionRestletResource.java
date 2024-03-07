@@ -39,10 +39,12 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -139,9 +141,10 @@ public class PinotIngestionRestletResource {
           String tableNameWithType, @ApiParam(value =
       "Batch config Map as json string. Must pass inputFormat, and optionally record reader properties. e.g. "
           + "{\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
-      FormDataMultiPart fileUpload, @Suspended final AsyncResponse asyncResponse) {
+      FormDataMultiPart fileUpload, @Suspended final AsyncResponse asyncResponse, @Context HttpHeaders headers) {
+    String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
-      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(fileUpload)));
+      asyncResponse.resume(ingestData(translatedTableName, batchConfigMapStr, new DataPayload(fileUpload)));
     } catch (IllegalArgumentException e) {
       asyncResponse.resume(new ControllerApplicationException(LOGGER, String
           .format("Got illegal argument when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
@@ -190,9 +193,10 @@ public class PinotIngestionRestletResource {
       "Batch config Map as json string. Must pass inputFormat, and optionally input FS properties. e.g. "
           + "{\"inputFormat\":\"json\"}", required = true) @QueryParam("batchConfigMapStr") String batchConfigMapStr,
       @ApiParam(value = "URI of file to upload", required = true) @QueryParam("sourceURIStr") String sourceURIStr,
-      @Suspended final AsyncResponse asyncResponse) {
+      @Suspended final AsyncResponse asyncResponse, @Context HttpHeaders headers) {
+    String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
-      asyncResponse.resume(ingestData(tableNameWithType, batchConfigMapStr, new DataPayload(new URI(sourceURIStr))));
+      asyncResponse.resume(ingestData(translatedTableName, batchConfigMapStr, new DataPayload(new URI(sourceURIStr))));
     } catch (IllegalArgumentException e) {
       asyncResponse.resume(new ControllerApplicationException(LOGGER, String
           .format("Got illegal argument when ingesting file into table: %s. %s", tableNameWithType, e.getMessage()),
