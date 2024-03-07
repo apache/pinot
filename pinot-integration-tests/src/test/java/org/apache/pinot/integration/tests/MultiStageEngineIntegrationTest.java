@@ -819,8 +819,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
   private void checkQueryResultForDBTest(String column, String tableName, @Nullable String database)
       throws Exception {
-    String query = (StringUtils.isNotBlank(database) ? "SET database='" + database + "'; " : "") +
-        "select max(" + column + ") from " + tableName + ";";
+    String query = (StringUtils.isNotBlank(database) ? "SET database='" + database + "'; " : "")
+        + "select max(" + column + ") from " + tableName + ";";
     // max value of 'ActualElapsedTime'
     long expectedValue = 678;
     JsonNode jsonNode = postQuery(query);
