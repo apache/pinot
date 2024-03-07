@@ -38,7 +38,6 @@
     <phase.prop>package</phase.prop>
     <pinot.root>${basedir}/../../..</pinot.root>
     <pulsar.version>2.11.0</pulsar.version>
-    <jetty-server.version>9.4.51.v20230217</jetty-server.version>
     <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
     <jersey-container-grizzly2-http.version>2.39</jersey-container-grizzly2-http.version>
@@ -54,17 +53,6 @@
   </properties>
 
   <dependencies>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-server</artifactId>
-      <version>${jetty-server.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>javax.servlet-api</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>pulsar</artifactId>
@@ -157,8 +145,11 @@
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-server</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-servlet</artifactId>
-      <version>${jetty-server.version}</version>
     </dependency>
     <dependency>
       <groupId>com.squareup.okio</groupId>
