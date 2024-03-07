@@ -44,7 +44,7 @@ class SegmentMetadataPropertyReader extends PropertiesReader {
   protected void parseProperty(final String line) {
     // if newer version of the segment metadata(based on version value in the property configuration header)
     // skip the regex based parsing of the line content and splitting the content based on first occurrence of separator
-    if (!_skipUnescapePropertyName) {
+    if (!_skipUnescapePropertyName && getCommentLines().size() > 0) {
       setSkipUnescapePropertyNameFlag();
     }
 
