@@ -20,6 +20,7 @@ package org.apache.pinot.core.transport;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.utils.config.InstanceUtils;
@@ -28,7 +29,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
-public class ServerInstance {
+public final class ServerInstance {
 
   public enum RoutingType {
     NETTY, GRPC, NETTY_TLS
@@ -160,13 +161,13 @@ public class ServerInstance {
     }
     ServerInstance that = (ServerInstance) o;
     // Only check instanceId because it can identify an instance within the same query
-    return _instanceId.equals(that._instanceId);
+    return Objects.equals(_instanceId, that._instanceId);
   }
 
   @Override
   public int hashCode() {
     // Only hash instanceId because it can identify an instance within the same query
-    return _instanceId.hashCode();
+    return Objects.hashCode(_instanceId);
   }
 
   @Override
