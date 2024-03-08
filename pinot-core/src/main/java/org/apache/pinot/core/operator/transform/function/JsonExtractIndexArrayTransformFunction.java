@@ -27,8 +27,6 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-
 
 public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "jsonExtractIndexArray";
