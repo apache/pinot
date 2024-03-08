@@ -79,16 +79,16 @@ public class JsonIndexTest {
     // @formatter: off
     // CHECKSTYLE:OFF
     String[] records = new String[]{
-        "{" + "\"name\":\"adam\"," + "\"age\":20," + "\"addresses\":["
+        "{" + "\"name\":\"adam\"," + "\"age\":20," + "\"score\":1.25," + "\"addresses\":["
             + "   {\"street\":\"street-00\",\"country\":\"us\"}," + "   {\"street\":\"street-01\",\"country\":\"us\"},"
             + "   {\"street\":\"street-02\",\"country\":\"ca\"}]," + "\"skills\":[\"english\",\"programming\"]" + "}",
-        "{" + "\"name\":\"bob\"," + "\"age\":25," + "\"addresses\":["
+        "{" + "\"name\":\"bob\"," + "\"age\":25," + "\"score\":1.94," + "\"addresses\":["
             + "   {\"street\":\"street-10\",\"country\":\"ca\"}," + "   {\"street\":\"street-11\",\"country\":\"us\"},"
             + "   {\"street\":\"street-12\",\"country\":\"in\"}]," + "\"skills\":[]" + "}",
-        "{" + "\"name\":\"charles\"," + "\"age\":30," + "\"addresses\":["
+        "{" + "\"name\":\"charles\"," + "\"age\":30," + "\"score\":0.90,"  + "\"addresses\":["
             + "   {\"street\":\"street-20\",\"country\":\"jp\"}," + "   {\"street\":\"street-21\",\"country\":\"kr\"},"
             + "   {\"street\":\"street-22\",\"country\":\"cn\"}]," + "\"skills\":[\"japanese\",\"korean\",\"chinese\"]"
-            + "}", "{" + "\"name\":\"david\"," + "\"age\":35," + "\"addresses\":["
+            + "}", "{" + "\"name\":\"david\"," + "\"age\":35," + "\"score\":0.9999,"  + "\"addresses\":["
         + "   {\"street\":\"street-30\",\"country\":\"ca\",\"types\":[\"home\",\"office\"]},"
         + "   {\"street\":\"street-31\",\"country\":\"ca\"}," + "   {\"street\":\"street-32\",\"country\":\"ca\"}],"
         + "\"skills\":null" + "}"
@@ -136,12 +136,23 @@ public class JsonIndexTest {
         matchingDocIds = getMatchingDocIds(indexReader, "\"age\" <= 25");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1});
 
-
         matchingDocIds = getMatchingDocIds(indexReader, "\"name\" > 'adam'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{1, 2, 3});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"name\" > 'a'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"score\" > 1");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"score\" > 1.0");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"score\" > 0.99");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "REGEXP_LIKE(\"score\", '[0-1]\\.[6-9].*')");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{1, 2, 3});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" NOT IN ('street-10', 'street-22')");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 3});
@@ -373,7 +384,7 @@ public class JsonIndexTest {
             {{"3"}, {}}
         };
         for (int i = 0; i < testKeys.length; i++) {
-          Map<String, ImmutableRoaringBitmap> context =
+          Map<String, RoaringBitmap> context =
               offHeapIndexReader.getValueToFlattenedDocIdsMap(testKeys[i][0], testKeys[i][1]);
           String[][] values = offHeapIndexReader.getValuesForMv(docMask, 2, context);
 

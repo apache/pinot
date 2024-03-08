@@ -50,7 +50,7 @@ public interface JsonIndexReader extends IndexReader {
    * @param filterJsonString The filter to apply on the flattened docs
    * @return Map from each unique value for the jsonPathKey value to the flattened docId posting list
    */
-  Map<String, ImmutableRoaringBitmap> getValueToFlattenedDocIdsMap(String jsonPathKey,
+  Map<String, RoaringBitmap> getValueToFlattenedDocIdsMap(String jsonPathKey,
       @Nullable String filterJsonString);
 
   /**
@@ -61,7 +61,7 @@ public interface JsonIndexReader extends IndexReader {
    *                                     posting list
    * @return String[][] where String[i] is the mv array for docIds[i]
    */
-  String[][] getValuesForMv(int[] docIds, int length, Map<String, ImmutableRoaringBitmap> matchingValueToFlattenedDocs);
+  String[][] getValuesForMv(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToFlattenedDocs);
 
   /**
    * For a JSON key, returns a Map from each value to the docId posting list. This map should be  used to avoid reading

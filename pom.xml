@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>1.1.0-SNAPSHOT</version>
+  <version>1.2.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -132,8 +132,8 @@
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.9</swagger.version>
-    <hadoop.version>3.2.4</hadoop.version>
-    <antlr.version>4.6</antlr.version>
+    <hadoop.version>3.3.6</hadoop.version>
+    <antlr.version>4.13.1</antlr.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.0</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
@@ -159,7 +159,7 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.1</stax2-api.version>
-    <aws.sdk.version>2.20.137</aws.sdk.version>
+    <aws.sdk.version>2.25.3</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
     <testng.version>7.9.0</testng.version>
     <woodstox.version>6.4.0</woodstox.version>
@@ -193,14 +193,18 @@
     <scala.version>2.12.18</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
-    <!-- Configuration for Scala -->
-    <scala.version>2.12.18</scala.version>
-    <scala.compat.version>2.12</scala.compat.version>
-
     <flink.version>1.14.6</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
 
-    <kotlin.stdlib.version>1.7.22</kotlin.stdlib.version>
+    <kotlin.stdlib.version>1.9.22</kotlin.stdlib.version>
+    <okio.version>3.8.0</okio.version>
+    <kerby.version>2.0.3</kerby.version>
+    <!-- Newer version jline requires java 21 -->
+    <jline.version>3.24.1</jline.version>
+    <wildfly.version>1.7.0.Final</wildfly.version>
+    <jettison.version>1.5.4</jettison.version>
+    <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
+    <wildfly-openssl.version>1.1.3.Final</wildfly-openssl.version>
   </properties>
 
   <profiles>
@@ -385,7 +389,7 @@
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
         <artifactId>equalsverifier</artifactId>
-        <version>3.14.1</version>
+        <version>3.15.8</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -672,10 +676,6 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>org.apache.yetus</groupId>
-            <artifactId>audience-annotations</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -781,20 +781,8 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.apache.yetus</groupId>
-            <artifactId>audience-annotations</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.codehaus.woodstox</groupId>
-            <artifactId>stax2-api</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-configuration2</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.apache.commons</groupId>
@@ -803,6 +791,10 @@
           <exclusion>
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop.thirdparty</groupId>
+            <artifactId>hadoop-shaded-protobuf_3_7</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -847,6 +839,10 @@
           <exclusion>
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -897,10 +893,6 @@
         <scope>provided</scope>
         <exclusions>
           <exclusion>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.codehaus.jackson</groupId>
             <artifactId>jackson-core-asl</artifactId>
           </exclusion>
@@ -932,6 +924,10 @@
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -939,6 +935,96 @@
         <artifactId>hadoop-hdfs-client</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
+      </dependency>
+      <!-- Solve the dependency converge issue within hadoop libraries -->
+      <dependency>
+        <groupId>ch.qos.reload4j</groupId>
+        <artifactId>reload4j</artifactId>
+        <version>1.2.25</version>
+      </dependency>
+      <!-- Solve the dependency converge issue between hadoop-common and orc-core -->
+      <dependency>
+        <groupId>javax.xml.bind</groupId>
+        <artifactId>jaxb-api</artifactId>
+        <version>2.3.1</version>
+      </dependency>
+      <!-- The following dependencies are added to solve the vulnerabilities of the old version -->
+      <dependency>
+        <groupId>org.apache.kerby</groupId>
+        <artifactId>kerb-core</artifactId>
+        <version>${kerby.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.kerby</groupId>
+        <artifactId>kerb-simplekdc</artifactId>
+        <version>${kerby.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jline</groupId>
+        <artifactId>jline</artifactId>
+        <version>${jline.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.wildfly.common</groupId>
+        <artifactId>wildfly-common</artifactId>
+        <version>${wildfly.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.jettison</groupId>
+        <artifactId>jettison</artifactId>
+        <version>${jettison.version}</version>
+      </dependency>
+
+      <!-- Consolidate eclipse jetty dependencies for hadoop/spark/pulsar -->
+      <dependency>
+        <groupId>org.eclipse.jetty.websocket</groupId>
+        <artifactId>websocket-client</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-server</artifactId>
+        <version>${eclipse.jetty.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-servlet</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util-ajax</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-webapp</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+
+      <!-- Upgrade hadoop-common dependency from hadoop-shaded-protobuf_3_7 to hadoop-shaded-protobuf_3_21 -->
+      <dependency>
+        <groupId>org.apache.hadoop.thirdparty</groupId>
+        <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
+        <version>1.2.0</version>
+      </dependency>
+
+      <!-- Upgrade azure-data-lake-store-sdk dependency-->
+      <dependency>
+        <groupId>org.wildfly.openssl</groupId>
+        <artifactId>wildfly-openssl</artifactId>
+        <version>${wildfly-openssl.version}</version>
       </dependency>
 
       <!-- Metrics -->
@@ -1198,13 +1284,7 @@
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
-        <version>5.5.0</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-inline</artifactId>
-        <version>5.2.0</version>
+        <version>5.11.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -1215,7 +1295,7 @@
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>2.2.220</version>
+        <version>2.2.224</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
@@ -1350,6 +1430,21 @@
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-stdlib</artifactId>
         <version>${kotlin.stdlib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-stdlib-common</artifactId>
+        <version>${kotlin.stdlib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.okio</groupId>
+        <artifactId>okio</artifactId>
+        <version>${okio.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.okio</groupId>
+        <artifactId>okio-jvm</artifactId>
+        <version>${okio.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
@@ -1497,7 +1592,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-eclipse-plugin</artifactId>
-          <version>2.9</version>
+          <version>2.10</version>
           <configuration>
             <downloadSources>true</downloadSources>
             <downloadJavadocs>true</downloadJavadocs>
@@ -1590,12 +1685,12 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-release-plugin</artifactId>
-          <version>2.5.3</version>
+          <version>3.0.1</version>
           <dependencies>
             <dependency>
               <groupId>org.apache.maven.scm</groupId>
               <artifactId>maven-scm-provider-gitexe</artifactId>
-              <version>1.9.4</version>
+              <version>2.0.1</version>
             </dependency>
           </dependencies>
           <configuration>
@@ -1626,7 +1721,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.0</version>
+          <version>3.12.1</version>
           <configuration>
             <release>${jdk.version}</release>
             <source>${jdk.version}</source>
@@ -2096,7 +2191,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
-        <version>3.3.0</version>
+        <version>3.5.0</version>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>

@@ -295,8 +295,7 @@ public class BrokerRequestToQueryContextConverterTest {
       List<FilterContext> children = filter.getChildren();
       assertEquals(children.size(), 2);
       assertEquals(children.get(0), FilterContext.forPredicate(
-          new RangePredicate(ExpressionContext.forIdentifier("foo"), false, "15", false, "*",
-              FieldSpec.DataType.INT)));
+          new RangePredicate(ExpressionContext.forIdentifier("foo"), false, "15", false, "*", FieldSpec.DataType.INT)));
       FilterContext orFilter = children.get(1);
       assertEquals(orFilter.getType(), FilterContext.Type.OR);
       assertEquals(orFilter.getChildren().size(), 2);

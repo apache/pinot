@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -34,7 +35,7 @@ public class JsonExtractIndexArrayTransformFunction extends BaseTransformFunctio
   private TransformResultMetadata _resultMetadata;
   private JsonIndexReader _jsonIndexReader;
   private Object _defaultValue;
-  private Map<String, ImmutableRoaringBitmap> _valueToMatchingFlattenedDocIdsMap;
+  private Map<String, RoaringBitmap> _valueToMatchingFlattenedDocIdsMap;
   @Override
   public String getName() {
     return FUNCTION_NAME;
