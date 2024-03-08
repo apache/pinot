@@ -204,6 +204,7 @@
     <wildfly.version>1.7.0.Final</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
+    <wildfly-openssl.version>1.1.3.Final</wildfly-openssl.version>
   </properties>
 
   <profiles>
@@ -1017,6 +1018,13 @@
         <groupId>org.apache.hadoop.thirdparty</groupId>
         <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
         <version>1.2.0</version>
+      </dependency>
+
+      <!-- Upgrade azure-data-lake-store-sdk dependency-->
+      <dependency>
+        <groupId>org.wildfly.openssl</groupId>
+        <artifactId>wildfly-openssl</artifactId>
+        <version>${wildfly-openssl.version}</version>
       </dependency>
 
       <!-- Metrics -->
