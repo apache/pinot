@@ -305,7 +305,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
-  private List<Integer> _filteredMessageOffsets = new ArrayList<>();
+  private final List<Integer> _filteredMessageOffsets = new ArrayList<>();
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
