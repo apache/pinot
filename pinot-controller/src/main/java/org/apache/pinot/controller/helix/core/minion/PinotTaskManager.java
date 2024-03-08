@@ -544,10 +544,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       String tableName = tableConfig.getTableName();
       try {
         String minionInstanceTag = taskGenerator.getMinionInstanceTag(tableConfig);
-        List<PinotTaskConfig> pinotTaskConfig = taskGenerator.generateTasks(List.of(tableConfig));
         List<PinotTaskConfig> presentTaskConfig =
             pinotMinionInstanceToTaskConfigs.computeIfAbsent(minionInstanceTag, k -> new ArrayList<>());
-        presentTaskConfig.addAll(pinotTaskConfig);
+        taskGenerator.generateTasks(List.of(tableConfig), presentTaskConfig);
+        pinotMinionInstanceToTaskConfigs.put(minionInstanceTag, presentTaskConfig);
         long successRunTimestamp = System.currentTimeMillis();
         _taskManagerStatusCache.saveTaskGeneratorInfo(tableName, taskType,
             taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(successRunTimestamp));

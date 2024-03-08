@@ -55,6 +55,11 @@ public interface PinotTaskGenerator {
       throws Exception;
 
   /**
+   * Generates a list of task based on the given table configs, it also gets list of existing task configs
+   */
+  void generateTasks(List<TableConfig> tableConfigs, List<PinotTaskConfig> pinotTaskConfigs) throws Exception;
+
+  /**
    * Returns the timeout in milliseconds for each task, 3600000 (1 hour) by default.
    */
   default long getTaskTimeoutMs() {

@@ -125,6 +125,12 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   }
 
   @Override
+  public void generateTasks(List<TableConfig> tableConfigs, List<PinotTaskConfig> pinotTaskConfigs)
+      throws Exception {
+    pinotTaskConfigs.addAll(generateTasks(tableConfigs));
+  }
+
+  @Override
   public String getMinionInstanceTag(TableConfig tableConfig) {
     TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
     if (tableTaskConfig != null) {
