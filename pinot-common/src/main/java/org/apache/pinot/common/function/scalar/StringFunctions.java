@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -47,6 +48,7 @@ public class StringFunctions {
 
   private final static Pattern LTRIM = Pattern.compile("^\\s+");
   private final static Pattern RTRIM = Pattern.compile("\\s+$");
+  private final static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 
   /**
@@ -830,5 +832,25 @@ public class StringFunctions {
   public static boolean like(String inputStr, String likePatternStr) {
     String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
     return regexpLike(inputStr, regexPatternStr);
+  }
+
+  /**
+   * Checks whether the input string can be parsed into a json node or not. Useful for scenarios where we want
+   * to filter out malformed json. In case of nulls, it is treated as valid json as in partial-upsert we might
+   * want to treat that column value as valid.
+   *
+   * @param inputStr Input string to test for valid json
+   */
+  @ScalarFunction
+  public static boolean isJson(String inputStr) {
+    try {
+      if (inputStr == null) {
+        return true;
+      }
+      OBJECT_MAPPER.readTree(inputStr);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
   }
 }
