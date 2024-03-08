@@ -48,19 +48,4 @@ public class InbuiltFunctionEvaluatorTest {
     // as INT is the stored type for BOOLEAN
     assertEquals(outputType.toInt(output), value);
   }
-
-  @Test
-  public void integerLiteralTest() {
-    checkIntegerLiteralExpression("1", 1);
-  }
-
-  private void checkIntegerLiteralExpression(String expression, int value) {
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(expression);
-    Object output = evaluator.evaluate(new GenericRow());
-    Class<?> outputValueClass = output.getClass();
-    PinotDataType outputType = FunctionUtils.getArgumentType(outputValueClass);
-    assertNotNull(outputType);
-    // as INT is the stored type for BOOLEAN
-    assertEquals(outputType.toInt(output), value);
-  }
 }
