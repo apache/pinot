@@ -78,7 +78,6 @@ public abstract class BaseTransformFunctionTest {
   protected static final String BIG_DECIMAL_SV_COLUMN = "bigDecimalSV";
   protected static final String STRING_SV_COLUMN = "stringSV";
   protected static final String JSON_STRING_SV_COLUMN = "jsonSV";
-  protected static final String JSON_STRING_ARRAY_COLUMN = "jsonArray";
   protected static final String STRING_SV_NULL_COLUMN = "stringSVNull";
   protected static final String BYTES_SV_COLUMN = "bytesSV";
   protected static final String VECTOR_1_COLUMN = "vector1";
@@ -156,14 +155,12 @@ public abstract class BaseTransformFunctionTest {
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
       _jsonSVValues[i] = String.format(
           "{\"intVal\":%s, \"longVal\":%s, \"floatVal\":%s, \"doubleVal\":%s, \"bigDecimalVal\":%s, "
-              + "\"stringVal\":\"%s\"}", RANDOM.nextInt(), RANDOM.nextLong(), RANDOM.nextFloat(), RANDOM.nextDouble(),
+              + "\"stringVal\":\"%s\", "
+              + "\"intVals\":[0,1], \"longVals\":[0,1], \"floatVals\":[0.0,1.0], \"doubleVals\":[0.0,1.0], "
+              + "\"bigDecimalVals\":[0.0,1.0], \"stringVals\":[\"0\",\"1\"]}",
+              RANDOM.nextInt(), RANDOM.nextLong(), RANDOM.nextFloat(), RANDOM.nextDouble(),
           BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(RANDOM.nextInt())),
           df.format(RANDOM.nextInt() * RANDOM.nextDouble()));
-      _jsonArrayValues[i] = String.format(
-          "{\"intVals\":[%s,%s], \"longVals\":[%s,%s], \"floatVals\":[%s,%s], \"doubleVals\":[%s,%s], "
-          + "\"bigDecimalVals\":[%s,%s], \"stringVals\":[\"%s\",\"%s\"]}",
-          0, 1, 0L, 1L, 0.0f, 1.0f, 0.0, 1.0, BigDecimal.valueOf(0.0), BigDecimal.valueOf(1.0),
-          df.format(0.0), df.format(1.0));
       _stringAlphaNumericSVValues[i] = RandomStringUtils.randomAlphanumeric(26);
       _bytesSVValues[i] = RandomStringUtils.randomAlphanumeric(26).getBytes();
 
@@ -267,7 +264,6 @@ public abstract class BaseTransformFunctionTest {
       map.put(FLOAT_MV_COLUMN_2, ArrayUtils.toObject(_floatMV2Values[i]));
       map.put(DOUBLE_MV_COLUMN_2, ArrayUtils.toObject(_doubleMV2Values[i]));
       map.put(JSON_STRING_SV_COLUMN, _jsonSVValues[i]);
-      map.put(JSON_STRING_ARRAY_COLUMN, _jsonArrayValues[i]);
       GenericRow row = new GenericRow();
       row.init(map);
       rows.add(row);
@@ -281,7 +277,6 @@ public abstract class BaseTransformFunctionTest {
         .addMetric(BIG_DECIMAL_SV_COLUMN, FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension(STRING_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_STRING_SV_COLUMN, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(JSON_STRING_ARRAY_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_SV_NULL_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_SV_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_ALPHANUM_NULL_SV_COLUMN, FieldSpec.DataType.STRING)
@@ -310,7 +305,7 @@ public abstract class BaseTransformFunctionTest {
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN)
-            .setJsonIndexColumns(List.of(JSON_STRING_SV_COLUMN, JSON_STRING_ARRAY_COLUMN))
+            .setJsonIndexColumns(List.of(JSON_STRING_SV_COLUMN))
             .setNullHandlingEnabled(true).build();
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
