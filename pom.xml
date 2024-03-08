@@ -1361,7 +1361,7 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.24ea16</version>
+        <version>2.25ea10</version>
       </dependency>
       <dependency>
         <groupId>org.ow2.asm</groupId>
