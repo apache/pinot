@@ -16,40 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.creator;
 
-import java.io.IOException;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.index.IndexCreator;
+package org.apache.pinot.plugin.metrics.dropwizard;
+
+import nl.jqno.equalsverifier.EqualsVerifier;
+import org.testng.annotations.Test;
 
 
-/**
- * Index creator for json index.
- */
-public interface JsonIndexCreator extends IndexCreator {
-  char KEY_VALUE_SEPARATOR = '\0';
-  char KEY_VALUE_SEPARATOR_NEXT_CHAR = KEY_VALUE_SEPARATOR + 1;
-
-  @Override
-  default void add(@Nonnull Object value, int dictId)
-      throws IOException {
-    add((String) value);
+public class DropwizardMetricNameTest {
+  @Test
+  public void testEqualsContract() {
+    EqualsVerifier.forClass(DropwizardMetricName.class).verify();
   }
-
-  @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
-  }
-
-  /**
-   * Adds the next json value.
-   */
-  void add(String jsonString)
-      throws IOException;
-
-  /**
-   * Seals the index and flushes it to disk.
-   */
-  void seal()
-      throws IOException;
 }

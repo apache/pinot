@@ -133,7 +133,7 @@
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.9</swagger.version>
     <hadoop.version>3.3.6</hadoop.version>
-    <antlr.version>4.6</antlr.version>
+    <antlr.version>4.13.1</antlr.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.0</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
@@ -199,9 +199,11 @@
     <kotlin.stdlib.version>1.9.22</kotlin.stdlib.version>
     <okio.version>3.8.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
-    <jline.version>3.22.0</jline.version>
-    <wildfly.version>1.5.4.Final</wildfly.version>
-    <jettison.version>1.4.0</jettison.version>
+    <!-- Newer version jline requires java 21 -->
+    <jline.version>3.24.1</jline.version>
+    <wildfly.version>1.7.0.Final</wildfly.version>
+    <jettison.version>1.5.4</jettison.version>
+    <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
   </properties>
 
   <profiles>
@@ -673,10 +675,6 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>org.apache.yetus</groupId>
-            <artifactId>audience-annotations</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -782,20 +780,8 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.apache.yetus</groupId>
-            <artifactId>audience-annotations</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.codehaus.woodstox</groupId>
-            <artifactId>stax2-api</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-configuration2</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.apache.commons</groupId>
@@ -804,6 +790,10 @@
           <exclusion>
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop.thirdparty</groupId>
+            <artifactId>hadoop-shaded-protobuf_3_7</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -957,6 +947,7 @@
         <artifactId>jaxb-api</artifactId>
         <version>2.3.1</version>
       </dependency>
+      <!-- The following dependencies are added to solve the vulnerabilities of the old version -->
       <dependency>
         <groupId>org.apache.kerby</groupId>
         <artifactId>kerb-core</artifactId>
@@ -981,6 +972,51 @@
         <groupId>org.codehaus.jettison</groupId>
         <artifactId>jettison</artifactId>
         <version>${jettison.version}</version>
+      </dependency>
+
+      <!-- Consolidate eclipse jetty dependencies for hadoop/spark/pulsar -->
+      <dependency>
+        <groupId>org.eclipse.jetty.websocket</groupId>
+        <artifactId>websocket-client</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-server</artifactId>
+        <version>${eclipse.jetty.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-servlet</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util-ajax</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-webapp</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+
+      <!-- Upgrade hadoop-common dependency from hadoop-shaded-protobuf_3_7 to hadoop-shaded-protobuf_3_21 -->
+      <dependency>
+        <groupId>org.apache.hadoop.thirdparty</groupId>
+        <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
+        <version>1.2.0</version>
       </dependency>
 
       <!-- Metrics -->
@@ -1641,7 +1677,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-release-plugin</artifactId>
-          <version>2.5.3</version>
+          <version>3.0.1</version>
           <dependencies>
             <dependency>
               <groupId>org.apache.maven.scm</groupId>

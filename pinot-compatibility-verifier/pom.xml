@@ -67,10 +67,6 @@
       <artifactId>pinot-tools</artifactId>
       <exclusions>
         <exclusion>
-          <groupId>net.minidev</groupId>
-          <artifactId>json-smart</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>com.typesafe.netty</groupId>
           <artifactId>netty-reactive-streams</artifactId>
         </exclusion>

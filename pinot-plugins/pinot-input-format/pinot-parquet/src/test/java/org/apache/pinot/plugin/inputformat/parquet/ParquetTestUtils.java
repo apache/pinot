@@ -16,40 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.creator;
+package org.apache.pinot.plugin.inputformat.parquet;
 
 import java.io.IOException;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.index.IndexCreator;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.hadoop.fs.Path;
+import org.apache.parquet.avro.AvroParquetWriter;
+import org.apache.parquet.hadoop.ParquetWriter;
 
 
-/**
- * Index creator for json index.
- */
-public interface JsonIndexCreator extends IndexCreator {
-  char KEY_VALUE_SEPARATOR = '\0';
-  char KEY_VALUE_SEPARATOR_NEXT_CHAR = KEY_VALUE_SEPARATOR + 1;
+public class ParquetTestUtils {
 
-  @Override
-  default void add(@Nonnull Object value, int dictId)
+  private ParquetTestUtils() {
+  }
+
+  /**
+   * Returns a ParquetWriter with the given path and schema.
+   */
+  public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
       throws IOException {
-    add((String) value);
+    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema)
+        .withConf(ParquetUtils.getParquetHadoopConfiguration())
+        .build();
   }
-
-  @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
-  }
-
-  /**
-   * Adds the next json value.
-   */
-  void add(String jsonString)
-      throws IOException;
-
-  /**
-   * Seals the index and flushes it to disk.
-   */
-  void seal()
-      throws IOException;
 }
