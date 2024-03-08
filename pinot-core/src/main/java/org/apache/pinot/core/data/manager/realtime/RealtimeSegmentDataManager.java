@@ -918,6 +918,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
           new SegmentErrorInfo(now(), message, null)
       );
+    } else {
+      // Record that this batch has no data loss.
+      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 0L);
     }
   }
 
