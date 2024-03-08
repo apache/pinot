@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.EqualityUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -565,6 +566,39 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     }
 
     /**
+     * Compares the given values of the data type.
+     *
+     * return 0 if the values are equal
+     * return -1 if value1 is less than value2
+     * return 1 if value1 is greater than value2
+     */
+    public int compare(Object value1, Object value2) {
+      switch (this) {
+        case INT:
+          return Integer.compare((int) value1, (int) value2);
+        case LONG:
+          return Long.compare((long) value1, (long) value2);
+        case FLOAT:
+          return Float.compare((float) value1, (float) value2);
+        case DOUBLE:
+          return Double.compare((double) value1, (double) value2);
+        case BIG_DECIMAL:
+          return ((BigDecimal) value1).compareTo((BigDecimal) value2);
+        case BOOLEAN:
+          return Boolean.compare((boolean) value1, (boolean) value2);
+        case TIMESTAMP:
+          return Long.compare((long) value1, (long) value2);
+        case STRING:
+        case JSON:
+          return ((String) value1).compareTo((String) value2);
+        case BYTES:
+          return ByteArray.compare((byte[]) value1, (byte[]) value2);
+        default:
+          throw new IllegalStateException();
+      }
+    }
+
+    /**
      * Converts the given value of the data type to string.The input value for BYTES type should be byte[].
      */
     public String toString(Object value) {
@@ -635,8 +669,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public boolean isBackwardCompatibleWith(FieldSpec oldFieldSpec) {
 
     return EqualityUtils.isEqual(_name, oldFieldSpec._name)
-            && EqualityUtils.isEqual(_dataType, oldFieldSpec._dataType)
-            && EqualityUtils.isEqual(_isSingleValueField, oldFieldSpec._isSingleValueField);
+        && EqualityUtils.isEqual(_dataType, oldFieldSpec._dataType)
+        && EqualityUtils.isEqual(_isSingleValueField, oldFieldSpec._isSingleValueField);
   }
 
   public static class FieldSpecMetadata {

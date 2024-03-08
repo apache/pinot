@@ -21,6 +21,7 @@ package org.apache.pinot.common.request.context.predicate;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
 
 
@@ -43,6 +44,7 @@ public class RangePredicate extends BasePredicate {
   private final String _lowerBound;
   private final boolean _upperInclusive;
   private final String _upperBound;
+  private final FieldSpec.DataType _rangeDataType;
 
   /**
    * The range is formatted as 5 parts:
@@ -67,15 +69,17 @@ public class RangePredicate extends BasePredicate {
     int upperLength = upper.length();
     _upperInclusive = upper.charAt(upperLength - 1) == UPPER_INCLUSIVE;
     _upperBound = upper.substring(0, upperLength - 1);
+    _rangeDataType = FieldSpec.DataType.UNKNOWN;
   }
 
   public RangePredicate(ExpressionContext lhs, boolean lowerInclusive, String lowerBound, boolean upperInclusive,
-      String upperBound) {
+      String upperBound, FieldSpec.DataType rangeDataType) {
     super(lhs);
     _lowerInclusive = lowerInclusive;
     _lowerBound = lowerBound;
     _upperInclusive = upperInclusive;
     _upperBound = upperBound;
+    _rangeDataType = rangeDataType;
   }
 
   @Override
@@ -97,6 +101,10 @@ public class RangePredicate extends BasePredicate {
 
   public String getUpperBound() {
     return _upperBound;
+  }
+
+  public FieldSpec.DataType getRangeDataType() {
+    return _rangeDataType;
   }
 
   @Override
