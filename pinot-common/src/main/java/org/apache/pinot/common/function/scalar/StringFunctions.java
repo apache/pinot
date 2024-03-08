@@ -28,6 +28,7 @@ import java.util.Base64;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -840,8 +841,8 @@ public class StringFunctions {
    *
    * @param inputStr Input string to test for valid json
    */
-  @ScalarFunction
-  public static boolean isJson(String inputStr) {
+  @ScalarFunction(nullableParameters = true, names = {"isJson", "is_json"})
+  public static boolean isJson(@Nullable String inputStr) {
     try {
       if (inputStr == null) {
         return true;
