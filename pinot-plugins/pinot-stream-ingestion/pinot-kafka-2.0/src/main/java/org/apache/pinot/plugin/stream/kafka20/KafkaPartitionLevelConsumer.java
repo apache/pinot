@@ -72,8 +72,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     long firstOffset = startOffset;
     long lastOffset = startOffset;
     StreamMessageMetadata rowMetadata = null;
-    if (!consumerRecords.isEmpty()) {
-      firstOffset = consumerRecords.iterator().next().offset();
+    if (!messageAndOffsets.isEmpty()) {
+      firstOffset = messageAndOffsets.get(0).offset();
     }
     for (ConsumerRecord<String, Bytes> messageAndOffset : messageAndOffsets) {
       long offset = messageAndOffset.offset();
