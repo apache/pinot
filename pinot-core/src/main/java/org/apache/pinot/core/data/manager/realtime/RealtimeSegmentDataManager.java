@@ -915,12 +915,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void validateStartOffset(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset batchFirstOffset) {
     if (batchFirstOffset.compareTo(startOffset) > 0) {
       _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
-      String message = "startOffset(" + startOffset
-          + ") is older than topic's beginning offset(" + batchFirstOffset + ")";
+      String message =
+          "startOffset(" + startOffset + ") is older than topic's beginning offset(" + batchFirstOffset + ")";
       _segmentLogger.error(message);
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-          new SegmentErrorInfo(now(), message, null)
-      );
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, null));
     }
   }
 
