@@ -25,7 +25,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
@@ -48,7 +47,7 @@ public class QueryServerTest {
   @Test(dataProvider = "parameters")
   public void startAndStop(final boolean nativeTransportEnabled) {
     PinotMetricUtils.init(new PinotConfiguration());
-    PinotMetricsRegistry registry = new YammerMetricsRegistry();
+    PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
     ServerMetrics.register(new ServerMetrics(registry));
     NettyConfig nettyConfig = new NettyConfig();
     nettyConfig.setNativeTransportsEnabled(nativeTransportEnabled);
