@@ -48,14 +48,14 @@ public class DatabaseUtils {
         return tableName;
       case 2:
         String databasePrefix = tableSplit[0];
-        if (StringUtils.isNotEmpty(databaseName) && !databaseName.equals(databasePrefix)) {
-          throw new IllegalArgumentException("Database name '" + databasePrefix
-              + "' from table prefix does not match database name '" + databaseName + "' from header");
-        }
+        Preconditions.checkArgument(StringUtils.isEmpty(databaseName) || databaseName.equals(databasePrefix),
+          "Database name '" + databasePrefix + "' from table prefix does not match database name '" + databaseName
+              + "' from header");
         // skip database name prefix if it's a 'default' database
         return databasePrefix.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE) ? tableSplit[1] : tableName;
       default:
-      throw new IllegalArgumentException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
+        throw new IllegalArgumentException("Table name: '" + tableName
+            + "' containing more than one '.' is not allowed");
     }
   }
 

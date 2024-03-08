@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -411,7 +412,7 @@ public class PinotSchemaRestletResource {
    * @param override  set to true to override the existing schema with the same name
    * @param force set to true to skip all rules and force to override the existing schema with the same name
    */
-  private SuccessResponse addSchema(Schema schema, String database, boolean override, boolean force) {
+  private SuccessResponse addSchema(Schema schema, @Nullable String database, boolean override, boolean force) {
     String schemaName = schema.getSchemaName();
     String translatedSchemaName = DatabaseUtils.translateTableName(schemaName, database);
     schema.setSchemaName(translatedSchemaName);
@@ -445,7 +446,7 @@ public class PinotSchemaRestletResource {
    * @param reload  set to true to reload the tables using the schema, so committed segments can pick up the new schema
    * @return
    */
-  private SuccessResponse updateSchema(String schemaName, Schema schema, String database, boolean reload) {
+  private SuccessResponse updateSchema(String schemaName, Schema schema, @Nullable String database, boolean reload) {
     validateSchemaInternal(schema);
     String translatedSchemaName = DatabaseUtils.translateTableName(schemaName, database);
     String payloadSchemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), database);

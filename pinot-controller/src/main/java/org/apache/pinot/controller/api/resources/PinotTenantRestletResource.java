@@ -368,7 +368,7 @@ public class PinotTenantRestletResource {
     }
   }
 
-  private String getTablesServedFromServerTenant(String tenantName, String database) {
+  private String getTablesServedFromServerTenant(String tenantName, @Nullable String database) {
     Set<String> tables = new HashSet<>();
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
@@ -388,7 +388,7 @@ public class PinotTenantRestletResource {
     return resourceGetRet.toString();
   }
 
-  private String getTablesServedFromBrokerTenant(String tenantName, String database) {
+  private String getTablesServedFromBrokerTenant(String tenantName, @Nullable String database) {
     Set<String> tables = new HashSet<>();
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 

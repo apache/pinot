@@ -723,7 +723,7 @@ public class PinotHelixResourceManager {
    * @param databaseName database name
    * @return List of table names in provided database name
    */
-  public List<String> getAllTables(String databaseName) {
+  public List<String> getAllTables(@Nullable String databaseName) {
     List<String> tableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
       if (TableNameBuilder.isTableResource(resourceName) && isPartOfDatabase(resourceName, databaseName)) {
@@ -733,8 +733,8 @@ public class PinotHelixResourceManager {
     return tableNames;
   }
 
-  private boolean isPartOfDatabase(String tableName, String databaseName) {
-    if (databaseName == null) {
+  private boolean isPartOfDatabase(String tableName, @Nullable String databaseName) {
+    if (StringUtils.isBlank(databaseName)) {
       return StringUtils.split(tableName, '.').length == 1;
     } else if (databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
       String[] split = StringUtils.split(tableName, '.');
@@ -759,7 +759,7 @@ public class PinotHelixResourceManager {
    * @param databaseName database name
    * @return List of offline table names in provided database name
    */
-  public List<String> getAllOfflineTables(String databaseName) {
+  public List<String> getAllOfflineTables(@Nullable String databaseName) {
     List<String> offlineTableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
       if (isPartOfDatabase(resourceName, databaseName) && TableNameBuilder.isOfflineTableResource(resourceName)) {
@@ -784,7 +784,7 @@ public class PinotHelixResourceManager {
    * @param databaseName database name
    * @return List of dimension table names in provided database name
    */
-  public List<String> getAllDimensionTables(String databaseName) {
+  public List<String> getAllDimensionTables(@Nullable String databaseName) {
     return _tableCache.getAllDimensionTables().stream()
         .filter(table -> isPartOfDatabase(table, databaseName))
         .collect(Collectors.toList());
@@ -805,7 +805,7 @@ public class PinotHelixResourceManager {
    * @param databaseName database name
    * @return List of realtime table names in provided database name
    */
-  public List<String> getAllRealtimeTables(String databaseName) {
+  public List<String> getAllRealtimeTables(@Nullable String databaseName) {
     List<String> realtimeTableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
       if (isPartOfDatabase(resourceName, databaseName) && TableNameBuilder.isRealtimeTableResource(resourceName)) {
@@ -830,7 +830,7 @@ public class PinotHelixResourceManager {
    * @param databaseName database name
    * @return List of raw table names in provided database name
    */
-  public List<String> getAllRawTables(String databaseName) {
+  public List<String> getAllRawTables(@Nullable String databaseName) {
     Set<String> rawTableNames = new HashSet<>();
     for (String resourceName : getAllResources()) {
       if (TableNameBuilder.isTableResource(resourceName) && isPartOfDatabase(resourceName, databaseName)) {
@@ -1607,7 +1607,7 @@ public class PinotHelixResourceManager {
     return getSchemaNames(null);
   }
 
-  public List<String> getSchemaNames(String databaseName) {
+  public List<String> getSchemaNames(@Nullable String databaseName) {
     List<String> schemas = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
     if (schemas != null) {
@@ -4032,7 +4032,7 @@ public class PinotHelixResourceManager {
    * @param databaseName database to get the tables from
    * @return Map of tableName to list of ONLINE brokers serving the table
    */
-  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping(String databaseName) {
+  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping(@Nullable String databaseName) {
     ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
     if (ev == null) {
       throw new IllegalStateException("Failed to find external view for " + Helix.BROKER_RESOURCE_INSTANCE);
