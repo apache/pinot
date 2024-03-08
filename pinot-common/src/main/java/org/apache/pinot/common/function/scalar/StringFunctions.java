@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -32,6 +31,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -48,7 +48,6 @@ public class StringFunctions {
 
   private final static Pattern LTRIM = Pattern.compile("^\\s+");
   private final static Pattern RTRIM = Pattern.compile("\\s+$");
-  private final static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 
   /**
@@ -847,7 +846,7 @@ public class StringFunctions {
       if (inputStr == null) {
         return true;
       }
-      OBJECT_MAPPER.readTree(inputStr);
+      JsonUtils.stringToJsonNode(inputStr);
       return true;
     } catch (Exception e) {
       return false;
