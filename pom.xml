@@ -204,6 +204,7 @@
     <wildfly.version>1.7.0.Final</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
+    <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
   </properties>
 
   <profiles>
@@ -780,10 +781,6 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.nimbusds</groupId>
-            <artifactId>nimbus-jose-jwt</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-text</artifactId>
           </exclusion>
@@ -972,6 +969,11 @@
         <groupId>org.codehaus.jettison</groupId>
         <artifactId>jettison</artifactId>
         <version>${jettison.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.nimbusds</groupId>
+        <artifactId>nimbus-jose-jwt</artifactId>
+        <version>${nimbus-jose-jwt.version}</version>
       </dependency>
 
       <!-- Consolidate eclipse jetty dependencies for hadoop/spark/pulsar -->
