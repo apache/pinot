@@ -104,7 +104,11 @@ public class PinotInstanceRestletResource {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Internal error")
   })
-  public Instances getAllInstances() {
+  public Instances getAllInstances(
+      @ApiParam("Filter by tag") @QueryParam("tag") String tag) {
+    if (tag != null) {
+      return new Instances(_pinotHelixResourceManager.getAllInstancesWithTag(tag));
+    }
     return new Instances(_pinotHelixResourceManager.getAllInstances());
   }
 

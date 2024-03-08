@@ -415,6 +415,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get Ids of all instance with the given tag.
+   *
+   * @return List of instance Ids
+   */
+  public List<String> getAllInstancesWithTag(String tag) {
+    return HelixHelper.getInstancesWithTag(_helixZkManager, tag);
+  }
+
+  /**
    * Get all live instance Ids.
    *
    * @return List of live instance Ids
