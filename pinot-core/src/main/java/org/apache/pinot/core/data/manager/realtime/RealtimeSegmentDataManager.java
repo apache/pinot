@@ -456,7 +456,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         throw t;
       }
 
-      validateStartOffset(_currentOffset, messageBatch.getFirstMessageOffset());
+      StreamPartitionMsgOffset batchFirstOffset = messageBatch.getFirstMessageOffset();
+      if (batchFirstOffset != null) {
+        validateStartOffset(_currentOffset, batchFirstOffset);
+      }
 
       boolean endCriteriaReached = processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
 
