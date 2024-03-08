@@ -111,7 +111,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),
   LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
-  LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false);
+  LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
+  STREAM_DATA_LOSS("streamDataLoss", false);
 
   private final String _meterName;
   private final String _unit;

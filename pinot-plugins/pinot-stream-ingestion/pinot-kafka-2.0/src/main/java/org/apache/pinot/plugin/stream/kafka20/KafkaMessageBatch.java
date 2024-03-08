@@ -31,6 +31,7 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 public class KafkaMessageBatch implements MessageBatch<StreamMessage<byte[]>> {
   private final List<StreamMessage<byte[]>> _messageList;
   private final int _unfilteredMessageCount;
+  private final long _firstOffset;
   private final long _lastOffset;
   private final StreamMessageMetadata _lastMessageMetadata;
 
@@ -41,9 +42,10 @@ public class KafkaMessageBatch implements MessageBatch<StreamMessage<byte[]>> {
    * @param lastMessageMetadata metadata for last filtered message in the batch, useful for estimating ingestion delay
    *                            when a batch has all messages filtered.
    */
-  public KafkaMessageBatch(int unfilteredMessageCount, long lastOffset, List<StreamMessage<byte[]>> batch,
-      StreamMessageMetadata lastMessageMetadata) {
+  public KafkaMessageBatch(int unfilteredMessageCount, long firstOffset, long lastOffset,
+      List<StreamMessage<byte[]>> batch, StreamMessageMetadata lastMessageMetadata) {
     _messageList = batch;
+    _firstOffset = firstOffset;
     _lastOffset = lastOffset;
     _unfilteredMessageCount = unfilteredMessageCount;
     _lastMessageMetadata = lastMessageMetadata;
@@ -110,5 +112,10 @@ public class KafkaMessageBatch implements MessageBatch<StreamMessage<byte[]>> {
   @Override
   public StreamMessage getStreamMessage(int index) {
     return _messageList.get(index);
+  }
+
+  @Override
+  public StreamPartitionMsgOffset getFirstMessageOffset() {
+    return new LongMsgOffset(_firstOffset);
   }
 }
