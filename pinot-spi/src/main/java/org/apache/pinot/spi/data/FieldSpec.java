@@ -27,7 +27,6 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -591,9 +590,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           return Long.compare((long) value1, (long) value2);
         case STRING:
         case JSON:
-          return StringUtils.compare((String) value1, (String) value2);
+          return ((String) value1).compareTo((String) value2);
         case BYTES:
-          return new ByteArray((byte[]) value1).compareTo(new ByteArray((byte[]) value2));
+          return ByteArray.compare((byte[]) value1, (byte[]) value2);
         default:
           throw new IllegalStateException();
       }

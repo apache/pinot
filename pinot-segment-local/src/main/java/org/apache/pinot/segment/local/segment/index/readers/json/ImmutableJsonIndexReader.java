@@ -38,6 +38,7 @@ import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -196,7 +197,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
           // "[0]"=1 -> ".$index"='0' && "."='1'
           // ".foo[1].bar"='abc' -> ".foo.$index"=1 && ".foo..bar"='abc'
           String searchKey =
-              leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
+              leftPart + JsonUtils.ARRAY_INDEX_KEY + JsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
           int dictId = _dictionary.indexOf(searchKey);
           if (dictId >= 0) {
             ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
@@ -236,7 +237,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         if (!arrayIndex.equals(JsonUtils.WILDCARD)) {
           // "foo[1].bar"='abc' -> "foo.$index"=1 && "foo.bar"='abc'
           String searchKey =
-              leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
+              leftPart + JsonUtils.ARRAY_INDEX_KEY + JsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
           int dictId = _dictionary.indexOf(searchKey);
           if (dictId >= 0) {
             ImmutableRoaringBitmap docIds = _invertedIndex.getDocIds(dictId);
@@ -258,7 +259,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     if (predicateType == Predicate.Type.EQ || predicateType == Predicate.Type.NOT_EQ) {
       String value = predicateType == Predicate.Type.EQ ? ((EqPredicate) predicate).getValue()
           : ((NotEqPredicate) predicate).getValue();
-      String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;
+      String keyValuePair = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value;
       int dictId = _dictionary.indexOf(keyValuePair);
       if (dictId >= 0) {
         ImmutableRoaringBitmap matchingDocIdsForKeyValuePair = _invertedIndex.getDocIds(dictId);
@@ -276,7 +277,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
           : ((NotInPredicate) predicate).getValues();
       MutableRoaringBitmap matchingDocIdsForKeyValuePairs = new MutableRoaringBitmap();
       for (String value : values) {
-        String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;
+        String keyValuePair = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value;
         int dictId = _dictionary.indexOf(keyValuePair);
         if (dictId >= 0) {
           matchingDocIdsForKeyValuePairs.or(_invertedIndex.getDocIds(dictId));
@@ -436,7 +437,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     if (indexOfMin == -1) {
       return new int[]{-1, -1}; // if key does not exist, immediately return
     }
-    int indexOfMax = _dictionary.insertionIndexOf(key + "\u0001");
+    int indexOfMax = _dictionary.insertionIndexOf(key + JsonIndexCreator.KEY_VALUE_SEPARATOR_NEXT_CHAR);
 
     int minDictId = indexOfMin + 1; // skip the index of the key only
     int maxDictId = -1 * indexOfMax - 1; // undo the binary search

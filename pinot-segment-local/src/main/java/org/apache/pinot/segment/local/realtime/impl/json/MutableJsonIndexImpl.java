@@ -39,7 +39,6 @@ import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableJsonIndex;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
@@ -235,7 +234,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       if (!arrayIndex.equals(JsonUtils.WILDCARD)) {
         // "[0]"=1 -> ".$index"='0' && "."='1'
         // ".foo[1].bar"='abc' -> ".foo.$index"=1 && ".foo..bar"='abc'
-        String searchKey = leftPart + JsonUtils.ARRAY_INDEX_KEY + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
+        String searchKey = leftPart + JsonUtils.ARRAY_INDEX_KEY + JsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
         RoaringBitmap docIds = _postingListMap.get(searchKey);
         if (docIds != null) {
           if (matchingDocIds == null) {
@@ -255,7 +254,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     if (predicateType == Predicate.Type.EQ || predicateType == Predicate.Type.NOT_EQ) {
       String value = predicateType == Predicate.Type.EQ ? ((EqPredicate) predicate).getValue()
           : ((NotEqPredicate) predicate).getValue();
-      String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;
+      String keyValuePair = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value;
       RoaringBitmap matchingDocIdsForKeyValuePair = _postingListMap.get(keyValuePair);
       if (matchingDocIdsForKeyValuePair != null) {
         if (matchingDocIds == null) {
@@ -272,7 +271,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
           : ((NotInPredicate) predicate).getValues();
       RoaringBitmap matchingDocIdsForKeyValuePairs = new RoaringBitmap();
       for (String value : values) {
-        String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;
+        String keyValuePair = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value;
         RoaringBitmap matchingDocIdsForKeyValuePair = _postingListMap.get(keyValuePair);
         if (matchingDocIdsForKeyValuePair != null) {
           matchingDocIdsForKeyValuePairs.or(matchingDocIdsForKeyValuePair);
@@ -425,8 +424,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   private Map<String, RoaringBitmap> getMatchingKeysMap(String key) {
-    return _postingListMap.subMap(key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR, false,
-        key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR_NEXT_CHAR, false);
+    return _postingListMap.subMap(key + JsonIndexCreator.KEY_VALUE_SEPARATOR, false,
+        key + JsonIndexCreator.KEY_VALUE_SEPARATOR_NEXT_CHAR, false);
   }
 
   @Override
