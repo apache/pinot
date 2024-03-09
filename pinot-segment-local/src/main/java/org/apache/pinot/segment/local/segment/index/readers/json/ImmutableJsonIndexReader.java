@@ -24,6 +24,7 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -33,11 +34,15 @@ import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
 import org.apache.pinot.common.request.context.predicate.NotInPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.json.BaseJsonIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.BitmapInvertedIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.StringDictionary;
+import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -176,9 +181,9 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         key = key.substring(2);
       }
     }
-    Pair<String, MutableRoaringBitmap> result = getKeyAndFlattenDocId(key);
-    key = result.getLeft();
-    MutableRoaringBitmap matchingDocIds = result.getRight();
+    Pair<String, MutableRoaringBitmap> pair = getKeyAndFlattenDocId(key);
+    key = pair.getLeft();
+    MutableRoaringBitmap matchingDocIds = pair.getRight();
     if (matchingDocIds != null && matchingDocIds.isEmpty()) {
       return matchingDocIds;
     }
@@ -187,7 +192,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     if (predicateType == Predicate.Type.EQ || predicateType == Predicate.Type.NOT_EQ) {
       String value = predicateType == Predicate.Type.EQ ? ((EqPredicate) predicate).getValue()
           : ((NotEqPredicate) predicate).getValue();
-      String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;
+      String keyValuePair = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value;
       int dictId = _dictionary.indexOf(keyValuePair);
       if (dictId >= 0) {
         ImmutableRoaringBitmap matchingDocIdsForKeyValuePair = _invertedIndex.getDocIds(dictId);
@@ -205,7 +210,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
           : ((NotInPredicate) predicate).getValues();
       MutableRoaringBitmap matchingDocIdsForKeyValuePairs = new MutableRoaringBitmap();
       for (String value : values) {
-        String keyValuePair = key + BaseJsonIndexCreator.KEY_VALUE_SEPARATOR + value;
+        String keyValuePair = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value;
         int dictId = _dictionary.indexOf(keyValuePair);
         if (dictId >= 0) {
           matchingDocIdsForKeyValuePairs.or(_invertedIndex.getDocIds(dictId));
@@ -229,6 +234,79 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         return matchingDocIds;
       } else {
         return new MutableRoaringBitmap();
+      }
+    } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
+      Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
+      int[] dictIds = getDictIdRangeForKey(key);
+
+      MutableRoaringBitmap result = null;
+      for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
+        String value = _dictionary.getStringValue(dictId).substring(key.length() + 1);
+        if (pattern.matcher(value).matches()) {
+          if (result == null) {
+            result = _invertedIndex.getDocIds(dictId).toMutableRoaringBitmap();
+          } else {
+            result.or(_invertedIndex.getDocIds(dictId));
+          }
+        }
+      }
+      if (result == null) {
+        return new MutableRoaringBitmap();
+      } else {
+        if (matchingDocIds == null) {
+          return result;
+        } else {
+          matchingDocIds.and(result);
+          return matchingDocIds;
+        }
+      }
+    } else if (predicateType == Predicate.Type.RANGE) {
+      RangePredicate rangePredicate = (RangePredicate) predicate;
+      FieldSpec.DataType rangeDataType = rangePredicate.getRangeDataType();
+      // Simplify to only support numeric and string types
+      if (rangeDataType.isNumeric()) {
+        rangeDataType = FieldSpec.DataType.DOUBLE;
+      } else {
+        rangeDataType = FieldSpec.DataType.STRING;
+      }
+
+      boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
+      boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
+      boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
+      boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
+      Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
+      Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
+
+      int[] dictIds = getDictIdRangeForKey(key);
+      MutableRoaringBitmap result = null;
+      for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
+        String value = _dictionary.getStringValue(dictId).substring(key.length() + 1);
+        Object valueObj = rangeDataType.convert(value);
+        boolean lowerCompareResult =
+            lowerUnbounded || (lowerInclusive ? rangeDataType.compare(valueObj, lowerBound) >= 0
+                : rangeDataType.compare(valueObj, lowerBound) > 0);
+        boolean upperCompareResult =
+            upperUnbounded || (upperInclusive ? rangeDataType.compare(valueObj, upperBound) <= 0
+                : rangeDataType.compare(valueObj, upperBound) < 0);
+
+        if (lowerCompareResult && upperCompareResult) {
+          if (result == null) {
+            result = _invertedIndex.getDocIds(dictId).toMutableRoaringBitmap();
+          } else {
+            result.or(_invertedIndex.getDocIds(dictId));
+          }
+        }
+      }
+
+      if (result == null) {
+        return new MutableRoaringBitmap();
+      } else {
+        if (matchingDocIds == null) {
+          return result;
+        } else {
+          matchingDocIds.and(result);
+          return matchingDocIds;
+        }
       }
     } else {
       throw new IllegalStateException("Unsupported json_match predicate type: " + predicate);
@@ -301,7 +379,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     if (indexOfMin == -1) {
       return new int[]{-1, -1}; // if key does not exist, immediately return
     }
-    int indexOfMax = _dictionary.insertionIndexOf(key + "\u0001");
+    int indexOfMax = _dictionary.insertionIndexOf(key + JsonIndexCreator.KEY_VALUE_SEPARATOR_NEXT_CHAR);
 
     int minDictId = indexOfMin + 1; // skip the index of the key only
     int maxDictId = -1 * indexOfMax - 1; // undo the binary search
