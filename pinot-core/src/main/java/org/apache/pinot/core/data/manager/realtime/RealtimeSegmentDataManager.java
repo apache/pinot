@@ -456,6 +456,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         throw t;
       }
 
+      StreamPartitionMsgOffset batchFirstOffset = messageBatch.getFirstMessageOffset();
+      if (batchFirstOffset != null) {
+        validateStartOffset(_currentOffset, batchFirstOffset);
+      }
+
       boolean endCriteriaReached = processStreamEvents(messageBatch, idlePipeSleepTimeMillis);
 
       if (_currentOffset.compareTo(lastUpdatedOffset) != 0) {
@@ -898,6 +903,24 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       createPartitionMetadataProvider("Get Partition Lag State");
     }
     return _partitionMetadataProvider.getCurrentPartitionLagState(consumerPartitionStateMap);
+  }
+
+  /**
+   * Checks if the begin offset of the stream partition has been fast-forwarded.
+   * batchFirstOffset should be less than or equal to startOffset.
+   * If batchFirstOffset is greater, then some messages were not received.
+   *
+   * @param startOffset The offset of the first message desired, inclusive.
+   * @param batchFirstOffset The offset of the first message in the batch.
+   */
+  private void validateStartOffset(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset batchFirstOffset) {
+    if (batchFirstOffset.compareTo(startOffset) > 0) {
+      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
+      String message =
+          "startOffset(" + startOffset + ") is older than topic's beginning offset(" + batchFirstOffset + ")";
+      _segmentLogger.error(message);
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), message, null));
+    }
   }
 
   public StreamPartitionMsgOffset getCurrentOffset() {
