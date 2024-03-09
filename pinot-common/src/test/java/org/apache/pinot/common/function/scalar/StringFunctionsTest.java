@@ -29,16 +29,21 @@ public class StringFunctionsTest {
   @DataProvider(name = "isJson")
   public static Object[][] isJsonTestCases() {
     return new Object[][]{
-        {null, true},
-        {"", true},
-        {"{\"key\": \"value\"}", true},
-        {"{\"key\": \"value\", }", false},
-        {"{\"key\": \"va", false},
+        {null, true, true},
+        {null, false, false},
+        {"", true, true},
+        {"{\"key\": \"value\"}", true, true},
+        {"{\"key\": \"value\", }", true, false},
+        {"{\"key\": \"va", true, false},
+        {"", false, true},
+        {"{\"key\": \"value\"}", false, true},
+        {"{\"key\": \"value\", }", false, false},
+        {"{\"key\": \"va", false, false},
     };
   }
 
   @Test(dataProvider = "isJson")
-  public void testIsJson(String input, boolean expectedValue) {
-    assertEquals(StringFunctions.isJson(input), expectedValue);
+  public void testIsJson(String input, boolean acceptNull, boolean expectedValue) {
+    assertEquals(StringFunctions.isJson(input, acceptNull), expectedValue);
   }
 }

@@ -840,12 +840,16 @@ public class StringFunctions {
    * want to treat that column value as valid.
    *
    * @param inputStr Input string to test for valid json
+   * @param acceptNull boolean value to decide whether null is accepted as a valid json or not
+   * @return in case of null value, it returns whatever acceptNull parameter value is. In case of non-null,
+   *         it returns true in case of valid json parsing else false
+   *
    */
   @ScalarFunction(nullableParameters = true, names = {"isJson", "is_json"})
-  public static boolean isJson(@Nullable String inputStr) {
+  public static boolean isJson(@Nullable String inputStr, boolean acceptNull) {
     try {
       if (inputStr == null) {
-        return true;
+        return acceptNull;
       }
       JsonUtils.stringToJsonNode(inputStr);
       return true;
