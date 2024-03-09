@@ -30,7 +30,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 
 /**
- * Default Partial upsert merger implementation unless custom implementation is not specified in the UpsertConfig
+ * Default Partial upsert merger implementation.
  * PartialUpsertColumnarMerger iterates over each column and merges them based on the defined strategy per column in
  * table config.
  */
