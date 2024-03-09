@@ -35,4 +35,12 @@ public class KafkaStreamMessage extends StreamMessage<byte[]> {
     }
     return -1;
   }
+
+  public long getOffset() {
+    if (_metadata != null) {
+      long offset = Long.parseLong(_metadata.getRecordMetadata().get(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY));
+      return offset < 0 ? -1 : offset;
+    }
+    return -1;
+  }
 }

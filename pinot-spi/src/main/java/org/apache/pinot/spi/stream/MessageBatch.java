@@ -105,6 +105,15 @@ public interface MessageBatch<T> {
   }
 
   /**
+   * Returns the offset of this message.
+   * @param index
+   * @return
+   */
+  default StreamPartitionMsgOffset getStreamPartitionMsgOffsetAtIndex(int index) {
+    return new LongMsgOffset(getMessageOffsetAtIndex(index));
+  }
+
+  /**
    * @return last offset in the batch
    */
   default StreamPartitionMsgOffset getOffsetOfNextBatch() {

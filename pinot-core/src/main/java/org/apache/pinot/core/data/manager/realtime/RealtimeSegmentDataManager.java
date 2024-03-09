@@ -305,7 +305,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   private final StreamPartitionMsgOffset _latestStreamOffsetAtStartupTime;
   private final CompletionMode _segmentCompletionMode;
-  private final List<Integer> _filteredMessageOffsets = new ArrayList<>();
+  private final List<String> _filteredMessageOffsets = new ArrayList<>();
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
   private boolean endCriteriaReached() {
@@ -573,7 +573,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Decode message
       StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(messagesAndOffsets.getStreamMessage(index));
       msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
-      int messageOffset = messagesAndOffsets.getMessageOffsetAtIndex(index);
+      StreamPartitionMsgOffset messageOffset = messagesAndOffsets.getStreamPartitionMsgOffsetAtIndex(index);
       if (decodedRow.getException() != null) {
         // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
         // decode error
@@ -589,7 +589,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _numRowsErrored++;
           // when exception happens we prefer abandoning the whole batch and not partially indexing some rows
           reusedResult.getTransformedRows().clear();
-          String errorMessage = String.format("Caught exception while transforming the record at offset: %d , row: %s",
+          String errorMessage = String.format("Caught exception while transforming the record at offset: %s , row: %s",
               messageOffset, decodedRow.getResult());
           _segmentLogger.error(errorMessage, e);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
@@ -598,7 +598,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           realtimeRowsDroppedMeter =
               _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
                   reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
-          _filteredMessageOffsets.add(messageOffset);
+          _filteredMessageOffsets.add(messageOffset.toString());
         }
         if (reusedResult.getIncompleteRowCount() > 0) {
           realtimeIncompleteRowsConsumedMeter =
@@ -621,7 +621,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
           } catch (Exception e) {
             _numRowsErrored++;
-            String errorMessage = String.format("Caught exception while indexing the record at offset: %d , row: %s",
+            String errorMessage = String.format("Caught exception while indexing the record at offset: %s , row: %s",
                 messageOffset, transformedRow);
             _segmentLogger.error(errorMessage, e);
             _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
