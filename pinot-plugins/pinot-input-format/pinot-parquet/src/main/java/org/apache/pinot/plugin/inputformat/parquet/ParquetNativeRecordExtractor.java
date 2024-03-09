@@ -170,9 +170,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
           return from.getValueToString(fieldIndex, index);
         case INT96:
           Binary int96 = from.getInt96(fieldIndex, index);
-          ByteBuffer buf = ByteBuffer.wrap(int96.getBytes()).order(ByteOrder.LITTLE_ENDIAN);
-          return (buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH) * DateTimeConstants.MILLIS_PER_DAY
-              + buf.getLong(0) / NANOS_PER_MILLISECOND;
+          return convertInt96ToLong(int96.getBytes());
         case BINARY:
         case FIXED_LEN_BYTE_ARRAY:
           if (logicalTypeAnnotation instanceof LogicalTypeAnnotation.DecimalLogicalTypeAnnotation) {
@@ -202,6 +200,12 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
       return extractMap(group);
     }
     return null;
+  }
+
+  public static long convertInt96ToLong(byte[] int96Bytes) {
+    ByteBuffer buf = ByteBuffer.wrap(int96Bytes).order(ByteOrder.LITTLE_ENDIAN);
+    return (buf.getInt(8) - JULIAN_DAY_NUMBER_FOR_UNIX_EPOCH) * DateTimeConstants.MILLIS_PER_DAY
+        + buf.getLong(0) / NANOS_PER_MILLISECOND;
   }
 
   public Object[] extractList(Group group) {

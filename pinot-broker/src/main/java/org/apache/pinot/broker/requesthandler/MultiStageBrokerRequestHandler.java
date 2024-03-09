@@ -19,8 +19,9 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,6 +62,7 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -179,14 +181,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
     boolean traceEnabled = Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
-
-    ResultTable queryResults;
-    Map<Integer, ExecutionStatsAggregator> stageIdStatsMap = new HashMap<>();
-    for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
-      stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(traceEnabled));
+    Map<Integer, ExecutionStatsAggregator> stageIdStatsMap;
+    if (!traceEnabled) {
+      stageIdStatsMap = Collections.singletonMap(0, new ExecutionStatsAggregator(false));
+    } else {
+      List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+      int numStages = stagePlans.size();
+      stageIdStatsMap = Maps.newHashMapWithExpectedSize(numStages);
+      for (int stageId = 0; stageId < numStages; stageId++) {
+        stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(true));
+      }
     }
 
     long executionStartTimeNs = System.nanoTime();
+    ResultTable queryResults;
     try {
       queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimeoutMs, queryOptions,
           stageIdStatsMap);

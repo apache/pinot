@@ -45,6 +45,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker;
 public class QueryLogger {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryLogger.class);
+  private static final QueryLogEntry[] QUERY_LOG_ENTRY_VALUES = QueryLogEntry.values();
 
   private final int _maxQueryLengthToLog;
   private final RateLimiter _logRateLimiter;
@@ -82,7 +83,7 @@ public class QueryLogger {
     }
 
     final StringBuilder queryLogBuilder = new StringBuilder();
-    for (QueryLogEntry value : QueryLogEntry.values()) {
+    for (QueryLogEntry value : QUERY_LOG_ENTRY_VALUES) {
       value.format(queryLogBuilder, this, params);
       queryLogBuilder.append(',');
     }

@@ -82,6 +82,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
+import org.testng.annotations.Listeners;
 
 import static org.apache.pinot.integration.tests.ClusterIntegrationTestUtils.getBrokerQueryApiUrl;
 import static org.testng.Assert.assertEquals;
@@ -92,6 +93,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Base class for integration tests that involve a complete Pinot cluster.
  */
+@Listeners(NettyTestNGListener.class)
 public abstract class ClusterTest extends ControllerTest {
   protected static final int DEFAULT_BROKER_PORT = 18099;
   protected static final Random RANDOM = new Random(System.currentTimeMillis());
@@ -160,6 +162,7 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT,
         NetUtils.findOpenPort(DEFAULT_BROKER_PORT + brokerId + RandomUtils.nextInt(10000)));
     brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+    brokerConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     overrideBrokerConf(brokerConf);
     return brokerConf;
   }
@@ -175,6 +178,9 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerPorts = new ArrayList<>();
     for (int i = 0; i < numBrokers; i++) {
       BaseBrokerStarter brokerStarter = startOneBroker(i);
+      assertEquals(brokerStarter.getConfig().getProperty(CommonConstants.CONFIG_OF_TIMEZONE, ""), "UTC");
+      assertEquals(System.getProperty("user.timezone"), "UTC");
+
       _brokerStarters.add(brokerStarter);
       _brokerPorts.add(brokerStarter.getPort());
     }
@@ -246,13 +252,13 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, _serverAdminApiPort);
     _serverNettyPort = NetUtils.findOpenPort(Helix.DEFAULT_SERVER_NETTY_PORT + new Random().nextInt(10000) + serverId);
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, _serverNettyPort);
-    _serverGrpcPort =
-        NetUtils.findOpenPort(Server.DEFAULT_GRPC_PORT + new Random().nextInt(10000) + serverId);
+    _serverGrpcPort = NetUtils.findOpenPort(Server.DEFAULT_GRPC_PORT + new Random().nextInt(10000) + serverId);
     serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, _serverGrpcPort);
 
     // Thread time measurement is disabled by default, enable it in integration tests.
     // TODO: this can be removed when we eventually enable thread time measurement by default.
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    serverConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     overrideServerConf(serverConf);
     return serverConf;
   }
@@ -276,6 +282,7 @@ public abstract class ClusterTest extends ControllerTest {
     HelixServerStarter serverStarter = new HelixServerStarter();
     serverStarter.init(getServerConf(serverId));
     serverStarter.start();
+    assertEquals(System.getProperty("user.timezone"), "UTC");
     return serverStarter;
   }
 
@@ -317,9 +324,11 @@ public abstract class ClusterTest extends ControllerTest {
     minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
     minionConf.setProperty(CommonConstants.Helix.KEY_OF_MINION_PORT,
         NetUtils.findOpenPort(CommonConstants.Minion.DEFAULT_HELIX_PORT));
+    minionConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     _minionStarter = new MinionStarter();
     _minionStarter.init(minionConf);
     _minionStarter.start();
+    assertEquals(System.getProperty("user.timezone"), "UTC");
   }
 
   protected void stopBroker() {
@@ -608,17 +617,14 @@ public abstract class ClusterTest extends ControllerTest {
   @DataProvider(name = "systemColumns")
   public Object[][] systemColumns() {
     return new Object[][]{
-        {"$docId"},
-        {"$hostName"},
-        {"$segmentName"}
+        {"$docId"}, {"$hostName"}, {"$segmentName"}
     };
   }
 
   @DataProvider(name = "useBothQueryEngines")
   public Object[][] useBothQueryEngines() {
     return new Object[][]{
-        {false},
-        {true}
+        {false}, {true}
     };
   }
 

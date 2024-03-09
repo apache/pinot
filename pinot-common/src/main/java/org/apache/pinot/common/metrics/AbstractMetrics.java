@@ -133,6 +133,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
+  public void removePhaseTiming(String tableName, QP phase) {
+    String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
+    removeTimer(fullTimerName);
+  }
+
   public void addPhaseTiming(String tableName, QP phase, long duration, TimeUnit timeUnit) {
     String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
     addValueToTimer(fullTimerName, duration, timeUnit);
@@ -206,6 +211,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     if (timer != null) {
       timer.update(duration, timeUnit);
     }
+  }
+
+  public void removeTimer(final String fullTimerName) {
+    PinotMetricUtils
+        .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName));
+  }
+
+  public void removeTableTimer(final String tableName, final T timer) {
+    final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
+    removeTimer(fullTimerName);
   }
 
   /**

@@ -29,7 +29,7 @@ if [ "$RUN_INTEGRATION_TESTS" != false ]; then
   # Integration Tests
   mvn clean install \
     -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
-    -am -B -T 16 \
+    -am -B -T 16 -ntp \
     -P github-actions,integration-tests \
     -pl 'pinot-integration-tests' || exit 1
 else
@@ -39,7 +39,7 @@ else
   if [ "$RUN_TEST_SET" == "1" ]; then
     mvn clean install \
       -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
-      -am -B -T 16 \
+      -am -B -T 16 -ntp \
       -P github-actions \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
@@ -52,7 +52,7 @@ else
   if [ "$RUN_TEST_SET" == "2" ]; then
     mvn clean install \
       -DskipTests -Dcheckstyle.skip -Dspotless.skip -Denforcer.skip -Dlicense.skip -Dmaven.plugin.appassembler.skip=true \
-      -am -B -T 16 \
+      -am -B -T 16 -ntp \
       -P github-actions \
       -pl '!pinot-integration-tests' \
       -pl '!pinot-perf' \

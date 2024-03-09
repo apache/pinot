@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
@@ -95,29 +96,36 @@ public class FilterOperatorUtils {
       // operator is used only if the column is sorted and has dictionary.
       Predicate.Type predicateType = predicateEvaluator.getPredicateType();
       if (predicateType == Predicate.Type.RANGE) {
-        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
+        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
           return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
-        if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
+        if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.RANGE)) {
           return new RangeIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
-        if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()) {
+        if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
           return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
-        if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null) {
+        if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
           return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else {
-        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null) {
+        if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
           return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
-        if (dataSource.getInvertedIndex() != null) {
+        if (dataSource.getInvertedIndex() != null
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
           return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
-        if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)) {
+        if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.RANGE)) {
           return new RangeIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);

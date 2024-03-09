@@ -82,8 +82,10 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String CSV_DELIMITER = ",";
   private static final String TABLE_NAME = "gameScores";
   private static final int NUM_SERVERS = 2;
-  private static final String PRIMARY_KEY_COL = "playerId";
   private static final String DELETE_COL = "deleted";
+  public static final String PRIMARY_KEY_COL = "playerId";
+  public static final String TIME_COL_NAME = "timestampInEpoch";
+  public static final String UPSERT_SCHEMA_FILE_NAME = "upsert_table_test.schema";
 
   protected PinotTaskManager _taskManager;
   protected PinotHelixTaskResourceManager _helixTaskResourceManager;
@@ -133,13 +135,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Override
   protected String getSchemaFileName() {
-    return "upsert_table_test.schema";
+    return UPSERT_SCHEMA_FILE_NAME;
   }
 
   @Nullable
   @Override
   protected String getTimeColumnName() {
-    return "timestampInEpoch";
+    return TIME_COL_NAME;
   }
 
   @Override
