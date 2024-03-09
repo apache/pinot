@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Objects;

@@ -18,11 +18,10 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
+import org.apache.pinot.segment.local.upsert.merger.PartialUpsertColumnarMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
 import org.apache.pinot.segment.local.upsert.merger.columnar.PartialUpsertColumnMerger;
@@ -34,10 +33,15 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 
 /**
  * Handler for partial-upsert.
+ *
+ * This class is responsible for merging the new record with the previous record.
+ * It uses the configured merge strategies to merge the columns. If no merge strategy is configured for a column,
+ * it uses the default merge strategy.
+ *
+ * It is also possible to define a custom logic for merging rows by implementing {@link PartialUpsertMerger}.
+ * If a merger for row is defined then it takes precedence and ignores column mergers.
  */
 public class PartialUpsertHandler {
-  // _column2Mergers maintains the mapping of merge strategies per columns.
-  private final Map<String, PartialUpsertColumnMerger> _column2Mergers = new HashMap<>();
   private final PartialUpsertColumnMerger _defaultPartialUpsertMerger;
   private final List<String> _comparisonColumns;
   private final List<String> _primaryKeyColumns;
@@ -51,17 +55,6 @@ public class PartialUpsertHandler {
 
     _partialUpsertMerger =
         PartialUpsertMergerFactory.getPartialUpsertMerger(_primaryKeyColumns, comparisonColumns, upsertConfig);
-  }
-
-  @VisibleForTesting
-  public PartialUpsertHandler(Schema schema, List<String> comparisonColumns, UpsertConfig upsertConfig,
-      PartialUpsertMerger partialUpsertMerger) {
-    _defaultPartialUpsertMerger =
-        PartialUpsertColumnMergerFactory.getMerger(upsertConfig.getDefaultPartialUpsertStrategy());
-    _comparisonColumns = comparisonColumns;
-    _primaryKeyColumns = schema.getPrimaryKeyColumns();
-
-    _partialUpsertMerger = partialUpsertMerger;
   }
 
   public void merge(LazyRow prevRecord, GenericRow newRecord, Map<String, Object> reuseMergerResult) {
@@ -92,9 +85,15 @@ public class PartialUpsertHandler {
           newRecord.removeNullValueField(column);
           newRecord.putValue(column, mergedValue);
         } else {
-          // if column exists but mapped to a null value then merger result was null
+          // if column exists but mapped to a null value then merger result was a null value
           newRecord.addNullValueField(column);
+          newRecord.putValue(column, null);
         }
+      } else if (!(_partialUpsertMerger instanceof PartialUpsertColumnarMerger)) {
+        // PartialUpsertColumnMerger already handles default merger but for any custom implementations
+        // non merged columns need to be applied with default merger
+        newRecord.putValue(column,
+            _defaultPartialUpsertMerger.merge(prevRecord.getValue(column), newRecord.getValue(column)));
       }
     }
   }

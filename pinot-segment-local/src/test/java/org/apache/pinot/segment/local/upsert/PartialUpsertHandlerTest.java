@@ -26,13 +26,14 @@ import java.util.Map;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
-import org.apache.pinot.segment.local.upsert.merger.BasePartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
+import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.mockito.MockedConstruction;
+import org.mockito.MockedStatic;
 import org.mockito.internal.util.collections.Sets;
 import org.testng.annotations.Test;
 
@@ -65,6 +66,32 @@ public class PartialUpsertHandlerTest {
     testMerge(true, 0, false, 8, "hoursSinceEpoch", 8, false);
     testMerge(false, 8, true, 0, "hoursSinceEpoch", 8, false);
     testMerge(false, 2, false, 8, "hoursSinceEpoch", 8, false);
+  }
+
+  @Test
+  public void testCustomPartialUpsertMergerWithNonNullResult() {
+    GenericRow newRecord = initGenericRow(new GenericRow(),
+        ImmutableMap.of("pk", "pk1", "field1", 3L, "field2", "inc", "hoursSinceEpoch", 2L));
+    LazyRow prevRecord = mock(LazyRow.class);
+    mockLazyRow(prevRecord, ImmutableMap.of("pk", "pk1", "field1", 5L, "field2", "set", "hoursSinceEpoch", 2L));
+    GenericRow expectedRecord = initGenericRow(new GenericRow(),
+        ImmutableMap.of("pk", "pk1", "field1", 8L, "field2", "inc", "hoursSinceEpoch", 2L));
+
+    testCustomMerge(prevRecord, newRecord, expectedRecord, getCustomMerger());
+  }
+
+  @Test
+  public void testCustomPartialUpsertMergerWithNullResult() {
+    Map newRowData = new HashMap(Map.of("pk", "pk1", "field1", 3L, "field2", "reset"));
+    newRowData.put("hoursSinceEpoch", null); // testing null comparison column
+    GenericRow newRecord = initGenericRow(new GenericRow(), newRowData);
+    LazyRow prevRecord = mock(LazyRow.class);
+    mockLazyRow(prevRecord, Map.of("pk", "pk1", "field1", 5L, "field2", "set", "hoursSinceEpoch", 2L));
+    Map<String, Object> expectedData = new HashMap<>(Map.of("pk", "pk1", "field2", "reset", "hoursSinceEpoch", 2L));
+    expectedData.put("field1", null);
+    GenericRow expectedRecord = initGenericRow(new GenericRow(), expectedData);
+
+    testCustomMerge(prevRecord, newRecord, expectedRecord, getCustomMerger());
   }
 
   public void testMerge(boolean isPreviousNull, Object previousValue, boolean isNewNull, Object newValue,
@@ -104,62 +131,69 @@ public class PartialUpsertHandlerTest {
     }
   }
 
-  @Test
-  public void testPartialUpsertHandlerWithCustomMerger() {
+  private void testCustomMerge(LazyRow prevRecord, GenericRow newRecord, GenericRow expectedRecord,
+      PartialUpsertMerger customMerger) {
+
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("pk", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("field1", FieldSpec.DataType.STRING).addMetric("field2", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("field1", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("field2", FieldSpec.DataType.STRING)
         .addDateTime("hoursSinceEpoch", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .setPrimaryKeyColumns(Arrays.asList("pk")).build();
+
     UpsertConfig upsertConfig = new UpsertConfig();
-    PartialUpsertMerger customMerger =
-        new BasePartialUpsertMerger(schema.getPrimaryKeyColumns(), Collections.singletonList("hoursSinceEpoch"),
-            upsertConfig) {
+    upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
+    upsertConfig.setRowMergerCustomImplementation("org.apache.pinot.segment.local.upsert.CustomPartialUpsertRowMerger");
 
-          @Override
-          public void merge(LazyRow prevRecord, GenericRow newRecord, Map<String, Object> mergerResult) {
-            String prevField1 = (String) prevRecord.getValue("field1");
-            Long prevField2 = (Long) prevRecord.getValue("field2");
-            if (prevField1 != null && "end".equalsIgnoreCase(prevField1)) {
-              mergerResult.put("field2", newRecord.getValue("field2"));
-            } else {
-              mergerResult.put("field2", prevField2 + ((Long) newRecord.getValue("field2")));
-            }
-          }
-        };
-
-    PartialUpsertHandler handler =
-        spy(new PartialUpsertHandler(schema, Collections.singletonList("hoursSinceEpoch"), upsertConfig, customMerger));
-
-    GenericRow expectedRecord = new GenericRow();
-    GenericRow newRecord = new GenericRow();
-    LazyRow prevRecord = mock(LazyRow.class);
-    HashMap<String, Object> reuseMergerResult = new HashMap<>();
-
-    initGenericRow(newRecord, ImmutableMap.of("pk", "pk1", "field1", "running", "field2", 5L));
-    mockLazyRow(prevRecord, ImmutableMap.of("pk", "pk1", "field1", "start", "field2", 5L));
-    initGenericRow(expectedRecord, ImmutableMap.of("pk", "pk1", "field1", "running", "field2", 10L));
-    handler.merge(prevRecord, newRecord, reuseMergerResult);
-    assertEquals(expectedRecord, newRecord);
-
-    initGenericRow(newRecord, ImmutableMap.of("pk", "pk1", "field1", "running", "field2", 3L));
-    mockLazyRow(prevRecord, ImmutableMap.of("pk", "pk1", "field1", "end", "field2", 5L));
-    initGenericRow(expectedRecord, ImmutableMap.of("pk", "pk1", "field1", "running", "field2", 3L));
-    handler.merge(prevRecord, newRecord, reuseMergerResult);
-    assertEquals(expectedRecord, newRecord);
+    try (MockedStatic<PartialUpsertMergerFactory> partialUpsertMergerFactory = mockStatic(
+        PartialUpsertMergerFactory.class)) {
+      when(PartialUpsertMergerFactory.getPartialUpsertMerger(Arrays.asList("pk"), Arrays.asList("hoursSinceEpoch"),
+          upsertConfig)).thenReturn(customMerger);
+      PartialUpsertHandler handler =
+          new PartialUpsertHandler(schema, Collections.singletonList("hoursSinceEpoch"), upsertConfig);
+      HashMap<String, Object> reuseMergerResult = new HashMap<>();
+      handler.merge(prevRecord, newRecord, reuseMergerResult);
+      assertEquals(newRecord, expectedRecord);
+    }
   }
 
-  private void mockLazyRow(LazyRow prevRecord, Map<String, Object> values) {
+  public PartialUpsertMerger getCustomMerger() {
+    return new PartialUpsertMerger() {
+      @Override
+      public void merge(LazyRow prevRecord, GenericRow newRecord, Map<String, Object> mergerResult) {
+        if ((newRecord.getValue("field2")).equals("set")) {
+          // use default merger (overwrite)
+          return;
+        }
+        if ((newRecord.getValue("field2")).equals("inc")) {
+          mergerResult.put("field1", (Long) prevRecord.getValue("field1") + (Long) newRecord.getValue("field1"));
+          return;
+        }
+        if ((newRecord.getValue("field2")).equals("reset")) {
+          mergerResult.put("field1", null);
+        }
+      }
+    };
+  }
+
+  private LazyRow mockLazyRow(LazyRow prevRecord, Map<String, Object> values) {
     reset(prevRecord);
     when(prevRecord.getColumnNames()).thenReturn(values.keySet());
     for (Map.Entry<String, Object> entry : values.entrySet()) {
       when(prevRecord.getValue(entry.getKey())).thenReturn(entry.getValue());
     }
+    return prevRecord;
   }
 
-  private void initGenericRow(GenericRow genericRow, Map<String, Object> values) {
+  private GenericRow initGenericRow(GenericRow genericRow, Map<String, Object> values) {
     genericRow.clear();
-    for (Map.Entry<String, Object> entry: values.entrySet()) {
-      genericRow.putValue(entry.getKey(), entry.getValue());
+    for (Map.Entry<String, Object> entry : values.entrySet()) {
+      String field = entry.getKey();
+      Object value = entry.getValue();
+      genericRow.putValue(field, value);
+      if (value == null) {
+        genericRow.addNullValueField(field);
+      }
     }
+    return genericRow;
   }
 }
