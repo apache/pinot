@@ -72,6 +72,7 @@ import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
+import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
@@ -294,6 +295,7 @@ public class QueryEnvironment {
       throw new IllegalArgumentException(
           String.format("unsupported SQL query, cannot validate out a valid sql from:\n%s", parsed));
     }
+    validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
     return validated;
   }
 
