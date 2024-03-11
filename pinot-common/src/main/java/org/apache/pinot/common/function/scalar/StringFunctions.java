@@ -28,7 +28,6 @@ import java.util.Base64;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -836,21 +835,17 @@ public class StringFunctions {
 
   /**
    * Checks whether the input string can be parsed into a json node or not. Useful for scenarios where we want
-   * to filter out malformed json. In case of nulls, it is treated as valid json as in partial-upsert we might
-   * want to treat that column value as valid.
+   * to filter out malformed json. In case of nulls we return null itself, as null can be treated as valid json
+   * in partial-upsert scenarios. Upto the user to use null response accordingly.
    *
    * @param inputStr Input string to test for valid json
-   * @param acceptNull boolean value to decide whether null is accepted as a valid json or not
-   * @return in case of null value, it returns whatever acceptNull parameter value is. In case of non-null,
-   *         it returns true in case of valid json parsing else false
+   * @return in case of null value, it returns null. In case of non-null, it returns true in case of valid json
+   * parsing else false
    *
    */
-  @ScalarFunction(nullableParameters = true, names = {"isJson", "is_json"})
-  public static boolean isJson(@Nullable String inputStr, boolean acceptNull) {
+  @ScalarFunction(names = {"isJson", "is_json"})
+  public static boolean isJson(String inputStr) {
     try {
-      if (inputStr == null) {
-        return acceptNull;
-      }
       JsonUtils.stringToJsonNode(inputStr);
       return true;
     } catch (Exception e) {
