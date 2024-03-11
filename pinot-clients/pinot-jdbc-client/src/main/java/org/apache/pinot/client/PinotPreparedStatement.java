@@ -244,6 +244,8 @@ public class PinotPreparedStatement extends AbstractBasePreparedStatement {
     _preparedStatement = null;
     _connection = null;
     _session = null;
+    _resultSet = null;
+    _resultSetGroup = null;
     _closed = true;
   }
 
