@@ -792,6 +792,10 @@
             <groupId>org.apache.hadoop.thirdparty</groupId>
             <artifactId>hadoop-shaded-protobuf_3_7</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.jboss.xnio</groupId>
+            <artifactId>xnio-api</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -923,6 +927,18 @@
           <exclusion>
             <groupId>io.netty</groupId>
             <artifactId>netty</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-yarn-client</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-yarn-common</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-hdfs-client</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
