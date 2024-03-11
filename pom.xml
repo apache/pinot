@@ -133,7 +133,6 @@
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.9</swagger.version>
     <hadoop.version>3.3.6</hadoop.version>
-    <antlr.version>4.13.1</antlr.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.0</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
@@ -1103,11 +1102,6 @@
         <groupId>com.tdunning</groupId>
         <artifactId>t-digest</artifactId>
         <version>3.2</version>
-      </dependency>
-      <dependency>
-        <groupId>org.antlr</groupId>
-        <artifactId>antlr4-runtime</artifactId>
-        <version>${antlr.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jayway.jsonpath</groupId>
