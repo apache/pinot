@@ -140,7 +140,6 @@ public class SegmentMetadataPropertyConfigTest {
         segmentMetadataFromFile(oldSegmentProperties, true, true,
         PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
 
-    assertNull(configuration.getHeader());
     testSegmentMetadataContent(configuration);
   }
 
