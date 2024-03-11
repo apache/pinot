@@ -64,7 +64,6 @@ class SegmentMetadataPropertyReader extends PropertiesReader {
   protected String unescapePropertyName(final String name) {
     // skip the unescaping of the propertyName(key), if newer version of the segment metadata.
     if (_skipUnescapePropertyName) {
-      System.out.println(",cbn.nck");
       return name;
     }
     return super.unescapePropertyName(name);
