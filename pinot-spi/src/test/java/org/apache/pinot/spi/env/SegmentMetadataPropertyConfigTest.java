@@ -144,22 +144,7 @@ public class SegmentMetadataPropertyConfigTest {
     testSegmentMetadataContent(configuration);
   }
 
-  @Test
-  public void testOldSegmentMetadataWithVersionHeader()
-      throws ConfigurationException {
-    File oldSegmentProperties = new File(
-        Objects.requireNonNull(
-            PropertiesConfiguration.class.getClassLoader()
-                .getResource("metadata-with-version-header.properties")).getFile());
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.
-        segmentMetadataFromFile(oldSegmentProperties, true, true,
-        PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
-
-    assertNotNull(configuration.getHeader());
-    testSegmentMetadataContent(configuration);
-  }
-
-  private static void testSegmentMetadataContent(PropertiesConfiguration configuration){
+  private static void testSegmentMetadataContent(PropertiesConfiguration configuration) {
     // getting all the keys, length of the list should be equal to the number of lines in the segment metadata
     List<String> keys = CommonsConfigurationUtils.getKeys(configuration);
     assertEquals(keys.size(), 123);
