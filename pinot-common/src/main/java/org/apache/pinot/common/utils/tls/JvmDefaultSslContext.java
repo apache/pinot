@@ -100,7 +100,7 @@ public class JvmDefaultSslContext {
           Optional.ofNullable(System.getProperty(JVM_TRUST_STORE_PASSWORD))
               .map(String::trim).filter(StringUtils::isNotBlank).orElse(null);
       RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(jvmSslFactory, jvmKeystoreType, jvmKeyStorePath,
-          jvmKeystorePassword, jvmTrustStoreType, jvmTrustStorePath, jvmTrustStorePassword, null, null, false);
+          jvmKeystorePassword, jvmTrustStoreType, jvmTrustStorePath, jvmTrustStorePassword, null, null, () -> false);
     }
     _initialized = true;
     LOGGER.info("Successfully initialized mvm default SSL context");

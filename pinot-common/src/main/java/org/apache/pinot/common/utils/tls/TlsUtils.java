@@ -233,7 +233,8 @@ public final class TlsUtils {
       if (isKeyOrTrustStorePathNullOrHasFileScheme(keyStorePath)
           && isKeyOrTrustStorePathNullOrHasFileScheme(trustStorePath)) {
         RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, keyStoreType, keyStorePath,
-            keyStorePassword, trustStoreType, trustStorePath, trustStorePassword, "SSL", secureRandom, false);
+            keyStorePassword, trustStoreType, trustStorePath, trustStorePassword, "SSL", secureRandom,
+            PinotInsecureMode::isPinotInInsecureMode);
       }
       // HttpsURLConnection
       HttpsURLConnection.setDefaultSSLSocketFactory(sslFactory.getSslSocketFactory());
@@ -300,7 +301,9 @@ public final class TlsUtils {
    * @param tlsConfig TLS config
    */
   public static SslContext buildClientContext(TlsConfig tlsConfig) {
-    SSLFactory sslFactory = RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig);
+    SSLFactory sslFactory =
+        RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
+            tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
     SslContextBuilder sslContextBuilder =
         SslContextBuilder.forClient().sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
     sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
@@ -321,7 +324,9 @@ public final class TlsUtils {
     if (tlsConfig.getKeyStorePath() == null) {
       throw new IllegalArgumentException("Must provide key store path for secured server");
     }
-    SSLFactory sslFactory = RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig);
+    SSLFactory sslFactory =
+        RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
+            tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
     SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
         .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
     sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
