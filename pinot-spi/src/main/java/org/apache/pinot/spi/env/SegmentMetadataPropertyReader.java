@@ -64,6 +64,7 @@ class SegmentMetadataPropertyReader extends PropertiesReader {
   protected String unescapePropertyName(final String name) {
     // skip the unescaping of the propertyName(key), if newer version of the segment metadata.
     if (_skipUnescapePropertyName) {
+      System.out.println(",cbn.nck");
       return name;
     }
     return super.unescapePropertyName(name);
@@ -73,6 +74,9 @@ class SegmentMetadataPropertyReader extends PropertiesReader {
   private void setSkipUnescapePropertyNameFlag() {
     List<String> commentLines = getCommentLines();
     if (commentLines.size() > 0) {
+      // assumes that header will have two lines
+      // first one with segment version header
+      // and second as a new line.
       String headerComment = commentLines.get(0);
         if (headerComment.contains(_segmentMetadataVersionHeader)) {
           _skipUnescapePropertyName = true;
