@@ -135,7 +135,7 @@ public class SegmentMetadataPropertyConfigTest {
     File oldSegmentProperties = new File(
         Objects.requireNonNull(
             PropertiesConfiguration.class.getClassLoader()
-                .getResource("metadata-without-version-header.properties")).getFile());
+                .getResource("segment-metadata-without-version-header.properties")).getFile());
     PropertiesConfiguration configuration = CommonsConfigurationUtils.
         segmentMetadataFromFile(oldSegmentProperties, true, true,
         PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
