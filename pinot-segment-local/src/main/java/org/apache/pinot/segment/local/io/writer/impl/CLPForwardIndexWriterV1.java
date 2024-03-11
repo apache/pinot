@@ -41,10 +41,15 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * HEADER
- *  version
- *  _LOGTYPE_DICTIONARY_OFFSET
- * column_LOGTYPE_DICTIONARY buffer
+ * Writer for CLP forward index.
+ * <p>CLP forward index contains 3 parts:
+ * <ul>
+ *   <li>LogType dictionary: dictionary for logType column</li>
+ *   <li>DictVars dictionary: dictionary for dictVars column</li>
+ *   <li>EncodedVars forward index: forward index for encodedVars column</li>
+ *   <li>LogType forward index: forward index for logType column</li>
+ *   <li>DictVars forward index: forward index for dictVars column</li>
+ *   <li>Metadata: magic bytes, version, number of dictVars, number of bytes per entry for logType and dictVars
  */
 
 public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {

@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWriterV1;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
@@ -37,28 +38,20 @@ import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
 public class CLPWriterTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "CLPForwardIndexCreatorTest");
+
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
+  }
 
   @Test
   public void testCLPWriter()
@@ -94,14 +87,11 @@ public class CLPWriterTest {
     for (String logLine : logLines) {
       statsCollector.collect(logLine);
     }
-
     statsCollector.seal();
-    System.out.println(statsCollector.getCLPStats());
 
-    File tmpDir = new File("/tmp/");
-    File indexFile = new File(tmpDir, "column1.fwd");
+    File indexFile = new File(TEMP_DIR, "column1.fwd");
     CLPForwardIndexWriterV1 clpForwardIndexWriterV1 =
-        new CLPForwardIndexWriterV1(tmpDir, indexFile, "column1", 4, statsCollector);
+        new CLPForwardIndexWriterV1(TEMP_DIR, indexFile, "column1", 4, statsCollector);
 
     for (String logLine : logLines) {
       clpForwardIndexWriterV1.putString(logLine);
@@ -111,7 +101,14 @@ public class CLPWriterTest {
     PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
     CLPForwardIndexReaderV1 clpForwardIndexReaderV1 = new CLPForwardIndexReaderV1(pinotDataBuffer, logLines.size());
     for (int i = 0; i < logLines.size(); i++) {
-      System.out.println(clpForwardIndexReaderV1.getString(i, clpForwardIndexReaderV1.createContext()));
+      Assert.assertEquals(clpForwardIndexReaderV1.getString(i, clpForwardIndexReaderV1.createContext()),
+          logLines.get(i));
     }
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws Exception {
+    FileUtils.deleteDirectory(TEMP_DIR);
   }
 }
