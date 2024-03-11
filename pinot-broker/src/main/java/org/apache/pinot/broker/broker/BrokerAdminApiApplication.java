@@ -23,6 +23,7 @@ import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -60,6 +61,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String BROKER_INSTANCE_ID = "brokerInstanceId";
 
+  public static final String START_TIME = "brokerStartTime";
+
   private final String _brokerResourcePackages;
   private final boolean _useHttps;
   private final boolean _swaggerBrokerEnabled;
@@ -89,7 +92,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         .getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
             CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
     connMgr.setDefaultSocketConfig(SocketConfig.custom().setSoTimeout(timeoutMs).build());
-
+    Instant startTime = Instant.now();
     register(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -109,6 +112,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID)).named(BROKER_INSTANCE_ID);
         bind(serverRoutingStatsManager).to(ServerRoutingStatsManager.class);
         bind(accessFactory).to(AccessControlFactory.class);
+        bind(startTime).named(BrokerAdminApiApplication.START_TIME);
       }
     });
     boolean enableBoundedJerseyThreadPoolExecutor = brokerConf

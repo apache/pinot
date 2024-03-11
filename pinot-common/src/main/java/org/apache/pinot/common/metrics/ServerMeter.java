@@ -35,12 +35,14 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETED_SEGMENT_COUNT("segments", false),
   DELETE_TABLE_FAILURES("tables", false),
   REALTIME_ROWS_CONSUMED("rows", true),
+  REALTIME_ROWS_FETCHED("rows", false),
   REALTIME_ROWS_FILTERED("rows", false),
   INVALID_REALTIME_ROWS_DROPPED("rows", false),
   INCOMPLETE_REALTIME_ROWS_CONSUMED("rows", false),
   REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
+  STREAM_CONSUMER_CREATE_EXCEPTIONS("exceptions", false),
   // number of times partition of a record did not match the partition of the stream
   REALTIME_PARTITION_MISMATCH("mismatch", false),
   REALTIME_DEDUP_DROPPED("rows", false),
@@ -50,6 +52,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   UPSERT_OUT_OF_ORDER("rows", false),
   DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   METADATA_TTL_PRIMARY_KEYS_REMOVED("rows", false),
+  UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
   LLC_CONTROLLER_RESPONSE_COMMIT("messages", true),
@@ -109,7 +112,8 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),
   LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
-  LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false);
+  LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
+  STREAM_DATA_LOSS("streamDataLoss", false);
 
   private final String _meterName;
   private final String _unit;

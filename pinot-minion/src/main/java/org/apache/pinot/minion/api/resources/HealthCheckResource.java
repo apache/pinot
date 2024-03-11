@@ -26,6 +26,9 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.GET;
@@ -37,6 +40,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.minion.MinionAdminApiApplication;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -53,6 +59,10 @@ public class HealthCheckResource {
   @Inject
   @Named(MinionAdminApiApplication.MINION_INSTANCE_ID)
   private String _instanceId;
+
+  @Inject
+  @Named(MinionAdminApiApplication.START_TIME)
+  private Instant _startTime;
 
   @GET
   @Path("/health")
@@ -71,5 +81,29 @@ public class HealthCheckResource {
     Response response =
         Response.status(Response.Status.SERVICE_UNAVAILABLE).entity(errMessage).build();
     throw new WebApplicationException(errMessage, response);
+  }
+
+  @GET
+  @Produces(MediaType.TEXT_PLAIN)
+  @Path("uptime")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
+  @ApiOperation(value = "Get minion uptime")
+  public long getUptime() {
+    if (_startTime == null) {
+      return 0;
+    }
+    Instant now = Instant.now();
+    Duration uptime = Duration.between(_startTime, now);
+    return uptime.getSeconds();
+  }
+
+  @GET
+  @Path("start-time")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_HEALTH)
+  @ApiOperation(value = "Get minion start time")
+  @Produces(MediaType.TEXT_PLAIN)
+  public String getStartTime() {
+    DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
+    return _startTime != null ? formatter.format(_startTime) : "";
   }
 }

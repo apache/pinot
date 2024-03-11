@@ -25,6 +25,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.request.context.predicate.RangePredicate;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
@@ -74,7 +75,8 @@ public class PredicateTest {
 
     // Non-standard RangePredicate (merged ranges)
     RangePredicate rangePredicate =
-        new RangePredicate(ExpressionContext.forIdentifier("foo"), true, "123", false, "456");
+        new RangePredicate(ExpressionContext.forIdentifier("foo"), true, "123", false, "456",
+            FieldSpec.DataType.STRING);
     String predicateExpression = rangePredicate.toString();
     assertEquals(predicateExpression, "(foo >= '123' AND foo < '456')");
     Expression thriftExpression = CalciteSqlParser.compileToExpression(predicateExpression);

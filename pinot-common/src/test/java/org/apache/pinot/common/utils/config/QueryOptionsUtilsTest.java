@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.sql.parsers.parser.ParseException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -48,23 +47,22 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
-  public void testIndexSkipConfigParsing()
-      throws ParseException {
-    String indexSkipConfigStr = "col1=inverted,range&col2=sorted";
+  public void testSkipIndexesParsing() {
+    String skipIndexesStr = "col1=inverted,range&col2=sorted";
     Map<String, String> queryOptions =
-        Map.of(CommonConstants.Broker.Request.QueryOptionKey.INDEX_SKIP_CONFIG, indexSkipConfigStr);
-    Map<String, Set<FieldConfig.IndexType>> indexSkipConfig = QueryOptionsUtils.getIndexSkipConfig(queryOptions);
-    Assert.assertEquals(indexSkipConfig.get("col1"),
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.SKIP_INDEXES, skipIndexesStr);
+    Map<String, Set<FieldConfig.IndexType>> skipIndexes = QueryOptionsUtils.getSkipIndexes(queryOptions);
+    Assert.assertEquals(skipIndexes.get("col1"),
         Set.of(FieldConfig.IndexType.RANGE, FieldConfig.IndexType.INVERTED));
-    Assert.assertEquals(indexSkipConfig.get("col2"),
+    Assert.assertEquals(skipIndexes.get("col2"),
         Set.of(FieldConfig.IndexType.SORTED));
   }
 
   @Test(expectedExceptions = RuntimeException.class)
-  public void testIndexSkipConfigParsingInvalid() {
-    String indexSkipConfigStr = "col1=inverted,range&col2";
+  public void testSkipIndexesParsingInvalid() {
+    String skipIndexesStr = "col1=inverted,range&col2";
     Map<String, String> queryOptions =
-        Map.of(CommonConstants.Broker.Request.QueryOptionKey.INDEX_SKIP_CONFIG, indexSkipConfigStr);
-     QueryOptionsUtils.getIndexSkipConfig(queryOptions);
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.SKIP_INDEXES, skipIndexesStr);
+     QueryOptionsUtils.getSkipIndexes(queryOptions);
   }
 }
