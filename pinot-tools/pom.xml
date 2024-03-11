@@ -34,7 +34,7 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <spark.version>3.5.0</spark.version>
-    <airlift.version>0.21</airlift.version>
+    <airlift.version>0.26</airlift.version>
   </properties>
   <dependencies>
     <dependency>
