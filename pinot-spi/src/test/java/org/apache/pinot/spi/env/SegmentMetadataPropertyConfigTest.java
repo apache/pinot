@@ -21,6 +21,7 @@ package org.apache.pinot.spi.env;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -31,6 +32,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class SegmentMetadataPropertyConfigTest {
@@ -57,7 +60,8 @@ public class SegmentMetadataPropertyConfigTest {
   @Test
   public void testSegmentMetadataPropertyConfiguration()
       throws ConfigurationException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true,
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.
+        segmentMetadataFromFile(CONFIG_FILE, true, true,
         PropertyIOFactoryKind.SegmentMetadataIOFactory, "");
 
     // setting the random value of the test keys
@@ -80,7 +84,8 @@ public class SegmentMetadataPropertyConfigTest {
   @Test
   public void testSegmentMetadataPropertyConfigurationWithHeader()
       throws ConfigurationException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true,
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.
+        segmentMetadataFromFile(CONFIG_FILE, true, true,
         PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
     configuration.setHeader("segment.metadata.version=version1");
 
@@ -122,6 +127,59 @@ public class SegmentMetadataPropertyConfigTest {
         PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
     testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR);
+  }
+
+  @Test
+  public void testOldSegmentMetadataBackwardCompatability()
+      throws ConfigurationException {
+    File oldSegmentProperties = new File(
+        Objects.requireNonNull(
+            PropertiesConfiguration.class.getClassLoader()
+                .getResource("metadata-without-version-header.properties")).getFile());
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.
+        segmentMetadataFromFile(oldSegmentProperties, true, true,
+        PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
+
+    assertNull(configuration.getHeader());
+    testSegmentMetadataContent(configuration);
+  }
+
+  @Test
+  public void testOldSegmentMetadataWithVersionHeader()
+      throws ConfigurationException {
+    File oldSegmentProperties = new File(
+        Objects.requireNonNull(
+            PropertiesConfiguration.class.getClassLoader()
+                .getResource("metadata-with-version-header.properties")).getFile());
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.
+        segmentMetadataFromFile(oldSegmentProperties, true, true,
+        PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
+
+    assertNotNull(configuration.getHeader());
+    testSegmentMetadataContent(configuration);
+  }
+
+  private static void testSegmentMetadataContent(PropertiesConfiguration configuration){
+    // getting all the keys, length of the list should be equal to the number of lines in the segment metadata
+    List<String> keys = CommonsConfigurationUtils.getKeys(configuration);
+    assertEquals(keys.size(), 123);
+
+    // asserting table name property from segment metadata
+    String tableName = configuration.getString("segment.table.name");
+    assertNotNull(tableName);
+    assertEquals(tableName, "fineFoodReviews");
+
+    // asserting table name property from segment metadata
+    String segmentName = configuration.getString("segment.name");
+    assertNotNull(tableName);
+    assertEquals(segmentName, "fineFoodReviews_OFFLINE_0");
+
+    // asserting segment dimension column names from segment metadata
+    String[] segmentDimensionColumnNames = configuration.getStringArray("segment.dimension.column.names");
+    assertNotNull(segmentDimensionColumnNames);
+    assertEquals(segmentDimensionColumnNames.length, 8);
+    assertEquals(String.join(",", segmentDimensionColumnNames),
+        "ProductId,Score,Summary,Text,UserId,combined,embedding,n_tokens");
   }
 
   private static void testPropertyKeys(List<String> recoveredKeys, String[] actualKeys) {
