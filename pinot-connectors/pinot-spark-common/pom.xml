@@ -163,7 +163,7 @@
              Thus, explicitly adding this plugin to a new profile to sign the files at the end all at once. -->
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
-            <version>1.6</version>
+            <version>3.2.0</version>
           </plugin>
         </plugins>
       </build>
