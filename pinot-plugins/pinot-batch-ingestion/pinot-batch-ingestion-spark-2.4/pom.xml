@@ -142,7 +142,7 @@
     <dependency>
       <groupId>com.twitter</groupId>
       <artifactId>chill_2.11</artifactId>
-      <version>0.9.3</version>
+      <version>0.10.0</version>
       <scope>test</scope>
       <exclusions>
         <exclusion>
