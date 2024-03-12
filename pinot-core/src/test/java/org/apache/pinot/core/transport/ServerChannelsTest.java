@@ -25,9 +25,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -47,7 +44,7 @@ public class ServerChannelsTest {
   }
 
   @BeforeClass
-  public void beforeClass()
+  public void setUp()
       throws Exception {
     _dummyServer = HttpServer.create();
     _dummyServer.bind(new InetSocketAddress("localhost", 0), 0);
@@ -55,7 +52,7 @@ public class ServerChannelsTest {
   }
 
   @AfterClass
-  public void afterClass()
+  public void tearDown()
       throws Exception {
     if (_dummyServer != null) {
       _dummyServer.stop(0);
@@ -63,11 +60,9 @@ public class ServerChannelsTest {
   }
 
   @Test(dataProvider = "parameters")
-  public void testConnect(final boolean nativeTransportEnabled)
+  public void testConnect(boolean nativeTransportEnabled)
       throws Exception {
-    PinotMetricUtils.init(new PinotConfiguration());
-    PinotMetricsRegistry registry = PinotMetricUtils.getPinotMetricsRegistry();
-    BrokerMetrics brokerMetrics = new BrokerMetrics(registry);
+    BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     NettyConfig nettyConfig = new NettyConfig();
     nettyConfig.setNativeTransportsEnabled(nativeTransportEnabled);
     QueryRouter queryRouter = mock(QueryRouter.class);
