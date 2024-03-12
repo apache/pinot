@@ -33,8 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <spark.version>3.5.0</spark.version>
-    <antlr-runtime.version>4.8</antlr-runtime.version>
+    <spark.version>3.5.1</spark.version>
     <scalatest.version>3.1.1</scalatest.version>
     <shadeBase>org.apache.pinot.\$internal</shadeBase>
   </properties>
@@ -52,10 +51,6 @@
           <version>${spark.version}</version>
           <scope>provided</scope>
           <exclusions>
-            <exclusion>
-              <groupId>org.antlr</groupId>
-              <artifactId>antlr4-runtime</artifactId>
-            </exclusion>
             <exclusion>
               <groupId>org.apache.curator</groupId>
               <artifactId>curator-recipes</artifactId>
@@ -208,38 +203,14 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.zookeeper</groupId>
-          <artifactId>zookeeper</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.antlr</groupId>
-          <artifactId>antlr4-runtime</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spark-common</artifactId>
-      <version>${project.parent.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
-      <version>${project.parent.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.antlr</groupId>
-          <artifactId>antlr4-runtime</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
-      <scope>provided</scope>
-      <groupId>org.antlr</groupId>
-      <artifactId>antlr4-runtime</artifactId>
-      <version>${antlr-runtime.version}</version>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-spark-common</artifactId>
     </dependency>
     <dependency>
       <scope>test</scope>

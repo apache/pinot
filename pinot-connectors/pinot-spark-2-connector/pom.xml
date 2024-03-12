@@ -33,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <spark.version>2.4.6</spark.version>
+    <spark.version>2.4.8</spark.version>
     <paranamer.version>2.8</paranamer.version>
     <scalaxml.version>1.3.0</scalaxml.version>
     <scalatest.version>3.1.1</scalatest.version>
@@ -207,7 +207,6 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spark-common</artifactId>
-      <version>${project.parent.version}</version>
     </dependency>
   </dependencies>
 </project>

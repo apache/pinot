@@ -42,7 +42,6 @@
         <filtering>true</filtering>
       </resource>
     </resources>
-    <!-- Antlr stuff -->
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
