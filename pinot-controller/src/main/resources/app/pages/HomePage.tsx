@@ -203,8 +203,9 @@ const HomePage = () => {
       </Grid>
       <Box mb={3} />
       <TenantsListing />
-      <Instances clusterName={clusterName} />
-
+      {clusterName !== '' ? (
+          <Instances clusterName={clusterName} />
+        ) : ( loading )}
       {taskTypesTable}
       <ClusterConfig />
     </Grid>
