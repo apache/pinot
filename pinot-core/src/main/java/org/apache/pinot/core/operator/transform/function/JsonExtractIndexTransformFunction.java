@@ -90,8 +90,13 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     }
     String resultsType = ((LiteralTransformFunction) thirdArgument).getStringLiteral().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
+    // TODO: will support array type; the underlying jsonIndexReader.getMatchingDocsMap supports the json path [*]
     if (!isSingleValue) {
       throw new IllegalArgumentException("jsonExtractIndex only supports single value type");
+    }
+    if (isSingleValue && inputJsonPath.contains("[*]")) {
+      throw new IllegalArgumentException("[*] syntax in json path is unsupported as json_extract_index"
+          + "currently does not support returning array types");
     }
     DataType dataType = DataType.valueOf(resultsType);
 

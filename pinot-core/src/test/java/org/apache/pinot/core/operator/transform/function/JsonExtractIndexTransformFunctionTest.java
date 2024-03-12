@@ -125,6 +125,31 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
         String.format("jsonExtractIndex(%s,'%s','STRING')", JSON_STRING_SV_COLUMN,
             "$.stringVal"), "$.stringVal", DataType.STRING, true
     });
+
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','INT')", JSON_STRING_SV_COLUMN,
+                    "$.intVals[0]"), "$.intVals[0]", DataType.INT, true
+    });
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','LONG')", JSON_STRING_SV_COLUMN,
+                    "$.longVals[1]"), "$.longVals[1]", DataType.LONG, true
+    });
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','FLOAT')", JSON_STRING_SV_COLUMN,
+                    "$.floatVals[0]"), "$.floatVals[0]", DataType.FLOAT, true
+    });
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','DOUBLE')", JSON_STRING_SV_COLUMN,
+                    "$.doubleVals[1]"), "$.doubleVals[1]", DataType.DOUBLE, true
+    });
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','BIG_DECIMAL')", JSON_STRING_SV_COLUMN,
+                    "$.bigDecimalVals[0]"), "$.bigDecimalVals[0]", DataType.BIG_DECIMAL, true
+    });
+    testArguments.add(new Object[]{
+            String.format("jsonExtractIndex(%s,'%s','STRING')", JSON_STRING_SV_COLUMN,
+                    "$.stringVals[1]"), "$.stringVals[1]", DataType.STRING, true
+    });
     return testArguments.toArray(new Object[0][]);
   }
 
