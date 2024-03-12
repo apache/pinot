@@ -2712,7 +2712,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         q -> queries.add(q.replace("mytable", "MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
     // something like "SELECT MYDB.MYTABLE.DAYSSinceEpOch from MYDB.MYTABLE where MYDB.MYTABLE.DAYSSinceEpOch = 16138"
     baseQueries.forEach(
-        q -> queries.add(q.replace("mytable", "MYDB.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
+        q -> queries.add(q.replace("mytable", "default.MYTABLE").replace("DaysSinceEpoch", "MYTABLE.DAYSSinceEpOch")));
 
     for (String query : queries) {
       JsonNode response = postQuery(query);
@@ -2758,7 +2758,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String pinotQuery = "SELECT DISTINCT(Carrier) FROM mytable LIMIT 1000000";
     String h2Query = "SELECT DISTINCT Carrier FROM mytable";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT DISTINCT Carrier FROM db.mytable LIMIT 1000000";
+    pinotQuery = "SELECT DISTINCT Carrier FROM default.mytable LIMIT 1000000";
     testQuery(pinotQuery, h2Query);
   }
 
@@ -2771,7 +2771,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String h2Query = "SELECT DISTINCT Carrier FROM mytable";
     testQuery(pinotQuery, h2Query);
 
-    pinotQuery = "SELECT DISTINCT Carrier FROM db.mytable LIMIT 1000000";
+    pinotQuery = "SELECT DISTINCT Carrier FROM default.mytable LIMIT 1000000";
     JsonNode response = postQuery(pinotQuery);
     JsonNode exceptions = response.get("exceptions");
     assertFalse(exceptions.isEmpty(), "At least one exception was expected");

@@ -70,6 +70,7 @@ import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.minion.BaseTaskGeneratorInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -215,7 +216,8 @@ public class PinotTaskRestletResource {
   public Map<String, TaskState> getTaskStatesByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType) {
+      String tableNameWithType, @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     return _pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, tableNameWithType);
   }
 
@@ -227,8 +229,9 @@ public class PinotTaskRestletResource {
   public String getTaskMetadataByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType) {
+      String tableNameWithType, @Context HttpHeaders headers) {
     try {
+      tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
       return _pinotHelixTaskResourceManager.getTaskMetadataByTable(taskType, tableNameWithType);
     } catch (JsonProcessingException e) {
       throw new ControllerApplicationException(LOGGER, String
@@ -245,7 +248,8 @@ public class PinotTaskRestletResource {
   public SuccessResponse deleteTaskMetadataByTable(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType) {
+      String tableNameWithType, @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     _pinotHelixTaskResourceManager.deleteTaskMetadataByTable(taskType, tableNameWithType);
     return new SuccessResponse(
         String.format("Successfully deleted metadata for task type: %s from table: %s", taskType, tableNameWithType));
@@ -287,7 +291,8 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "verbosity (Prints information for all the tasks for the given task type and table."
           + "By default, only prints subtask details for running and error tasks. "
           + "Value of > 0 prints subtask details for all tasks)")
-      @DefaultValue("0") @QueryParam("verbosity") int verbosity) {
+      @DefaultValue("0") @QueryParam("verbosity") int verbosity, @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     return _pinotHelixTaskResourceManager.getTasksDebugInfoByTable(taskType, tableNameWithType, verbosity);
   }
 
@@ -297,13 +302,13 @@ public class PinotTaskRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @ApiOperation("Fetch task generation information for the recent runs of the given task for the given table")
   public String getTaskGenerationDebugInto(
-      @Context HttpHeaders httpHeaders,
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
           String tableNameWithType,
       @ApiParam(value = "Whether to only lookup local cache for logs", defaultValue = "false") @QueryParam("localOnly")
-          boolean localOnly)
+          boolean localOnly, @Context HttpHeaders httpHeaders)
       throws JsonProcessingException {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
     if (localOnly) {
       BaseTaskGeneratorInfo taskGeneratorMostRecentRunInfo =
           _taskManagerStatusCache.fetchTaskGeneratorInfo(tableNameWithType, taskType);
@@ -320,9 +325,10 @@ public class PinotTaskRestletResource {
     // Relying on original schema that was used to query the controller
     URI uri = _uriInfo.getRequestUri();
     String scheme = uri.getScheme();
+    String finalTableNameWithType = tableNameWithType;
     List<String> controllerUrls = controllers.stream().map(controller -> String
         .format("%s://%s:%d/tasks/generator/%s/%s/debug?localOnly=true", scheme, controller.getHostName(),
-            Integer.parseInt(controller.getPort()), tableNameWithType, taskType)).collect(Collectors.toList());
+            Integer.parseInt(controller.getPort()), finalTableNameWithType, taskType)).collect(Collectors.toList());
 
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, HashBiMap.create(0));
@@ -610,12 +616,13 @@ public class PinotTaskRestletResource {
   @ApiOperation("Fetch cron scheduler job keys")
   public Map<String, Object> getCronSchedulerJobDetails(
       @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
-      @ApiParam(value = "Task type") @QueryParam("taskType") String taskType)
+      @ApiParam(value = "Task type") @QueryParam("taskType") String taskType, @Context HttpHeaders headers)
       throws SchedulerException {
     Scheduler scheduler = _pinotTaskManager.getScheduler();
     if (scheduler == null) {
       throw new NotFoundException("Task scheduler is disabled");
     }
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     JobKey jobKey = JobKey.jobKey(tableName, taskType);
     if (!scheduler.checkExists(jobKey)) {
       throw new NotFoundException(
@@ -668,7 +675,9 @@ public class PinotTaskRestletResource {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
   public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
-      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName) {
+      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (taskType != null) {
       // Schedule task for the given task type
       String taskName = tableName != null ? _pinotTaskManager.scheduleTask(taskType, tableName)
