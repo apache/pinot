@@ -144,7 +144,7 @@ public class CalciteSqlCompilerTest {
   @Test
   public void testAggregationInCaseWhenStatementsWithGroupBy() {
     //@formatter:off
-   PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
+    PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(
         "SELECT OrderID, SUM(Quantity),\n"
             + "CASE\n"
             + "    WHEN sum(Quantity) > 30 THEN 'The quantity is greater than 30'\n"
@@ -158,13 +158,14 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(caseStm.getOperator(), "case");
     Expression firstWhen = caseStm.getOperands().get(0);
     Assert.assertEquals(firstWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "sum");
-    Assert.assertEquals(firstWhen.getFunctionCall().getOperands().get(0).getFunctionCall()
-        .getOperands().get(0).getIdentifier().getName(), "Quantity");
-
+    Assert.assertEquals(
+        firstWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
+            .getName(), "Quantity");
     Expression secondWhen = caseStm.getOperands().get(2);
     Assert.assertEquals(secondWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "sum");
-    Assert.assertEquals(secondWhen.getFunctionCall().getOperands().get(0).getFunctionCall()
-        .getOperands().get(0).getIdentifier().getName(), "Quantity");
+    Assert.assertEquals(
+        secondWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
+            .getName(), "Quantity");
   }
 
   @Test
@@ -178,19 +179,19 @@ public class CalciteSqlCompilerTest {
             + "    ELSE 'The quantity is under 30'\n"
             + "END AS QuantityText\n"
             + "FROM OrderDetails\n");
-      //@formatter:on
-
+    //@formatter:on
     Function caseStm = pinotQuery.getSelectList().get(1).getFunctionCall().getOperands().get(0).getFunctionCall();
     Assert.assertEquals(caseStm.getOperator(), "case");
     Expression firstWhen = caseStm.getOperands().get(0);
     Assert.assertEquals(firstWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "sum");
-    Assert.assertEquals(firstWhen.getFunctionCall().getOperands().get(0).getFunctionCall()
-        .getOperands().get(0).getIdentifier().getName(), "Quantity");
-
+    Assert.assertEquals(
+        firstWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
+            .getName(), "Quantity");
     Expression secondWhen = caseStm.getOperands().get(2);
     Assert.assertEquals(secondWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperator(), "sum");
-    Assert.assertEquals(secondWhen.getFunctionCall().getOperands().get(0).getFunctionCall()
-        .getOperands().get(0).getIdentifier().getName(), "Quantity");
+    Assert.assertEquals(
+        secondWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
+            .getName(), "Quantity");
   }
 
   @Test
