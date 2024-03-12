@@ -472,7 +472,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     CompressionCodec[] compressionCodecs = CompressionCodec.values();
     while (true) {
       CompressionCodec compressionCodec = compressionCodecs[RANDOM.nextInt(compressionCodecs.length)];
-      if (compressionCodec.isApplicableToRawIndex()) {
+      if (compressionCodec.isApplicableToRawIndex() && compressionCodec != CompressionCodec.CLP) {
         return compressionCodec;
       }
     }
