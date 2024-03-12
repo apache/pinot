@@ -34,7 +34,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
  * might be treated as two different routing target instances based on the types of table it serves.
  */
 @ThreadSafe
-public class ServerRoutingInstance {
+public final class ServerRoutingInstance {
   private static final String SHORT_OFFLINE_SUFFIX = "_O";
   private static final String SHORT_REALTIME_SUFFIX = "_R";
   private static final Map<String, String> SHORT_HOSTNAME_MAP = new ConcurrentHashMap<>();
