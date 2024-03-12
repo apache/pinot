@@ -21,19 +21,15 @@ package org.apache.pinot.segment.local.segment.index.forward.mutable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
-import org.apache.commons.lang.RandomStringUtils;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndex;
-import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class CLPMutableForwardIndexTest {
@@ -63,10 +59,12 @@ public class CLPMutableForwardIndexTest {
       List<String> logLines = new ArrayList<>();
       logLines.add(
           "2023/10/26 00:03:10.168 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] "
-              + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective: true");
+              + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective: "
+              + "true");
       logLines.add(
           "2023/10/26 00:03:10.169 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32d_DEFAULT)] "
-              + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective: true");
+              + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective: "
+              + "true");
       logLines.add(
           "2023/10/27 16:35:10.470 INFO [ControllerResponseFilter] [grizzly-http-server-2] Handled request from 10.12"
               + ".15.1 GET https://10.12.15.10:8443/health?checkType=liveness, content-type null status code 200 OK");
@@ -82,6 +80,21 @@ public class CLPMutableForwardIndexTest {
       for (int i = 0; i < rows; i++) {
         Assert.assertEquals(readerWriter.getString(i), logLines.get(i));
       }
+
+      // Verify clp stats
+      CLPStatsProvider.CLPStats stats = new CLPStatsProvider.CLPStats();
+      for (int i = 0; i < rows; i++) {
+        stats.collect(logLines.get(i));
+      }
+      stats.seal();
+
+      CLPStatsProvider.CLPStats mutableIndexStats = readerWriter.getCLPStats();
+      Assert.assertEquals(stats.getTotalNumberOfDictVars(), mutableIndexStats.getTotalNumberOfDictVars());
+      Assert.assertEquals(stats.getMaxNumberOfEncodedVars(), mutableIndexStats.getMaxNumberOfEncodedVars());
+      Assert.assertEquals(stats.getSortedDictVarValues(), mutableIndexStats.getSortedDictVarValues());
+      Assert.assertEquals(stats.getTotalNumberOfEncodedVars(), mutableIndexStats.getTotalNumberOfEncodedVars());
+      Assert.assertEquals(stats.getSortedLogTypeValues(), mutableIndexStats.getSortedLogTypeValues());
+      Assert.assertEquals(stats.getSortedDictVarValues(), mutableIndexStats.getSortedDictVarValues());
     }
   }
 }

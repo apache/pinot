@@ -34,6 +34,11 @@ import org.apache.pinot.spi.data.FieldSpec;
 
 
 public class CLPMutableForwardIndex implements MutableForwardIndex {
+  // TODO: We can get better dynamic estimates using segment stats
+  private static final int ESTIMATED_LOG_TYPE_CARDINALITY = 10000;
+  private static final int ESTIMATED_DICT_VARS_CARDINALITY = 10000;
+  private static final int ESTIMATED_LOG_TYPE_LENGTH = 200;
+  private static final int ESTIMATED_DICT_VARS_LENGTH = 50;
   private FieldSpec.DataType _storedType;
   private final EncodedMessage _clpEncodedMessage;
   private final MessageEncoder _clpMessageEncoder;
@@ -57,9 +62,11 @@ public class CLPMutableForwardIndex implements MutableForwardIndex {
     _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
     _logTypeDictCreator =
-        new StringOffHeapMutableDictionary(10000, 100, memoryManager, columnName + "_logType.dict", 1000);
+        new StringOffHeapMutableDictionary(ESTIMATED_LOG_TYPE_CARDINALITY, ESTIMATED_LOG_TYPE_CARDINALITY / 10,
+            memoryManager, columnName + "_logType.dict", ESTIMATED_LOG_TYPE_LENGTH);
     _dictVarsDictCreator =
-        new StringOffHeapMutableDictionary(10000, 100, memoryManager, columnName + "_dictVars.dict", 1000);
+        new StringOffHeapMutableDictionary(ESTIMATED_DICT_VARS_CARDINALITY, ESTIMATED_DICT_VARS_CARDINALITY / 10,
+            memoryManager, columnName + "_dictVars.dict", ESTIMATED_DICT_VARS_LENGTH);
 
     _logTypeFwdIndex = new FixedByteSVMutableForwardIndex(true, FieldSpec.DataType.INT, capacity, memoryManager,
         columnName + "_logType.fwd");

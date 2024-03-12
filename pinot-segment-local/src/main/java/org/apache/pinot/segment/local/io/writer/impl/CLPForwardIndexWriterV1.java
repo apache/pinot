@@ -44,12 +44,13 @@ import org.apache.pinot.spi.data.FieldSpec;
  * Writer for CLP forward index.
  * <p>CLP forward index contains 3 parts:
  * <ul>
+ *   <li>Header bytes: MAGIC_BYTES, version, </li>
  *   <li>LogType dictionary: dictionary for logType column</li>
  *   <li>DictVars dictionary: dictionary for dictVars column</li>
- *   <li>EncodedVars forward index: forward index for encodedVars column</li>
- *   <li>LogType forward index: forward index for logType column</li>
- *   <li>DictVars forward index: forward index for dictVars column</li>
- *   <li>Metadata: magic bytes, version, number of dictVars, number of bytes per entry for logType and dictVars
+ *   <li>LogType fwd index: fwd index for logType column</li>
+ *   <li>DictVars fwd index: fwd index for dictVars column</li>
+ *   <li>EncodedVars fwd index: raw fwd index for encodedVars column</li>
+ * </ul>
  */
 
 public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
@@ -106,7 +107,7 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
 
     _encodedVarsFwdIndexFile = new File(_baseIndexDir, column + "_clp_encodedvars.fwd");
     _encodedVarsFwdIndexWriter =
-        new MultiValueFixedByteRawIndexCreator(_encodedVarsFwdIndexFile, ChunkCompressionType.PASS_THROUGH, numDocs,
+        new MultiValueFixedByteRawIndexCreator(_encodedVarsFwdIndexFile, ChunkCompressionType.LZ4, numDocs,
             FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), false,
             VarByteChunkForwardIndexWriterV4.VERSION);
     _clpStats.clear();
@@ -118,7 +119,7 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
 
   @Override
   public void putBigDecimal(BigDecimal value) {
-    throw new UnsupportedOperationException("String only");
+    throw new UnsupportedOperationException("Non string types are not supported");
   }
 
   @Override
@@ -167,17 +168,17 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
 
   @Override
   public void putBytes(byte[] value) {
-    throw new UnsupportedOperationException("String only");
+    throw new UnsupportedOperationException("Non string types are not supported");
   }
 
   @Override
   public void putStringMV(String[] values) {
-    throw new UnsupportedOperationException("String only");
+    throw new UnsupportedOperationException("Non string types are not supported");
   }
 
   @Override
   public void putBytesMV(byte[][] values) {
-    throw new UnsupportedOperationException("String only");
+    throw new UnsupportedOperationException("Non string types are not supported");
   }
 
   @Override
@@ -194,26 +195,51 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
     _dictVarsFwdIndexWriter.close();
     _encodedVarsFwdIndexWriter.close();
 
-    int totalSize = MAGIC_BYTES.length + 9 * 4 + (int) _logTypeDictFile.length() + (int) _dictVarsDictFile.length()
-        + (int) _logTypeFwdIndexFile.length() + (int) _dictVarsFwdIndexFile.length()
-        + (int) _encodedVarsFwdIndexFile.length();
-
+    long totalSize = 0;
     _fileBuffer.put(MAGIC_BYTES);
+    totalSize += MAGIC_BYTES.length;
+
     _fileBuffer.putInt(1); // version
+    totalSize += Integer.BYTES;
+
     _fileBuffer.putInt(_clpStats.getTotalNumberOfDictVars());
+    totalSize += Integer.BYTES;
+
     _fileBuffer.putInt(_logTypeDictCreator.getNumBytesPerEntry());
+    totalSize += Integer.BYTES;
+
     _fileBuffer.putInt(_dictVarsDictCreator.getNumBytesPerEntry());
+    totalSize += Integer.BYTES;
+
     _fileBuffer.putInt((int) _logTypeDictFile.length()); // logType dict length
+    totalSize += Integer.BYTES;
+
     _fileBuffer.putInt((int) _dictVarsDictFile.length()); // dictVars dict length
+    totalSize += Integer.BYTES;
+
     _fileBuffer.putInt((int) _logTypeFwdIndexFile.length()); // logType fwd index length
+    totalSize += Integer.BYTES;
+
     _fileBuffer.putInt((int) _dictVarsFwdIndexFile.length()); // dictVars fwd index length
+    totalSize += Integer.BYTES;
+
     _fileBuffer.putInt((int) _encodedVarsFwdIndexFile.length()); // encodedVars fwd index length
+    totalSize += Integer.BYTES;
 
     copyFileIntoBuffer(_logTypeDictFile);
+    totalSize += _logTypeDictFile.length();
+
     copyFileIntoBuffer(_dictVarsDictFile);
+    totalSize += _dictVarsDictFile.length();
+
     copyFileIntoBuffer(_logTypeFwdIndexFile);
+    totalSize += _logTypeFwdIndexFile.length();
+
     copyFileIntoBuffer(_dictVarsFwdIndexFile);
+    totalSize += _dictVarsFwdIndexFile.length();
+
     copyFileIntoBuffer(_encodedVarsFwdIndexFile);
+    totalSize += _encodedVarsFwdIndexFile.length();
 
     _dataFile.truncate(totalSize);
 

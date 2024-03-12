@@ -60,18 +60,6 @@ public interface CLPStatsProvider {
           BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
     }
 
-    public int getMaxNumberOfEncodedVars() {
-      return _maxNumberOfEncodedVars;
-    }
-
-    public int getTotalNumberOfDictVars() {
-      return _totalNumberOfDictVars;
-    }
-
-    public int getTotalNumberOfEncodedVars() {
-      return _totalNumberOfEncodedVars;
-    }
-
     public void collect(String value) {
       String logType;
       String[] dictVars;
@@ -117,6 +105,18 @@ public interface CLPStatsProvider {
     public void clear() {
       _sortedLogTypeValues = null;
       _sortedDictVarValues = null;
+    }
+
+    public int getMaxNumberOfEncodedVars() {
+      return _maxNumberOfEncodedVars;
+    }
+
+    public int getTotalNumberOfDictVars() {
+      return _totalNumberOfDictVars;
+    }
+
+    public int getTotalNumberOfEncodedVars() {
+      return _totalNumberOfEncodedVars;
     }
 
     public String[] getSortedLogTypeValues() {
