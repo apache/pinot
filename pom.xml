@@ -133,7 +133,6 @@
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.9</swagger.version>
     <hadoop.version>3.3.6</hadoop.version>
-    <antlr.version>4.13.1</antlr.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.0</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
@@ -145,11 +144,11 @@
     <!-- hadoop-common, spark-core use commons-net -->
     <commons-net.version>3.10.0</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.2.23</dropwizard-metrics.version>
-    <snappy-java.version>1.1.10.4</snappy-java.version>
+    <dropwizard-metrics.version>4.2.25</dropwizard-metrics.version>
+    <snappy-java.version>1.1.10.5</snappy-java.version>
     <zstd-jni.version>1.5.5-11</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
-    <log4j.version>2.22.0</log4j.version>
+    <log4j.version>2.23.1</log4j.version>
     <slf4j.version>2.0.9</slf4j.version>
     <netty.version>4.1.107.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
@@ -204,6 +203,7 @@
     <wildfly.version>1.7.0.Final</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
+    <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
   </properties>
 
   <profiles>
@@ -314,17 +314,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-tools</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-hadoop</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-spark</artifactId>
+        <artifactId>pinot-broker</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -334,12 +324,17 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-broker</artifactId>
+        <artifactId>pinot-minion</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-minion</artifactId>
+        <artifactId>pinot-tools</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spark-common</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -414,7 +409,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.9.38</version>
+        <version>1.0.5</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -780,10 +775,6 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>com.nimbusds</groupId>
-            <artifactId>nimbus-jose-jwt</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-text</artifactId>
           </exclusion>
@@ -794,6 +785,10 @@
           <exclusion>
             <groupId>org.apache.hadoop.thirdparty</groupId>
             <artifactId>hadoop-shaded-protobuf_3_7</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.jboss.xnio</groupId>
+            <artifactId>xnio-api</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -927,6 +922,18 @@
             <groupId>io.netty</groupId>
             <artifactId>netty</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-yarn-client</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-yarn-common</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-hdfs-client</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -972,6 +979,11 @@
         <groupId>org.codehaus.jettison</groupId>
         <artifactId>jettison</artifactId>
         <version>${jettison.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.nimbusds</groupId>
+        <artifactId>nimbus-jose-jwt</artifactId>
+        <version>${nimbus-jose-jwt.version}</version>
       </dependency>
 
       <!-- Consolidate eclipse jetty dependencies for hadoop/spark/pulsar -->
@@ -1085,11 +1097,6 @@
         <groupId>com.tdunning</groupId>
         <artifactId>t-digest</artifactId>
         <version>3.2</version>
-      </dependency>
-      <dependency>
-        <groupId>org.antlr</groupId>
-        <artifactId>antlr4-runtime</artifactId>
-        <version>${antlr.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jayway.jsonpath</groupId>
@@ -1361,7 +1368,7 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.24ea16</version>
+        <version>2.25ea10</version>
       </dependency>
       <dependency>
         <groupId>org.ow2.asm</groupId>

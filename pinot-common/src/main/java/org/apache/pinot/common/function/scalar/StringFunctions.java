@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -830,5 +831,25 @@ public class StringFunctions {
   public static boolean like(String inputStr, String likePatternStr) {
     String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
     return regexpLike(inputStr, regexPatternStr);
+  }
+
+  /**
+   * Checks whether the input string can be parsed into a json node or not. Useful for scenarios where we want
+   * to filter out malformed json. In case of nulls we return null itself, as null can be treated as valid json
+   * in partial-upsert scenarios. Upto the user to use null response accordingly.
+   *
+   * @param inputStr Input string to test for valid json
+   * @return in case of null value, it returns null. In case of non-null, it returns true in case of valid json
+   * parsing else false
+   *
+   */
+  @ScalarFunction(names = {"isJson", "is_json"})
+  public static boolean isJson(String inputStr) {
+    try {
+      JsonUtils.stringToJsonNode(inputStr);
+      return true;
+    } catch (Exception e) {
+      return false;
+    }
   }
 }
