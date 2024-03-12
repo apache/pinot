@@ -24,6 +24,8 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
+import org.apache.parquet.hadoop.util.HadoopOutputFile;
+import org.apache.parquet.io.OutputFile;
 
 
 public class ParquetTestUtils {
@@ -36,7 +38,8 @@ public class ParquetTestUtils {
    */
   public static ParquetWriter<GenericRecord> getParquetAvroWriter(Path path, Schema schema)
       throws IOException {
-    return AvroParquetWriter.<GenericRecord>builder(path).withSchema(schema)
+    OutputFile outputFile = HadoopOutputFile.fromPath(path, ParquetUtils.getParquetHadoopConfiguration());
+    return AvroParquetWriter.<GenericRecord>builder(outputFile).withSchema(schema)
         .withConf(ParquetUtils.getParquetHadoopConfiguration())
         .build();
   }
