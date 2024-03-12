@@ -747,18 +747,10 @@ public class CalciteSqlParser {
         for (int i = 0; i < whenOperands.size(); i++) {
           SqlNode whenSqlNode = whenOperands.get(i);
           Expression whenExpression = toExpression(whenSqlNode);
-          if (isAggregateExpression(whenExpression)) {
-            throw new SqlCompilationException(
-                "Aggregation functions inside WHEN Clause is not supported - " + whenSqlNode);
-          }
           caseFuncExpr.getFunctionCall().addToOperands(whenExpression);
 
           SqlNode thenSqlNode = thenOperands.get(i);
           Expression thenExpression = toExpression(thenSqlNode);
-          if (isAggregateExpression(thenExpression)) {
-            throw new SqlCompilationException(
-                "Aggregation functions inside THEN Clause is not supported - " + thenSqlNode);
-          }
           caseFuncExpr.getFunctionCall().addToOperands(thenExpression);
         }
         Expression elseExpression = toExpression(elseOperand);

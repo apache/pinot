@@ -106,6 +106,9 @@ public class QueryTestSet {
             + " SUM(CASE WHEN a.col2 <> 'foo' AND a.col2 <> 'alice' THEN 1 ELSE 0 END) as unmatch_sum "
             + " FROM a WHERE a.ts >= 1600000000 GROUP BY a.col1"},
 
+        new Object[]{"SELECT a.col1, CASE WHEN sum(a.col3) = 0 THEN 0 ELSE SUM(a.col3) END AS match_sum "
+            + " FROM a WHERE a.ts >= 1600000000 GROUP BY a.col1"},
+
         new Object[]{"SELECT a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 "
             + " WHERE a.col3 IN (1, 2, 3) OR (a.col3 > 10 AND a.col3 < 50)"},
 
