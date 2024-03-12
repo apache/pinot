@@ -24,6 +24,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -51,6 +52,9 @@ public final class AccessControlUtils {
    */
   public static void validatePermission(@Nullable String tableName, AccessType accessType,
       @Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl, AccessControl accessControl) {
+    if (tableName != null) {
+      tableName = DatabaseUtils.translateTableName(tableName, httpHeaders);
+    }
     String userMessage = getUserMessage(tableName, accessType, endpointUrl);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
