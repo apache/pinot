@@ -835,12 +835,11 @@ public class StringFunctions {
 
   /**
    * Checks whether the input string can be parsed into a json node or not. Useful for scenarios where we want
-   * to filter out malformed json. In case of nulls we return null itself, as null can be treated as valid json
-   * in partial-upsert scenarios. Upto the user to use null response accordingly.
+   * to filter out malformed json.
+   * Null values are handled by the function invoker here and this function processes the results on non-null values.
    *
    * @param inputStr Input string to test for valid json
-   * @return in case of null value, it returns null. In case of non-null, it returns true in case of valid json
-   * parsing else false
+   * @return  true in case of valid json parsing else false
    *
    */
   @ScalarFunction(names = {"isJson", "is_json"})
