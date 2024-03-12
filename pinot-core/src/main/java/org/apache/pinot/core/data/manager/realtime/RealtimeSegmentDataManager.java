@@ -427,6 +427,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     boolean asyncConsumerEnabled = false;
     MessageBatchBuffer<MessageBatch> messagesQueue = null;
     while (!_shouldStop && !endCriteriaReached()) {
+      _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
@@ -486,7 +487,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
               ((LongMsgOffset) _currentOffset).getOffset());
         }
-        _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
         lastUpdatedOffset = _streamPartitionMsgOffsetFactory.create(_currentOffset);
       } else if (endCriteriaReached) {
         // At this point current offset has not moved because processStreamEvents() has exited before processing a
@@ -511,9 +511,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         long timeSinceStreamLastCreatedOrConsumedMs = _idleTimer.getTimeSinceStreamLastCreatedOrConsumedMs();
 
         if (idleTimeoutMillis >= 0 && (timeSinceStreamLastCreatedOrConsumedMs > idleTimeoutMillis)) {
-          // Update the partition-consuming metric only if we have been idling beyond idle timeout.
           // Create a new stream consumer wrapper, in case we are stuck on something.
-          _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
           recreateStreamConsumer(
               String.format("Total idle time: %d ms exceeded idle timeout: %d ms",
                   timeSinceStreamLastCreatedOrConsumedMs, idleTimeoutMillis));
