@@ -1619,11 +1619,11 @@ public class PinotHelixResourceManager {
   public List<String> getSchemaNames(@Nullable String databaseName) {
     List<String> schemas = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
-    if (databaseName != null) {
+    if (schemas != null) {
       return schemas.stream().filter(schemaName -> isPartOfDatabase(schemaName, databaseName))
           .collect(Collectors.toList());
     }
-    return schemas;
+    return Collections.emptyList();
   }
 
   public void initUserACLConfig(ControllerConf controllerConf)

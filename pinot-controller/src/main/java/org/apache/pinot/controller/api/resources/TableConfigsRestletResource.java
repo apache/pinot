@@ -176,19 +176,17 @@ public class TableConfigsRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
-    TableConfigs tableConfigs;
-    String rawTableName;
     try {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
-      tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), httpHeaders);
-      tableConfigs.setTableName(rawTableName);
-      validateConfig(tableConfigs, typesToSkip);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs. %s", e.getMessage()),
           Response.Status.BAD_REQUEST, e);
     }
+    TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+    validateConfig(tableConfigs, typesToSkip);
+    String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), httpHeaders);
+    tableConfigs.setTableName(rawTableName);
 
     if (_pinotHelixResourceManager.hasOfflineTable(rawTableName) || _pinotHelixResourceManager.hasRealtimeTable(
         rawTableName) || _pinotHelixResourceManager.getSchema(rawTableName) != null) {
@@ -197,34 +195,26 @@ public class TableConfigsRestletResource {
           Response.Status.BAD_REQUEST);
     }
 
-    // validate permission
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
     Schema schema = tableConfigs.getSchema();
 
     try {
+      // validate permission
       String endpointUrl = request.getRequestURL().toString();
       AccessControl accessControl = _accessControlFactory.create();
-      AccessControlUtils
-          .validatePermission(schema.getSchemaName(), AccessType.CREATE, httpHeaders, endpointUrl, accessControl);
-
-      if (offlineTableConfig != null) {
-        tuneConfig(offlineTableConfig, schema);
-        AccessControlUtils
-            .validatePermission(offlineTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
-                accessControl);
-      }
-      if (realtimeTableConfig != null) {
-        tuneConfig(realtimeTableConfig, schema);
-        AccessControlUtils
-            .validatePermission(realtimeTableConfig.getTableName(), AccessType.CREATE, httpHeaders, endpointUrl,
-                accessControl);
-      }
-
-      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.CREATE_TABLE)) {
+      AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders, endpointUrl,
+          accessControl);
+      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.CREATE_TABLE)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
 
+      if (offlineTableConfig != null) {
+        tuneConfig(offlineTableConfig, schema);
+      }
+      if (realtimeTableConfig != null) {
+        tuneConfig(realtimeTableConfig, schema);
+      }
       try {
         _pinotHelixResourceManager.addSchema(schema, false, false);
         LOGGER.info("Added schema: {}", schema.getSchemaName());
@@ -273,7 +263,7 @@ public class TableConfigsRestletResource {
   @ApiOperation(value = "Delete the TableConfigs", notes = "Delete the TableConfigs")
   public SuccessResponse deleteConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
-          String tableName, @Context HttpHeaders headers) {
+      String tableName, @Context HttpHeaders headers) {
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
       boolean tableExists =
@@ -314,26 +304,25 @@ public class TableConfigsRestletResource {
       notes = "Update the TableConfigs provided by the tableConfigsStr json")
   public ConfigSuccessResponse updateConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
-          String tableName,
+      String tableName,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
       @ApiParam(value = "Reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload,
-      @ApiParam(value = "Force update the table schema") @DefaultValue("false")
-      @QueryParam("forceTableSchemaUpdate") boolean forceTableSchemaUpdate,
-      String tableConfigsStr, @Context HttpHeaders headers) throws Exception {
+      @ApiParam(value = "Force update the table schema") @DefaultValue("false") @QueryParam("forceTableSchemaUpdate")
+      boolean forceTableSchemaUpdate, String tableConfigsStr, @Context HttpHeaders headers)
+      throws Exception {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     TableConfigs tableConfigs;
-    String translatedTableName;
     try {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      tableConfigs.setTableName(DatabaseUtils.translateTableName(tableConfigs.getTableName(), headers));
-      Preconditions.checkState(tableConfigs.getTableName().equals(tableName),
-          "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
       validateConfig(tableConfigs, typesToSkip);
+      Preconditions.checkState(DatabaseUtils.translateTableName(tableConfigs.getTableName(), headers).equals(tableName),
+          "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
+      tableConfigs.setTableName(tableName);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s", tableName),
           Response.Status.BAD_REQUEST, e);
@@ -377,8 +366,7 @@ public class TableConfigsRestletResource {
     } catch (InvalidTableConfigException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableConfigs for: %s, %s", tableName, e.getMessage()),
-          Response.Status.BAD_REQUEST, e);
+          String.format("Invalid TableConfigs for: %s, %s", tableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER,
@@ -404,48 +392,27 @@ public class TableConfigsRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
-    TableConfigs tableConfigs;
     try {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
-      tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs json string: %s", tableConfigsStr), Response.Status.BAD_REQUEST, e);
     }
-    tableConfigs.setTableName(DatabaseUtils.translateTableName(tableConfigs.getTableName(), httpHeaders));
+    TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
+    validateConfig(tableConfigs, typesToSkip);
+    String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), httpHeaders);
+    tableConfigs.setTableName(rawTableName);
 
     // validate permission
     String endpointUrl = request.getRequestURL().toString();
     AccessControl accessControl = _accessControlFactory.create();
-    Schema schema = tableConfigs.getSchema();
-    TableConfig offlineTableConfig = tableConfigs.getOffline();
-    TableConfig realtimeTableConfig = tableConfigs.getRealtime();
-
-    AccessControlUtils
-        .validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl, accessControl);
-
-    if (offlineTableConfig != null) {
-      tuneConfig(offlineTableConfig, schema);
-      AccessControlUtils
-          .validatePermission(offlineTableConfig.getTableName(), AccessType.READ, httpHeaders, endpointUrl,
-              accessControl);
-    }
-    if (realtimeTableConfig != null) {
-      tuneConfig(realtimeTableConfig, schema);
-      AccessControlUtils
-          .validatePermission(realtimeTableConfig.getTableName(), AccessType.READ, httpHeaders, endpointUrl,
-              accessControl);
-    }
-
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(),
-        Actions.Table.VALIDATE_TABLE_CONFIGS)) {
+    AccessControlUtils.validatePermission(rawTableName, AccessType.READ, httpHeaders, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
-    TableConfigs validatedTableConfigs = validateConfig(tableConfigs, typesToSkip);
-
-    ObjectNode response = JsonUtils.objectToJsonNode(validatedTableConfigs).deepCopy();
+    ObjectNode response = JsonUtils.objectToJsonNode(tableConfigs).deepCopy();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(tableConfigsAndUnrecognizedProps.getRight()));
     return response.toString();
   }
@@ -456,7 +423,7 @@ public class TableConfigsRestletResource {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
 
-  private TableConfigs validateConfig(TableConfigs tableConfigs, @Nullable String typesToSkip) {
+  private void validateConfig(TableConfigs tableConfigs, @Nullable String typesToSkip) {
     String rawTableName = tableConfigs.getTableName();
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
@@ -488,8 +455,6 @@ public class TableConfigsRestletResource {
       if (offlineTableConfig != null && realtimeTableConfig != null) {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);
       }
-
-      return tableConfigs;
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs: %s. %s", rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);

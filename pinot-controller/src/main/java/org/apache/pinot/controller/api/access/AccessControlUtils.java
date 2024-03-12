@@ -24,7 +24,6 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -44,7 +43,7 @@ public final class AccessControlUtils {
   /**
    * Validate permission for the given access type against the given table
    *
-   * @param tableName name of the table to be accessed
+   * @param tableName name of the table to be accessed (post database name translation)
    * @param accessType type of the access
    * @param httpHeaders HTTP headers containing requester identity required by access control object
    * @param endpointUrl the request url for which this access control is called
@@ -52,9 +51,6 @@ public final class AccessControlUtils {
    */
   public static void validatePermission(@Nullable String tableName, AccessType accessType,
       @Nullable HttpHeaders httpHeaders, @Nullable String endpointUrl, AccessControl accessControl) {
-    if (tableName != null) {
-      tableName = DatabaseUtils.translateTableName(tableName, httpHeaders);
-    }
     String userMessage = getUserMessage(tableName, accessType, endpointUrl);
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 

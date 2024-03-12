@@ -84,6 +84,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -110,6 +111,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableStatus;
@@ -201,18 +203,20 @@ public class PinotTableRestletResource {
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
       tableConfig.setTableName(tableNameWithType);
+      // Handle legacy config
+      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+      if (validationConfig.getSchemaName() != null) {
+        validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
+      }
 
       // validate permission
       String endpointUrl = request.getRequestURL().toString();
+      AccessControl accessControl = _accessControlFactory.create();
       AccessControlUtils.validatePermission(tableNameWithType, AccessType.CREATE, httpHeaders, endpointUrl,
-          _accessControlFactory.create());
-      if (!_accessControlFactory.create()
-          .hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType, Actions.Table.CREATE_TABLE)) {
+          accessControl);
+      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType, Actions.Table.CREATE_TABLE)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
-
-      // Set schema name to null
-      tableConfig.getValidationConfig().setSchemaName(null);
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
@@ -474,6 +478,11 @@ public class PinotTableRestletResource {
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
       tableConfig.setTableName(tableNameWithType);
+      // Handle legacy config
+      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+      if (validationConfig.getSchemaName() != null) {
+        validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), headers));
+      }
       String tableNameFromPath = DatabaseUtils.translateTableName(
           TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName), headers);
       if (!tableNameFromPath.equals(tableNameWithType)) {
@@ -481,9 +490,6 @@ public class PinotTableRestletResource {
             "Request table " + tableNameFromPath + " does not match table name in the body " + tableNameWithType,
             Response.Status.BAD_REQUEST);
       }
-
-      // Set schema name to null
-      tableConfig.getValidationConfig().setSchemaName(null);
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
@@ -540,18 +546,20 @@ public class PinotTableRestletResource {
     TableConfig tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
     String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
     tableConfig.setTableName(tableNameWithType);
+    // Handle legacy config
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig.getSchemaName() != null) {
+      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
+    }
 
     // validate permission
     String endpointUrl = request.getRequestURL().toString();
-    AccessControlUtils.validatePermission(tableNameWithType, AccessType.READ, httpHeaders, endpointUrl,
-        _accessControlFactory.create());
-    if (!_accessControlFactory.create()
-        .hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
+    AccessControl accessControl = _accessControlFactory.create();
+    AccessControlUtils.validatePermission(tableNameWithType, AccessType.READ, httpHeaders, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType,
+        Actions.Table.VALIDATE_TABLE_CONFIGS)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
-
-    // Set schema name to null
-    tableConfig.getValidationConfig().setSchemaName(null);
 
     ObjectNode validationResponse =
         validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip);
@@ -576,23 +584,28 @@ public class PinotTableRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
       @Context Request request) {
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
+    String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
+    tableConfig.setTableName(tableNameWithType);
+    // Handle legacy config
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig.getSchemaName() != null) {
+      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
+    }
     Schema schema = tableSchemaConfig.getSchema();
-
     if (schema == null) {
       schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
     }
 
     // validate permission
-    String schemaName = schema != null ? schema.getSchemaName() : null;
     String endpointUrl = request.getRequestURL().toString();
-    AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
-        _accessControlFactory.create());
-    if (!_accessControlFactory.create()
-        .hasAccess(httpHeaders, TargetType.TABLE, tableConfig.getTableName(), Actions.Table.VALIDATE_TABLE_CONFIGS)) {
+    AccessControl accessControl = _accessControlFactory.create();
+    AccessControlUtils.validatePermission(tableNameWithType, AccessType.READ, httpHeaders, endpointUrl, accessControl);
+    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType,
+        Actions.Table.VALIDATE_TABLE_CONFIGS)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
-    return validateConfig(tableSchemaConfig.getTableConfig(), schema, typesToSkip).toString();
+    return validateConfig(tableConfig, schema, typesToSkip).toString();
   }
 
   private ObjectNode validateConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
