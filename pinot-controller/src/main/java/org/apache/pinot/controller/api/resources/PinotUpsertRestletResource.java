@@ -33,9 +33,11 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -93,7 +95,8 @@ public class PinotUpsertRestletResource {
   public String estimateHeapUsage(String tableSchemaConfigStr,
       @ApiParam(value = "cardinality", required = true) @QueryParam("cardinality") long cardinality,
       @ApiParam(value = "primaryKeySize", defaultValue = "-1") @QueryParam("primaryKeySize") int primaryKeySize,
-      @ApiParam(value = "numPartitions", defaultValue = "-1") @QueryParam("numPartitions") int numPartitions) {
+      @ApiParam(value = "numPartitions", defaultValue = "-1") @QueryParam("numPartitions") int numPartitions,
+      @Context HttpHeaders headers) {
     ObjectNode resultData = JsonUtils.newObjectNode();
     TableAndSchemaConfig tableSchemaConfig;
 
@@ -106,9 +109,11 @@ public class PinotUpsertRestletResource {
     }
 
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
-    resultData.put("tableName", tableConfig.getTableName());
-
+    String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
+    tableConfig.setTableName(tableNameWithType);
     Schema schema = tableSchemaConfig.getSchema();
+
+    resultData.put("tableName", tableNameWithType);
 
     // Estimated key space, it contains primary key columns.
     int bytesPerKey = 0;

@@ -26,6 +26,7 @@ import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
@@ -33,7 +34,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * Utility methods to share in Broker and Controller request filters related to fine grain authorization.
  */
 public class FineGrainedAuthUtils {
-
   private FineGrainedAuthUtils() {
   }
 
@@ -76,7 +76,7 @@ public class FineGrainedAuthUtils {
       final Authorize auth = endpointMethod.getAnnotation(Authorize.class);
       String targetId = null;
       // Message to use in the access denied exception
-      String accessDeniedMsg = null;
+      String accessDeniedMsg;
       if (auth.targetType() == TargetType.TABLE) {
         // paramName is mandatory for table level authorization
         if (StringUtils.isEmpty(auth.paramName())) {
@@ -95,7 +95,7 @@ public class FineGrainedAuthUtils {
         }
 
         // Table name may contain type, hence get raw table name for checking access
-        targetId = TableNameBuilder.extractRawTableName(targetId);
+        targetId = DatabaseUtils.translateTableName(TableNameBuilder.extractRawTableName(targetId), httpHeaders);
 
         accessDeniedMsg = "Access denied to " + auth.action() + " for table: " + targetId;
       } else if (auth.targetType() == TargetType.CLUSTER) {

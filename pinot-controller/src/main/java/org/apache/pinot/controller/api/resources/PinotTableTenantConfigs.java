@@ -32,10 +32,12 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -75,7 +77,9 @@ public class PinotTableTenantConfigs {
       @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or serializing response")
   })
   public SuccessResponse rebuildBrokerResource(
-      @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType) {
+      @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType,
+      @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     try {
       final PinotResourceManagerResponse pinotResourceManagerResponse =
           _helixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);
