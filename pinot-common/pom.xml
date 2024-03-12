@@ -42,7 +42,6 @@
         <filtering>true</filtering>
       </resource>
     </resources>
-    <!-- Antlr stuff -->
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -55,19 +54,6 @@
             </property>
           </properties>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.antlr</groupId>
-        <artifactId>antlr4-maven-plugin</artifactId>
-        <version>${antlr.version}</version>
-        <executions>
-          <execution>
-            <id>antlr</id>
-            <goals>
-              <goal>antlr4</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
@@ -217,10 +203,6 @@
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpcore</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.antlr</groupId>
-      <artifactId>antlr4-runtime</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.calcite</groupId>
