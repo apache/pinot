@@ -276,7 +276,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     // Test aggregation functions in a CaseWhen statement
     query =
-        "SELECT AirlineID, CASE WHEN Sum(ArrDelay) < 0 THEN 0 WHEN SUM(ArrDelay) > 0 THEN SUM(ArrDelay) END AS SumArrDelay"
+        "SELECT AirlineID, "
+            + "CASE WHEN Sum(ArrDelay) < 0 THEN 0 WHEN SUM(ArrDelay) > 0 THEN SUM(ArrDelay) END AS SumArrDelay"
             + " FROM mytable GROUP BY AirlineID";
     testQuery(query);
     query =
