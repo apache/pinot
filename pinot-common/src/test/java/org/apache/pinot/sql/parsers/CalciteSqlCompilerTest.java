@@ -141,6 +141,28 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(caseFunc.getOperands().get(6).getLiteral().getFieldValue(), 0L);
   }
 
+  @Test()
+  public void testAggregationInCaseWhenStatements() {
+    // Not support Aggregation functions in case statements.
+    try {
+      //@formatter:off
+      CalciteSqlParser.compileToPinotQuery(
+          "SELECT OrderID, SUM(Quantity),\n"
+              + "CASE\n"
+              + "    WHEN sum(Quantity) > 30 THEN 'The quantity is greater than 30'\n"
+              + "    WHEN sum(Quantity) = 30 THEN 'The quantity is 30'\n"
+              + "    ELSE 'The quantity is under 30'\n"
+              + "END AS QuantityText\n"
+              + "FROM OrderDetails\n"
+              + "GROUP BY OrderID");
+      //@formatter:on
+    } catch (SqlCompilationException e) {
+      Assert.assertEquals(e.getMessage(),
+          "Aggregation functions inside WHEN Clause is not supported - SUM(`Quantity`) > 30");
+      throw e;
+    }
+  }
+
   @Test
   public void testQuotedStrings() {
     PinotQuery pinotQuery =
