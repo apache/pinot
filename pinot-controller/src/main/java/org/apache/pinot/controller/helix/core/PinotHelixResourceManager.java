@@ -120,6 +120,7 @@ import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.common.utils.BcryptUtils;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
@@ -744,7 +745,7 @@ public class PinotHelixResourceManager {
 
   private boolean isPartOfDatabase(String tableName, @Nullable String databaseName) {
     // assumes tableName will not have default database prefix ('default.')
-    if (StringUtils.isBlank(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
+    if (StringUtils.isEmpty(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
       return StringUtils.split(tableName, '.').length == 1;
     } else {
       return tableName.startsWith(databaseName + ".");
@@ -852,7 +853,8 @@ public class PinotHelixResourceManager {
    * @param tableName tableName in any case.
    * @return tableName actually defined in Pinot (matches case) and exists ,else, return the input value
    */
-  public String getActualTableName(String tableName) {
+  public String getActualTableName(String tableName, @Nullable String databaseName) {
+    tableName = DatabaseUtils.translateTableName(tableName, databaseName, _tableCache.isIgnoreCase());
     String actualTableName = _tableCache.getActualTableName(tableName);
     return actualTableName != null ? actualTableName : tableName;
   }
@@ -1617,9 +1619,9 @@ public class PinotHelixResourceManager {
   public List<String> getSchemaNames(@Nullable String databaseName) {
     List<String> schemas = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
-    if (schemas != null) {
-        return schemas.stream().filter(schemaName -> isPartOfDatabase(schemaName, databaseName))
-            .collect(Collectors.toList());
+    if (databaseName != null) {
+      return schemas.stream().filter(schemaName -> isPartOfDatabase(schemaName, databaseName))
+          .collect(Collectors.toList());
     }
     return schemas;
   }
@@ -4053,20 +4055,20 @@ public class PinotHelixResourceManager {
     ZNRecord znRecord = ev.getRecord();
     for (Map.Entry<String, Map<String, String>> tableToBrokersEntry : znRecord.getMapFields().entrySet()) {
       String tableName = tableToBrokersEntry.getKey();
-      if (isPartOfDatabase(tableName, databaseName)) {
-        Map<String, String> brokersToState = tableToBrokersEntry.getValue();
-        List<InstanceInfo> hosts = new ArrayList<>();
-        for (Map.Entry<String, String> brokerEntry : brokersToState.entrySet()) {
-          if ("ONLINE".equalsIgnoreCase(brokerEntry.getValue())
-              && instanceConfigMap.containsKey(brokerEntry.getKey())) {
-            InstanceConfig instanceConfig = instanceConfigMap.get(brokerEntry.getKey());
-            hosts.add(new InstanceInfo(instanceConfig.getInstanceName(), instanceConfig.getHostName(),
-                Integer.parseInt(instanceConfig.getPort())));
-          }
+      if (!isPartOfDatabase(tableName, databaseName)) {
+        continue;
+      }
+      Map<String, String> brokersToState = tableToBrokersEntry.getValue();
+      List<InstanceInfo> hosts = new ArrayList<>();
+      for (Map.Entry<String, String> brokerEntry : brokersToState.entrySet()) {
+        if ("ONLINE".equalsIgnoreCase(brokerEntry.getValue()) && instanceConfigMap.containsKey(brokerEntry.getKey())) {
+          InstanceConfig instanceConfig = instanceConfigMap.get(brokerEntry.getKey());
+          hosts.add(new InstanceInfo(instanceConfig.getInstanceName(), instanceConfig.getHostName(),
+              Integer.parseInt(instanceConfig.getPort())));
         }
-        if (!hosts.isEmpty()) {
-          result.put(tableName, hosts);
-        }
+      }
+      if (!hosts.isEmpty()) {
+        result.put(tableName, hosts);
       }
     }
     return result;

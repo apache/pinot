@@ -123,7 +123,7 @@ public class PinotBrokerRestletResource {
   public Map<String, List<String>> getTablesToBrokersMapping(
       @ApiParam(value = "ONLINE|OFFLINE") @QueryParam("state") String state, @Context HttpHeaders headers) {
     Map<String, List<String>> resultMap = new HashMap<>();
-    _pinotHelixResourceManager.getAllRawTables(headers.getHeaderString(CommonConstants.DATABASE)).stream()
+    _pinotHelixResourceManager.getAllRawTables(headers.getHeaderString(CommonConstants.DATABASE))
         .forEach(table -> resultMap.put(table, getBrokersForTable(table, null, state, headers)));
     return resultMap;
   }

@@ -78,15 +78,14 @@ public class PinotControllerPeriodicTaskRestletResource {
     }
 
     if (tableName != null) {
-      tableName = DatabaseUtils.translateTableName(tableName, headers).trim();
-      List<String> matchingTableNamesWithType = ResourceUtils
-          .getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, Constants.validateTableType(tableType),
-              LOGGER);
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+      List<String> matchingTableNamesWithType =
+          ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName,
+              Constants.validateTableType(tableType), LOGGER);
 
       if (matchingTableNamesWithType.size() > 1) {
         throw new WebApplicationException(
-            "More than one table matches Table '" + tableName + "'. Matching names: " + matchingTableNamesWithType
-                .toString());
+            "More than one table matches Table '" + tableName + "'. Matching names: " + matchingTableNamesWithType);
       }
 
       tableName = matchingTableNamesWithType.get(0);

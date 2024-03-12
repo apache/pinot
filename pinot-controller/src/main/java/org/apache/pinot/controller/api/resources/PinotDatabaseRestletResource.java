@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -36,7 +35,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,14 +56,7 @@ public class PinotDatabaseRestletResource {
   @Path("/databases")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_DATABASE)
   @ApiOperation(value = "List all database names", notes = "Lists all database names")
-  public String listDatabaseNames() {
-    List<String> dbNames = _pinotHelixResourceManager.getDatabaseNames();
-    ArrayNode ret = JsonUtils.newArrayNode();
-    if (dbNames != null) {
-      for (String db : dbNames) {
-        ret.add(db);
-      }
-    }
-    return ret.toString();
+  public List<String> listDatabaseNames() {
+    return _pinotHelixResourceManager.getDatabaseNames();
   }
 }

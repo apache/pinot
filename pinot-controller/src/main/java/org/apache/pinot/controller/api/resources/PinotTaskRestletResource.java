@@ -308,10 +308,10 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Whether to only lookup local cache for logs", defaultValue = "false") @QueryParam("localOnly")
           boolean localOnly, @Context HttpHeaders httpHeaders)
       throws JsonProcessingException {
-    String translatedTableName = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
     if (localOnly) {
       BaseTaskGeneratorInfo taskGeneratorMostRecentRunInfo =
-          _taskManagerStatusCache.fetchTaskGeneratorInfo(translatedTableName, taskType);
+          _taskManagerStatusCache.fetchTaskGeneratorInfo(tableNameWithType, taskType);
       if (taskGeneratorMostRecentRunInfo == null) {
         throw new ControllerApplicationException(LOGGER, "Task generation information not found",
             Response.Status.NOT_FOUND);
@@ -325,9 +325,10 @@ public class PinotTaskRestletResource {
     // Relying on original schema that was used to query the controller
     URI uri = _uriInfo.getRequestUri();
     String scheme = uri.getScheme();
+    String finalTableNameWithType = tableNameWithType;
     List<String> controllerUrls = controllers.stream().map(controller -> String
         .format("%s://%s:%d/tasks/generator/%s/%s/debug?localOnly=true", scheme, controller.getHostName(),
-            Integer.parseInt(controller.getPort()), tableNameWithType, taskType)).collect(Collectors.toList());
+            Integer.parseInt(controller.getPort()), finalTableNameWithType, taskType)).collect(Collectors.toList());
 
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, HashBiMap.create(0));

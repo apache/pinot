@@ -33,11 +33,13 @@ public class DatabaseUtils {
    * Construct the fully qualified table name i.e. {databaseName}.{tableName} from given table name and database name
    * @param tableName table/schema name
    * @param databaseName database name
+   * @param ignoreCase whether to ignore case when comparing passed in database name against table name prefix if both
+   *                   exist. For 'default' database, always compare it ignoring case.
    * @return translated table name. Throws {@link IllegalArgumentException} if {@code tableName} contains
    * more than 1 dot or if {@code tableName} has database prefix, and it does not match with {@code databaseName}
    */
-  public static String translateTableName(String tableName, @Nullable String databaseName) {
-    Preconditions.checkArgument(tableName != null, "'tableName' cannot be null");
+  public static String translateTableName(String tableName, @Nullable String databaseName, boolean ignoreCase) {
+    Preconditions.checkArgument(StringUtils.isNotEmpty(tableName), "'tableName' cannot be null or empty");
     String[] tableSplit = StringUtils.split(tableName, '.');
     switch (tableSplit.length) {
       case 1:
@@ -47,26 +49,39 @@ public class DatabaseUtils {
         }
         return tableName;
       case 2:
+        Preconditions.checkArgument(!tableSplit[1].isEmpty(), "Invalid table name '%s'", tableName);
         String databasePrefix = tableSplit[0];
-        Preconditions.checkArgument(StringUtils.isEmpty(databaseName) || databaseName.equals(databasePrefix),
-          "Database name '" + databasePrefix + "' from table prefix does not match database name '" + databaseName
-              + "' from header");
+        Preconditions.checkArgument(
+            StringUtils.isEmpty(databaseName) || (!ignoreCase && databaseName.equals(databasePrefix)) || (ignoreCase
+                && databaseName.equalsIgnoreCase(databasePrefix)),
+            "Database name '%s' from table prefix does not match database name '%s' from header", databasePrefix,
+            databaseName);
         // skip database name prefix if it's a 'default' database
         return databasePrefix.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE) ? tableSplit[1] : tableName;
       default:
-        throw new IllegalArgumentException("Table name: '" + tableName
-            + "' containing more than one '.' is not allowed");
+        throw new IllegalArgumentException(
+            "Table name: '" + tableName + "' containing more than one '.' is not allowed");
     }
+  }
+
+  public static String translateTableName(String tableName, @Nullable String databaseName) {
+    return translateTableName(tableName, databaseName, false);
   }
 
   /**
    * Utility to get fully qualified table name i.e. {databaseName}.{tableName} from given table name and http headers
    * @param tableName table/schema name
    * @param headers http headers
+   * @param ignoreCase whether to ignore case when comparing database name in headers against table name prefix if both
+   *                   exist. For 'default' database, always compare it ignoring case.
    * @return translated table name. Throws {@link IllegalStateException} if {@code tableName} contains more than 1 dot
    * or if {@code tableName} has database prefix, and it does not match with the 'database' header
    */
+  public static String translateTableName(String tableName, HttpHeaders headers, boolean ignoreCase) {
+    return translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE), ignoreCase);
+  }
+
   public static String translateTableName(String tableName, HttpHeaders headers) {
-    return translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE));
+    return translateTableName(tableName, headers, false);
   }
 }

@@ -109,11 +109,11 @@ public class PinotUpsertRestletResource {
     }
 
     TableConfig tableConfig = tableSchemaConfig.getTableConfig();
-    String tableName = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
-    tableConfig.setTableName(tableName);
+    String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
+    tableConfig.setTableName(tableNameWithType);
     Schema schema = tableSchemaConfig.getSchema();
 
-    resultData.put("tableName", tableName);
+    resultData.put("tableName", tableNameWithType);
 
     // Estimated key space, it contains primary key columns.
     int bytesPerKey = 0;

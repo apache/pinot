@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -34,7 +33,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -50,7 +48,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
@@ -111,17 +108,8 @@ public class PinotSchemaRestletResource {
   @Path("/schemas")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMA)
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
-  public String listSchemaNames(@Context HttpHeaders headers) {
-    List<String> schemaNames = _pinotHelixResourceManager.getSchemaNames(
-        headers.getHeaderString(CommonConstants.DATABASE));
-    ArrayNode ret = JsonUtils.newArrayNode();
-
-    if (schemaNames != null) {
-      for (String schema : schemaNames) {
-        ret.add(schema);
-      }
-    }
-    return ret.toString();
+  public List<String> listSchemaNames(@Context HttpHeaders headers) {
+    return _pinotHelixResourceManager.getSchemaNames(headers.getHeaderString(CommonConstants.DATABASE));
   }
 
   @GET
@@ -161,7 +149,8 @@ public class PinotSchemaRestletResource {
   public SuccessResponse deleteSchema(
       @ApiParam(value = "Schema name", required = true) @PathParam("schemaName") String schemaName,
       @Context HttpHeaders headers) {
-    deleteSchemaInternal(schemaName, headers.getHeaderString(CommonConstants.DATABASE));
+    schemaName = DatabaseUtils.translateTableName(schemaName, headers);
+    deleteSchemaInternal(schemaName);
     return new SuccessResponse("Schema " + schemaName + " deleted");
   }
 
@@ -181,11 +170,12 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload, @Context HttpHeaders headers, FormDataMultiPart multiPart) {
+    schemaName = DatabaseUtils.translateTableName(schemaName, headers);
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
-    String database = headers.getHeaderString(CommonConstants.DATABASE);
-    SuccessResponse successResponse = updateSchema(schemaName, schema, database, reload);
+    schema.setSchemaName(DatabaseUtils.translateTableName(schema.getSchemaName(), headers));
+    SuccessResponse successResponse = updateSchema(schemaName, schema, reload);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
 
@@ -206,6 +196,7 @@ public class PinotSchemaRestletResource {
       @ApiParam(value = "Name of the schema", required = true) @PathParam("schemaName") String schemaName,
       @ApiParam(value = "Whether to reload the table if the new schema is backward compatible") @DefaultValue("false")
       @QueryParam("reload") boolean reload, @Context HttpHeaders headers, String schemaJsonString) {
+    schemaName = DatabaseUtils.translateTableName(schemaName, headers);
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps;
     try {
       schemaAndUnrecognizedProps = JsonUtils.stringToObjectAndUnrecognizedProperties(schemaJsonString, Schema.class);
@@ -214,8 +205,8 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     Schema schema = schemaAndUnrecognizedProps.getLeft();
-    String database = headers.getHeaderString(CommonConstants.DATABASE);
-    SuccessResponse successResponse = updateSchema(schemaName, schema, database, reload);
+    schema.setSchemaName(DatabaseUtils.translateTableName(schema.getSchemaName(), headers));
+    SuccessResponse successResponse = updateSchema(schemaName, schema, reload);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
 
@@ -241,17 +232,16 @@ public class PinotSchemaRestletResource {
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
-    String schemaName = schema.getSchemaName();
-    String databaseName = httpHeaders.getHeaderString(CommonConstants.DATABASE);
+    String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
+    schema.setSchemaName(schemaName);
     String endpointUrl = request.getRequestURL().toString();
-    validateSchemaName(schemaName);
     AccessControlUtils.validatePermission(schemaName, AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     if (!_accessControlFactory.create()
         .hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.CREATE_SCHEMA)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
-    SuccessResponse successResponse = addSchema(schema, databaseName, override, force);
+    SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
 
@@ -284,17 +274,16 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     Schema schema = schemaAndUnrecognizedProperties.getLeft();
-    String schemaName = schema.getSchemaName();
-    String databaseName = httpHeaders.getHeaderString(CommonConstants.DATABASE);
+    String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
+    schema.setSchemaName(schemaName);
     String endpointUrl = request.getRequestURL().toString();
-    validateSchemaName(schemaName);
     AccessControlUtils.validatePermission(schemaName, AccessType.CREATE, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     if (!_accessControlFactory.create()
         .hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.CREATE_SCHEMA)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
-    SuccessResponse successResponse = addSchema(schema, databaseName, override, force);
+    SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProperties.getRight());
   }
 
@@ -314,12 +303,14 @@ public class PinotSchemaRestletResource {
     Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps =
         getSchemaAndUnrecognizedPropertiesFromMultiPart(multiPart);
     Schema schema = schemaAndUnrecognizedProps.getLeft();
-    String endpointUrl = request.getRequestURL().toString();
+    String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
+    schema.setSchemaName(schemaName);
     validateSchemaInternal(schema);
-    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
+    String endpointUrl = request.getRequestURL().toString();
+    AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     if (!_accessControlFactory.create()
-        .hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.VALIDATE_SCHEMA)) {
+        .hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.VALIDATE_SCHEMA)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
     ObjectNode response = schema.toJsonObject();
@@ -344,7 +335,7 @@ public class PinotSchemaRestletResource {
   })
   @ManualAuthorization // performed after parsing schema
   public String validateSchema(String schemaJsonString, @Context HttpHeaders httpHeaders, @Context Request request) {
-    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps = null;
+    Pair<Schema, Map<String, Object>> schemaAndUnrecognizedProps;
     try {
       schemaAndUnrecognizedProps = JsonUtils.stringToObjectAndUnrecognizedProperties(schemaJsonString, Schema.class);
     } catch (Exception e) {
@@ -352,12 +343,14 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     Schema schema = schemaAndUnrecognizedProps.getLeft();
-    String endpointUrl = request.getRequestURL().toString();
+    String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
+    schema.setSchemaName(schemaName);
     validateSchemaInternal(schema);
-    AccessControlUtils.validatePermission(schema.getSchemaName(), AccessType.READ, httpHeaders, endpointUrl,
+    String endpointUrl = request.getRequestURL().toString();
+    AccessControlUtils.validatePermission(schemaName, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     if (!_accessControlFactory.create()
-        .hasAccess(httpHeaders, TargetType.TABLE, schema.getSchemaName(), Actions.Table.VALIDATE_SCHEMA)) {
+        .hasAccess(httpHeaders, TargetType.TABLE, schemaName, Actions.Table.VALIDATE_SCHEMA)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
     ObjectNode response = schema.toJsonObject();
@@ -386,15 +379,7 @@ public class PinotSchemaRestletResource {
     }
   }
 
-  private void validateSchemaName(String schemaName) {
-    if (StringUtils.isBlank(schemaName)) {
-      throw new ControllerApplicationException(LOGGER, "Invalid schema. Reason: 'schemaName' should not be null",
-          Response.Status.BAD_REQUEST);
-    }
-  }
-
   private void validateSchemaInternal(Schema schema) {
-    validateSchemaName(schema.getSchemaName());
     try {
       List<TableConfig> tableConfigs = _pinotHelixResourceManager.getTableConfigsForSchema(schema.getSchemaName());
       boolean isIgnoreCase = _pinotHelixResourceManager.getTableCache().isIgnoreCase();
@@ -408,14 +393,11 @@ public class PinotSchemaRestletResource {
   /**
    * Internal method to add schema
    * @param schema  schema
-   * @param database database name
    * @param override  set to true to override the existing schema with the same name
    * @param force set to true to skip all rules and force to override the existing schema with the same name
    */
-  private SuccessResponse addSchema(Schema schema, @Nullable String database, boolean override, boolean force) {
+  private SuccessResponse addSchema(Schema schema, boolean override, boolean force) {
     String schemaName = schema.getSchemaName();
-    String translatedSchemaName = DatabaseUtils.translateTableName(schemaName, database);
-    schema.setSchemaName(translatedSchemaName);
     validateSchemaInternal(schema);
 
     try {
@@ -442,24 +424,20 @@ public class PinotSchemaRestletResource {
    * Internal method to update schema
    * @param schemaName  name of the schema to update
    * @param schema  schema
-   * @param database database name
    * @param reload  set to true to reload the tables using the schema, so committed segments can pick up the new schema
    * @return
    */
-  private SuccessResponse updateSchema(String schemaName, Schema schema, @Nullable String database, boolean reload) {
+  private SuccessResponse updateSchema(String schemaName, Schema schema, boolean reload) {
     validateSchemaInternal(schema);
-    String translatedSchemaName = DatabaseUtils.translateTableName(schemaName, database);
-    String payloadSchemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), database);
 
-    if (!payloadSchemaName.equals(translatedSchemaName)) {
+    if (!schemaName.equals(schema.getSchemaName())) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String
-          .format("Schema name mismatch for uploaded schema, tried to add schema with name %s as %s",
-              schema.getSchemaName(), schema), Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Schema name mismatch for uploaded schema, tried to add schema with name %s as %s",
+              schema.getSchemaName(), schemaName), Response.Status.BAD_REQUEST);
     }
 
     try {
-      schema.setSchemaName(payloadSchemaName);
       _pinotHelixResourceManager.updateSchema(schema, reload, false);
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
@@ -506,9 +484,8 @@ public class PinotSchemaRestletResource {
     }
   }
 
-  private void deleteSchemaInternal(String schemaName, String database) {
-    String translatedSchemaName = DatabaseUtils.translateTableName(schemaName, database);
-    Schema schema = _pinotHelixResourceManager.getSchema(translatedSchemaName);
+  private void deleteSchemaInternal(String schemaName) {
+    Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
     if (schema == null) {
       throw new ControllerApplicationException(LOGGER, String.format("Schema %s not found", schemaName),
           Response.Status.NOT_FOUND);
@@ -520,14 +497,14 @@ public class PinotSchemaRestletResource {
     //       - Behavior change since we don't allow deleting schema for OFFLINE tables
     List<String> realtimeTables = _pinotHelixResourceManager.getAllRealtimeTables();
     for (String realtimeTableName : realtimeTables) {
-      if (translatedSchemaName.equals(TableNameBuilder.extractRawTableName(realtimeTableName))) {
+      if (schemaName.equals(TableNameBuilder.extractRawTableName(realtimeTableName))) {
         throw new ControllerApplicationException(LOGGER,
             String.format("Cannot delete schema %s, as it is associated with table %s", schemaName, realtimeTableName),
             Response.Status.CONFLICT);
       }
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(realtimeTableName);
       if (tableConfig != null) {
-        if (translatedSchemaName.equals(tableConfig.getValidationConfig().getSchemaName())) {
+        if (schemaName.equals(tableConfig.getValidationConfig().getSchemaName())) {
           throw new ControllerApplicationException(LOGGER,
               String.format("Cannot delete schema %s, as it is associated with table %s", schemaName,
                   realtimeTableName), Response.Status.CONFLICT);
@@ -536,7 +513,7 @@ public class PinotSchemaRestletResource {
     }
 
     LOGGER.info("Trying to delete schema {}", schemaName);
-    if (_pinotHelixResourceManager.deleteSchema(translatedSchemaName)) {
+    if (_pinotHelixResourceManager.deleteSchema(schemaName)) {
       LOGGER.info("Notifying metadata event for deleting schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.DELETE);
       LOGGER.info("Success: Deleted schema {}", schemaName);

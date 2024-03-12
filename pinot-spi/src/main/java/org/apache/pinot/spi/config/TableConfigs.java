@@ -58,14 +58,14 @@ public class TableConfigs extends BaseJsonConfig {
     return _tableName;
   }
 
-  public void setTableName(String tableName) {
-    _tableName = tableName;
-    _schema.setSchemaName(tableName);
+  public void setTableName(String rawTableName) {
+    _tableName = rawTableName;
+    _schema.setSchemaName(rawTableName);
     if (_offline != null) {
-      _offline.setTableName(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+      _offline.setTableName(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
     }
     if (_realtime != null) {
-      _realtime.setTableName(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+      _realtime.setTableName(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
     }
   }
 

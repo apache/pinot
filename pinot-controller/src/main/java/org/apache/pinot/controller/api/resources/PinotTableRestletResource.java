@@ -110,7 +110,6 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableStatus;
@@ -195,30 +194,25 @@ public class PinotTableRestletResource {
     // TODO introduce a table config ctor with json string.
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
-    String tableName;
-    String translatedTableName;
+    String tableNameWithType;
     try {
       tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
-      tableName = tableConfig.getTableName();
-      translatedTableName = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
+      tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
+      tableConfig.setTableName(tableNameWithType);
+
       // validate permission
       String endpointUrl = request.getRequestURL().toString();
-      AccessControlUtils.validatePermission(translatedTableName, AccessType.CREATE, httpHeaders, endpointUrl,
+      AccessControlUtils.validatePermission(tableNameWithType, AccessType.CREATE, httpHeaders, endpointUrl,
           _accessControlFactory.create());
       if (!_accessControlFactory.create()
-          .hasAccess(httpHeaders, TargetType.TABLE, translatedTableName, Actions.Table.CREATE_TABLE)) {
+          .hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType, Actions.Table.CREATE_TABLE)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
       }
-      String tableNameWithType = TableNameBuilder.forType(tableConfig.getTableType())
-          .tableNameWithType(translatedTableName);
-      tableConfig.setTableName(tableNameWithType);
-      // Handling deprecated config
-      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-      if (validationConfig != null && validationConfig.getSchemaName() != null) {
-        validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
-      }
+
+      // Set schema name to null
+      tableConfig.getValidationConfig().setSchemaName(null);
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
@@ -234,7 +228,7 @@ public class PinotTableRestletResource {
       try {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
-        checkHybridTableConfig(TableNameBuilder.extractRawTableName(translatedTableName), tableConfig);
+        checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -242,12 +236,12 @@ public class PinotTableRestletResource {
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of
       // the validation manager)
-      return new ConfigSuccessResponse("Table " + tableName + " successfully added",
+      return new ConfigSuccessResponse("Table " + tableNameWithType + " successfully added",
           tableConfigAndUnrecognizedProperties.getRight());
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof InvalidTableConfigException) {
-        String errStr = String.format("Invalid table config for table %s: %s", tableName, e.getMessage());
+        String errStr = String.format("Invalid table config for table %s: %s", tableNameWithType, e.getMessage());
         throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
       } else if (e instanceof TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
@@ -471,28 +465,25 @@ public class PinotTableRestletResource {
       @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders headers,
       String tableConfigString)
       throws Exception {
-    Pair<TableConfig, Map<String, Object>> tableConfigJsonPojoWithUnparsableProps;
+    Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
     String tableNameWithType;
-    String translatedTableName;
     try {
-      tableConfigJsonPojoWithUnparsableProps =
+      tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigString, TableConfig.class);
-      tableConfig = tableConfigJsonPojoWithUnparsableProps.getLeft();
+      tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
-      translatedTableName = DatabaseUtils.translateTableName(
+      tableConfig.setTableName(tableNameWithType);
+      String tableNameFromPath = DatabaseUtils.translateTableName(
           TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName), headers);
-      if (!translatedTableName.equals(tableNameWithType)) {
+      if (!tableNameFromPath.equals(tableNameWithType)) {
         throw new ControllerApplicationException(LOGGER,
-            "Request table " + tableName + " does not match table name in the body " + tableConfig.getTableName(),
+            "Request table " + tableNameFromPath + " does not match table name in the body " + tableNameWithType,
             Response.Status.BAD_REQUEST);
       }
-      tableConfig.setTableName(tableNameWithType);
-      // Handling deprecated config
-      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-      if (validationConfig != null && validationConfig.getSchemaName() != null) {
-        validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), headers));
-      }
+
+      // Set schema name to null
+      tableConfig.getValidationConfig().setSchemaName(null);
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
       TableConfigUtils.validate(tableConfig, schema, typesToSkip, _controllerConf.isDisableIngestionGroovy());
@@ -510,7 +501,7 @@ public class PinotTableRestletResource {
       try {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
-        checkHybridTableConfig(TableNameBuilder.extractRawTableName(translatedTableName), tableConfig);
+        checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -524,7 +515,7 @@ public class PinotTableRestletResource {
       throw e;
     }
     return new ConfigSuccessResponse("Table config updated for " + tableName,
-        tableConfigJsonPojoWithUnparsableProps.getRight());
+        tableConfigAndUnrecognizedProperties.getRight());
   }
 
   @POST
@@ -547,26 +538,23 @@ public class PinotTableRestletResource {
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     TableConfig tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
-    String tableName = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
-    tableConfig.setTableName(tableName);
-    // Handling deprecated config
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig != null && validationConfig.getSchemaName() != null) {
-      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
-    }
+    String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
+    tableConfig.setTableName(tableNameWithType);
 
     // validate permission
     String endpointUrl = request.getRequestURL().toString();
-    AccessControlUtils.validatePermission(tableName, AccessType.READ, httpHeaders, endpointUrl,
+    AccessControlUtils.validatePermission(tableNameWithType, AccessType.READ, httpHeaders, endpointUrl,
         _accessControlFactory.create());
     if (!_accessControlFactory.create()
-        .hasAccess(httpHeaders, TargetType.TABLE, tableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
+        .hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
 
+    // Set schema name to null
+    tableConfig.getValidationConfig().setSchemaName(null);
+
     ObjectNode validationResponse =
-        validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig),
-            typesToSkip);
+        validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip);
     validationResponse.set("unrecognizedProperties",
         JsonUtils.objectToJsonNode(tableConfigAndUnrecognizedProperties.getRight()));
     return validationResponse;

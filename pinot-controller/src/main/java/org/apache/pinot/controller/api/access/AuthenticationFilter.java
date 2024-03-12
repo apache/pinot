@@ -99,7 +99,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     // If table name is not available, it means the endpoint is not a table-level endpoint.
     String tableName = extractTableName(uriInfo.getPathParameters(), uriInfo.getQueryParameters());
     if (tableName != null) {
-      // If table name is present translat it to the fully qualified name based on database header.
+      // If table name is present, translate it to the fully qualified name based on database header.
       tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
     }
     AccessType accessType = extractAccessType(endpointMethod);

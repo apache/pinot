@@ -31,7 +31,6 @@ public class DatabaseUtilsTest {
   private static final String DEFAULT_DATABASE_NAME = CommonConstants.DEFAULT_DATABASE;
   private static final String FULLY_QUALIFIED_TABLE_NAME = "db1.tb1";
 
-
   @Test
   public void translateTableNameTest() {
     // valid cases with non-default database

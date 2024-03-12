@@ -263,9 +263,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     long requestId = _brokerIdGenerator.get();
     requestContext.setRequestId(requestId);
     if (httpHeaders != null) {
-      requestContext.setRequestHttpHeaders(httpHeaders.getRequestHeaders().entrySet().stream()
-          .filter(entry -> PinotBrokerQueryEventListenerFactory.getAllowlistQueryRequestHeaders()
-              .contains(entry.getKey())).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+      requestContext.setRequestHttpHeaders(httpHeaders.getRequestHeaders().entrySet().stream().filter(
+              entry -> PinotBrokerQueryEventListenerFactory.getAllowlistQueryRequestHeaders().contains(entry.getKey()))
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
     }
 
     // First-stage access control to prevent unauthenticated requests from using up resources. Secondary table-level
@@ -374,17 +374,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       }
 
-      String tableName = getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders),
-          _tableCache);
+      boolean ignoreCase = _tableCache.isIgnoreCase();
+      String tableName =
+          getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders, ignoreCase),
+              _tableCache);
       dataSource.setTableName(tableName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       requestContext.setTableName(rawTableName);
 
       try {
-        boolean isCaseInsensitive = _tableCache.isIgnoreCase();
         Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
         if (columnNameMap != null) {
-          updateColumnNames(rawTableName, serverPinotQuery, isCaseInsensitive, columnNameMap);
+          updateColumnNames(rawTableName, serverPinotQuery, ignoreCase, columnNameMap);
         }
       } catch (Exception e) {
         // Throw exceptions with column in-existence error.
@@ -1652,21 +1653,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if ("*".equals(columnName)) {
       return columnName;
     }
-    String columnNameToCheck;
-    String[] tableSplit = StringUtils.split(rawTableName, ".", 2);
-    String logicalTableName = tableSplit.length == 2 ? tableSplit[1] : null;
-    if (columnName.regionMatches(ignoreCase, 0, rawTableName, 0, rawTableName.length())
-        && columnName.length() > rawTableName.length() && columnName.charAt(rawTableName.length()) == '.') {
-      columnNameToCheck = ignoreCase ? columnName.substring(rawTableName.length() + 1).toLowerCase()
-          : columnName.substring(rawTableName.length() + 1);
-    } else if (// when table name has the database prefix but column name only has the logical table name as prefix
-        logicalTableName != null
-        && columnName.regionMatches(ignoreCase, 0, logicalTableName, 0, logicalTableName.length())
-        && columnName.length() > logicalTableName.length() && columnName.charAt(logicalTableName.length()) == '.') {
-      columnNameToCheck = ignoreCase ? columnName.substring(logicalTableName.length() + 1).toLowerCase()
-          : columnName.substring(logicalTableName.length() + 1);
-    } else {
-      columnNameToCheck = ignoreCase ? columnName.toLowerCase() : columnName;
+    String columnNameToCheck = trimTableName(rawTableName, columnName, ignoreCase);
+    if (ignoreCase) {
+      columnNameToCheck = columnNameToCheck.toLowerCase();
     }
     if (columnNameMap != null) {
       String actualColumnName = columnNameMap.get(columnNameToCheck);
@@ -1678,6 +1667,26 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return columnName;
     }
     throw new BadQueryRequestException("Unknown columnName '" + columnName + "' found in the query");
+  }
+
+  private static String trimTableName(String rawTableName, String columnName, boolean ignoreCase) {
+    int columnNameLength = columnName.length();
+    int rawTableNameLength = rawTableName.length();
+    if (columnNameLength > rawTableNameLength && columnName.charAt(rawTableNameLength) == '.'
+        && columnName.regionMatches(ignoreCase, 0, rawTableName, 0, rawTableNameLength)) {
+      return columnName.substring(rawTableNameLength + 1);
+    }
+    // Check if raw table name is translated name ([database_name].[logical_table_name]])
+    String[] split = StringUtils.split(rawTableName, '.');
+    if (split.length == 2) {
+      String logicalTableName = split[1];
+      int logicalTableNameLength = logicalTableName.length();
+      if (columnNameLength > logicalTableNameLength && columnName.charAt(logicalTableNameLength) == '.'
+          && columnName.regionMatches(ignoreCase, 0, logicalTableName, 0, logicalTableNameLength)) {
+        return columnName.substring(logicalTableNameLength + 1);
+      }
+    }
+    return columnName;
   }
 
   /**

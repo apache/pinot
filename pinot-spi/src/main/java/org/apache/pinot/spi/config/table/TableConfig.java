@@ -202,8 +202,8 @@ public class TableConfig extends BaseJsonConfig {
     return _tableName;
   }
 
-  public void setTableName(String tableName) {
-    _tableName = tableName;
+  public void setTableName(String tableNameWithType) {
+    _tableName = tableNameWithType;
   }
 
   @JsonProperty(TABLE_TYPE_KEY)
@@ -298,8 +298,7 @@ public class TableConfig extends BaseJsonConfig {
     return _instanceAssignmentConfigMap;
   }
 
-  public void setInstanceAssignmentConfigMap(
-      Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+  public void setInstanceAssignmentConfigMap(Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     _instanceAssignmentConfigMap = instanceAssignmentConfigMap;
   }
 
