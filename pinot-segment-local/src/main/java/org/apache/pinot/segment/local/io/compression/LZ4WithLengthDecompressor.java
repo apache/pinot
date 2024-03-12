@@ -35,17 +35,14 @@ class LZ4WithLengthDecompressor implements ChunkDecompressor {
   private final LZ4DecompressorWithLength _decompressor;
 
   private LZ4WithLengthDecompressor() {
-    _decompressor = new LZ4DecompressorWithLength(LZ4Compressor.LZ4_FACTORY.fastDecompressor());
+    // safeDecompressor is used to avoid reading past input buffer limit, which is not guaranteed with fastDecompressor
+    _decompressor = new LZ4DecompressorWithLength(LZ4Compressor.LZ4_FACTORY.safeDecompressor());
   }
 
   @Override
   public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException {
-    // LZ4DecompressorWithLength.decompress(src, out) should not be called directly as it can move src.position
-    // beyond src.limit(). This implementation only moves dest.position
-    _decompressor.decompress(compressedInput, compressedInput.position(), decompressedOutput,
-        decompressedOutput.position());
-    decompressedOutput.position(decompressedOutput.position() + decompressedLength(compressedInput));
+    _decompressor.decompress(compressedInput, decompressedOutput);
     decompressedOutput.flip();
     return decompressedOutput.limit();
   }
