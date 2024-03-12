@@ -743,11 +743,9 @@ public class PinotHelixResourceManager {
   }
 
   private boolean isPartOfDatabase(String tableName, @Nullable String databaseName) {
-    if (StringUtils.isBlank(databaseName)) {
+    // assumes tableName will not have default database prefix ('default.')
+    if (StringUtils.isBlank(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
       return StringUtils.split(tableName, '.').length == 1;
-    } else if (databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-      String[] split = StringUtils.split(tableName, '.');
-      return split.length == 1 || split[0].equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE);
     } else {
       return tableName.startsWith(databaseName + ".");
     }
