@@ -346,7 +346,7 @@ public abstract class ClusterTest extends ControllerTest {
     for (BaseServerStarter serverStarter : _serverStarters) {
       serverStarter.stop();
     }
-    FileUtils.deleteQuietly(new File(_baseInstanceDataDir + File.separator + "PinotServer"));
+    FileUtils.deleteQuietly(new File(_baseInstanceDataDir));
     _serverStarters = null;
     _serverGrpcPort = 0;
     _serverAdminApiPort = 0;
