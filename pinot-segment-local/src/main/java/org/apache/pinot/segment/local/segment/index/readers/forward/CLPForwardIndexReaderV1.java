@@ -23,8 +23,7 @@ import com.yscope.clp.compressorfrontend.MessageDecoder;
 import java.io.IOException;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
-import org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWriterV1;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -45,7 +44,7 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<CLPForwardInd
 
   public CLPForwardIndexReaderV1(PinotDataBuffer pinotDataBuffer, int numDocs) {
     _numDocs = numDocs;
-    int offset = CLPForwardIndexWriterV1.MAGIC_BYTES.length;
+    int offset = CLPForwardIndexCreatorV1.MAGIC_BYTES.length;
     _version = pinotDataBuffer.getInt(offset);
     offset += 4;
     _totalDictVarValues = pinotDataBuffer.getInt(offset);
@@ -125,11 +124,6 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<CLPForwardInd
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  @Override
-  public ChunkCompressionType getCompressionType() {
-    return ChunkCompressionType.CLP;
   }
 
   @Override

@@ -284,7 +284,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           // Use a smaller capacity as opposed to segment flush size
           int initialCapacity = Math.min(context.getCapacity(),
               NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
-          if (config.getChunkCompressionType() == ChunkCompressionType.CLP) {
+          if (config.getCompressionCodec() == CompressionCodec.CLP) {
             return new CLPMutableForwardIndex(column, storedType, context.getMemoryManager(), context.getCapacity());
           }
           return new VarByteSVMutableForwardIndex(storedType, context.getMemoryManager(), allocationContext,

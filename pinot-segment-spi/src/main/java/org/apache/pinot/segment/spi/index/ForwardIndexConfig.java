@@ -78,7 +78,7 @@ public class ForwardIndexConfig extends IndexConfig {
           _chunkCompressionType = null;
           break;
         case CLP:
-          _chunkCompressionType = ChunkCompressionType.CLP;
+          _chunkCompressionType = null;
           _dictIdCompressionType = null;
           break;
         default:

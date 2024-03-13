@@ -318,7 +318,7 @@ public class DictionaryToRawIndexConverter {
 
     try (ForwardIndexCreator rawIndexCreator = ForwardIndexCreatorFactory
         .getRawIndexCreatorForSVColumn(newSegment, compressionType, column, storedType, numDocs, lengthOfLongestEntry,
-            false, ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION, null);
+            false, ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext()) {
       switch (storedType) {
         case INT:

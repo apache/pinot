@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.forward;
 
 import java.io.File;
 import java.io.IOException;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueEntryDictForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
@@ -31,10 +32,10 @@ import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueUnsort
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
-import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -70,6 +71,10 @@ public class ForwardIndexCreatorFactory {
     } else {
       // Dictionary disabled columns
       DataType storedType = fieldSpec.getDataType().getStoredType();
+      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+        // CLP compression codec
+        return new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
+      }
       ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
       if (chunkCompressionType == null) {
         chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
@@ -78,7 +83,7 @@ public class ForwardIndexCreatorFactory {
       int writerVersion = indexConfig.getRawIndexWriterVersion();
       if (fieldSpec.isSingleValueField()) {
         return getRawIndexCreatorForSVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
-            context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion, context.getColumnStatistics());
+            context.getLengthOfLongestEntry(), deriveNumDocsPerChunk, writerVersion);
       } else {
         return getRawIndexCreatorForMVColumn(indexDir, chunkCompressionType, columnName, storedType, numTotalDocs,
             context.getMaxNumberOfMultiValueElements(), deriveNumDocsPerChunk, writerVersion,
@@ -93,7 +98,7 @@ public class ForwardIndexCreatorFactory {
    */
   public static ForwardIndexCreator getRawIndexCreatorForSVColumn(File indexDir, ChunkCompressionType compressionType,
       String column, DataType storedType, int numTotalDocs, int lengthOfLongestEntry, boolean deriveNumDocsPerChunk,
-      int writerVersion, ColumnStatistics columnStatistics)
+      int writerVersion)
       throws IOException {
     switch (storedType) {
       case INT:
@@ -106,7 +111,7 @@ public class ForwardIndexCreatorFactory {
       case STRING:
       case BYTES:
         return new SingleValueVarByteRawIndexCreator(indexDir, compressionType, column, numTotalDocs, storedType,
-            lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion, columnStatistics);
+            lengthOfLongestEntry, deriveNumDocsPerChunk, writerVersion);
       default:
         throw new IllegalStateException("Unsupported stored type: " + storedType);
     }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.writer.impl;
+package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
@@ -31,12 +31,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardOpenOption;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
-import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
+import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -53,7 +57,7 @@ import org.apache.pinot.spi.data.FieldSpec;
  * </ul>
  */
 
-public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
+public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
   public static final byte[] MAGIC_BYTES = "CLP.v1".getBytes(StandardCharsets.UTF_8);
   private final String _column;
   private final int _numDocs;
@@ -74,13 +78,14 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
   private final File _dictVarsFwdIndexFile;
   private final File _encodedVarsFwdIndexFile;
 
-  public CLPForwardIndexWriterV1(File baseIndexDir, File indexFile, String column, int numDocs,
-      ColumnStatistics columnStatistics)
+  public CLPForwardIndexCreatorV1(File baseIndexDir, String column, int numDocs, ColumnStatistics columnStatistics)
       throws IOException {
     _column = column;
     _numDocs = numDocs;
     _baseIndexDir = baseIndexDir;
-    _dataFile = new RandomAccessFile(indexFile, "rw").getChannel();
+    _dataFile =
+        new RandomAccessFile(new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION),
+            "rw").getChannel();
     _fileBuffer = _dataFile.map(FileChannel.MapMode.READ_WRITE, 0, Integer.MAX_VALUE);
 
     CLPStatsProvider statsCollector = (CLPStatsProvider) columnStatistics;
@@ -115,6 +120,21 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
     _clpEncodedMessage = new EncodedMessage();
     _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
+  }
+
+  @Override
+  public boolean isDictionaryEncoded() {
+    return false;
+  }
+
+  @Override
+  public boolean isSingleValue() {
+    return true;
+  }
+
+  @Override
+  public FieldSpec.DataType getValueType() {
+    return FieldSpec.DataType.STRING;
   }
 
   @Override
@@ -164,21 +184,6 @@ public class CLPForwardIndexWriterV1 implements VarByteChunkWriter {
       encodedVarsUnboxed[i] = encodedVars[i];
     }
     _encodedVarsFwdIndexWriter.putLongMV(encodedVarsUnboxed);
-  }
-
-  @Override
-  public void putBytes(byte[] value) {
-    throw new UnsupportedOperationException("Non string types are not supported");
-  }
-
-  @Override
-  public void putStringMV(String[] values) {
-    throw new UnsupportedOperationException("Non string types are not supported");
-  }
-
-  @Override
-  public void putBytesMV(byte[][] values) {
-    throw new UnsupportedOperationException("Non string types are not supported");
   }
 
   @Override

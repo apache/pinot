@@ -23,9 +23,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWriterV1;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -44,7 +45,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class CLPWriterTest {
+public class CLPForwardIndexCreatorTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "CLPForwardIndexCreatorTest");
 
   @BeforeClass
@@ -89,14 +90,14 @@ public class CLPWriterTest {
     }
     statsCollector.seal();
 
-    File indexFile = new File(TEMP_DIR, "column1.fwd");
-    CLPForwardIndexWriterV1 clpForwardIndexWriterV1 =
-        new CLPForwardIndexWriterV1(TEMP_DIR, indexFile, "column1", 4, statsCollector);
+    File indexFile = new File(TEMP_DIR, "column1" + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
+    CLPForwardIndexCreatorV1 clpForwardIndexCreatorV1 =
+        new CLPForwardIndexCreatorV1(TEMP_DIR, "column1", 4, statsCollector);
 
     for (String logLine : logLines) {
-      clpForwardIndexWriterV1.putString(logLine);
+      clpForwardIndexCreatorV1.putString(logLine);
     }
-    clpForwardIndexWriterV1.close();
+    clpForwardIndexCreatorV1.close();
 
     PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
     CLPForwardIndexReaderV1 clpForwardIndexReaderV1 = new CLPForwardIndexReaderV1(pinotDataBuffer, logLines.size());

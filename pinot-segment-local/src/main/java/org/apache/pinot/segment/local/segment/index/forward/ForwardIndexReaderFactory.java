@@ -20,8 +20,8 @@
 package org.apache.pinot.segment.local.segment.index.forward;
 
 import org.apache.commons.lang.ArrayUtils;
-import org.apache.pinot.segment.local.io.writer.impl.CLPForwardIndexWriterV1;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVEntryDictForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVForwardIndexReader;
@@ -79,10 +79,10 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
         }
       }
     } else {
-      if (dataBuffer.size() >= CLPForwardIndexWriterV1.MAGIC_BYTES.length) {
-        byte[] magicBytes = new byte[CLPForwardIndexWriterV1.MAGIC_BYTES.length];
+      if (dataBuffer.size() >= CLPForwardIndexCreatorV1.MAGIC_BYTES.length) {
+        byte[] magicBytes = new byte[CLPForwardIndexCreatorV1.MAGIC_BYTES.length];
         dataBuffer.copyTo(0, magicBytes);
-        if (ArrayUtils.isEquals(magicBytes, CLPForwardIndexWriterV1.MAGIC_BYTES)) {
+        if (ArrayUtils.isEquals(magicBytes, CLPForwardIndexCreatorV1.MAGIC_BYTES)) {
           return new CLPForwardIndexReaderV1(dataBuffer, metadata.getTotalDocs());
         }
       }
