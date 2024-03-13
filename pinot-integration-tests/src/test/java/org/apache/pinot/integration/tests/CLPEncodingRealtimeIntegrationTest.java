@@ -29,10 +29,9 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.util.TestUtils;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.assertEquals;
 
 
 public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -94,7 +93,9 @@ public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTe
   @Test
   public void testValues()
       throws Exception {
-    assertEquals(getCurrentCountStarResult(), getCountStarResult());
+    Assert.assertEquals(getPinotConnection().execute(
+            "SELECT count(*) FROM " + getTableName() + " WHERE REGEXP_LIKE(logLine, '.*executor.*')").getResultSet(0)
+        .getLong(0), 53);
   }
 
   protected int getRealtimeSegmentFlushSize() {
