@@ -61,7 +61,7 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
   public static final byte[] MAGIC_BYTES = "CLP.v1".getBytes(StandardCharsets.UTF_8);
   private final String _column;
   private final int _numDocs;
-  private final File _baseIndexDir;
+  private final File _intermediateFilesDir;
   private final FileChannel _dataFile;
   private final ByteBuffer _fileBuffer;
   private final EncodedMessage _clpEncodedMessage;
@@ -82,7 +82,14 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
       throws IOException {
     _column = column;
     _numDocs = numDocs;
-    _baseIndexDir = baseIndexDir;
+    _intermediateFilesDir =
+        new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION + ".clp.tmp");
+    if (_intermediateFilesDir.exists()) {
+      FileUtils.cleanDirectory(_intermediateFilesDir);
+    } else {
+      FileUtils.forceMkdir(_intermediateFilesDir);
+    }
+
     _dataFile =
         new RandomAccessFile(new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION),
             "rw").getChannel();
@@ -90,27 +97,27 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
 
     CLPStatsProvider statsCollector = (CLPStatsProvider) columnStatistics;
     _clpStats = statsCollector.getCLPStats();
-    _logTypeDictFile = new File(_baseIndexDir, _column + "_clp_logtype.dict");
+    _logTypeDictFile = new File(_intermediateFilesDir, _column + "_clp_logtype.dict");
     _logTypeDictCreator =
         new SegmentDictionaryCreator(_column + "_clp_logtype.dict", FieldSpec.DataType.STRING, _logTypeDictFile, true);
     _logTypeDictCreator.build(_clpStats.getSortedLogTypeValues());
 
-    _dictVarsDictFile = new File(_baseIndexDir, _column + "_clp_dictvars.dict");
+    _dictVarsDictFile = new File(_intermediateFilesDir, _column + "_clp_dictvars.dict");
     _dictVarsDictCreator =
         new SegmentDictionaryCreator(_column + "_clp_dictvars.dict", FieldSpec.DataType.STRING, _dictVarsDictFile,
             true);
     _dictVarsDictCreator.build(_clpStats.getSortedDictVarValues());
 
-    _logTypeFwdIndexFile = new File(_baseIndexDir, column + "_clp_logtype.fwd");
+    _logTypeFwdIndexFile = new File(_intermediateFilesDir, column + "_clp_logtype.fwd");
     _logTypeFwdIndexWriter = new FixedBitSVForwardIndexWriter(_logTypeFwdIndexFile, numDocs,
         PinotDataBitSet.getNumBitsPerValue(_clpStats.getSortedLogTypeValues().length - 1));
 
-    _dictVarsFwdIndexFile = new File(_baseIndexDir, column + "_clp_dictvars.fwd");
+    _dictVarsFwdIndexFile = new File(_intermediateFilesDir, column + "_clp_dictvars.fwd");
     _dictVarsFwdIndexWriter =
         new FixedBitMVForwardIndexWriter(_dictVarsFwdIndexFile, numDocs, _clpStats.getTotalNumberOfDictVars(),
             PinotDataBitSet.getNumBitsPerValue(_clpStats.getSortedDictVarValues().length - 1));
 
-    _encodedVarsFwdIndexFile = new File(_baseIndexDir, column + "_clp_encodedvars.fwd");
+    _encodedVarsFwdIndexFile = new File(_intermediateFilesDir, column + "_clp_encodedvars.fwd");
     _encodedVarsFwdIndexWriter =
         new MultiValueFixedByteRawIndexCreator(_encodedVarsFwdIndexFile, ChunkCompressionType.LZ4, numDocs,
             FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), false,
@@ -187,7 +194,7 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
   }
 
   @Override
-  public void close()
+  public void seal()
       throws IOException {
     // Append all of these into fileBuffer
     _logTypeDictCreator.seal();
@@ -247,18 +254,19 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
     totalSize += _encodedVarsFwdIndexFile.length();
 
     _dataFile.truncate(totalSize);
-
-    // Delete all temp files
-    FileUtils.deleteQuietly(_logTypeDictFile);
-    FileUtils.deleteQuietly(_dictVarsDictFile);
-    FileUtils.deleteQuietly(_logTypeFwdIndexFile);
-    FileUtils.deleteQuietly(_dictVarsFwdIndexFile);
-    FileUtils.deleteQuietly(_encodedVarsFwdIndexFile);
   }
 
   private void copyFileIntoBuffer(File file) throws IOException {
     try (FileChannel from = (FileChannel.open(file.toPath(), StandardOpenOption.READ))) {
       _fileBuffer.put(from.map(FileChannel.MapMode.READ_ONLY, 0, file.length()));
     }
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    // Delete all temp file
+    _dataFile.close();
+    FileUtils.deleteDirectory(_intermediateFilesDir);
   }
 }

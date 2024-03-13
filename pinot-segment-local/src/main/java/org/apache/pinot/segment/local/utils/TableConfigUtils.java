@@ -1192,8 +1192,14 @@ public final class TableConfigUtils {
       CompressionCodec compressionCodec = fieldConfig.getCompressionCodec();
       switch (encodingType) {
         case RAW:
-          Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToRawIndex(),
-              "Compression codec: %s is not applicable to raw index", compressionCodec);
+          Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToRawIndex()
+                  || compressionCodec == CompressionCodec.CLP, "Compression codec: %s is not applicable to raw index",
+              compressionCodec);
+          if (compressionCodec == CompressionCodec.CLP && schema != null) {
+            Preconditions.checkArgument(
+                schema.getFieldSpecFor(columnName).getDataType().getStoredType() == DataType.STRING,
+                "CLP compression codec can only be applied to string columns");
+          }
           break;
         case DICTIONARY:
           Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToDictEncodedIndex(),

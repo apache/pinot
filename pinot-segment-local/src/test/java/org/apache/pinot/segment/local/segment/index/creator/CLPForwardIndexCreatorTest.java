@@ -97,6 +97,7 @@ public class CLPForwardIndexCreatorTest {
     for (String logLine : logLines) {
       clpForwardIndexCreatorV1.putString(logLine);
     }
+    clpForwardIndexCreatorV1.seal();
     clpForwardIndexCreatorV1.close();
 
     PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
