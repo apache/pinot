@@ -58,6 +58,7 @@ public class ForwardIndexConfig extends IndexConfig {
     if (compressionCodec != null) {
       switch (compressionCodec) {
         case PASS_THROUGH:
+        case CLP:
           _chunkCompressionType = ChunkCompressionType.PASS_THROUGH;
           _dictIdCompressionType = null;
           break;
@@ -76,10 +77,6 @@ public class ForwardIndexConfig extends IndexConfig {
         case MV_ENTRY_DICT:
           _dictIdCompressionType = DictIdCompressionType.MV_ENTRY_DICT;
           _chunkCompressionType = null;
-          break;
-        case CLP:
-          _chunkCompressionType = null;
-          _dictIdCompressionType = null;
           break;
         default:
           throw new IllegalStateException("Unsupported compression codec: " + compressionCodec);

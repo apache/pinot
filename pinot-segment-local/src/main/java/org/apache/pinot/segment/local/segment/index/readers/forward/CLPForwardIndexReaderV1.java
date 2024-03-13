@@ -24,6 +24,7 @@ import java.io.IOException;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -127,7 +128,8 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<CLPForwardInd
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
   }
 
   @Override
@@ -136,14 +138,17 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<CLPForwardInd
         _encodedVarFwdIndexReader.createContext());
   }
 
+  @Override
+  public ChunkCompressionType getCompressionType() {
+    return ChunkCompressionType.PASS_THROUGH;
+  }
 
   public static final class CLPReaderContext implements ForwardIndexReaderContext {
     private final FixedBitMVForwardIndexReader.Context _dictVarsReaderContext;
     private final ForwardIndexReaderContext _logTypeReaderContext;
     private final VarByteChunkForwardIndexReaderV4.ReaderContext _encodedVarReaderContext;
 
-    public CLPReaderContext(
-        FixedBitMVForwardIndexReader.Context dictVarsReaderContext,
+    public CLPReaderContext(FixedBitMVForwardIndexReader.Context dictVarsReaderContext,
         ForwardIndexReaderContext logTypeReaderContext,
         VarByteChunkForwardIndexReaderV4.ReaderContext encodedVarReaderContext) {
       _dictVarsReaderContext = dictVarsReaderContext;
