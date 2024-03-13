@@ -168,16 +168,6 @@ public class PinotTaskRestletResource {
     return _pinotHelixTaskResourceManager.getTaskTypes();
   }
 
-  @Deprecated
-  @GET
-  @Path("/tasks/taskqueues")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation("List all task queues (deprecated)")
-  public Set<String> getTaskQueues() {
-    return _pinotHelixTaskResourceManager.getTaskQueues();
-  }
-
   @GET
   @Path("/tasks/{taskType}/state")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
@@ -186,17 +176,6 @@ public class PinotTaskRestletResource {
   public TaskState getTaskQueueState(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
     return _pinotHelixTaskResourceManager.getTaskQueueState(taskType);
-  }
-
-  @Deprecated
-  @GET
-  @Path("/tasks/taskqueuestate/{taskType}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation("Get the state (task queue state) for the given task type (deprecated)")
-  public StringResultResponse getTaskQueueStateDeprecated(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
-    return new StringResultResponse(_pinotHelixTaskResourceManager.getTaskQueueState(taskType).toString());
   }
 
   @GET
@@ -366,34 +345,12 @@ public class PinotTaskRestletResource {
     return _pinotHelixTaskResourceManager.getTaskDebugInfo(taskName, verbosity);
   }
 
-  @Deprecated
-  @GET
-  @Path("/tasks/tasks/{taskType}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation("List all tasks for the given task type (deprecated)")
-  public Set<String> getTasksDeprecated(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
-    return _pinotHelixTaskResourceManager.getTasks(taskType);
-  }
-
   @GET
   @Path("/tasks/{taskType}/taskstates")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Get a map from task to task state for the given task type")
   public Map<String, TaskState> getTaskStates(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
-    return _pinotHelixTaskResourceManager.getTaskStates(taskType);
-  }
-
-  @Deprecated
-  @GET
-  @Path("/tasks/taskstates/{taskType}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation("Get a map from task to task state for the given task type (deprecated)")
-  public Map<String, TaskState> getTaskStatesDeprecated(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
     return _pinotHelixTaskResourceManager.getTaskStates(taskType);
   }
@@ -406,17 +363,6 @@ public class PinotTaskRestletResource {
   public TaskState getTaskState(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
     return _pinotHelixTaskResourceManager.getTaskState(taskName);
-  }
-
-  @Deprecated
-  @GET
-  @Path("/tasks/taskstate/{taskName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation("Get the task state for the given task (deprecated)")
-  public StringResultResponse getTaskStateDeprecated(
-      @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
-    return new StringResultResponse(String.valueOf(_pinotHelixTaskResourceManager.getTaskState(taskName)));
   }
 
   @GET
@@ -447,17 +393,6 @@ public class PinotTaskRestletResource {
   public Map<String, String> getTaskConfig(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
     return _pinotHelixTaskResourceManager.getTaskRuntimeConfig(taskName);
-  }
-
-  @Deprecated
-  @GET
-  @Path("/tasks/taskconfig/{taskName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation("Get the task config (a list of child task configs) for the given task (deprecated)")
-  public List<PinotTaskConfig> getTaskConfigsDeprecated(
-      @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName) {
-    return _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName);
   }
 
   @GET
@@ -720,17 +655,6 @@ public class PinotTaskRestletResource {
     }
   }
 
-  @Deprecated
-  @PUT
-  @Path("/tasks/scheduletasks")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CREATE_TASK)
-  @Produces(MediaType.APPLICATION_JSON)
-  @Authenticate(AccessType.UPDATE)
-  @ApiOperation("Schedule tasks (deprecated)")
-  public Map<String, String> scheduleTasksDeprecated() {
-    return _pinotTaskManager.scheduleTasks();
-  }
-
   @PUT
   @Path("/tasks/{taskType}/cleanup")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CLEANUP_TASK)
@@ -738,19 +662,6 @@ public class PinotTaskRestletResource {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation("Clean up finished tasks (COMPLETED, FAILED) for the given task type")
   public SuccessResponse cleanUpTasks(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
-    _pinotHelixTaskResourceManager.cleanUpTaskQueue(taskType);
-    return new SuccessResponse("Successfully cleaned up tasks for task type: " + taskType);
-  }
-
-  @Deprecated
-  @PUT
-  @Path("/tasks/cleanuptasks/{taskType}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CLEANUP_TASK)
-  @Produces(MediaType.APPLICATION_JSON)
-  @Authenticate(AccessType.UPDATE)
-  @ApiOperation("Clean up finished tasks (COMPLETED, FAILED) for the given task type (deprecated)")
-  public SuccessResponse cleanUpTasksDeprecated(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
     _pinotHelixTaskResourceManager.cleanUpTaskQueue(taskType);
     return new SuccessResponse("Successfully cleaned up tasks for task type: " + taskType);
@@ -780,28 +691,6 @@ public class PinotTaskRestletResource {
     return new SuccessResponse("Successfully resumed tasks for task type: " + taskType);
   }
 
-  @Deprecated
-  @PUT
-  @Path("/tasks/taskqueue/{taskType}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_TASK_QUEUE)
-  @Produces(MediaType.APPLICATION_JSON)
-  @Authenticate(AccessType.UPDATE)
-  @ApiOperation("Stop/resume a task queue (deprecated)")
-  public SuccessResponse toggleTaskQueueState(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "state", required = true) @QueryParam("state") String state) {
-    switch (state.toUpperCase()) {
-      case TASK_QUEUE_STATE_STOP:
-        _pinotHelixTaskResourceManager.stopTaskQueue(taskType);
-        return new SuccessResponse("Successfully stopped task queue for task type: " + taskType);
-      case TASK_QUEUE_STATE_RESUME:
-        _pinotHelixTaskResourceManager.resumeTaskQueue(taskType);
-        return new SuccessResponse("Successfully resumed task queue for task type: " + taskType);
-      default:
-        throw new IllegalArgumentException("Unsupported state: " + state);
-    }
-  }
-
   @DELETE
   @Path("/tasks/{taskType}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_TASK)
@@ -828,20 +717,5 @@ public class PinotTaskRestletResource {
       @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
     _pinotHelixTaskResourceManager.deleteTask(taskName, forceDelete);
     return new SuccessResponse("Successfully deleted task: " + taskName);
-  }
-
-  @Deprecated
-  @DELETE
-  @Path("/tasks/taskqueue/{taskType}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_TASK)
-  @Produces(MediaType.APPLICATION_JSON)
-  @Authenticate(AccessType.DELETE)
-  @ApiOperation("Delete a task queue (deprecated)")
-  public SuccessResponse deleteTaskQueue(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
-      @ApiParam(value = "Whether to force delete the task queue (expert only option, enable with cautious")
-      @DefaultValue("false") @QueryParam("forceDelete") boolean forceDelete) {
-    _pinotHelixTaskResourceManager.deleteTaskQueue(taskType, forceDelete);
-    return new SuccessResponse("Successfully deleted task queue for task type: " + taskType);
   }
 }

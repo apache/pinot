@@ -384,7 +384,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forListAllCrcInformationForTable(String tableName) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName, "segments", "crc");
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "crc");
   }
 
   public String forDeleteTableWithType(String tableName, String tableType) {

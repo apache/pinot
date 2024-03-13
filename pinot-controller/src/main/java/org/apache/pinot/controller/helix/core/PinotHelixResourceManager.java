@@ -59,7 +59,6 @@ import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
@@ -155,10 +154,7 @@ import org.apache.pinot.controller.helix.core.util.ZKMetadataUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.instance.Instance;
-import org.apache.pinot.spi.config.table.IndexingConfig;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableCustomConfig;
 import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
@@ -1975,46 +1971,6 @@ public class PinotHelixResourceManager {
 
     // Send update query quota message if quota is specified
     sendTableConfigRefreshMessage(tableNameWithType);
-  }
-
-  public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs)
-      throws Exception {
-    String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
-    ImmutablePair<TableConfig, Integer> tableConfigWithVersion =
-        ZKMetadataProvider.getTableConfigWithVersion(_propertyStore, tableNameWithType);
-    if (tableConfigWithVersion == null) {
-      throw new RuntimeException("Table: " + tableName + " of type: " + type + " does not exist");
-    }
-    TableConfig tableConfig = tableConfigWithVersion.getLeft();
-    tableConfig.setCustomConfig(newConfigs);
-    setExistingTableConfig(tableConfig, tableConfigWithVersion.getRight());
-  }
-
-  public void updateSegmentsValidationAndRetentionConfigFor(String tableName, TableType type,
-      SegmentsValidationAndRetentionConfig newConfigs)
-      throws Exception {
-    String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
-    ImmutablePair<TableConfig, Integer> tableConfigWithVersion =
-        ZKMetadataProvider.getTableConfigWithVersion(_propertyStore, tableNameWithType);
-    if (tableConfigWithVersion == null) {
-      throw new RuntimeException("Table: " + tableName + " of type: " + type + " does not exist");
-    }
-    TableConfig tableConfig = tableConfigWithVersion.getLeft();
-    tableConfig.setValidationConfig(newConfigs);
-    setExistingTableConfig(tableConfig, tableConfigWithVersion.getRight());
-  }
-
-  public void updateIndexingConfigFor(String tableName, TableType type, IndexingConfig newConfigs)
-      throws Exception {
-    String tableNameWithType = TableNameBuilder.forType(type).tableNameWithType(tableName);
-    ImmutablePair<TableConfig, Integer> tableConfigWithVersion =
-        ZKMetadataProvider.getTableConfigWithVersion(_propertyStore, tableNameWithType);
-    if (tableConfigWithVersion == null) {
-      throw new RuntimeException("Table: " + tableName + " of type: " + type + " does not exist");
-    }
-    TableConfig tableConfig = tableConfigWithVersion.getLeft();
-    tableConfig.setIndexingConfig(newConfigs);
-    setExistingTableConfig(tableConfig, tableConfigWithVersion.getRight());
   }
 
   public void deleteUser(String username) {

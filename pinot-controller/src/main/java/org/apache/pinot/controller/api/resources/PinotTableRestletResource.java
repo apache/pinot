@@ -568,46 +568,6 @@ public class PinotTableRestletResource {
     return validationResponse;
   }
 
-  @Deprecated
-  @POST
-  @Path("/tables/validateTableAndSchema")
-  @Consumes(MediaType.APPLICATION_JSON)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Validate table config for a table along with specified schema",
-      notes = "Deprecated. Use /tableConfigs/validate instead."
-          + "Validate given table config and schema. If specified schema is null, attempt to retrieve schema using the "
-          + "table name. This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
-          + " This allows us to validate table config before apply.")
-  @ManualAuthorization // performed after parsing TableAndSchemaConfig
-  public String validateTableAndSchema(TableAndSchemaConfig tableSchemaConfig,
-      @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
-      @Context Request request) {
-    TableConfig tableConfig = tableSchemaConfig.getTableConfig();
-    String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
-    tableConfig.setTableName(tableNameWithType);
-    // Handle legacy config
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig.getSchemaName() != null) {
-      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
-    }
-    Schema schema = tableSchemaConfig.getSchema();
-    if (schema == null) {
-      schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
-    }
-
-    // validate permission
-    String endpointUrl = request.getRequestURL().toString();
-    AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils.validatePermission(tableNameWithType, AccessType.READ, httpHeaders, endpointUrl, accessControl);
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType,
-        Actions.Table.VALIDATE_TABLE_CONFIGS)) {
-      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-    }
-
-    return validateConfig(tableConfig, schema, typesToSkip).toString();
-  }
-
   private ObjectNode validateConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
     try {
       if (schema == null) {
