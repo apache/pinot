@@ -189,7 +189,7 @@
     <surefire.version>3.2.5</surefire.version>
 
     <!-- Configuration for Scala -->
-    <scala.version>2.12.18</scala.version>
+    <scala.version>2.13.13</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
     <flink.version>1.14.6</flink.version>
