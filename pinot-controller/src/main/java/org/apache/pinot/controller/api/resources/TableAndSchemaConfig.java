@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -29,7 +30,9 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 /**
  * Wrapper for TableConfig and Schema used in validation API
+ * @deprecated Use {@link TableConfigs} instead.
  */
+@Deprecated
 public class TableAndSchemaConfig {
   private final TableConfig _tableConfig;
   private final Schema _schema;

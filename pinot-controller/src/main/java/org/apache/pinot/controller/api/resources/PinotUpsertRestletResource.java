@@ -92,6 +92,7 @@ public class PinotUpsertRestletResource {
   @ApiOperation(value = "Estimate memory usage for an upsert table", notes =
       "This API returns the estimated heap usage based on primary key column stats."
           + " This allows us to estimate table size before onboarding.")
+  // TODO: Switch to use TableConfigs
   public String estimateHeapUsage(String tableSchemaConfigStr,
       @ApiParam(value = "cardinality", required = true) @QueryParam("cardinality") long cardinality,
       @ApiParam(value = "primaryKeySize", defaultValue = "-1") @QueryParam("primaryKeySize") int primaryKeySize,
