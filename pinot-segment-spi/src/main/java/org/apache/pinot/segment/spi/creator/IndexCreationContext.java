@@ -114,9 +114,8 @@ public interface IndexCreationContext {
     private boolean _textCommitOnClose;
 
     public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
-      return withLengthOfLongestEntry(
-          columnIndexCreationInfo.getLengthOfLongestEntry()).withMaxNumberOfMultiValueElements(
-              columnIndexCreationInfo.getMaxNumberOfMultiValueElements())
+      return withLengthOfLongestEntry(columnIndexCreationInfo.getLengthOfLongestEntry())
+          .withMaxNumberOfMultiValueElements(columnIndexCreationInfo.getMaxNumberOfMultiValueElements())
           .withMaxRowLengthInBytes(columnIndexCreationInfo.getMaxRowLengthInBytes())
           .withMinValue((Comparable<?>) columnIndexCreationInfo.getMin())
           .withMaxValue((Comparable<?>) columnIndexCreationInfo.getMax())
@@ -124,7 +123,8 @@ public interface IndexCreationContext {
           .withSortedUniqueElementsArray(columnIndexCreationInfo.getSortedUniqueElementsArray())
           .withColumnStatistics(columnIndexCreationInfo.getColumnStatistics())
           .withCardinality(columnIndexCreationInfo.getDistinctValueCount())
-          .withFixedLength(columnIndexCreationInfo.isFixedLength()).sorted(columnIndexCreationInfo.isSorted());
+          .withFixedLength(columnIndexCreationInfo.isFixedLength())
+          .sorted(columnIndexCreationInfo.isSorted());
     }
 
     public Builder withColumnStatistics(ColumnStatistics columnStatistics) {
@@ -268,11 +268,12 @@ public interface IndexCreationContext {
     private final boolean _textCommitOnClose;
     private final ColumnStatistics _columnStatistics;
 
-    public Common(File indexDir, int lengthOfLongestEntry, int maxNumberOfMultiValueElements, int maxRowLengthInBytes,
-        boolean onHeap, FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries, int totalDocs,
-        boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue, boolean forwardIndexDisabled,
-        Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength, boolean textCommitOnClose,
-        ColumnStatistics columnStatistics) {
+    public Common(File indexDir, int lengthOfLongestEntry,
+        int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
+        FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
+        int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
+        boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary,
+        boolean fixedLength, boolean textCommitOnClose, ColumnStatistics columnStatistics) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;

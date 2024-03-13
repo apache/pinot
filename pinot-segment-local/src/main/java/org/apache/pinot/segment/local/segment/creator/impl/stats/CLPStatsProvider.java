@@ -33,15 +33,11 @@ public interface CLPStatsProvider {
   CLPStats getCLPStats();
 
   class CLPStats {
-    private final EncodedMessage _clpEncodedMessage;
-    private final MessageEncoder _clpMessageEncoder;
     int _totalNumberOfDictVars = 0;
     int _totalNumberOfEncodedVars = 0;
     int _maxNumberOfEncodedVars = 0;
     private String[] _sortedLogTypeValues;
     private String[] _sortedDictVarValues;
-    private Set<String> _logTypes = new ObjectOpenHashSet<>(AbstractColumnStatisticsCollector.INITIAL_HASH_SET_SIZE);
-    private Set<String> _dictVars = new ObjectOpenHashSet<>(AbstractColumnStatisticsCollector.INITIAL_HASH_SET_SIZE);
 
     public CLPStats(String[] sortedLogTypeValues, String[] sortedDictVarValues, int totalNumberOfDictVars,
         int totalNumberOfEncodedVars, int maxNumberOfEncodedVars) {
@@ -50,56 +46,6 @@ public interface CLPStatsProvider {
       _totalNumberOfDictVars = totalNumberOfDictVars;
       _totalNumberOfEncodedVars = totalNumberOfEncodedVars;
       _maxNumberOfEncodedVars = maxNumberOfEncodedVars;
-      _clpEncodedMessage = null;
-      _clpMessageEncoder = null;
-    }
-
-    public CLPStats() {
-      _clpEncodedMessage = new EncodedMessage();
-      _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
-          BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
-    }
-
-    public void collect(String value) {
-      String logType;
-      String[] dictVars;
-      Long[] encodedVars;
-
-      try {
-        _clpMessageEncoder.encodeMessage(value, _clpEncodedMessage);
-        logType = _clpEncodedMessage.getLogTypeAsString();
-        dictVars = _clpEncodedMessage.getDictionaryVarsAsStrings();
-        encodedVars = _clpEncodedMessage.getEncodedVarsAsBoxedLongs();
-      } catch (IOException e) {
-        throw new IllegalArgumentException("Failed to encode message: " + value, e);
-      }
-
-      if (logType == null) {
-        logType = FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
-      }
-
-      if (dictVars == null) {
-        dictVars = new String[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING};
-      }
-
-      if (encodedVars == null) {
-        encodedVars = new Long[]{FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG};
-      }
-
-      _logTypes.add(logType);
-      _dictVars.addAll(Arrays.asList(dictVars));
-      _totalNumberOfDictVars += dictVars.length;
-      _totalNumberOfEncodedVars += encodedVars.length;
-      _maxNumberOfEncodedVars = Math.max(_maxNumberOfEncodedVars, encodedVars.length);
-    }
-
-    public void seal() {
-      _sortedLogTypeValues = _logTypes.toArray(new String[0]);
-      _logTypes = null;
-      Arrays.sort(_sortedLogTypeValues);
-      _sortedDictVarValues = _dictVars.toArray(new String[0]);
-      _dictVars = null;
-      Arrays.sort(_sortedDictVarValues);
     }
 
     public void clear() {

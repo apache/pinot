@@ -60,6 +60,13 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
     return StandardIndexes.forward();
   }
 
+  @Override
+  protected ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
+      ForwardIndexConfig indexConfig)
+      throws IndexReaderConstraintException {
+    return createIndexReader(dataBuffer, metadata);
+  }
+
   public static ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
     if (metadata.hasDictionary()) {
       if (metadata.isSingleValue()) {
@@ -119,12 +126,5 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
         return new VarByteChunkMVForwardIndexReader(dataBuffer, storedType);
       }
     }
-  }
-
-  @Override
-  protected ForwardIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata,
-      ForwardIndexConfig indexConfig)
-      throws IndexReaderConstraintException {
-    return createIndexReader(dataBuffer, metadata);
   }
 }

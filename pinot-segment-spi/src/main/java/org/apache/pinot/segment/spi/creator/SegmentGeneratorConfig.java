@@ -273,7 +273,8 @@ public class SegmentGeneratorConfig implements Serializable {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW && fieldConfig.getCompressionCodec() != null
+        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
+            && fieldConfig.getCompressionCodec() != null
             && fieldConfig.getCompressionCodec().isApplicableToRawIndex()) {
           _rawIndexCreationColumns.add(fieldConfig.getName());
           _rawIndexCompressionType.put(fieldConfig.getName(),

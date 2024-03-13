@@ -24,6 +24,7 @@ import java.util.List;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
@@ -59,18 +60,16 @@ public class CLPMutableForwardIndexTest {
       List<String> logLines = new ArrayList<>();
       logLines.add(
           "2023/10/26 00:03:10.168 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] "
-              + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective: "
-              + "true");
+              + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective: true");
       logLines.add(
           "2023/10/26 00:03:10.169 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32d_DEFAULT)] "
-              + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective: "
-              + "true");
+              + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective: true");
       logLines.add(
-          "2023/10/27 16:35:10.470 INFO [ControllerResponseFilter] [grizzly-http-server-2] Handled request from 10.12"
-              + ".15.1 GET https://10.12.15.10:8443/health?checkType=liveness, content-type null status code 200 OK");
+          "2023/10/27 16:35:10.470 INFO [ControllerResponseFilter] [grizzly-http-server-2] Handled request from 0.0"
+              + ".0.0 GET https://0.0.0.0:8443/health?checkType=liveness, content-type null status code 200 OK");
       logLines.add(
-          "2023/10/27 16:35:10.607 INFO [ControllerResponseFilter] [grizzly-http-server-6] Handled request from 10.12"
-              + ".19.5 GET https://pinot-pinot-broker-headless.managed.svc.cluster.local:8093/tables, content-type "
+          "2023/10/27 16:35:10.607 INFO [ControllerResponseFilter] [grizzly-http-server-6] Handled request from 0.0"
+              + ".0.0 GET https://pinot-pinot-broker-headless.managed.svc.cluster.local:8093/tables, content-type "
               + "application/json status code 200 OK");
 
       for (int i = 0; i < rows; i++) {
@@ -82,11 +81,13 @@ public class CLPMutableForwardIndexTest {
       }
 
       // Verify clp stats
-      CLPStatsProvider.CLPStats stats = new CLPStatsProvider.CLPStats();
+      StringColumnPreIndexStatsCollector.CLPStatsCollector statsCollector =
+          new StringColumnPreIndexStatsCollector.CLPStatsCollector();
       for (int i = 0; i < rows; i++) {
-        stats.collect(logLines.get(i));
+        statsCollector.collect(logLines.get(i));
       }
-      stats.seal();
+      statsCollector.seal();
+      CLPStatsProvider.CLPStats stats = statsCollector.getCLPStats();
 
       CLPStatsProvider.CLPStats mutableIndexStats = readerWriter.getCLPStats();
       Assert.assertEquals(stats.getTotalNumberOfDictVars(), mutableIndexStats.getTotalNumberOfDictVars());
