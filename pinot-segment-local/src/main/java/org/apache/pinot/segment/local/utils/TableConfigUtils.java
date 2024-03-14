@@ -921,32 +921,40 @@ public final class TableConfigUtils {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     assert upsertConfig != null;
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
+    String rowMergerCustomImplementation = upsertConfig.getRowMergerCustomImplementation();
+
+    Preconditions.checkState(StringUtils.isNotBlank(rowMergerCustomImplementation)
+            || MapUtils.isNotEmpty(partialUpsertStrategies),
+        "At least one of rowMergerCustomImplementation or partialUpsertStrategies must be provided for partial upsert table");
 
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
-    for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
-      String column = entry.getKey();
-      UpsertConfig.Strategy columnStrategy = entry.getValue();
-      Preconditions.checkState(!primaryKeyColumns.contains(column), "Merger cannot be applied to primary key columns");
+    // skip the partial upsert strategies check if rowMergerCustomImplementation is provided
+    if (StringUtils.isBlank(rowMergerCustomImplementation)) {
+      for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
+        String column = entry.getKey();
+        UpsertConfig.Strategy columnStrategy = entry.getValue();
+        Preconditions.checkState(!primaryKeyColumns.contains(column), "Merger cannot be applied to primary key columns");
 
-      if (upsertConfig.getComparisonColumns() != null) {
-        Preconditions.checkState(!upsertConfig.getComparisonColumns().contains(column),
-            "Merger cannot be applied to comparison column");
-      } else {
-        Preconditions.checkState(!tableConfig.getValidationConfig().getTimeColumnName().equals(column),
-            "Merger cannot be applied to time column");
-      }
+        if (upsertConfig.getComparisonColumns() != null) {
+          Preconditions.checkState(!upsertConfig.getComparisonColumns().contains(column),
+              "Merger cannot be applied to comparison column");
+        } else {
+          Preconditions.checkState(!tableConfig.getValidationConfig().getTimeColumnName().equals(column),
+              "Merger cannot be applied to time column");
+        }
 
-      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
-      Preconditions.checkState(fieldSpec != null, "Merger cannot be applied to non-existing column: %s", column);
+        FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+        Preconditions.checkState(fieldSpec != null, "Merger cannot be applied to non-existing column: %s", column);
 
-      if (columnStrategy == UpsertConfig.Strategy.INCREMENT) {
-        Preconditions.checkState(fieldSpec.getDataType().getStoredType().isNumeric(),
-            "INCREMENT merger cannot be applied to non-numeric column: %s", column);
-        Preconditions.checkState(!schema.getDateTimeNames().contains(column),
-            "INCREMENT merger cannot be applied to date time column: %s", column);
-      } else if (columnStrategy == UpsertConfig.Strategy.APPEND || columnStrategy == UpsertConfig.Strategy.UNION) {
-        Preconditions.checkState(!fieldSpec.isSingleValueField(),
-            "%s merger cannot be applied to single-value column: %s", columnStrategy.toString(), column);
+        if (columnStrategy == UpsertConfig.Strategy.INCREMENT) {
+          Preconditions.checkState(fieldSpec.getDataType().getStoredType().isNumeric(),
+              "INCREMENT merger cannot be applied to non-numeric column: %s", column);
+          Preconditions.checkState(!schema.getDateTimeNames().contains(column),
+              "INCREMENT merger cannot be applied to date time column: %s", column);
+        } else if (columnStrategy == UpsertConfig.Strategy.APPEND || columnStrategy == UpsertConfig.Strategy.UNION) {
+          Preconditions.checkState(!fieldSpec.isSingleValueField(),
+              "%s merger cannot be applied to single-value column: %s", columnStrategy.toString(), column);
+        }
       }
     }
   }
