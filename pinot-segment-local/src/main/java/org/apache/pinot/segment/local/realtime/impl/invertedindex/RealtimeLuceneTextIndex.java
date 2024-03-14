@@ -30,6 +30,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.mutable.MutableTextIndex;
 import org.roaringbitmap.IntIterator;
@@ -53,6 +54,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
   private Analyzer _analyzer;
   private final String _column;
   private final String _segmentName;
+  private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
 
   /**
    * Created by {@link MutableSegmentImpl}
@@ -80,6 +82,7 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       IndexWriter indexWriter = _indexCreator.getIndexWriter();
       _searcherManager = new SearcherManager(indexWriter, false, false, null);
       _analyzer = _indexCreator.getIndexWriter().getConfig().getAnalyzer();
+      _enablePrefixSuffixMatchingInPhraseQueries = config.isEnablePrefixSuffixMatchingInPhraseQueries();
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate realtime Lucene index reader for column {}, exception {}", column,
           e.getMessage());
@@ -119,7 +122,12 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
     Callable<MutableRoaringBitmap> searchCallable = () -> {
       IndexSearcher indexSearcher = null;
       try {
-        Query query = new QueryParser(_column, _analyzer).parse(searchQuery);
+        QueryParser parser = new QueryParser(_column, _analyzer);
+        parser.setAllowLeadingWildcard(true);
+        Query query = parser.parse(searchQuery);
+        if (_enablePrefixSuffixMatchingInPhraseQueries) {
+          query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
+        }
         indexSearcher = _searcherManager.acquire();
         indexSearcher.search(query, docIDCollector);
         return getPinotDocIds(indexSearcher, docIDs);

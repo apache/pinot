@@ -153,6 +153,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     props = new HashMap<>();
     props.put(FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, "coordinator");
     props.put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "it, those");
+    props.put(FieldConfig.TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES, "true");
     columnProperties.put(SKILLS_TEXT_COL_NAME, props);
     props = new HashMap<>();
     props.put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "");
@@ -207,6 +208,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     addTextIndexProp(config, SKILLS_TEXT_COL_NAME, ImmutableMap.<String, String>builder()
         .put(FieldConfig.TEXT_INDEX_STOP_WORD_INCLUDE_KEY, "coordinator")
         .put(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, "it, those")
+        .put(FieldConfig.TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES, "true")
         .build());
     addTextIndexProp(config, SKILLS_TEXT_COL_DICT_NAME,
         Collections.singletonMap(FieldConfig.TEXT_INDEX_STOP_WORD_EXCLUDE_KEY, ""));
@@ -278,6 +280,32 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     assertEquals(counter, 24150);
 
     return rows;
+  }
+
+  @Test
+  public void testMultiTermRegexSearch()
+      throws Exception {
+    // Search in SKILLS_TEXT_COL column to look for documents that have the /.*ealtime stream system.*/ regex pattern
+    List<Object[]> expected = new ArrayList<>();
+    expected.add(new Object[]{1010,
+        "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
+            + "storage, concurrency, multi-threading"});
+    expected.add(new Object[]{1019,
+        "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
+            + "distributed storage, concurrency, multi-threading, apache airflow"});
+
+    String query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '*ealtime streaming system*') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+
+    // Search /*java realtime stream system*, only 1 result left./
+    List<Object[]> expected1 = new ArrayList<>();
+    expected1.add(new Object[]{1010,
+        "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
+            + "storage, concurrency, multi-threading"});
+    String query1 =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '*ava realtime streaming system*') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query1, expected1.size(), false, expected1);
   }
 
   /**

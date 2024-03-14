@@ -37,7 +37,7 @@ public class TextIndexConfig extends IndexConfig {
   private static final boolean LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE = true;
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null);
+          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, false);
   private final FSTType _fstType;
   @Nullable
   private final Object _rawValueForTextIndex;
@@ -48,6 +48,7 @@ public class TextIndexConfig extends IndexConfig {
   private final boolean _luceneUseCompoundFile;
   private final int _luceneMaxBufferSizeMB;
   private final String _luceneAnalyzerClass;
+  private final boolean _enablePrefixSuffixMatchingInPhraseQueries;
 
   @JsonCreator
   public TextIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("fst") FSTType fstType,
@@ -58,7 +59,8 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("stopWordsExclude") List<String> stopWordsExclude,
       @JsonProperty("luceneUseCompoundFile") Boolean luceneUseCompoundFile,
       @JsonProperty("luceneMaxBufferSizeMB") Integer luceneMaxBufferSizeMB,
-      @JsonProperty("luceneAnalyzerClass") String luceneAnalyzerClass) {
+      @JsonProperty("luceneAnalyzerClass") String luceneAnalyzerClass,
+      @JsonProperty("enablePrefixSuffixMatchingInPhraseQueries") Boolean enablePrefixSuffixMatchingInPhraseQueries) {
     super(disabled);
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
@@ -72,6 +74,8 @@ public class TextIndexConfig extends IndexConfig {
         luceneMaxBufferSizeMB == null ? LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB : luceneMaxBufferSizeMB;
     _luceneAnalyzerClass = (luceneAnalyzerClass == null || luceneAnalyzerClass.isEmpty())
         ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS : luceneAnalyzerClass;
+    _enablePrefixSuffixMatchingInPhraseQueries =
+        enablePrefixSuffixMatchingInPhraseQueries == null ? false : enablePrefixSuffixMatchingInPhraseQueries;
   }
 
   public FSTType getFstType() {
@@ -125,6 +129,16 @@ public class TextIndexConfig extends IndexConfig {
     return _luceneAnalyzerClass;
   }
 
+  /**
+   *  Whether to enable prefix and suffix wildcard term matching (i.e., .*value for prefix and value.* for suffix
+   *  term matching) in a phrase query. By default, Pinot today treats .* in a phrase query like ".*value str1 value.*"
+   *  as literal. If this flag is enabled, .*value will be treated as suffix matching and value.* will be treated as
+   *  prefix matching.
+   */
+  public boolean isEnablePrefixSuffixMatchingInPhraseQueries() {
+    return _enablePrefixSuffixMatchingInPhraseQueries;
+  }
+
   public static abstract class AbstractBuilder {
     @Nullable
     protected FSTType _fstType;
@@ -137,6 +151,7 @@ public class TextIndexConfig extends IndexConfig {
     protected boolean _luceneUseCompoundFile = LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE;
     protected int _luceneMaxBufferSizeMB = LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB;
     protected String _luceneAnalyzerClass = FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS;
+    protected boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
 
     public AbstractBuilder(@Nullable FSTType fstType) {
       _fstType = fstType;
@@ -151,11 +166,13 @@ public class TextIndexConfig extends IndexConfig {
       _luceneUseCompoundFile = other._luceneUseCompoundFile;
       _luceneMaxBufferSizeMB = other._luceneMaxBufferSizeMB;
       _luceneAnalyzerClass = other._luceneAnalyzerClass;
+      _enablePrefixSuffixMatchingInPhraseQueries = other._enablePrefixSuffixMatchingInPhraseQueries;
     }
 
     public TextIndexConfig build() {
       return new TextIndexConfig(false, _fstType, _rawValueForTextIndex, _enableQueryCache, _useANDForMultiTermQueries,
-          _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile, _luceneMaxBufferSizeMB, _luceneAnalyzerClass);
+          _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile, _luceneMaxBufferSizeMB, _luceneAnalyzerClass,
+          _enablePrefixSuffixMatchingInPhraseQueries);
     }
 
     public abstract AbstractBuilder withProperties(@Nullable Map<String, String> textIndexProperties);
@@ -187,6 +204,12 @@ public class TextIndexConfig extends IndexConfig {
 
     public AbstractBuilder withLuceneAnalyzerClass(String luceneAnalyzerClass) {
       _luceneAnalyzerClass = luceneAnalyzerClass;
+      return this;
+    }
+
+    public AbstractBuilder withEnablePrefixSuffixMatchingInPhraseQueries(
+        boolean enablePrefixSuffixMatchingInPhraseQueries) {
+      _enablePrefixSuffixMatchingInPhraseQueries = enablePrefixSuffixMatchingInPhraseQueries;
       return this;
     }
   }

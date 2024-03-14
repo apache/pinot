@@ -61,6 +61,8 @@ public class FieldConfig extends BaseJsonConfig {
   // Config to disable forward index
   public static final String FORWARD_INDEX_DISABLED = "forwardIndexDisabled";
   public static final String DEFAULT_FORWARD_INDEX_DISABLED = Boolean.FALSE.toString();
+  public static final String TEXT_INDEX_ENABLE_PREFIX_SUFFIX_PHRASE_QUERIES =
+      "enablePrefixSuffixMatchingInPhraseQueries";
 
   private final String _name;
   private final EncodingType _encodingType;

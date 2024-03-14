@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexC
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
+import org.apache.pinot.segment.local.utils.LuceneTextIndexUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -66,6 +67,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final DocIdTranslator _docIdTranslator;
   private final Analyzer _analyzer;
   private boolean _useANDForMultiTermQueries = false;
+  private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
 
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
     _column = column;
@@ -81,6 +83,9 @@ public class LuceneTextIndexReader implements TextIndexReader {
       }
       if (config.isUseANDForMultiTermQueries()) {
         _useANDForMultiTermQueries = true;
+      }
+      if (config.isEnablePrefixSuffixMatchingInPhraseQueries()) {
+        _enablePrefixSuffixMatchingInPhraseQueries = true;
       }
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
@@ -150,10 +155,14 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // be instantiated per query. Analyzer on the other hand is stateless
       // and can be created upfront.
       QueryParser parser = new QueryParser(_column, _analyzer);
+      parser.setAllowLeadingWildcard(true);
       if (_useANDForMultiTermQueries) {
         parser.setDefaultOperator(QueryParser.Operator.AND);
       }
       Query query = parser.parse(searchQuery);
+      if (_enablePrefixSuffixMatchingInPhraseQueries) {
+        query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
+      }
       _indexSearcher.search(query, docIDCollector);
       return docIds;
     } catch (Exception e) {
@@ -162,7 +171,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
       throw new RuntimeException(msg, e);
     }
   }
-
   /**
    * When we destroy the loaded ImmutableSegment, all the indexes
    * (for each column) are destroyed and as part of that
