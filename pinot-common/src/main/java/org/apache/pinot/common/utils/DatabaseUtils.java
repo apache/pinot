@@ -84,4 +84,13 @@ public class DatabaseUtils {
   public static String translateTableName(String tableName, HttpHeaders headers) {
     return translateTableName(tableName, headers, false);
   }
+
+  public static boolean isPartOfDatabase(String tableName, @Nullable String databaseName) {
+    // assumes tableName will not have default database prefix ('default.')
+    if (StringUtils.isEmpty(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
+      return StringUtils.split(tableName, '.').length == 1;
+    } else {
+      return tableName.startsWith(databaseName + ".");
+    }
+  }
 }
