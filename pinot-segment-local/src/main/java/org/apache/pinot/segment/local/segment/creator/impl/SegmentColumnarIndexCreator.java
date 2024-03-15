@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl;
 
-import com.google.common.annotations.VisibleForTesting;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,7 +68,6 @@ import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -315,11 +313,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
       FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-
-      if (fieldSpec.isSingleValueField()) {
-        indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
-      } else {
-        indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+      try {
+        if (fieldSpec.isSingleValueField()) {
+          indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+        } else {
+          indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+        }
+      } catch (JsonParseException jpe) {
+        throw new ColumnJsonParserException(columnName, jpe);
       }
     }
 
@@ -604,7 +605,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       Object min = columnIndexCreationInfo.getMin();
       Object max = columnIndexCreationInfo.getMax();
       if (min != null && max != null) {
-        addColumnMinMaxValueInfo(properties, column, min.toString(), max.toString(), dataType.getStoredType());
+        addColumnMinMaxValueInfo(properties, column, min, max, dataType.getStoredType());
       }
     }
 
@@ -614,72 +615,38 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       //       null value changes
       defaultNullValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(defaultNullValue);
     }
-    properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+    if (defaultNullValue != null) {
+      properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+    }
   }
 
-  public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
-      String maxValue, DataType storedType) {
-    properties.setProperty(getKeyFor(column, MIN_VALUE), getValidPropertyValue(minValue, false, storedType));
-    properties.setProperty(getKeyFor(column, MAX_VALUE), getValidPropertyValue(maxValue, true, storedType));
+  public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column,
+      @Nullable Object minValue, @Nullable Object maxValue, DataType storedType) {
+    String validMinValue = minValue != null ? getValidPropertyValue(minValue.toString(), storedType) : null;
+    if (validMinValue != null) {
+      properties.setProperty(getKeyFor(column, MIN_VALUE), validMinValue);
+    }
+    String validMaxValue = maxValue != null ? getValidPropertyValue(maxValue.toString(), storedType) : null;
+    if (validMaxValue != null) {
+      properties.setProperty(getKeyFor(column, MAX_VALUE), validMaxValue);
+    }
+    if (validMinValue == null && validMaxValue == null) {
+      properties.setProperty(getKeyFor(column, MIN_MAX_VALUE_INVALID), true);
+    }
   }
 
   /**
-   * Helper method to get the valid value for setting min/max.
+   * Helper method to get the valid value for setting min/max. Returns {@code null} if the value is too long (longer
+   * than 512 characters), or is not supported in {@link PropertiesConfiguration}, e.g. contains character with
+   * surrogate.
    */
-  private static String getValidPropertyValue(String value, boolean isMax, DataType storedType) {
-    String valueWithinLengthLimit = getValueWithinLengthLimit(value, isMax, storedType);
-    return storedType == DataType.STRING ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(
-        valueWithinLengthLimit) : valueWithinLengthLimit;
-  }
-
-  /**
-   * Returns the original string if its length is within the allowed limit. If the string's length exceeds the limit,
-   * returns a truncated version of the string with maintaining min or max value.
-   */
-  @VisibleForTesting
-  static String getValueWithinLengthLimit(String value, boolean isMax, DataType storedType) {
-    int length = value.length();
-    if (length <= METADATA_PROPERTY_LENGTH_LIMIT) {
-      return value;
+  @Nullable
+  private static String getValidPropertyValue(String value, DataType storedType) {
+    if (value.length() > METADATA_PROPERTY_LENGTH_LIMIT) {
+      return null;
     }
-    switch (storedType) {
-      case STRING:
-        if (isMax) {
-          int trimIndexValue = METADATA_PROPERTY_LENGTH_LIMIT - 1;
-          // determining the index for the character having value less than '\uFFFF'
-          while (trimIndexValue < length && value.charAt(trimIndexValue) == '\uFFFF') {
-            trimIndexValue++;
-          }
-          if (trimIndexValue == length) {
-            return value;
-          } else {
-            // assigning the '\uFFFF' to make the value max.
-            return value.substring(0, trimIndexValue) + '\uFFFF';
-          }
-        } else {
-          return value.substring(0, METADATA_PROPERTY_LENGTH_LIMIT);
-        }
-      case BYTES:
-        if (isMax) {
-          byte[] valueInByteArray = BytesUtils.toBytes(value);
-          int trimIndexValue = METADATA_PROPERTY_LENGTH_LIMIT / 2 - 1;
-          // determining the index for the byte having value less than 0xFF
-          while (trimIndexValue < valueInByteArray.length && valueInByteArray[trimIndexValue] == (byte) 0xFF) {
-            trimIndexValue++;
-          }
-          if (trimIndexValue == valueInByteArray.length) {
-            return value;
-          } else {
-            byte[] shortByteValue = Arrays.copyOf(valueInByteArray, trimIndexValue + 1);
-            shortByteValue[trimIndexValue] = (byte) 0xFF; // assigning the 0xFF to make the value max.
-            return BytesUtils.toHexString(shortByteValue);
-          }
-        } else {
-          return BytesUtils.toHexString(Arrays.copyOf(BytesUtils.toBytes(value), (METADATA_PROPERTY_LENGTH_LIMIT / 2)));
-        }
-      default:
-        throw new IllegalStateException("Unsupported stored type for property value length reduction: " + storedType);
-    }
+    return storedType == DataType.STRING ? CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(value)
+        : value;
   }
 
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {

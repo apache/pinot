@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -71,13 +72,14 @@ import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
+import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -198,6 +200,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
     ServiceStartableUtils.applyClusterConfig(_config, _helixZkURL, _helixClusterName, ServiceRole.CONTROLLER);
+
+    PinotInsecureMode.setPinotInInsecureMode(
+        Boolean.valueOf(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
+            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
 
     setupHelixSystemProperties();
     HelixHelper.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
@@ -486,6 +492,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
     // register all the controller objects for injection to jersey resources
+    Instant controllerStartTime = Instant.now();
     _adminApp.registerBinder(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -506,6 +513,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(_pinotLLCRealtimeSegmentManager).to(PinotLLCRealtimeSegmentManager.class);
         bind(_tenantRebalancer).to(TenantRebalancer.class);
+        bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
           bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);

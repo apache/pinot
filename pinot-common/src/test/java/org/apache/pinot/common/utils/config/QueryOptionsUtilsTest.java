@@ -21,6 +21,8 @@ package org.apache.pinot.common.utils.config;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -42,5 +44,25 @@ public class QueryOptionsUtilsTest {
     // Then:
     Assert.assertEquals(resolved.get(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING), "true");
     Assert.assertEquals(resolved.get(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE), "false");
+  }
+
+  @Test
+  public void testSkipIndexesParsing() {
+    String skipIndexesStr = "col1=inverted,range&col2=sorted";
+    Map<String, String> queryOptions =
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.SKIP_INDEXES, skipIndexesStr);
+    Map<String, Set<FieldConfig.IndexType>> skipIndexes = QueryOptionsUtils.getSkipIndexes(queryOptions);
+    Assert.assertEquals(skipIndexes.get("col1"),
+        Set.of(FieldConfig.IndexType.RANGE, FieldConfig.IndexType.INVERTED));
+    Assert.assertEquals(skipIndexes.get("col2"),
+        Set.of(FieldConfig.IndexType.SORTED));
+  }
+
+  @Test(expectedExceptions = RuntimeException.class)
+  public void testSkipIndexesParsingInvalid() {
+    String skipIndexesStr = "col1=inverted,range&col2";
+    Map<String, String> queryOptions =
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.SKIP_INDEXES, skipIndexesStr);
+     QueryOptionsUtils.getSkipIndexes(queryOptions);
   }
 }

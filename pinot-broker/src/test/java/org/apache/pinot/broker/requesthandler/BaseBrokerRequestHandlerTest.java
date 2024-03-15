@@ -28,6 +28,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
@@ -48,7 +50,6 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.util.TestUtils;
@@ -91,6 +92,12 @@ public class BaseBrokerRequestHandlerTest {
     String actualColumnName =
         BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable.student_name", columnNameMap, false);
     Assert.assertEquals(actualColumnName, "student_name");
+    Assert.assertEquals(
+        BaseBrokerRequestHandler.getActualColumnName("db1.mytable", "db1.mytable.student_name", columnNameMap, false),
+        "student_name");
+    Assert.assertEquals(
+        BaseBrokerRequestHandler.getActualColumnName("db1.mytable", "mytable.student_name", columnNameMap, false),
+        "student_name");
     boolean exceptionThrown = false;
     try {
       BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable2.student_name", columnNameMap, false);
@@ -125,6 +132,12 @@ public class BaseBrokerRequestHandlerTest {
     String actualColumnName =
         BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE.student_name", columnNameMap, true);
     Assert.assertEquals(actualColumnName, "student_name");
+    Assert.assertEquals(
+        BaseBrokerRequestHandler.getActualColumnName("db1.MYTABLE", "DB1.mytable.student_name", columnNameMap, true),
+        "student_name");
+    Assert.assertEquals(
+        BaseBrokerRequestHandler.getActualColumnName("db1.mytable", "MYTABLE.student_name", columnNameMap, true),
+        "student_name");
     boolean exceptionThrown = false;
     try {
       BaseBrokerRequestHandler.getActualColumnName("student", "MYTABLE2.student_name", columnNameMap, true);
@@ -145,46 +158,6 @@ public class BaseBrokerRequestHandlerTest {
   }
 
   @Test
-  public void testGetActualTableNameBanningDots() {
-    // not allowing dots
-    PinotConfiguration configuration = new PinotConfiguration();
-    configuration.setProperty(CommonConstants.Helix.ALLOW_TABLE_NAME_WITH_DATABASE, false);
-
-    TableCache tableCache = Mockito.mock(TableCache.class);
-    when(tableCache.isIgnoreCase()).thenReturn(true);
-    when(tableCache.getActualTableName("mytable")).thenReturn("mytable");
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("mytable", tableCache), "mytable");
-    when(tableCache.getActualTableName("db.mytable")).thenReturn(null);
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "mytable");
-
-    when(tableCache.isIgnoreCase()).thenReturn(false);
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "mytable");
-  }
-
-  @Test
-  public void testGetActualTableNameAllowingDots() {
-
-    TableCache tableCache = Mockito.mock(TableCache.class);
-    when(tableCache.isIgnoreCase()).thenReturn(true);
-    // the tableCache should have only "db.mytable" in it since this is the only table
-    when(tableCache.getActualTableName("mytable")).thenReturn(null);
-    when(tableCache.getActualTableName("db.mytable")).thenReturn("db.mytable");
-    when(tableCache.getActualTableName("other.mytable")).thenReturn(null);
-    when(tableCache.getActualTableName("test_table")).thenReturn(null);
-
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("test_table", tableCache), "test_table");
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("mytable", tableCache), "mytable");
-
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "db.mytable");
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("other.mytable", tableCache), "other.mytable");
-
-    when(tableCache.isIgnoreCase()).thenReturn(false);
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.mytable", tableCache), "db.mytable");
-    Assert.assertEquals(BaseBrokerRequestHandler.getActualTableName("db.namespace.mytable", tableCache),
-        "db.namespace.mytable");
-  }
-
-  @Test
   public void testCancelQuery()
       throws Exception {
     String tableName = "myTable_OFFLINE";
@@ -192,6 +165,9 @@ public class BaseBrokerRequestHandlerTest {
     TableCache tableCache = mock(TableCache.class);
     TableConfig tableCfg = mock(TableConfig.class);
     when(tableCache.getActualTableName(anyString())).thenReturn(tableName);
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(headers.getHeaderString(anyString())).thenReturn(null);
     TenantConfig tenant = new TenantConfig("tier_BROKER", "tier_SERVER", null);
     when(tableCfg.getTenantConfig()).thenReturn(tenant);
     when(tableCache.getTableConfig(anyString())).thenReturn(tableCfg);
@@ -239,7 +215,7 @@ public class BaseBrokerRequestHandlerTest {
         JsonNode request = JsonUtils.stringToJsonNode(
             String.format("{\"sql\":\"select * from %s limit 10\",\"queryOptions\":\"timeoutMs=10000\"}", tableName));
         RequestContext requestStats = Tracing.getTracer().createRequestScope();
-        requestHandler.handleRequest(request, null, requestStats, null);
+        requestHandler.handleRequest(request, null, requestStats, headers);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

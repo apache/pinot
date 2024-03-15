@@ -63,6 +63,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -166,7 +167,8 @@ public class PinotRunningQueryResource {
       @ApiParam(value = "Timeout for brokers to return running queries") @QueryParam("timeoutMs") @DefaultValue("3000")
           int timeoutMs, @Context HttpHeaders httpHeaders) {
     try {
-      Map<String, List<InstanceInfo>> tableBrokers = _pinotHelixResourceManager.getTableToLiveBrokersMapping();
+      Map<String, List<InstanceInfo>> tableBrokers = _pinotHelixResourceManager.getTableToLiveBrokersMapping(
+          httpHeaders.getHeaderString(CommonConstants.DATABASE));
       Map<String, InstanceInfo> brokers = new HashMap<>();
       tableBrokers.values().forEach(list -> list.forEach(info -> brokers.putIfAbsent(getInstanceKey(info), info)));
       return getRunningQueries(brokers, timeoutMs, createRequestHeaders(httpHeaders));
@@ -187,7 +189,7 @@ public class PinotRunningQueryResource {
     }
     LOGGER.debug("Getting running queries via broker urls: {}", brokerUrls);
     CompletionService<MultiHttpRequestResponse> completionService =
-        new MultiHttpRequest(_executor, _httpConnMgr).execute(brokerUrls, requestHeaders, timeoutMs);
+        new MultiHttpRequest(_executor, _httpConnMgr).executeGet(brokerUrls, requestHeaders, timeoutMs);
     Map<String, Map<String, String>> queriesByBroker = new HashMap<>();
     List<String> errMsgs = new ArrayList<>(brokerUrls.size());
     for (int i = 0; i < brokerUrls.size(); i++) {

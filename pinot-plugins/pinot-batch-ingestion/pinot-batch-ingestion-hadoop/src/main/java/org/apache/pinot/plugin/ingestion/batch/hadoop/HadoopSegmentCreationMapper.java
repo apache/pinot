@@ -108,7 +108,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
   protected void map(LongWritable key, Text value, Context context) {
     try {
       String[] splits = StringUtils.split(value.toString(), ' ');
-      Preconditions.checkState(splits.length == 2, "Illegal input value: {}", value);
+      Preconditions.checkState(splits.length == 2, "Illegal input value: %s", value);
 
       String path = splits[0];
       int idx = Integer.valueOf(splits[1]);

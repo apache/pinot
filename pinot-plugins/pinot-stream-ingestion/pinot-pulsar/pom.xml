@@ -26,7 +26,7 @@
   <parent>
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
 
@@ -38,34 +38,21 @@
     <phase.prop>package</phase.prop>
     <pinot.root>${basedir}/../../..</pinot.root>
     <pulsar.version>2.11.0</pulsar.version>
-    <jetty-server.version>9.4.51.v20230217</jetty-server.version>
     <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
     <jersey-container-grizzly2-http.version>2.39</jersey-container-grizzly2-http.version>
     <simpleclient_common.version>0.16.0</simpleclient_common.version>
     <grpc-proto.version>2.29.0</grpc-proto.version>
-    <grpc-context.version>1.59.0</grpc-context.version>
+    <grpc-context.version>1.60.1</grpc-context.version>
     <bouncycastle.version>1.75</bouncycastle.version>
     <caffeine.version>2.6.2</caffeine.version>
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
     <commons-collections.version>4.4</commons-collections.version>
     <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
-    <okio.version>1.6.0</okio.version>
   </properties>
 
   <dependencies>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-server</artifactId>
-      <version>${jetty-server.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>javax.servlet-api</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>pulsar</artifactId>
@@ -141,7 +128,6 @@
     <dependency>
       <groupId>com.google.api.grpc</groupId>
       <artifactId>proto-google-common-protos</artifactId>
-      <version>${grpc-proto.version}</version>
     </dependency>
     <dependency>
       <groupId>io.grpc</groupId>
@@ -153,24 +139,21 @@
       <artifactId>commons-codec</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.google.errorprone</groupId>
-      <artifactId>error_prone_annotations</artifactId>
-      <version>2.23.0</version>
-    </dependency>
-    <dependency>
       <groupId>io.prometheus</groupId>
       <artifactId>simpleclient</artifactId>
       <version>${simpleclient_common.version}</version>
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-server</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-servlet</artifactId>
-      <version>${jetty-server.version}</version>
     </dependency>
     <dependency>
       <groupId>com.squareup.okio</groupId>
       <artifactId>okio</artifactId>
-      <version>${okio.version}</version>
     </dependency>
     <dependency>
       <groupId>io.prometheus</groupId>
@@ -182,10 +165,6 @@
       <artifactId>grpc-protobuf-lite</artifactId>
       <version>${grpc-protobuf-lite.version}</version>
       <exclusions>
-        <exclusion>
-          <groupId>com.google.errorprone</groupId>
-          <artifactId>error_prone_annotations</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>io.grpc</groupId>
           <artifactId>grpc-context</artifactId>

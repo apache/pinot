@@ -20,9 +20,7 @@ package org.apache.pinot.query.service.server;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
-import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -33,9 +31,11 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
+import org.apache.pinot.query.routing.StageMetadata;
+import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
-import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
-import org.apache.pinot.query.runtime.plan.serde.QueryPlanSerDeUtils;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -97,42 +97,72 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   @Override
   public void submit(Worker.QueryRequest request, StreamObserver<Worker.QueryResponse> responseObserver) {
-    // Deserialize the request
-    List<DistributedStagePlan> distributedStagePlans;
     Map<String, String> requestMetadata;
-    requestMetadata = Collections.unmodifiableMap(request.getMetadataMap());
+    try {
+      requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(request.getMetadata());
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while deserializing request metadata", e);
+      responseObserver.onNext(Worker.QueryResponse.newBuilder()
+          .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
+              QueryException.getTruncatedStackTrace(e)).build());
+      responseObserver.onCompleted();
+      return;
+    }
     long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
-    // 1. Deserialized request
-    try {
-      distributedStagePlans = QueryPlanSerDeUtils.deserializeStagePlan(request);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while deserializing the request: {}", requestId, e);
-      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription("Bad request").withCause(e).asException());
-      return;
+
+    List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
+    int numStages = protoStagePlans.size();
+    CompletableFuture<?>[] stageSubmissionStubs = new CompletableFuture[numStages];
+    for (int i = 0; i < numStages; i++) {
+      Worker.StagePlan protoStagePlan = protoStagePlans.get(i);
+      stageSubmissionStubs[i] = CompletableFuture.runAsync(() -> {
+        StagePlan stagePlan;
+        try {
+          stagePlan = QueryPlanSerDeUtils.fromProtoStagePlan(protoStagePlan);
+        } catch (Exception e) {
+          throw new RuntimeException(
+              String.format("Caught exception while deserializing stage plan for request: %d, stage: %d", requestId,
+                  protoStagePlan.getStageMetadata().getStageId()), e);
+        }
+        StageMetadata stageMetadata = stagePlan.getStageMetadata();
+        List<WorkerMetadata> workerMetadataList = stageMetadata.getWorkerMetadataList();
+        int numWorkers = workerMetadataList.size();
+        CompletableFuture<?>[] workerSubmissionStubs = new CompletableFuture[numWorkers];
+        for (int j = 0; j < numWorkers; j++) {
+          WorkerMetadata workerMetadata = workerMetadataList.get(j);
+          workerSubmissionStubs[j] =
+              CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata),
+                  _querySubmissionExecutorService);
+        }
+        try {
+          CompletableFuture.allOf(workerSubmissionStubs)
+              .get(deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+          throw new RuntimeException(
+              String.format("Caught exception while submitting request: %d, stage: %d", requestId,
+                  stageMetadata.getStageId()), e);
+        } finally {
+          for (CompletableFuture<?> future : workerSubmissionStubs) {
+            if (!future.isDone()) {
+              future.cancel(true);
+            }
+          }
+        }
+      }, _querySubmissionExecutorService);
     }
-    // 2. Submit distributed stage plans, await response successful or any failure which cancels all other tasks.
-    int numSubmission = distributedStagePlans.size();
-    CompletableFuture<?>[] submissionStubs = new CompletableFuture[numSubmission];
-    for (int i = 0; i < numSubmission; i++) {
-      DistributedStagePlan distributedStagePlan = distributedStagePlans.get(i);
-      submissionStubs[i] =
-          CompletableFuture.runAsync(() -> _queryRunner.processQuery(distributedStagePlan, requestMetadata),
-              _querySubmissionExecutorService);
-    }
     try {
-      CompletableFuture.allOf(submissionStubs).get(deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      CompletableFuture.allOf(stageSubmissionStubs).get(deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     } catch (Exception e) {
-      LOGGER.error("error occurred during stage submission for {}:\n{}", requestId, e);
+      LOGGER.error("Caught exception while submitting request: {}", requestId, e);
       responseObserver.onNext(Worker.QueryResponse.newBuilder()
           .putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR,
               QueryException.getTruncatedStackTrace(e)).build());
       responseObserver.onCompleted();
       return;
     } finally {
-      // Cancel all ongoing submission
-      for (CompletableFuture<?> future : submissionStubs) {
+      for (CompletableFuture<?> future : stageSubmissionStubs) {
         if (!future.isDone()) {
           future.cancel(true);
         }

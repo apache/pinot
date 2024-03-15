@@ -54,7 +54,7 @@ public class DistinctCountHLLPlusValueAggregator implements ValueAggregator<Obje
 
   @Override
   public AggregationFunctionType getAggregationType() {
-    return AggregationFunctionType.DISTINCTCOUNTHLL;
+    return AggregationFunctionType.DISTINCTCOUNTHLLPLUS;
   }
 
   @Override

@@ -24,10 +24,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.query.mailbox.MailboxIdUtils;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
-import org.apache.pinot.query.routing.MailboxMetadata;
+import org.apache.pinot.query.planner.physical.MailboxIdUtils;
+import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
 import org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer;
@@ -47,7 +47,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
-  private final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
+  protected final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
 
   public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       int senderStageId) {
@@ -58,11 +58,11 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     _exchangeType = exchangeType;
 
     long requestId = context.getRequestId();
-    int workerId = context.getServer().workerId();
-    MailboxMetadata mailboxMetadata =
-        context.getStageMetadata().getWorkerMetadataList().get(workerId).getMailBoxInfosMap().get(senderStageId);
-    if (mailboxMetadata != null && !mailboxMetadata.getMailBoxIdList().isEmpty()) {
-      _mailboxIds = MailboxIdUtils.toMailboxIds(requestId, mailboxMetadata);
+    MailboxInfos mailboxInfos = context.getWorkerMetadata().getMailboxInfosMap().get(senderStageId);
+    if (mailboxInfos != null) {
+      _mailboxIds =
+          MailboxIdUtils.toMailboxIds(requestId, senderStageId, mailboxInfos.getMailboxInfos(), context.getStageId(),
+              context.getWorkerId());
     } else {
       _mailboxIds = Collections.emptyList();
     }
@@ -71,14 +71,6 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         .collect(Collectors.toList());
     _multiConsumer =
         new BlockingMultiStreamConsumer.OfTransferableBlock(context.getId(), context.getDeadlineMs(), asyncStreams);
-  }
-
-  protected BlockingMultiStreamConsumer.OfTransferableBlock getMultiConsumer() {
-    return _multiConsumer;
-  }
-
-  public List<String> getMailboxIds() {
-    return _mailboxIds;
   }
 
   @Override

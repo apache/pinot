@@ -18,118 +18,31 @@
  */
 package org.apache.pinot.plugin.minion.tasks.upsertcompaction;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.File;
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Set;
-import javax.annotation.Nullable;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
-import org.apache.http.client.utils.URIBuilder;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.data.readers.RecordReaderConfig;
-import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
-import org.roaringbitmap.PeekableIntIterator;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactionTaskExecutor.class);
-  private static HelixManager _helixManager = MINION_CONTEXT.getHelixManager();
-  private static HelixAdmin _clusterManagementTool = _helixManager.getClusterManagmentTool();
-  private static String _clusterName = _helixManager.getClusterName();
-
-  private class CompactedRecordReader implements RecordReader {
-    private final PinotSegmentRecordReader _pinotSegmentRecordReader;
-    private final PeekableIntIterator _validDocIdsIterator;
-    // Reusable generic row to store the next row to return
-    GenericRow _nextRow = new GenericRow();
-    // Flag to mark whether we need to fetch another row
-    boolean _nextRowReturned = true;
-
-    CompactedRecordReader(File indexDir, ImmutableRoaringBitmap validDocIds) {
-      _pinotSegmentRecordReader = new PinotSegmentRecordReader();
-      _pinotSegmentRecordReader.init(indexDir, null, null);
-      _validDocIdsIterator = validDocIds.getIntIterator();
-    }
-
-    @Override
-    public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
-    }
-
-    @Override
-    public boolean hasNext() {
-      if (!_validDocIdsIterator.hasNext() && _nextRowReturned) {
-        return false;
-      }
-
-      // If next row has not been returned, return true
-      if (!_nextRowReturned) {
-        return true;
-      }
-
-      // Try to get the next row to return
-      if (_validDocIdsIterator.hasNext()) {
-        int docId = _validDocIdsIterator.next();
-        _nextRow.clear();
-        _pinotSegmentRecordReader.getRecord(docId, _nextRow);
-        _nextRowReturned = false;
-        return true;
-      }
-
-      // Cannot find next row to return, return false
-      return false;
-    }
-
-    @Override
-    public GenericRow next() {
-      return next(new GenericRow());
-    }
-
-    @Override
-    public GenericRow next(GenericRow reuse) {
-      Preconditions.checkState(!_nextRowReturned);
-      reuse.init(_nextRow);
-      _nextRowReturned = true;
-      return reuse;
-    }
-
-    @Override
-    public void rewind() {
-      _pinotSegmentRecordReader.rewind();
-      _nextRowReturned = true;
-    }
-
-    @Override
-    public void close()
-        throws IOException {
-      _pinotSegmentRecordReader.close();
-    }
-  }
 
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
@@ -143,7 +56,33 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     TableConfig tableConfig = getTableConfig(tableNameWithType);
-    ImmutableRoaringBitmap validDocIds = getValidDocIds(tableNameWithType, configs);
+
+    String validDocIdsTypeStr =
+        configs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
+    ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
+    ValidDocIdsBitmapResponse validDocIdsBitmapResponse =
+        MinionTaskUtils.getValidDocIdsBitmap(tableNameWithType, segmentName, validDocIdsType.toString(),
+            MINION_CONTEXT);
+
+    // Check crc from the downloaded segment against the crc returned from the server along with the valid doc id
+    // bitmap. If this doesn't match, this means that we are hitting the race condition where the segment has been
+    // uploaded successfully while the server is still reloading the segment. Reloading can take a while when the
+    // offheap upsert is used because we will need to delete & add all primary keys.
+    // `BaseSingleSegmentConversionExecutor.executeTask()` already checks for the crc from the task generator
+    // against the crc from the current segment zk metadata, so we don't need to check that here.
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    String originalSegmentCrcFromTaskGenerator = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
+    String crcFromDeepStorageSegment = segmentMetadata.getCrc();
+    String crcFromValidDocIdsBitmap = validDocIdsBitmapResponse.getSegmentCrc();
+    if (!originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)
+        || !originalSegmentCrcFromTaskGenerator.equals(crcFromValidDocIdsBitmap)) {
+      LOGGER.warn("CRC mismatch for segment: {}, expected: {}, actual crc from server: {}", segmentName,
+          crcFromDeepStorageSegment, validDocIdsBitmapResponse.getSegmentCrc());
+      return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
+          .build();
+    }
+
+    RoaringBitmap validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
 
     if (validDocIds.isEmpty()) {
       // prevents empty segment generation
@@ -158,8 +97,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
           .build();
     }
 
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    try (CompactedRecordReader compactedRecordReader = new CompactedRecordReader(indexDir, validDocIds)) {
+    try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(indexDir,
+        validDocIds)) {
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName);
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, compactedRecordReader);
@@ -196,46 +135,6 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
     }
     return config;
-  }
-
-  // TODO: Consider moving this method to a more appropriate class (eg ServerSegmentMetadataReader)
-  private static ImmutableRoaringBitmap getValidDocIds(String tableNameWithType, Map<String, String> configs)
-      throws URISyntaxException {
-    String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
-    String server = getServer(segmentName, tableNameWithType);
-
-    // get the url for the validDocIds for the server
-    InstanceConfig instanceConfig = _clusterManagementTool.getInstanceConfig(_clusterName, server);
-    String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
-    String url =
-        new URIBuilder(endpoint).setPath(String.format("/segments/%s/%s/validDocIds", tableNameWithType, segmentName))
-            .toString();
-
-    // get the validDocIds from that server
-    Response response = ClientBuilder.newClient().target(url).request().get(Response.class);
-    Preconditions.checkState(response.getStatus() == Response.Status.OK.getStatusCode(),
-        "Unable to retrieve validDocIds from %s", url);
-    byte[] snapshot = response.readEntity(byte[].class);
-    ImmutableRoaringBitmap validDocIds = new ImmutableRoaringBitmap(ByteBuffer.wrap(snapshot));
-    return validDocIds;
-  }
-
-  @VisibleForTesting
-  public static String getServer(String segmentName, String tableNameWithType) {
-    ExternalView externalView = _clusterManagementTool.getResourceExternalView(_clusterName, tableNameWithType);
-    if (externalView == null) {
-      throw new IllegalStateException("External view does not exist for table: " + tableNameWithType);
-    }
-    Map<String, String> instanceStateMap = externalView.getStateMap(segmentName);
-    if (instanceStateMap == null) {
-      throw new IllegalStateException("Failed to find segment: " + segmentName);
-    }
-    for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
-      if (entry.getValue().equals(SegmentStateModel.ONLINE)) {
-        return entry.getKey();
-      }
-    }
-    throw new IllegalStateException("Failed to find ONLINE server for segment: " + segmentName);
   }
 
   @Override

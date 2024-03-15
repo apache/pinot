@@ -50,7 +50,8 @@ public enum ServerTimer implements AbstractMetrics.Timer {
       + "activities cpu time + response serialization cpu time) for query processing on server."),
 
   UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS("milliseconds", false,
-      "Total time taken to delete expired primary keys based on metadataTTL or deletedKeysTTL");
+      "Total time taken to delete expired primary keys based on metadataTTL or deletedKeysTTL"),
+  UPSERT_SNAPSHOT_TIME_MS("milliseconds", false, "Total time taken to take upsert table snapshot");
 
   private final String _timerName;
   private final boolean _global;

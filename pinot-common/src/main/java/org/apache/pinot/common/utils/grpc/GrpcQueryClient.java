@@ -22,18 +22,22 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
+import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslContextBuilder;
 import io.grpc.netty.shaded.io.netty.handler.ssl.SslProvider;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
-import javax.net.ssl.TrustManagerFactory;
+import nl.altindag.ssl.SSLFactory;
 import org.apache.pinot.common.config.GrpcConfig;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.PinotQueryServerGrpc;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +45,10 @@ import org.slf4j.LoggerFactory;
 public class GrpcQueryClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(GrpcQueryClient.class);
   private static final int DEFAULT_CHANNEL_SHUTDOWN_TIMEOUT_SECOND = 10;
+  // the key is the hashCode of the TlsConfig, the value is the SslContext
+  // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
+  // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
+  private static final Map<Integer, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private final ManagedChannel _managedChannel;
   private final PinotQueryServerGrpc.PinotQueryServerBlockingStub _blockingStub;
@@ -55,30 +63,35 @@ public class GrpcQueryClient {
           ManagedChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
               .usePlaintext().build();
     } else {
+      _managedChannel =
+          NettyChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
+              .sslContext(buildSslContext(config.getTlsConfig())).build();
+    }
+    _blockingStub = PinotQueryServerGrpc.newBlockingStub(_managedChannel);
+  }
+
+  private SslContext buildSslContext(TlsConfig tlsConfig) {
+    LOGGER.info("Building gRPC SSL context");
+    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
       try {
+        SSLFactory sslFactory =
+            RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
+                tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
         SslContextBuilder sslContextBuilder = SslContextBuilder.forClient();
-        if (config.getTlsConfig().getKeyStorePath() != null) {
-          KeyManagerFactory keyManagerFactory = TlsUtils.createKeyManagerFactory(config.getTlsConfig());
-          sslContextBuilder.keyManager(keyManagerFactory);
-        }
-        if (config.getTlsConfig().getTrustStorePath() != null) {
-          TrustManagerFactory trustManagerFactory = TlsUtils.createTrustManagerFactory(config.getTlsConfig());
-          sslContextBuilder.trustManager(trustManagerFactory);
-        }
-        if (config.getTlsConfig().getSslProvider() != null) {
+        sslFactory.getKeyManagerFactory().ifPresent(sslContextBuilder::keyManager);
+        sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
+        if (tlsConfig.getSslProvider() != null) {
           sslContextBuilder =
-              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(config.getTlsConfig().getSslProvider()));
+              GrpcSslContexts.configure(sslContextBuilder, SslProvider.valueOf(tlsConfig.getSslProvider()));
         } else {
           sslContextBuilder = GrpcSslContexts.configure(sslContextBuilder);
         }
-        _managedChannel =
-            NettyChannelBuilder.forAddress(host, port).maxInboundMessageSize(config.getMaxInboundMessageSizeBytes())
-                .sslContext(sslContextBuilder.build()).build();
+        return sslContextBuilder.build();
       } catch (SSLException e) {
-        throw new RuntimeException("Failed to create Netty gRPC channel with SSL Context", e);
+        throw new RuntimeException("Failed to build gRPC SSL context", e);
       }
-    }
-    _blockingStub = PinotQueryServerGrpc.newBlockingStub(_managedChannel);
+    });
+    return sslContext;
   }
 
   public Iterator<Server.ServerResponse> submit(Server.ServerRequest request) {

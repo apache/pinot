@@ -48,6 +48,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -62,6 +63,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.debug.TableDebugInfo;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -128,8 +130,10 @@ public class DebugResource {
   public String getTableDebugInfo(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Verbosity of debug information") @DefaultValue("0") @QueryParam("verbosity") int verbosity)
+      @ApiParam(value = "Verbosity of debug information") @DefaultValue("0") @QueryParam("verbosity") int verbosity,
+      @Context HttpHeaders headers)
       throws JsonProcessingException {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     ObjectNode root = JsonUtils.newObjectNode();
     root.put("clusterName", _pinotHelixResourceManager.getHelixClusterName());
 
@@ -159,8 +163,10 @@ public class DebugResource {
   public TableDebugInfo.SegmentDebugInfo getSegmentDebugInfo(
       @ApiParam(value = "Name of the table (with type)", required = true) @PathParam("tableName")
           String tableNameWithType,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName)
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @Context HttpHeaders headers)
       throws Exception {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     return debugSegment(tableNameWithType, segmentName);
   }
 

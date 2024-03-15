@@ -32,9 +32,11 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -67,7 +69,9 @@ public class PinotTableSchema {
       @ApiResponse(code = 404, message = "Table not found")
   })
   public String getTableSchema(
-      @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
     if (schema != null) {
       return schema.toPrettyJsonString();

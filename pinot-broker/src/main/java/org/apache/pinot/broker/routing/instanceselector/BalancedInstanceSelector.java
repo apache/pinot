@@ -31,7 +31,6 @@ import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSele
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.HashUtil;
 
-
 /**
  * Instance selector to balance the number of segments served by each selected server instance.
  * <p>If AdaptiveServerSelection is enabled, the request is routed to the best available server for a segment
@@ -50,8 +49,9 @@ import org.apache.pinot.common.utils.HashUtil;
 public class BalancedInstanceSelector extends BaseInstanceSelector {
 
   public BalancedInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock);
+      BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
+      boolean useFixedReplica) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useFixedReplica);
   }
 
   @Override
@@ -89,7 +89,13 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
         if (candidates == null) {
           continue;
         }
-        int selectedIdx = requestId++ % candidates.size();
+        int selectedIdx;
+        if (isUseFixedReplica(queryOptions)) {
+          // candidates array is always sorted
+          selectedIdx = _tableNameHashForFixedReplicaRouting % candidates.size();
+        } else {
+          selectedIdx = requestId++ % candidates.size();
+        }
         SegmentInstanceCandidate selectedCandidate = candidates.get(selectedIdx);
         // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
         // broker or server can skip it upon any issue to process it.

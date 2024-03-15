@@ -40,6 +40,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // ideal state
   PERCENT_SEGMENTS_AVAILABLE("segments", false),
 
+  // Number of segments running with less than expected replicas in external view
+  SEGMENTS_WITH_LESS_REPLICAS("segments", false),
+
   SEGMENT_COUNT("SegmentCount", false),
 
   // Number of segments including the replaced segments which are specified in the segment lineage entries and cannot
@@ -51,6 +54,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   REALTIME_TABLE_COUNT("TableCount", true),
   OFFLINE_TABLE_COUNT("TableCount", true),
   DISABLED_TABLE_COUNT("TableCount", true),
+  UPSERT_TABLE_COUNT("TableCount", true),
   PERIODIC_TASK_NUM_TABLES_PROCESSED("PeriodicTaskNumTablesProcessed", true),
   TIME_MS_SINCE_LAST_MINION_TASK_METADATA_UPDATE("TimeMsSinceLastMinionTaskMetadataUpdate", false),
   TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION("TimeMsSinceLastSuccessfulMinionTaskGeneration", false),
@@ -153,7 +157,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   TABLE_CONSUMPTION_PAUSED("tableConsumptionPaused", false),
 
-  TABLE_DISABLED("tableDisabled", false);
+  TABLE_DISABLED("tableDisabled", false),
+
+  TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false);
 
   private final String _gaugeName;
   private final String _unit;

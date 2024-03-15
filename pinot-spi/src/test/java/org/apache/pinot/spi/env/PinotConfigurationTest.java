@@ -83,7 +83,7 @@ public class PinotConfigurationTest {
     properties.put("property.3.key", "val1");
     properties.put("property.4.key", "val1");
 
-    PinotConfiguration pinotConfiguration = new PinotConfiguration(properties);
+    PinotConfiguration pinotConfiguration = new PinotConfiguration(properties, new HashMap<>());
 
     List<String> keys = pinotConfiguration.getKeys();
     Assert.assertTrue(keys.contains("property.1.key"));
@@ -133,10 +133,7 @@ public class PinotConfigurationTest {
 
     baseProperties.put("controller.host", "cli-argument-controller-host");
     baseProperties.put("config.paths", "classpath:/pinot-configuration-1.properties");
-    mockedEnvironmentVariables.put("PINOT_CONTROLLER_HOST", "env-var-controller-host");
-    mockedEnvironmentVariables.put("PINOT_CONTROLLER_PORT", "env-var-controller-port");
-    mockedEnvironmentVariables.put("PINOT_RELAXEDPROPERTY_TEST", "true");
-    mockedEnvironmentVariables.put("PINOT_CONFIG_PATHS", configFile2 + "," + configFile3);
+    mockedEnvironmentVariables.put("CONFIG_PATHS", configFile2 + "," + configFile3);
 
     copyClasspathResource("/pinot-configuration-2.properties", configFile2);
     copyClasspathResource("/pinot-configuration-3.properties", configFile3);
@@ -145,9 +142,6 @@ public class PinotConfigurationTest {
 
     // Tests that cli arguments have the highest priority.
     Assert.assertEquals(configuration.getProperty("controller.host"), "cli-argument-controller-host");
-
-    // Tests that environment variable have priority overs config.paths properties.
-    Assert.assertEquals(configuration.getProperty("controller.port"), "env-var-controller-port");
 
     // Tests that config.paths properties provided through cli arguments are prioritized.
     Assert.assertEquals(configuration.getProperty("controller.cluster-name"), "config-path-1-cluster-name");
@@ -162,9 +156,35 @@ public class PinotConfigurationTest {
     // Tests properties provided through the last config file of a config.paths array.
     Assert.assertEquals(configuration.getProperty("controller.config-paths-multi-value-test-2"),
         "config-path-3-config-paths-multi-value-test-2");
+  }
 
-    // Tests relaxed binding on environment variables
-    Assert.assertEquals(configuration.getProperty("relaxed-property.test"), "true");
+  @Test
+  public void assertDynamicEnvConfig()
+      throws IOException {
+    Map<String, Object> baseProperties = new HashMap<>();
+    Map<String, String> mockedEnvironmentVariables = new HashMap<>();
+
+    String configFile = File.createTempFile("pinot-configuration-test-4", ".properties").getAbsolutePath();
+
+    baseProperties.put("server.host", "ENV_SERVER_HOST");
+    baseProperties.put("not.templated.cli", "static-value");
+    baseProperties.put("dynamic.env.config", "server.host");
+
+    mockedEnvironmentVariables.put("ENV_VAR_HOST", "test-host");
+    mockedEnvironmentVariables.put("TEST_PROPERTY", "test-property");
+    mockedEnvironmentVariables.put("ENV_SERVER_HOST", "test-server-host");
+
+    baseProperties.put("config.paths", "classpath:/pinot-configuration-4.properties");
+    copyClasspathResource("/pinot-configuration-4.properties", configFile);
+
+    PinotConfiguration configuration = new PinotConfiguration(baseProperties, mockedEnvironmentVariables);
+
+    // Tests that cli arguments have the highest priority.
+    Assert.assertEquals(configuration.getProperty("server.host"), "test-server-host");
+    // Checking for non templated values
+    Assert.assertEquals(configuration.getProperty("not.templated.cli"), "static-value");
+    // Templated values in configFile
+    Assert.assertEquals(configuration.getProperty("pinot.controller.host"), "test-host");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -180,8 +200,8 @@ public class PinotConfigurationTest {
   public void assertPropertiesFromBaseConfiguration()
       throws ConfigurationException {
     PropertiesConfiguration propertiesConfiguration = CommonsConfigurationUtils.fromPath(
-        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile(),
-        true, true);
+        PropertiesConfiguration.class.getClassLoader().getResource("pinot-configuration-1.properties").getFile(), true,
+        true);
 
     PinotConfiguration config = new PinotConfiguration(propertiesConfiguration);
 

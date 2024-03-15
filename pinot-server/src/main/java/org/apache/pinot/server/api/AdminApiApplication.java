@@ -24,6 +24,7 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.UnknownHostException;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -53,18 +54,25 @@ import org.slf4j.LoggerFactory;
 public class AdminApiApplication extends ResourceConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AdminApiApplication.class);
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
-  public static final String RESOURCE_PACKAGE = "org.apache.pinot.server.api.resources";
   public static final String SERVER_INSTANCE_ID = "serverInstanceId";
+
+  public static final String START_TIME = "serverStartTime";
 
   private final AtomicBoolean _shutDownInProgress = new AtomicBoolean();
   private final ServerInstance _serverInstance;
   private HttpServer _httpServer;
+  private final String _adminApiResourcePackages;
+
 
   public AdminApiApplication(ServerInstance instance, AccessControlFactory accessControlFactory,
       PinotConfiguration serverConf) {
     _serverInstance = instance;
-    packages(RESOURCE_PACKAGE);
+
+    _adminApiResourcePackages = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_RESOURCE_PACKAGES,
+        CommonConstants.Server.DEFAULT_SERVER_RESOURCE_PACKAGES);
+    packages(_adminApiResourcePackages);
     property(PINOT_CONFIGURATION, serverConf);
+    Instant serverStartTime = Instant.now();
 
     register(new AbstractBinder() {
       @Override
@@ -81,6 +89,7 @@ public class AdminApiApplication extends ResourceConfig {
         } else {
           bind(new DummyLogFileServer()).to(LogFileServer.class);
         }
+        bind(serverStartTime).named(START_TIME);
       }
     });
 
@@ -132,7 +141,7 @@ public class AdminApiApplication extends ResourceConfig {
       beanConfig.setSchemes(new String[]{CommonConstants.HTTP_PROTOCOL, CommonConstants.HTTPS_PROTOCOL});
     }
     beanConfig.setBasePath("/");
-    beanConfig.setResourcePackage(RESOURCE_PACKAGE);
+    beanConfig.setResourcePackage(_adminApiResourcePackages);
     beanConfig.setScan(true);
     try {
       beanConfig.setHost(InetAddress.getLocalHost().getHostName());

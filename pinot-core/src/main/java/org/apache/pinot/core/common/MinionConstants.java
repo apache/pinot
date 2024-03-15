@@ -104,6 +104,7 @@ public class MinionConstants {
     // Segment config
     public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
     public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+    public static final String SEGMENT_MAPPER_FILE_SIZE_IN_BYTES = "segmentMapperFileSizeThresholdInBytes";
     public static final String MAX_NUM_PARALLEL_BUCKETS = "maxNumParallelBuckets";
     public static final String SEGMENT_NAME_PREFIX_KEY = "segmentNamePrefix";
     public static final String SEGMENT_NAME_POSTFIX_KEY = "segmentNamePostfix";
@@ -163,5 +164,10 @@ public class MinionConstants {
      * e.g. if the count surpasses 100k, then the segment may be compacted
      */
     public static final String INVALID_RECORDS_THRESHOLD_COUNT = "invalidRecordsThresholdCount";
+
+    /**
+     * Valid doc ids type
+     */
+    public static final String VALID_DOC_IDS_TYPE = "validDocIdsType";
   }
 }

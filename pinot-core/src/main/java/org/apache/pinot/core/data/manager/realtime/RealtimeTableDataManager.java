@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -115,6 +116,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
+  private static final SegmentLocks SEGMENT_UPSERT_LOCKS = SegmentLocks.create();
 
   // TODO: Change it to BooleanSupplier
   private final Supplier<Boolean> _isServerReadyToServeQueries;
@@ -169,7 +171,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     File consumerDir = new File(consumerDirPath);
     if (consumerDir.exists()) {
       File[] segmentFiles = consumerDir.listFiles((dir, name) -> !name.equals(STATS_FILE_NAME));
-      Preconditions.checkState(segmentFiles != null, "Failed to list segment files from consumer dir: {} for table: {}",
+      Preconditions.checkState(segmentFiles != null, "Failed to list segment files from consumer dir: %s for table: %s",
           consumerDirPath, _tableNameWithType);
       for (File file : segmentFiles) {
         if (file.delete()) {
@@ -183,10 +185,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     // Set up dedup/upsert metadata manager
     // NOTE: Dedup/upsert has to be set up when starting the server. Changing the table config without restarting the
     //       server won't enable/disable them on the fly.
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", _tableNameWithType);
-
-    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    DedupConfig dedupConfig = _tableConfig.getDedupConfig();
     boolean dedupEnabled = dedupConfig != null && dedupConfig.isDedupEnabled();
     if (dedupEnabled) {
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
@@ -195,19 +194,18 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(primaryKeyColumns),
           "Primary key columns must be configured for dedup");
-      _tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(tableConfig, schema, this, _serverMetrics);
+      _tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(_tableConfig, schema, this, _serverMetrics);
     }
 
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
     if (upsertConfig != null && upsertConfig.getMode() != UpsertConfig.Mode.NONE) {
       Preconditions.checkState(!dedupEnabled, "Dedup and upsert cannot be both enabled for table: %s",
           _tableUpsertMetadataManager);
       Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
       Preconditions.checkState(schema != null, "Failed to find schema for table: %s", _tableNameWithType);
-      // NOTE: Set _tableUpsertMetadataManager before initializing it because when preloading is enabled, we need to
-      //       load segments into it
-      _tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(tableConfig);
-      _tableUpsertMetadataManager.init(tableConfig, schema, this, _helixManager, _segmentPreloadExecutor);
+      _tableUpsertMetadataManager =
+          TableUpsertMetadataManagerFactory.create(_tableConfig, _instanceDataManagerConfig.getUpsertConfig());
+      _tableUpsertMetadataManager.init(_tableConfig, schema, this);
     }
 
     // For dedup and partial-upsert, need to wait for all segments loaded before starting consuming data
@@ -326,7 +324,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public String getConsumerDir() {
-    String consumerDirPath = _tableDataManagerConfig.getConsumerDir();
+    String consumerDirPath = _instanceDataManagerConfig.getConsumerDir();
     File consumerDir;
     // If a consumer directory has been configured, use it to create a per-table path under the consumer dir.
     // Otherwise, create a sub-dir under the table-specific data director and use it for consumer mmaps
@@ -359,6 +357,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         && _tableUpsertMetadataManager.getUpsertMode() == UpsertConfig.Mode.PARTIAL;
   }
 
+  private boolean isUpsertPreloadEnabled() {
+    UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
+    return _tableUpsertMetadataManager != null && _segmentPreloadExecutor != null && upsertConfig != null
+        && upsertConfig.isEnableSnapshot() && upsertConfig.isEnablePreload();
+  }
+
   /*
    * This call comes in one of two ways:
    * For HL Segments:
@@ -380,16 +384,33 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       throws Exception {
     Preconditions.checkState(!_shutDown, "Table data manager is already shut down, cannot add segment: %s to table: %s",
         segmentName, _tableNameWithType);
+    boolean upsertPreloadEnabled = isUpsertPreloadEnabled();
+    if (upsertPreloadEnabled) {
+      Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, segmentZKMetadata, null);
+      Preconditions.checkNotNull(partitionId,
+          String.format("Failed to get partition id for segment: %s (upsert-enabled table: %s)", segmentName,
+              _tableNameWithType));
+      PartitionUpsertMetadataManager partitionUpsertMetadataManager =
+          _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
+      partitionUpsertMetadataManager.preloadSegments(indexLoadingConfig);
+      // Continue to add segment after preloading, as the segment might not be added by preloading.
+    }
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
-      _logger.warn("Skipping adding existing segment: {} for table: {} with data manager class: {}", segmentName,
-          _tableNameWithType, segmentDataManager.getClass().getSimpleName());
+      if (upsertPreloadEnabled) {
+        _logger.debug(
+            "Skipping adding existing segment: {} for table: {} with data manager class: {}, as it's preloaded",
+            segmentName, _tableNameWithType, segmentDataManager.getClass().getSimpleName());
+      } else {
+        _logger.warn("Skipping adding existing segment: {} for table: {} with data manager class: {}", segmentName,
+            _tableNameWithType, segmentDataManager.getClass().getSimpleName());
+      }
       return;
     }
 
     // Assign table directory and tier info to not let the segment be moved during loading/preprocessing
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    indexLoadingConfig.setInstanceTierConfigs(_tableDataManagerConfig.getInstanceTierConfigs());
+    indexLoadingConfig.setInstanceTierConfigs(_instanceDataManagerConfig.getTierConfigs());
     indexLoadingConfig.setSegmentTier(segmentZKMetadata.getTier());
 
     File segmentDir = new File(_indexDir, segmentName);
@@ -529,19 +550,26 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     // Register the new segment after it is fully initialized by partitionUpsertMetadataManager, e.g. to fill up its
     // validDocId bitmap. Otherwise, the query can return wrong results, if accessing the premature segment.
-    if (_tableUpsertMetadataManager.isPreloading()) {
-      // Preloading segment happens when creating table manager when server restarts, and segment is ensured to be
-      // preloaded by a single thread, so no need for segmentLock.
+    if (partitionUpsertMetadataManager.isPreloading()) {
+      // Preloading segment is ensured to be handled by a single thread, so no need to take a lock.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
       registerSegment(segmentName, newSegmentManager);
       _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
       return;
     }
-    // Replacing segment may happen in two threads, i.e. the consuming thread that's committing the mutable segment
-    // and a HelixTaskExecutor thread that's bringing segment from ONLINE to CONSUMING when the server finds
-    // consuming thread can't commit the segment in time. Adding segment should be done by a single HelixTaskExecutor
-    // thread but do it with segmentLock as well for simplicity.
-    Lock segmentLock = SegmentLocks.getSegmentLock(_tableNameWithType, segmentName);
+    // Replacing segment takes multiple steps, and particularly need to access the oldSegment. Replace segment may
+    // happen in two threads, i.e. the consuming thread that's committing the mutable segment and a HelixTaskExecutor
+    // thread that's bringing segment from ONLINE to CONSUMING when the server finds consuming thread can't commit
+    // the segment in time. The slower thread takes the reference of the oldSegment here, but it may get closed by
+    // the faster thread if not synchronized. In particular, the slower thread may iterate the primary keys in the
+    // oldSegment, causing seg fault. So we have to take a lock here.
+    // However, we can't just reuse the existing segmentLocks. Because many methods of partitionUpsertMetadataManager
+    // takes this lock internally, but after taking snapshot RW lock. If we take segmentLock here (before taking
+    // snapshot RW lock), we can get into deadlock with threads calling partitionUpsertMetadataManager's other
+    // methods, like removeSegment.
+    // Adding segment should be done by a single HelixTaskExecutor thread, but do it with lock here for simplicity
+    // otherwise, we'd need to double-check if oldSegmentManager is null.
+    Lock segmentLock = SEGMENT_UPSERT_LOCKS.getLock(_tableNameWithType, segmentName);
     segmentLock.lock();
     try {
       SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
@@ -648,11 +676,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "." + System.currentTimeMillis());
       File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-      // First find servers hosting the segment in a ONLINE state.
-      List<URI> peerSegmentURIs = PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
-      // Next download the segment from a randomly chosen server using configured scheme.
-      SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(peerSegmentURIs, segmentTarFile);
-      _logger.info("Fetched segment {} from: {} to: {} of size: {}", segmentName, peerSegmentURIs, segmentTarFile,
+      // Next download the segment from a randomly chosen server using configured download scheme (http or https).
+      SegmentFetcherFactory.getSegmentFetcher(downloadScheme).fetchSegmentToLocal(segmentName, () -> {
+        List<URI> peerServerURIs =
+            PeerServerSegmentFinder.getPeerServerURIs(segmentName, downloadScheme, _helixManager);
+        Collections.shuffle(peerServerURIs);
+        return peerServerURIs;
+      }, segmentTarFile);
+      _logger.info("Fetched segment {} successfully to {} of size {}", segmentName, segmentTarFile,
           segmentTarFile.length());
       untarAndMoveSegment(segmentName, indexLoadingConfig, segmentTarFile, tempRootDir);
     } catch (Exception e) {
@@ -670,7 +701,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     File indexDir = new File(_indexDir, segmentName);
     // Use the latest table config and schema to load the segment
     TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, _tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to get table config for table: {}", _tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to get table config for table: %s", _tableNameWithType);
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableConfig);
 
     // Construct a new indexLoadingConfig with the updated tableConfig and schema.
@@ -686,6 +717,23 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public String getServerInstance() {
     return _instanceId;
+  }
+
+  @VisibleForTesting
+  public TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return _tableUpsertMetadataManager;
+  }
+
+  /**
+   * Retrieves a mapping of partition id to the primary key count for the partition.
+   *
+   * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition.
+   */
+  public Map<Integer, Long> getUpsertPartitionToPrimaryKeyCount() {
+    if (isUpsertEnabled()) {
+      return _tableUpsertMetadataManager.getPartitionToPrimaryKeyCount();
+    }
+    return Collections.emptyMap();
   }
 
   /**

@@ -55,8 +55,7 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   private ExecutableNode planExecution(ExpressionContext expression) {
     switch (expression.getType()) {
       case LITERAL:
-        // TODO: pass literal with type into ConstantExecutionNode.
-        return new ConstantExecutionNode(expression.getLiteral().getStringValue());
+        return new ConstantExecutionNode(expression.getLiteral().getValue());
       case IDENTIFIER:
         String columnName = expression.getIdentifier();
         ColumnExecutionNode columnExecutionNode = new ColumnExecutionNode(columnName, _arguments.size());
@@ -233,6 +232,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
             }
           }
         }
+        if (_functionInvoker.getMethod().isVarArgs()) {
+          return _functionInvoker.invoke(new Object[]{_arguments});
+        }
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);
       } catch (Exception e) {
@@ -256,6 +258,9 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
             }
           }
         }
+        if (_functionInvoker.getMethod().isVarArgs()) {
+          return _functionInvoker.invoke(new Object[]{_arguments});
+        }
         _functionInvoker.convertTypes(_arguments);
         return _functionInvoker.invoke(_arguments);
       } catch (Exception e) {
@@ -270,14 +275,14 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   }
 
   private static class ConstantExecutionNode implements ExecutableNode {
-    final String _value;
+    final Object _value;
 
-    ConstantExecutionNode(String value) {
+    ConstantExecutionNode(Object value) {
       _value = value;
     }
 
     @Override
-    public String execute(GenericRow row) {
+    public Object execute(GenericRow row) {
       return _value;
     }
 

@@ -40,6 +40,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
@@ -47,8 +48,10 @@ import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -70,6 +73,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
+import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
@@ -79,6 +83,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
+import org.apache.pinot.spi.recordenricher.RecordEnricherRegistry;
+import org.apache.pinot.spi.recordenricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -194,20 +200,15 @@ public final class TableConfigUtils {
   /**
    * Validates the table name with the following rules:
    * <ul>
-   *   <li>If there is a flag allowing database name in it, table name can have one dot in it.
-   *   <li>Otherwise, there is no dot allowed in table name.</li>
+   *   <li>Table name can have at most one dot in it.
+   *   <li>Table name does not have whitespace.</li>
    * </ul>
    */
-  public static void validateTableName(TableConfig tableConfig, boolean allowTableNameWithDatabase) {
+  public static void validateTableName(TableConfig tableConfig) {
     String tableName = tableConfig.getTableName();
     int dotCount = StringUtils.countMatches(tableName, '.');
-    // For transitioning into full [database_name].[table_name] support, we allow the table name
-    // with one dot at max, so the admin may create mydb.mytable with a feature knob.
-    if (allowTableNameWithDatabase && dotCount > 1) {
+    if (dotCount > 1) {
       throw new IllegalStateException("Table name: '" + tableName + "' containing more than one '.' is not allowed");
-    }
-    if (!allowTableNameWithDatabase && dotCount > 0) {
-      throw new IllegalStateException("Table name: '" + tableName + "' containing '.' is not allowed");
     }
     if (StringUtils.containsWhitespace(tableName)) {
       throw new IllegalStateException("Table name: '" + tableName + "' containing space is not allowed");
@@ -494,7 +495,28 @@ public final class TableConfigUtils {
           Preconditions.checkState(new HashSet<>(schema.getMetricNames()).equals(aggregationColumns),
               "all metric columns must be aggregated");
         }
+
+        // This is required by MutableSegmentImpl.enableMetricsAggregationIfPossible().
+        // That code will disable ingestion aggregation if all metrics aren't noDictionaryColumns.
+        // But if you do that after the table is already created, all future aggregations will
+        // just be the default value.
+        Map<String, DictionaryIndexConfig> configPerCol = StandardIndexes.dictionary().getConfig(tableConfig, schema);
+        aggregationColumns.forEach(column -> {
+          DictionaryIndexConfig dictConfig = configPerCol.get(column);
+          Preconditions.checkState(dictConfig != null && dictConfig.isDisabled(),
+              "Aggregated column: %s must be a no-dictionary column", column);
+        });
       }
+
+      // Enrichment configs
+      List<EnrichmentConfig> enrichmentConfigs = ingestionConfig.getEnrichmentConfigs();
+      if (enrichmentConfigs != null) {
+        for (EnrichmentConfig enrichmentConfig : enrichmentConfigs) {
+          RecordEnricherRegistry.validateEnrichmentConfig(enrichmentConfig,
+              new RecordEnricherValidationConfig(disableGroovy));
+        }
+      }
+
 
       // Transform configs
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
@@ -669,6 +691,20 @@ public final class TableConfigUtils {
               taskTypeConfig.containsKey("invalidRecordsThresholdPercent") || taskTypeConfig.containsKey(
                   "invalidRecordsThresholdCount"),
               "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
+          String validDocIdsType = taskTypeConfig.getOrDefault("validDocIdsType", "snapshot");
+          if (validDocIdsType.equals(ValidDocIdsType.SNAPSHOT.toString())) {
+            UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+            Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+            Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
+                "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdsType = "
+                    + "%s", validDocIdsType));
+          } else if (validDocIdsType.equals(ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())) {
+            UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+            Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+            Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(), String.format(
+                "deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
+                validDocIdsType));
+          }
         }
       }
     }
@@ -705,8 +741,10 @@ public final class TableConfigUtils {
     Preconditions.checkState(
         tableConfig.getRoutingConfig() != null && isRoutingStrategyAllowedForUpsert(tableConfig.getRoutingConfig()),
         "Upsert/Dedup table must use strict replica-group (i.e. strictReplicaGroup) based routing");
-    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null,
-        "Upsert/Dedup table cannot use tenant tag override");
+    Preconditions.checkState(tableConfig.getTenantConfig().getTagOverrideConfig() == null || (
+        tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeConsuming() == null
+            && tableConfig.getTenantConfig().getTagOverrideConfig().getRealtimeCompleted()
+            == null), "Invalid tenant tag override used for Upsert/Dedup table");
 
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -728,9 +766,15 @@ public final class TableConfigUtils {
       String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
       if (deleteRecordColumn != null) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(deleteRecordColumn);
+        Preconditions.checkState(fieldSpec != null,
+            String.format("Column %s specified in deleteRecordColumn does not exist", deleteRecordColumn));
+        Preconditions.checkState(fieldSpec.isSingleValueField(),
+            String.format("The deleteRecordColumn - %s must be a single-valued column", deleteRecordColumn));
+        DataType dataType = fieldSpec.getDataType();
         Preconditions.checkState(
-            fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
-            "The delete record column must be a single-valued BOOLEAN column");
+            dataType == DataType.BOOLEAN || dataType == DataType.STRING || dataType.isNumeric(),
+            String.format("The deleteRecordColumn - %s must be of type: String / Boolean / Numeric",
+                deleteRecordColumn));
       }
 
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
@@ -1025,6 +1069,7 @@ public final class TableConfigUtils {
     }
 
     List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
+    Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
     if (starTreeIndexConfigList != null) {
       for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
         // Dimension split order cannot be null
@@ -1041,6 +1086,11 @@ public final class TableConfigUtils {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
                   + "in the form <Aggregation function>__<Column name>");
             }
+            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+            if (!storedTypes.add(storedType)) {
+              LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
+                  columnPair, storedType);
+            }
             String columnName = columnPair.getColumn();
             if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
               columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
@@ -1055,6 +1105,11 @@ public final class TableConfigUtils {
               columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
             } catch (Exception e) {
               throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
+            }
+            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+            if (!storedTypes.add(storedType)) {
+              LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
+                  columnPair, storedType);
             }
             String columnName = columnPair.getColumn();
             if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {

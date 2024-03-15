@@ -25,7 +25,7 @@ LABEL MAINTAINER=dev@pinot.apache.org
 
 RUN yum update -y && \
   yum groupinstall 'Development Tools' -y && \
-  yum install -y procps vim less wget curl git python sysstat perf libtasn1 && \
+  yum install -y procps vim less wget curl git python sysstat perf libtasn1 zstd && \
   yum clean all
 
 RUN case `uname -m` in \

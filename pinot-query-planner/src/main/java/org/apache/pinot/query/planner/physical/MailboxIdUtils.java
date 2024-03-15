@@ -18,15 +18,48 @@
  */
 package org.apache.pinot.query.planner.physical;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.pinot.query.routing.MailboxInfo;
+import org.apache.pinot.query.routing.RoutingInfo;
+
+
 public class MailboxIdUtils {
   private MailboxIdUtils() {
   }
 
-  private static final char SEPARATOR = '|';
+  public static final char SEPARATOR = '|';
 
-  public static String toPlanMailboxId(int senderStageId, int senderWorkerId, int receiverStageId,
+  @VisibleForTesting
+  public static String toMailboxId(long requestId, int senderStageId, int senderWorkerId, int receiverStageId,
       int receiverWorkerId) {
-    return Integer.toString(senderStageId) + SEPARATOR + senderWorkerId + SEPARATOR
+    return Long.toString(requestId) + SEPARATOR + senderStageId + SEPARATOR + senderWorkerId + SEPARATOR
         + receiverStageId + SEPARATOR + receiverWorkerId;
+  }
+
+  public static List<RoutingInfo> toRoutingInfos(long requestId, int senderStageId, int senderWorkerId,
+      int receiverStageId, List<MailboxInfo> receiverMailboxInfos) {
+    List<RoutingInfo> routingInfos = new ArrayList<>();
+    for (MailboxInfo mailboxInfo : receiverMailboxInfos) {
+      String hostname = mailboxInfo.getHostname();
+      int port = mailboxInfo.getPort();
+      for (int receiverWorkerId : mailboxInfo.getWorkerIds()) {
+        routingInfos.add(new RoutingInfo(hostname, port,
+            toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiverWorkerId)));
+      }
+    }
+    return routingInfos;
+  }
+
+  public static List<String> toMailboxIds(long requestId, int senderStageId, List<MailboxInfo> senderMailboxInfos,
+      int receiverStageId, int receiverWorkerId) {
+    List<String> mailboxIds = new ArrayList<>();
+    for (MailboxInfo mailboxInfo : senderMailboxInfos) {
+      for (int senderWorkerId : mailboxInfo.getWorkerIds()) {
+        mailboxIds.add(toMailboxId(requestId, senderStageId, senderWorkerId, receiverStageId, receiverWorkerId));
+      }
+    }
+    return mailboxIds;
   }
 }

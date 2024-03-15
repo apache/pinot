@@ -58,10 +58,11 @@ import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
-import org.apache.pinot.common.utils.TlsUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -152,6 +153,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
 
+    PinotInsecureMode.setPinotInInsecureMode(
+        Boolean.valueOf(_serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
+            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
     _hostname = _serverConf.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST,
@@ -205,7 +210,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
-
     // Set data table version send to broker.
     int dataTableVersion =
         _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, DataTableBuilderFactory.DEFAULT_VERSION);
@@ -418,7 +422,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       }
     }
 
-    // Update system resource info (CPU, memory, etc)
+    // Update system resource info (CPU, memory, etc.)
     Map<String, String> newSystemResourceInfoMap = new SystemResourceInfo().toMap();
     Map<String, String> existingSystemResourceInfoMap =
         znRecord.getMapField(CommonConstants.Helix.Instance.SYSTEM_RESOURCE_INFO_KEY);
@@ -427,7 +431,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       if (existingSystemResourceInfoMap == null) {
         existingSystemResourceInfoMap = newSystemResourceInfoMap;
       } else {
-        // existingSystemResourceInfoMap may contains more KV pairs than newSystemResourceInfoMap,
+        // existingSystemResourceInfoMap may contain more KV pairs than newSystemResourceInfoMap,
         // we need to preserve those KV pairs and only update the different values.
         for (Map.Entry<String, String> entry : newSystemResourceInfoMap.entrySet()) {
           existingSystemResourceInfoMap.put(entry.getKey(), entry.getValue());
@@ -573,6 +577,10 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ServerConf serverConf = new ServerConf(_serverConf);
     _serverInstance = new ServerInstance(serverConf, _helixManager, accessControlFactory);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+
+    // Enable Server level realtime ingestion rate limier
+    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, serverMetrics);
+
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
     // initialize the thread accountant for query killing
@@ -765,7 +773,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   /**
    * When shutting down the server, waits for all the resources turn OFFLINE (all partitions served by the server are
-   * neither ONLINE or CONSUMING).
+   * neither ONLINE nor CONSUMING).
    *
    * @param endTimeMs Timeout for the check
    */

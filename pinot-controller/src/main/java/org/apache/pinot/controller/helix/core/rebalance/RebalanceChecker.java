@@ -151,7 +151,7 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
     // Get tableConfig only when the table needs to retry rebalance, and get it before submitting rebalance to another
     // thread, in order to avoid unnecessary ZK reads and making too many ZK reads in a short time.
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: {}", tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
     _executorService.submit(() -> {
       // Retry rebalance in another thread as rebalance can take time.
       try {

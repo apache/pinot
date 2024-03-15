@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
 import org.apache.pinot.common.http.MultiHttpRequest;
@@ -79,12 +80,46 @@ public class CompletionServiceHelper {
   public CompletionServiceResponse doMultiGetRequest(List<String> serverURLs, String tableNameWithType,
       boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders, int timeoutMs,
       @Nullable String useCase) {
-    CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
-
     // TODO: use some service other than completion service so that we know which server encounters the error
     CompletionService<MultiHttpRequestResponse> completionService =
-        new MultiHttpRequest(_executor, _httpConnectionManager).execute(serverURLs, requestHeaders, timeoutMs);
-    for (int i = 0; i < serverURLs.size(); i++) {
+        new MultiHttpRequest(_executor, _httpConnectionManager).executeGet(serverURLs, requestHeaders, timeoutMs);
+
+    return collectResponse(tableNameWithType, serverURLs.size(), completionService, multiRequestPerServer, useCase);
+  }
+
+  /**
+   * This method makes a MultiPost call to all given URLs and its corresponding bodies.
+   * @param serverURLsAndRequestBodies server urls to send POST request.
+   * @param tableNameWithType table name with type suffix
+   * @param multiRequestPerServer it's possible that need to send multiple requests to a same server.
+   *                              If multiRequestPerServer is set as false, return as long as one of the requests return
+   *                              response; If multiRequestPerServer is set as true, wait until all requests
+   *                              return response.
+   * @param requestHeaders Headers to be set when making the http calls.
+   * @param timeoutMs timeout in milliseconds to wait per request.
+   * @param useCase the use case initiating the multi-post request. If not null and an exception is thrown, only the
+   *                error message and the use case are logged instead of the full stack trace.
+   * @return CompletionServiceResponse Map of the endpoint(server instance, or full request path if
+   * multiRequestPerServer is true) to the response from that endpoint.
+   */
+  public CompletionServiceResponse doMultiPostRequest(List<Pair<String, String>> serverURLsAndRequestBodies,
+      String tableNameWithType, boolean multiRequestPerServer, @Nullable Map<String, String> requestHeaders,
+      int timeoutMs, @Nullable String useCase) {
+
+    CompletionService<MultiHttpRequestResponse> completionService =
+        new MultiHttpRequest(_executor, _httpConnectionManager).executePost(serverURLsAndRequestBodies, requestHeaders,
+            timeoutMs);
+
+    return collectResponse(tableNameWithType, serverURLsAndRequestBodies.size(), completionService,
+        multiRequestPerServer, useCase);
+  }
+
+  private CompletionServiceResponse collectResponse(String tableNameWithType, int size,
+      CompletionService<MultiHttpRequestResponse> completionService, boolean multiRequestPerServer,
+      @Nullable String useCase) {
+    CompletionServiceResponse completionServiceResponse = new CompletionServiceResponse();
+
+    for (int i = 0; i < size; i++) {
       MultiHttpRequestResponse multiHttpRequestResponse = null;
       try {
         multiHttpRequestResponse = completionService.take().get();
@@ -93,7 +128,8 @@ public class CompletionServiceHelper {
             _endpointsToServers.get(String.format("%s://%s:%d", uri.getScheme(), uri.getHost(), uri.getPort()));
         int statusCode = multiHttpRequestResponse.getResponse().getStatusLine().getStatusCode();
         if (statusCode >= 300) {
-          LOGGER.error("Server: {} returned error: {}", instance, statusCode);
+          String reason = multiHttpRequestResponse.getResponse().getStatusLine().getReasonPhrase();
+          LOGGER.error("Server: {} returned error: {}, reason: {}", instance, statusCode, reason);
           completionServiceResponse._failedResponseCount++;
           continue;
         }
@@ -102,7 +138,7 @@ public class CompletionServiceHelper {
             .put(multiRequestPerServer ? uri.toString() : instance, responseString);
       } catch (Exception e) {
         String reason = useCase == null ? "" : String.format(" in '%s'", useCase);
-        LOGGER.error("Connection error{}. Details: {}", reason, e.getMessage());
+        LOGGER.error("Connection error {}. Details: {}", reason, e.getMessage());
         completionServiceResponse._failedResponseCount++;
       } finally {
         if (multiHttpRequestResponse != null) {
@@ -116,9 +152,9 @@ public class CompletionServiceHelper {
     }
 
     int numServersResponded = completionServiceResponse._httpResponses.size();
-    if (numServersResponded != serverURLs.size()) {
+    if (numServersResponded != size) {
       LOGGER.warn("Finished reading information for table: {} with {}/{} server responses", tableNameWithType,
-          numServersResponded, serverURLs.size());
+          numServersResponded, size);
     } else {
       LOGGER.info("Finished reading information for table: {}", tableNameWithType);
     }

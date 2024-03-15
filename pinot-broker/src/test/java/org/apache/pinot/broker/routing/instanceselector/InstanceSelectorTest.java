@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.mercateo.test.clock.TestClock;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -48,9 +47,11 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.TestClock;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.AfterMethod;
@@ -156,10 +157,10 @@ public class InstanceSelectorTest {
   }
 
   private InstanceSelector createTestInstanceSelector(String selectorType) {
-    RoutingConfig config = new RoutingConfig(null, null, selectorType);
+    RoutingConfig config = new RoutingConfig(null, null, selectorType, false);
     when(_tableConfig.getRoutingConfig()).thenReturn(config);
     return InstanceSelectorFactory.getInstanceSelector(_tableConfig, _propertyStore, _brokerMetrics, null,
-        _mutableClock);
+        _mutableClock, new PinotConfiguration());
   }
 
   @DataProvider(name = "selectorType")
@@ -172,7 +173,7 @@ public class InstanceSelectorTest {
 
   @BeforeMethod
   public void setUp() {
-    _mutableClock = TestClock.fixed(Instant.now(), ZoneId.systemDefault());
+    _mutableClock = new TestClock(Instant.now(), ZoneId.systemDefault());
     _mocks = MockitoAnnotations.openMocks(this);
     when(_brokerRequest.getPinotQuery()).thenReturn(_pinotQuery);
     when(_pinotQuery.getQueryOptions()).thenReturn(null);
@@ -191,39 +192,40 @@ public class InstanceSelectorTest {
     TableConfig tableConfig = mock(TableConfig.class);
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
+    when(tableConfig.getTableName()).thenReturn("testTable_OFFLINE");
 
     // Routing config is missing
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof BalancedInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof BalancedInstanceSelector);
 
     // Instance selector type is not configured
     RoutingConfig routingConfig = mock(RoutingConfig.class);
     when(tableConfig.getRoutingConfig()).thenReturn(routingConfig);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof BalancedInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof BalancedInstanceSelector);
 
     // Replica-group instance selector should be returned
     when(routingConfig.getInstanceSelectorType()).thenReturn(REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof ReplicaGroupInstanceSelector);
 
     // Strict replica-group instance selector should be returned
     when(routingConfig.getInstanceSelectorType()).thenReturn(STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof StrictReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof StrictReplicaGroupInstanceSelector);
 
     // Should be backward-compatible with legacy config
     when(routingConfig.getInstanceSelectorType()).thenReturn(null);
     when(tableConfig.getTableType()).thenReturn(TableType.OFFLINE);
     when(routingConfig.getRoutingTableBuilderName()).thenReturn(
         InstanceSelectorFactory.LEGACY_REPLICA_GROUP_OFFLINE_ROUTING);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof ReplicaGroupInstanceSelector);
     when(tableConfig.getTableType()).thenReturn(TableType.REALTIME);
     when(routingConfig.getRoutingTableBuilderName()).thenReturn(
         InstanceSelectorFactory.LEGACY_REPLICA_GROUP_REALTIME_ROUTING);
-    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore,
-        brokerMetrics) instanceof ReplicaGroupInstanceSelector);
+    assertTrue(InstanceSelectorFactory.getInstanceSelector(tableConfig, propertyStore, brokerMetrics,
+        new PinotConfiguration()) instanceof ReplicaGroupInstanceSelector);
   }
 
   @Test
@@ -232,11 +234,13 @@ public class InstanceSelectorTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false);
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false);
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -756,7 +760,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -838,7 +843,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -920,7 +926,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -993,7 +1000,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     MultiStageReplicaGroupSelector multiStageSelector =
-        new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new MultiStageReplicaGroupSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false);
     multiStageSelector = spy(multiStageSelector);
     doReturn(instancePartitions).when(multiStageSelector).getInstancePartitions();
 
@@ -1088,10 +1096,11 @@ public class InstanceSelectorTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false);
     // ReplicaGroupInstanceSelector has the same behavior as BalancedInstanceSelector for the unavailable segments
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC());
+        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
+            false);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);

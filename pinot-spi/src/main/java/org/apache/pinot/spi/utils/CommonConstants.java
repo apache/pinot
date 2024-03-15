@@ -44,6 +44,7 @@ public class CommonConstants {
   public static final String UNKNOWN = "unknown";
   public static final String CONFIG_OF_METRICS_FACTORY_CLASS_NAME = "factory.className";
   public static final String CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME = "factory.className";
+  public static final String CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS = "request.context.tracked.header.keys";
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
   public static final String DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME =
@@ -51,6 +52,12 @@ public class CommonConstants {
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.1.0/";
+  public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
+
+  public static final String DATABASE = "database";
+  public static final String DEFAULT_DATABASE = "default";
+  public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
+  public static final String DEFAULT_PINOT_INSECURE_MODE = "false";
 
   /**
    * The state of the consumer for a given segment
@@ -90,8 +97,6 @@ public class CommonConstants {
 
     public static final String ENABLE_CASE_INSENSITIVE_KEY = "enable.case.insensitive";
     public static final boolean DEFAULT_ENABLE_CASE_INSENSITIVE = true;
-    public static final String ALLOW_TABLE_NAME_WITH_DATABASE = "allow.table.name.with.database";
-    public static final boolean DEFAULT_ALLOW_TABLE_NAME_WITH_DATABASE = false;
 
     public static final String DEFAULT_HYPERLOGLOG_LOG2M_KEY = "default.hyperloglog.log2m";
     public static final int DEFAULT_HYPERLOGLOG_LOG2M = 8;
@@ -324,13 +329,18 @@ public class CommonConstants {
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = false;
 
+    public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
+    public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
+
     // Broker config indicating the maximum serialized response size across all servers for a query. This value is
     // equally divided across all servers processing the query.
+    // The value can be in human readable format (e.g. '200K', '200KB', '0.2MB') or in raw bytes (e.g. '200000').
     public static final String CONFIG_OF_MAX_QUERY_RESPONSE_SIZE_BYTES = "pinot.broker.max.query.response.size.bytes";
 
     // Broker config indicating the maximum length of the serialized response per server for a query.
+    // If both "server.response.size" and "query.response.size" are set, then the "server.response.size" takes
+    // precedence over "query.response.size" (i.e., "query.response.size" will be ignored).
     public static final String CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES = "pinot.broker.max.server.response.size.bytes";
-
 
     public static class Request {
       public static final String SQL = "sql";
@@ -350,12 +360,14 @@ public class CommonConstants {
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
+        public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
         // Reorder scan based predicates based on cardinality and number of selected values
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
+        public static final String SKIP_INDEXES = "skipIndexes";
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
@@ -564,6 +576,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_SWAGGER_USE_HTTPS = "pinot.server.swagger.use.https";
     public static final String CONFIG_OF_ADMIN_API_PORT = "pinot.server.adminapi.port";
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
+    public static final String CONFIG_OF_SERVER_RESOURCE_PACKAGES = "server.restlet.api.resource.packages";
+    public static final String DEFAULT_SERVER_RESOURCE_PACKAGES = "org.apache.pinot.server.api.resources";
 
     public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
@@ -614,6 +628,11 @@ public class CommonConstants {
     // Use 10 seconds by default so high volume stream are able to catch up.
     // This is also the default in the case a user misconfigures this by setting to <= 0.
     public static final int DEFAULT_STARTUP_REALTIME_MIN_FRESHNESS_MS = 10000;
+
+    // Config for realtime consumption message rate limit
+    public static final String CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT = "pinot.server.consumption.rate.limit";
+    // Default to 0.0 (no limit)
+    public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
 
     public static final String DEFAULT_READ_MODE = "mmap";
     // Whether to reload consuming segment on scheme update
@@ -753,6 +772,7 @@ public class CommonConstants {
     public static final String VERSION_HTTP_HEADER = "Pinot-Controller-Version";
     public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
     public static final String TABLE_NAME_HTTP_HEADER = "Pinot-Table-Name";
+    public static final String PINOT_QUERY_ERROR_CODE_HEADER = "X-Pinot-Error-Code";
     public static final String INGESTION_DESCRIPTOR = "Pinot-Ingestion-Descriptor";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.controller.crypter";
 

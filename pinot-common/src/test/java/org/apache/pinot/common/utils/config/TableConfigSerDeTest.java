@@ -176,7 +176,7 @@ public class TableConfigSerDeTest {
     {
       // With routing config
       RoutingConfig routingConfig =
-          new RoutingConfig("builder", Arrays.asList("pruner0", "pruner1", "pruner2"), "selector");
+          new RoutingConfig("builder", Arrays.asList("pruner0", "pruner1", "pruner2"), "selector", false);
       TableConfig tableConfig = tableConfigBuilder.setRoutingConfig(routingConfig).build();
 
       checkRoutingConfig(tableConfig);
@@ -212,7 +212,7 @@ public class TableConfigSerDeTest {
       InstanceAssignmentConfig instanceAssignmentConfig =
           new InstanceAssignmentConfig(new InstanceTagPoolConfig("tenant_OFFLINE", true, 3, null),
               new InstanceConstraintConfig(Arrays.asList("constraint1", "constraint2")),
-              new InstanceReplicaGroupPartitionConfig(true, 0, 3, 5, 0, 0, false, null));
+              new InstanceReplicaGroupPartitionConfig(true, 0, 3, 5, 0, 0, false, null), null, false);
       TableConfig tableConfig = tableConfigBuilder.setInstanceAssignmentConfigMap(
           Collections.singletonMap(InstancePartitionsType.OFFLINE.toString(), instanceAssignmentConfig)).build();
 
@@ -536,7 +536,7 @@ public class TableConfigSerDeTest {
 
     FieldConfig secondFieldConfig = fieldConfigList.get(1);
     assertEquals(secondFieldConfig.getName(), "column2");
-    assertNull(secondFieldConfig.getEncodingType());
+    assertEquals(secondFieldConfig.getEncodingType(), FieldConfig.EncodingType.DICTIONARY);
     assertNull(secondFieldConfig.getIndexType());
     assertEquals(secondFieldConfig.getIndexTypes().size(), 0);
     assertNull(secondFieldConfig.getProperties());

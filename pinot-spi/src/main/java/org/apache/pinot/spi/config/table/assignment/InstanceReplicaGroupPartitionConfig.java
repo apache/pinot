@@ -56,6 +56,8 @@ public class InstanceReplicaGroupPartitionConfig extends BaseJsonConfig {
       "Name of the column used for partition, if not provided table level replica group will be used")
   private final String _partitionColumn;
 
+  // TODO: remove this config in the next official release
+  @Deprecated
   private final boolean _minimizeDataMovement;
 
   @JsonCreator

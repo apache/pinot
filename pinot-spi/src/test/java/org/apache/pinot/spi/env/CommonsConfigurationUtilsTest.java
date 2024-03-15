@@ -21,7 +21,6 @@ package org.apache.pinot.spi.env;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.configuration2.PropertiesConfiguration;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -30,13 +29,13 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class CommonsConfigurationUtilsTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "CommonsConfigurationUtilsTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
   private static final String PROPERTY_KEY = "testKey";
-  private static final String LIST_PROPERTY_KEY = "listTestKey";
   private static final int NUM_ROUNDS = 10000;
 
   @BeforeClass
@@ -53,7 +52,7 @@ public class CommonsConfigurationUtilsTest {
 
   @Test
   public void testPropertyValueWithSpecialCharacters()
-      throws ConfigurationException {
+      throws Exception {
     // Leading/trailing whitespace
     testPropertyValueWithSpecialCharacters(" a");
     testPropertyValueWithSpecialCharacters("a ");
@@ -93,17 +92,29 @@ public class CommonsConfigurationUtilsTest {
   }
 
   private void testPropertyValueWithSpecialCharacters(String value)
-      throws ConfigurationException {
+      throws Exception {
     String replacedValue = CommonsConfigurationUtils.replaceSpecialCharacterInPropertyValue(value);
+    if (replacedValue == null) {
+      boolean hasSurrogate = false;
+      int length = value.length();
+      for (int i = 0; i < length; i++) {
+        if (Character.isSurrogate(value.charAt(i))) {
+          hasSurrogate = true;
+          break;
+        }
+      }
+      assertTrue(hasSurrogate);
+      return;
+    }
 
     PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true);
     configuration.setProperty(PROPERTY_KEY, replacedValue);
     String recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
+
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
     configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true);
-
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);

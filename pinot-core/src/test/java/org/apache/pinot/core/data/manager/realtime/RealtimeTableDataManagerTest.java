@@ -34,27 +34,26 @@ import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.data.manager.TableDataManagerTestUtils;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerConfig;
-import org.apache.pinot.segment.local.data.manager.TableDataManagerParams;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -77,15 +76,20 @@ public class RealtimeTableDataManagerTest {
   private static final String LONG_COLUMN = "col2";
   private static final long[] LONG_VALUES = {10000L, 20000L, 50000L, 40000L, 30000L};
 
+  @BeforeClass
+  public void setUp() {
+    ServerMetrics.register(mock(ServerMetrics.class));
+  }
+
   @BeforeMethod
-  public void setUp()
+  public void setUpMethod()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
     TableDataManagerTestUtils.initSegmentFetcher();
   }
 
   @AfterMethod
-  public void tearDown()
+  public void tearDownMethod()
       throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
   }
@@ -93,14 +97,14 @@ public class RealtimeTableDataManagerTest {
   @Test
   public void testAddSegmentUseBackupCopy()
       throws Exception {
-    RealtimeTableDataManager tmgr = new RealtimeTableDataManager(null);
-    TableDataManagerConfig tableDataManagerConfig = createTableDataManagerConfig();
-    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    InstanceDataManagerConfig instanceDataManagerConfig = createInstanceDataManagerConfig();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     TableConfig tableConfig = setupTableConfig(propertyStore);
     Schema schema = setupSchema(propertyStore);
-    tmgr.init(tableDataManagerConfig, "server01", propertyStore,
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
-        new TableDataManagerParams(0, false, -1));
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    RealtimeTableDataManager tmgr = new RealtimeTableDataManager(null);
+    tmgr.init(instanceDataManagerConfig, tableConfig, helixManager, null, null);
 
     // Create a dummy local segment.
     String segName = "seg01";
@@ -128,14 +132,14 @@ public class RealtimeTableDataManagerTest {
   @Test
   public void testAddSegmentNoBackupCopy()
       throws Exception {
-    RealtimeTableDataManager tmgr = new RealtimeTableDataManager(null);
-    TableDataManagerConfig tableDataManagerConfig = createTableDataManagerConfig();
-    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    InstanceDataManagerConfig instanceDataManagerConfig = createInstanceDataManagerConfig();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     TableConfig tableConfig = setupTableConfig(propertyStore);
     Schema schema = setupSchema(propertyStore);
-    tmgr.init(tableDataManagerConfig, "server01", propertyStore,
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
-        new TableDataManagerParams(0, false, -1));
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    RealtimeTableDataManager tmgr = new RealtimeTableDataManager(null);
+    tmgr.init(instanceDataManagerConfig, tableConfig, helixManager, null, null);
 
     // Create a raw segment and put it in deep store backed by local fs.
     String segName = "seg01";
@@ -159,14 +163,14 @@ public class RealtimeTableDataManagerTest {
   @Test
   public void testAddSegmentDefaultTierByTierBasedDirLoader()
       throws Exception {
-    RealtimeTableDataManager tmgr1 = new RealtimeTableDataManager(null);
-    TableDataManagerConfig tableDataManagerConfig = createTableDataManagerConfig();
-    ZkHelixPropertyStore propertyStore = mock(ZkHelixPropertyStore.class);
+    InstanceDataManagerConfig instanceDataManagerConfig = createInstanceDataManagerConfig();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     TableConfig tableConfig = setupTableConfig(propertyStore);
     Schema schema = setupSchema(propertyStore);
-    tmgr1.init(tableDataManagerConfig, "server01", propertyStore,
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
-        new TableDataManagerParams(0, false, -1));
+    HelixManager helixManager = mock(HelixManager.class);
+    when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
+    RealtimeTableDataManager tmgr1 = new RealtimeTableDataManager(null);
+    tmgr1.init(instanceDataManagerConfig, tableConfig, helixManager, null, null);
 
     // Create a raw segment and put it in deep store backed by local fs.
     String segName = "seg_tiered_01";
@@ -190,17 +194,10 @@ public class RealtimeTableDataManagerTest {
     // Now, repeat initialization of the table data manager
     tmgr1.shutDown();
     RealtimeTableDataManager tmgr2 = new RealtimeTableDataManager(null);
-    tableDataManagerConfig = createTableDataManagerConfig();
-    propertyStore = mock(ZkHelixPropertyStore.class);
-    tableConfig = setupTableConfig(propertyStore);
-    schema = setupSchema(propertyStore);
-    tmgr2.init(tableDataManagerConfig, "server01", propertyStore,
-        new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry()), mock(HelixManager.class), null, null,
-        new TableDataManagerParams(0, false, -1));
+    tmgr2.init(instanceDataManagerConfig, tableConfig, helixManager, null, null);
 
     // Reinitialize index loading config and try adding the segment
-    indexLoadingConfig =
-        TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, schema);
+    indexLoadingConfig = TableDataManagerTestUtils.createIndexLoadingConfig("tierBased", tableConfig, schema);
     tmgr2.addSegment(segName, indexLoadingConfig, segmentZKMetadata);
 
     // Make sure that the segment hasn't been moved
@@ -245,24 +242,22 @@ public class RealtimeTableDataManagerTest {
     return new File(TABLE_DATA_DIR, segName);
   }
 
-  private static TableDataManagerConfig createTableDataManagerConfig() {
-    TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
-    when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME_WITH_TYPE);
-    when(tableDataManagerConfig.getDataDir()).thenReturn(TABLE_DATA_DIR.getAbsolutePath());
-    return tableDataManagerConfig;
+  private static InstanceDataManagerConfig createInstanceDataManagerConfig() {
+    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+    return instanceDataManagerConfig;
   }
 
-  private static TableConfig setupTableConfig(ZkHelixPropertyStore propertyStore)
+  private static TableConfig setupTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore)
       throws Exception {
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).build();
     ZNRecord tableConfigZNRecord = TableConfigUtils.toZNRecord(tableConfig);
     when(propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(TABLE_NAME_WITH_TYPE), null,
         AccessOption.PERSISTENT)).thenReturn(tableConfigZNRecord);
     return tableConfig;
   }
 
-  private static Schema setupSchema(ZkHelixPropertyStore propertyStore) {
+  private static Schema setupSchema(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
         .addMetric(LONG_COLUMN, FieldSpec.DataType.LONG).build();

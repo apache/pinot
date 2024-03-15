@@ -108,6 +108,10 @@ public class PinotQueryResource {
   public String handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
+      if (!requestJson.has("sql")) {
+        return constructQueryExceptionResponse(QueryException.getException(QueryException.JSON_PARSING_ERROR,
+                "JSON Payload is missing the query string field 'sql'"));
+      }
       String sqlQuery = requestJson.get("sql").asText();
       String traceEnabled = "false";
       if (requestJson.has("trace")) {
@@ -242,7 +246,8 @@ public class PinotQueryResource {
       String inputTableName =
           sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
               .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
-      tableName = _pinotHelixResourceManager.getActualTableName(inputTableName);
+      tableName = _pinotHelixResourceManager.getActualTableName(inputTableName,
+          httpHeaders.getHeaderString(CommonConstants.DATABASE));
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
       try {

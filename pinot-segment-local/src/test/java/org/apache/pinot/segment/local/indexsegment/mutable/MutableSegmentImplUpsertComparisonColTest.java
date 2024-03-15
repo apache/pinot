@@ -21,8 +21,6 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 import java.io.File;
 import java.net.URL;
 import java.util.Collections;
-import java.util.concurrent.ExecutorService;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
@@ -86,9 +84,9 @@ public class MutableSegmentImplUpsertComparisonColTest {
     _schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
     _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
     File jsonFile = new File(dataResourceUrl.getFile());
-    TableUpsertMetadataManager tableUpsertMetadataManager = TableUpsertMetadataManagerFactory.create(_tableConfig);
-    tableUpsertMetadataManager.init(_tableConfig, _schema, _tableDataManager, mock(HelixManager.class),
-        mock(ExecutorService.class));
+    TableUpsertMetadataManager tableUpsertMetadataManager =
+        TableUpsertMetadataManagerFactory.create(_tableConfig, null);
+    tableUpsertMetadataManager.init(_tableConfig, _schema, _tableDataManager);
     _partitionUpsertMetadataManager = tableUpsertMetadataManager.getOrCreatePartitionManager(0);
     _mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(),
