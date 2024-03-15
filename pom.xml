@@ -2243,6 +2243,9 @@
 
             <!-- MISC -->
             <exclude>**/.factorypath</exclude>
+
+            <!-- specific files -->
+            <exclude>**/src/test/resources/*version-header.properties</exclude>
           </excludes>
         </configuration>
       </plugin>
