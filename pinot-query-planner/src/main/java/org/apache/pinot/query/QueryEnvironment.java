@@ -74,6 +74,7 @@ import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
@@ -85,7 +86,6 @@ import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
  * <p>It provide the higher level entry interface to convert a SQL string into a {@link DispatchableSubPlan}.
  */
 public class QueryEnvironment {
-  private static final String DATABASE_KEY = "database";
   // Calcite configurations
   private final FrameworkConfig _config;
 
@@ -361,7 +361,7 @@ public class QueryEnvironment {
   }
 
   private PlannerContext getPlannerContext(Map<String, String> options) {
-    String database = options.getOrDefault(DATABASE_KEY, "default");
+    String database = options.getOrDefault(CommonConstants.DATABASE, CommonConstants.DEFAULT_DATABASE);
     if (database.equalsIgnoreCase("default")) {
       return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, _traitProgram);
     } else {

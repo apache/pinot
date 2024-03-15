@@ -49,6 +49,7 @@ import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -178,8 +179,8 @@ public final class RelToPlanNodeConverter {
     if (node.getTable().getQualifiedName().size() == 1) {
       tableName = node.getTable().getQualifiedName().get(0);
     } else {
-      tableName = PinotCatalog.constructPhysicalTableName(
-          node.getTable().getQualifiedName().get(0), node.getTable().getQualifiedName().get(1));
+      tableName = DatabaseUtils.translateTableName(node.getTable().getQualifiedName().get(1),
+          node.getTable().getQualifiedName().get(0));
     }
     List<String> columnNames =
         node.getRowType().getFieldList().stream().map(RelDataTypeField::getName).collect(Collectors.toList());
@@ -298,7 +299,7 @@ public final class RelToPlanNodeConverter {
       if (split.length == 1) {
         tableNames.add(tableName);
       } else {
-        tableNames.add(PinotCatalog.constructPhysicalTableName(split[0], split[1]));
+        tableNames.add(DatabaseUtils.translateTableName(split[1], split[0]));
       }
     }
     return tableNames;
