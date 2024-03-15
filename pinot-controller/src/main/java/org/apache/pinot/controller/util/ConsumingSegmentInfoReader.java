@@ -94,7 +94,7 @@ public class ConsumingSegmentInfoReader {
     // Segments which are in CONSUMING state but found no consumer on the server
     Set<String> consumingSegments = _pinotHelixResourceManager.getConsumingSegments(tableNameWithType);
     consumingSegments.forEach(c -> consumingSegmentInfoMap.putIfAbsent(c, Collections.emptyList()));
-    return new ConsumingSegmentsInfoMap(consumingSegmentInfoMap, response._failedResponseCount);
+    return new ConsumingSegmentsInfoMap(consumingSegmentInfoMap, response._failedResponseCount, response._failedParses);
   }
 
   /**
@@ -134,7 +134,7 @@ public class ConsumingSegmentInfoReader {
       LOGGER.warn("Failed to parse {} / {} segment size info responses from servers.", failedParses, serverUrls.size());
     }
     return new ConsumingSegmentsInfoFromServersResponse(
-        serverToConsumingSegmentInfoList, serviceResponse._failedResponseCount);
+        serverToConsumingSegmentInfoList, serviceResponse._failedResponseCount, failedParses);
   }
 
   private String generateServerURL(String tableNameWithType, String endpoint) {
@@ -193,12 +193,16 @@ public class ConsumingSegmentInfoReader {
     public TreeMap<String, List<ConsumingSegmentInfo>> _segmentToConsumingInfoMap;
     @JsonProperty("serversFailingToRespond")
     public int _serversFailingToRespond;
+    @JsonProperty("serversUnparsableRespond")
+    public int _serversUnparsableRespond;
 
     public ConsumingSegmentsInfoMap(@JsonProperty("segmentToConsumingInfoMap")
         TreeMap<String, List<ConsumingSegmentInfo>> segmentToConsumingInfoMap,
-        @JsonProperty("serversFailingToRespond") int serversFailingToRespond) {
+        @JsonProperty("serversFailingToRespond") int serversFailingToRespond,
+        @JsonProperty("serversUnparsableRespond") int serversUnparsableRespond) {
       _segmentToConsumingInfoMap = segmentToConsumingInfoMap;
       _serversFailingToRespond = serversFailingToRespond;
+      _serversUnparsableRespond = serversUnparsableRespond;
     }
   }
 
@@ -264,11 +268,14 @@ public class ConsumingSegmentInfoReader {
   public static class ConsumingSegmentsInfoFromServersResponse {
     private final Map<String, List<SegmentConsumerInfo>> _serverToSegmentConsumerInfoMap;
     private final int _failedResponseCount;
+    private final int _failedParses;
 
     public ConsumingSegmentsInfoFromServersResponse(
-        Map<String, List<SegmentConsumerInfo>> serverToSegmentConsumerInfoMap, int failedResponseCount) {
+        Map<String, List<SegmentConsumerInfo>> serverToSegmentConsumerInfoMap, int failedResponseCount,
+        int failedParses) {
       _serverToSegmentConsumerInfoMap = serverToSegmentConsumerInfoMap;
       _failedResponseCount = failedResponseCount;
+      _failedParses = failedParses;
     }
   }
 }
