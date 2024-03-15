@@ -142,6 +142,20 @@ public class SegmentMetadataPropertyConfigTest {
     testSegmentMetadataContent(configuration);
   }
 
+  @Test
+  public void testSegmentMetadataWithVersionHeader()
+      throws ConfigurationException {
+    File oldSegmentProperties = new File(
+        Objects.requireNonNull(
+            PropertiesConfiguration.class.getClassLoader()
+                .getResource("segment-metadata-with-version-header.properties")).getFile());
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.
+        segmentMetadataFromFile(oldSegmentProperties, true, true,
+        PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
+
+    testSegmentMetadataContent(configuration);
+  }
+
   private static void testSegmentMetadataContent(PropertiesConfiguration configuration) {
     // getting all the keys, length of the list should be equal to the number of lines in the segment metadata
     List<String> keys = CommonsConfigurationUtils.getKeys(configuration);
@@ -163,6 +177,11 @@ public class SegmentMetadataPropertyConfigTest {
     assertEquals(segmentDimensionColumnNames.length, 8);
     assertEquals(String.join(",", segmentDimensionColumnNames),
         "ProductId,Score,Summary,Text,UserId,combined,embedding,n_tokens");
+
+    // asserting segment.index.version
+    String segmentIndexVersion = configuration.getString("segment.index.version");
+    assertNotNull(segmentIndexVersion);
+    assertEquals(segmentIndexVersion, "v3");
   }
 
   private static void testPropertyKeys(List<String> recoveredKeys, String[] actualKeys) {
