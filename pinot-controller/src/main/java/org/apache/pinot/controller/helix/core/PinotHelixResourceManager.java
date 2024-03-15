@@ -732,20 +732,12 @@ public class PinotHelixResourceManager {
   public List<String> getAllTables(@Nullable String databaseName) {
     List<String> tableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
-      if (TableNameBuilder.isTableResource(resourceName) && isPartOfDatabase(resourceName, databaseName)) {
+      if (TableNameBuilder.isTableResource(resourceName) &&
+          DatabaseUtils.isPartOfDatabase(resourceName, databaseName)) {
         tableNames.add(resourceName);
       }
     }
     return tableNames;
-  }
-
-  private boolean isPartOfDatabase(String tableName, @Nullable String databaseName) {
-    // assumes tableName will not have default database prefix ('default.')
-    if (StringUtils.isEmpty(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-      return StringUtils.split(tableName, '.').length == 1;
-    } else {
-      return tableName.startsWith(databaseName + ".");
-    }
   }
 
   /**
@@ -766,7 +758,8 @@ public class PinotHelixResourceManager {
   public List<String> getAllOfflineTables(@Nullable String databaseName) {
     List<String> offlineTableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
-      if (isPartOfDatabase(resourceName, databaseName) && TableNameBuilder.isOfflineTableResource(resourceName)) {
+      if (DatabaseUtils.isPartOfDatabase(resourceName, databaseName) &&
+          TableNameBuilder.isOfflineTableResource(resourceName)) {
         offlineTableNames.add(resourceName);
       }
     }
@@ -790,7 +783,7 @@ public class PinotHelixResourceManager {
    */
   public List<String> getAllDimensionTables(@Nullable String databaseName) {
     return _tableCache.getAllDimensionTables().stream()
-        .filter(table -> isPartOfDatabase(table, databaseName))
+        .filter(table -> DatabaseUtils.isPartOfDatabase(table, databaseName))
         .collect(Collectors.toList());
   }
 
@@ -812,7 +805,8 @@ public class PinotHelixResourceManager {
   public List<String> getAllRealtimeTables(@Nullable String databaseName) {
     List<String> realtimeTableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
-      if (isPartOfDatabase(resourceName, databaseName) && TableNameBuilder.isRealtimeTableResource(resourceName)) {
+      if (DatabaseUtils.isPartOfDatabase(resourceName, databaseName) &&
+          TableNameBuilder.isRealtimeTableResource(resourceName)) {
         realtimeTableNames.add(resourceName);
       }
     }
@@ -837,7 +831,8 @@ public class PinotHelixResourceManager {
   public List<String> getAllRawTables(@Nullable String databaseName) {
     Set<String> rawTableNames = new HashSet<>();
     for (String resourceName : getAllResources()) {
-      if (TableNameBuilder.isTableResource(resourceName) && isPartOfDatabase(resourceName, databaseName)) {
+      if (TableNameBuilder.isTableResource(resourceName) &&
+          DatabaseUtils.isPartOfDatabase(resourceName, databaseName)) {
         rawTableNames.add(TableNameBuilder.extractRawTableName(resourceName));
       }
     }
@@ -1616,7 +1611,7 @@ public class PinotHelixResourceManager {
     List<String> schemas = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
     if (schemas != null) {
-      return schemas.stream().filter(schemaName -> isPartOfDatabase(schemaName, databaseName))
+      return schemas.stream().filter(schemaName -> DatabaseUtils.isPartOfDatabase(schemaName, databaseName))
           .collect(Collectors.toList());
     }
     return Collections.emptyList();
@@ -4011,7 +4006,7 @@ public class PinotHelixResourceManager {
     ZNRecord znRecord = ev.getRecord();
     for (Map.Entry<String, Map<String, String>> tableToBrokersEntry : znRecord.getMapFields().entrySet()) {
       String tableName = tableToBrokersEntry.getKey();
-      if (!isPartOfDatabase(tableName, databaseName)) {
+      if (!DatabaseUtils.isPartOfDatabase(tableName, databaseName)) {
         continue;
       }
       Map<String, String> brokersToState = tableToBrokersEntry.getValue();
