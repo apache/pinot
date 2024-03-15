@@ -732,8 +732,8 @@ public class PinotHelixResourceManager {
   public List<String> getAllTables(@Nullable String databaseName) {
     List<String> tableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
-      if (TableNameBuilder.isTableResource(resourceName) &&
-          DatabaseUtils.isPartOfDatabase(resourceName, databaseName)) {
+      if (TableNameBuilder.isTableResource(resourceName)
+          && DatabaseUtils.isPartOfDatabase(resourceName, databaseName)) {
         tableNames.add(resourceName);
       }
     }
@@ -758,8 +758,8 @@ public class PinotHelixResourceManager {
   public List<String> getAllOfflineTables(@Nullable String databaseName) {
     List<String> offlineTableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
-      if (DatabaseUtils.isPartOfDatabase(resourceName, databaseName) &&
-          TableNameBuilder.isOfflineTableResource(resourceName)) {
+      if (DatabaseUtils.isPartOfDatabase(resourceName, databaseName)
+          && TableNameBuilder.isOfflineTableResource(resourceName)) {
         offlineTableNames.add(resourceName);
       }
     }
@@ -805,8 +805,8 @@ public class PinotHelixResourceManager {
   public List<String> getAllRealtimeTables(@Nullable String databaseName) {
     List<String> realtimeTableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
-      if (DatabaseUtils.isPartOfDatabase(resourceName, databaseName) &&
-          TableNameBuilder.isRealtimeTableResource(resourceName)) {
+      if (DatabaseUtils.isPartOfDatabase(resourceName, databaseName)
+          && TableNameBuilder.isRealtimeTableResource(resourceName)) {
         realtimeTableNames.add(resourceName);
       }
     }
@@ -831,8 +831,8 @@ public class PinotHelixResourceManager {
   public List<String> getAllRawTables(@Nullable String databaseName) {
     Set<String> rawTableNames = new HashSet<>();
     for (String resourceName : getAllResources()) {
-      if (TableNameBuilder.isTableResource(resourceName) &&
-          DatabaseUtils.isPartOfDatabase(resourceName, databaseName)) {
+      if (TableNameBuilder.isTableResource(resourceName)
+          && DatabaseUtils.isPartOfDatabase(resourceName, databaseName)) {
         rawTableNames.add(TableNameBuilder.extractRawTableName(resourceName));
       }
     }
