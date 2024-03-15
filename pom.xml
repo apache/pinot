@@ -181,7 +181,7 @@
 
     <confluent.version>7.6.1</confluent.version>
     <pulsar.version>3.2.2</pulsar.version>
-    <flink.version>1.14.6</flink.version>
+    <flink.version>1.19.0</flink.version>
 
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.14.0</commons-lang3.version>
@@ -1448,14 +1448,26 @@
 
       <dependency>
         <groupId>org.apache.flink</groupId>
-        <artifactId>flink-clients_${scala.compat.version}</artifactId>
+        <artifactId>flink-clients</artifactId>
         <version>${flink.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.apache.flink</groupId>
-        <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
+        <artifactId>flink-streaming-java</artifactId>
         <version>${flink.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-java</artifactId>
+        <version>${flink.version}</version>
+        <exclusions>
+          <!-- excluding Kryo library due to Maven Enforcer convergence error -->
+          <exclusion>
+            <groupId>com.esotericsoftware.kryo</groupId>
+            <artifactId>kryo</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
