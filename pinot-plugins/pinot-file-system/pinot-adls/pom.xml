@@ -37,25 +37,14 @@
   </properties>
   <dependencies>
     <dependency>
-      <groupId>com.microsoft.azure</groupId>
-      <artifactId>azure-data-lake-store-sdk</artifactId>
-      <version>2.3.10</version>
-    </dependency>
-    <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-storage-file-datalake</artifactId>
-      <version>12.16.0</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.fasterxml.woodstox</groupId>
-          <artifactId>woodstox-core</artifactId>
-        </exclusion>
-      </exclusions>
+      <version>12.18.2</version>
     </dependency>
     <dependency>
       <groupId>com.azure</groupId>
       <artifactId>azure-identity</artifactId>
-      <version>1.11.1</version>
+      <version>1.11.3</version>
     </dependency>
   </dependencies>
   <dependencyManagement>
@@ -76,10 +65,6 @@
         <version>3.6.2</version>
       </dependency>
       <dependency>
-        <groupId>com.fasterxml.woodstox</groupId>
-        <artifactId>woodstox-core</artifactId>
-      </dependency>
-      <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna-platform</artifactId>
         <version>5.6.0</version>
@@ -92,12 +77,11 @@
       <dependency>
         <groupId>com.microsoft.azure</groupId>
         <artifactId>msal4j</artifactId>
-        <version>1.13.10</version>
+        <version>1.14.3</version>
       </dependency>
       <dependency>
         <groupId>com.nimbusds</groupId>
         <artifactId>nimbus-jose-jwt</artifactId>
-        <version>9.37.3</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

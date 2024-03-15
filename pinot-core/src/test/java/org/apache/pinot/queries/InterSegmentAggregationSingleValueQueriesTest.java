@@ -301,7 +301,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 24516L, 252256L, 49032L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
-    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{3495L, 12022L}));
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{3495L, 12031L}));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable);
 
     brokerResponse = getBrokerResponse(query + FILTER + GROUP_BY);
@@ -365,7 +365,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         cardinalityExtractor);
 
     brokerResponse = getBrokerResponse(query + GROUP_BY);
-    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{3495L, 12022L}));
+    expectedResultTable = new ResultTable(expectedDataSchema, Collections.singletonList(new Object[]{3495L, 12031L}));
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 120000L, 0L, 360000L, 120000L, expectedResultTable,
         cardinalityExtractor);
 

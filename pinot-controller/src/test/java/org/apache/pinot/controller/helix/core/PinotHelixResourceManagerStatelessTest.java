@@ -148,6 +148,17 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   }
 
   @Test
+  public void testGetInstancesByTag() {
+    List<String> controllersByTag = _helixResourceManager.getAllInstancesWithTag("controller");
+    List<InstanceConfig> controllerConfigs = _helixResourceManager.getAllControllerInstanceConfigs();
+
+    assertEquals(controllersByTag.size(), controllerConfigs.size());
+    for (InstanceConfig c: controllerConfigs) {
+      assertTrue(controllersByTag.contains(c.getInstanceName()));
+    }
+  }
+
+  @Test
   public void testGetDataInstanceAdminEndpoints()
       throws Exception {
     Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);

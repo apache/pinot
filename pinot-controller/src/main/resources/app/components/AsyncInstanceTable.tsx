@@ -88,7 +88,7 @@ export const AsyncInstanceTable = ({
 
   useEffect(() => {
     const instances = fetchInstances(instanceType, tenant);
-    if (showInstanceDetails) {
+    if (showInstanceDetails && cluster.length > 0) {
       const instanceDetails = instances.then(async (instancesData) => {
         const liveInstanceArr = await PinotMethodUtils.getLiveInstance(cluster);
         return PinotMethodUtils.getInstanceData(

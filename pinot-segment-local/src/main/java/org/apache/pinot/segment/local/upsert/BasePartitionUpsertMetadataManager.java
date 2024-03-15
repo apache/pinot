@@ -887,6 +887,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
+    int numMissedSegments = numTrackedSegments - numImmutableSegments - numConsumingSegments;
+    if (numMissedSegments > 0) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
+          ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
+      _logger.warn("Missed taking snapshot for {} immutable segments", numMissedSegments);
+    }
     _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
             + "{} are consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);

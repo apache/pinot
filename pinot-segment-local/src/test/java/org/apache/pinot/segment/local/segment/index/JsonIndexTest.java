@@ -24,6 +24,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
@@ -519,6 +520,63 @@ public class JsonIndexTest {
     String[] records = {"{\"key1\":\"va\""};
 
     createIndex(true, jsonIndexConfig, records);
+  }
+
+
+  @Test
+  public void testGetMatchingValDocIdsPairForArrayPath() throws Exception {
+    String[] records = {
+            "{\"foo\":[{\"bar\":[\"x\",\"y\"]},{\"bar\":[\"a\",\"b\"]}],\"foo2\":[\"u\"]}",
+            "{\"foo\":[{\"bar\":[\"y\",\"z\"]}],\"foo2\":[\"u\"]}"
+    };
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(offHeapIndexFile.exists());
+
+    String[] keys = {".foo[0].bar[1]", ".foo[1].bar[0]", ".foo2[0]", ".foo[100].bar[100]", ".foo[0].bar[*]",
+            ".foo[*].bar[0]", ".foo[*].bar[*]"};
+    List<Map<String, RoaringBitmap>> expected = List.of(
+            Map.of("y", RoaringBitmap.bitmapOf(0), "z", RoaringBitmap.bitmapOf(1)),
+            Map.of("a", RoaringBitmap.bitmapOf(0)),
+            Map.of("u", RoaringBitmap.bitmapOf(0, 1)),
+            Collections.emptyMap(),
+            Map.of("x", RoaringBitmap.bitmapOf(0),
+                    "y", RoaringBitmap.bitmapOf(0, 1),
+                    "z", RoaringBitmap.bitmapOf(1)),
+            Map.of("x", RoaringBitmap.bitmapOf(0),
+                    "a", RoaringBitmap.bitmapOf(0),
+                    "y", RoaringBitmap.bitmapOf(1)),
+            Map.of("x", RoaringBitmap.bitmapOf(0),
+                    "y", RoaringBitmap.bitmapOf(0, 1),
+                    "z", RoaringBitmap.bitmapOf(1),
+                    "a", RoaringBitmap.bitmapOf(0),
+                    "b", RoaringBitmap.bitmapOf(0))
+    );
+
+    try (PinotDataBuffer onHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+         PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+         JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
+         JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
+         MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+      for (String record : records) {
+        mutableJsonIndex.add(record);
+      }
+
+      for (int i = 0; i < keys.length; i++) {
+        Map<String, RoaringBitmap> onHeapRes = onHeapIndexReader.getMatchingDocsMap(keys[i]);
+        Map<String, RoaringBitmap> offHeapRes = offHeapIndexReader.getMatchingDocsMap(keys[i]);
+        Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingDocsMap(keys[i]);
+        Assert.assertEquals(expected.get(i), onHeapRes);
+        Assert.assertEquals(expected.get(i), offHeapRes);
+        Assert.assertEquals(mutableRes, expected.get(i));
+      }
+    }
   }
 
   public static class ConfTest extends AbstractSerdeIndexContract {

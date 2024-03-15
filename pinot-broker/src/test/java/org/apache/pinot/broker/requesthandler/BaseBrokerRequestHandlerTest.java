@@ -28,6 +28,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import javax.annotation.Nullable;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedHashMap;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
@@ -90,6 +92,12 @@ public class BaseBrokerRequestHandlerTest {
     String actualColumnName =
         BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable.student_name", columnNameMap, false);
     Assert.assertEquals(actualColumnName, "student_name");
+    Assert.assertEquals(
+        BaseBrokerRequestHandler.getActualColumnName("db1.mytable", "db1.mytable.student_name", columnNameMap, false),
+        "student_name");
+    Assert.assertEquals(
+        BaseBrokerRequestHandler.getActualColumnName("db1.mytable", "mytable.student_name", columnNameMap, false),
+        "student_name");
     boolean exceptionThrown = false;
     try {
       BaseBrokerRequestHandler.getActualColumnName("mytable", "mytable2.student_name", columnNameMap, false);
@@ -124,6 +132,12 @@ public class BaseBrokerRequestHandlerTest {
     String actualColumnName =
         BaseBrokerRequestHandler.getActualColumnName("mytable", "MYTABLE.student_name", columnNameMap, true);
     Assert.assertEquals(actualColumnName, "student_name");
+    Assert.assertEquals(
+        BaseBrokerRequestHandler.getActualColumnName("db1.MYTABLE", "DB1.mytable.student_name", columnNameMap, true),
+        "student_name");
+    Assert.assertEquals(
+        BaseBrokerRequestHandler.getActualColumnName("db1.mytable", "MYTABLE.student_name", columnNameMap, true),
+        "student_name");
     boolean exceptionThrown = false;
     try {
       BaseBrokerRequestHandler.getActualColumnName("student", "MYTABLE2.student_name", columnNameMap, true);
@@ -151,6 +165,9 @@ public class BaseBrokerRequestHandlerTest {
     TableCache tableCache = mock(TableCache.class);
     TableConfig tableCfg = mock(TableConfig.class);
     when(tableCache.getActualTableName(anyString())).thenReturn(tableName);
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
+    when(headers.getHeaderString(anyString())).thenReturn(null);
     TenantConfig tenant = new TenantConfig("tier_BROKER", "tier_SERVER", null);
     when(tableCfg.getTenantConfig()).thenReturn(tenant);
     when(tableCache.getTableConfig(anyString())).thenReturn(tableCfg);
@@ -198,7 +215,7 @@ public class BaseBrokerRequestHandlerTest {
         JsonNode request = JsonUtils.stringToJsonNode(
             String.format("{\"sql\":\"select * from %s limit 10\",\"queryOptions\":\"timeoutMs=10000\"}", tableName));
         RequestContext requestStats = Tracing.getTracer().createRequestScope();
-        requestHandler.handleRequest(request, null, requestStats, null);
+        requestHandler.handleRequest(request, null, requestStats, headers);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
