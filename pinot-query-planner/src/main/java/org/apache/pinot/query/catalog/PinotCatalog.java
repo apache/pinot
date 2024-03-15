@@ -37,6 +37,8 @@ import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -49,8 +51,6 @@ import static java.util.Objects.requireNonNull;
  * entire catalog. In Pinot, since we don't have nested sub-catalog concept, we just return a flat list of schemas.
  */
 public class PinotCatalog implements Schema {
-
-  public static final String DEFAULT_DB_NAME = "default";
 
   private final TableCache _tableCache;
 
@@ -87,8 +87,8 @@ public class PinotCatalog implements Schema {
             CalciteSchemaBuilder.asSubSchema(new PinotCatalog(databaseName, tableCache), databaseName));
       }
     }
-    subCatalog.put(DEFAULT_DB_NAME,
-        CalciteSchemaBuilder.asSubSchema(new PinotCatalog(DEFAULT_DB_NAME, tableCache), DEFAULT_DB_NAME));
+    subCatalog.put(CommonConstants.DEFAULT_DATABASE, CalciteSchemaBuilder.asSubSchema(
+        new PinotCatalog(CommonConstants.DEFAULT_DATABASE, tableCache), CommonConstants.DEFAULT_DATABASE));
     return subCatalog;
   }
 
@@ -100,21 +100,12 @@ public class PinotCatalog implements Schema {
   @Override
   public Table getTable(String name) {
     String rawTableName = TableNameBuilder.extractRawTableName(name);
-    String tableName;
-    if (_databaseName != null) {
-      tableName = constructPhysicalTableName(_databaseName, rawTableName);
-    } else {
-      tableName = rawTableName;
-    }
+    String tableName = DatabaseUtils.translateTableName(rawTableName, _databaseName);
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
     if (schema == null) {
       throw new IllegalArgumentException(String.format("Could not find schema for table: '%s'", tableName));
     }
     return new PinotTable(schema);
-  }
-
-  public static String constructPhysicalTableName(String databaseName, String tableName) {
-    return databaseName.equals(DEFAULT_DB_NAME) ? tableName : databaseName + "." + tableName;
   }
 
   /**
@@ -124,10 +115,9 @@ public class PinotCatalog implements Schema {
   @Override
   public Set<String> getTableNames() {
     if (_databaseName != null) {
-      return _databaseName.equals(DEFAULT_DB_NAME) ? _tableCache.getTableNameMap().keySet().stream()
-          .filter(n -> StringUtils.split(n, '.').length == 1).collect(Collectors.toSet())
-          : _tableCache.getTableNameMap().keySet().stream().filter(n -> n.startsWith(_databaseName))
-              .collect(Collectors.toSet());
+      return _tableCache.getTableNameMap().keySet().stream()
+          .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
+          .collect(Collectors.toSet());
     } else {
       return Collections.emptySet();
     }
