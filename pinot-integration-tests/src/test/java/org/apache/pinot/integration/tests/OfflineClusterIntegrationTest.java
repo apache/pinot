@@ -2772,11 +2772,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     testQuery(pinotQuery, h2Query);
 
     pinotQuery = "SELECT DISTINCT Carrier FROM default.mytable LIMIT 1000000";
-    JsonNode response = postQuery(pinotQuery);
-    JsonNode exceptions = response.get("exceptions");
-    assertFalse(exceptions.isEmpty(), "At least one exception was expected");
-    JsonNode firstException = exceptions.get(0);
-    assertEquals(firstException.get("errorCode").asInt(), QueryException.QUERY_PLANNING_ERROR_CODE);
+    testQuery(pinotQuery, h2Query);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
