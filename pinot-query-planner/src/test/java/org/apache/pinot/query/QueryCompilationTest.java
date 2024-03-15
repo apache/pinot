@@ -74,6 +74,23 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     }
   }
 
+  @Test
+  public void testAggregateCaseToFilter() {
+    // Tests that queries like "SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a" are rewritten to
+    // "SELECT COUNT(a) FROM a WHERE col1 = 'a'"
+    String query = "EXPLAIN PLAN FOR SELECT SUM(CASE WHEN col1 = 'a' THEN 1 ELSE 0 END) FROM a";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    assertEquals(explain,
+        "Execution Plan\n"
+        + "LogicalProject(EXPR$0=[CAST($0):BIGINT])\n"
+        + "  LogicalAggregate(group=[{}], agg#0=[COUNT($0)])\n"
+        + "    PinotLogicalExchange(distribution=[hash])\n"
+        + "      LogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0])\n"
+        + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
+        + "          LogicalTableScan(table=[[a]])\n");
+  }
+
   private static void assertGroupBySingletonAfterJoin(DispatchableSubPlan dispatchableSubPlan, boolean shouldRewrite) {
     for (int stageId = 0; stageId < dispatchableSubPlan.getQueryStageList().size(); stageId++) {
       if (dispatchableSubPlan.getTableNames().size() == 0 && !PlannerUtils.isRootPlanFragment(stageId)) {

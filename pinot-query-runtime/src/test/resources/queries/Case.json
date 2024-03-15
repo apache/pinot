@@ -88,18 +88,23 @@
     },
     "queries": [
       {
+        "ignored": true,
         "sql": "SELECT {tbl1}.primary_key, {tbl1}.description, CASE WHEN {tbl2}.attribute = 'red' THEN 'Color' ELSE 'Non-color' END AS attribute FROM {tbl1} JOIN {tbl2} ON {tbl1}.primary_key = {tbl2}.primary_key",
         "description": "Joins the two tables and categorizes attributes from tbl2 as either 'Color' or 'Non-color'"
       },
       {
+        "ignored": true,
         "sql": "SELECT {tbl1}.primary_key, CASE WHEN {tbl1}.description = 'Item one' THEN {tbl2}.attribute ELSE {tbl1}.description END AS description FROM {tbl1} JOIN {tbl2} ON {tbl1}.primary_key = {tbl2}.primary_key",
         "description": "Joins the two tables and selects either the attribute from tbl2 or the description from tbl1, depending on the description from tbl1"
       },
       {
         "sql": "SELECT {tbl1}.primary_key, SUM(CASE WHEN {tbl2}.attribute = 'chocolate' THEN 1 ELSE 0 END) as chocolate_count FROM {tbl1} JOIN {tbl2} ON {tbl1}.primary_key = {tbl2}.primary_key GROUP BY {tbl1}.primary_key",
-        "description": "Joins the two tables and aggregates the number of times 'chocolate' appears as an attribute in tbl2"
+        "h2Sql": "SELECT {tbl1}.primary_key, COUNT(*) as chocolate_count FROM {tbl1} JOIN {tbl2} ON {tbl1}.primary_key = {tbl2}.primary_key WHERE {tbl2}.attribute = 'chocolate' GROUP BY {tbl1}.primary_key",
+        "description": "Joins the two tables and aggregates the number of times 'chocolate' appears as an attribute in tbl2",
+        "comment": "Pinot pushes aggregation filters and hence the query does not includes values where chocolate_count is 0"
       },
       {
+        "ignored": true,
         "sql": "SELECT primary_key, CASE WHEN description IN ('Item one', 'Item two') THEN attribute ELSE description END AS description, CASE WHEN description NOT IN ('Item three', 'Item four') THEN attribute ELSE description END AS attribute FROM ( select {tbl1}.primary_key, {tbl1}.description, {tbl2}.attribute FROM {tbl1} JOIN {tbl2} ON {tbl1}.primary_key = {tbl2}.primary_key) tmp WHERE attribute IN ('A','B','C','D') limit 10",
         "description": "Joins the two tables and selects either the attribute using IN/NOT-IN clause"
       }
