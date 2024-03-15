@@ -22,6 +22,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -65,7 +66,9 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
     // catch direct memory oom here
-    if (cause instanceof OutOfMemoryError && cause.getMessage().contains("Direct buffer")) {
+    ;
+    if (cause instanceof OutOfMemoryError
+        && StringUtils.containsIgnoreCase(cause.getMessage(), "direct buffer")) {
       BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.DIRECT_MEMORY_OOM, 1L);
       // only one thread can get here and do the shutdown
       if (DIRECT_OOM_SHUTTING_DOWN.compareAndSet(false, true)) {
