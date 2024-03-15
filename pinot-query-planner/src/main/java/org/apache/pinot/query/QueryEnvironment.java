@@ -362,7 +362,7 @@ public class QueryEnvironment {
 
   private PlannerContext getPlannerContext(Map<String, String> options) {
     String database = options.getOrDefault(CommonConstants.DATABASE, CommonConstants.DEFAULT_DATABASE);
-    if (database.equalsIgnoreCase("default")) {
+    if (database.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
       return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, _traitProgram);
     } else {
       Prepare.CatalogReader catalogReader = getCatalog(database);
