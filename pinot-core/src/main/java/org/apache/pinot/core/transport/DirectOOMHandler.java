@@ -66,7 +66,6 @@ public class DirectOOMHandler extends ChannelInboundHandlerAdapter {
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
     // catch direct memory oom here
-    ;
     if (cause instanceof OutOfMemoryError
         && StringUtils.containsIgnoreCase(cause.getMessage(), "direct buffer")) {
       BrokerMetrics.get().addMeteredGlobalValue(BrokerMeter.DIRECT_MEMORY_OOM, 1L);
