@@ -107,6 +107,15 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
    * @param initialAcum the initial value of the accumulator
    * @param <A> The type of the accumulator
    */
+  public <A> A foldNotNull(int length, BlockValSet blockValSet, A initialAcum, Reducer<A> reducer) {
+    return foldNotNull(length, blockValSet.getNullBitmap(), initialAcum, reducer);
+  }
+
+  /**
+   * Folds over the non-null ranges of the blockValSet using the reducer.
+   * @param initialAcum the initial value of the accumulator
+   * @param <A> The type of the accumulator
+   */
   public <A> A foldNotNull(int length, @Nullable RoaringBitmap roaringBitmap, A initialAcum, Reducer<A> reducer) {
     IntIterator intIterator = roaringBitmap == null ? null : roaringBitmap.getIntIterator();
     return foldNotNull(length, intIterator, initialAcum, reducer);

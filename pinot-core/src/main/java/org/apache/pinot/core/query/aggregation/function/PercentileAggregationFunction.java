@@ -77,8 +77,12 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     DoubleArrayList valueList = getValueList(aggregationResultHolder);
-    forEachNotNullDouble(length, blockValSetMap.get(_expression), value -> {
-      valueList.add(value);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[] valueArray = blockValSet.getDoubleValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        valueList.add(valueArray[i]);
+      }
     });
   }
 
@@ -86,19 +90,27 @@ public class PercentileAggregationFunction extends NullableSingleInputAggregatio
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    forEachNotNullDouble(length, blockValSet, (i, value) -> {
-      DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-      valueList.add(value);
+    double[] valueArray = blockValSet.getDoubleValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
+        valueList.add(valueArray[i]);
+      }
     });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    forEachNotNullDouble(length, blockValSetMap.get(_expression), (i, value) -> {
-      for (int groupKey : groupKeysArray[i]) {
-        DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
-        valueList.add(value);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[] valueArray = blockValSet.getDoubleValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double value = valueArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
+          valueList.add(value);
+        }
       }
     });
   }

@@ -104,9 +104,12 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
       TDigest tDigest = getDefaultTDigest(aggregationResultHolder, _compressionFactor);
-      forEachNotNullDouble(length, blockValSet, value -> {
-        tDigest.add(value);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          tDigest.add(doubleValues[i]);
+        }
       });
     } else {
       // Serialized TDigest
@@ -133,19 +136,25 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
-      forEachNotNullDouble(length, blockValSet, (i, value) -> {
-        getDefaultTDigest(groupByResultHolder, groupKeyArray[i], _compressionFactor).add(value);
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          getDefaultTDigest(groupByResultHolder, groupKeyArray[i], _compressionFactor).add(doubleValues[i]);
+        }
       });
     } else {
       // Serialized TDigest
-      forEachNotNullBytes(length, blockValSet, (i, bytes) -> {
-        TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes);
-        int groupKey = groupKeyArray[i];
-        TDigest tDigest = groupByResultHolder.getResult(groupKey);
-        if (tDigest != null) {
-          tDigest.add(value);
-        } else {
-          groupByResultHolder.setValueForKey(groupKey, value);
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]);
+          int groupKey = groupKeyArray[i];
+          TDigest tDigest = groupByResultHolder.getResult(groupKey);
+          if (tDigest != null) {
+            tDigest.add(value);
+          } else {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
         }
       });
     }
@@ -156,22 +165,29 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
-      forEachNotNullDouble(length, blockValSet, (i, value) -> {
-        for (int groupKey : groupKeysArray[i]) {
-          getDefaultTDigest(groupByResultHolder, groupKey, _compressionFactor).add(value);
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          double value = doubleValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            getDefaultTDigest(groupByResultHolder, groupKey, _compressionFactor).add(value);
+          }
         }
       });
     } else {
       // Serialized QuantileDigest
-      forEachNotNullBytes(length, blockValSet, (i, bytes) -> {
-        TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes);
-        for (int groupKey : groupKeysArray[i]) {
-          TDigest tDigest = groupByResultHolder.getResult(groupKey);
-          if (tDigest != null) {
-            tDigest.add(value);
-          } else {
-            // Create a new TDigest for the group
-            groupByResultHolder.setValueForKey(groupKey, ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytes));
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            TDigest tDigest = groupByResultHolder.getResult(groupKey);
+            if (tDigest != null) {
+              tDigest.add(value);
+            } else {
+              // Create a new TDigest for the group
+              groupByResultHolder.setValueForKey(groupKey, ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]));
+            }
           }
         }
       });

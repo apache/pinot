@@ -132,18 +132,21 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
       BlockValSet blockValSet) {
     TDigest tDigest = aggregationResultHolder.getResult();
     if (blockValSet.isSingleValue()) {
-      forEachNotNullDouble(length, blockValSet, value -> {
-        tDigest.add(value);
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          tDigest.add(doubleValues[i]);
+        }
       });
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
-      forEachNotNull(length, blockValSet, ((fromInclusive, toExclusive) -> {
-        for (int i = fromInclusive; i < toExclusive; i++) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
           for (double value : doubleValues[i]) {
             tDigest.add(value);
           }
         }
-      }));
+      });
     }
   }
 
@@ -166,11 +169,9 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
       );
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
-      forEachNotNull(length, blockValSet, (from, toEx) -> {
-        for (int i = from; i < toEx; i++) {
-          valueList.addElements(valueList.size(), doubleValues[i]);
-        }
-      });
+      forEachNotNull(length, blockValSet, (from, toEx) ->
+        valueList.addElements(valueList.size(), doubleValues[from], 0, toEx - from)
+      );
     }
     if (valueList.size() > _threshold) {
       aggregationResultHolder.setValue(convertValueListToTDigest(valueList));
@@ -192,14 +193,17 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     validateValueType(blockValSet);
     if (blockValSet.isSingleValue()) {
-      forEachNotNullDouble(length, blockValSet, (i, value) -> {
-        DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
-        valueList.add(value);
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
+          valueList.add(doubleValues[i]);
+        }
       });
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
-      forEachNotNull(length, blockValSet, (from, toEx) -> {
-        for (int i = from; i < toEx; i++) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
           DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
           valueList.addElements(valueList.size(), doubleValues[i]);
         }
@@ -222,15 +226,18 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     validateValueType(blockValSet);
     if (blockValSet.isSingleValue()) {
-      forEachNotNullDouble(length, blockValSet, (i, value) -> {
-        for (int groupKey : groupKeysArray[i]) {
-          getValueList(groupByResultHolder, groupKey).add(value);
+      double[] doubleValues = blockValSet.getDoubleValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            getValueList(groupByResultHolder, groupKey).add(doubleValues[i]);
+          }
         }
       });
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
-      forEachNotNull(length, blockValSet, (from, toEx) -> {
-        for (int i = from; i < toEx; i++) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
           for (int groupKey : groupKeysArray[i]) {
             DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
             valueList.addElements(valueList.size(), doubleValues[i]);
