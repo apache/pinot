@@ -26,6 +26,7 @@ import org.apache.lucene.queries.spans.SpanTermQuery;
 import org.apache.lucene.search.AutomatonQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
@@ -61,7 +62,8 @@ public class LuceneTextIndexUtils {
       return query;
     }
     SpanNearQuery spanNearQuery = new SpanNearQuery(spanQueryLst.toArray(new SpanQuery[0]), 0, true);
-    LOGGER.error("The phrase query {} is re-written as {}", query, spanNearQuery);
+    IndexSearcher.setMaxClauseCount(Integer.MAX_VALUE);
+    LOGGER.info("The phrase query {} is re-written as {}", query, spanNearQuery);
     return spanNearQuery;
   }
 }
