@@ -169,8 +169,11 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
       );
     } else {
       double[][] doubleValues = blockValSet.getDoubleValuesMV();
-      forEachNotNull(length, blockValSet, (from, toEx) ->
-        valueList.addElements(valueList.size(), doubleValues[from], 0, toEx - from)
+      forEachNotNull(length, blockValSet, (from, toEx) -> {
+          for (int i = 0; i < length; i++) {
+            valueList.addElements(valueList.size(), doubleValues[i]);
+          }
+        }
       );
     }
     if (valueList.size() > _threshold) {

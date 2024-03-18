@@ -82,9 +82,11 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
     if (blockValSet.getValueType() != DataType.BYTES) {
       long[] longValues = blockValSet.getLongValuesSV();
       QuantileDigest quantileDigest = getDefaultQuantileDigest(aggregationResultHolder);
-      for (int i = 0; i < length; i++) {
-        quantileDigest.add(longValues[i]);
-      }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          quantileDigest.add(longValues[i]);
+        }
+      });
     } else {
       // Serialized QuantileDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
