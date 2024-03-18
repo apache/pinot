@@ -56,7 +56,7 @@ public class PostAggregationFunctionTest {
     assertEquals(function.invoke(new Object[]{"1234567890"}), "0987654321");
 
     // ST_AsText
-    function = new PostAggregationFunction("ST_AsText", new ColumnDataType[]{ColumnDataType.BYTES});
+    function = new PostAggregationFunction("ST_As_Text", new ColumnDataType[]{ColumnDataType.BYTES});
     assertEquals(function.getResultType(), ColumnDataType.STRING);
     assertEquals(function.invoke(
         new Object[]{GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20)))}),

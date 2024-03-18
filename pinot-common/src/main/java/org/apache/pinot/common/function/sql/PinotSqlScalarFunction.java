@@ -16,22 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.calcite.sql;
+package org.apache.pinot.common.function.sql;
 
+import org.apache.calcite.sql.SqlFunction;
+import org.apache.calcite.sql.SqlFunctionCategory;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlOperandTypeInference;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.pinot.common.function.schema.PinotScalarFunction;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 
-/**
- * Pinot SqlAggFunction class to register the Pinot aggregation functions with the Calcite operator table.
- */
-public class PinotSqlTransformFunction extends SqlFunction {
+public class PinotSqlScalarFunction extends SqlFunction {
+  private final PinotScalarFunction _pinotScalarFunction;
 
-  public PinotSqlTransformFunction(String name, SqlKind kind, @Nullable SqlReturnTypeInference returnTypeInference,
+  public PinotSqlScalarFunction(String name, SqlKind kind, @Nullable SqlReturnTypeInference returnTypeInference,
       @Nullable SqlOperandTypeInference operandTypeInference, @Nullable SqlOperandTypeChecker operandTypeChecker,
-      SqlFunctionCategory category) {
+      SqlFunctionCategory category, PinotScalarFunction pinotScalarFunction) {
     super(name, kind, returnTypeInference, operandTypeInference, operandTypeChecker, category);
+    _pinotScalarFunction = pinotScalarFunction;
+  }
+
+  public PinotScalarFunction getFunction() {
+    return _pinotScalarFunction;
   }
 }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.calcite.prepare;
+package org.apache.pinot.common.function.sql;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -35,6 +35,8 @@ import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.linq4j.function.Hints;
 import org.apache.calcite.model.ModelHandler;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.prepare.Prepare;
+import org.apache.calcite.prepare.RelOptTableImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeFactoryImpl;
@@ -57,6 +59,7 @@ import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlOperandMetadata;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlOperandTypeInference;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
@@ -74,14 +77,20 @@ import org.apache.calcite.sql.validate.SqlUserDefinedTableMacro;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.util.Optionality;
 import org.apache.calcite.util.Util;
+import org.apache.pinot.common.function.schema.PinotScalarFunction;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 
 /**
  * ============================================================================
- * THIS CLASS IS COPIED FROM Calcite's {@link org.apache.calcite.prepare.CalciteCatalogReader} and modified the
- * case sensitivity of Function lookup. which is ALWAYS case-insensitive regardless of conventions on
- * column/table identifier.
+ * THIS CLASS IS COPIED FROM Calcite's {@link org.apache.calcite.prepare.CalciteCatalogReader} and modified
+ * <ul>
+ *   <li>the case sensitivity of Function lookup. Pinot ALWAYS resolve case-insensitive function regardless of
+ *   case sensitivity conventions of column/table identifier.</li>
+ *   <li>made the {@link PinotCalciteCatalogReader#toOp(SqlIdentifier, org.apache.calcite.schema.Function)}</li> method
+ *   public access for overriding behavior for catalog function operand/return type inference.
+ * </ul>
+ *
  * ============================================================================
  *
  * Pinot's implementation of {@link org.apache.calcite.prepare.Prepare.CatalogReader}
@@ -310,8 +319,25 @@ public class PinotCalciteCatalogReader implements Prepare.CatalogReader {
   }
 
   /** Converts a function to a {@link org.apache.calcite.sql.SqlOperator}. */
-  private static SqlOperator toOp(SqlIdentifier name,
+  // ====================================================================
+  // LINES CHANGED BELOW
+  // ====================================================================
+  public static SqlOperator toOp(SqlIdentifier name,
       final org.apache.calcite.schema.Function function) {
+
+    // TODO: support AGG and TABLE function in the future
+    if (function instanceof PinotScalarFunction && ((PinotScalarFunction) function).getOperandTypeChecker() != null) {
+      final SqlOperandTypeChecker operandTypeChecker =
+          ((PinotScalarFunction) function).getOperandTypeChecker();
+      final SqlReturnTypeInference returnTypeInference =
+          ((PinotScalarFunction) function).getReturnTypeInference();
+      final SqlKind kind = kind(function);
+      return new PinotSqlScalarFunction(name.toString(), kind, returnTypeInference, null, operandTypeChecker,
+          SqlFunctionCategory.USER_DEFINED_FUNCTION, ((PinotScalarFunction) function));
+    }
+    // ====================================================================
+    // LINES CHANGED ABOVE
+    // ====================================================================
     final Function<RelDataTypeFactory, List<RelDataType>> argTypesFactory =
         typeFactory -> function.getParameters()
             .stream()
@@ -339,9 +365,7 @@ public class PinotCalciteCatalogReader implements Prepare.CatalogReader {
     final List<SqlTypeFamily> typeFamilies =
         typeFamiliesFactory.apply(dummyTypeFactory);
 
-    final SqlOperandTypeInference operandTypeInference =
-        InferTypes.explicit(argTypes);
-
+    final SqlOperandTypeInference operandTypeInference = InferTypes.explicit(argTypes);
     final SqlOperandMetadata operandMetadata =
         OperandTypes.operandMetadata(typeFamilies, paramTypesFactory,
             i -> function.getParameters().get(i).getName(),
@@ -389,17 +413,20 @@ public class PinotCalciteCatalogReader implements Prepare.CatalogReader {
   }
 
   private static SqlReturnTypeInference infer(final ScalarFunction function) {
-    return opBinding -> {
-      final RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
-      final RelDataType type;
-      if (function instanceof ScalarFunctionImpl) {
-        type = ((ScalarFunctionImpl) function).getReturnType(typeFactory,
-            opBinding);
-      } else {
-        type = function.getReturnType(typeFactory);
-      }
-      return toSql(typeFactory, type);
-    };
+    if (function instanceof PinotScalarFunction && ((PinotScalarFunction) function).getReturnTypeInference() != null) {
+      return ((PinotScalarFunction) function).getReturnTypeInference();
+    } else {
+      return opBinding -> {
+        final RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
+        final RelDataType type;
+        if (function instanceof ScalarFunctionImpl) {
+          type = ((ScalarFunctionImpl) function).getReturnType(typeFactory, opBinding);
+        } else {
+          type = function.getReturnType(typeFactory);
+        }
+        return toSql(typeFactory, type);
+      };
+    }
   }
 
   private static SqlReturnTypeInference infer(

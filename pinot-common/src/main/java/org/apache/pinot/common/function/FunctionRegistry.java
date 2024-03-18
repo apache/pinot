@@ -18,18 +18,39 @@
  */
 package org.apache.pinot.common.function;
 
-import com.google.common.base.Preconditions;
+import com.google.common.annotations.VisibleForTesting;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.schema.Function;
-import org.apache.calcite.schema.impl.ScalarFunctionImpl;
+import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.SqlOperatorTable;
+import org.apache.calcite.sql.SqlSyntax;
+import org.apache.calcite.sql.SqlUtil;
+import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
+import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.validate.SqlNameMatchers;
+import org.apache.calcite.sql.validate.SqlUserDefinedFunction;
 import org.apache.calcite.util.NameMultimap;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.function.schema.PinotFunction;
+import org.apache.pinot.common.function.schema.PinotScalarFunction;
+import org.apache.pinot.common.function.sql.PinotSqlAggFunction;
+import org.apache.pinot.common.function.sql.PinotSqlScalarFunction;
+import org.apache.pinot.common.function.sql.PinotSqlTransformFunction;
+import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
@@ -37,22 +58,16 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Registry for scalar functions.
- * <p>TODO: Merge FunctionRegistry and FunctionDefinitionRegistry to provide one single registry for all functions.
+ * Registry for functions.
  */
 public class FunctionRegistry {
+  public static final boolean CASE_SENSITIVITY = false;
+  private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
+  private static final NameMultimap<SqlOperator> OPERATOR_MAP = new NameMultimap<>();
+  private static final NameMultimap<PinotFunction> FUNCTION_MAP = new NameMultimap<>();
+
   private FunctionRegistry() {
   }
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(FunctionRegistry.class);
-
-  // TODO: consolidate the following 2
-  // This FUNCTION_INFO_MAP is used by Pinot server to look up function by # of arguments
-  private static final Map<String, Map<Integer, FunctionInfo>> FUNCTION_INFO_MAP = new HashMap<>();
-  // This FUNCTION_MAP is used by Calcite function catalog to look up function by function signature.
-  private static final NameMultimap<Function> FUNCTION_MAP = new NameMultimap<>();
-
-  private static final int VAR_ARG_KEY = -1;
 
   /**
    * Registers the scalar functions via reflection.
@@ -60,6 +75,7 @@ public class FunctionRegistry {
    *       in its class path. This convention can significantly reduce the time of class scanning.
    */
   static {
+    // REGISTER FUNCTIONS
     long startTimeMs = System.currentTimeMillis();
     Set<Method> methods = PinotReflectionUtils.getMethodsThroughReflection(".*\\.function\\..*", ScalarFunction.class);
     for (Method method : methods) {
@@ -68,22 +84,67 @@ public class FunctionRegistry {
       }
       ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
       if (scalarFunction.enabled()) {
-        // Annotated function names
-        String[] scalarFunctionNames = scalarFunction.names();
+        // Parse annotated function names and alias
+        Set<String> scalarFunctionNames = Arrays.stream(scalarFunction.names()).collect(Collectors.toSet());
+        if (scalarFunctionNames.size() == 0) {
+          scalarFunctionNames.add(method.getName());
+        }
         boolean nullableParameters = scalarFunction.nullableParameters();
-        boolean isPlaceholder = scalarFunction.isPlaceholder();
-        boolean isVarArg = scalarFunction.isVarArg();
-        if (scalarFunctionNames.length > 0) {
-          for (String name : scalarFunctionNames) {
-            FunctionRegistry.registerFunction(name, method, nullableParameters, isPlaceholder, isVarArg);
-          }
-        } else {
-          FunctionRegistry.registerFunction(method, nullableParameters, isPlaceholder, isVarArg);
+        boolean varArg = scalarFunction.isVarArg();
+        registerFunction(method, scalarFunctionNames, nullableParameters, varArg);
+      }
+    }
+    Set<Class<?>> classes =
+        PinotReflectionUtils.getClassesThroughReflection(".*\\.function\\..*", ScalarFunction.class);
+    for (Class<?> clazz : classes) {
+      if (!Modifier.isPublic(clazz.getModifiers())) {
+        continue;
+      }
+      ScalarFunction scalarFunction = clazz.getAnnotation(ScalarFunction.class);
+      if (scalarFunction.enabled()) {
+        // Parse annotated function names and alias
+        Set<String> scalarFunctionNames = Arrays.stream(scalarFunction.names()).collect(Collectors.toSet());
+        if (scalarFunctionNames.size() == 0) {
+          scalarFunctionNames.add(clazz.getName());
+        }
+        boolean nullableParameters = scalarFunction.nullableParameters();
+        boolean varArg = scalarFunction.isVarArg();
+        registerFunction(clazz, scalarFunctionNames, nullableParameters, varArg);
+      }
+    }
+    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_MAP.map().size(),
+        FUNCTION_MAP.map().keySet(), System.currentTimeMillis() - startTimeMs);
+
+    // REGISTER OPERATORS
+    // Walk through all the Pinot aggregation types and
+    //   1. register those that are supported in multistage in addition to calcite standard opt table.
+    //   2. register special handling that differs from calcite standard.
+    for (AggregationFunctionType aggregationFunctionType : AggregationFunctionType.values()) {
+      if (aggregationFunctionType.getSqlKind() != null) {
+        // 1. Register the aggregation function with Calcite
+        registerAggregateFunction(aggregationFunctionType.getName(), aggregationFunctionType);
+        // 2. Register the aggregation function with Calcite on all alternative names
+        List<String> alternativeFunctionNames = aggregationFunctionType.getAlternativeNames();
+        for (String alternativeFunctionName : alternativeFunctionNames) {
+          registerAggregateFunction(alternativeFunctionName, aggregationFunctionType);
         }
       }
     }
-    LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_INFO_MAP.size(),
-        FUNCTION_INFO_MAP.keySet(), System.currentTimeMillis() - startTimeMs);
+
+    // Walk through all the Pinot transform types and
+    //   1. register those that are supported in multistage in addition to calcite standard opt table.
+    //   2. register special handling that differs from calcite standard.
+    for (TransformFunctionType transformFunctionType : TransformFunctionType.values()) {
+      if (transformFunctionType.getSqlKind() != null) {
+        // 1. Register the transform function with Calcite
+        registerTransformFunction(transformFunctionType.getName(), transformFunctionType);
+        // 2. Register the transform function with Calcite on all alternative names
+        List<String> alternativeFunctionNames = transformFunctionType.getAlternativeNames();
+        for (String alternativeFunctionName : alternativeFunctionNames) {
+          registerTransformFunction(alternativeFunctionName, transformFunctionType);
+        }
+      }
+    }
   }
 
   /**
@@ -94,61 +155,21 @@ public class FunctionRegistry {
   public static void init() {
   }
 
-  /**
-   * Registers a method with the name of the method.
-   */
-  public static void registerFunction(Method method, boolean nullableParameters, boolean isPlaceholder,
-      boolean isVarArg) {
-    registerFunction(method.getName(), method, nullableParameters, isPlaceholder, isVarArg);
+  @VisibleForTesting
+  public static void registerFunction(Method method) {
+    registerFunction(method, Collections.singleton(method.getName()), false, false);
   }
 
-  /**
-   * Registers a method with the given function name.
-   */
-  public static void registerFunction(String functionName, Method method, boolean nullableParameters,
-      boolean isPlaceholder, boolean isVarArg) {
-    if (!isPlaceholder) {
-      registerFunctionInfoMap(functionName, method, nullableParameters, isVarArg);
-    }
-    registerCalciteNamedFunctionMap(functionName, method, nullableParameters, isVarArg);
-  }
-
-  private static void registerFunctionInfoMap(String functionName, Method method, boolean nullableParameters,
-      boolean isVarArg) {
-    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), nullableParameters);
-    String canonicalName = canonicalize(functionName);
-    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.computeIfAbsent(canonicalName, k -> new HashMap<>());
-    if (isVarArg) {
-      FunctionInfo existFunctionInfo = functionInfoMap.put(VAR_ARG_KEY, functionInfo);
-      Preconditions.checkState(existFunctionInfo == null || existFunctionInfo.getMethod() == functionInfo.getMethod(),
-          "Function: %s with variable number of parameters is already registered", functionName);
-    } else {
-      FunctionInfo existFunctionInfo = functionInfoMap.put(method.getParameterCount(), functionInfo);
-      Preconditions.checkState(existFunctionInfo == null || existFunctionInfo.getMethod() == functionInfo.getMethod(),
-          "Function: %s with %s parameters is already registered", functionName, method.getParameterCount());
-    }
-  }
-
-  private static void registerCalciteNamedFunctionMap(String functionName, Method method, boolean nullableParameters,
-      boolean isVarArg) {
-    if (method.getAnnotation(Deprecated.class) == null) {
-      FUNCTION_MAP.put(functionName, ScalarFunctionImpl.create(method));
-    }
-  }
-
-  public static Map<String, List<Function>> getRegisteredCalciteFunctionMap() {
-    return FUNCTION_MAP.map();
-  }
-
+  @VisibleForTesting
   public static Set<String> getRegisteredCalciteFunctionNames() {
-    return FUNCTION_MAP.map().keySet();
+    return getFunctionMap().map().keySet();
   }
 
   /**
    * Returns {@code true} if the given function name is registered, {@code false} otherwise.
    */
   public static boolean containsFunction(String functionName) {
-    return FUNCTION_INFO_MAP.containsKey(canonicalize(functionName));
+    return getFunctionMap().containsKey(functionName, CASE_SENSITIVITY);
   }
 
   /**
@@ -157,20 +178,173 @@ public class FunctionRegistry {
    * methods are already registered.
    */
   @Nullable
-  public static FunctionInfo getFunctionInfo(String functionName, int numParameters) {
-    Map<Integer, FunctionInfo> functionInfoMap = FUNCTION_INFO_MAP.get(canonicalize(functionName));
-    if (functionInfoMap != null) {
-      FunctionInfo functionInfo = functionInfoMap.get(numParameters);
-      if (functionInfo != null) {
-        return functionInfo;
+  public static FunctionInfo getFunctionInfo(String functionName, int numParams) {
+    return getFunctionInfoFromCalciteNamedMap(functionName, numParams);
+  }
+
+  /**
+   * Returns the {@link FunctionInfo} associated with the given function name and number of parameters, or {@code null}
+   * if there is no matching method. This method should be called after the FunctionRegistry is initialized and all
+   * methods are already registered.
+   */
+  @Nullable
+  public static FunctionInfo getFunctionInfo(SqlOperatorTable operatorTable, RelDataTypeFactory typeFactory,
+      String functionName, List<RelDataType> argTypes) {
+    PinotScalarFunction scalarFunction = getScalarFunction(operatorTable, typeFactory, functionName, argTypes);
+    if (scalarFunction != null) {
+      return scalarFunction.getFunctionInfo();
+    } else {
+      // TODO: convert this to throw IAE when all operator has scalar equivalent.
+      return null;
+    }
+  }
+
+  @Nullable
+  private static FunctionInfo getFunctionInfoFromCalciteNamedMap(String functionName, int numParams) {
+    List<PinotScalarFunction> candidates = getFunctionMap().range(functionName, CASE_SENSITIVITY).stream().filter(
+            e -> e.getValue() instanceof PinotScalarFunction && (e.getValue().getParameters().size() == numParams
+                || ((PinotScalarFunction) e.getValue()).isVarArgs())).map(e -> (PinotScalarFunction) e.getValue())
+        .collect(Collectors.toList());
+    if (candidates.size() == 1) {
+      return candidates.get(0).getFunctionInfo();
+    } else {
+      // TODO: convert this to throw IAE when all operator has scalar equivalent.
+      return null;
+    }
+  }
+
+  @Nullable
+  private static PinotScalarFunction getScalarFunction(SqlOperatorTable operatorTable, RelDataTypeFactory typeFactory,
+      String functionName, List<RelDataType> argTypes) {
+    SqlOperator sqlOperator =
+        SqlUtil.lookupRoutine(operatorTable, typeFactory, new SqlIdentifier(functionName, SqlParserPos.QUOTED_ZERO),
+            argTypes, null, null, SqlSyntax.FUNCTION, SqlKind.OTHER_FUNCTION,
+            SqlNameMatchers.withCaseSensitive(false), true);
+    if (sqlOperator instanceof SqlUserDefinedFunction) {
+      Function function = ((SqlUserDefinedFunction) sqlOperator).getFunction();
+      if (function instanceof PinotScalarFunction) {
+        return (PinotScalarFunction) function;
       }
-      return functionInfoMap.get(VAR_ARG_KEY);
+    } else if (sqlOperator instanceof PinotSqlScalarFunction) {
+      return ((PinotSqlScalarFunction) sqlOperator).getFunction();
     }
     return null;
   }
 
-  private static String canonicalize(String functionName) {
-    return StringUtils.remove(functionName, '_').toLowerCase();
+  public static NameMultimap<PinotFunction> getFunctionMap() {
+    return FUNCTION_MAP;
+  }
+
+  public static NameMultimap<SqlOperator> getOperatorMap() {
+    return OPERATOR_MAP;
+  }
+
+  private static void registerFunction(Method method, Set<String> alias, boolean nullableParameters, boolean varArg) {
+    if (method.getAnnotation(Deprecated.class) == null) {
+      for (String name : alias) {
+        registerCalciteNamedFunctionMap(name, method, nullableParameters, varArg);
+      }
+    }
+  }
+
+  private static void registerFunction(Class<?> clazz, Set<String> alias, boolean nullableParameters, boolean varArg) {
+    if (clazz.getAnnotation(Deprecated.class) == null) {
+      for (String name : alias) {
+        registerCalciteNamedFunctionMap(name, clazz, nullableParameters, varArg);
+      }
+    }
+  }
+
+  private static void registerCalciteNamedFunctionMap(String name, Method method, boolean nullableParameters,
+      boolean varArg) {
+    FUNCTION_MAP.put(name, new PinotScalarFunction(name, method, nullableParameters, varArg));
+  }
+
+  private static void registerCalciteNamedFunctionMap(String name, Class<?> clazz, boolean nullableParameters,
+      boolean varArg) {
+    try {
+      SqlReturnTypeInference returnTypeInference =
+          (SqlReturnTypeInference) clazz.getField("RETURN_TYPE_INFERENCE").get(null);
+      SqlOperandTypeChecker operandTypeChecker =
+          (SqlOperandTypeChecker) clazz.getField("OPERAND_TYPE_CHECKER").get(null);
+      for (Method method : clazz.getMethods()) {
+        if (method.getName().equals("eval")) {
+          FUNCTION_MAP.put(name, new PinotScalarFunction(name, method, nullableParameters, varArg, operandTypeChecker,
+              returnTypeInference));
+        }
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void registerAggregateFunction(String functionName, AggregationFunctionType functionType) {
+    if (functionType.getOperandTypeChecker() != null && functionType.getReturnTypeInference() != null) {
+      PinotSqlAggFunction sqlAggFunction =
+          new PinotSqlAggFunction(functionName.toUpperCase(Locale.ROOT), null, functionType.getSqlKind(),
+              functionType.getReturnTypeInference(), null, functionType.getOperandTypeChecker(),
+              functionType.getSqlFunctionCategory());
+      OPERATOR_MAP.put(functionName.toUpperCase(Locale.ROOT), sqlAggFunction);
+    }
+  }
+
+  private static void registerTransformFunction(String functionName, TransformFunctionType functionType) {
+    if (functionType.getOperandTypeChecker() != null && functionType.getReturnTypeInference() != null) {
+      PinotSqlTransformFunction sqlTransformFunction =
+          new PinotSqlTransformFunction(functionName.toUpperCase(Locale.ROOT), functionType.getSqlKind(),
+              functionType.getReturnTypeInference(), null, functionType.getOperandTypeChecker(),
+              functionType.getSqlFunctionCategory());
+      OPERATOR_MAP.put(functionName.toUpperCase(Locale.ROOT), sqlTransformFunction);
+    }
+  }
+
+  public static List<RelDataType> convertArgumentTypes(RelDataTypeFactory typeFactory,
+      List<DataSchema.ColumnDataType> argTypes) {
+    return argTypes.stream().map(type -> toRelType(typeFactory, type)).collect(Collectors.toList());
+  }
+
+  private static RelDataType toRelType(RelDataTypeFactory typeFactory, DataSchema.ColumnDataType dataType) {
+    switch (dataType) {
+      case INT:
+        return typeFactory.createSqlType(SqlTypeName.INTEGER);
+      case LONG:
+        return typeFactory.createSqlType(SqlTypeName.BIGINT);
+      case FLOAT:
+        return typeFactory.createSqlType(SqlTypeName.REAL);
+      case DOUBLE:
+        return typeFactory.createSqlType(SqlTypeName.DOUBLE);
+      case BIG_DECIMAL:
+        return typeFactory.createSqlType(SqlTypeName.DECIMAL);
+      case BOOLEAN:
+        return typeFactory.createSqlType(SqlTypeName.BOOLEAN);
+      case TIMESTAMP:
+        return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
+      case JSON:
+      case STRING:
+        return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      case BYTES:
+        return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      case INT_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.INTEGER), -1);
+      case LONG_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BIGINT), -1);
+      case FLOAT_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.REAL), -1);
+      case DOUBLE_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DOUBLE), -1);
+      case BOOLEAN_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BOOLEAN), -1);
+      case TIMESTAMP_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.TIMESTAMP), -1);
+      case STRING_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.VARCHAR), -1);
+      case BYTES_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.VARBINARY), -1);
+      case UNKNOWN:
+      case OBJECT:
+      default:
+        return typeFactory.createSqlType(SqlTypeName.ANY);
+    }
   }
 
   /**

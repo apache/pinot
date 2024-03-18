@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.calcite.sql.fun;
+package org.apache.calcite.sql;
 
-import org.apache.calcite.sql.SqlCall;
-import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.fun.SqlCoalesceFunction;
 import org.apache.calcite.sql.validate.SqlValidator;
 
 

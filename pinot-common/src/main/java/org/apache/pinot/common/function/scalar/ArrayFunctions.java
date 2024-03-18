@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -25,6 +26,16 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.math.BigDecimal;
 import java.util.Arrays;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.type.RelDataTypeFactory;
+import org.apache.calcite.sql.type.NonNullableAccessors;
+import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
+import org.apache.calcite.sql.type.SameOperandTypeChecker;
+import org.apache.calcite.sql.type.SqlOperandTypeChecker;
+import org.apache.calcite.sql.type.SqlReturnTypeInference;
+import org.apache.calcite.sql.type.SqlTypeFamily;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -228,61 +239,98 @@ public class ArrayFunctions {
     return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.STRING;
   }
 
+  @ScalarFunction(names = {"arrayElementAt", "array_element_at"})
+  public static class ArrayElementAt {
+    public static final SqlReturnTypeInference RETURN_TYPE_INFERENCE = (opBinding) -> {
+      final RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
+      final RelDataType operandType = opBinding.getOperandType(0);
+      Preconditions.checkState(operandType.getSqlTypeName() == SqlTypeName.ARRAY);
+      return typeFactory.createTypeWithNullability(NonNullableAccessors.getComponentTypeOrThrow(operandType), true);
+    };
+    public static final SqlOperandTypeChecker OPERAND_TYPE_CHECKER =
+        OperandTypes.family(SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER);
+
+    public static int eval(int[] arr, int idx) {
+      return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.INT;
+    }
+
+    public static long eval(long[] arr, int idx) {
+      return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.LONG;
+    }
+
+    public static float eval(float[] arr, int idx) {
+      return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.FLOAT;
+    }
+
+    public static double eval(double[] arr, int idx) {
+      return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.DOUBLE;
+    }
+
+    public static String eval(String[] arr, int idx) {
+      return idx > 0 && idx <= arr.length ? arr[idx - 1] : NullValuePlaceHolder.STRING;
+    }
+  }
+
   @ScalarFunction(names = {"array", "arrayValueConstructor"}, isVarArg = true)
-  public static Object arrayValueConstructor(Object... arr) {
-    if (arr.length == 0) {
+  public static class ArrayValueConstructor {
+    public static final SqlReturnTypeInference RETURN_TYPE_INFERENCE = ReturnTypes.TO_ARRAY;
+    public static final SqlOperandTypeChecker OPERAND_TYPE_CHECKER = new SameOperandTypeChecker(-1);
+
+    public static Object eval(Object... arr) {
+      if (arr.length == 0) {
+        return arr;
+      }
+      Class<?> clazz = arr[0].getClass();
+      if (clazz == Integer.class) {
+        int[] intArr = new int[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+          intArr[i] = (Integer) arr[i];
+        }
+        return intArr;
+      }
+      if (clazz == Long.class) {
+        long[] longArr = new long[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+          longArr[i] = (Long) arr[i];
+        }
+        return longArr;
+      }
+      if (clazz == Float.class) {
+        float[] floatArr = new float[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+          floatArr[i] = (Float) arr[i];
+        }
+        return floatArr;
+      }
+      if (clazz == Double.class) {
+        double[] doubleArr = new double[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+          doubleArr[i] = (Double) arr[i];
+        }
+        return doubleArr;
+      }
+      if (clazz == Boolean.class) {
+        boolean[] boolArr = new boolean[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+          boolArr[i] = (Boolean) arr[i];
+        }
+        return boolArr;
+      }
+      if (clazz == BigDecimal.class) {
+        BigDecimal[] bigDecimalArr = new BigDecimal[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+          bigDecimalArr[i] = (BigDecimal) arr[i];
+        }
+        return bigDecimalArr;
+      }
+      if (clazz == String.class) {
+        String[] strArr = new String[arr.length];
+        for (int i = 0; i < arr.length; i++) {
+          strArr[i] = (String) arr[i];
+        }
+        return strArr;
+      }
       return arr;
     }
-    Class<?> clazz = arr[0].getClass();
-    if (clazz == Integer.class) {
-      int[] intArr = new int[arr.length];
-      for (int i = 0; i < arr.length; i++) {
-        intArr[i] = (Integer) arr[i];
-      }
-      return intArr;
-    }
-    if (clazz == Long.class) {
-      long[] longArr = new long[arr.length];
-      for (int i = 0; i < arr.length; i++) {
-        longArr[i] = (Long) arr[i];
-      }
-      return longArr;
-    }
-    if (clazz == Float.class) {
-      float[] floatArr = new float[arr.length];
-      for (int i = 0; i < arr.length; i++) {
-        floatArr[i] = (Float) arr[i];
-      }
-      return floatArr;
-    }
-    if (clazz == Double.class) {
-      double[] doubleArr = new double[arr.length];
-      for (int i = 0; i < arr.length; i++) {
-        doubleArr[i] = (Double) arr[i];
-      }
-      return doubleArr;
-    }
-    if (clazz == Boolean.class) {
-      boolean[] boolArr = new boolean[arr.length];
-      for (int i = 0; i < arr.length; i++) {
-        boolArr[i] = (Boolean) arr[i];
-      }
-      return boolArr;
-    }
-    if (clazz == BigDecimal.class) {
-      BigDecimal[] bigDecimalArr = new BigDecimal[arr.length];
-      for (int i = 0; i < arr.length; i++) {
-        bigDecimalArr[i] = (BigDecimal) arr[i];
-      }
-      return bigDecimalArr;
-    }
-    if (clazz == String.class) {
-      String[] strArr = new String[arr.length];
-      for (int i = 0; i < arr.length; i++) {
-        strArr[i] = (String) arr[i];
-      }
-      return strArr;
-    }
-    return arr;
   }
 }
