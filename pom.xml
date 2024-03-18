@@ -173,7 +173,7 @@
     <protobuf.version>3.25.2</protobuf.version>
     <grpc.version>1.61.1</grpc.version>
 
-    <confluent.version>7.2.6</confluent.version>
+    <confluent.version>7.6.0</confluent.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine>-Xms4g -Xmx4g</argLine>
