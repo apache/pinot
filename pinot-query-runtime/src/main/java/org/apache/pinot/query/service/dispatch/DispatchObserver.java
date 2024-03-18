@@ -28,15 +28,13 @@ import org.apache.pinot.query.routing.QueryServerInstance;
  * A {@link StreamObserver} used by {@link DispatchClient} to subscribe to the response of a async Query Dispatch call.
  */
 class DispatchObserver implements StreamObserver<Worker.QueryResponse> {
-  private int _stageId;
-  private QueryServerInstance _virtualServer;
-  private Consumer<AsyncQueryDispatchResponse> _callback;
+  private final QueryServerInstance _serverInstance;
+  private final Consumer<AsyncQueryDispatchResponse> _callback;
+
   private Worker.QueryResponse _queryResponse;
 
-  public DispatchObserver(int stageId, QueryServerInstance virtualServer,
-      Consumer<AsyncQueryDispatchResponse> callback) {
-    _stageId = stageId;
-    _virtualServer = virtualServer;
+  public DispatchObserver(QueryServerInstance serverInstance, Consumer<AsyncQueryDispatchResponse> callback) {
+    _serverInstance = serverInstance;
     _callback = callback;
   }
 
@@ -48,12 +46,11 @@ class DispatchObserver implements StreamObserver<Worker.QueryResponse> {
   @Override
   public void onError(Throwable throwable) {
     _callback.accept(
-        new AsyncQueryDispatchResponse(_virtualServer, _stageId, Worker.QueryResponse.getDefaultInstance(),
-            throwable));
+        new AsyncQueryDispatchResponse(_serverInstance, Worker.QueryResponse.getDefaultInstance(), throwable));
   }
 
   @Override
   public void onCompleted() {
-    _callback.accept(new AsyncQueryDispatchResponse(_virtualServer, _stageId, _queryResponse, null));
+    _callback.accept(new AsyncQueryDispatchResponse(_serverInstance, _queryResponse, null));
   }
 }

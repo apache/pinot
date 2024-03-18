@@ -52,7 +52,7 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private final boolean _isSortOnSender;
   private final List<Object[]> _rows = new ArrayList<>();
 
-  private boolean _isSortedBlockConstructed;
+  private TransferableBlock _eosBlock;
 
   public SortedMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       DataSchema dataSchema, List<RexExpression> collationKeys, List<Direction> collationDirections,
@@ -74,20 +74,25 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    while (true) { // loop in order to keep asking if we receive data blocks
-      TransferableBlock block = getMultiConsumer().readBlockBlocking();
+    if (_eosBlock != null) {
+      return _eosBlock;
+    }
+    // Collect all the rows from the mailbox and sort them
+    while (true) {
+      TransferableBlock block = _multiConsumer.readBlockBlocking();
       if (block.isDataBlock()) {
         _rows.addAll(block.getContainer());
       } else if (block.isErrorBlock()) {
         return block;
       } else {
         assert block.isSuccessfulEndOfStreamBlock();
-
-        if (!_isSortedBlockConstructed && !_rows.isEmpty()) {
+        if (!_rows.isEmpty()) {
+          _eosBlock = block;
+          // TODO: This might not be efficient because we are sorting all the received rows. We should use a k-way merge
+          //       when sender side is sorted.
           _rows.sort(
               new SortUtils.SortComparator(_collationKeys, _collationDirections, _collationNullDirections, _dataSchema,
                   false));
-          _isSortedBlockConstructed = true;
           return new TransferableBlock(_rows, _dataSchema, DataBlock.Type.ROW);
         } else {
           return block;

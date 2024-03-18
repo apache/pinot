@@ -51,6 +51,13 @@ public interface DataSource {
   ForwardIndexReader<?> getForwardIndex();
 
   /**
+   * Returns the column name to which this data source pertains
+   */
+  default String getColumnName() {
+    return getDataSourceMetadata().getFieldSpec().getName();
+  }
+
+  /**
    * Returns the dictionary for the column if it is dictionary-encoded, or {@code null} if not.
    */
   @Nullable

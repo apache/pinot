@@ -59,6 +59,7 @@ public class Actions {
     public static final String GET_SEGMENT = "GetSegment";
     public static final String GET_SEGMENT_RELOAD_STATUS = "GetSegmentReloadStatus";
     public static final String GET_SERVER_ROUTING_STATS = "GetServerRoutingStats";
+    public static final String GET_DATABASE = "GetDatabase";
     public static final String GET_TABLE = "GetTable";
     public static final String GET_TABLE_CONFIG = "GetTableConfig";
     public static final String GET_TABLE_LEADER = "GetTableLeader";

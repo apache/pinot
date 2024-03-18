@@ -19,6 +19,7 @@
 
 package org.apache.pinot.core.query.aggregation.function;
 
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -64,6 +65,32 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
     }
   }
 
+  @Test(dataProvider = "scenarios")
+  void aggrWithoutNullAndEmptySegments(Scenario scenario) {
+    scenario.getDeclaringTable(false)
+        .onFirstInstance("myField",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null"
+        ).whenQuery("select mode(myField) as mode from testTable")
+        .thenResultIs("DOUBLE", aggrWithoutNullResult(scenario._dataType));
+  }
+
+  @Test(dataProvider = "scenarios")
+  void aggrWithNullAndEmptySegments(Scenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null"
+        ).whenQuery("select mode(myField) as mode from testTable")
+        .thenResultIs("DOUBLE", "null");
+  }
+
   String aggrWithoutNullResult(FieldSpec.DataType dt) {
     switch (dt) {
       case INT: return "-2.147483648E9";
@@ -102,7 +129,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
             "1",
             "null"
         ).whenQuery("select mode(myField) as mode from testTable")
-        .thenResultIs("DOUBLE", aggrWithoutNullResult(scenario._dataType));
+        .thenResultIs("DOUBLE", "1");
   }
 
   String aggrSvWithoutNullResult(FieldSpec.DataType dt) {
@@ -142,7 +169,64 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
             "1",
             "null"
         ).whenQuery("select 'cte', mode(myField) as mode from testTable group by 'cte'")
-        .thenResultIs("STRING | DOUBLE", "cte | " + aggrSvWithoutNullResult(scenario._dataType));
+        .thenResultIs("STRING | DOUBLE", "cte | 1");
+  }
+
+  @Test(dataProvider = "scenarios")
+  void aggrSvSelfWithoutNull(Scenario scenario) {
+    PinotDataType pinotDataType = scenario._dataType == FieldSpec.DataType.INT
+        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario._dataType.name());
+
+    Object defaultNullValue;
+    switch (scenario._dataType) {
+      case INT:
+        defaultNullValue = Integer.MIN_VALUE;
+        break;
+      case LONG:
+        defaultNullValue = Long.MIN_VALUE;
+        break;
+      case FLOAT:
+        defaultNullValue = Float.NEGATIVE_INFINITY;
+        break;
+      case DOUBLE:
+        defaultNullValue = Double.NEGATIVE_INFINITY;
+        break;
+      default:
+        throw new IllegalArgumentException("Unexpected scenario data type " + scenario._dataType);
+    }
+
+    scenario.getDeclaringTable(false)
+        .onFirstInstance("myField",
+            "null",
+            "1",
+            "2"
+        ).andOnSecondInstance("myField",
+            "null",
+            "1",
+            "2"
+        ).whenQuery("select myField, mode(myField) as mode from testTable group by myField order by myField")
+        .thenResultIs(pinotDataType + " | DOUBLE",
+            defaultNullValue + " | " + aggrSvWithoutNullResult(scenario._dataType),
+            "1           | 1",
+            "2           | 2");
+  }
+
+  @Test(dataProvider = "scenarios")
+  void aggrSvSelfWithNull(Scenario scenario) {
+    PinotDataType pinotDataType = scenario._dataType == FieldSpec.DataType.INT
+        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario._dataType.name());
+
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "1",
+            "2"
+        ).andOnSecondInstance("myField",
+            "null",
+            "1",
+            "2"
+        ).whenQuery("select myField, mode(myField) as mode from testTable group by myField order by myField")
+        .thenResultIs(pinotDataType + " | DOUBLE", "1 | 1", "2 | 2", "null | null");
   }
 
   String aggrMvWithoutNullResult(FieldSpec.DataType dt) {
@@ -157,6 +241,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
 
   @Test(dataProvider = "scenarios")
   void aggrMvWithoutNull(Scenario scenario) {
+    // TODO: This test is not actually exercising aggregateGroupByMV
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField",
             "null",
@@ -172,6 +257,7 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
 
   @Test(dataProvider = "scenarios")
   void aggrMvWithNull(Scenario scenario) {
+    // TODO: This test is not actually exercising aggregateGroupByMV
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField",
             "null",
@@ -182,6 +268,6 @@ public class ModeAggregationFunctionTest extends AbstractAggregationFunctionTest
             "1",
             "null"
         ).whenQuery("select 'cte1' as cte1, 'cte2' as cte2, mode(myField) as mode from testTable group by cte1, cte2")
-        .thenResultIs("STRING | STRING | DOUBLE", "cte1 | cte2 | " + aggrMvWithoutNullResult(scenario._dataType));
+        .thenResultIs("STRING | STRING | DOUBLE", "cte1 | cte2 | 1");
   }
 }

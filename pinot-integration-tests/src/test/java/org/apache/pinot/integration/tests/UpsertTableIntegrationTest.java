@@ -35,6 +35,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -81,11 +82,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String CSV_DELIMITER = ",";
   private static final String TABLE_NAME = "gameScores";
   private static final int NUM_SERVERS = 2;
-  private static final String PRIMARY_KEY_COL = "playerId";
   private static final String DELETE_COL = "deleted";
+  public static final String PRIMARY_KEY_COL = "playerId";
+  public static final String TIME_COL_NAME = "timestampInEpoch";
+  public static final String UPSERT_SCHEMA_FILE_NAME = "upsert_table_test.schema";
 
-  private PinotTaskManager _taskManager;
-  private PinotHelixTaskResourceManager _helixTaskResourceManager;
+  protected PinotTaskManager _taskManager;
+  protected PinotHelixTaskResourceManager _helixTaskResourceManager;
 
   @BeforeClass
   public void setUp()
@@ -132,13 +135,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Override
   protected String getSchemaFileName() {
-    return "upsert_table_test.schema";
+    return UPSERT_SCHEMA_FILE_NAME;
   }
 
   @Nullable
   @Override
   protected String getTimeColumnName() {
-    return "timestampInEpoch";
+    return TIME_COL_NAME;
   }
 
   @Override
@@ -458,11 +461,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       throws Exception {
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
+    upsertConfig.setEnableSnapshot(true);
     String tableName = "gameScoresWithCompaction";
     TableConfig tableConfig =
         setupTable(tableName, getKafkaTopic() + "-with-compaction", INPUT_DATA_LARGE_TAR_FILE, upsertConfig);
     tableConfig.setTaskConfig(getCompactionTaskConfig());
     updateTableConfig(tableConfig);
+
     waitForAllDocsLoaded(tableName, 600_000L, 1000);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
@@ -483,6 +488,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       throws Exception {
     final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
+    upsertConfig.setEnableSnapshot(true);
     String tableName = "gameScoresWithCompactionDeleteSegments";
     String kafkaTopicName = getKafkaTopic() + "-with-compaction-segment-delete";
     TableConfig tableConfig = setupTable(tableName, kafkaTopicName, INPUT_DATA_LARGE_TAR_FILE, upsertConfig);
@@ -514,7 +520,13 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     String tableName = "gameScoresWithCompactionWithSoftDelete";
     String kafkaTopicName = getKafkaTopic() + "-with-compaction-delete";
     TableConfig tableConfig = setupTable(tableName, kafkaTopicName, INPUT_DATA_LARGE_TAR_FILE, upsertConfig);
-    tableConfig.setTaskConfig(getCompactionTaskConfig());
+    TableTaskConfig taskConfig = getCompactionTaskConfig();
+    Map<String, String> compactionTaskConfig =
+        taskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE);
+    compactionTaskConfig.put("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString());
+    taskConfig = new TableTaskConfig(
+        Collections.singletonMap(MinionConstants.UpsertCompactionTask.TASK_TYPE, compactionTaskConfig));
+    tableConfig.setTaskConfig(taskConfig);
     updateTableConfig(tableConfig);
 
     // Push data one more time

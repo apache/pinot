@@ -48,7 +48,8 @@ import org.apache.pinot.spi.utils.Obfuscator;
  * <li>Apache Commons {@link Configuration} (see {@link #PinotConfiguration(Configuration)})</li>
  * <li>Generic key-value properties provided with a {@link Map} (see
  * {@link PinotConfiguration#PinotConfiguration(Map)}</li>
- * <li>Environment variables (see {@link PinotConfiguration#PinotConfiguration(Map, Map)}</li>
+ * <li>Environment variables through env.dynamic.config (see {@link PinotConfiguration#PinotConfiguration(Map, Map)}
+ * </li>
  * <li>{@link PinotFSSpec} (see {@link PinotConfiguration#PinotConfiguration(PinotFSSpec)}</li>
  * </ul>
  * </p>
@@ -56,10 +57,16 @@ import org.apache.pinot.spi.utils.Obfuscator;
  * These different sources will all merged in an underlying {@link CompositeConfiguration} for which all
  * configuration keys will have
  * been sanitized.
- * Through this mechanism, properties can be configured and retrieved with kebab case, camel case, snake case and
- * environment variable
+ * Through this mechanism, properties can be configured and retrieved with kebab case, camel case and snake case
  * conventions.
  * </p>
+ * <strong>Dynamic configuration</strong>
+ * <p>
+ * In order to enable loading configurations through environment variables you can specify
+ * {@value ENV_DYNAMIC_CONFIG_KEY} as a list of property keys to dynamically template.
+ * {@link PinotConfiguration#applyDynamicEnvConfig(List, Map)}}. This enables loading secrets safely
+ * into the configuration.
+ * <p/>
  * <table>
  * <tr>
  * <th>Property</th>
@@ -77,15 +84,12 @@ import org.apache.pinot.spi.utils.Obfuscator;
  * <td>controller.sub_module.alerts.email_address</td>
  * <td>Snake case notation, which is an alternative format for use in .properties and .yml files.</td>
  * </tr>
- * <tr>
- * <td>PINOT_MODULE_SUBMODULE_ALERTS_EMAILADDRESS</td>
- * <td>Upper case format, which is recommended when using system environment variables.</td>
- * </tr>
  * </table>
  *
  */
 public class PinotConfiguration {
   public static final String CONFIG_PATHS_KEY = "config.paths";
+  public static final String ENV_DYNAMIC_CONFIG_KEY = "dynamic.env.config";
 
   private final CompositeConfiguration _configuration;
 
@@ -116,7 +120,7 @@ public class PinotConfiguration {
    * @param baseProperties to provide programmatically through a {@link Map}.
    */
   public PinotConfiguration(Map<String, Object> baseProperties) {
-    this(baseProperties, new HashMap<>());
+    this(baseProperties, new SystemEnvironment().getEnvironmentVariables());
   }
 
   /**
@@ -125,10 +129,12 @@ public class PinotConfiguration {
    * sanitized for relaxed binding. See {@link PinotConfiguration} for further details.
    *
    * @param baseProperties with highest precedences (e.g. CLI arguments)
-   * @param environmentVariables as a {@link Map}. Can be provided with {@link SystemEnvironment}
+   * @param environmentVariables as a {@link Map}.
    */
   public PinotConfiguration(Map<String, Object> baseProperties, Map<String, String> environmentVariables) {
-    _configuration = new CompositeConfiguration(computeConfigurationsFromSources(baseProperties, environmentVariables));
+    _configuration = new CompositeConfiguration(
+        applyDynamicEnvConfig(computeConfigurationsFromSources(baseProperties, environmentVariables),
+            environmentVariables));
   }
 
   /**
@@ -139,8 +145,8 @@ public class PinotConfiguration {
    */
   public PinotConfiguration(PinotFSSpec pinotFSSpec) {
     this(Optional.ofNullable(pinotFSSpec.getConfigs()).map(configs -> configs.entrySet().stream()
-        .collect(Collectors.<Entry<String, String>, String, Object>toMap(Entry::getKey, entry -> entry.getValue())))
-        .orElseGet(() -> new HashMap<>()));
+            .collect(Collectors.<Entry<String, String>, String, Object>toMap(Entry::getKey, Entry::getValue)))
+        .orElseGet(HashMap::new));
   }
 
   private static List<Configuration> computeConfigurationsFromSources(Configuration baseConfiguration,
@@ -148,22 +154,42 @@ public class PinotConfiguration {
     return computeConfigurationsFromSources(relaxConfigurationKeys(baseConfiguration), environmentVariables);
   }
 
+  /**
+   * This function templates the configuration from the env variables using env.dynamic.config to
+   * specify the mapping.
+   * E.g.
+   * env.dynamic.mapping=test.property
+   * test.property=ENV_VAR_NAME
+   * This function will look up `ENV_VAR_NAME` and insert its content in test.property.
+   *
+   * @param configurations List of configurations to template.
+   * @param environmentVariables Env used to fetch content to insert in the configuration.
+   * @return returns configuration
+   */
+  public static List<Configuration> applyDynamicEnvConfig(List<Configuration> configurations,
+      Map<String, String> environmentVariables) {
+    return configurations.stream().peek(configuration -> {
+      for (String dynamicEnvConfigVarName : configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY)) {
+        configuration.setProperty(dynamicEnvConfigVarName,
+            environmentVariables.get(configuration.getString(dynamicEnvConfigVarName)));
+      }
+    }).collect(Collectors.toList());
+  }
+
   private static List<Configuration> computeConfigurationsFromSources(Map<String, Object> baseProperties,
       Map<String, String> environmentVariables) {
     Map<String, Object> relaxedBaseProperties = relaxProperties(baseProperties);
+    // Env is only used to check for config paths to load.
     Map<String, String> relaxedEnvVariables = relaxEnvironmentVariables(environmentVariables);
 
-    Stream<Configuration> propertiesFromConfigPaths = Stream
-        .of(Optional.ofNullable(relaxedBaseProperties.get(CONFIG_PATHS_KEY)).map(Object::toString),
-            Optional.ofNullable(relaxedEnvVariables.get(CONFIG_PATHS_KEY)))
+    Stream<Configuration> propertiesFromConfigPaths =
+        Stream.of(Optional.ofNullable(relaxedBaseProperties.get(CONFIG_PATHS_KEY)).map(Object::toString),
+                Optional.ofNullable(relaxedEnvVariables.get(CONFIG_PATHS_KEY))).filter(Optional::isPresent)
+            .map(Optional::get).flatMap(configPaths -> Arrays.stream(configPaths.split(",")))
+            .map(PinotConfiguration::loadProperties);
 
-        .filter(Optional::isPresent).map(Optional::get)
-
-        .flatMap(configPaths -> Arrays.stream(configPaths.split(",")))
-
-        .map(PinotConfiguration::loadProperties);
-
-    return Stream.concat(Stream.of(relaxedBaseProperties, relaxedEnvVariables).map(e -> {
+    // Priority in CompositeConfiguration is CLI, ConfigFile(s)
+    return Stream.concat(Stream.of(relaxedBaseProperties).map(e -> {
       MapConfiguration mapConfiguration = new MapConfiguration(e);
       mapConfiguration.setListDelimiterHandler(new LegacyListDelimiterHandler(','));
       return mapConfiguration;
@@ -187,8 +213,7 @@ public class PinotConfiguration {
       PropertiesConfiguration propertiesConfiguration;
       if (configPath.startsWith("classpath:")) {
         propertiesConfiguration = CommonsConfigurationUtils.fromInputStream(
-            PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())),
-            true, true);
+            PinotConfiguration.class.getResourceAsStream(configPath.substring("classpath:".length())), true, true);
       } else {
         propertiesConfiguration = CommonsConfigurationUtils.fromPath(configPath, true, true);
       }
@@ -201,16 +226,16 @@ public class PinotConfiguration {
   private static Map<String, Object> relaxConfigurationKeys(Configuration configuration) {
     return CommonsConfigurationUtils.getKeysStream(configuration).distinct()
 
-        .collect(Collectors.toMap(PinotConfiguration::relaxPropertyName, key -> configuration.getProperty(key)));
+        .collect(Collectors.toMap(PinotConfiguration::relaxPropertyName, configuration::getProperty));
   }
 
   private static Map<String, String> relaxEnvironmentVariables(Map<String, String> environmentVariables) {
-    return environmentVariables.entrySet().stream().filter(entry -> entry.getKey().startsWith("PINOT_"))
+    return environmentVariables.entrySet().stream()
         .collect(Collectors.toMap(PinotConfiguration::relaxEnvVarName, Entry::getValue));
   }
 
   private static String relaxEnvVarName(Entry<String, String> envVarEntry) {
-    return envVarEntry.getKey().substring(6).replace("_", ".").toLowerCase();
+    return envVarEntry.getKey().replace("_", ".").toLowerCase();
   }
 
   private static Map<String, Object> relaxProperties(Map<String, Object> properties) {
@@ -332,8 +357,8 @@ public class PinotConfiguration {
    * @return the property String value. Fallback to the provided default values if no property is found.
    */
   public List<String> getProperty(String name, List<String> defaultValues) {
-    return Optional
-        .of(Arrays.stream(_configuration.getStringArray(relaxPropertyName(name))).collect(Collectors.toList()))
+    return Optional.of(
+            Arrays.stream(_configuration.getStringArray(relaxPropertyName(name))).collect(Collectors.toList()))
         .filter(list -> !list.isEmpty()).orElse(defaultValues);
   }
 

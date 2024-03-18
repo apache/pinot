@@ -119,6 +119,17 @@ public interface MessageBatch<T> {
   }
 
   /**
+   * Return the offset of the first message in the batch.
+   * The first offset of the batch is useful to determine if there were gaps in the stream.
+   *
+   * @return null by default
+   */
+  @Nullable
+  default public StreamPartitionMsgOffset getFirstMessageOffset() {
+    return null;
+  }
+
+  /**
    * This is useful while determining ingestion delay for a message batch. Retaining metadata for last filtered message
    * in a batch can enable us to estimate the ingestion delay for the batch.
    * Note that a batch can be fully filtered, and we can still retain the metadata for the last filtered message to

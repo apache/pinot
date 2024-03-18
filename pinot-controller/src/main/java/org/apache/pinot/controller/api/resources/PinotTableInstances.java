@@ -38,16 +38,19 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,7 +82,8 @@ public class PinotTableInstances {
   public String getTableInstances(
       @ApiParam(value = "Table name without type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Instance type", example = "broker", allowableValues = "BROKER, SERVER") @DefaultValue("")
-      @QueryParam("type") String type) {
+      @QueryParam("type") String type, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     ObjectNode ret = JsonUtils.newObjectNode();
     ret.put("tableName", tableName);
     ArrayNode brokers = JsonUtils.newArrayNode();
@@ -148,7 +152,8 @@ public class PinotTableInstances {
   })
   public List<String> getLiveBrokersForTable(
       @ApiParam(value = "Table name (with or without type)", required = true)
-      @PathParam("tableName") String tableName) {
+      @PathParam("tableName") String tableName, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     try {
       return _pinotHelixResourceManager.getLiveBrokersForTable(tableName);
     } catch (TableNotFoundException e) {
@@ -165,9 +170,9 @@ public class PinotTableInstances {
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
-  public Map<String, List<InstanceInfo>> getLiveBrokers() {
+  public Map<String, List<InstanceInfo>> getLiveBrokers(@Context HttpHeaders headers) {
     try {
-      return _pinotHelixResourceManager.getTableToLiveBrokersMapping();
+      return _pinotHelixResourceManager.getTableToLiveBrokersMapping(headers.getHeaderString(CommonConstants.DATABASE));
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }

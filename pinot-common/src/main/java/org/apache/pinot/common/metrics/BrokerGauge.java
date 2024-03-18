@@ -56,7 +56,18 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
    * The cache size used by the allocator for normal arenas
    */
   NETTY_POOLED_THREADLOCALCACHE("bytes", true),
-  NETTY_POOLED_CHUNK_SIZE("bytes", true);
+  NETTY_POOLED_CHUNK_SIZE("bytes", true),
+
+  /**
+   * The type of Adaptive Server Selector.
+   * See {@link org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector.Type}
+   */
+  ADAPTIVE_SERVER_SELECTOR_TYPE("adaptiveServerSelectorType", true),
+
+  /**
+   * The queue size of ServerRoutingStatsManager main executor service.
+   */
+  ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true);
 
   private final String _brokerGaugeName;
   private final String _unit;

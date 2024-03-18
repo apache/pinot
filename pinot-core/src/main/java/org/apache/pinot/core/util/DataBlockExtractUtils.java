@@ -28,7 +28,6 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
 import org.roaringbitmap.PeekableIntIterator;
@@ -105,7 +104,7 @@ public final class DataBlockExtractUtils {
     }
   }
 
-  public static Key[] extractKeys(DataBlock dataBlock, int[] keyIds) {
+  public static Object[][] extractKeys(DataBlock dataBlock, int[] keyIds) {
     DataSchema dataSchema = dataBlock.getDataSchema();
     int numKeys = keyIds.length;
     ColumnDataType[] storedTypes = new ColumnDataType[numKeys];
@@ -115,7 +114,7 @@ public final class DataBlockExtractUtils {
       nullBitmaps[colId] = dataBlock.getNullRowIds(keyIds[colId]);
     }
     int numRows = dataBlock.getNumberOfRows();
-    Key[] keys = new Key[numRows];
+    Object[][] keys = new Object[numRows][];
     for (int rowId = 0; rowId < numRows; rowId++) {
       Object[] values = new Object[numKeys];
       for (int colId = 0; colId < numKeys; colId++) {
@@ -124,12 +123,13 @@ public final class DataBlockExtractUtils {
           values[colId] = extractValue(dataBlock, storedTypes[colId], rowId, keyIds[colId]);
         }
       }
-      keys[rowId] = new Key(values);
+      keys[rowId] = values;
     }
     return keys;
   }
 
-  public static Key[] extractKeys(DataBlock dataBlock, int[] keyIds, int numMatchedRows, RoaringBitmap matchedBitmap) {
+  public static Object[][] extractKeys(DataBlock dataBlock, int[] keyIds, int numMatchedRows,
+      RoaringBitmap matchedBitmap) {
     DataSchema dataSchema = dataBlock.getDataSchema();
     int numKeys = keyIds.length;
     ColumnDataType[] storedTypes = new ColumnDataType[numKeys];
@@ -138,7 +138,7 @@ public final class DataBlockExtractUtils {
       storedTypes[colId] = dataSchema.getColumnDataType(keyIds[colId]).getStoredType();
       nullBitmaps[colId] = dataBlock.getNullRowIds(keyIds[colId]);
     }
-    Key[] keys = new Key[numMatchedRows];
+    Object[][] keys = new Object[numMatchedRows][];
     PeekableIntIterator iterator = matchedBitmap.getIntIterator();
     for (int matchedRowId = 0; matchedRowId < numMatchedRows; matchedRowId++) {
       int rowId = iterator.next();
@@ -149,7 +149,7 @@ public final class DataBlockExtractUtils {
           values[colId] = extractValue(dataBlock, storedTypes[colId], rowId, keyIds[colId]);
         }
       }
-      keys[matchedRowId] = new Key(values);
+      keys[matchedRowId] = values;
     }
     return keys;
   }

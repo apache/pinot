@@ -28,7 +28,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
-public class ServerInstance {
+public final class ServerInstance {
 
   public enum RoutingType {
     NETTY, GRPC, NETTY_TLS
