@@ -164,7 +164,8 @@ public class PercentileEstAggregationFunction extends NullableSingleInputAggrega
               quantileDigest.merge(value);
             } else {
               // Create a new QuantileDigest for the group
-              groupByResultHolder.setValueForKey(groupKey, value);
+              groupByResultHolder.setValueForKey(groupKey,
+                  ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
             }
           }
         }
