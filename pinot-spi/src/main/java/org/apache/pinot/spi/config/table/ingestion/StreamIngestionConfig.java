@@ -37,7 +37,7 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to use column major mode when creating the segment.")
   private boolean _columnMajorSegmentBuilderEnabled;
 
-  @JsonPropertyDescription("Whether to use column major mode when creating the segment.")
+  @JsonPropertyDescription("Whether to track offsets of the filtered stream messages during consumption.")
   private boolean _trackFilteredMessageOffsets = false;
 
   @JsonCreator
