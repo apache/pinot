@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import javax.annotation.Nullable;
+import org.apache.pinot.plugin.stream.kinesis.AwsSdkUtil;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.slf4j.Logger;
@@ -35,7 +36,6 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.http.SdkHttpConfigurationOption;
-import software.amazon.awssdk.http.apache.ApacheSdkHttpService;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.model.CreateStreamRequest;
@@ -85,7 +85,7 @@ public class KinesisDataServerStartable implements StreamDataServerStartable {
   public void createTopic(String topic, Properties topicProps) {
     try {
       KinesisClient kinesisClient = KinesisClient.builder().httpClient(
-              new ApacheSdkHttpService().createHttpClientBuilder().buildWithDefaults(
+              AwsSdkUtil.createSdkHttpService().createHttpClientBuilder().buildWithDefaults(
                   AttributeMap.builder().put(SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, Boolean.TRUE).build()))
           .credentialsProvider(getLocalAWSCredentials()).region(Region.of(DEFAULT_REGION))
           .endpointOverride(new URI(_localStackKinesisEndpoint)).build();

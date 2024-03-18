@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import org.apache.pinot.plugin.stream.kinesis.AwsSdkUtil;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.FixedDelayRetryPolicy;
@@ -36,7 +37,6 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.SdkBytes;
-import software.amazon.awssdk.http.apache.ApacheSdkHttpService;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.KinesisClientBuilder;
@@ -84,11 +84,11 @@ public class KinesisDataProducer implements StreamDataProducer {
         if (props.containsKey(ACCESS) && props.containsKey(SECRET)) {
           kinesisClientBuilder = KinesisClient.builder().region(Region.of(props.getProperty(REGION)))
               .credentialsProvider(getLocalAWSCredentials(props))
-              .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
+              .httpClientBuilder(AwsSdkUtil.createSdkHttpService().createHttpClientBuilder());
         } else {
           kinesisClientBuilder = KinesisClient.builder().region(Region.of(props.getProperty(REGION)))
               .credentialsProvider(DefaultCredentialsProvider.builder().build())
-              .httpClientBuilder(new ApacheSdkHttpService().createHttpClientBuilder());
+              .httpClientBuilder(AwsSdkUtil.createSdkHttpService().createHttpClientBuilder());
         }
 
         if (props.containsKey(ENDPOINT)) {
