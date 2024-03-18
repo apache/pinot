@@ -86,21 +86,23 @@ public class ForwardIndexHandlerTest {
   private static final String DIM_PASS_THROUGH_STRING = "DIM_PASS_THROUGH_STRING";
   private static final String DIM_ZSTANDARD_STRING = "DIM_ZSTANDARD_STRING";
   private static final String DIM_LZ4_STRING = "DIM_LZ4_STRING";
+  private static final String DIM_GZIP_STRING = "DIM_GZIP_STRING";
 
   private static final String DIM_SNAPPY_LONG = "DIM_SNAPPY_LONG";
   private static final String DIM_PASS_THROUGH_LONG = "DIM_PASS_THROUGH_LONG";
   private static final String DIM_ZSTANDARD_LONG = "DIM_ZSTANDARD_LONG";
   private static final String DIM_LZ4_LONG = "DIM_LZ4_LONG";
-
+  private static final String DIM_GZIP_LONG = "DIM_GZIP_LONG";
   private static final String DIM_SNAPPY_INTEGER = "DIM_SNAPPY_INTEGER";
   private static final String DIM_PASS_THROUGH_INTEGER = "DIM_PASS_THROUGH_INTEGER";
   private static final String DIM_ZSTANDARD_INTEGER = "DIM_ZSTANDARD_INTEGER";
   private static final String DIM_LZ4_INTEGER = "DIM_LZ4_INTEGER";
-
+  private static final String DIM_GZIP_INTEGER = "DIM_GZIP_INTEGER";
   private static final String DIM_SNAPPY_BYTES = "DIM_SNAPPY_BYTES";
   private static final String DIM_PASS_THROUGH_BYTES = "DIM_PASS_THROUGH_BYTES";
   private static final String DIM_ZSTANDARD_BYTES = "DIM_ZSTANDARD_BYTES";
   private static final String DIM_LZ4_BYTES = "DIM_LZ4_BYTES";
+  private static final String DIM_GZIP_BYTES = "DIM_GZIP_BYTES";
 
   // Sorted columns
   private static final String DIM_RAW_SORTED_INTEGER = "DIM_RAW_SORTED_INTEGER";
@@ -110,11 +112,13 @@ public class ForwardIndexHandlerTest {
   private static final String METRIC_SNAPPY_INTEGER = "METRIC_SNAPPY_INTEGER";
   private static final String METRIC_ZSTANDARD_INTEGER = "METRIC_ZSTANDARD_INTEGER";
   private static final String METRIC_LZ4_INTEGER = "METRIC_LZ4_INTEGER";
+  private static final String METRIC_GZIP_INTEGER = "METRIC_GZIP_INTEGER";
 
   private static final String METRIC_SNAPPY_BIG_DECIMAL = "METRIC_SNAPPY_BIG_DECIMAL";
   private static final String METRIC_PASS_THROUGH_BIG_DECIMAL = "METRIC_PASS_THROUGH_BIG_DECIMAL";
   private static final String METRIC_ZSTANDARD_BIG_DECIMAL = "METRIC_ZSTANDARD_BIG_DECIMAL";
   private static final String METRIC_LZ4_BIG_DECIMAL = "METRIC_LZ4_BIG_DECIMAL";
+  private static final String METRIC_GZIP_BIG_DECIMAL = "METRIC_GZIP_BIG_DECIMAL";
 
   // Multi-value columns
   private static final String DIM_MV_PASS_THROUGH_INTEGER = "DIM_MV_PASS_THROUGH_INTEGER";
@@ -187,6 +191,10 @@ public class ForwardIndexHandlerTest {
       Arrays.asList(DIM_LZ4_STRING, DIM_LZ4_LONG, DIM_LZ4_INTEGER, DIM_LZ4_BYTES, METRIC_LZ4_BIG_DECIMAL,
           METRIC_LZ4_INTEGER);
 
+  private static final List<String> RAW_GZIP_INDEX_COLUMNS =
+      Arrays.asList(DIM_GZIP_STRING, DIM_GZIP_LONG, DIM_GZIP_INTEGER, DIM_GZIP_BYTES, METRIC_GZIP_BIG_DECIMAL,
+          METRIC_GZIP_INTEGER);
+
   private static final List<String> DICT_ENABLED_COLUMNS_WITH_FORWARD_INDEX = Arrays.asList(DIM_DICT_INTEGER,
       DIM_DICT_LONG, DIM_DICT_STRING, DIM_DICT_BYES, DIM_DICT_MV_BYTES, DIM_DICT_MV_STRING,
       DIM_DICT_MV_INTEGER, DIM_DICT_MV_LONG);
@@ -241,7 +249,7 @@ public class ForwardIndexHandlerTest {
 
     List<FieldConfig> fieldConfigs = new ArrayList<>(
         RAW_SNAPPY_INDEX_COLUMNS.size() + RAW_SORTED_INDEX_COLUMNS.size() + RAW_ZSTANDARD_INDEX_COLUMNS.size()
-            + RAW_PASS_THROUGH_INDEX_COLUMNS.size() + RAW_LZ4_INDEX_COLUMNS.size()
+            + RAW_PASS_THROUGH_INDEX_COLUMNS.size() + RAW_LZ4_INDEX_COLUMNS.size() + RAW_GZIP_INDEX_COLUMNS.size()
             + SV_FORWARD_INDEX_DISABLED_COLUMNS.size() + MV_FORWARD_INDEX_DISABLED_COLUMNS.size()
             + MV_FORWARD_INDEX_DISABLED_DUPLICATES_COLUMNS.size() + FORWARD_INDEX_DISABLED_RAW_COLUMNS.size() + 2);
 
@@ -268,6 +276,11 @@ public class ForwardIndexHandlerTest {
     for (String indexColumn : RAW_LZ4_INDEX_COLUMNS) {
       fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
           CompressionCodec.LZ4, null));
+    }
+
+    for (String indexColumn : RAW_GZIP_INDEX_COLUMNS) {
+      fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
+          CompressionCodec.GZIP, null));
     }
 
     for (String indexColumn : SV_FORWARD_INDEX_DISABLED_COLUMNS) {
@@ -306,6 +319,7 @@ public class ForwardIndexHandlerTest {
     _noDictionaryColumns.addAll(RAW_ZSTANDARD_INDEX_COLUMNS);
     _noDictionaryColumns.addAll(RAW_PASS_THROUGH_INDEX_COLUMNS);
     _noDictionaryColumns.addAll(RAW_LZ4_INDEX_COLUMNS);
+    _noDictionaryColumns.addAll(RAW_GZIP_INDEX_COLUMNS);
     _noDictionaryColumns.addAll(FORWARD_INDEX_DISABLED_RAW_COLUMNS);
     _noDictionaryColumns.addAll(RAW_SORTED_INDEX_COLUMNS);
 
@@ -330,23 +344,28 @@ public class ForwardIndexHandlerTest {
         .addSingleValueDimension(DIM_PASS_THROUGH_STRING, FieldSpec.DataType.STRING)
         .addSingleValueDimension(DIM_ZSTANDARD_STRING, FieldSpec.DataType.STRING)
         .addSingleValueDimension(DIM_LZ4_STRING, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(DIM_GZIP_STRING, FieldSpec.DataType.STRING)
         .addSingleValueDimension(DIM_SNAPPY_INTEGER, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIM_RAW_SORTED_INTEGER, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIM_ZSTANDARD_INTEGER, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIM_PASS_THROUGH_INTEGER, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIM_LZ4_INTEGER, FieldSpec.DataType.INT)
+        .addSingleValueDimension(DIM_GZIP_INTEGER, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIM_SNAPPY_LONG, FieldSpec.DataType.LONG)
         .addSingleValueDimension(DIM_ZSTANDARD_LONG, FieldSpec.DataType.LONG)
         .addSingleValueDimension(DIM_PASS_THROUGH_LONG, FieldSpec.DataType.LONG)
         .addSingleValueDimension(DIM_LZ4_LONG, FieldSpec.DataType.LONG)
+        .addSingleValueDimension(DIM_GZIP_LONG, FieldSpec.DataType.LONG)
         .addSingleValueDimension(DIM_SNAPPY_BYTES, FieldSpec.DataType.BYTES)
         .addSingleValueDimension(DIM_PASS_THROUGH_BYTES, FieldSpec.DataType.BYTES)
         .addSingleValueDimension(DIM_ZSTANDARD_BYTES, FieldSpec.DataType.BYTES)
         .addSingleValueDimension(DIM_LZ4_BYTES, FieldSpec.DataType.BYTES)
+        .addSingleValueDimension(DIM_GZIP_BYTES, FieldSpec.DataType.BYTES)
         .addMetric(METRIC_SNAPPY_BIG_DECIMAL, FieldSpec.DataType.BIG_DECIMAL)
         .addMetric(METRIC_PASS_THROUGH_BIG_DECIMAL, FieldSpec.DataType.BIG_DECIMAL)
         .addMetric(METRIC_ZSTANDARD_BIG_DECIMAL, FieldSpec.DataType.BIG_DECIMAL)
         .addMetric(METRIC_LZ4_BIG_DECIMAL, FieldSpec.DataType.BIG_DECIMAL)
+        .addMetric(METRIC_GZIP_BIG_DECIMAL, FieldSpec.DataType.BIG_DECIMAL)
         .addSingleValueDimension(DIM_DICT_INTEGER, FieldSpec.DataType.INT)
         .addSingleValueDimension(DIM_DICT_LONG, FieldSpec.DataType.LONG)
         .addSingleValueDimension(DIM_DICT_STRING, FieldSpec.DataType.STRING)
@@ -354,6 +373,7 @@ public class ForwardIndexHandlerTest {
         .addMetric(METRIC_PASS_THROUGH_INTEGER, FieldSpec.DataType.INT)
         .addMetric(METRIC_SNAPPY_INTEGER, FieldSpec.DataType.INT)
         .addMetric(METRIC_LZ4_INTEGER, FieldSpec.DataType.INT)
+        .addMetric(METRIC_GZIP_INTEGER, FieldSpec.DataType.INT)
         .addMetric(METRIC_ZSTANDARD_INTEGER, FieldSpec.DataType.INT)
         .addMultiValueDimension(DIM_MV_PASS_THROUGH_INTEGER, FieldSpec.DataType.INT)
         .addMultiValueDimension(DIM_MV_PASS_THROUGH_LONG, FieldSpec.DataType.LONG)
@@ -480,13 +500,16 @@ public class ForwardIndexHandlerTest {
       row.putValue(DIM_ZSTANDARD_STRING, tempStringRows[i]);
       row.putValue(DIM_PASS_THROUGH_STRING, tempStringRows[i]);
       row.putValue(DIM_LZ4_STRING, tempStringRows[i]);
+      row.putValue(DIM_GZIP_STRING, tempStringRows[i]);
 
       // Raw integer columns
       row.putValue(DIM_SNAPPY_INTEGER, tempIntRows[i]);
       row.putValue(DIM_ZSTANDARD_INTEGER, tempIntRows[i]);
       row.putValue(DIM_PASS_THROUGH_INTEGER, tempIntRows[i]);
       row.putValue(DIM_LZ4_INTEGER, tempIntRows[i]);
+      row.putValue(DIM_GZIP_INTEGER, tempIntRows[i]);
       row.putValue(METRIC_LZ4_INTEGER, tempIntRows[i]);
+      row.putValue(METRIC_GZIP_INTEGER, tempIntRows[i]);
       row.putValue(METRIC_PASS_THROUGH_INTEGER, tempIntRows[i]);
       row.putValue(METRIC_ZSTANDARD_INTEGER, tempIntRows[i]);
       row.putValue(METRIC_SNAPPY_INTEGER, tempIntRows[i]);
@@ -497,18 +520,21 @@ public class ForwardIndexHandlerTest {
       row.putValue(DIM_ZSTANDARD_LONG, tempLongRows[i]);
       row.putValue(DIM_PASS_THROUGH_LONG, tempLongRows[i]);
       row.putValue(DIM_LZ4_LONG, tempLongRows[i]);
+      row.putValue(DIM_GZIP_LONG, tempLongRows[i]);
 
       // Raw Byte columns
       row.putValue(DIM_SNAPPY_BYTES, tempBytesRows[i]);
       row.putValue(DIM_ZSTANDARD_BYTES, tempBytesRows[i]);
       row.putValue(DIM_PASS_THROUGH_BYTES, tempBytesRows[i]);
       row.putValue(DIM_LZ4_BYTES, tempBytesRows[i]);
+      row.putValue(DIM_GZIP_BYTES, tempBytesRows[i]);
 
       // Raw BigDecimal column
       row.putValue(METRIC_SNAPPY_BIG_DECIMAL, tempBigDecimalRows[i]);
       row.putValue(METRIC_ZSTANDARD_BIG_DECIMAL, tempBigDecimalRows[i]);
       row.putValue(METRIC_PASS_THROUGH_BIG_DECIMAL, tempBigDecimalRows[i]);
       row.putValue(METRIC_LZ4_BIG_DECIMAL, tempBigDecimalRows[i]);
+      row.putValue(METRIC_GZIP_BIG_DECIMAL, tempBigDecimalRows[i]);
 
       // Dictionary SV columns
       row.putValue(DIM_DICT_INTEGER, tempIntRows[i]);

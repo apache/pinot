@@ -25,6 +25,10 @@ import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import net.jpountz.lz4.LZ4Factory;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.pinot.segment.spi.compression.ChunkCompressor;
+import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -50,7 +54,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 @Warmup(iterations = 3)
 @Measurement(iterations = 5)
 @State(Scope.Benchmark)
-// Test to get memory statistics for snappy, zstandard and lz4 string compression techniques
+// Test to get memory statistics for snappy, zstandard, lz4 and gzip string compression techniques
 public class BenchmarkNoDictionaryStringCompression {
 
   @Param({"500000", "1000000", "2000000", "3000000", "4000000", "5000000"})
@@ -70,8 +74,13 @@ public class BenchmarkNoDictionaryStringCompression {
     private static ByteBuffer _lz4CompressedStringOutput;
     private static ByteBuffer _lz4CompressedStringInput;
     private static ByteBuffer _lz4StringDecompressed;
+    private static ByteBuffer _gzipCompressedStringOutput;
+    private static ByteBuffer _gzipCompressedStringInput;
+    private static ByteBuffer _gzipStringDecompressed;
 
     private static LZ4Factory _factory;
+    private static ChunkCompressor _gzipCompressor;
+    private static ChunkDecompressor _gzipDecompressor;
 
     @Setup(Level.Invocation)
     public void setUp()
@@ -87,17 +96,21 @@ public class BenchmarkNoDictionaryStringCompression {
       // position for lz4 is required
       _uncompressedString.flip();
       _factory.fastCompressor().compress(_uncompressedString, _lz4CompressedStringInput);
+      _gzipCompressor.compress(_uncompressedString, _gzipCompressedStringInput);
 
       _zstandardStringDecompressed.rewind();
       _zstandardCompressedStringInput.flip();
       _uncompressedString.flip();
       _snappyStringDecompressed.flip();
       _lz4CompressedStringInput.flip();
+      _gzipCompressedStringInput.flip();
     }
 
     private void initializeCompressors() {
-      //Initialize compressors and decompressors for lz4
+      //Initialize compressors and decompressors for lz4 and zip
       _factory = LZ4Factory.fastestInstance();
+      _gzipCompressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.GZIP);
+      _gzipDecompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.GZIP);
     }
 
     private void generateRandomStringBuffer() {
@@ -128,6 +141,9 @@ public class BenchmarkNoDictionaryStringCompression {
       _lz4StringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
       _lz4CompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
       _lz4CompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _gzipCompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _gzipCompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
+      _gzipStringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
     }
 
     @TearDown(Level.Invocation)
@@ -139,10 +155,13 @@ public class BenchmarkNoDictionaryStringCompression {
       _zstandardStringDecompressed.clear();
       _lz4CompressedStringOutput.clear();
       _lz4StringDecompressed.clear();
+      _gzipCompressedStringOutput.clear();
+      _gzipStringDecompressed.clear();
 
       _uncompressedString.rewind();
       _zstandardCompressedStringInput.rewind();
       _lz4CompressedStringInput.rewind();
+      _gzipCompressedStringInput.rewind();
     }
   }
 
@@ -222,9 +241,29 @@ public class BenchmarkNoDictionaryStringCompression {
     return state._lz4StringDecompressed.position();
   }
 
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkGZIPStringCompression(
+      BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
+      throws IOException {
+    state._gzipCompressor.compress(state._uncompressedString, state._gzipCompressedStringOutput);
+    return state._gzipCompressedStringOutput.position();
+  }
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  public int benchmarkGZIPStringDecompression(
+      BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
+      throws IOException {
+    state._gzipDecompressor.decompress(state._gzipCompressedStringInput, state._gzipStringDecompressed);
+    return state._gzipStringDecompressed.position();
+  }
+
   public static void main(String[] args)
       throws Exception {
-    new Runner(new OptionsBuilder().include(BenchmarkNoDictionaryStringCompression.class.getSimpleName()).build())
-        .run();
+    new Runner(
+        new OptionsBuilder().include(BenchmarkNoDictionaryStringCompression.class.getSimpleName()).build()).run();
   }
 }

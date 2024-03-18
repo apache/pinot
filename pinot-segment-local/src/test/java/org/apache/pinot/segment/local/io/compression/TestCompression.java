@@ -41,11 +41,9 @@ public class TestCompression {
     buffer.put(input);
     buffer.flip();
     return new Object[][]{
-        {ChunkCompressionType.PASS_THROUGH, buffer.slice()},
-        {ChunkCompressionType.SNAPPY, buffer.slice()},
-        {ChunkCompressionType.LZ4, buffer.slice()},
-        {ChunkCompressionType.LZ4_LENGTH_PREFIXED, buffer.slice()},
-        {ChunkCompressionType.ZSTANDARD, buffer.slice()}
+        {ChunkCompressionType.PASS_THROUGH, buffer.slice()}, {ChunkCompressionType.SNAPPY, buffer.slice()},
+        {ChunkCompressionType.LZ4, buffer.slice()}, {ChunkCompressionType.LZ4_LENGTH_PREFIXED, buffer.slice()},
+        {ChunkCompressionType.ZSTANDARD, buffer.slice()}, {ChunkCompressionType.GZIP, buffer.slice()}
     };
   }
 
@@ -72,9 +70,10 @@ public class TestCompression {
     compressor.compress(rawInput.slice(), compressedOutput);
     ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(compressor.compressionType());
     int decompressedLength = decompressor.decompressedLength(compressedOutput);
-    assertTrue(compressor.compressionType() == ChunkCompressionType.LZ4 || decompressedLength > 0);
-    ByteBuffer decompressedOutput = ByteBuffer.allocateDirect(
-        compressor.compressionType() == ChunkCompressionType.LZ4 ? rawInput.limit() : decompressedLength);
+    boolean isLz4OrGzip = compressor.compressionType() == ChunkCompressionType.LZ4
+        || compressor.compressionType() == ChunkCompressionType.GZIP;
+    assertTrue(isLz4OrGzip || decompressedLength > 0);
+    ByteBuffer decompressedOutput = ByteBuffer.allocateDirect(isLz4OrGzip ? rawInput.limit() : decompressedLength);
     decompressor.decompress(compressedOutput, decompressedOutput);
     byte[] expected = new byte[rawInput.limit()];
     rawInput.get(expected);
