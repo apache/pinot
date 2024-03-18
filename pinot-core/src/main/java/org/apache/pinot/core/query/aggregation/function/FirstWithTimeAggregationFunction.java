@@ -126,13 +126,15 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
       ValueLongPair<V> defaultValueLongPair = getDefaultValueTimePair();
 
       ValueLongPair<V> result = constructValueLongPair(defaultValueLongPair.getValue(), defaultValueLongPair.getTime());
-      forEachNotNullBytes(length, blockValSet, bytes -> {
-        ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytes);
-        long time = firstWithTimePair.getTime();
-
-        if (time < result.getTime()) {
-          result.setTime(time);
-          result.setValue(firstWithTimePair.getValue());
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+          long time = firstWithTimePair.getTime();
+          if (time < result.getTime()) {
+            result.setTime(time);
+            result.setValue(firstWithTimePair.getValue());
+          }
         }
       });
 
@@ -157,12 +159,15 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
           blockValSet, timeValSet);
     } else {
       // Serialized FirstPair
-      forEachNotNullBytes(length, blockValSet, (i, bytes) -> {
-        ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytes);
-        setGroupByResult(groupKeyArray[i],
-            groupByResultHolder,
-            firstWithTimePair.getValue(),
-            firstWithTimePair.getTime());
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+          setGroupByResult(groupKeyArray[i],
+              groupByResultHolder,
+              firstWithTimePair.getValue(),
+              firstWithTimePair.getTime());
+        }
       });
     }
   }
@@ -176,12 +181,15 @@ public abstract class FirstWithTimeAggregationFunction<V extends Comparable<V>>
       aggregateGroupResultWithRawDataMv(length, groupKeysArray, groupByResultHolder, blockValSet, timeValSet);
     } else {
       // Serialized ValueTimePair
-      forEachNotNullBytes(length, blockValSet, (i, bytes) -> {
-        ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytes);
-        V data = firstWithTimePair.getValue();
-        long time = firstWithTimePair.getTime();
-        for (int groupKey : groupKeysArray[i]) {
-          setGroupByResult(groupKey, groupByResultHolder, data, time);
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          ValueLongPair<V> firstWithTimePair = _objectSerDe.deserialize(bytesValues[i]);
+          V data = firstWithTimePair.getValue();
+          long time = firstWithTimePair.getTime();
+          for (int groupKey : groupKeysArray[i]) {
+            setGroupByResult(groupKey, groupByResultHolder, data, time);
+          }
         }
       });
     }
