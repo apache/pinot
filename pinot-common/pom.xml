@@ -25,7 +25,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.1.0-SNAPSHOT</version>
+    <version>1.2.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-common</artifactId>
@@ -42,7 +42,6 @@
         <filtering>true</filtering>
       </resource>
     </resources>
-    <!-- Antlr stuff -->
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -55,19 +54,6 @@
             </property>
           </properties>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.antlr</groupId>
-        <artifactId>antlr4-maven-plugin</artifactId>
-        <version>${antlr.version}</version>
-        <executions>
-          <execution>
-            <id>antlr</id>
-            <goals>
-              <goal>antlr4</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
@@ -219,10 +205,6 @@
       <artifactId>httpcore</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.antlr</groupId>
-      <artifactId>antlr4-runtime</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.calcite</groupId>
       <artifactId>calcite-core</artifactId>
     </dependency>
@@ -282,12 +264,6 @@
     <dependency>
       <groupId>org.apache.helix</groupId>
       <artifactId>helix-core</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>javax.xml.bind</groupId>
-          <artifactId>jaxb-api</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>it.unimi.dsi</groupId>
@@ -324,18 +300,7 @@
     </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
-      <!--
-      NOTE: use `mockito-inline` here instead of `mockito-core`, as mockito-core does not support mocking static function:
-      ```
-      org.mockito.exceptions.base.MockitoException:
-      The used MockMaker SubclassByteBuddyMockMaker does not support the creation of static mocks
-
-      Mockito's inline mock maker supports static mocks based on the Instrumentation API.
-      You can simply enable this mock mode, by placing the 'mockito-inline' artifact where you are currently using 'mockito-core'.
-      Note that Mockito's inline mock maker is not supported on Android.
-      ```
-      -->
-      <artifactId>mockito-inline</artifactId>
+      <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

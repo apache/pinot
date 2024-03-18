@@ -24,6 +24,7 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.net.UnknownHostException;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -55,6 +56,8 @@ public class AdminApiApplication extends ResourceConfig {
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String SERVER_INSTANCE_ID = "serverInstanceId";
 
+  public static final String START_TIME = "serverStartTime";
+
   private final AtomicBoolean _shutDownInProgress = new AtomicBoolean();
   private final ServerInstance _serverInstance;
   private HttpServer _httpServer;
@@ -69,6 +72,7 @@ public class AdminApiApplication extends ResourceConfig {
         CommonConstants.Server.DEFAULT_SERVER_RESOURCE_PACKAGES);
     packages(_adminApiResourcePackages);
     property(PINOT_CONFIGURATION, serverConf);
+    Instant serverStartTime = Instant.now();
 
     register(new AbstractBinder() {
       @Override
@@ -85,6 +89,7 @@ public class AdminApiApplication extends ResourceConfig {
         } else {
           bind(new DummyLogFileServer()).to(LogFileServer.class);
         }
+        bind(serverStartTime).named(START_TIME);
       }
     });
 

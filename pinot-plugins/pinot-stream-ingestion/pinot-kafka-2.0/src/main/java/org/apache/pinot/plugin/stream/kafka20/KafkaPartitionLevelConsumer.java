@@ -69,8 +69,12 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     ConsumerRecords<String, Bytes> consumerRecords = _consumer.poll(Duration.ofMillis(timeoutMillis));
     List<ConsumerRecord<String, Bytes>> messageAndOffsets = consumerRecords.records(_topicPartition);
     List<StreamMessage<byte[]>> filtered = new ArrayList<>(messageAndOffsets.size());
+    long firstOffset = startOffset;
     long lastOffset = startOffset;
     StreamMessageMetadata rowMetadata = null;
+    if (!messageAndOffsets.isEmpty()) {
+      firstOffset = messageAndOffsets.get(0).offset();
+    }
     for (ConsumerRecord<String, Bytes> messageAndOffset : messageAndOffsets) {
       long offset = messageAndOffset.offset();
       _lastFetchedOffset = offset;
@@ -90,6 +94,6 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
             endOffset);
       }
     }
-    return new KafkaMessageBatch(messageAndOffsets.size(), lastOffset, filtered, rowMetadata);
+    return new KafkaMessageBatch(messageAndOffsets.size(), firstOffset, lastOffset, filtered, rowMetadata);
   }
 }

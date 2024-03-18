@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>1.1.0-SNAPSHOT</version>
+  <version>1.2.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -124,7 +124,7 @@
     <avro.version>1.11.3</avro.version>
     <parquet.version>1.13.1</parquet.version>
     <helix.version>1.3.1</helix.version>
-    <zkclient.version>0.7</zkclient.version>
+    <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.12.7.20221012</jackson.version>
     <zookeeper.version>3.7.2</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
@@ -132,9 +132,8 @@
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.9</swagger.version>
-    <hadoop.version>3.2.4</hadoop.version>
-    <antlr.version>4.6</antlr.version>
-    <jsonpath.version>2.8.0</jsonpath.version>
+    <hadoop.version>3.3.6</hadoop.version>
+    <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.0</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.30.0</calcite.version>
@@ -145,31 +144,33 @@
     <!-- hadoop-common, spark-core use commons-net -->
     <commons-net.version>3.10.0</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
-    <dropwizard-metrics.version>4.2.23</dropwizard-metrics.version>
-    <snappy-java.version>1.1.10.4</snappy-java.version>
+    <dropwizard-metrics.version>4.2.25</dropwizard-metrics.version>
+    <snappy-java.version>1.1.10.5</snappy-java.version>
     <zstd-jni.version>1.5.5-11</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
-    <log4j.version>2.22.0</log4j.version>
+    <log4j.version>2.23.1</log4j.version>
     <slf4j.version>2.0.9</slf4j.version>
-    <netty.version>4.1.100.Final</netty.version>
+    <netty.version>4.1.107.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.19.0</jts.version>
     <h3.version>4.1.1</h3.version>
-    <jmh.version>1.26</jmh.version>
+    <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.1</stax2-api.version>
-    <aws.sdk.version>2.20.137</aws.sdk.version>
+    <aws.sdk.version>2.25.3</aws.sdk.version>
     <joda-time.version>2.12.5</joda-time.version>
-    <testng.version>7.8.0</testng.version>
+    <testng.version>7.9.0</testng.version>
     <woodstox.version>6.4.0</woodstox.version>
     <sslcontext.kickstart.version>8.2.0</sslcontext.kickstart.version>
 
-    <!-- google libraries -->
-    <guava.version>33.0.0-jre</guava.version>
-    <error_prone_annotations.version>2.24.1</error_prone_annotations.version>
+    <!-- Google Libraries -->
+    <google.cloud.libraries.version>26.32.0</google.cloud.libraries.version>
+    <google.auth.version>1.23.0</google.auth.version>
+    <gson.version>2.10.1</gson.version>
+    <guava.version>33.1.0-jre</guava.version>
+    <google.http-client.version>1.44.1</google.http-client.version>
     <protobuf.version>3.25.2</protobuf.version>
-    <proto-google-common-protos.version>2.34.0</proto-google-common-protos.version>
     <grpc.version>1.61.1</grpc.version>
 
     <confluent.version>7.2.6</confluent.version>
@@ -185,11 +186,7 @@
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
     <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
-    <surefire.version>3.1.2</surefire.version>
-
-    <!-- Configuration for Scala -->
-    <scala.version>2.12.18</scala.version>
-    <scala.compat.version>2.12</scala.compat.version>
+    <surefire.version>3.2.5</surefire.version>
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.18</scala.version>
@@ -198,7 +195,15 @@
     <flink.version>1.14.6</flink.version>
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
 
-    <kotlin.stdlib.version>1.7.22</kotlin.stdlib.version>
+    <kotlin.stdlib.version>1.9.22</kotlin.stdlib.version>
+    <okio.version>3.8.0</okio.version>
+    <kerby.version>2.0.3</kerby.version>
+    <!-- Newer version jline requires java 21 -->
+    <jline.version>3.24.1</jline.version>
+    <wildfly.version>1.7.0.Final</wildfly.version>
+    <jettison.version>1.5.4</jettison.version>
+    <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
+    <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
   </properties>
 
   <profiles>
@@ -254,29 +259,9 @@
       </properties>
     </profile>
   </profiles>
+
   <dependencyManagement>
     <dependencies>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpmime</artifactId>
-        <version>4.5.13</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpclient</artifactId>
-        <version>4.5.14</version>
-        <exclusions>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.httpcomponents</groupId>
-        <artifactId>httpcore</artifactId>
-        <version>4.4.13</version>
-      </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-common</artifactId>
@@ -329,17 +314,7 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-tools</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-hadoop</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-spark</artifactId>
+        <artifactId>pinot-broker</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -349,12 +324,17 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-broker</artifactId>
+        <artifactId>pinot-minion</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-minion</artifactId>
+        <artifactId>pinot-tools</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-spark-common</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -383,7 +363,6 @@
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
-
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-query-planner</artifactId>
@@ -404,8 +383,13 @@
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
         <artifactId>equalsverifier</artifactId>
-        <version>3.14.1</version>
+        <version>3.15.8</version>
         <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.checkerframework</groupId>
+        <artifactId>checker-qual</artifactId>
+        <version>3.42.0</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -425,7 +409,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>0.9.38</version>
+        <version>1.0.5</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -443,25 +427,9 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>com.google.guava</groupId>
-        <artifactId>guava</artifactId>
-        <version>${guava.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.checkerframework</groupId>
-            <artifactId>checker-qual</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>com.google.errorprone</groupId>
-        <artifactId>error_prone_annotations</artifactId>
-        <version>${error_prone_annotations.version}</version>
-      </dependency>
-      <dependency>
         <groupId>commons-cli</groupId>
         <artifactId>commons-cli</artifactId>
-        <version>1.5.0</version>
+        <version>1.6.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
@@ -488,6 +456,28 @@
         <groupId>commons-io</groupId>
         <artifactId>commons-io</artifactId>
         <version>2.11.0</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpmime</artifactId>
+        <version>4.5.13</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpclient</artifactId>
+        <version>4.5.14</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents</groupId>
+        <artifactId>httpcore</artifactId>
+        <version>4.4.13</version>
       </dependency>
 
       <!-- netty BOM -->
@@ -547,7 +537,7 @@
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-compress</artifactId>
-        <version>1.21</version>
+        <version>1.26.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.thrift</groupId>
@@ -680,10 +670,6 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>org.apache.yetus</groupId>
-            <artifactId>audience-annotations</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -707,8 +693,46 @@
         <groupId>com.fasterxml.jackson</groupId>
         <artifactId>jackson-bom</artifactId>
         <version>${jackson.version}</version>
-        <scope>import</scope>
         <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Google Libraries -->
+      <dependency>
+        <groupId>com.google.cloud</groupId>
+        <artifactId>libraries-bom</artifactId>
+        <version>${google.cloud.libraries.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- Solve the dependency converge issue between google-cloud-storage and google-cloud-nio -->
+      <dependency>
+        <groupId>com.google.apis</groupId>
+        <artifactId>google-api-services-storage</artifactId>
+        <version>v1-rev20240209-2.0.0</version>
+      </dependency>
+      <!-- Solve the dependency converge issue between guava and calcite-core -->
+      <dependency>
+        <groupId>com.google.errorprone</groupId>
+        <artifactId>error_prone_annotations</artifactId>
+        <version>2.25.0</version>
+      </dependency>
+      <!-- Legacy Google Libraries -->
+      <dependency>
+        <groupId>com.google.auto.service</groupId>
+        <artifactId>auto-service</artifactId>
+        <version>1.1.1</version>
+        <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
+      </dependency>
+      <dependency>
+        <groupId>com.google.code.findbugs</groupId>
+        <artifactId>jsr305</artifactId>
+        <version>3.0.2</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.j2objc</groupId>
+        <artifactId>j2objc-annotations</artifactId>
+        <version>2.8</version>
       </dependency>
 
       <!-- Hadoop -->
@@ -751,28 +775,20 @@
             <artifactId>slf4j-log4j12</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.apache.yetus</groupId>
-            <artifactId>audience-annotations</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.codehaus.woodstox</groupId>
-            <artifactId>stax2-api</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.nimbusds</groupId>
-            <artifactId>nimbus-jose-jwt</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-configuration2</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-text</artifactId>
           </exclusion>
           <exclusion>
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.hadoop.thirdparty</groupId>
+            <artifactId>hadoop-shaded-protobuf_3_7</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.jboss.xnio</groupId>
+            <artifactId>xnio-api</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -817,6 +833,10 @@
           <exclusion>
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -867,10 +887,6 @@
         <scope>provided</scope>
         <exclusions>
           <exclusion>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.codehaus.jackson</groupId>
             <artifactId>jackson-core-asl</artifactId>
           </exclusion>
@@ -902,6 +918,10 @@
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>io.netty</groupId>
+            <artifactId>netty</artifactId>
+          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
@@ -909,6 +929,94 @@
         <artifactId>hadoop-hdfs-client</artifactId>
         <version>${hadoop.version}</version>
         <scope>provided</scope>
+      </dependency>
+      <!-- Solve the dependency converge issue within hadoop libraries -->
+      <dependency>
+        <groupId>ch.qos.reload4j</groupId>
+        <artifactId>reload4j</artifactId>
+        <version>1.2.25</version>
+      </dependency>
+      <!-- Solve the dependency converge issue between hadoop-common and orc-core -->
+      <dependency>
+        <groupId>javax.xml.bind</groupId>
+        <artifactId>jaxb-api</artifactId>
+        <version>2.3.1</version>
+      </dependency>
+      <!-- The following dependencies are added to solve the vulnerabilities of the old version -->
+      <dependency>
+        <groupId>org.apache.kerby</groupId>
+        <artifactId>kerb-core</artifactId>
+        <version>${kerby.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.kerby</groupId>
+        <artifactId>kerb-simplekdc</artifactId>
+        <version>${kerby.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jline</groupId>
+        <artifactId>jline</artifactId>
+        <version>${jline.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.wildfly.common</groupId>
+        <artifactId>wildfly-common</artifactId>
+        <version>${wildfly.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.jettison</groupId>
+        <artifactId>jettison</artifactId>
+        <version>${jettison.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.nimbusds</groupId>
+        <artifactId>nimbus-jose-jwt</artifactId>
+        <version>${nimbus-jose-jwt.version}</version>
+      </dependency>
+
+      <!-- Consolidate eclipse jetty dependencies for hadoop/spark/pulsar -->
+      <dependency>
+        <groupId>org.eclipse.jetty.websocket</groupId>
+        <artifactId>websocket-client</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-server</artifactId>
+        <version>${eclipse.jetty.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-servlet</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-util-ajax</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-webapp</artifactId>
+        <version>${eclipse.jetty.version}</version>
+      </dependency>
+
+      <!-- Upgrade hadoop-common dependency from hadoop-shaded-protobuf_3_7 to hadoop-shaded-protobuf_3_21 -->
+      <dependency>
+        <groupId>org.apache.hadoop.thirdparty</groupId>
+        <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
+        <version>1.2.0</version>
       </dependency>
 
       <!-- Metrics -->
@@ -961,7 +1069,7 @@
       <dependency>
         <groupId>com.clearspring.analytics</groupId>
         <artifactId>stream</artifactId>
-        <version>2.7.0</version>
+        <version>2.9.8</version>
       </dependency>
       <dependency>
         <groupId>org.apache.datasketches</groupId>
@@ -977,11 +1085,6 @@
         <groupId>com.tdunning</groupId>
         <artifactId>t-digest</artifactId>
         <version>3.2</version>
-      </dependency>
-      <dependency>
-        <groupId>org.antlr</groupId>
-        <artifactId>antlr4-runtime</artifactId>
-        <version>${antlr.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jayway.jsonpath</groupId>
@@ -1052,23 +1155,7 @@
       <dependency>
         <groupId>com.jcabi</groupId>
         <artifactId>jcabi-log</artifactId>
-        <version>0.18.1</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.auto.service</groupId>
-        <artifactId>auto-service</artifactId>
-        <version>1.1.1</version>
-        <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
-      </dependency>
-      <dependency>
-        <groupId>com.google.code.findbugs</groupId>
-        <artifactId>jsr305</artifactId>
-        <version>3.0.2</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.j2objc</groupId>
-        <artifactId>j2objc-annotations</artifactId>
-        <version>2.8</version>
+        <version>0.24.1</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.containers</groupId>
@@ -1184,13 +1271,7 @@
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
-        <version>5.5.0</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-inline</artifactId>
-        <version>5.2.0</version>
+        <version>5.11.0</version>
         <scope>test</scope>
       </dependency>
       <dependency>
@@ -1201,7 +1282,7 @@
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>2.2.220</version>
+        <version>2.2.224</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
@@ -1216,7 +1297,7 @@
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
-        <version>4.6.1</version>
+        <version>4.7.5</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
@@ -1228,12 +1309,6 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-math3</artifactId>
         <version>3.2</version>
-      </dependency>
-      <!-- hadoop-common & google-cloud-storage use gson -->
-      <dependency>
-        <groupId>com.google.code.gson</groupId>
-        <artifactId>gson</artifactId>
-        <version>2.10.1</version>
       </dependency>
       <!-- kafka_2.10 & jmh-core use jopt-simple -->
       <dependency>
@@ -1256,42 +1331,6 @@
         <artifactId>reflections</artifactId>
         <version>${reflections.version}</version>
       </dependency>
-      <!-- protobuf and grpc -->
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java</artifactId>
-        <version>${protobuf.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.protobuf</groupId>
-        <artifactId>protobuf-java-util</artifactId>
-        <version>${protobuf.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-context</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-netty-shaded</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-protobuf</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.grpc</groupId>
-        <artifactId>grpc-stub</artifactId>
-        <version>${grpc.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.google.api.grpc</groupId>
-        <artifactId>proto-google-common-protos</artifactId>
-        <version>${proto-google-common-protos.version}</version>
-      </dependency>
       <!-- geo dependencies -->
       <dependency>
         <groupId>org.locationtech.jts</groupId>
@@ -1308,24 +1347,6 @@
         <artifactId>ipaddress</artifactId>
         <version>5.3.4</version>
       </dependency>
-      <dependency>
-        <groupId>com.mercateo</groupId>
-        <artifactId>test-clock</artifactId>
-        <version>1.0.4</version>
-        <scope>test</scope>
-        <exclusions>
-          <exclusion>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <!-- starting from 1.18.30, JDK21 is supported -->
-        <groupId>org.projectlombok</groupId>
-        <artifactId>lombok</artifactId>
-        <version>1.18.30</version>
-      </dependency>
 
       <dependency>
         <groupId>net.openhft</groupId>
@@ -1335,7 +1356,7 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.24ea16</version>
+        <version>2.25ea10</version>
       </dependency>
       <dependency>
         <groupId>org.ow2.asm</groupId>
@@ -1396,6 +1417,21 @@
         <groupId>org.jetbrains.kotlin</groupId>
         <artifactId>kotlin-stdlib</artifactId>
         <version>${kotlin.stdlib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.jetbrains.kotlin</groupId>
+        <artifactId>kotlin-stdlib-common</artifactId>
+        <version>${kotlin.stdlib.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.okio</groupId>
+        <artifactId>okio</artifactId>
+        <version>${okio.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.squareup.okio</groupId>
+        <artifactId>okio-jvm</artifactId>
+        <version>${okio.version}</version>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
@@ -1511,12 +1547,12 @@
         </plugin>
         <plugin>
           <artifactId>maven-resources-plugin</artifactId>
-          <version>2.6</version>
+          <version>3.3.1</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-dependency-plugin</artifactId>
-          <version>2.8</version>
+          <version>3.6.1</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1543,7 +1579,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-eclipse-plugin</artifactId>
-          <version>2.9</version>
+          <version>2.10</version>
           <configuration>
             <downloadSources>true</downloadSources>
             <downloadJavadocs>true</downloadJavadocs>
@@ -1636,12 +1672,12 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-release-plugin</artifactId>
-          <version>2.5.3</version>
+          <version>3.0.1</version>
           <dependencies>
             <dependency>
               <groupId>org.apache.maven.scm</groupId>
               <artifactId>maven-scm-provider-gitexe</artifactId>
-              <version>1.9.4</version>
+              <version>2.0.1</version>
             </dependency>
           </dependencies>
           <configuration>
@@ -1672,7 +1708,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.0</version>
+          <version>3.13.0</version>
           <configuration>
             <release>${jdk.version}</release>
             <source>${jdk.version}</source>
@@ -1744,7 +1780,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>3.1.2</version>
+        <version>3.3.1</version>
         <configuration>
           <configLocation>${pinot.root}/config/checkstyle.xml</configLocation>
           <suppressionsLocation>${pinot.root}/config/suppressions.xml</suppressionsLocation>
@@ -2142,7 +2178,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
-        <version>3.3.0</version>
+        <version>3.5.0</version>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>

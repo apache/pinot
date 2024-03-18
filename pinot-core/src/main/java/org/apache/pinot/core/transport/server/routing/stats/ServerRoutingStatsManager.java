@@ -30,6 +30,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.AdaptiveServerSelector;
 import org.slf4j.Logger;
@@ -46,6 +48,7 @@ public class ServerRoutingStatsManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerRoutingStatsManager.class);
 
   private final PinotConfiguration _config;
+  private final BrokerMetrics _brokerMetrics;
   private volatile boolean _isEnabled;
   private ConcurrentHashMap<String, ServerRoutingStatsEntry> _serverQueryStatsMap;
 
@@ -61,8 +64,9 @@ public class ServerRoutingStatsManager {
   private double _avgInitializationVal;
   private int _hybridScoreExponent;
 
-  public ServerRoutingStatsManager(PinotConfiguration pinotConfig) {
+  public ServerRoutingStatsManager(PinotConfiguration pinotConfig, BrokerMetrics brokerMetrics) {
     _config = pinotConfig;
+    _brokerMetrics = brokerMetrics;
   }
 
   public void init() {
@@ -138,9 +142,9 @@ public class ServerRoutingStatsManager {
       return;
     }
 
-    // TODO: Track Executor qSize and alert if it crosses a threshold.
     _executorService.execute(() -> {
       try {
+        recordQueueSizeMetrics();
         updateStatsAfterQuerySubmission(serverInstanceId);
       } catch (Exception e) {
         LOGGER.error("Exception caught while updating stats. requestId={}, exception={}", requestId, e);
@@ -376,5 +380,10 @@ public class ServerRoutingStatsManager {
     } finally {
       stats.getServerReadLock().unlock();
     }
+  }
+
+  private void recordQueueSizeMetrics() {
+    int queueSize = getQueueSize();
+    _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ROUTING_STATS_MANAGER_QUEUE_SIZE, queueSize);
   }
 }
