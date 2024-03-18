@@ -129,7 +129,7 @@ public class CommonsConfigurationUtils {
   public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
       boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
-    return fromFile(file, setIOFactory, setDefaultDelimiter, ioFactoryKind, "");
+    return fromFile(file, setIOFactory, setDefaultDelimiter, ioFactoryKind, null);
   }
 
   /**
@@ -309,16 +309,16 @@ public class CommonsConfigurationUtils {
    * @param setIOFactory sets the IOFactory
    * @param setDefaultDelimiter sets the default list delimiter.
    * @param ioFactoryKind IOFactory kind
-   * @param headerContentToCheck header content to validate.
+   * @param headerToCheck header content to validate.
    * @return PropertiesConfiguration
    */
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind, String headerContentToCheck) {
+      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind, String headerToCheck) {
     PropertiesConfiguration config = new PropertiesConfiguration();
 
     // setting IO Reader Factory
     if (setIOFactory) {
-      config.setIOFactory(createPropertyIOFactory(ioFactoryKind, headerContentToCheck));
+      config.setIOFactory(createPropertyIOFactory(ioFactoryKind, headerToCheck));
     }
 
     // setting DEFAULT_LIST_DELIMITER
@@ -341,8 +341,9 @@ public class CommonsConfigurationUtils {
       case ConfigFileIOFactory:
         return new ConfigFilePropertyIOFactory();
       case SegmentMetadataIOFactory:
+        Preconditions.checkNotNull(headerContentToCheck,
+            "Segment metadata version header should not be null for SegmentMetadataProperty configuration");
         return new SegmentMetadataPropertyIOFactory(headerContentToCheck);
-      case DefaultPropertyConfigurationIOFactory:
       default:
         return new PropertiesConfiguration.DefaultIOFactory();
     }
