@@ -196,7 +196,7 @@
     <commons-configuration2.version>2.9.0</commons-configuration2.version>
 
     <kotlin.stdlib.version>1.9.22</kotlin.stdlib.version>
-    <okio.version>3.8.0</okio.version>
+    <okio.version>3.9.0</okio.version>
     <kerby.version>2.0.3</kerby.version>
     <!-- Newer version jline requires java 21 -->
     <jline.version>3.24.1</jline.version>
