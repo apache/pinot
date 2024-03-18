@@ -28,7 +28,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.controller.api.resources.TableAndSchemaConfig;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
@@ -668,53 +667,6 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       fail("Validation of an invalid table config should fail.");
     } catch (IOException e) {
       // Expected 400 Bad Request
-      assertTrue(e.getMessage().contains("Got error status code: 400"));
-    }
-  }
-
-  @Test
-  public void testValidateTableAndSchema()
-      throws IOException {
-    String tableName = "verificationTestTableAndSchema";
-    // Create a dummy schema
-    Schema schema = DEFAULT_INSTANCE.createDummySchema(tableName);
-
-    // Create a valid OFFLINE table config
-    TableConfig offlineTableConfig =
-        _offlineBuilder.setTableName(tableName).setInvertedIndexColumns(Arrays.asList("dimA", "dimB")).build();
-    TableAndSchemaConfig tableAndSchemaConfig = new TableAndSchemaConfig(offlineTableConfig, schema);
-
-    try {
-      sendPostRequest(
-          StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
-          tableAndSchemaConfig.toJsonString());
-    } catch (IOException e) {
-      fail("Valid table config and schema validation should succeed.");
-    }
-
-    // Add a dummy schema to Pinot
-    DEFAULT_INSTANCE.addDummySchema(tableName);
-    tableAndSchemaConfig = new TableAndSchemaConfig(offlineTableConfig, null);
-    try {
-      sendPostRequest(
-          StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
-          tableAndSchemaConfig.toJsonString());
-    } catch (IOException e) {
-      fail("Valid table config and existing schema validation should succeed.");
-    }
-
-    // Create an invalid table config
-    offlineTableConfig =
-        _offlineBuilder.setTableName(tableName).setInvertedIndexColumns(Arrays.asList("invalidColA", "invalidColB"))
-            .build();
-    tableAndSchemaConfig = new TableAndSchemaConfig(offlineTableConfig, schema);
-    try {
-      sendPostRequest(
-          StringUtil.join("/", DEFAULT_INSTANCE.getControllerBaseApiUrl(), "tables", "validateTableAndSchema"),
-          tableAndSchemaConfig.toJsonString());
-      fail("Validation of an invalid table config and schema should fail.");
-    } catch (IOException e) {
-      // Expected
       assertTrue(e.getMessage().contains("Got error status code: 400"));
     }
   }

@@ -23,8 +23,12 @@ import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
@@ -34,6 +38,7 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOver
  * Utils to parse query options.
  */
 public class QueryOptionsUtils {
+
   private QueryOptionsUtils() {
   }
 
@@ -143,6 +148,34 @@ public class QueryOptionsUtils {
 
   public static boolean isSkipScanFilterReorder(Map<String, String> queryOptions) {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
+  }
+
+  @Nullable
+  public static Map<String, Set<FieldConfig.IndexType>> getSkipIndexes(Map<String, String> queryOptions) {
+    // Example config:  skipIndexes='col1=inverted,range&col2=inverted'
+    String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_INDEXES);
+    if (skipIndexesStr == null) {
+      return null;
+    }
+
+    String[] perColumnIndexSkip = StringUtils.split(skipIndexesStr, '&');
+    Map<String, Set<FieldConfig.IndexType>> skipIndexes = new HashMap<>();
+    for (String columnConf : perColumnIndexSkip) {
+      String[] conf = StringUtils.split(columnConf, '=');
+      if (conf.length != 2) {
+        throw new RuntimeException("Invalid format for " + QueryOptionKey.SKIP_INDEXES
+            + ". Example of valid format: SET skipIndexes='col1=inverted,range&col2=inverted'");
+      }
+      String columnName = conf[0];
+      String[] indexTypes = StringUtils.split(conf[1], ',');
+
+      for (String indexType : indexTypes) {
+        skipIndexes.computeIfAbsent(columnName, k -> new HashSet<>())
+            .add(FieldConfig.IndexType.valueOf(indexType.toUpperCase()));
+      }
+    }
+
+    return skipIndexes;
   }
 
   @Nullable

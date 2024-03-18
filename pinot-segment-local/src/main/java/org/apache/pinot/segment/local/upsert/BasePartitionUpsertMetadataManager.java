@@ -27,34 +27,52 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.HashFunction;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BooleanUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
@@ -99,6 +117,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // Initialize with 1 pending operation to indicate the metadata manager can take more operations
   private int _numPendingOperations = 1;
   private boolean _closed;
+  // The lock and boolean flag ensure only one thread can start preloading and preloading happens only once.
+  private final Lock _preloadLock = new ReentrantLock();
+  private volatile boolean _isPreloading;
 
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
@@ -111,6 +132,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _partialUpsertHandler = context.getPartialUpsertHandler();
     _enableSnapshot = context.isSnapshotEnabled();
     _snapshotLock = _enableSnapshot ? new ReentrantReadWriteLock() : null;
+    _isPreloading = _enableSnapshot && context.isPreloadEnabled();
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
     _tableIndexDir = context.getTableIndexDir();
@@ -149,6 +171,161 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           segment.getSegmentName(), e);
     }
     return queryableDocIds;
+  }
+
+  @Override
+  public boolean isPreloading() {
+    return _isPreloading;
+  }
+
+  @Override
+  public void preloadSegments(IndexLoadingConfig indexLoadingConfig) {
+    if (!_isPreloading) {
+      return;
+    }
+    TableDataManager tableDataManager = _context.getTableDataManager();
+    Preconditions.checkNotNull(tableDataManager, "Preloading segments requires tableDataManager");
+    HelixManager helixManager = tableDataManager.getHelixManager();
+    ExecutorService segmentPreloadExecutor = tableDataManager.getSegmentPreloadExecutor();
+    // Preloading the segments with the snapshots of validDocIds for fast upsert metadata recovery.
+    // Note that there is a waiting logic between the thread pool doing the segment preloading here and the
+    // other helix threads about to process segment state transitions (e.g. taking segments from OFFLINE to ONLINE).
+    // The thread doing the segment preloading here must complete before the other helix threads start to handle
+    // segment state transitions. This is ensured by the lock here.
+    _preloadLock.lock();
+    try {
+      // Check the flag again to ensure preloading happens only once.
+      if (!_isPreloading) {
+        return;
+      }
+      // From now on, the _isPreloading flag is true until the segments are preloaded.
+      doPreloadSegments(tableDataManager, indexLoadingConfig, helixManager, segmentPreloadExecutor);
+    } catch (Exception e) {
+      // Even if preloading fails, we should continue to complete the initialization, so that TableDataManager can be
+      // created. Once TableDataManager is created, no more segment preloading would happen, and the normal segment
+      // loading logic would be used. The segments not being preloaded successfully here would be loaded via the
+      // normal segment loading logic, the one doing more costly checks on the upsert metadata.
+      _logger.warn("Failed to preload segments from partition: {} of table: {}, skipping", _partitionId,
+          _tableNameWithType, e);
+      if (e instanceof InterruptedException) {
+        // Restore the interrupted status in case the upper callers want to check.
+        Thread.currentThread().interrupt();
+      }
+    } finally {
+      _isPreloading = false;
+      _preloadLock.unlock();
+    }
+  }
+
+  protected void doPreloadSegments(TableDataManager tableDataManager, IndexLoadingConfig indexLoadingConfig,
+      HelixManager helixManager, ExecutorService segmentPreloadExecutor)
+      throws Exception {
+    _logger.info("Preload segments from partition: {} of table: {} for fast upsert metadata recovery", _partitionId,
+        _tableNameWithType);
+    String instanceId = getInstanceId(tableDataManager);
+    Map<String, Map<String, String>> segmentAssignment = getSegmentAssignment(helixManager);
+    Map<String, SegmentZKMetadata> segmentMetadataMap = getSegmentsZKMetadata(helixManager);
+    List<Future<?>> futures = new ArrayList<>();
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> instanceStateMap = entry.getValue();
+      String state = instanceStateMap.get(instanceId);
+      if (!CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE.equals(state)) {
+        if (state == null) {
+          _logger.debug("Skip segment: {} as it's not assigned to instance: {}", segmentName, instanceId);
+        } else {
+          _logger.info("Skip segment: {} as its ideal state: {} is not ONLINE for instance: {}", segmentName, state,
+              instanceId);
+        }
+        continue;
+      }
+      SegmentZKMetadata segmentZKMetadata = segmentMetadataMap.get(segmentName);
+      Preconditions.checkState(segmentZKMetadata != null, "Failed to find ZK metadata for segment: %s, table: %s",
+          segmentName, _tableNameWithType);
+      Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, segmentZKMetadata, null);
+      Preconditions.checkNotNull(partitionId,
+          String.format("Failed to get partition id for segment: %s (upsert-enabled table: %s)", segmentName,
+              _tableNameWithType));
+      if (partitionId != _partitionId) {
+        _logger.debug("Skip segment: {} as its partition: {} is different from the requested partition: {}",
+            segmentName, partitionId, _partitionId);
+        continue;
+      }
+      if (!hasValidDocIdsSnapshot(tableDataManager, indexLoadingConfig.getTableConfig(), segmentName,
+          segmentZKMetadata.getTier())) {
+        _logger.info("Skip segment: {} from partition: {} as no validDocIds snapshot exists", segmentName,
+            _partitionId);
+        continue;
+      }
+      futures.add(segmentPreloadExecutor.submit(
+          () -> doPreloadSegmentWithSnapshot(tableDataManager, segmentName, indexLoadingConfig, segmentZKMetadata)));
+    }
+    try {
+      for (Future<?> f : futures) {
+        f.get();
+      }
+    } finally {
+      for (Future<?> f : futures) {
+        if (!f.isDone()) {
+          f.cancel(true);
+        }
+      }
+    }
+    _logger.info("Preloaded segments from partition: {} of table: {} for fast upsert metadata recovery", _partitionId,
+        _tableNameWithType);
+  }
+
+  private String getInstanceId(TableDataManager tableDataManager) {
+    return tableDataManager.getInstanceDataManagerConfig().getInstanceId();
+  }
+
+  private static boolean hasValidDocIdsSnapshot(TableDataManager tableDataManager, TableConfig tableConfig,
+      String segmentName, String segmentTier) {
+    try {
+      File indexDir = tableDataManager.getSegmentDataDir(segmentName, segmentTier, tableConfig);
+      File snapshotFile =
+          new File(SegmentDirectoryPaths.findSegmentDirectory(indexDir), V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+      return snapshotFile.exists();
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  @VisibleForTesting
+  Map<String, Map<String, String>> getSegmentAssignment(HelixManager helixManager) {
+    IdealState idealState = HelixHelper.getTableIdealState(helixManager, _tableNameWithType);
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", _tableNameWithType);
+    return idealState.getRecord().getMapFields();
+  }
+
+  @VisibleForTesting
+  Map<String, SegmentZKMetadata> getSegmentsZKMetadata(HelixManager helixManager) {
+    Map<String, SegmentZKMetadata> segmentMetadataMap = new HashMap<>();
+    ZKMetadataProvider.getSegmentsZKMetadata(helixManager.getHelixPropertyStore(), _tableNameWithType)
+        .forEach(m -> segmentMetadataMap.put(m.getSegmentName(), m));
+    return segmentMetadataMap;
+  }
+
+  @VisibleForTesting
+  void doPreloadSegmentWithSnapshot(TableDataManager tableDataManager, String segmentName,
+      IndexLoadingConfig indexLoadingConfig, SegmentZKMetadata segmentZKMetadata) {
+    try {
+      _logger.info("Preload segment: {} from partition: {} of table: {}", segmentName, _partitionId,
+          _tableNameWithType);
+      // This method checks segment crc and if it has changed, the segment is not loaded. It might modify the
+      // file on disk, but we don't need to take the segmentLock, because every segment from the current table is
+      // processed by at most one thread from the preloading thread pool. HelixTaskExecutor task threads about to
+      // process segments from the same table are blocked on _preloadLock.
+      // In fact, taking segmentLock during segment preloading phase could cause deadlock when HelixTaskExecutor
+      // threads processing other tables have taken the same segmentLock as decided by the hash of table name and
+      // segment name, i.e. due to hash collision.
+      tableDataManager.tryLoadExistingSegment(segmentName, indexLoadingConfig, segmentZKMetadata);
+      _logger.info("Preloaded segment: {} from partition: {} of table: {}", segmentName, _partitionId,
+          _tableNameWithType);
+    } catch (Exception e) {
+      _logger.warn("Failed to preload segment: {} from partition: {} of table: {}, skipping", segmentName, _partitionId,
+          _tableNameWithType, e);
+    }
   }
 
   @Override
@@ -510,13 +687,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing untracked (replaced or empty) segment: {}", segmentName);
       return;
     }
-    // Skip removing segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
+    // Skip removing the upsert metadata of segment that has max comparison value smaller than
+    // (largestSeenComparisonValue - TTL), i.e. out of metadata TTL. The expired metadata is removed while creating
+    // new consuming segment in batches.
+    boolean skipRemoveMetadata = false;
     if (_metadataTTL > 0 && _largestSeenComparisonValue.get() > 0) {
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
       if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL) {
         _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
-        return;
+        skipRemoveMetadata = true;
       }
     }
     if (!startOperation()) {
@@ -527,7 +707,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _snapshotLock.readLock().lock();
     }
     try {
-      doRemoveSegment(segment);
+      if (!skipRemoveMetadata) {
+        doRemoveSegment(segment);
+      }
       _trackedSegments.remove(segment);
     } finally {
       if (_enableSnapshot) {
@@ -601,6 +783,46 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
+  /**
+   * When we have to process a new segment, if there are comparison value ties for the same primary-key within the
+   * segment, then for Partial Upsert tables we need to make sure that the record location map is updated only
+   * for the latest version of the record. This is specifically a concern for Partial Upsert tables because Realtime
+   * consumption can potentially end up reading the wrong version of a record, which will lead to permanent
+   * data-inconsistency.
+   *
+   * <p>
+   *  This function returns an iterator that will de-dup records with the same primary-key. Moreover, for comparison
+   *  ties, it will only keep the latest record. This iterator can then further be used to update the primary-key
+   *  record location map safely.
+   * </p>
+   *
+   * @param recordInfoIterator iterator over the new segment
+   * @param hashFunction       hash function configured for Upsert's primary keys
+   * @return iterator that returns de-duplicated records. To resolve ties for comparison column values, we prefer to
+   *         return the latest record.
+   */
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  protected static Iterator<RecordInfo> resolveComparisonTies(Iterator<RecordInfo> recordInfoIterator,
+      HashFunction hashFunction) {
+    Map<Object, RecordInfo> deDuplicatedRecordInfo = new HashMap<>();
+    while (recordInfoIterator.hasNext()) {
+      RecordInfo recordInfo = recordInfoIterator.next();
+      Comparable newComparisonValue = recordInfo.getComparisonValue();
+      deDuplicatedRecordInfo.compute(HashUtils.hashPrimaryKey(recordInfo.getPrimaryKey(), hashFunction),
+          (key, maxComparisonValueRecordInfo) -> {
+            if (maxComparisonValueRecordInfo == null) {
+              return recordInfo;
+            }
+            int comparisonResult = newComparisonValue.compareTo(maxComparisonValueRecordInfo.getComparisonValue());
+            if (comparisonResult >= 0) {
+              return recordInfo;
+            }
+            return maxComparisonValueRecordInfo;
+          });
+    }
+    return deDuplicatedRecordInfo.values().iterator();
+  }
+
   @Override
   public void takeSnapshot() {
     if (!_enableSnapshot) {
@@ -616,7 +838,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     _snapshotLock.writeLock().lock();
     try {
+      long startTime = System.currentTimeMillis();
       doTakeSnapshot();
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_SNAPSHOT_TIME_MS, duration,
+          TimeUnit.MILLISECONDS);
     } finally {
       _snapshotLock.writeLock().unlock();
       finishOperation();
@@ -631,6 +857,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     long startTimeMs = System.currentTimeMillis();
 
     int numImmutableSegments = 0;
+    int numConsumingSegments = 0;
     // The segments without validDocIds snapshots should take their snapshots at last. So that when there is failure
     // to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of valid docs across
     // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
@@ -638,6 +865,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     for (IndexSegment segment : _trackedSegments) {
       if (!(segment instanceof ImmutableSegmentImpl)) {
+        numConsumingSegments++;
         continue;
       }
       ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
@@ -659,9 +887,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
-    _logger.info(
-        "Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments) in {}ms",
-        numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments, System.currentTimeMillis() - startTimeMs);
+    int numMissedSegments = numTrackedSegments - numImmutableSegments - numConsumingSegments;
+    if (numMissedSegments > 0) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
+          ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
+      _logger.warn("Missed taking snapshot for {} immutable segments", numMissedSegments);
+    }
+    _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
+            + "{} are consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
+        numConsumingSegments, System.currentTimeMillis() - startTimeMs);
   }
 
   /**

@@ -19,11 +19,14 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
@@ -37,7 +40,6 @@ import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -139,23 +141,31 @@ public class MinionTaskUtils {
     return dirInStr;
   }
 
-  public static RoaringBitmap getValidDocIds(String tableNameWithType, String segmentName, Map<String, String> configs,
-      MinionContext minionContext) {
+  public static ValidDocIdsBitmapResponse getValidDocIdsBitmap(String tableNameWithType, String segmentName,
+      String validDocIdsType, MinionContext minionContext) {
     HelixAdmin helixAdmin = minionContext.getHelixManager().getClusterManagmentTool();
     String clusterName = minionContext.getHelixManager().getClusterName();
 
-    String server = getServer(segmentName, tableNameWithType, helixAdmin, clusterName);
-    InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
-    String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
+    List<String> servers = getServers(segmentName, tableNameWithType, helixAdmin, clusterName);
+    for (String server : servers) {
+      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(clusterName, server);
+      String endpoint = InstanceUtils.getServerAdminEndpoint(instanceConfig);
 
-    // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
-    // passing an empty list.
-    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
-    return serverSegmentMetadataReader.getValidDocIdsFromServer(tableNameWithType, segmentName, endpoint, 60_000);
+      // We only need aggregated table size and the total number of docs/rows. Skipping column related stats, by
+      // passing an empty list.
+      ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
+      try {
+        return serverSegmentMetadataReader.getValidDocIdsBitmapFromServer(tableNameWithType, segmentName, endpoint,
+                validDocIdsType, 60_000);
+      } catch (Exception e) {
+        LOGGER.info("Unable to retrieve validDocIdsBitmap for {} from {}", segmentName, endpoint);
+      }
+    }
+    throw new IllegalStateException("Unable to retrieve validDocIds for segment: " + segmentName);
   }
 
-  public static String getServer(String segmentName, String tableNameWithType, HelixAdmin helixAdmin,
-      String clusterName) {
+  public static List<String> getServers(String segmentName, String tableNameWithType, HelixAdmin helixAdmin,
+                                        String clusterName) {
     ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, tableNameWithType);
     if (externalView == null) {
       throw new IllegalStateException("External view does not exist for table: " + tableNameWithType);
@@ -164,11 +174,15 @@ public class MinionTaskUtils {
     if (instanceStateMap == null) {
       throw new IllegalStateException("Failed to find segment: " + segmentName);
     }
+    ArrayList<String> servers = new ArrayList<>();
     for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
       if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE)) {
-        return entry.getKey();
+        servers.add(entry.getKey());
       }
     }
-    throw new IllegalStateException("Failed to find ONLINE server for segment: " + segmentName);
+    if (servers.isEmpty()) {
+      throw new IllegalStateException("Failed to find any ONLINE servers for segment: " + segmentName);
+    }
+    return servers;
   }
 }

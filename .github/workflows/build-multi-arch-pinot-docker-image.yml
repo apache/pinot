@@ -45,7 +45,7 @@ jobs:
       commit-id: ${{ steps.generate-build-info.outputs.commit-id }}
       tags: ${{ steps.generate-build-info.outputs.tags }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Generate Build Info
         id: generate-build-info
         env:
@@ -68,13 +68,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/setup-qemu-action@v2
+      - uses: docker/setup-qemu-action@v3
         name: Set up QEMU
         with:
           platforms: linux/${{ matrix.arch }}
       - uses: docker/setup-buildx-action@v2
         name: Set up Docker Buildx
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build and push the Docker image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"
@@ -95,11 +95,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/setup-qemu-action@v2
+      - uses: docker/setup-qemu-action@v3
         name: Set up QEMU
       - uses: docker/setup-buildx-action@v2
         name: Set up Docker Buildx
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Create Multi-Arch Manifest
         env:
           TAGS: "${{needs.generate-build-info.outputs.tags}}"

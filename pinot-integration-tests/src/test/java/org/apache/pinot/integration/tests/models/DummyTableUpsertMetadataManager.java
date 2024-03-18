@@ -22,8 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.concurrent.ExecutorService;
-import org.apache.helix.HelixManager;
+import java.util.Map;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.upsert.BasePartitionUpsertMetadataManager;
@@ -51,9 +50,8 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
   }
 
   @Override
-  public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager, HelixManager helixManager,
-      @org.jetbrains.annotations.Nullable ExecutorService segmentPreloadExecutor) {
-    super.init(tableConfig, schema, tableDataManager, helixManager, segmentPreloadExecutor);
+  public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager) {
+    super.init(tableConfig, schema, tableDataManager);
     _tableConfig = tableConfig;
     _schema = schema;
   }
@@ -70,6 +68,11 @@ public class DummyTableUpsertMetadataManager extends BaseTableUpsertMetadataMana
 
   @Override
   public void stop() {
+  }
+
+  @Override
+  public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
+    return Collections.emptyMap();
   }
 
   @Override

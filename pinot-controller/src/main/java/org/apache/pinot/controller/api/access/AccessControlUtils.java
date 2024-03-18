@@ -43,7 +43,7 @@ public final class AccessControlUtils {
   /**
    * Validate permission for the given access type against the given table
    *
-   * @param tableName name of the table to be accessed
+   * @param tableName name of the table to be accessed (post database name translation)
    * @param accessType type of the access
    * @param httpHeaders HTTP headers containing requester identity required by access control object
    * @param endpointUrl the request url for which this access control is called

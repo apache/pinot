@@ -29,11 +29,12 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.routing.StagePlan;
+import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChain;
-import org.apache.pinot.query.runtime.plan.DistributedStagePlan;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
 import org.slf4j.Logger;
@@ -55,7 +56,8 @@ public class PipelineBreakerExecutor {
    *
    * @param scheduler scheduler service to run the pipeline breaker main thread.
    * @param mailboxService mailbox service to attach the {@link MailboxReceiveNode} against.
-   * @param distributedStagePlan the distributed stage plan to run pipeline breaker on.
+   * @param workerMetadata worker metadata for the current worker.
+   * @param stagePlan the distributed stage plan to run pipeline breaker on.
    * @param opChainMetadata request metadata, including query options
    * @param requestId request ID
    * @param deadlineMs execution deadline
@@ -65,23 +67,22 @@ public class PipelineBreakerExecutor {
    */
   @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
-      MailboxService mailboxService, DistributedStagePlan distributedStagePlan, Map<String, String> opChainMetadata,
-      long requestId, long deadlineMs) {
+      MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> opChainMetadata, long requestId, long deadlineMs) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
-    PipelineBreakerVisitor.visitPlanRoot(distributedStagePlan.getStageRoot(), pipelineBreakerContext);
+    PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
     if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
       try {
         // TODO: This PlanRequestContext needs to indicate it is a pre-stage opChain and only listens to pre-stage
         //     OpChain receive-mail callbacks.
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
-            new OpChainExecutionContext(mailboxService, requestId, distributedStagePlan.getStageId(),
-                distributedStagePlan.getServer(), deadlineMs, opChainMetadata, distributedStagePlan.getStageMetadata(),
-                null);
+            new OpChainExecutionContext(mailboxService, requestId, deadlineMs, opChainMetadata,
+                stagePlan.getStageMetadata(), workerMetadata, null);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {
         LOGGER.error("Caught exception executing pipeline breaker for request: {}, stage: {}", requestId,
-            distributedStagePlan.getStageId(), e);
+            stagePlan.getStageMetadata().getStageId(), e);
         return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), Collections.emptyMap(),
             TransferableBlockUtils.getErrorTransferableBlock(e), null);
       }

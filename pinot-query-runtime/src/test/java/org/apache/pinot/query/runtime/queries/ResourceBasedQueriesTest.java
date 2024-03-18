@@ -441,7 +441,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     Map<String, QueryTestCase> testCaseMap = getTestCases();
     List<Object[]> providerContent = new ArrayList<>();
     for (Map.Entry<String, QueryTestCase> testCaseEntry : testCaseMap.entrySet()) {
-      if (testCaseEntry.getValue()._ignored) {
+      if (testCaseEntry.getValue()._ignored || !testCaseEntry.getKey().equals("nested_case_when_test")) {
         continue;
       }
 

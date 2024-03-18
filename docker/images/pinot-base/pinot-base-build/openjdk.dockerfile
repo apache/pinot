@@ -34,7 +34,7 @@ RUN apt-get update && \
 
 # install maven
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
-  && wget https://dlcdn.apache.org/maven/maven-3/3.9.2/binaries/apache-maven-3.9.2-bin.tar.gz -P /tmp \
+  && wget https://dlcdn.apache.org/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz -P /tmp \
   && tar -xzf /tmp/apache-maven-*.tar.gz -C /usr/share/maven --strip-components=1 \
   && rm -f /tmp/apache-maven-*.tar.gz \
   && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn \
@@ -42,7 +42,7 @@ RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
 
 
 # install thrift
-RUN  wget http://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
+RUN  wget https://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
   tar xfz /tmp/thrift-0.12.0.tar.gz --directory /tmp && \
   base_dir=`pwd` && \
   cd /tmp/thrift-0.12.0 && \
