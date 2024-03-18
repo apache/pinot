@@ -334,13 +334,17 @@ public class QueryEnvironment {
   private Prepare.CatalogReader getCatalog(@Nullable String schemaPath) {
     Properties catalogReaderConfigProperties = new Properties();
     catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
-    CalciteSchema subSchema = schemaPath == null ? _rootSchema : _rootSchema.getSubSchema(schemaPath, false);
-    if (subSchema != null) {
-      return new PinotCalciteCatalogReader(subSchema, subSchema.path(null), _typeFactory,
-          new CalciteConnectionConfigImpl(catalogReaderConfigProperties));
+    CalciteSchema schema;
+    if (schemaPath == null) {
+      schema = _rootSchema;
     } else {
-      throw new IllegalArgumentException("Cannot find schema with path: " + schemaPath);
+      schema = _rootSchema.getSubSchema(schemaPath, false);
+      if (schema == null) {
+        throw new IllegalArgumentException("Cannot find schema with path: " + schemaPath);
+      }
     }
+    CalciteConnectionConfigImpl connConfig = new CalciteConnectionConfigImpl(catalogReaderConfigProperties);
+    return new PinotCalciteCatalogReader(schema, schema.path(null), _typeFactory, connConfig);
   }
 
   private FrameworkConfig getConfig(Prepare.CatalogReader catalogReader) {
