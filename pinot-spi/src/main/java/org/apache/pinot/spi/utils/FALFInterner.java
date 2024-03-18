@@ -66,11 +66,11 @@ import java.util.function.ToIntFunction;
  * a different value Y.
  *
  * This interner has a minimum possible memory footprint. You should be careful when
- * choosing its capacity. In general, the bigger the better, but if some of the objects
- * that are interned eventually go away, an interner with too big a capacity may still
- * keep these objects in memory. Also, since there are no collision chains, it is
- * very important to use a hash function with the most uniform distribution, to minimize
- * a chance that two or more objects with many duplicates compete for the same array slot.
+ * choosing its capacity. Ideally, capacity should be the number of elements that have duplicates. In general, the
+ * bigger the better, but if some of the objects that are interned eventually go away, an interner with too big a
+ * capacity may still keep these objects in memory. Also, since there are no collision chains, it is very important
+ * to use a hash function with the most uniform distribution, to minimize a chance that two or more objects with many
+ * duplicates compete for the same array slot.
  *
  * For more information, see https://dzone.com/articles/duplicate-objects-in-java-not-just-strings
  * Credits to the author: Misha Dmitriev
@@ -144,5 +144,58 @@ public class FALFInterner<T> implements Interner<T> {
     n |= n >>> 8;
     n |= n >>> 16;
     return (n < 0) ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + 1;
+  }
+
+  // Custom hash code implementation, that gives better distribution than standard hashCode()
+  private static final int C1 = 0xcc9e2d51;
+  private static final int C2 = 0x1b873593;
+
+  public static int hashCode(String s) {
+    int h1 = 0;
+
+    // step through value 2 chars at a time
+    for (int i = 1; i < s.length(); i += 2) {
+      int k1 = s.charAt(i - 1) | (s.charAt(i) << 16);
+      h1 = nextHashCode(k1, h1);
+    }
+
+    // deal with any remaining characters
+    if ((s.length() & 1) == 1) {
+      int k1 = s.charAt(s.length() - 1);
+      k1 = mixK1(k1);
+      h1 ^= k1;
+    }
+
+    return fmix(h1, s.length() * 2);
+  }
+
+  private static int nextHashCode(int value, int prevHashCode) {
+    int k1 = mixK1(value);
+    return mixH1(prevHashCode, k1);
+  }
+
+  private static int mixK1(int k1) {
+    k1 *= C1;
+    k1 = Integer.rotateLeft(k1, 15);
+    k1 *= C2;
+    return k1;
+  }
+
+  private static int mixH1(int h1, int k1) {
+    h1 ^= k1;
+    h1 = Integer.rotateLeft(h1, 13);
+    h1 = h1 * 5 + 0xe6546b64;
+    return h1;
+  }
+
+  private static int fmix(int h1, int len) {
+    // Force all bits to avalanche
+    h1 ^= len;
+    h1 ^= h1 >>> 16;
+    h1 *= 0x85ebca6b;
+    h1 ^= h1 >>> 13;
+    h1 *= 0xc2b2ae35;
+    h1 ^= h1 >>> 16;
+    return h1;
   }
 }
