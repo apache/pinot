@@ -35,13 +35,15 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
 import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
-import org.apache.pinot.common.restlet.resources.ValidDocIdMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.jersey.client.ClientConfig;
@@ -110,6 +112,7 @@ public class ServerSegmentMetadataReader {
     final Map<String, Double> columnCardinalityMap = new HashMap<>();
     final Map<String, Double> maxNumMultiValuesMap = new HashMap<>();
     final Map<String, Map<String, Double>> columnIndexSizeMap = new HashMap<>();
+    final Map<Integer, Map<String, Long>> upsertPartitionToServerPrimaryKeyCountMap = new HashMap<>();
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         TableMetadataInfo tableMetadataInfo =
@@ -126,6 +129,14 @@ public class ServerSegmentMetadataReader {
           }
           return l;
         }));
+        tableMetadataInfo.getUpsertPartitionToServerPrimaryKeyCountMap().forEach(
+            (partition, serverToPrimaryKeyCount) -> upsertPartitionToServerPrimaryKeyCountMap.merge(partition,
+                new HashMap<>(serverToPrimaryKeyCount), (l, r) -> {
+                  for (Map.Entry<String, Long> serverToPKCount : r.entrySet()) {
+                    l.merge(serverToPKCount.getKey(), serverToPKCount.getValue(), Long::sum);
+                  }
+                  return l;
+                }));
       } catch (IOException e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
@@ -149,7 +160,7 @@ public class ServerSegmentMetadataReader {
 
     TableMetadataInfo aggregateTableMetadataInfo =
         new TableMetadataInfo(tableNameWithType, totalDiskSizeInBytes, totalNumSegments, totalNumRows, columnLengthMap,
-            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap);
+            columnCardinalityMap, maxNumMultiValuesMap, columnIndexSizeMap, upsertPartitionToServerPrimaryKeyCountMap);
     if (failedParses != 0) {
       LOGGER.warn("Failed to parse {} / {} aggregated segment metadata responses from servers.", failedParses,
           serverUrls.size());
@@ -207,9 +218,9 @@ public class ServerSegmentMetadataReader {
    *
    * @return segment metadata as a JSON string
    */
-  public List<ValidDocIdMetadataInfo> getValidDocIdMetadataFromServer(String tableNameWithType,
+  public List<ValidDocIdsMetadataInfo> getValidDocIdsMetadataFromServer(String tableNameWithType,
       Map<String, List<String>> serverToSegmentsMap, BiMap<String, String> serverToEndpoints,
-      @Nullable List<String> segmentNames, int timeoutMs) {
+      @Nullable List<String> segmentNames, int timeoutMs, String validDocIdsType) {
     List<Pair<String, String>> serverURLsAndBodies = new ArrayList<>();
     for (Map.Entry<String, List<String>> serverToSegments : serverToSegmentsMap.entrySet()) {
       List<String> segmentsForServer = serverToSegments.getValue();
@@ -224,47 +235,58 @@ public class ServerSegmentMetadataReader {
           }
         }
       }
-      serverURLsAndBodies.add(generateValidDocIdMetadataURL(tableNameWithType, segmentsToQuery,
+      serverURLsAndBodies.add(generateValidDocIdsMetadataURL(tableNameWithType, segmentsToQuery, validDocIdsType,
           serverToEndpoints.get(serverToSegments.getKey())));
     }
 
+    BiMap<String, String> endpointsToServers = serverToEndpoints.inverse();
+
     // request the urls from the servers
     CompletionServiceHelper completionServiceHelper =
-        new CompletionServiceHelper(_executor, _connectionManager, serverToEndpoints);
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
 
     Map<String, String> requestHeaders = Map.of("Content-Type", "application/json");
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiPostRequest(serverURLsAndBodies, tableNameWithType, false, requestHeaders,
             timeoutMs, null);
 
-    List<ValidDocIdMetadataInfo> validDocIdMetadataInfos = new ArrayList<>();
+    Map<String, ValidDocIdsMetadataInfo> validDocIdsMetadataInfos = new HashMap<>();
     int failedParses = 0;
-    int returnedSegmentsCount = 0;
+    int returnedServersCount = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        String validDocIdMetadataList = streamResponse.getValue();
-        List<ValidDocIdMetadataInfo> validDocIdMetadataInfo =
-            JsonUtils.stringToObject(validDocIdMetadataList, new TypeReference<ArrayList<ValidDocIdMetadataInfo>>() {
+        String validDocIdsMetadataList = streamResponse.getValue();
+        List<ValidDocIdsMetadataInfo> validDocIdsMetadataInfoList =
+            JsonUtils.stringToObject(validDocIdsMetadataList, new TypeReference<ArrayList<ValidDocIdsMetadataInfo>>() {
             });
-        validDocIdMetadataInfos.addAll(validDocIdMetadataInfo);
-        returnedSegmentsCount++;
+        for (ValidDocIdsMetadataInfo validDocIdsMetadataInfo: validDocIdsMetadataInfoList) {
+          validDocIdsMetadataInfos.put(validDocIdsMetadataInfo.getSegmentName(), validDocIdsMetadataInfo);
+        }
+        returnedServersCount++;
       } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
       }
     }
+
     if (failedParses != 0) {
       LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses,
           serverURLsAndBodies.size());
     }
 
-    if (segmentNames != null && returnedSegmentsCount != segmentNames.size()) {
-      LOGGER.error("Unable to get validDocIdMetadata from all servers. Expected: {}, Actual: {}", segmentNames.size(),
-          returnedSegmentsCount);
+    if (returnedServersCount != serverURLsAndBodies.size()) {
+      LOGGER.error("Unable to get validDocIdsMetadata from all servers. Expected: {}, Actual: {}",
+          serverURLsAndBodies.size(), returnedServersCount);
     }
-    LOGGER.info("Retrieved valid doc id metadata for {} segments from {} servers.", returnedSegmentsCount,
-        serverURLsAndBodies.size());
-    return validDocIdMetadataInfos;
+
+    if (segmentNames != null && !segmentNames.isEmpty() && segmentNames.size() != validDocIdsMetadataInfos.size()) {
+      LOGGER.error("Unable to get validDocIdsMetadata for all segments. Expected: {}, Actual: {}",
+          segmentNames.size(), validDocIdsMetadataInfos.size());
+    }
+
+    LOGGER.info("Retrieved validDocIds metadata for {} segments from {} servers.", validDocIdsMetadataInfos.size(),
+        returnedServersCount);
+    return new ArrayList<>(validDocIdsMetadataInfos.values());
   }
 
   /**
@@ -273,10 +295,11 @@ public class ServerSegmentMetadataReader {
    *
    * @return a bitmap of validDocIds
    */
-  public RoaringBitmap getValidDocIdsFromServer(String tableNameWithType, String segmentName, String endpoint,
-      int timeoutMs) {
+  @Deprecated
+  public RoaringBitmap getValidDocIdsFromServer(String tableNameWithType, String segmentName, String validDocIdsType,
+      String endpoint, int timeoutMs) {
     // Build the endpoint url
-    String url = generateValidDocIdsURL(tableNameWithType, segmentName, endpoint);
+    String url = generateValidDocIdsURL(tableNameWithType, segmentName, validDocIdsType, endpoint);
 
     // Set timeout
     ClientConfig clientConfig = new ClientConfig();
@@ -288,6 +311,29 @@ public class ServerSegmentMetadataReader {
         "Unable to retrieve validDocIds from %s", url);
     byte[] validDocIds = response.readEntity(byte[].class);
     return RoaringBitmapUtils.deserialize(validDocIds);
+  }
+
+  /**
+   * This method is called when the API request is to fetch validDocIds for a segment of the given table. This method
+   * will pick a server that hosts the target segment and fetch the validDocIds result.
+   *
+   * @return a bitmap of validDocIds
+   */
+  public ValidDocIdsBitmapResponse getValidDocIdsBitmapFromServer(String tableNameWithType, String segmentName,
+      String endpoint, String validDocIdsType, int timeoutMs) {
+    // Build the endpoint url
+    String url = generateValidDocIdsBitmapURL(tableNameWithType, segmentName, validDocIdsType, endpoint);
+
+    // Set timeout
+    ClientConfig clientConfig = new ClientConfig();
+    clientConfig.property(ClientProperties.CONNECT_TIMEOUT, timeoutMs);
+    clientConfig.property(ClientProperties.READ_TIMEOUT, timeoutMs);
+
+    ValidDocIdsBitmapResponse response =
+        ClientBuilder.newClient(clientConfig).target(url).request(MediaType.APPLICATION_JSON)
+            .get(ValidDocIdsBitmapResponse.class);
+    Preconditions.checkNotNull(response, "Unable to retrieve validDocIdsBitmap from %s", url);
+    return response;
   }
 
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, List<String> columns,
@@ -305,14 +351,31 @@ public class ServerSegmentMetadataReader {
     return String.format("%s/tables/%s/segments/%s/metadata?%s", endpoint, tableNameWithType, segmentName, paramsStr);
   }
 
-  private String generateValidDocIdsURL(String tableNameWithType, String segmentName, String endpoint) {
+  @Deprecated
+  private String generateValidDocIdsURL(String tableNameWithType, String segmentName, String validDocIdsType,
+      String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
-    return String.format("%s/segments/%s/%s/validDocIds", endpoint, tableNameWithType, segmentName);
+    String url = String.format("%s/segments/%s/%s/validDocIds", endpoint, tableNameWithType, segmentName);
+    if (validDocIdsType != null) {
+      url = url + "?validDocIdsType=" + validDocIdsType;
+    }
+    return url;
   }
 
-  private Pair<String, String> generateValidDocIdMetadataURL(String tableNameWithType, List<String> segmentNames,
+  private String generateValidDocIdsBitmapURL(String tableNameWithType, String segmentName, String validDocIdsType,
       String endpoint) {
+    tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
+    segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
+    String url = String.format("%s/segments/%s/%s/validDocIdsBitmap", endpoint, tableNameWithType, segmentName);
+    if (validDocIdsType != null) {
+      url = url + "?validDocIdsType=" + validDocIdsType;
+    }
+    return url;
+  }
+
+  private Pair<String, String> generateValidDocIdsMetadataURL(String tableNameWithType, List<String> segmentNames,
+      String validDocIdsType, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     TableSegments tableSegments = new TableSegments(segmentNames);
     String jsonTableSegments;
@@ -322,8 +385,11 @@ public class ServerSegmentMetadataReader {
       LOGGER.error("Failed to convert segment names to json request body: segmentNames={}", segmentNames);
       throw new RuntimeException(e);
     }
-    return Pair.of(
-        String.format("%s/tables/%s/validDocIdMetadata", endpoint, tableNameWithType), jsonTableSegments);
+    String url = String.format("%s/tables/%s/validDocIdsMetadata", endpoint, tableNameWithType);
+    if (validDocIdsType != null) {
+      url = url + "?validDocIdsType=" + validDocIdsType;
+    }
+    return Pair.of(url, jsonTableSegments);
   }
 
   private String generateColumnsParam(List<String> columns) {

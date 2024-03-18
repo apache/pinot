@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.assignment.instance;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
@@ -29,12 +30,17 @@ abstract class InstancePartitionSelector {
   protected final InstanceReplicaGroupPartitionConfig _replicaGroupPartitionConfig;
   protected final String _tableNameWithType;
   protected final InstancePartitions _existingInstancePartitions;
+  protected final boolean _minimizeDataMovement;
 
   public InstancePartitionSelector(InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig,
-      String tableNameWithType, InstancePartitions existingInstancePartitions) {
+      String tableNameWithType, @Nullable InstancePartitions existingInstancePartitions, boolean minimizeDataMovement) {
     _replicaGroupPartitionConfig = replicaGroupPartitionConfig;
     _tableNameWithType = tableNameWithType;
     _existingInstancePartitions = existingInstancePartitions;
+    // For backward compatibility, enable minimize data movement when it is enabled in top level or instance partition
+    // selector level
+    _minimizeDataMovement = (minimizeDataMovement || replicaGroupPartitionConfig.isMinimizeDataMovement())
+        && existingInstancePartitions != null;
   }
 
   /**

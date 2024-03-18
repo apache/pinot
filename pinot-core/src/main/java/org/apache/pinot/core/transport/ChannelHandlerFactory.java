@@ -22,11 +22,13 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import io.netty.handler.ssl.SslContext;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -36,8 +38,15 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * The {@code ChannelHandlerFactory} provides all kinds of Netty ChannelHandlers
  */
 public class ChannelHandlerFactory {
-
   public static final String SSL = "ssl";
+  // The key is the hashCode of the TlsConfig, the value is the SslContext
+  // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
+  // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
+  private static final Map<Integer, SslContext> CLIENT_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
+  // the key is the hashCode of the TlsConfig, the value is the SslContext
+  // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
+  // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
+  private static final Map<Integer, SslContext> SERVER_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private ChannelHandlerFactory() {
   }
@@ -61,14 +70,18 @@ public class ChannelHandlerFactory {
    * The {@code getClientTlsHandler} return a Client side Tls handler that encrypt and decrypt everything.
    */
   public static ChannelHandler getClientTlsHandler(TlsConfig tlsConfig, SocketChannel ch) {
-    return TlsUtils.buildClientContext(tlsConfig).newHandler(ch.alloc());
+    SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE
+        .computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> TlsUtils.buildClientContext(tlsConfig));
+    return sslContext.newHandler(ch.alloc());
   }
 
   /**
    * The {@code getServerTlsHandler} return a Server side Tls handler that encrypt and decrypt everything.
    */
   public static ChannelHandler getServerTlsHandler(TlsConfig tlsConfig, SocketChannel ch) {
-    return TlsUtils.buildServerContext(tlsConfig).newHandler(ch.alloc());
+    SslContext sslContext = SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(
+        tlsConfig.hashCode(), tlsConfigHashCode -> TlsUtils.buildServerContext(tlsConfig));
+    return sslContext.newHandler(ch.alloc());
   }
 
   /**

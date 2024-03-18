@@ -47,6 +47,7 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 import '../styles/styles.css';
 import {Resizable} from "re-resizable";
 import { useHistory, useLocation } from 'react-router';
+import sqlFormatter from '@sqltools/formatter';
 
 const useStyles = makeStyles((theme) => ({
   title: {
@@ -78,7 +79,15 @@ const useStyles = makeStyles((theme) => ({
   },
   runNowBtn: {
     marginLeft: 'auto',
-    paddingLeft: '74px',
+    paddingLeft: '10px',
+  },
+  formatSQLBtn: {
+    marginLeft: 'auto',
+    paddingLeft: '30px',
+  },
+  formatMSE: {
+    marginLeft: '-30px',
+    paddingLeft: 'auto',
   },
   sqlDiv: {
     height: '100%',
@@ -270,6 +279,11 @@ const QueryPage = () => {
     });
     setInputQuery(querySplit.join("\n"));
   }
+
+  const handleFormatSQL = (query?: string) => {
+    const formatted = sqlFormatter.format(query);
+    setInputQuery(formatted);
+  };
 
   const handleRunNow = async (query?: string) => {
     setQueryLoader(true);
@@ -503,7 +517,7 @@ const QueryPage = () => {
                 Tracing
               </Grid>
 
-              <Grid item xs={3}>
+              <Grid item xs={3} className={classes.formatMSE}>
                 <Checkbox
                     name="useMSE"
                     color="primary"
@@ -515,16 +529,26 @@ const QueryPage = () => {
 
               <Grid item xs={3}>
                 <FormControl fullWidth={true} className={classes.timeoutControl}>
-                  <InputLabel htmlFor="my-input">Timeout (in Milliseconds)</InputLabel>
+                  <InputLabel htmlFor="my-input">Timeout (Milliseconds)</InputLabel>
                   <Input id="my-input" type="number" value={queryTimeout} onChange={(e)=> setQueryTimeout(Number(e.target.value) || '')}/>
                 </FormControl>
               </Grid>
 
-              <Grid item xs={3} className={classes.runNowBtn}>
+              <Grid item xs={2} className={classes.formatSQLBtn}>
                 <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() => handleRunNow()}
+                    variant="contained"
+                    color="primary"
+                    onClick={() => handleFormatSQL(inputQuery)}
+                >
+                  Format SQL
+                </Button>
+              </Grid>
+
+              <Grid item xs={2} className={classes.runNowBtn}>
+                <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => handleRunNow()}
                 >
                   Run Query
                 </Button>

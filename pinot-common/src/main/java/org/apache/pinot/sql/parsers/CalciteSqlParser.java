@@ -296,17 +296,25 @@ public class CalciteSqlParser {
             + "the signature is VECTOR_SIMILARITY(float[], float[], int).");
       }
       Expression vectorLiteral = filterExpression.getFunctionCall().getOperands().get(1);
-      // Array Literal is a function of type 'ARRAYVALUECONSTRUCTOR' with operands of Float/Double Literals
-      if (!vectorLiteral.isSetFunctionCall() || !vectorLiteral.getFunctionCall().getOperator().equalsIgnoreCase(
-          "arrayvalueconstructor")) {
-        throw new IllegalStateException("The second argument of VECTOR_SIMILARITY must be a float array literal, "
-            + "the signature is VECTOR_SIMILARITY(float[], float[], int).");
+      /*
+       * Array Literal could be either:
+       * 1. a function of type 'ARRAYVALUECONSTRUCTOR' with operands of float/double
+       * 2. a float/double array literals
+       * Also check in
+       * {@link org.apache.pinot.sql.parsers.rewriter.PredicateComparisonRewriter#updateFunctionExpression(Expression)}
+       */
+      if ((vectorLiteral.isSetFunctionCall() && !vectorLiteral.getFunctionCall().getOperator().equalsIgnoreCase(
+          "arrayvalueconstructor"))
+          || (vectorLiteral.isSetLiteral() && !vectorLiteral.getLiteral().isSetFloatArrayValue()
+          && !vectorLiteral.getLiteral().isSetDoubleArrayValue())) {
+        throw new IllegalStateException("The second argument of VECTOR_SIMILARITY must be a float/double array "
+            + "literal, the signature is VECTOR_SIMILARITY(float[], float[], int)");
       }
       if (filterExpression.getFunctionCall().getOperands().size() == 3) {
         Expression topK = filterExpression.getFunctionCall().getOperands().get(2);
         if (!topK.isSetLiteral()) {
           throw new IllegalStateException("The third argument of VECTOR_SIMILARITY must be an integer literal, "
-              + "the signature is VECTOR_SIMILARITY(float[], float[], int).");
+              + "the signature is VECTOR_SIMILARITY(float[], float[], int)");
         }
       }
     } else {
@@ -739,18 +747,10 @@ public class CalciteSqlParser {
         for (int i = 0; i < whenOperands.size(); i++) {
           SqlNode whenSqlNode = whenOperands.get(i);
           Expression whenExpression = toExpression(whenSqlNode);
-          if (isAggregateExpression(whenExpression)) {
-            throw new SqlCompilationException(
-                "Aggregation functions inside WHEN Clause is not supported - " + whenSqlNode);
-          }
           caseFuncExpr.getFunctionCall().addToOperands(whenExpression);
 
           SqlNode thenSqlNode = thenOperands.get(i);
           Expression thenExpression = toExpression(thenSqlNode);
-          if (isAggregateExpression(thenExpression)) {
-            throw new SqlCompilationException(
-                "Aggregation functions inside THEN Clause is not supported - " + thenSqlNode);
-          }
           caseFuncExpr.getFunctionCall().addToOperands(thenExpression);
         }
         Expression elseExpression = toExpression(elseOperand);

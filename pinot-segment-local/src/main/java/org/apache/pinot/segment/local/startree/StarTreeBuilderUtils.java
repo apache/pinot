@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.startree;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -37,6 +38,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
+import org.apache.pinot.spi.data.Schema;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -76,6 +78,27 @@ public class StarTreeBuilderUtils {
     }
     if (enableDefaultStarTree) {
       StarTreeV2BuilderConfig defaultConfig = StarTreeV2BuilderConfig.generateDefaultConfig(segmentMetadata);
+      if (!builderConfigs.contains(defaultConfig)) {
+        builderConfigs.add(defaultConfig);
+      }
+    }
+    return builderConfigs;
+  }
+
+  public static List<StarTreeV2BuilderConfig> generateBuilderConfigs(@Nullable List<StarTreeIndexConfig> indexConfigs,
+      boolean enableDefaultStarTree, Schema schema, JsonNode segmentMetadata) {
+    List<StarTreeV2BuilderConfig> builderConfigs = new ArrayList<>();
+    if (indexConfigs != null) {
+      for (StarTreeIndexConfig indexConfig : indexConfigs) {
+        StarTreeV2BuilderConfig builderConfig = StarTreeV2BuilderConfig.fromIndexConfig(indexConfig);
+        if (!builderConfigs.contains(builderConfig)) {
+          builderConfigs.add(builderConfig);
+        }
+      }
+    }
+    if (enableDefaultStarTree) {
+      StarTreeV2BuilderConfig defaultConfig =
+          StarTreeV2BuilderConfig.generateDefaultConfig(schema, segmentMetadata.get("columns"));
       if (!builderConfigs.contains(defaultConfig)) {
         builderConfigs.add(defaultConfig);
       }
@@ -252,6 +275,25 @@ public class StarTreeBuilderUtils {
       }
     }
     return false;
+  }
+
+  /**
+   * Returns {@code true} if the given star-tree builder configs are equal, {@code false} otherwise.
+   */
+  public static boolean areStarTreeBuilderConfigListsEqual(List<StarTreeV2BuilderConfig> builderConfig1,
+      List<StarTreeV2BuilderConfig> builderConfig2) {
+    int numStarTrees = builderConfig1.size();
+    if (builderConfig2.size() != numStarTrees) {
+      return false;
+    }
+    for (int i = 0; i < numStarTrees; i++) {
+      StarTreeV2BuilderConfig builderConfigToCompare1 = builderConfig1.get(i);
+      StarTreeV2BuilderConfig builderConfigToCompare2 = builderConfig2.get(i);
+      if (!builderConfigToCompare1.equals(builderConfigToCompare2)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

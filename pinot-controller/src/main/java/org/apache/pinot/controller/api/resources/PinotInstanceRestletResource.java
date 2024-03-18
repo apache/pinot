@@ -104,8 +104,25 @@ public class PinotInstanceRestletResource {
       @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 500, message = "Internal error")
   })
-  public Instances getAllInstances() {
+  public Instances getAllInstances(
+      @ApiParam("Filter by tag") @QueryParam("tag") String tag) {
+    if (tag != null) {
+      return new Instances(_pinotHelixResourceManager.getAllInstancesWithTag(tag));
+    }
     return new Instances(_pinotHelixResourceManager.getAllInstances());
+  }
+
+  @GET
+  @Path("/liveinstances")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_INSTANCE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "List all live instances")
+  @ApiResponses(value = {
+          @ApiResponse(code = 200, message = "Success"),
+          @ApiResponse(code = 500, message = "Internal error")
+  })
+  public Instances getAllLiveInstances() {
+    return new Instances(_pinotHelixResourceManager.getAllLiveInstances());
   }
 
   @GET

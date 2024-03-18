@@ -22,6 +22,7 @@ import io.swagger.jaxrs.config.BeanConfig;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.time.Instant;
 import java.util.List;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
@@ -50,6 +51,8 @@ public class MinionAdminApiApplication extends ResourceConfig {
   public static final String PINOT_CONFIGURATION = "pinotConfiguration";
   public static final String MINION_INSTANCE_ID = "minionInstanceId";
 
+  public static final String START_TIME = "minionStartTime";
+
   private HttpServer _httpServer;
   private final boolean _useHttps;
 
@@ -57,6 +60,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
     packages(RESOURCE_PACKAGE);
     property(PINOT_CONFIGURATION, minionConf);
     _useHttps = Boolean.parseBoolean(minionConf.getProperty(CommonConstants.Minion.CONFIG_OF_SWAGGER_USE_HTTPS));
+    Instant minionStartTime = Instant.now();
     register(new AbstractBinder() {
       @Override
       protected void configure() {
@@ -68,6 +72,7 @@ public class MinionAdminApiApplication extends ResourceConfig {
         } else {
           bind(new DummyLogFileServer()).to(LogFileServer.class);
         }
+        bind(minionStartTime).named(START_TIME);
       }
     });
 

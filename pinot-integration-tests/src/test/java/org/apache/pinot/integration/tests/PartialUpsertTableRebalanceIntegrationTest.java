@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
@@ -299,12 +300,14 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
   }
 
   @AfterClass
-  public void tearDown() {
+  public void tearDown()
+      throws IOException {
     stopServer();
     stopBroker();
     stopController();
     stopKafka();
     stopZk();
+    FileUtils.deleteDirectory(_tempDir);
   }
 
   @Override

@@ -35,7 +35,8 @@ class LZ4WithLengthDecompressor implements ChunkDecompressor {
   private final LZ4DecompressorWithLength _decompressor;
 
   private LZ4WithLengthDecompressor() {
-    _decompressor = new LZ4DecompressorWithLength(LZ4Compressor.LZ4_FACTORY.fastDecompressor());
+    // safeDecompressor is used to avoid reading past input buffer limit, which is not guaranteed with fastDecompressor
+    _decompressor = new LZ4DecompressorWithLength(LZ4Compressor.LZ4_FACTORY.safeDecompressor());
   }
 
   @Override

@@ -214,6 +214,16 @@ public interface TableDataManager {
   File getTableDataDir();
 
   /**
+   * Returns helixManager that is used to find out the segments to preload.
+   */
+  HelixManager getHelixManager();
+
+  /**
+   * Returns segmentPreloadExecutor that is used when to preload segments in parallel.
+   */
+  ExecutorService getSegmentPreloadExecutor();
+
+  /**
    * Add error related to segment, if any. The implementation
    * is expected to cache last 'N' errors for the table, related to
    * segment transitions.

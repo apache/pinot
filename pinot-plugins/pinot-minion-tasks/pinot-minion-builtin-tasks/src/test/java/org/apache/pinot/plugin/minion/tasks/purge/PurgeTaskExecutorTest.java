@@ -26,6 +26,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -70,7 +71,7 @@ public class PurgeTaskExecutorTest {
   public void setUp()
       throws Exception {
     FileUtils.deleteDirectory(TEMP_DIR);
-
+    MinionMetrics.register(Mockito.mock(MinionMetrics.class));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(D1, FieldSpec.DataType.INT).build();
 

@@ -209,23 +209,23 @@ public class RequestContextUtils {
       case GREATER_THAN:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), false, getStringValue(operands.get(1)), false,
-                RangePredicate.UNBOUNDED));
+                RangePredicate.UNBOUNDED, new LiteralContext(operands.get(1).getLiteral()).getType()));
       case GREATER_THAN_OR_EQUAL:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), false,
-                RangePredicate.UNBOUNDED));
+                RangePredicate.UNBOUNDED, new LiteralContext(operands.get(1).getLiteral()).getType()));
       case LESS_THAN:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, false,
-                getStringValue(operands.get(1))));
+                getStringValue(operands.get(1)), new LiteralContext(operands.get(1).getLiteral()).getType()));
       case LESS_THAN_OR_EQUAL:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), false, RangePredicate.UNBOUNDED, true,
-                getStringValue(operands.get(1))));
+                getStringValue(operands.get(1)), new LiteralContext(operands.get(1).getLiteral()).getType()));
       case BETWEEN:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), true, getStringValue(operands.get(1)), true,
-                getStringValue(operands.get(2))));
+                getStringValue(operands.get(2)), new LiteralContext(operands.get(1).getLiteral()).getType()));
       case RANGE:
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -400,22 +400,24 @@ public class RequestContextUtils {
       }
       case GREATER_THAN:
         return FilterContext.forPredicate(
-            new RangePredicate(operands.get(0), false, getStringValue(operands.get(1)), false,
-                RangePredicate.UNBOUNDED));
+            new RangePredicate(operands.get(0), false, getStringValue(operands.get(1)), false, RangePredicate.UNBOUNDED,
+                operands.get(1).getLiteral().getType()));
       case GREATER_THAN_OR_EQUAL:
         return FilterContext.forPredicate(
-            new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), false,
-                RangePredicate.UNBOUNDED));
+            new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), false, RangePredicate.UNBOUNDED,
+                operands.get(1).getLiteral().getType()));
       case LESS_THAN:
-        return FilterContext.forPredicate(new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, false,
-            getStringValue(operands.get(1))));
+        return FilterContext.forPredicate(
+            new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, false, getStringValue(operands.get(1)),
+                operands.get(1).getLiteral().getType()));
       case LESS_THAN_OR_EQUAL:
-        return FilterContext.forPredicate(new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, true,
-            getStringValue(operands.get(1))));
+        return FilterContext.forPredicate(
+            new RangePredicate(operands.get(0), false, RangePredicate.UNBOUNDED, true, getStringValue(operands.get(1)),
+                operands.get(1).getLiteral().getType()));
       case BETWEEN:
         return FilterContext.forPredicate(
             new RangePredicate(operands.get(0), true, getStringValue(operands.get(1)), true,
-                getStringValue(operands.get(2))));
+                getStringValue(operands.get(2)), operands.get(1).getLiteral().getType()));
       case RANGE:
         return FilterContext.forPredicate(new RangePredicate(operands.get(0), getStringValue(operands.get(1))));
       case REGEXP_LIKE:
@@ -470,6 +472,37 @@ public class RequestContextUtils {
   }
 
   private static float[] getVectorValue(Expression thriftExpression) {
+    if (thriftExpression.getType() == ExpressionType.LITERAL) {
+      Literal literalExpression = thriftExpression.getLiteral();
+      if (literalExpression.isSetIntArrayValue()) {
+        float[] vector = new float[literalExpression.getIntArrayValue().size()];
+        for (int i = 0; i < literalExpression.getIntArrayValue().size(); i++) {
+          vector[i] = literalExpression.getIntArrayValue().get(i).floatValue();
+        }
+        return vector;
+      }
+      if (literalExpression.isSetLongArrayValue()) {
+        float[] vector = new float[literalExpression.getLongArrayValue().size()];
+        for (int i = 0; i < literalExpression.getLongArrayValue().size(); i++) {
+          vector[i] = literalExpression.getLongArrayValue().get(i).floatValue();
+        }
+        return vector;
+      }
+      if (literalExpression.isSetFloatArrayValue()) {
+        float[] vector = new float[literalExpression.getFloatArrayValue().size()];
+        for (int i = 0; i < literalExpression.getFloatArrayValue().size(); i++) {
+          vector[i] = literalExpression.getFloatArrayValue().get(i);
+        }
+        return vector;
+      }
+      if (literalExpression.isSetDoubleArrayValue()) {
+        float[] vector = new float[literalExpression.getDoubleArrayValue().size()];
+        for (int i = 0; i < literalExpression.getDoubleArrayValue().size(); i++) {
+          vector[i] = literalExpression.getDoubleArrayValue().get(i).floatValue();
+        }
+        return vector;
+      }
+    }
     if (thriftExpression.getType() != ExpressionType.FUNCTION) {
       throw new BadQueryRequestException(
           "Pinot does not support column or function on the right-hand side of the predicate");

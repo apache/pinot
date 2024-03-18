@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -30,8 +32,12 @@ import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.scalar.VectorFunctions;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -172,9 +178,60 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(l2Distance, 22.627416997969522);
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testVectorSimilarity(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    int topK = 5;
+    String oneVectorStringLiteral = "ARRAY[1.1"
+        + StringUtils.repeat(", 1.1", VECTOR_DIM_SIZE - 1)
+        + "]";
+    String query1 =
+        String.format("SELECT "
+                + "cosineDistance(%s, %s) AS dist "
+                + "FROM %s "
+                + "WHERE vectorSimilarity(%s, %s, %d) "
+                + "ORDER BY dist ASC "
+                + "LIMIT %d",
+            VECTOR_1, oneVectorStringLiteral, getTableName(), VECTOR_1, oneVectorStringLiteral, topK * 10, topK);
+    String query2 =
+        String.format("SELECT "
+                + "cosineDistance(%s, %s) as dist "
+                + "FROM %s "
+                + "ORDER BY dist ASC "
+                + "LIMIT %d",
+            VECTOR_1, oneVectorStringLiteral, getTableName(), topK);
+
+    JsonNode jsonNode1 = postQuery(query1);
+    JsonNode jsonNode2 = postQuery(query2);
+    for (int i = 0; i < topK; i++) {
+      double dist1 = jsonNode1.get("resultTable").get("rows").get(i).get(0).asDouble();
+      double dist2 = jsonNode2.get("resultTable").get("rows").get(i).get(0).asDouble();
+      assertEquals(dist1, dist2);
+    }
+  }
+
   @Override
   public String getTableName() {
     return DEFAULT_TABLE_NAME;
+  }
+
+  @Override
+  public TableConfig createOfflineTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(getTableName())
+        .setFieldConfigList(List.of(
+            new FieldConfig.Builder(VECTOR_1)
+                .withIndexTypes(List.of(FieldConfig.IndexType.VECTOR))
+                .withEncodingType(FieldConfig.EncodingType.RAW)
+                .withProperties(Map.of(
+                    "vectorIndexType", "HNSW",
+                    "vectorDimension", String.valueOf(VECTOR_DIM_SIZE),
+                    "vectorDistanceFunction", "COSINE",
+                    "version", "1"))
+                .build()
+        ))
+        .build();
   }
 
   @Override

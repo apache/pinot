@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.mercateo.test.clock.TestClock;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -48,6 +47,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.TestClock;
 import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -173,7 +173,7 @@ public class InstanceSelectorTest {
 
   @BeforeMethod
   public void setUp() {
-    _mutableClock = TestClock.fixed(Instant.now(), ZoneId.systemDefault());
+    _mutableClock = new TestClock(Instant.now(), ZoneId.systemDefault());
     _mocks = MockitoAnnotations.openMocks(this);
     when(_brokerRequest.getPinotQuery()).thenReturn(_pinotQuery);
     when(_pinotQuery.getQueryOptions()).thenReturn(null);

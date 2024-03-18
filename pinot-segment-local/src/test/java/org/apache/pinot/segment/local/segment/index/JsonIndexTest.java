@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.segment.local.segment.index;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
@@ -69,22 +72,23 @@ public class JsonIndexTest {
     FileUtils.deleteDirectory(INDEX_DIR);
   }
 
+
   @Test
   public void testSmallIndex()
       throws Exception {
     // @formatter: off
     // CHECKSTYLE:OFF
     String[] records = new String[]{
-        "{" + "\"name\":\"adam\"," + "\"age\":20," + "\"addresses\":["
+        "{" + "\"name\":\"adam\"," + "\"age\":20," + "\"score\":1.25," + "\"addresses\":["
             + "   {\"street\":\"street-00\",\"country\":\"us\"}," + "   {\"street\":\"street-01\",\"country\":\"us\"},"
             + "   {\"street\":\"street-02\",\"country\":\"ca\"}]," + "\"skills\":[\"english\",\"programming\"]" + "}",
-        "{" + "\"name\":\"bob\"," + "\"age\":25," + "\"addresses\":["
+        "{" + "\"name\":\"bob\"," + "\"age\":25," + "\"score\":1.94," + "\"addresses\":["
             + "   {\"street\":\"street-10\",\"country\":\"ca\"}," + "   {\"street\":\"street-11\",\"country\":\"us\"},"
             + "   {\"street\":\"street-12\",\"country\":\"in\"}]," + "\"skills\":[]" + "}",
-        "{" + "\"name\":\"charles\"," + "\"age\":30," + "\"addresses\":["
+        "{" + "\"name\":\"charles\"," + "\"age\":30," + "\"score\":0.90,"  + "\"addresses\":["
             + "   {\"street\":\"street-20\",\"country\":\"jp\"}," + "   {\"street\":\"street-21\",\"country\":\"kr\"},"
             + "   {\"street\":\"street-22\",\"country\":\"cn\"}]," + "\"skills\":[\"japanese\",\"korean\",\"chinese\"]"
-            + "}", "{" + "\"name\":\"david\"," + "\"age\":35," + "\"addresses\":["
+            + "}", "{" + "\"name\":\"david\"," + "\"age\":35," + "\"score\":0.9999,"  + "\"addresses\":["
         + "   {\"street\":\"street-30\",\"country\":\"ca\",\"types\":[\"home\",\"office\"]},"
         + "   {\"street\":\"street-31\",\"country\":\"ca\"}," + "   {\"street\":\"street-32\",\"country\":\"ca\"}],"
         + "\"skills\":null" + "}"
@@ -116,6 +120,39 @@ public class JsonIndexTest {
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" = 'street-21'");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "REGEXP_LIKE(\"addresses[*].street\", 'street-2.*')");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{2});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"age\" > 25");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{2, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"age\" >= 25");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{1, 2, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"age\" < 25");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"age\" <= 25");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"name\" > 'adam'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{1, 2, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"name\" > 'a'");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 2, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"score\" > 1");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"score\" > 1.0");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "\"score\" > 0.99");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 1, 3});
+
+        matchingDocIds = getMatchingDocIds(indexReader, "REGEXP_LIKE(\"score\", '[0-1]\\.[6-9].*')");
+        Assert.assertEquals(matchingDocIds.toArray(), new int[]{1, 2, 3});
 
         matchingDocIds = getMatchingDocIds(indexReader, "\"addresses[*].street\" NOT IN ('street-10', 'street-22')");
         Assert.assertEquals(matchingDocIds.toArray(), new int[]{0, 3});
@@ -367,6 +404,107 @@ public class JsonIndexTest {
         docMask = new int[]{1, 2};
         values = mutableJsonIndex.getValuesForKeyAndDocs(docMask, context);
         Assert.assertEquals(values, new String[]{"value2", "value1"});
+      }
+    }
+  }
+
+  @Test
+  public void testSkipInvalidJsonEnable() throws Exception {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    jsonIndexConfig.setSkipInvalidJson(true);
+    // the braces don't match and cannot be parsed
+    String[] records = {"{\"key1\":\"va\""};
+
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(offHeapIndexFile.exists());
+
+    try (PinotDataBuffer onHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+        PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+        JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
+        JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+      for (String record : records) {
+        mutableJsonIndex.add(record);
+      }
+      Map<String, RoaringBitmap> onHeapRes = onHeapIndexReader.getMatchingDocsMap("");
+      Map<String, RoaringBitmap> offHeapRes = offHeapIndexReader.getMatchingDocsMap("");
+      Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingDocsMap("");
+      Map<String, RoaringBitmap> expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT,
+          RoaringBitmap.bitmapOf(0));
+      Assert.assertEquals(expectedRes, onHeapRes);
+      Assert.assertEquals(expectedRes, offHeapRes);
+      Assert.assertEquals(expectedRes, mutableRes);
+    }
+  }
+
+  @Test(expectedExceptions = JsonProcessingException.class)
+  public void testSkipInvalidJsonDisabled() throws Exception {
+    // by default, skipInvalidJson is disabled
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    // the braces don't match and cannot be parsed
+    String[] records = {"{\"key1\":\"va\""};
+
+    createIndex(true, jsonIndexConfig, records);
+  }
+
+
+  @Test
+  public void testGetMatchingValDocIdsPairForArrayPath() throws Exception {
+    String[] records = {
+            "{\"foo\":[{\"bar\":[\"x\",\"y\"]},{\"bar\":[\"a\",\"b\"]}],\"foo2\":[\"u\"]}",
+            "{\"foo\":[{\"bar\":[\"y\",\"z\"]}],\"foo2\":[\"u\"]}"
+    };
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+
+    createIndex(true, jsonIndexConfig, records);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    Assert.assertTrue(offHeapIndexFile.exists());
+
+    String[] keys = {".foo[0].bar[1]", ".foo[1].bar[0]", ".foo2[0]", ".foo[100].bar[100]", ".foo[0].bar[*]",
+            ".foo[*].bar[0]", ".foo[*].bar[*]"};
+    List<Map<String, RoaringBitmap>> expected = List.of(
+            Map.of("y", RoaringBitmap.bitmapOf(0), "z", RoaringBitmap.bitmapOf(1)),
+            Map.of("a", RoaringBitmap.bitmapOf(0)),
+            Map.of("u", RoaringBitmap.bitmapOf(0, 1)),
+            Collections.emptyMap(),
+            Map.of("x", RoaringBitmap.bitmapOf(0),
+                    "y", RoaringBitmap.bitmapOf(0, 1),
+                    "z", RoaringBitmap.bitmapOf(1)),
+            Map.of("x", RoaringBitmap.bitmapOf(0),
+                    "a", RoaringBitmap.bitmapOf(0),
+                    "y", RoaringBitmap.bitmapOf(1)),
+            Map.of("x", RoaringBitmap.bitmapOf(0),
+                    "y", RoaringBitmap.bitmapOf(0, 1),
+                    "z", RoaringBitmap.bitmapOf(1),
+                    "a", RoaringBitmap.bitmapOf(0),
+                    "b", RoaringBitmap.bitmapOf(0))
+    );
+
+    try (PinotDataBuffer onHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+         PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+         JsonIndexReader onHeapIndexReader = new ImmutableJsonIndexReader(onHeapDataBuffer, records.length);
+         JsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, records.length);
+         MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig)) {
+      for (String record : records) {
+        mutableJsonIndex.add(record);
+      }
+
+      for (int i = 0; i < keys.length; i++) {
+        Map<String, RoaringBitmap> onHeapRes = onHeapIndexReader.getMatchingDocsMap(keys[i]);
+        Map<String, RoaringBitmap> offHeapRes = offHeapIndexReader.getMatchingDocsMap(keys[i]);
+        Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingDocsMap(keys[i]);
+        Assert.assertEquals(expected.get(i), onHeapRes);
+        Assert.assertEquals(expected.get(i), offHeapRes);
+        Assert.assertEquals(mutableRes, expected.get(i));
       }
     }
   }

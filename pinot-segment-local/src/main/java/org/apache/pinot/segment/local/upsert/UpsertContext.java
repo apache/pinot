@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -41,11 +42,12 @@ public class UpsertContext {
   private final double _metadataTTL;
   private final double _deletedKeysTTL;
   private final File _tableIndexDir;
+  private final TableDataManager _tableDataManager;
 
   private UpsertContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
       List<String> comparisonColumns, @Nullable String deleteRecordColumn, HashFunction hashFunction,
       @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, boolean enablePreload,
-      double metadataTTL, double deletedKeysTTL, File tableIndexDir) {
+      double metadataTTL, double deletedKeysTTL, File tableIndexDir, @Nullable TableDataManager tableDataManager) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
@@ -58,6 +60,7 @@ public class UpsertContext {
     _metadataTTL = metadataTTL;
     _deletedKeysTTL = deletedKeysTTL;
     _tableIndexDir = tableIndexDir;
+    _tableDataManager = tableDataManager;
   }
 
   public TableConfig getTableConfig() {
@@ -108,6 +111,10 @@ public class UpsertContext {
     return _tableIndexDir;
   }
 
+  public TableDataManager getTableDataManager() {
+    return _tableDataManager;
+  }
+
   public static class Builder {
     private TableConfig _tableConfig;
     private Schema _schema;
@@ -121,6 +128,7 @@ public class UpsertContext {
     private double _metadataTTL;
     private double _deletedKeysTTL;
     private File _tableIndexDir;
+    private TableDataManager _tableDataManager;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -182,6 +190,11 @@ public class UpsertContext {
       return this;
     }
 
+    public Builder setTableDataManager(TableDataManager tableDataManager) {
+      _tableDataManager = tableDataManager;
+      return this;
+    }
+
     public UpsertContext build() {
       Preconditions.checkState(_tableConfig != null, "Table config must be set");
       Preconditions.checkState(_schema != null, "Schema must be set");
@@ -191,7 +204,7 @@ public class UpsertContext {
       Preconditions.checkState(_tableIndexDir != null, "Table index directory must be set");
       return new UpsertContext(_tableConfig, _schema, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn,
           _hashFunction, _partialUpsertHandler, _enableSnapshot, _enablePreload, _metadataTTL, _deletedKeysTTL,
-          _tableIndexDir);
+          _tableIndexDir, _tableDataManager);
     }
   }
 }

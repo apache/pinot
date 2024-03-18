@@ -30,27 +30,22 @@ import org.apache.pinot.query.routing.QueryServerInstance;
  * {@link #getThrowable()} to check if it is null.
  */
 class AsyncQueryDispatchResponse {
-  private final QueryServerInstance _virtualServer;
-  private final int _stageId;
+  private final QueryServerInstance _serverInstance;
   private final Worker.QueryResponse _queryResponse;
   private final Throwable _throwable;
 
-  public AsyncQueryDispatchResponse(QueryServerInstance virtualServer, int stageId, Worker.QueryResponse queryResponse,
+  public AsyncQueryDispatchResponse(QueryServerInstance serverInstance, @Nullable Worker.QueryResponse queryResponse,
       @Nullable Throwable throwable) {
-    _virtualServer = virtualServer;
-    _stageId = stageId;
+    _serverInstance = serverInstance;
     _queryResponse = queryResponse;
     _throwable = throwable;
   }
 
-  public QueryServerInstance getVirtualServer() {
-    return _virtualServer;
+  public QueryServerInstance getServerInstance() {
+    return _serverInstance;
   }
 
-  public int getStageId() {
-    return _stageId;
-  }
-
+  @Nullable
   public Worker.QueryResponse getQueryResponse() {
     return _queryResponse;
   }

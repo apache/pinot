@@ -76,6 +76,8 @@ public class JsonUtils {
   public static final String ARRAY_INDEX_KEY = ".$index";
   public static final String SKIPPED_VALUE_REPLACEMENT = "$SKIPPED$";
   public static final int MAX_COMBINATIONS = 100_000;
+  private static final List<Map<String, String>> SKIPPED_FLATTENED_RECORD =
+      Collections.singletonList(Collections.singletonMap(VALUE_KEY, SKIPPED_VALUE_REPLACEMENT));
 
   // For querying
   public static final String WILDCARD = "*";
@@ -356,7 +358,7 @@ public class JsonUtils {
    * ]
    * </pre>
    */
-  public static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig) {
+  protected static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig) {
     try {
       return flatten(node, jsonIndexConfig, 0, "$", false);
     } catch (OutOfMemoryError oom) {
@@ -373,6 +375,10 @@ public class JsonUtils {
       String path, boolean includePathMatched) {
     // Null
     if (node.isNull()) {
+      return Collections.emptyList();
+    }
+
+    if (node.isMissingNode()) {
       return Collections.emptyList();
     }
 
@@ -718,5 +724,20 @@ public class JsonUtils {
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType + " for field: " + name);
       }
     }
+  }
+
+  public static List<Map<String, String>> flatten(String jsonString, JsonIndexConfig jsonIndexConfig)
+      throws IOException {
+    JsonNode jsonNode;
+    try {
+      jsonNode = JsonUtils.stringToJsonNode(jsonString);
+    } catch (JsonProcessingException e) {
+      if (jsonIndexConfig.getSkipInvalidJson()) {
+        return SKIPPED_FLATTENED_RECORD;
+      } else {
+        throw e;
+      }
+    }
+    return JsonUtils.flatten(jsonNode, jsonIndexConfig);
   }
 }
