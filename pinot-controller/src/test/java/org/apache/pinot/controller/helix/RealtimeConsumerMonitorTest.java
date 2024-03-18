@@ -137,7 +137,7 @@ public class RealtimeConsumerMonitorTest {
 
     ConsumingSegmentInfoReader consumingSegmentReader = mock(ConsumingSegmentInfoReader.class);
     when(consumingSegmentReader.getConsumingSegmentsInfo(tableName, 10000))
-        .thenReturn(new ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap(response));
+        .thenReturn(new ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap(response, 0, 0));
     RealtimeConsumerMonitor realtimeConsumerMonitor =
         new RealtimeConsumerMonitor(config, helixResourceManager, leadControllerManager,
             controllerMetrics, consumingSegmentReader);
