@@ -368,14 +368,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           for (String argument : arguments) {
             ColumnMetadata columnMetadata = _segmentMetadata.getColumnMetadataFor(argument);
             if (columnMetadata == null) {
-              LOGGER.warn("Skip creating derived column: {} because argument: {} does not exist in the segment", column,
-                  argument);
-              if (errorOnFailure) {
-                throw new RuntimeException(String.format(
-                    "Failed to create derived column: %s because argument: %s does not exist in the segment", column,
-                    argument));
-              }
-              return false;
+              LOGGER.warn("Assigning default value to derived column: {} because argument: {} does not exist in the "
+                  + "segment", column, argument);
+              createDefaultValueColumnV1Indices(column);
+              return true;
             }
             // TODO: Support creation of derived columns from forward index disabled columns
             if (!_segmentWriter.hasIndexFor(argument, StandardIndexes.forward())) {
