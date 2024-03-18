@@ -39,9 +39,10 @@ public class SegmentMetadataPropertyConfigTest {
   private static final String SEGMENT_VERSION_IDENTIFIER = "segment.metadata.version";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentMetadataPropertyConfigTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
-  private static final String[] TEST_PROPERTY_KEY = { "test1", "test2_key", "test3_key_", "test3_key_1234" };
+  private static final String[] TEST_PROPERTY_KEY = { "test1", "test2_key", "test3_key_",
+      "test4_key_1234", "test-1", "test.1" };
   private static final String[] TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR = { "test:1", "test2=key",
-      "test3,key_", "test3:=._key_1234" };
+      "test3,key_", "test4:=._key_1234", "test5-1=" };
 
   @BeforeClass
   public void setUp()
@@ -61,7 +62,7 @@ public class SegmentMetadataPropertyConfigTest {
       throws ConfigurationException {
     PropertiesConfiguration configuration = CommonsConfigurationUtils.
         segmentMetadataFromFile(CONFIG_FILE, true, true,
-        PropertyIOFactoryKind.SegmentMetadataIOFactory, "");
+        PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
 
     // setting the random value of the test keys
     for (String key: TEST_PROPERTY_KEY) {
@@ -75,7 +76,7 @@ public class SegmentMetadataPropertyConfigTest {
 
     // reading the configuration from saved file.
     configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true,
-        PropertyIOFactoryKind.SegmentMetadataIOFactory, "");
+        PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
     testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
   }
@@ -106,7 +107,7 @@ public class SegmentMetadataPropertyConfigTest {
   }
 
   @Test
-  public void testSegmentMetadataReaderWithSpecialChars()
+  public void testSegmentMetadataReaderWithSpecialCharsPropertyKeys()
       throws ConfigurationException {
     PropertiesConfiguration configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true,
         PropertyIOFactoryKind.SegmentMetadataIOFactory, SEGMENT_VERSION_IDENTIFIER);
@@ -129,6 +130,7 @@ public class SegmentMetadataPropertyConfigTest {
   }
 
   @Test
+  //Test requires 'segment-metadata-without-version-header.properties' sample segment metadata file in resources folder
   public void testOldSegmentMetadataBackwardCompatability()
       throws ConfigurationException {
     File oldSegmentProperties = new File(
@@ -143,7 +145,8 @@ public class SegmentMetadataPropertyConfigTest {
   }
 
   @Test
-  public void testSegmentMetadataWithVersionHeader()
+  //Test requires 'segment-metadata-with-version-header.properties' sample segment metadata file in resources folder
+  public void testSampleSegmentMetadataWithVersionHeader()
       throws ConfigurationException {
     File oldSegmentProperties = new File(
         Objects.requireNonNull(
