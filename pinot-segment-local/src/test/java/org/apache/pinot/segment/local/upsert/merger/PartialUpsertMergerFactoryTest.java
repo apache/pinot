@@ -44,7 +44,7 @@ public class PartialUpsertMergerFactoryTest {
     partialUpsertStrategies.put("field1", UpsertConfig.Strategy.OVERWRITE);
     upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
     upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.IGNORE);
-    upsertConfig.setRowMergerCustomImplementation(
+    upsertConfig.setPartialUpsertMergerClass(
         "org.apache.pinot.segment.local.upsert.merger.PartialUpsertColumnarMerger");
 
     PartialUpsertMerger partialUpsertMerger =

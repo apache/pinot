@@ -41,5 +41,5 @@ public interface PartialUpsertMerger {
    * @param newRecord
    * @param mergerResult
    */
-  public void merge(LazyRow prevRecord, GenericRow newRecord, Map<String, Object> mergerResult);
+  void merge(LazyRow prevRecord, GenericRow newRecord, Map<String, Object> mergerResult);
 }

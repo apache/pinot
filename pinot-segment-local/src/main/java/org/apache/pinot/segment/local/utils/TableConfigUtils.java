@@ -921,19 +921,22 @@ public final class TableConfigUtils {
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     assert upsertConfig != null;
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
-    String rowMergerCustomImplementation = upsertConfig.getRowMergerCustomImplementation();
+    String partialUpsertMergerClass = upsertConfig.getPartialUpsertMergerClass();
 
-    Preconditions.checkState(StringUtils.isNotBlank(rowMergerCustomImplementation)
-            || MapUtils.isNotEmpty(partialUpsertStrategies),
-        "At least one of rowMergerCustomImplementation or partialUpsertStrategies must be provided for partial upsert table");
+    Preconditions.checkState(
+        StringUtils.isNotBlank(partialUpsertMergerClass) || MapUtils.isNotEmpty(partialUpsertStrategies),
+        "At least one of partialUpsertMergerClass or partialUpsertStrategies must be provided for partial upsert "
+            + "table");
 
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
-    // skip the partial upsert strategies check if rowMergerCustomImplementation is provided
-    if (StringUtils.isBlank(rowMergerCustomImplementation)) {
+    // skip the partial upsert strategies check if partialUpsertMergerClass is provided
+    if (StringUtils.isBlank(partialUpsertMergerClass)) {
+      // validate partial upsert column mergers
       for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
         String column = entry.getKey();
         UpsertConfig.Strategy columnStrategy = entry.getValue();
-        Preconditions.checkState(!primaryKeyColumns.contains(column), "Merger cannot be applied to primary key columns");
+        Preconditions.checkState(!primaryKeyColumns.contains(column),
+            "Merger cannot be applied to primary key columns");
 
         if (upsertConfig.getComparisonColumns() != null) {
           Preconditions.checkState(!upsertConfig.getComparisonColumns().contains(column),

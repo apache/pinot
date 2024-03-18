@@ -24,8 +24,6 @@ import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertColumnarMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
-import org.apache.pinot.segment.local.upsert.merger.columnar.PartialUpsertColumnMerger;
-import org.apache.pinot.segment.local.upsert.merger.columnar.PartialUpsertColumnMergerFactory;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -42,14 +40,11 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * If a merger for row is defined then it takes precedence and ignores column mergers.
  */
 public class PartialUpsertHandler {
-  private final PartialUpsertColumnMerger _defaultPartialUpsertMerger;
   private final List<String> _comparisonColumns;
   private final List<String> _primaryKeyColumns;
   private final PartialUpsertMerger _partialUpsertMerger;
 
   public PartialUpsertHandler(Schema schema, List<String> comparisonColumns, UpsertConfig upsertConfig) {
-    _defaultPartialUpsertMerger =
-        PartialUpsertColumnMergerFactory.getMerger(upsertConfig.getDefaultPartialUpsertStrategy());
     _comparisonColumns = comparisonColumns;
     _primaryKeyColumns = schema.getPrimaryKeyColumns();
 
@@ -63,38 +58,52 @@ public class PartialUpsertHandler {
     // merger current row with previously indexed row
     _partialUpsertMerger.merge(prevRecord, newRecord, reuseMergerResult);
 
-    for (String column : prevRecord.getColumnNames()) {
-      // no merger to apply on primary key columns
-      if (_primaryKeyColumns.contains(column)) {
-        continue;
-      }
-      // no merger to apply on comparison key column, use previous row's value if current is null
-      if (_comparisonColumns.contains(column)) {
-        if (newRecord.isNullValue(column) && !prevRecord.isNullValue(column)) {
-          newRecord.putValue(column, prevRecord.getValue(column));
-          newRecord.removeNullValueField(column);
+    if (_partialUpsertMerger instanceof PartialUpsertColumnarMerger) {
+      // iterate over all columns in prevRecord and update newRecord with merged values
+      for (String column : prevRecord.getColumnNames()) {
+        // no merger to apply on primary key columns
+        if (_primaryKeyColumns.contains(column) || _comparisonColumns.contains(column)) {
+          continue;
         }
-        continue;
-      }
 
-      // use merged column value from result map
-      if (reuseMergerResult.containsKey(column)) {
-        Object mergedValue = reuseMergerResult.get(column);
-        if (mergedValue != null) {
-          // remove null value field if it was set
-          newRecord.removeNullValueField(column);
-          newRecord.putValue(column, mergedValue);
-        } else {
-          // if column exists but mapped to a null value then merger result was a null value
-          newRecord.addNullValueField(column);
-          newRecord.putValue(column, null);
+        // use merged column value from result map
+        if (reuseMergerResult.containsKey(column)) {
+          Object mergedValue = reuseMergerResult.get(column);
+          setMergedValue(newRecord, column, mergedValue);
         }
-      } else if (!(_partialUpsertMerger instanceof PartialUpsertColumnarMerger)) {
-        // PartialUpsertColumnMerger already handles default merger but for any custom implementations
-        // non merged columns need to be applied with default merger
-        newRecord.putValue(column,
-            _defaultPartialUpsertMerger.merge(prevRecord.getValue(column), newRecord.getValue(column)));
       }
+    } else {
+      // iterate over only merger results and update newRecord with merged values
+      for (Map.Entry<String, Object> entry : reuseMergerResult.entrySet()) {
+        // skip if primary key column
+        String column = entry.getKey();
+        if (_primaryKeyColumns.contains(column) || _comparisonColumns.contains(column)) {
+          continue;
+        }
+
+        Object mergedValue = entry.getValue();
+        setMergedValue(newRecord, column, mergedValue);
+      }
+    }
+
+    // handle comparison columns
+    for (String column: _comparisonColumns) {
+      if (newRecord.isNullValue(column) && !prevRecord.isNullValue(column)) {
+        newRecord.putValue(column, prevRecord.getValue(column));
+        newRecord.removeNullValueField(column);
+      }
+    }
+  }
+
+  private void setMergedValue(GenericRow newRecord, String column, Object mergedValue) {
+    if (mergedValue != null) {
+      // remove null value field if it was set
+      newRecord.removeNullValueField(column);
+      newRecord.putValue(column, mergedValue);
+    } else {
+      // if column exists but mapped to a null value then merger result was a null value
+      newRecord.addNullValueField(column);
+      newRecord.putValue(column, null);
     }
   }
 }

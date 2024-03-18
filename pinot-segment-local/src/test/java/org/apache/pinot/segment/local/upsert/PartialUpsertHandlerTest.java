@@ -142,7 +142,7 @@ public class PartialUpsertHandlerTest {
 
     UpsertConfig upsertConfig = new UpsertConfig();
     upsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
-    upsertConfig.setRowMergerCustomImplementation("org.apache.pinot.segment.local.upsert.CustomPartialUpsertRowMerger");
+    upsertConfig.setPartialUpsertMergerClass("org.apache.pinot.segment.local.upsert.CustomPartialUpsertRowMerger");
 
     try (MockedStatic<PartialUpsertMergerFactory> partialUpsertMergerFactory = mockStatic(
         PartialUpsertMergerFactory.class)) {
