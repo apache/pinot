@@ -40,14 +40,14 @@ public class PartialUpsertMergerFactory {
   public static PartialUpsertMerger getPartialUpsertMerger(List<String> primaryKeyColumns,
       List<String> comparisonColumns, UpsertConfig upsertConfig) {
     PartialUpsertMerger partialUpsertMerger;
-    String customRowMerger = upsertConfig.getRowMergerCustomImplementation();
+    String customRowMerger = upsertConfig.getPartialUpsertMergerClass();
     // If a custom implementation is provided in config, initialize an implementation and return.
     if (StringUtils.isNotBlank(customRowMerger)) {
       try {
         Class<?> partialUpsertMergerClass = Class.forName(customRowMerger);
         if (!BasePartialUpsertMerger.class.isAssignableFrom(partialUpsertMergerClass)) {
           throw new RuntimeException(
-              "Provided rowMergerCustomImplementation is not an implementation of BasePartialUpsertMerger.class");
+              "Provided partialUpsertMergerClass is not an implementation of BasePartialUpsertMerger.class");
         }
         partialUpsertMerger =
             (PartialUpsertMerger) partialUpsertMergerClass.getConstructor(List.class, List.class, UpsertConfig.class)
