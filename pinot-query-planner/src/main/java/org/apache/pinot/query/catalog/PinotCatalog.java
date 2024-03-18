@@ -119,6 +119,7 @@ public class PinotCatalog implements Schema {
           .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
           .collect(Collectors.toSet());
     } else {
+      // root schema will not contain tables
       return Collections.emptySet();
     }
   }

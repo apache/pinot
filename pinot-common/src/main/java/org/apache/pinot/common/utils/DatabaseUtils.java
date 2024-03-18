@@ -85,10 +85,25 @@ public class DatabaseUtils {
     return translateTableName(tableName, headers, false);
   }
 
+  /**
+   * Checks if the fully qualified {@code tableName} belongs to the provided {@code databaseName}
+   * @param tableName fully qualified table name
+   * @param databaseName database name
+   * @return true if
+   * <ul>
+   *   <li>
+   *     tableName is prefixed with "databaseName." or
+   *   </li>
+   *   <li>
+   *     databaseName is null or "default" and tableName does not have a '.'
+   *   </li>
+   * </ul>
+   * else false
+   */
   public static boolean isPartOfDatabase(String tableName, @Nullable String databaseName) {
     // assumes tableName will not have default database prefix ('default.')
     if (StringUtils.isEmpty(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-      return StringUtils.split(tableName, '.').length == 1;
+      return !tableName.contains(".");
     } else {
       return tableName.startsWith(databaseName + ".");
     }
