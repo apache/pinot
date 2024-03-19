@@ -190,7 +190,7 @@ public class BrokerCache {
 
   public String getBroker(String... tableNames) {
     List<String> brokers = null;
-    if (tableNames != null) {
+    if (!(tableNames == null || tableNames.length == 0 || tableNames[0] == null)) {
        // returning list of common brokers hosting all the tables.
        brokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
            _brokerData.getTableToBrokerMap());
