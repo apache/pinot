@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.io.util;
 
+import java.util.List;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -99,6 +101,15 @@ public class VarLengthValueReader implements ValueReader {
     assert numBytesPerValue >= length;
     _dataBuffer.copyTo(startOffset, buffer, 0, length);
     return new String(buffer, 0, length, UTF_8);
+  }
+
+  public void recordOffsetRanges(int index, long baseOffset, List<ForwardIndexReader.ByteRange> rangeList) {
+    int offsetPosition = _dataSectionStartOffSet + Integer.BYTES * index;
+    int startOffset = _dataBuffer.getInt(offsetPosition);
+    int endOffset = _dataBuffer.getInt(offsetPosition + Integer.BYTES);
+    rangeList.add(new ForwardIndexReader.ByteRange(offsetPosition + baseOffset, 2 * Integer.BYTES));
+    int length = endOffset - startOffset;
+    rangeList.add(new ForwardIndexReader.ByteRange(startOffset + baseOffset, length));
   }
 
   @Override

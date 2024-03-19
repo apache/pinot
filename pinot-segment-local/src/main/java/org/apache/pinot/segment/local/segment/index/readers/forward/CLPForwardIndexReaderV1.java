@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.segment.index.readers.forward;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.MessageDecoder;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
@@ -36,10 +38,15 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<CLPForwardInd
   private final int _totalDictVarValues;
   private final int _logTypeDictNumBytesPerValue;
   private final int _dictVarsDictNumBytesPerValue;
+  private final int _logTypeDictReaderStartOffset;
   private final VarLengthValueReader _logTypeDictReader;
+  private final int _dictVarsDictReaderStartOffset;
   private final VarLengthValueReader _dictVarsDictReader;
+  private final int _logTypeFwdIndexReaderStartOffset;
   private final FixedBitSVForwardIndexReader _logTypeFwdIndexReader;
+  private final int _dictVarsFwdIndexReaderStartOffset;
   private final FixedBitMVForwardIndexReader _dictVarsFwdIndexReader;
+  private final int _encodedVarFwdIndexReaderStartOffset;
   private final VarByteChunkForwardIndexReaderV4 _encodedVarFwdIndexReader;
   private final MessageDecoder _clpMessageDecoder;
 
@@ -66,22 +73,27 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<CLPForwardInd
     int encodedVarFwdIndexLength = pinotDataBuffer.getInt(offset);
     offset += 4;
 
+    _logTypeDictReaderStartOffset = offset;
     _logTypeDictReader = new VarLengthValueReader(pinotDataBuffer.view(offset, offset + logTypeDictLength));
     offset += logTypeDictLength;
 
+    _dictVarsDictReaderStartOffset = offset;
     _dictVarsDictReader = new VarLengthValueReader(pinotDataBuffer.view(offset, offset + dictVarDictLength));
     offset += dictVarDictLength;
 
+    _logTypeFwdIndexReaderStartOffset = offset;
     _logTypeFwdIndexReader =
         new FixedBitSVForwardIndexReader(pinotDataBuffer.view(offset, offset + logTypeFwdIndexLength), _numDocs,
             PinotDataBitSet.getNumBitsPerValue(_logTypeDictReader.getNumValues() - 1));
     offset += logTypeFwdIndexLength;
 
+    _dictVarsFwdIndexReaderStartOffset = offset;
     _dictVarsFwdIndexReader =
         new FixedBitMVForwardIndexReader(pinotDataBuffer.view(offset, offset + dictVarsFwdIndexLength), _numDocs,
             _totalDictVarValues, PinotDataBitSet.getNumBitsPerValue(_dictVarsDictReader.getNumValues() - 1));
     offset += dictVarsFwdIndexLength;
 
+    _encodedVarFwdIndexReaderStartOffset = offset;
     _encodedVarFwdIndexReader =
         new VarByteChunkForwardIndexReaderV4(pinotDataBuffer.view(offset, offset + encodedVarFwdIndexLength),
             FieldSpec.DataType.LONG, false);
@@ -136,6 +148,40 @@ public class CLPForwardIndexReaderV1 implements ForwardIndexReader<CLPForwardInd
   public CLPReaderContext createContext() {
     return new CLPReaderContext(_dictVarsFwdIndexReader.createContext(), _logTypeFwdIndexReader.createContext(),
         _encodedVarFwdIndexReader.createContext());
+  }
+
+  @Override
+  public boolean isBufferByteRangeInfoSupported() {
+    return true;
+  }
+
+  @Override
+  public void recordDocIdByteRanges(int docId, CLPReaderContext context, List<ByteRange> ranges) {
+    int logTypeDictId = _logTypeFwdIndexReader.getDictId(docId, context._logTypeReaderContext);
+    ranges.add(new ByteRange(_logTypeFwdIndexReaderStartOffset + _logTypeFwdIndexReader.getRawDataStartOffset()
+        + (long) _logTypeFwdIndexReader.getDocLength() * docId, _logTypeFwdIndexReader.getDocLength()));
+    _logTypeDictReader.recordOffsetRanges(logTypeDictId, _logTypeDictReaderStartOffset, ranges);
+
+    int[] dictVarsDictIds = _dictVarsFwdIndexReader.getDictIdMV(docId, context._dictVarsReaderContext);
+    List<ByteRange> fwdIndexByteRanges = new ArrayList<>();
+    _dictVarsFwdIndexReader.recordDocIdByteRanges(docId, context._dictVarsReaderContext, fwdIndexByteRanges);
+    for (ByteRange range : fwdIndexByteRanges) {
+      ranges.add(new ByteRange(_dictVarsFwdIndexReaderStartOffset + range.getOffset(), range.getSizeInBytes()));
+    }
+    fwdIndexByteRanges.clear();
+
+    for (int dictVarsDictId : dictVarsDictIds) {
+      _dictVarsDictReader.recordOffsetRanges(dictVarsDictId, _dictVarsDictReaderStartOffset, ranges);
+    }
+    _encodedVarFwdIndexReader.recordDocIdByteRanges(docId, context._encodedVarReaderContext, fwdIndexByteRanges);
+    for (ByteRange range : fwdIndexByteRanges) {
+      ranges.add(new ByteRange(_encodedVarFwdIndexReaderStartOffset + range.getOffset(), range.getSizeInBytes()));
+    }
+  }
+
+  @Override
+  public boolean isFixedOffsetMappingType() {
+    return false;
   }
 
   @Override
