@@ -29,11 +29,13 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class BloomIndexTypeTest {
@@ -56,7 +58,7 @@ public class BloomIndexTypeTest {
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(BloomFilterConfig expected) {
-      Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.bloomFilter()), expected);
+      checkConfigsMatch(StandardIndexes.bloomFilter(), "dimInt", expected);
     }
 
     @Test
