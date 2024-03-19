@@ -63,14 +63,14 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    MinMaxRangePair minMax = new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+    MinMaxRangePair minMax = new MinMaxRangePair();
 
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
           double value = doubleValues[i];
-          minMax.apply(value, value);
+          minMax.apply(value);
         }
       });
     } else {
@@ -162,7 +162,7 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
   public MinMaxRangePair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
     if (minMaxRangePair == null && !_nullHandlingEnabled) {
-      return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+      return new MinMaxRangePair();
     } else {
       return minMaxRangePair;
     }
@@ -172,7 +172,7 @@ public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregati
   public MinMaxRangePair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     MinMaxRangePair minMaxRangePair = groupByResultHolder.getResult(groupKey);
     if (minMaxRangePair == null && !_nullHandlingEnabled) {
-      return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+      return new MinMaxRangePair();
     } else {
       return minMaxRangePair;
     }
