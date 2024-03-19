@@ -423,7 +423,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     boolean consumptionStarted = false;
-    boolean asyncConsumerEnabled = false;
+    boolean asyncConsumerEnabled = _streamConfig.isEnableAsyncConsumer();
     MessageBatchBuffer<MessageBatch> messagesQueue = null;
     while (!_shouldStop && !endCriteriaReached()) {
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
@@ -432,7 +432,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       MessageBatch messageBatch;
       if (!consumptionStarted && asyncConsumerEnabled) {
         consumptionStarted = true;
-        messagesQueue = new OnHeapMessageBatchBuffer(10000);
+        messagesQueue = new OnHeapMessageBatchBuffer(_streamConfig.getConsumerBufferCapacity());
         _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis(), messagesQueue);
       }
       try {
@@ -520,10 +520,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
 
       if (endCriteriaReached) {
+        // TODO: flush the queue if we are stopping
         // check this flag to avoid calling endCriteriaReached() at the beginning of the loop
         break;
       }
     }
+
+    if (_streamConfig.isEnableAsyncConsumer()) {
+      messagesQueue.close();
+    }
+
+
 
     if (_numRowsErrored > 0) {
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);

@@ -50,6 +50,8 @@ public class StreamConfig {
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
   public static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS_KINESIS = 600_000;
   public static final int DEFAULT_IDLE_TIMEOUT_MILLIS = 3 * 60 * 1000;
+  public static final boolean DEFAULT_STREAM_CONSUMER_ENABLE_ASYNC = false;
+  public static final int DEFAULT_STREAM_CONSUMER_BUFFER_CAPACITY = 10000;
 
   private static final double CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED = -1;
 
@@ -83,6 +85,9 @@ public class StreamConfig {
   // segment commit protocol. By default, segment is uploaded to the controller during commit.
   // If this flag is set to true, the segment is uploaded to deep store.
   private final boolean _serverUploadToDeepStore;
+
+  private boolean _enableAsyncConsumer = DEFAULT_STREAM_CONSUMER_ENABLE_ASYNC;
+  private int _consumerBufferCapacity = DEFAULT_STREAM_CONSUMER_BUFFER_CAPACITY;
 
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config
@@ -201,7 +206,31 @@ public class StreamConfig {
     String rate = streamConfigMap.get(StreamConfigProperties.TOPIC_CONSUMPTION_RATE_LIMIT);
     _topicConsumptionRateLimit = rate != null ? Double.parseDouble(rate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
 
+    _enableAsyncConsumer = streamConfigMap.get(StreamConfigProperties.ENABLE_ASYNC_CONFIG) != null
+        ? Boolean.parseBoolean(streamConfigMap.get(StreamConfigProperties.ENABLE_ASYNC_CONFIG))
+        : DEFAULT_STREAM_CONSUMER_ENABLE_ASYNC;
+
+    _consumerBufferCapacity = streamConfigMap.get(StreamConfigProperties.ASYNC_BUFFER_CAPACITY_CONFIG) != null
+        ? Integer.parseInt(streamConfigMap.get(StreamConfigProperties.ASYNC_BUFFER_CAPACITY_CONFIG))
+        : DEFAULT_STREAM_CONSUMER_BUFFER_CAPACITY;
+
     _streamConfigMap.putAll(streamConfigMap);
+  }
+
+  public boolean isEnableAsyncConsumer() {
+    return _enableAsyncConsumer;
+  }
+
+  public void setEnableAsyncConsumer(boolean enableAsyncConsumer) {
+    _enableAsyncConsumer = enableAsyncConsumer;
+  }
+
+  public int getConsumerBufferCapacity() {
+    return _consumerBufferCapacity;
+  }
+
+  public void setConsumerBufferCapacity(int consumerBufferCapacity) {
+    _consumerBufferCapacity = consumerBufferCapacity;
   }
 
   public static void validateConsumerType(String streamType, Map<String, String> streamConfigMap) {

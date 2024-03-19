@@ -116,6 +116,8 @@ public class StreamConfigProperties {
    * Config used to indicate whether server should by-pass controller and directly upload the segment to the deep store
    */
   public static final String SERVER_UPLOAD_TO_DEEPSTORE = "realtime.segment.serverUploadToDeepStore";
+  public static final String ENABLE_ASYNC_CONFIG = "consumer.enableAsync";
+  public static final String ASYNC_BUFFER_CAPACITY_CONFIG = "consumer.bufferCapacity";
 
   /**
    * Helper method to create a stream specific property
