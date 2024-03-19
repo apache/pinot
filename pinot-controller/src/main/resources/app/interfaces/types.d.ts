@@ -280,10 +280,10 @@ declare module 'Models' {
   }
 
   export const enum InstanceType {
-    BROKER = "broker",
-    CONTROLLER = "controller",
-    MINION = "minion",
-    SERVER = "server"
+    BROKER = "BROKER",
+    CONTROLLER = "CONTROLLER",
+    MINION = "MINION",
+    SERVER = "SERVER"
   }
 
   export const enum TableType {
