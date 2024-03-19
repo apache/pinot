@@ -5,7 +5,7 @@ import java.util.List;
 import org.apache.pinot.spi.stream.MessageBatch;
 
 
-public class OnHeapMessageBatchBuffer implements MessageBatchBuffer<MessageBatch> {
+public class OnHeapMessageBatchBuffer implements MessageBatchBuffer<MessageBatch>, AutoCloseable {
   private final List<MessageBatch> buffer; // to store elements
   private final int capacity; // maximum number of elements in the buffer
 
@@ -37,15 +37,24 @@ public class OnHeapMessageBatchBuffer implements MessageBatchBuffer<MessageBatch
 
   // Additional utility methods
 
-  public synchronized int size() {
+  @Override
+  public int size() {
     return buffer.size();
   }
 
-  public synchronized boolean isEmpty() {
+  @Override
+  public boolean isEmpty() {
     return buffer.isEmpty();
   }
 
-  public synchronized boolean isFull() {
+  @Override
+  public boolean isFull() {
     return buffer.size() == capacity;
+  }
+
+  @Override
+  public void close()
+      throws Exception {
+    buffer.clear();
   }
 }
