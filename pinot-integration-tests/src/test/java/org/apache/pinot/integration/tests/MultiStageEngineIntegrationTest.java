@@ -54,6 +54,7 @@ import static org.testng.Assert.assertTrue;
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
+  private static final String TABLE_NAME_WITH_DATABASE = "db1." + DEFAULT_TABLE_NAME;
   private String _tableName = DEFAULT_TABLE_NAME;
   private List<File> _avroFiles = new ArrayList<>();
 
@@ -95,6 +96,36 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
+
+    setupTableWithNonDefaultDatabase();
+  }
+
+  private void setupTableWithNonDefaultDatabase()
+      throws Exception {
+    _tableName = TABLE_NAME_WITH_DATABASE;
+    String defaultCol = "ActualElapsedTime";
+    String customCol = "ActualElapsedTime_2";
+    Schema schema = createSchema();
+    schema.addField(new MetricFieldSpec(customCol, FieldSpec.DataType.INT));
+    addSchema(schema);
+    TableConfig tableConfig = createOfflineTableConfig();
+    assert tableConfig.getIndexingConfig().getNoDictionaryColumns() != null;
+    List<String> noDicCols = new ArrayList<>(DEFAULT_NO_DICTIONARY_COLUMNS);
+    noDicCols.add(customCol);
+    tableConfig.getIndexingConfig().setNoDictionaryColumns(noDicCols);
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(List.of(new TransformConfig(customCol, defaultCol)));
+    tableConfig.setIngestionConfig(ingestionConfig);
+    addTableConfig(tableConfig);
+
+    // Create and upload segments to 'db1.mytable'
+    TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(_avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
+    uploadSegments(getTableName(), _tarDir);
+
+    // Wait for all documents loaded
+    waitForAllDocsLoaded(600_000L);
+    _tableName = DEFAULT_TABLE_NAME;
   }
 
   protected void setupTenants()
@@ -764,52 +795,39 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testWithDatabaseContext()
+  public void testWithoutDatabaseContext()
       throws Exception {
-    try {
-      _tableName = "db1." + DEFAULT_TABLE_NAME;
-      String defaultCol = "ActualElapsedTime";
-      String customCol = "ActualElapsedTime_2";
-      Schema schema = createSchema();
-      schema.addField(new MetricFieldSpec(customCol, FieldSpec.DataType.INT));
-      addSchema(schema);
-      TableConfig tableConfig = createOfflineTableConfig();
-      assert tableConfig.getIndexingConfig().getNoDictionaryColumns() != null;
-      List<String> noDicCols = new ArrayList<>(DEFAULT_NO_DICTIONARY_COLUMNS);
-      noDicCols.add(customCol);
-      tableConfig.getIndexingConfig().setNoDictionaryColumns(noDicCols);
-      IngestionConfig ingestionConfig = new IngestionConfig();
-      ingestionConfig.setTransformConfigs(List.of(new TransformConfig(customCol, defaultCol)));
-      tableConfig.setIngestionConfig(ingestionConfig);
-      addTableConfig(tableConfig);
+    // default database check. No database context passed
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_TABLE_NAME);
+  }
 
-      // Create and upload segments to 'db1.mytable'
-      TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
-      ClusterIntegrationTestUtils.buildSegmentsFromAvro(_avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
-      uploadSegments(getTableName(), _tarDir);
+  @Test
+  public void testWithDefaultDatabaseContextAsTableNamePrefix()
+      throws Exception {
+    // default database check. Default database context passed as table prefix
+    checkQueryResultForDBTest("ActualElapsedTime", "default." + DEFAULT_TABLE_NAME);
+  }
 
-      // Wait for all documents loaded
-      waitForAllDocsLoaded(600_000L);
+  @Test
+  public void testWithDefaultDatabaseContextAsQueryOption()
+      throws Exception {
+    // default database check. Default database context passed as SET database='dbName'
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_TABLE_NAME, "default");
+  }
 
-      // default database check. No database context passed
-      checkQueryResultForDBTest(defaultCol, DEFAULT_TABLE_NAME);
+  @Test
+  public void testWithDatabaseContextAsTableNamePrefix()
+      throws Exception {
+    // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
+    // custom database check. Database context passed as table prefix
+    checkQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE);
+  }
 
-      // default database check. Default database context passed as table prefix
-      checkQueryResultForDBTest(defaultCol, "default." + DEFAULT_TABLE_NAME);
-
-      // default database check. Default database context passed as SET database='dbName'
-      checkQueryResultForDBTest(defaultCol, DEFAULT_TABLE_NAME, "default");
-
-      // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
-      // custom database check. Database context passed as table prefix
-      checkQueryResultForDBTest(customCol, _tableName);
-
-      // custom database check. Database context passed as SET database='dbName'
-      checkQueryResultForDBTest(customCol, DEFAULT_TABLE_NAME, "db1");
-    } finally {
-      dropOfflineTable(_tableName);
-      _tableName = DEFAULT_TABLE_NAME;
-    }
+  @Test
+  public void testWithDatabaseContextAsQueryOption()
+      throws Exception {
+    // custom database check. Database context passed as SET database='dbName'
+    checkQueryResultForDBTest("ActualElapsedTime_2", DEFAULT_TABLE_NAME, "db1");
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)
@@ -832,6 +850,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void tearDown()
       throws Exception {
     dropOfflineTable(DEFAULT_TABLE_NAME);
+    dropOfflineTable(TABLE_NAME_WITH_DATABASE);
 
     stopServer();
     stopBroker();
