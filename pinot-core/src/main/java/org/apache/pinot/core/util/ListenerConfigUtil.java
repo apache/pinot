@@ -38,7 +38,9 @@ import nl.altindag.ssl.SSLFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.utils.TlsUtils;
+import org.apache.pinot.common.utils.tls.PinotInsecureMode;
+import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.transport.HttpServerThreadPoolConfig;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -263,7 +265,9 @@ public final class ListenerConfigUtil {
   }
 
   private static SSLEngineConfigurator buildSSLEngineConfigurator(TlsConfig tlsConfig) {
-    SSLFactory sslFactory = TlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig);
+    SSLFactory sslFactory =
+        RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
+            tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
     return new SSLEngineConfigurator(sslFactory.getSslContext()).setClientMode(false)
         .setNeedClientAuth(tlsConfig.isClientAuthEnabled()).setEnabledProtocols(new String[]{"TLSv1.2"});
   }

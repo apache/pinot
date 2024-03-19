@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils;
+package org.apache.pinot.common.utils.tls;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
@@ -51,15 +51,15 @@ import javax.net.ssl.X509ExtendedTrustManager;
 import javax.net.ssl.X509KeyManager;
 import javax.net.ssl.X509TrustManager;
 import nl.altindag.ssl.SSLFactory;
+import nl.altindag.ssl.trustmanager.HotSwappableX509ExtendedTrustManager;
+import nl.altindag.ssl.trustmanager.UnsafeX509ExtendedTrustManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.config.TlsConfig;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.*;
 
 
 /**
@@ -86,7 +86,7 @@ public class TlsUtilsTest {
   private static final String TLS_KEYSTORE_FILE_PATH = DEFAULT_TEST_TLS_DIR + "/" + TLS_KEYSTORE_FILE;
   private static final String TLS_TRUSTSTORE_FILE_PATH = DEFAULT_TEST_TLS_DIR + "/" + TLS_TRUSTSTORE_FILE;
 
-  @BeforeClass
+  @BeforeMethod
   public void setUp()
       throws IOException, URISyntaxException {
     copyResourceFilesToTempFolder(
@@ -114,7 +114,7 @@ public class TlsUtilsTest {
     }
   }
 
-  @AfterClass
+  @AfterMethod
   public void tearDown() {
     FileUtils.deleteQuietly(new File(DEFAULT_TEST_TLS_DIR));
   }
@@ -130,7 +130,7 @@ public class TlsUtilsTest {
     SSLContext sslContext = SSLContext.getInstance("TLS");
     sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), secureRandom);
     SSLFactory sslFactory =
-        TlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD,
+        RenewableTlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD,
             TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, true, false);
     KeyManagerFactory swappableKeyManagerFactory = sslFactory.getKeyManagerFactory().get();
     assertEquals(swappableKeyManagerFactory.getKeyManagers().length, keyManagerFactory.getKeyManagers().length);
@@ -172,8 +172,8 @@ public class TlsUtilsTest {
   public void reloadSslFactoryWhenFileStoreChanges()
       throws IOException, URISyntaxException, InterruptedException {
     SecureRandom secureRandom = new SecureRandom();
-    SSLFactory sslFactory = TlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD, TRUSTSTORE_TYPE,
-        TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, true, false);
+    SSLFactory sslFactory = RenewableTlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD,
+        TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, true, false);
     X509ExtendedKeyManager x509ExtendedKeyManager = sslFactory.getKeyManager().get();
     X509ExtendedTrustManager x509ExtendedTrustManager = sslFactory.getTrustManager().get();
     SSLContext sslContext = sslFactory.getSslContext();
@@ -187,30 +187,13 @@ public class TlsUtilsTest {
     executorService.execute(
         () -> {
           try {
-            TlsUtils.reloadSslFactoryWhenFileStoreChanges(sslFactory, KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD,
-                TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, false);
+            RenewableTlsUtils.reloadSslFactoryWhenFileStoreChanges(sslFactory, KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH,
+                PASSWORD, TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, () -> false);
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
         });
-
-    WatchService watchService = FileSystems.getDefault().newWatchService();
-    Map<WatchKey, Set<Path>> watchKeyPathMap = new HashMap<>();
-    TlsUtils.registerFile(watchService, watchKeyPathMap, TLS_KEYSTORE_FILE_PATH);
-    TlsUtils.registerFile(watchService, watchKeyPathMap, TLS_TRUSTSTORE_FILE_PATH);
-
-    // wait for the new thread to start
-    Thread.sleep(100);
-
-    // update tls files
-    copyResourceFilesToTempFolder(
-        ImmutableMap.of(TLS_KEYSTORE_UPDATED_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_UPDATED_FILE,
-            TLS_TRUSTSTORE_FILE));
-
-    // wait for the file change event to be detected
-    watchService.take();
-    // it will take some time for the thread to be notified and reload the ssl factory
-    Thread.sleep(500);
+    updateTlsFilesAndWaitForSslFactoryToBeRenewed();
     executorService.shutdown();
 
     // after tls file update, the returned values should be the same, since the wrapper is the same
@@ -230,7 +213,7 @@ public class TlsUtilsTest {
   @Test
   public void enableAutoRenewalFromFileStoreForSSLFactoryThrows() {
     SSLFactory swappableSslFactory =
-        TlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD, TRUSTSTORE_TYPE,
+        RenewableTlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD, TRUSTSTORE_TYPE,
             TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", null, true, false);
     TlsConfig tlsConfig = new TlsConfig();
     tlsConfig.setKeyStoreType(KEYSTORE_TYPE);
@@ -241,7 +224,8 @@ public class TlsUtilsTest {
     tlsConfig.setTrustStorePassword(PASSWORD);
     RuntimeException e = null;
     try {
-      TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(swappableSslFactory, tlsConfig);
+      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(
+          swappableSslFactory, tlsConfig, () -> false);
     } catch (RuntimeException ex) {
       e = ex;
     }
@@ -253,7 +237,8 @@ public class TlsUtilsTest {
     tlsConfig.setTrustStorePath("ftp://" + TLS_TRUSTSTORE_FILE_PATH);
     e = null;
     try {
-      TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(swappableSslFactory, tlsConfig);
+      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(
+          swappableSslFactory, tlsConfig, () -> false);
     } catch (RuntimeException ex) {
       e = ex;
     }
@@ -261,12 +246,13 @@ public class TlsUtilsTest {
         + "or null when SSL auto renew is enabled");
 
     SSLFactory nonSwappableSslFactory =
-        TlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD, TRUSTSTORE_TYPE,
+        RenewableTlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD, TRUSTSTORE_TYPE,
             TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", null, false, false);
     e = null;
     tlsConfig.setTrustStorePath(TLS_TRUSTSTORE_FILE_PATH);
     try {
-      TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(nonSwappableSslFactory, tlsConfig);
+      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(
+          nonSwappableSslFactory, tlsConfig, () -> false);
     } catch (RuntimeException ex) {
       e = ex;
     }
@@ -276,11 +262,105 @@ public class TlsUtilsTest {
     tlsConfig.setKeyStorePath(null);
     e = null;
     try {
-      TlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(nonSwappableSslFactory, tlsConfig);
+      RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(
+          nonSwappableSslFactory, tlsConfig, () -> false);
     } catch (RuntimeException ex) {
       e = ex;
     }
     assertEquals(e.getMessage(),
         "java.lang.IllegalArgumentException: trust manager of the existing SSLFactory must be swappable");
+  }
+
+  @Test
+  public void createSslFactoryInInsecureMode() {
+    SecureRandom secureRandom = new SecureRandom();
+    SSLFactory sslFactory = RenewableTlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD,
+        TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, false, true);
+
+    X509ExtendedTrustManager x509ExtendedTrustManager = sslFactory.getTrustManager().get();
+    assertTrue(x509ExtendedTrustManager instanceof UnsafeX509ExtendedTrustManager);
+    assertEquals(x509ExtendedTrustManager.getAcceptedIssuers().length, 0);
+
+    sslFactory = RenewableTlsUtils.createSSLFactory(KEYSTORE_TYPE, TLS_KEYSTORE_FILE_PATH, PASSWORD,
+        TRUSTSTORE_TYPE, TLS_TRUSTSTORE_FILE_PATH, PASSWORD, "TLS", secureRandom, true, true);
+    ensurSslFactoryUseUnsafeTrustManager(sslFactory);
+  }
+
+  @Test
+  public void createSSLFactoryAndEnableAutoRenewalWhenUsingFileStoresWithPinotSecureMode()
+      throws IOException, URISyntaxException, InterruptedException {
+    TlsConfig tlsConfig = createTlsConfig();
+    SSLFactory sslFactory =
+        RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig, () -> false);
+    ensurSslFactoryUseNormalTrustManager(sslFactory);
+
+    updateTlsFilesAndWaitForSslFactoryToBeRenewed();
+
+    ensurSslFactoryUseNormalTrustManager(sslFactory);
+  }
+
+  @Test
+  public void createSSLFactoryAndEnableAutoRenewalWhenUsingFileStoresWithPinotInsecureMode()
+      throws IOException, URISyntaxException, InterruptedException {
+    TlsConfig tlsConfig = createTlsConfig();
+    SSLFactory sslFactory =
+        RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(tlsConfig, () -> true);
+    ensurSslFactoryUseUnsafeTrustManager(sslFactory);
+
+    updateTlsFilesAndWaitForSslFactoryToBeRenewed();
+
+    // after tls file update, the ssl factory should still use UnsafeX509ExtendedTrustManager
+    ensurSslFactoryUseUnsafeTrustManager(sslFactory);
+  }
+
+  private void ensurSslFactoryUseNormalTrustManager(SSLFactory sslFactory) {
+    X509ExtendedTrustManager x509ExtendedTrustManager = sslFactory.getTrustManager().get();
+    assertTrue(x509ExtendedTrustManager instanceof HotSwappableX509ExtendedTrustManager);
+    HotSwappableX509ExtendedTrustManager hotSwappableX509ExtendedTrustManager
+        = (HotSwappableX509ExtendedTrustManager) x509ExtendedTrustManager;
+    assertFalse(hotSwappableX509ExtendedTrustManager.getInnerTrustManager() instanceof UnsafeX509ExtendedTrustManager);
+    assertEquals(x509ExtendedTrustManager.getAcceptedIssuers().length, 1);
+  }
+
+  private void ensurSslFactoryUseUnsafeTrustManager(SSLFactory sslFactory) {
+    X509ExtendedTrustManager x509ExtendedTrustManager = sslFactory.getTrustManager().get();
+    assertTrue(x509ExtendedTrustManager instanceof HotSwappableX509ExtendedTrustManager);
+    HotSwappableX509ExtendedTrustManager hotSwappableX509ExtendedTrustManager
+        = (HotSwappableX509ExtendedTrustManager) x509ExtendedTrustManager;
+    assertTrue(hotSwappableX509ExtendedTrustManager.getInnerTrustManager() instanceof UnsafeX509ExtendedTrustManager);
+    assertEquals(x509ExtendedTrustManager.getAcceptedIssuers().length, 0);
+  }
+
+  private TlsConfig createTlsConfig() {
+    TlsConfig tlsConfig = new TlsConfig();
+    tlsConfig.setKeyStoreType(KEYSTORE_TYPE);
+    tlsConfig.setKeyStorePath(TLS_KEYSTORE_FILE_PATH);
+    tlsConfig.setKeyStorePassword(PASSWORD);
+    tlsConfig.setTrustStoreType(TRUSTSTORE_TYPE);
+    tlsConfig.setTrustStorePath(TLS_TRUSTSTORE_FILE_PATH);
+    tlsConfig.setTrustStorePassword(PASSWORD);
+    tlsConfig.setInsecure(false);
+    return tlsConfig;
+  }
+
+  private void updateTlsFilesAndWaitForSslFactoryToBeRenewed()
+      throws IOException, URISyntaxException, InterruptedException {
+    WatchService watchService = FileSystems.getDefault().newWatchService();
+    Map<WatchKey, Set<Path>> watchKeyPathMap = new HashMap<>();
+    RenewableTlsUtils.registerFile(watchService, watchKeyPathMap, TLS_KEYSTORE_FILE_PATH);
+    RenewableTlsUtils.registerFile(watchService, watchKeyPathMap, TLS_TRUSTSTORE_FILE_PATH);
+
+    // wait for the new thread to start
+    Thread.sleep(100);
+
+    // update tls files
+    copyResourceFilesToTempFolder(
+        ImmutableMap.of(TLS_KEYSTORE_UPDATED_FILE, TLS_KEYSTORE_FILE, TLS_TRUSTSTORE_UPDATED_FILE,
+            TLS_TRUSTSTORE_FILE));
+
+    // wait for the file change event to be detected
+    watchService.take();
+    // it will take some time for the thread to be notified and reload the ssl factory
+    Thread.sleep(500);
   }
 }

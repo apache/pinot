@@ -378,6 +378,10 @@ public class JsonUtils {
       return Collections.emptyList();
     }
 
+    if (node.isMissingNode()) {
+      return Collections.emptyList();
+    }
+
     // Value
     if (node.isValueNode()) {
       String valueAsText = node.asText();

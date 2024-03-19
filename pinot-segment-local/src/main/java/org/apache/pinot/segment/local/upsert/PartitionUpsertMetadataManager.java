@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.upsert;
 import java.io.Closeable;
 import java.util.List;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -63,6 +64,13 @@ public interface PartitionUpsertMetadataManager extends Closeable {
    * Initializes the upsert metadata for the given immutable segment.
    */
   void addSegment(ImmutableSegment segment);
+
+  /**
+   * Preload segments for the table partition. Segments can be added differently during preloading.
+   */
+  void preloadSegments(IndexLoadingConfig indexLoadingConfig);
+
+  boolean isPreloading();
 
   /**
    * Different from adding a segment, when preloading a segment, the upsert metadata may be updated more efficiently.

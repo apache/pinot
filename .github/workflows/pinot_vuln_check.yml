@@ -37,9 +37,9 @@ jobs:
     name: Verify Docker Image
     runs-on: ubuntu-latest
     steps:
-      - uses: docker/setup-qemu-action@v2
+      - uses: docker/setup-qemu-action@v3
         name: Set up QEMU
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build the Docker image
         env:
           DOCKER_FILE_BASE_DIR: "docker/images/pinot"

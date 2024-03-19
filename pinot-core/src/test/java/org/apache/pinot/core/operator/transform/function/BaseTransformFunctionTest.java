@@ -24,7 +24,6 @@ import java.sql.Timestamp;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -116,6 +115,7 @@ public abstract class BaseTransformFunctionTest {
   protected final BigDecimal[] _bigDecimalSVValues = new BigDecimal[NUM_ROWS];
   protected final String[] _stringSVValues = new String[NUM_ROWS];
   protected final String[] _jsonSVValues = new String[NUM_ROWS];
+  protected final String[] _jsonArrayValues = new String[NUM_ROWS];
   protected final String[] _stringAlphaNumericSVValues = new String[NUM_ROWS];
   protected final byte[][] _bytesSVValues = new byte[NUM_ROWS][];
   protected final int[][] _intMVValues = new int[NUM_ROWS][];
@@ -155,7 +155,10 @@ public abstract class BaseTransformFunctionTest {
       _stringSVValues[i] = df.format(_intSVValues[i] * RANDOM.nextDouble());
       _jsonSVValues[i] = String.format(
           "{\"intVal\":%s, \"longVal\":%s, \"floatVal\":%s, \"doubleVal\":%s, \"bigDecimalVal\":%s, "
-              + "\"stringVal\":\"%s\"}", RANDOM.nextInt(), RANDOM.nextLong(), RANDOM.nextFloat(), RANDOM.nextDouble(),
+              + "\"stringVal\":\"%s\", "
+              + "\"intVals\":[0,1], \"longVals\":[0,1], \"floatVals\":[0.0,1.0], \"doubleVals\":[0.0,1.0], "
+              + "\"bigDecimalVals\":[0.0,1.0], \"stringVals\":[\"0\",\"1\"]}",
+              RANDOM.nextInt(), RANDOM.nextLong(), RANDOM.nextFloat(), RANDOM.nextDouble(),
           BigDecimal.valueOf(RANDOM.nextDouble()).multiply(BigDecimal.valueOf(RANDOM.nextInt())),
           df.format(RANDOM.nextInt() * RANDOM.nextDouble()));
       _stringAlphaNumericSVValues[i] = RandomStringUtils.randomAlphanumeric(26);
@@ -302,7 +305,7 @@ public abstract class BaseTransformFunctionTest {
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, TIME_COLUMN), null).build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN)
-            .setJsonIndexColumns(Collections.singletonList(JSON_STRING_SV_COLUMN))
+            .setJsonIndexColumns(List.of(JSON_STRING_SV_COLUMN))
             .setNullHandlingEnabled(true).build();
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);

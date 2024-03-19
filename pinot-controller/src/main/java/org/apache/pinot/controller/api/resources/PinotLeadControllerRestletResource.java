@@ -39,18 +39,21 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.MasterSlaveSMD;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -74,7 +77,7 @@ public class PinotLeadControllerRestletResource {
   @Path("/tables")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TABLE_LEADER)
   @ApiOperation(value = "Gets leaders for all tables", notes = "Gets leaders for all tables")
-  public LeadControllerResponse getLeadersForAllTables() {
+  public LeadControllerResponse getLeadersForAllTables(@Context HttpHeaders headers) {
     Map<String, LeadControllerEntry> leadControllerEntryMap = new LinkedHashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
     boolean isLeadControllerResourceEnabled;
@@ -101,7 +104,8 @@ public class PinotLeadControllerRestletResource {
     }
 
     // Assigns all the tables to the relevant partitions.
-    List<String> tableNames = _pinotHelixResourceManager.getAllTables();
+    List<String> tableNames = _pinotHelixResourceManager.getAllTables(
+        headers.getHeaderString(CommonConstants.DATABASE));
     for (String tableName : tableNames) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
@@ -118,7 +122,9 @@ public class PinotLeadControllerRestletResource {
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_LEADER)
   @ApiOperation(value = "Gets leader for a given table", notes = "Gets leader for a given table")
   public LeadControllerResponse getLeaderForTable(
-      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     Map<String, LeadControllerEntry> leadControllerEntryMap = new HashMap<>();
     HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
     boolean isLeadControllerResourceEnabled;

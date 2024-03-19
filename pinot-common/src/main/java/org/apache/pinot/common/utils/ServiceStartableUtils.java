@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import java.util.Map;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
@@ -29,6 +30,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_TIMEZONE;
+
 
 public class ServiceStartableUtils {
   private ServiceStartableUtils() {
@@ -38,6 +41,7 @@ public class ServiceStartableUtils {
   private static final String CLUSTER_CONFIG_ZK_PATH_TEMPLATE = "/%s/CONFIGS/CLUSTER/%s";
   private static final String PINOT_ALL_CONFIG_KEY_PREFIX = "pinot.all.";
   private static final String PINOT_INSTANCE_CONFIG_KEY_PREFIX_TEMPLATE = "pinot.%s.";
+  protected static String _timeZone;
 
   /**
    * Applies the ZK cluster config to the given instance config if it does not already exist.
@@ -66,6 +70,7 @@ public class ServiceStartableUtils {
           zkClient.readData(String.format(CLUSTER_CONFIG_ZK_PATH_TEMPLATE, clusterName, clusterName), true);
       if (clusterConfigZNRecord == null) {
         LOGGER.warn("Failed to find cluster config for cluster: {}, skipping applying cluster config", clusterName);
+        setupTimezone(instanceConfig);
         return;
       }
 
@@ -87,11 +92,19 @@ public class ServiceStartableUtils {
     } finally {
       zkClient.close();
     }
+    setupTimezone(instanceConfig);
   }
 
   private static void addConfigIfNotExists(PinotConfiguration instanceConfig, String key, String value) {
     if (!instanceConfig.containsKey(key)) {
       instanceConfig.setProperty(key, value);
     }
+  }
+
+  private static void setupTimezone(PinotConfiguration instanceConfig) {
+    TimeZone localTimezone = TimeZone.getDefault();
+    _timeZone = instanceConfig.getProperty(CONFIG_OF_TIMEZONE, localTimezone.getID());
+    System.setProperty("user.timezone", _timeZone);
+    LOGGER.info("Timezone: {}", _timeZone);
   }
 }

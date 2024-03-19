@@ -38,6 +38,8 @@ public class PinotQueryRuleSets {
           EnumerableRules.ENUMERABLE_PROJECT_RULE, EnumerableRules.ENUMERABLE_WINDOW_RULE,
           EnumerableRules.ENUMERABLE_SORT_RULE, EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE,
 
+          // converts CASE-style filtered aggregates into true filtered aggregates.
+          CoreRules.AGGREGATE_CASE_TO_FILTER,
           // push a filter into a join
           CoreRules.FILTER_INTO_JOIN,
           // push filter through an aggregation

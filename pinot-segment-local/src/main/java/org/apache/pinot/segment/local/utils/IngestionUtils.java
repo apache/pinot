@@ -65,6 +65,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
@@ -379,15 +380,16 @@ public final class IngestionUtils {
           expressionContext.getColumns(fields);
         }
       }
+
+      fields.addAll(RecordEnricherPipeline.fromIngestionConfig(ingestionConfig).getColumnsToExtract());
       List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       if (transformConfigs != null) {
         for (TransformConfig transformConfig : transformConfigs) {
           FunctionEvaluator expressionEvaluator =
               FunctionEvaluatorFactory.getExpressionEvaluator(transformConfig.getTransformFunction());
           fields.addAll(expressionEvaluator.getArguments());
-          fields.add(transformConfig
-              .getColumnName()); // add the column itself too, so that if it is already transformed, we won't
-          // transform again
+          // add the column itself too, so that if it is already transformed, we won't transform again
+          fields.add(transformConfig.getColumnName());
         }
       }
       ComplexTypeConfig complexTypeConfig = ingestionConfig.getComplexTypeConfig();

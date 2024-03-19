@@ -33,9 +33,11 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
@@ -62,8 +64,9 @@ public class PinotBrokerRouting {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public String buildRouting(
-      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType) {
-    _routingManager.buildRouting(tableNameWithType);
+      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
+      @Context HttpHeaders headers) {
+    _routingManager.buildRouting(DatabaseUtils.translateTableName(tableNameWithType, headers));
     return "Success";
   }
 
@@ -78,8 +81,9 @@ public class PinotBrokerRouting {
   })
   public String refreshRouting(
       @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
-      @ApiParam(value = "Segment name") @PathParam("segmentName") String segmentName) {
-    _routingManager.refreshSegment(tableNameWithType, segmentName);
+      @ApiParam(value = "Segment name") @PathParam("segmentName") String segmentName,
+      @Context HttpHeaders headers) {
+    _routingManager.refreshSegment(DatabaseUtils.translateTableName(tableNameWithType, headers), segmentName);
     return "Success";
   }
 
@@ -93,8 +97,9 @@ public class PinotBrokerRouting {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public String removeRouting(
-      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType) {
-    _routingManager.removeRouting(tableNameWithType);
+      @ApiParam(value = "Table name (with type)") @PathParam("tableName") String tableNameWithType,
+      @Context HttpHeaders headers) {
+    _routingManager.removeRouting(DatabaseUtils.translateTableName(tableNameWithType, headers));
     return "Success";
   }
 }
