@@ -33,8 +33,9 @@ public class FlushThresholdUpdateManager {
    * Check table config for flush size.
    *
    * If flush size > 0, create a new DefaultFlushThresholdUpdater with given flush size.
-   * If flush size <= 0, create new SegmentSizeBasedFlushThresholdUpdater if not already created. Create only 1 per
-   * table because we want to maintain tuning information for the table in the updater.
+   * If flush size <= 0, create new SegmentRowsBasedFlushThresholdUpdater if flushThresholdSegmentRows > 0.
+   * If flush size <= 0 AND segment.row <=0, create new SegmentSizeBasedFlushThresholdUpdater if not already created.
+   * Create only 1 per table because we want to maintain tuning information for the table in the updater.
    */
   public FlushThresholdUpdater getFlushThresholdUpdater(StreamConfig streamConfig) {
     String realtimeTableName = streamConfig.getTableNameWithType();
