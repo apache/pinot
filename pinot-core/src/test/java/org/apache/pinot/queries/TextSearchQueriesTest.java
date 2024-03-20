@@ -295,7 +295,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             + "distributed storage, concurrency, multi-threading, apache airflow"});
 
     String query =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '*ealtime streaming system*') LIMIT 50000";
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '*ealtime streaming system*') "
+            + "LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
     // Search /*java realtime stream system*, only 1 result left./
@@ -304,7 +305,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
             + "storage, concurrency, multi-threading"});
     String query1 =
-        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '*ava realtime streaming system*') LIMIT 50000";
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL, '*ava realtime streaming "
+            + "system*') LIMIT 50000";
     testTextSearchSelectQueryHelper(query1, expected1.size(), false, expected1);
   }
 
