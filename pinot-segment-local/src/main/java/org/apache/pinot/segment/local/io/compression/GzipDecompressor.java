@@ -28,13 +28,13 @@ import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 /**
  * Implementation of {@link ChunkDecompressor} using GZIP decompression algorithm.
  */
-class GZIPDecompressor implements ChunkDecompressor {
+class GzipDecompressor implements ChunkDecompressor {
 
-  static final GZIPDecompressor INSTANCE = new GZIPDecompressor();
+  static final ThreadLocal<GzipDecompressor> INSTANCE = ThreadLocal.withInitial(GzipDecompressor::new);
 
   private final Inflater _decompressor;
 
-  private GZIPDecompressor() {
+  private GzipDecompressor() {
     _decompressor = new Inflater();
   }
 

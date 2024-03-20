@@ -21,6 +21,10 @@ package org.apache.pinot.segment.local.io.compression;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
@@ -64,7 +68,78 @@ public class TestCompression {
     roundtrip(compressor, rawInput);
   }
 
-  private void roundtrip(ChunkCompressor compressor, ByteBuffer rawInput)
+  @Test(dataProvider = "formats")
+  public void testConcurrent(ChunkCompressionType type, ByteBuffer ignore) {
+
+    String expected = "The gzip file format is:\n"
+        + "- a 10-byte header, containing a magic number (1f 8b), the compression method (08 for DEFLATE), "
+        + "1-byte of header flags, a 4-byte timestamp, compression flags and the operating system ID.\n"
+        + "- optional extra headers as allowed by the header flags, including the original filename, a "
+        + "comment field, an 'extra' field, and the lower half of a CRC-32 checksum for the header section.\n"
+        + "- a body, containing a DEFLATE-compressed payload.\n"
+        + "- an 8-byte trailer, containing a CRC-32 checksum and the length of the original uncompressed "
+        + "data, modulo 232.[4]\n"
+        + "gzip is normally used to compress just single files. Compressed archives are typically created "
+        + "by assembling collections of files into a single tar archive and then compressing that archive "
+        + "with gzip.\n gzip is not to be confused with ZIP, which can hold collections of files without "
+        + "an external archiver, but is less compact than compressed tarballs holding the same data, because "
+        + "it compresses files individually and cannot take advantage of redundancy between files.\n\n";
+    byte[] input = expected.getBytes(StandardCharsets.UTF_8);
+    ByteBuffer rawInput = ByteBuffer.allocateDirect(input.length).put(input).flip();
+
+    Thread[] workers = new Thread[5];
+    ByteBuffer[] compressed = new ByteBuffer[workers.length];
+    ByteBuffer[] decompressed = new ByteBuffer[workers.length];
+    CountDownLatch done = new CountDownLatch(workers.length);
+    AtomicInteger errors = new AtomicInteger();
+    for (int i = 0; i < workers.length; i++) {
+      int idx = i;
+      workers[i] = new Thread(() -> {
+        try {
+          // compress
+          ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type);
+          compressed[idx] = ByteBuffer.allocateDirect(compressor.maxCompressedSize(rawInput.limit()));
+          compressor.compress(rawInput.slice(), compressed[idx]);
+
+          // small context switch
+          TimeUnit.MILLISECONDS.sleep(1l + (long) (ThreadLocalRandom.current().nextDouble() * 10.0));
+
+          // decompress
+          ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(type);
+          int size = decompressor.decompressedLength(compressed[idx]);
+          if (type == ChunkCompressionType.LZ4 || type == ChunkCompressionType.GZIP) {
+            size = rawInput.limit();
+          }
+          decompressed[idx] = ByteBuffer.allocateDirect(size);
+          decompressor.decompress(compressed[idx], decompressed[idx]);
+        } catch (Throwable e) {
+          e.printStackTrace();
+          errors.incrementAndGet();
+        } finally {
+          done.countDown();
+        }
+      });
+      workers[i].start();
+    }
+
+    try {
+      done.await(60L, TimeUnit.SECONDS); // it will not take this long
+    } catch (InterruptedException e) {
+      throw new AssertionError("timed-out");
+    }
+
+    // there are no errors
+    assertEquals(errors.get(), 0);
+
+    // all decompressed buffers contain the original text
+    for (int i = 0; i < workers.length; i++) {
+      assertEquals(StandardCharsets.UTF_8.decode(decompressed[i]).toString(), expected);
+      compressed[i].clear();
+      decompressed[i].clear();
+    }
+  }
+
+  private static void roundtrip(ChunkCompressor compressor, ByteBuffer rawInput)
       throws IOException {
     ByteBuffer compressedOutput = ByteBuffer.allocateDirect(compressor.maxCompressedSize(rawInput.limit()));
     compressor.compress(rawInput.slice(), compressedOutput);
