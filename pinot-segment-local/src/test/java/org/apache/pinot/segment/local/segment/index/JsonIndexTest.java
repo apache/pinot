@@ -406,15 +406,17 @@ public class JsonIndexTest {
     // @formatter: off
     // CHECKSTYLE:OFF
     String[] records = new String[]{
-        "{\"field1\":\"value1\",\"field2\":\"value2\",\"field3\":\"value3\"}", "{\"field1\":\"value2\", "
-        + "\"field2\":[\"value1\",\"value2\"]}", "{\"field1\":\"value1\",\"field2\":\"value4\"}",
+        "{\"field1\":\"value1\",\"field2\":\"value2\",\"field3\":\"value3\"}",
+        "{\"field1\":\"value2\", \"field2\":[\"value1\",\"value2\"]}",
+        "{\"field1\":\"value1\",\"field2\":\"value4\"}",
     };
     // CHECKSTYLE:ON
     // @formatter: on
     String[] testKeys = new String[]{".field1", ".field2", ".field3", ".field4"};
 
     String colName = "col";
-    try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, new JsonIndexConfig());
+    try (
+        JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, new JsonIndexConfig());
         MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig())) {
       for (String record : records) {
         offHeapIndexCreator.add(record);

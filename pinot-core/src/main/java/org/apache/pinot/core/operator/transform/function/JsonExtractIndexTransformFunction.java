@@ -44,7 +44,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   private TransformResultMetadata _resultMetadata;
   private JsonIndexReader _jsonIndexReader;
   private Object _defaultValue;
-  private Map<String, RoaringBitmap> _matchingDocsMap;
+  private Map<String, RoaringBitmap> _valueToMatchingFlattenedDocIdsMap;
 
   @Override
   public String getName() {
@@ -53,11 +53,11 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    // Check that there are exactly 3 or 4 arguments
-    if (arguments.size() < 3 || arguments.size() > 4) {
+    // Check that there are exactly 3 or 4 or 5 arguments
+    if (arguments.size() < 3 || arguments.size() > 5) {
       throw new IllegalArgumentException(
-          "Expected 3/4 arguments for transform function: jsonExtractIndex(jsonFieldName, 'jsonPath', 'resultsType',"
-              + " ['defaultValue'])");
+          "Expected 3/4/5 arguments for transform function: jsonExtractIndex(jsonFieldName, 'jsonPath', 'resultsType',"
+              + " ['defaultValue'], ['jsonFilterExpression'])");
     }
 
     TransformFunction firstArgument = arguments.get(0);
@@ -90,15 +90,12 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     }
     String resultsType = ((LiteralTransformFunction) thirdArgument).getStringLiteral().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
-    // TODO: will support array type; the underlying jsonIndexReader.getMatchingDocsMap supports the json path [*]
-    if (!isSingleValue) {
-      throw new IllegalArgumentException("jsonExtractIndex only supports single value type");
-    }
     if (isSingleValue && inputJsonPath.contains("[*]")) {
-      throw new IllegalArgumentException("[*] syntax in json path is unsupported as json_extract_index"
-          + "currently does not support returning array types");
+      throw new IllegalArgumentException(
+          "[*] syntax in json path is unsupported for singleValue field json_extract_index");
     }
-    DataType dataType = DataType.valueOf(resultsType);
+    DataType dataType = isSingleValue ? DataType.valueOf(resultsType)
+        : DataType.valueOf(resultsType.substring(0, resultsType.length() - 6));
 
     if (arguments.size() == 4) {
       TransformFunction fourthArgument = arguments.get(3);
@@ -108,8 +105,18 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
     }
 
-    _resultMetadata = new TransformResultMetadata(dataType, true, false);
-    _matchingDocsMap = _jsonIndexReader.getMatchingDocsMap(_jsonPathString);
+    String filterJsonPath = null;
+    if (arguments.size() == 5) {
+      TransformFunction fifthArgument = arguments.get(4);
+      if (!(fifthArgument instanceof LiteralTransformFunction)) {
+        throw new IllegalArgumentException("JSON path filter argument must be a literal");
+      }
+      filterJsonPath = ((LiteralTransformFunction) fifthArgument).getStringLiteral();
+    }
+
+    _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
+    _valueToMatchingFlattenedDocIdsMap =
+        _jsonIndexReader.getValueToFlattenedDocIdsMap(inputJsonPath.substring(1), filterJsonPath);
   }
 
   @Override
@@ -122,8 +129,8 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initIntValuesSV(numDocs);
-    String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _matchingDocsMap);
+    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[inputDocIds[i]];
       if (value == null) {
@@ -144,8 +151,8 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initLongValuesSV(numDocs);
-    String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _matchingDocsMap);
+    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -166,8 +173,8 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initFloatValuesSV(numDocs);
-    String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _matchingDocsMap);
+    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -188,8 +195,8 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initDoubleValuesSV(numDocs);
-    String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _matchingDocsMap);
+    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -210,8 +217,8 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initBigDecimalValuesSV(numDocs);
-    String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _matchingDocsMap);
+    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -232,8 +239,8 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initStringValuesSV(numDocs);
-    String[] valuesFromIndex =
-        _jsonIndexReader.getValuesForKeyAndDocs(valueBlock.getDocIds(), _matchingDocsMap);
+    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
       if (value == null) {
@@ -251,26 +258,80 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("jsonExtractIndex does not support transforming to multi-value columns");
+    int numDocs = valueBlock.getNumDocs();
+    initIntValuesMV(numDocs);
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
+
+    for (int i = 0; i < numDocs; i++) {
+      String[] value = valuesFromIndex[i];
+      _intValuesMV[i] = new int[value.length];
+      for (int j = 0; j < value.length; j++) {
+        _intValuesMV[i][j] = Integer.parseInt(value[j]);
+      }
+    }
+    return _intValuesMV;
   }
 
   @Override
   public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("jsonExtractIndex does not support transforming to multi-value columns");
+    int numDocs = valueBlock.getNumDocs();
+    initLongValuesMV(numDocs);
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
+    for (int i = 0; i < numDocs; i++) {
+      String[] value = valuesFromIndex[i];
+      _longValuesMV[i] = new long[value.length];
+      for (int j = 0; j < value.length; j++) {
+        _longValuesMV[i][j] = Long.parseLong(value[j]);
+      }
+    }
+    return _longValuesMV;
   }
 
   @Override
   public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("jsonExtractIndex does not support transforming to multi-value columns");
+    int numDocs = valueBlock.getNumDocs();
+    initFloatValuesMV(numDocs);
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
+    for (int i = 0; i < numDocs; i++) {
+      String[] value = valuesFromIndex[i];
+      _floatValuesMV[i] = new float[value.length];
+      for (int j = 0; j < value.length; j++) {
+        _floatValuesMV[i][j] = Float.parseFloat(value[j]);
+      }
+    }
+    return _floatValuesMV;
   }
 
   @Override
   public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("jsonExtractIndex does not support transforming to multi-value columns");
+    int numDocs = valueBlock.getNumDocs();
+    initDoubleValuesMV(numDocs);
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
+    for (int i = 0; i < numDocs; i++) {
+      String[] value = valuesFromIndex[i];
+      _doubleValuesMV[i] = new double[value.length];
+      for (int j = 0; j < value.length; j++) {
+        _doubleValuesMV[i][j] = Double.parseDouble(value[j]);
+      }
+    }
+    return _doubleValuesMV;
   }
 
   @Override
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
-    throw new UnsupportedOperationException("jsonExtractIndex does not support transforming to multi-value columns");
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesMV(numDocs);
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+        _valueToMatchingFlattenedDocIdsMap);
+    for (int i = 0; i < numDocs; i++) {
+      String[] value = valuesFromIndex[i];
+      _stringValuesMV[i] = new String[value.length];
+      System.arraycopy(value, 0, _stringValuesMV[i], 0, value.length);
+    }
+    return _stringValuesMV;
   }
 }

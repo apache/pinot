@@ -483,11 +483,20 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter, true);
       }
 
+      Pair<String, RoaringBitmap> result = getKeyAndFlattenDocId(jsonPathKey);
+      jsonPathKey = result.getLeft();
+      RoaringBitmap arrayIndexFlattenDocIds = result.getRight();
+      if (arrayIndexFlattenDocIds != null && arrayIndexFlattenDocIds.isEmpty()) {
+        return valueToMatchingFlattenedDocIdsMap;
+      }
       Map<String, RoaringBitmap> subMap = getMatchingKeysMap(jsonPathKey);
       for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
         RoaringBitmap flattenedDocIds = entry.getValue().clone();
         if (filteredFlattenedDocIds != null) {
           flattenedDocIds.and(filteredFlattenedDocIds);
+        }
+        if (arrayIndexFlattenDocIds != null) {
+          flattenedDocIds.and(arrayIndexFlattenDocIds);
         }
         valueToMatchingFlattenedDocIdsMap.put(entry.getKey().substring(jsonPathKey.length() + 1), flattenedDocIds);
       }
@@ -535,6 +544,29 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       while (!pq.isEmpty()) {
         result[i][j++] = pq.poll().getLeft();
       }
+    }
+
+    return result;
+  }
+
+  @Override
+  public String[] getValuesForSv(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
+    String[] result = new String[length];
+
+    _readLock.lock();
+    try {
+      for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingFlattenedDocs.entrySet()) {
+        String value = entry.getKey();
+        RoaringBitmap matchingFlattenedDocIds = entry.getValue();
+        matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> {
+          int docId = _docIdMapping.getInt(flattenedDocId);
+          if (docId < length) {
+            result[docId] = value;
+          }
+        });
+      }
+    } finally {
+      _readLock.unlock();
     }
 
     return result;

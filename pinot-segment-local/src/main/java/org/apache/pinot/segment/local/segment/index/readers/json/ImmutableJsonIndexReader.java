@@ -385,12 +385,26 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter, true).toRoaringBitmap();
     }
     Map<String, RoaringBitmap> result = new HashMap<>();
+    Pair<String, MutableRoaringBitmap> pathKey = getKeyAndFlattenDocId(jsonPathKey);
+    if (pathKey.getRight() != null && pathKey.getRight().isEmpty()) {
+      return result;
+    }
+
+    jsonPathKey = pathKey.getLeft();
+    RoaringBitmap arrayIndexFlattenDocIds = null;
+    if (pathKey.getRight() != null) {
+      arrayIndexFlattenDocIds = pathKey.getRight().toRoaringBitmap();
+    }
     int[] dictIds = getDictIdRangeForKey(jsonPathKey);
     for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
       String key = _dictionary.getStringValue(dictId);
       RoaringBitmap docIds = _invertedIndex.getDocIds(dictId).toRoaringBitmap();
       if (filteredFlattenedDocIds != null) {
         docIds.and(filteredFlattenedDocIds);
+      }
+
+      if (arrayIndexFlattenDocIds != null) {
+        docIds.and(arrayIndexFlattenDocIds);
       }
       result.put(key.substring(jsonPathKey.length() + 1), docIds);
     }
@@ -430,6 +444,24 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       while (!pq.isEmpty()) {
         result[i][j++] = pq.poll().getLeft();
       }
+    }
+
+    return result;
+  }
+
+  @Override
+  public String[] getValuesForSv(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
+    String[] result = new String[length];
+
+    for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingFlattenedDocs.entrySet()) {
+      String value = entry.getKey();
+      RoaringBitmap matchingFlattenedDocIds = entry.getValue();
+      matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> {
+        int docId = getDocId(flattenedDocId);
+        if (docId < length) {
+          result[docId] = value;
+        }
+      });
     }
 
     return result;
