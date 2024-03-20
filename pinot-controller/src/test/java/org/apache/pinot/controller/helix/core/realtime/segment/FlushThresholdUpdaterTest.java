@@ -65,6 +65,13 @@ public class FlushThresholdUpdaterTest {
     assertTrue(flushThresholdUpdater instanceof DefaultFlushThresholdUpdater);
     assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(), 1234);
 
+    // Flush threshold rows set to 0 and Segment Rows larger than 0 - SegmentRowsBasedFlushThresholdUpdater should be returned
+    FlushThresholdUpdater segmentRowsFlushThresholdUpdater = flushThresholdUpdateManager
+        .getFlushThresholdUpdater(mockSegmentRowsStreamConfig(StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS));
+    assertTrue(segmentRowsFlushThresholdUpdater instanceof SegmentRowsBasedFlushThresholdUpdater);
+    assertEquals(((SegmentRowsBasedFlushThresholdUpdater) segmentRowsFlushThresholdUpdater).getTableFlushSize(),
+        StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
+
     // Flush threshold rows set to 0 - SegmentSizeBasedFlushThresholdUpdater should be returned
     FlushThresholdUpdater segmentBasedflushThresholdUpdater =
         flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(0, -1));
@@ -99,6 +106,14 @@ public class FlushThresholdUpdaterTest {
     when(streamConfig.getTableNameWithType()).thenReturn(REALTIME_TABLE_NAME);
     when(streamConfig.getFlushThresholdRows()).thenReturn(flushThresholdRows);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(flushThresholdSegmentSize);
+    return streamConfig;
+  }
+
+  private StreamConfig mockSegmentRowsStreamConfig(int flushThresholdSegmentRows) {
+    StreamConfig streamConfig = mock(StreamConfig.class);
+    when(streamConfig.getTableNameWithType()).thenReturn(REALTIME_TABLE_NAME);
+    when(streamConfig.getFlushThresholdRows()).thenReturn(0);
+    when(streamConfig.getFlushThresholdSegmentRows()).thenReturn(flushThresholdSegmentRows);
     return streamConfig;
   }
 
