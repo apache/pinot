@@ -676,7 +676,7 @@ public class PinotSegmentRestletResource {
           + "Using 0d or -1d will instantly delete segments without retention")
       @QueryParam("retention") String retentionPeriod,
       @ApiParam(value = "Segment names to be deleted if not provided deletes all segments by default",
-          allowMultiple = true) @QueryParam("segmentNames") List<String> segments, @Context HttpHeaders headers) {
+          allowMultiple = true) @QueryParam("segments") List<String> segments, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
