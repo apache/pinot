@@ -37,6 +37,9 @@ import org.slf4j.LoggerFactory;
 public class LuceneTextIndexUtils {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexUtils.class);
 
+  private LuceneTextIndexUtils() {
+  }
+
   // Convert a boolean query with literal matching for each clause to a span query which enables prefix and suffix
   // matching for terms with .* prefix or suffix.
   public static Query convertToMultiTermSpanQuery(Query query) {
