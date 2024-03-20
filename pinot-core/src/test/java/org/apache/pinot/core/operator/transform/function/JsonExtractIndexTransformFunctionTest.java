@@ -218,9 +218,11 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
             "$.stringVals[1]"), "$.stringVals[1]", DataType.STRING, true
     });
 
+    addMvTests(testArguments);
+    return testArguments.toArray(new Object[0][]);
+  }
 
-
-    // MV tests
+  private void addMvTests(List<Object[]> testArguments) {
     testArguments.add(new Object[]{
         String.format("jsonExtractIndex(%s,'%s','INT_ARRAY')", JSON_STRING_SV_COLUMN,
             "$.intVals[*]"), "$.intVals[*]", DataType.INT, false
@@ -254,8 +256,6 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
             "$.arrayField[*].arrIntField"), "$.arrayField[?(@.arrStringField =~ /.*y.*/)].arrIntField", DataType.INT,
         false
     });
-
-    return testArguments.toArray(new Object[0][]);
   }
 
   @Test(dataProvider = "testJsonExtractIndexDefaultValue")
