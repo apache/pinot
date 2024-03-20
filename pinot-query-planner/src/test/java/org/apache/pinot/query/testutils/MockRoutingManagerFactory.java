@@ -81,8 +81,10 @@ public class MockRoutingManagerFactory {
   }
 
   private void registerTableNameWithType(Schema schema, String tableNameWithType) {
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     _tableNameMap.put(tableNameWithType, tableNameWithType);
-    _schemaMap.put(TableNameBuilder.extractRawTableName(tableNameWithType), schema);
+    _tableNameMap.put(rawTableName, rawTableName);
+    _schemaMap.put(rawTableName, schema);
   }
 
   public void registerSegment(int insertToServerPort, String tableNameWithType, String segmentName) {
