@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
@@ -107,5 +108,26 @@ public class DatabaseUtils {
     } else {
       return tableName.startsWith(databaseName + ".");
     }
+  }
+
+  /**
+   * Extract database context from headers and query options
+   * @param queryOptions Query option from request
+   * @param headers http headers from request
+   * @return extracted database name.
+   * If queryOptions and headers have conflicting database context an {@link IllegalArgumentException} is thrown
+   */
+  public static @Nullable String extractDatabaseFromQueryRequest(
+      Map<String, String> queryOptions, HttpHeaders headers) {
+    String databaseFromOptions = queryOptions.get(CommonConstants.DATABASE);
+    String databaseFromHeaders = headers.getHeaderString(CommonConstants.DATABASE);
+    if (databaseFromHeaders != null && databaseFromOptions != null) {
+      Preconditions.checkArgument(databaseFromOptions.equals(databaseFromHeaders), "Database context mismatch : "
+          + "from headers %s, from query options %s", databaseFromHeaders, databaseFromOptions);
+    }
+    if (databaseFromHeaders != null) {
+      return databaseFromHeaders;
+    }
+    return databaseFromOptions;
   }
 }

@@ -20,13 +20,9 @@ package org.apache.pinot.query.catalog;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.calcite.jdbc.CalciteSchema;
-import org.apache.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelProtoDataType;
 import org.apache.calcite.schema.Function;
@@ -35,10 +31,8 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -53,9 +47,6 @@ import static java.util.Objects.requireNonNull;
 public class PinotCatalog implements Schema {
 
   private final TableCache _tableCache;
-
-  private final Map<String, CalciteSchema> _subCatalog;
-
   private final String _databaseName;
 
   /**
@@ -65,31 +56,11 @@ public class PinotCatalog implements Schema {
   public PinotCatalog(TableCache tableCache) {
     _tableCache = tableCache;
     _databaseName = null;
-    // create all databases
-    // TODO: we need to monitor table cache changes to register newly created databases
-    // TODO: we also need to monitor table that needs to be put into the right places
-    _subCatalog = constructSubCatalogs(_tableCache);
   }
 
-  private PinotCatalog(String databaseName, TableCache tableCache) {
+  public PinotCatalog(String databaseName, TableCache tableCache) {
     _tableCache = tableCache;
     _databaseName = databaseName;
-    _subCatalog = null;
-  }
-
-  private Map<String, CalciteSchema> constructSubCatalogs(TableCache tableCache) {
-    Map<String, CalciteSchema> subCatalog = new HashMap<>();
-    for (String physicalTableName : tableCache.getTableNameMap().keySet()) {
-      String[] nameSplit = StringUtils.split(physicalTableName, '.');
-      if (nameSplit.length > 1) {
-        String databaseName = nameSplit[0];
-        subCatalog.putIfAbsent(databaseName,
-            CalciteSchemaBuilder.asSubSchema(new PinotCatalog(databaseName, tableCache), databaseName));
-      }
-    }
-    subCatalog.put(CommonConstants.DEFAULT_DATABASE, CalciteSchemaBuilder.asSubSchema(
-        new PinotCatalog(CommonConstants.DEFAULT_DATABASE, tableCache), CommonConstants.DEFAULT_DATABASE));
-    return subCatalog;
   }
 
   /**
@@ -101,6 +72,9 @@ public class PinotCatalog implements Schema {
   public Table getTable(String name) {
     String rawTableName = TableNameBuilder.extractRawTableName(name);
     String tableName = DatabaseUtils.translateTableName(rawTableName, _databaseName);
+    if (!_tableCache.getTableNameMap().containsKey(tableName.toLowerCase())) {
+      return null;
+    }
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
     if (schema == null) {
       throw new IllegalArgumentException(String.format("Could not find schema for table: '%s'", tableName));
@@ -114,14 +88,9 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    if (_databaseName != null) {
-      return _tableCache.getTableNameMap().keySet().stream()
-          .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
-          .collect(Collectors.toSet());
-    } else {
-      // root schema will not contain tables
-      return Collections.emptySet();
-    }
+    return _tableCache.getTableNameMap().keySet().stream()
+        .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
+        .collect(Collectors.toSet());
   }
 
   @Override
@@ -136,7 +105,7 @@ public class PinotCatalog implements Schema {
 
   /**
    * {@code PinotCatalog} doesn't need to return function collections b/c they are already registered.
-   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema)}
+   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema, String)}
    */
   @Override
   public Collection<Function> getFunctions(String name) {
@@ -145,7 +114,7 @@ public class PinotCatalog implements Schema {
 
   /**
    * {@code PinotCatalog} doesn't need to return function name set b/c they are already registered.
-   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema)}
+   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema, String)}
    */
   @Override
   public Set<String> getFunctionNames() {
@@ -154,16 +123,12 @@ public class PinotCatalog implements Schema {
 
   @Override
   public Schema getSubSchema(String name) {
-    if (_subCatalog != null && _subCatalog.containsKey(name)) {
-      return _subCatalog.get(name).schema;
-    } else {
-      return null;
-    }
+    return null;
   }
 
   @Override
   public Set<String> getSubSchemaNames() {
-    return _subCatalog.keySet();
+    return Collections.emptySet();
   }
 
   @Override

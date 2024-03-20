@@ -272,7 +272,7 @@ public class QueryEnvironmentTestBase {
     RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);
     TableCache tableCache = factory.buildTableCache();
     return new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
+        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache), null),
         new WorkerManager("localhost", reducerPort, routingManager), tableCache);
   }
 

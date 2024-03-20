@@ -58,6 +58,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -205,8 +206,14 @@ public class PinotQueryResource {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
+    Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
+    if (queryOptions != null) {
+      queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
+    }
+    String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
     QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null, null);
+        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(database, _pinotHelixResourceManager.getTableCache()),
+            database), null, null);
     List<String> tableNames;
     try {
       tableNames = queryEnvironment.getTableNamesForQuery(query);
@@ -242,6 +249,11 @@ public class PinotQueryResource {
       HttpHeaders httpHeaders) {
     // Get resource table name.
     String tableName;
+    Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
+    if (queryOptions != null) {
+      queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
+    }
+    String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
     try {
       String inputTableName =
           sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
@@ -254,8 +266,8 @@ public class PinotQueryResource {
         // try to compile the query using multi-stage engine and suggest using it if it succeeds.
         LOGGER.info("Trying to compile query {} using multi-stage engine", query);
         QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-            CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_pinotHelixResourceManager.getTableCache())), null,
-            null);
+            CalciteSchemaBuilder.asRootSchema(new PinotCatalog(database, _pinotHelixResourceManager.getTableCache()),
+                database), null, null);
         queryEnvironment.getTableNamesForQuery(query);
         LOGGER.info("Successfully compiled query using multi-stage engine: {}", query);
         return QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(

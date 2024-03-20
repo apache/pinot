@@ -20,6 +20,7 @@ package org.apache.calcite.jdbc;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaPlus;
@@ -51,8 +52,11 @@ public class CalciteSchemaBuilder {
    * @param root schema to use as a root schema
    * @return calcite schema with given schema as the root
    */
-  public static CalciteSchema asRootSchema(Schema root) {
-    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, "", root);
+  public static CalciteSchema asRootSchema(Schema root, @Nullable String name) {
+    if (name == null) {
+      name = "";
+    }
+    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, name, root);
     SchemaPlus schemaPlus = rootSchema.plus();
     for (Map.Entry<String, List<Function>> e : FunctionRegistry.getRegisteredCalciteFunctionMap().entrySet()) {
       for (Function f : e.getValue()) {
@@ -60,16 +64,5 @@ public class CalciteSchemaBuilder {
       }
     }
     return rootSchema;
-  }
-
-  public static CalciteSchema asSubSchema(Schema root, String name) {
-    CalciteSchema subSchema = CalciteSchema.createRootSchema(false, false, name, root);
-    SchemaPlus schemaPlus = subSchema.plus();
-    for (Map.Entry<String, List<Function>> e : FunctionRegistry.getRegisteredCalciteFunctionMap().entrySet()) {
-      for (Function f : e.getValue()) {
-        schemaPlus.add(e.getKey(), f);
-      }
-    }
-    return subSchema;
   }
 }

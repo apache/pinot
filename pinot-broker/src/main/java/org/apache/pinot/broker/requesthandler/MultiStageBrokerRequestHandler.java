@@ -52,6 +52,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -124,10 +125,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
       queryTimeoutMs = timeoutMsFromQueryOption == null ? _brokerTimeoutMs : timeoutMsFromQueryOption;
+      String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
       // Compile the request
       compilationStartTimeNs = System.nanoTime();
       QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-          CalciteSchemaBuilder.asRootSchema(new PinotCatalog(_tableCache)), _workerManager, _tableCache);
+          CalciteSchemaBuilder.asRootSchema(new PinotCatalog(database, _tableCache), database), _workerManager,
+          _tableCache);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
           queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);

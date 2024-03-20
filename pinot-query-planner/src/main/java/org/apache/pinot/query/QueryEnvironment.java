@@ -21,6 +21,7 @@ package org.apache.pinot.query;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -61,6 +62,7 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
@@ -109,7 +111,7 @@ public class QueryEnvironment {
     _tableCache = tableCache;
 
     // catalog & config
-    _catalogReader = getCatalog(null);
+    _catalogReader = getCatalog(_rootSchema.getName());
     _config = getConfig(_catalogReader);
     // opt programs
     _optProgram = getOptProgram();
@@ -129,7 +131,7 @@ public class QueryEnvironment {
    * @return QueryPlannerResult containing the dispatchable query plan and the relRoot.
    */
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
-    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions.getOptions())) {
+    try (PlannerContext plannerContext = getPlannerContext()) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
@@ -157,7 +159,7 @@ public class QueryEnvironment {
    * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
   public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
-    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions.getOptions())) {
+    try (PlannerContext plannerContext = getPlannerContext()) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
@@ -194,7 +196,7 @@ public class QueryEnvironment {
   }
 
   public List<String> getTableNamesForQuery(String sqlQuery, Map<String, String> options) {
-    try (PlannerContext plannerContext = getPlannerContext(options)) {
+    try (PlannerContext plannerContext = getPlannerContext()) {
       SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
@@ -334,17 +336,12 @@ public class QueryEnvironment {
   private Prepare.CatalogReader getCatalog(@Nullable String schemaPath) {
     Properties catalogReaderConfigProperties = new Properties();
     catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
-    CalciteSchema schema;
-    if (schemaPath == null) {
-      schema = _rootSchema;
-    } else {
-      schema = _rootSchema.getSubSchema(schemaPath, false);
-      if (schema == null) {
-        throw new IllegalArgumentException("Cannot find schema with path: " + schemaPath);
-      }
-    }
     CalciteConnectionConfigImpl connConfig = new CalciteConnectionConfigImpl(catalogReaderConfigProperties);
-    return new PinotCalciteCatalogReader(schema, schema.path(null), _typeFactory, connConfig);
+    if (StringUtils.isEmpty(schemaPath) || schemaPath.equals(CommonConstants.DEFAULT_DATABASE)) {
+      return new PinotCalciteCatalogReader(_rootSchema, Collections.emptyList(), _typeFactory,
+          connConfig);
+    }
+    return new PinotCalciteCatalogReader(_rootSchema, Collections.singletonList(schemaPath), _typeFactory, connConfig);
   }
 
   private FrameworkConfig getConfig(Prepare.CatalogReader catalogReader) {
@@ -364,15 +361,8 @@ public class QueryEnvironment {
         .build();
   }
 
-  private PlannerContext getPlannerContext(Map<String, String> options) {
-    String database = options.getOrDefault(CommonConstants.DATABASE, CommonConstants.DEFAULT_DATABASE);
-    if (database.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-      return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, _traitProgram);
-    } else {
-      Prepare.CatalogReader catalogReader = getCatalog(database);
-      FrameworkConfig config = getConfig(catalogReader);
-      return new PlannerContext(config, catalogReader, _typeFactory, _optProgram, _traitProgram);
-    }
+  private PlannerContext getPlannerContext() {
+    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, _traitProgram);
   }
 
   private HintStrategyTable getHintStrategyTable() {
