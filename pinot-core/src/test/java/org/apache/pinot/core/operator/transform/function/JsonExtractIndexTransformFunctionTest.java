@@ -194,16 +194,16 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
     });
 
     testArguments.add(new Object[]{
-            String.format("jsonExtractIndex(%s,'%s','INT')", JSON_STRING_SV_COLUMN,
-                    "$.intVals[0]"), "$.intVals[0]", DataType.INT, true
+        String.format("jsonExtractIndex(%s,'%s','INT')", JSON_STRING_SV_COLUMN,
+            "$.intVals[0]"), "$.intVals[0]", DataType.INT, true
     });
     testArguments.add(new Object[]{
-            String.format("jsonExtractIndex(%s,'%s','LONG')", JSON_STRING_SV_COLUMN,
-                    "$.longVals[1]"), "$.longVals[1]", DataType.LONG, true
+        String.format("jsonExtractIndex(%s,'%s','LONG')", JSON_STRING_SV_COLUMN,
+            "$.longVals[1]"), "$.longVals[1]", DataType.LONG, true
     });
     testArguments.add(new Object[]{
-            String.format("jsonExtractIndex(%s,'%s','FLOAT')", JSON_STRING_SV_COLUMN,
-                    "$.floatVals[0]"), "$.floatVals[0]", DataType.FLOAT, true
+        String.format("jsonExtractIndex(%s,'%s','FLOAT')", JSON_STRING_SV_COLUMN,
+            "$.floatVals[0]"), "$.floatVals[0]", DataType.FLOAT, true
     });
     testArguments.add(new Object[]{
         String.format("jsonExtractIndex(%s,'%s','DOUBLE')", JSON_STRING_SV_COLUMN,
@@ -217,6 +217,8 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
         String.format("jsonExtractIndex(%s,'%s','STRING')", JSON_STRING_SV_COLUMN,
             "$.stringVals[1]"), "$.stringVals[1]", DataType.STRING, true
     });
+
+
 
     // MV tests
     testArguments.add(new Object[]{
