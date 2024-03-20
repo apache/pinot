@@ -102,6 +102,41 @@ public class FlushThresholdUpdaterTest {
   }
 
   private StreamConfig mockStreamConfig(int flushThresholdRows, long flushThresholdSegmentSize) {
+    assertNotSame(flushThresholdUpdateManager.getFlushThresholdUpdater(autotuneStreamConfig),
+        autotuneFlushThresholdUpdater);
+  }
+
+  @Test
+  public void testDefaultFlushThreshold() {
+    StreamConfig streamConfig = mockStreamConfig(10000);
+    DefaultFlushThresholdUpdater flushThresholdUpdater = new DefaultFlushThresholdUpdater(10000);
+    SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
+    CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
+    int maxNumPartitionsPerInstance = 4;
+
+    flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor, null,
+        maxNumPartitionsPerInstance);
+
+    // 10000 / 4 partition => 2500
+    assertEquals(newSegmentZKMetadata.getSizeThresholdToFlushSegment(), 2500);
+  }
+
+  @Test
+  public void testSegmentRowBasedFlushThreshold() {
+    StreamConfig streamConfig = mockSegmentRowsStreamConfig(10000);
+    SegmentRowsBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentRowsBasedFlushThresholdUpdater(10000);
+    SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
+    CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
+    int maxNumPartitionsPerInstance = 4;
+
+    flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor, null,
+        maxNumPartitionsPerInstance);
+
+    // 10000 -> 10000
+    assertEquals(newSegmentZKMetadata.getSizeThresholdToFlushSegment(), 10000);
+  }
+
+  private StreamConfig mockStreamConfig(int flushThresholdRows) {
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getTableNameWithType()).thenReturn(REALTIME_TABLE_NAME);
     when(streamConfig.getFlushThresholdRows()).thenReturn(flushThresholdRows);

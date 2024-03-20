@@ -38,6 +38,7 @@ public class StreamConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamConfig.class);
 
   public static final int DEFAULT_FLUSH_THRESHOLD_ROWS = 5_000_000;
+  public static final int DEFAULT_FLUSH_THRESHOLD_SEGMENT_ROWS = 5_000_000;
   public static final long DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS = TimeUnit.MILLISECONDS.convert(6, TimeUnit.HOURS);
   public static final long DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024; // 200M
   public static final int DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS = 100_000;
@@ -276,13 +277,13 @@ public class StreamConfig {
         Preconditions.checkState(flushThresholdRows >= 0);
         return flushThresholdRows;
       } catch (Exception e) {
-        // yet to decide on default value of this property
         LOGGER.warn("Invalid config {}: {}, defaulting to: {}", key, flushThresholdSegmentRowsStr,
-            DEFAULT_FLUSH_THRESHOLD_ROWS);
-        return DEFAULT_FLUSH_THRESHOLD_ROWS;
+            DEFAULT_FLUSH_THRESHOLD_SEGMENT_ROWS);
+        return DEFAULT_FLUSH_THRESHOLD_SEGMENT_ROWS;
       }
     } else {
-      return DEFAULT_FLUSH_THRESHOLD_ROWS;
+      // when not specified, make the default value as 0.
+      return 0;
     }
   }
 
@@ -363,7 +364,7 @@ public class StreamConfig {
   public int getFlushThresholdRows() {
     return _flushThresholdRows;
   }
-  
+
   public int getFlushThresholdSegmentRows() {
     return _flushThresholdSegmentRows;
   }
