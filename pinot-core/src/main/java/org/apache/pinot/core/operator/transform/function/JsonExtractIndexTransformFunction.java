@@ -106,8 +106,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     }
 
     _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
-    _valueToMatchingDocsMap =
-        _jsonIndexReader.getMatchingFlattenedDocsMap(inputJsonPath.substring(1));
+    _valueToMatchingDocsMap = _jsonIndexReader.getMatchingFlattenedDocsMap(_jsonPathString);
     if (isSingleValue) {
       // For single value result type, it's more efficient to use original docIDs map
       _jsonIndexReader.convertFlattenedDocIdsToDocIds(_valueToMatchingDocsMap);
