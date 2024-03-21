@@ -39,6 +39,7 @@ import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -50,11 +51,14 @@ import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
-  private static final String TABLE_NAME_WITH_DATABASE = "db1." + DEFAULT_TABLE_NAME;
+  private static final String DEFAULT_DATABASE_NAME = CommonConstants.DEFAULT_DATABASE;
+  private static final String DATABASE_NAME = "db1";
+  private static final String TABLE_NAME_WITH_DATABASE = DATABASE_NAME + "." + DEFAULT_TABLE_NAME;
   private String _tableName = DEFAULT_TABLE_NAME;
 
   @Override
@@ -804,14 +808,22 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testWithDefaultDatabaseContextAsTableNamePrefix()
       throws Exception {
     // default database check. Default database context passed as table prefix
-    checkQueryResultForDBTest("ActualElapsedTime", "default." + DEFAULT_TABLE_NAME);
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_DATABASE_NAME + "." + DEFAULT_TABLE_NAME);
   }
 
   @Test
   public void testWithDefaultDatabaseContextAsQueryOption()
       throws Exception {
     // default database check. Default database context passed as SET database='dbName'
-    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_TABLE_NAME, "default");
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_TABLE_NAME, DEFAULT_DATABASE_NAME);
+  }
+
+  @Test
+  public void testWithDefaultDatabaseContextAsTableNamePrefixAndQueryOption()
+      throws Exception {
+    // default database check. Default database context passed as table prefix as well as query option
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_DATABASE_NAME + "." + DEFAULT_TABLE_NAME,
+        DEFAULT_DATABASE_NAME);
   }
 
   @Test
@@ -825,8 +837,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testWithDatabaseContextAsQueryOption()
       throws Exception {
+    // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
     // custom database check. Database context passed as SET database='dbName'
-    checkQueryResultForDBTest("ActualElapsedTime_2", DEFAULT_TABLE_NAME, "db1");
+    checkQueryResultForDBTest("ActualElapsedTime_2", DEFAULT_TABLE_NAME, DATABASE_NAME);
+  }
+
+  @Test
+  public void testWithDatabaseContextAsTableNamePrefixAndQueryOption()
+      throws Exception {
+    // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
+    // custom database check. Database context passed as table prefix as well as query option
+    checkQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE, DATABASE_NAME);
+  }
+
+  @Test
+  public void testCrossDatabaseQuery()
+      throws Exception {
+    String query = "SELECT tb1.Carrier, maxTime, distance FROM (SELECT max(AirTime) AS maxTime, Carrier FROM "
+        + DEFAULT_TABLE_NAME + " GROUP BY Carrier ORDER BY maxTime DESC) AS tb1 JOIN (SELECT sum(Distance) AS distance,"
+        + " Carrier FROM " + TABLE_NAME_WITH_DATABASE + " GROUP BY Carrier) AS tb2 "
+        + "ON tb1.Carrier = tb2.Carrier; ";
+    JsonNode result = postQuery(query);
+    assertEquals(result.get("exceptions").get(0).get("errorCode").asInt(), QueryException.QUERY_PLANNING_ERROR_CODE);
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)
