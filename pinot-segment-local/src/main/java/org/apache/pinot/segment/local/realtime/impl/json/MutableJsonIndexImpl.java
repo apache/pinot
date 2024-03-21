@@ -34,6 +34,7 @@ import java.util.PriorityQueue;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -168,30 +169,41 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
    * Returns the matching flattened doc ids for the given filter.
    */
   private RoaringBitmap getMatchingFlattenedDocIds(FilterContext filter) {
+    return getMatchingFlattenedDocIds(filter, false);
+  }
+
+  private RoaringBitmap getMatchingFlattenedDocIds(FilterContext filter, boolean allowNestedExclusivePredicate) {
     switch (filter.getType()) {
       case AND: {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
-        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0));
+        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicate);
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i)));
+          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicate));
         }
         return matchingDocIds;
       }
       case OR: {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
-        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0));
+        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicate);
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i)));
+          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicate));
         }
         return matchingDocIds;
       }
       case PREDICATE: {
         Predicate predicate = filter.getPredicate();
-        Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
-            predicate);
-        return getMatchingFlattenedDocIds(predicate);
+        if (!allowNestedExclusivePredicate) {
+          Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
+              predicate);
+        }
+
+        MutableRoaringBitmap matchingFlattenedDocs = getMatchingFlattenedDocIds(predicate).toMutableRoaringBitmap();
+        if (isExclusive(predicate.getType())) {
+          matchingFlattenedDocs.flip(0L, _nextFlattenedDocId);
+        }
+        return matchingFlattenedDocs.toRoaringBitmap();
       }
       default:
         throw new IllegalStateException();
@@ -371,10 +383,18 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   @Override
-  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String jsonPathKey) {
+  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String jsonPathKey, @Nullable String filterString) {
     Map<String, RoaringBitmap> valueToMatchingFlattenedDocIdsMap = new HashMap<>();
     _readLock.lock();
     try {
+      RoaringBitmap filteredFlattenedDocIds = null;
+      FilterContext filter;
+      if (filterString != null) {
+        filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+        Preconditions.checkArgument(!filter.isConstant(), "Invalid json match filter: " + filterString);
+        filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter, true);
+      }
+
       Pair<String, RoaringBitmap> result = getKeyAndFlattenDocId(jsonPathKey);
       jsonPathKey = result.getLeft();
       RoaringBitmap arrayIndexFlattenDocIds = result.getRight();
@@ -384,6 +404,9 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       Map<String, RoaringBitmap> subMap = getMatchingKeysMap(jsonPathKey);
       for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
         RoaringBitmap flattenedDocIds = entry.getValue().clone();
+        if (filteredFlattenedDocIds != null) {
+          flattenedDocIds.and(filteredFlattenedDocIds);
+        }
         if (arrayIndexFlattenDocIds != null) {
           flattenedDocIds.and(arrayIndexFlattenDocIds);
         }

@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -131,14 +132,23 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
    * Returns the matching flattened doc ids for the given filter.
    */
   private MutableRoaringBitmap getMatchingFlattenedDocIds(FilterContext filter) {
+    return getMatchingFlattenedDocIds(filter, false);
+  }
+
+  /**
+   * When operator requires flattened doc IDs (eg: jsonExtractIndexArray), nested exclusive predicates are allowed.
+   * When operator requires unflattened doc IDs, nested exclusive predicates are not allowed.
+   */
+  private MutableRoaringBitmap getMatchingFlattenedDocIds(FilterContext filter,
+      boolean allowNestedExclusivePredicates) {
     switch (filter.getType()) {
       case AND: {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
         MutableRoaringBitmap matchingDocIds =
-            getMatchingFlattenedDocIds(children.get(0));
+            getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicates);
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i)));
+          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicates));
         }
         return matchingDocIds;
       }
@@ -146,17 +156,24 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
         MutableRoaringBitmap matchingDocIds =
-            getMatchingFlattenedDocIds(children.get(0));
+            getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicates);
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i)));
+          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicates));
         }
         return matchingDocIds;
       }
       case PREDICATE: {
         Predicate predicate = filter.getPredicate();
-        Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
-            predicate);
-        return getMatchingFlattenedDocIds(predicate);
+        if (!allowNestedExclusivePredicates) {
+          Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
+              predicate);
+        }
+
+        MutableRoaringBitmap matchingFlattenedDocs = getMatchingFlattenedDocIds(predicate);
+        if (isExclusive(predicate.getType())) {
+          matchingFlattenedDocs.flip(0L, _numFlattenedDocs);
+        }
+        return matchingFlattenedDocs;
       }
       default:
         throw new IllegalStateException();
@@ -337,7 +354,19 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   }
 
   @Override
-  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String jsonPathKey) {
+  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String jsonPathKey, @Nullable String filterString) {
+    RoaringBitmap filteredFlattenedDocIds = null;
+    if (filterString != null) {
+      FilterContext filter;
+      try {
+        filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+        Preconditions.checkArgument(!filter.isConstant());
+      } catch (Exception e) {
+        throw new BadQueryRequestException("Invalid json match filter: " + filterString);
+      }
+      filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter, true).toRoaringBitmap();
+    }
+
     Map<String, RoaringBitmap> result = new HashMap<>();
     Pair<String, MutableRoaringBitmap> pathKey = getKeyAndFlattenDocId(jsonPathKey);
     if (pathKey.getRight() != null && pathKey.getRight().isEmpty()) {
@@ -353,6 +382,10 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
       String key = _dictionary.getStringValue(dictId);
       RoaringBitmap docIds = _invertedIndex.getDocIds(dictId).toRoaringBitmap();
+      if (filteredFlattenedDocIds != null) {
+        docIds.and(filteredFlattenedDocIds);
+      }
+
       if (arrayIndexFlattenDocIds != null) {
         docIds.and(arrayIndexFlattenDocIds);
       }
