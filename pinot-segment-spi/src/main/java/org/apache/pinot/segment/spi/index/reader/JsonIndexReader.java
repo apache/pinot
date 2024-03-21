@@ -36,16 +36,6 @@ public interface JsonIndexReader extends IndexReader {
   MutableRoaringBitmap getMatchingDocIds(String filterString);
 
   /**
-   * For an array of docIds and context specific to a JSON key, returns the corresponding mv array for each docId.
-   * @param docIds array of docIds
-   * @param length length of the array
-   * @param matchingValueToFlattenedDocs Map from each unique value for the jsonPathKey value to the flattened docId
-   *                                     posting list
-   * @return String[][] where String[i] is the mv array for docIds[i]
-   */
-  String[][] getValuesForMv(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToFlattenedDocs);
-
-  /**
    * For an array of docIds and context specific to a JSON key, returns the corresponding sv value for each docId.
    * @param docIds array of docIds
    * @param length length of the array
@@ -53,7 +43,17 @@ public interface JsonIndexReader extends IndexReader {
    *                                     posting list
    * @return String[] where String[i] is the sv value for docIds[i]
    */
-  String[] getValuesForSv(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToFlattenedDocs);
+  String[] getValuesSv(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToFlattenedDocs);
+
+  /**
+   * For an array of docIds and context specific to a JSON key, returns the corresponding mv array for each docId.
+   * @param docIds array of docIds
+   * @param length length of the array
+   * @param matchingValueToFlattenedDocs Map from each unique value for the jsonPathKey value to the flattened docId
+   *                                     posting list
+   * @return String[][] where String[i] is the mv array for docIds[i]
+   */
+  String[][] getValuesMv(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToFlattenedDocs);
 
   /**
    * For a JSON key, returns a Map from each value to the flattened docId posting list. This map should be used to
