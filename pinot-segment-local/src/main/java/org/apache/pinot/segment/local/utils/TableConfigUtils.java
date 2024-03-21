@@ -823,6 +823,10 @@ public final class TableConfigUtils {
       Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert TTL must have snapshot enabled");
     }
 
+    if (upsertConfig.isEnablePreload()) {
+      Preconditions.checkState(upsertConfig.isEnableSnapshot(), "Upsert Preload must have snapshot enabled");
+    }
+
     if (upsertConfig.getDeletedKeysTTL() > 0) {
       Preconditions.checkState(upsertConfig.getDeleteRecordColumn() != null,
           "Deleted Keys TTL can only be enabled with deleteRecordColumn set.");
