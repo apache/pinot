@@ -43,7 +43,7 @@ public interface JsonIndexReader extends IndexReader {
    * @param isFlattenedDocIds whether the docIds are flattened or unflattened
    * @return String[] where String[i] is the sv value for docIds[i]
    */
-  String[] getValuesSv(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToDocs,
+  String[] getValuesSV(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToDocs,
       boolean isFlattenedDocIds);
 
   /**
@@ -54,7 +54,7 @@ public interface JsonIndexReader extends IndexReader {
    *                                     posting list
    * @return String[][] where String[i] is the mv array for docIds[i]
    */
-  String[][] getValuesMv(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToFlattenedDocs);
+  String[][] getValuesMV(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToFlattenedDocs);
 
   /**
    * For a JSON key, returns a Map from each value to the flattened docId posting list. This map should be used to

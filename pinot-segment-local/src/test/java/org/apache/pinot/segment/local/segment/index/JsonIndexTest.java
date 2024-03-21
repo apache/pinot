@@ -376,14 +376,14 @@ public class JsonIndexTest {
         for (int i = 0; i < testKeys.length; i++) {
           Map<String, RoaringBitmap> context =
               offHeapIndexReader.getMatchingFlattenedDocsMap(testKeys[i]);
-          String[][] values = offHeapIndexReader.getValuesMv(docMask, docIdValidLength, context);
+          String[][] values = offHeapIndexReader.getValuesMV(docMask, docIdValidLength, context);
 
           for (int j = 0; j < docIdValidLength; j++) {
             Assert.assertEquals(values[j], expectedValues[i][j]);
           }
 
           context = mutableJsonIndex.getMatchingFlattenedDocsMap(testKeys[i]);
-          values = mutableJsonIndex.getValuesMv(docMask, docIdValidLength, context);
+          values = mutableJsonIndex.getValuesMV(docMask, docIdValidLength, context);
           Assert.assertEquals(values, expectedValues[i]);
         }
       }
@@ -428,19 +428,19 @@ public class JsonIndexTest {
                 {null, null, null}};
         for (int i = 0; i < testKeys.length; i++) {
           Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingFlattenedDocsMap(testKeys[i]);
-          String[] values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, true);
+          String[] values = offHeapIndexReader.getValuesSV(docMask, docMask.length, context, true);
           Assert.assertEquals(values, expectedValues[i]);
 
           offHeapIndexReader.convertFlattenedDocIdsToDocIds(context);
-          values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, false);
+          values = offHeapIndexReader.getValuesSV(docMask, docMask.length, context, false);
           Assert.assertEquals(values, expectedValues[i]);
 
           context = mutableJsonIndex.getMatchingFlattenedDocsMap(testKeys[i]);
-          values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, true);
+          values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, true);
           Assert.assertEquals(values, expectedValues[i]);
 
           mutableJsonIndex.convertFlattenedDocIdsToDocIds(context);
-          values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, false);
+          values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, false);
           Assert.assertEquals(values, expectedValues[i]);
         }
 
@@ -449,54 +449,54 @@ public class JsonIndexTest {
         expectedValues = new String[][]{{"value2", "value1"}, {null, "value4"}, {null, null}, {null, null}};
         for (int i = 0; i < testKeys.length; i++) {
           Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingFlattenedDocsMap(testKeys[i]);
-          String[] values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, true);
+          String[] values = offHeapIndexReader.getValuesSV(docMask, docMask.length, context, true);
           Assert.assertEquals(values, expectedValues[i]);
 
           offHeapIndexReader.convertFlattenedDocIdsToDocIds(context);
-          values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, false);
+          values = offHeapIndexReader.getValuesSV(docMask, docMask.length, context, false);
           Assert.assertEquals(values, expectedValues[i]);
 
           context = mutableJsonIndex.getMatchingFlattenedDocsMap(testKeys[i]);
-          values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, true);
+          values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, true);
           Assert.assertEquals(values, expectedValues[i]);
 
           mutableJsonIndex.convertFlattenedDocIdsToDocIds(context);
-          values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, false);
+          values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, false);
           Assert.assertEquals(values, expectedValues[i]);
         }
 
         // Immutable index, context is reused for the second method call
         Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingFlattenedDocsMap(".field1");
         docMask = new int[]{0};
-        String[] values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, true);
+        String[] values = offHeapIndexReader.getValuesSV(docMask, docMask.length, context, true);
         Assert.assertEquals(values, new String[]{"value1"});
         docMask = new int[]{1, 2};
-        values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, true);
+        values = offHeapIndexReader.getValuesSV(docMask, docMask.length, context, true);
         Assert.assertEquals(values, new String[]{"value2", "value1"});
 
         offHeapIndexReader.convertFlattenedDocIdsToDocIds(context);
         docMask = new int[]{0};
-        values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, false);
+        values = offHeapIndexReader.getValuesSV(docMask, docMask.length, context, false);
         Assert.assertEquals(values, new String[]{"value1"});
         docMask = new int[]{1, 2};
-        values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, false);
+        values = offHeapIndexReader.getValuesSV(docMask, docMask.length, context, false);
         Assert.assertEquals(values, new String[]{"value2", "value1"});
 
         // Mutable index, context is reused for the second method call
         context = mutableJsonIndex.getMatchingFlattenedDocsMap(".field1");;
         docMask = new int[]{0};
-        values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, true);
+        values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, true);
         Assert.assertEquals(values, new String[]{"value1"});
         docMask = new int[]{1, 2};
-        values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, true);
+        values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, true);
         Assert.assertEquals(values, new String[]{"value2", "value1"});
 
         mutableJsonIndex.convertFlattenedDocIdsToDocIds(context);
         docMask = new int[]{0};
-        values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, false);
+        values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, false);
         Assert.assertEquals(values, new String[]{"value1"});
         docMask = new int[]{1, 2};
-        values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, false);
+        values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, false);
         Assert.assertEquals(values, new String[]{"value2", "value1"});
       }
     }
