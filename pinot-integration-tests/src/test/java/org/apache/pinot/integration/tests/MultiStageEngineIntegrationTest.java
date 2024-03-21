@@ -26,7 +26,9 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
@@ -51,7 +53,6 @@ import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -819,6 +820,14 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testWithDefaultDatabaseContextAsHttpHeader()
+      throws Exception {
+    // default database check. Default database context passed as "database" http header
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_TABLE_NAME,
+        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+  }
+
+  @Test
   public void testWithDefaultDatabaseContextAsTableNamePrefixAndQueryOption()
       throws Exception {
     // default database check. Default database context passed as table prefix as well as query option
@@ -827,11 +836,20 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testWithDefaultDatabaseContextAsTableNamePrefixAndHttpHeader()
+      throws Exception {
+    // default database check. Default database context passed as table prefix as well as http header
+    checkQueryResultForDBTest("ActualElapsedTime", DEFAULT_DATABASE_NAME + "." + DEFAULT_TABLE_NAME,
+        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+  }
+
+  @Test
   public void testWithDatabaseContextAsTableNamePrefix()
       throws Exception {
     // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
-    // custom database check. Database context passed as table prefix
-    checkQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE);
+    // custom database check. Database context passed only as table prefix. Will
+    JsonNode result = getQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE, null, null);
+    checkQueryPlanningErrorForDBTest(result);
   }
 
   @Test
@@ -843,11 +861,53 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testWithDatabaseContextAsHttpHeader()
+      throws Exception {
+    // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
+    // custom database check. Database context passed as "database" http header
+    checkQueryResultForDBTest("ActualElapsedTime_2", DEFAULT_TABLE_NAME,
+        Collections.singletonMap(CommonConstants.DATABASE, DATABASE_NAME));
+  }
+
+  @Test
   public void testWithDatabaseContextAsTableNamePrefixAndQueryOption()
       throws Exception {
     // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
     // custom database check. Database context passed as table prefix as well as query option
     checkQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE, DATABASE_NAME);
+  }
+
+  @Test
+  public void testWithDatabaseContextAsTableNamePrefixAndHttpHeader()
+      throws Exception {
+    // Using renamed column "ActualElapsedTime_2" to ensure that the same table is not being queried.
+    // custom database check. Database context passed as table prefix as well as http header
+    checkQueryResultForDBTest("ActualElapsedTime_2", TABLE_NAME_WITH_DATABASE,
+        Collections.singletonMap(CommonConstants.DATABASE, DATABASE_NAME));
+  }
+
+  @Test
+  public void testWithConflictingDatabaseContextFromTableNamePrefixAndQueryOption()
+      throws Exception {
+    JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DEFAULT_DATABASE_NAME,
+        null);
+    checkQueryPlanningErrorForDBTest(result);
+  }
+
+  @Test
+  public void testWithConflictingDatabaseContextFromTableNamePrefixAndHttpHeader()
+      throws Exception {
+    JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, null,
+        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+    checkQueryPlanningErrorForDBTest(result);
+  }
+
+  @Test
+  public void testWithConflictingDatabaseContextFromHttpHeaderAndQueryOption()
+      throws Exception {
+    JsonNode result = getQueryResultForDBTest("ActualElapsedTime", TABLE_NAME_WITH_DATABASE, DATABASE_NAME,
+        Collections.singletonMap(CommonConstants.DATABASE, DEFAULT_DATABASE_NAME));
+    checkQueryPlanningErrorForDBTest(result);
   }
 
   @Test
@@ -858,23 +918,45 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         + " Carrier FROM " + TABLE_NAME_WITH_DATABASE + " GROUP BY Carrier) AS tb2 "
         + "ON tb1.Carrier = tb2.Carrier; ";
     JsonNode result = postQuery(query);
-    assertEquals(result.get("exceptions").get(0).get("errorCode").asInt(), QueryException.QUERY_PLANNING_ERROR_CODE);
+    checkQueryPlanningErrorForDBTest(result);
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)
       throws Exception {
-    checkQueryResultForDBTest(column, tableName, null);
+    checkQueryResultForDBTest(column, tableName, null, null);
   }
 
-  private void checkQueryResultForDBTest(String column, String tableName, @Nullable String database)
+  private void checkQueryResultForDBTest(String column, String tableName, Map<String, String> headers)
+      throws Exception {
+    checkQueryResultForDBTest(column, tableName, null, headers);
+  }
+
+  private void checkQueryResultForDBTest(String column, String tableName, String database)
+      throws Exception {
+    checkQueryResultForDBTest(column, tableName, database, null);
+  }
+
+  private void checkQueryResultForDBTest(String column, String tableName, @Nullable String database,
+      Map<String, String> headers)
+      throws Exception {
+    // max value of 'ActualElapsedTime'
+    long expectedValue = 678;
+    JsonNode jsonNode = getQueryResultForDBTest(column, tableName, database, headers);
+    long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+    assertEquals(result, expectedValue);
+  }
+
+  private void checkQueryPlanningErrorForDBTest(JsonNode queryResult) {
+    long result = queryResult.get("exceptions").get(0).get("errorCode").asInt();
+    assertEquals(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+  }
+
+  private JsonNode getQueryResultForDBTest(String column, String tableName, @Nullable String database,
+      Map<String, String> headers)
       throws Exception {
     String query = (StringUtils.isNotBlank(database) ? "SET database='" + database + "'; " : "")
         + "select max(" + column + ") from " + tableName + ";";
-    // max value of 'ActualElapsedTime'
-    long expectedValue = 678;
-    JsonNode jsonNode = postQuery(query);
-    long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
-    assertEquals(result, expectedValue);
+    return postQuery(query, headers);
   }
 
   @AfterClass
