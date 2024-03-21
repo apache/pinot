@@ -25,6 +25,8 @@ import java.math.BigDecimal;
 import java.net.URL;
 import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
+import nl.jqno.equalsverifier.EqualsVerifier;
+import nl.jqno.equalsverifier.Warning;
 import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -221,8 +223,7 @@ public class SchemaTest {
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime0", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
         .addDateTime("dateTime1", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-        .addDateTime("dateTime2", FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS")
-        .build();
+        .addDateTime("dateTime2", FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS").build();
 
     // Test method which fetches the DateTimeFieldSpec given the timeColumnName
     // Test is on TIME
@@ -326,15 +327,10 @@ public class SchemaTest {
   @Test
   public void testSerializeDeserializeOptions()
       throws IOException {
-    String json = "{\n"
-        + "  \"primaryKeyColumns\" : null,\n"
-        + "  \"timeFieldSpec\" : null,\n"
-        + "  \"schemaName\" : null,\n"
-        + "  \"enableColumnBasedNullHandling\" : true,\n"
-        + "  \"dimensionFieldSpecs\" : [ ],\n"
-        + "  \"metricFieldSpecs\" : [ ],\n"
-        + "  \"dateTimeFieldSpecs\" : [ ]\n"
-        + "}";
+    String json =
+        "{\n" + "  \"primaryKeyColumns\" : null,\n" + "  \"timeFieldSpec\" : null,\n" + "  \"schemaName\" : null,\n"
+            + "  \"enableColumnBasedNullHandling\" : true,\n" + "  \"dimensionFieldSpecs\" : [ ],\n"
+            + "  \"metricFieldSpecs\" : [ ],\n" + "  \"dateTimeFieldSpecs\" : [ ]\n" + "}";
     JsonNode expectedNode = JsonUtils.stringToJsonNode(json);
 
     Schema schema = JsonUtils.jsonNodeToObject(expectedNode, Schema.class);
@@ -507,5 +503,12 @@ public class SchemaTest {
     Assert.assertTrue(newSchema.isBackwardCompatibleWith(oldSchema));
     Assert.assertEquals(newSchema.getFieldSpecFor("svBoolean").getDataType(), FieldSpec.DataType.BOOLEAN);
     Assert.assertEquals(newSchema.getFieldSpecFor("svBooleanWithDefault").getDataType(), FieldSpec.DataType.BOOLEAN);
+  }
+
+  @Test
+  public void equalsVerifier() {
+    EqualsVerifier.configure().suppress(Warning.NONFINAL_FIELDS).forClass(Schema.class)
+        .withIgnoredFields("_fieldSpecMap", "_dimensionNames", "_metricNames", "_dateTimeNames", "_hasJSONColumn")
+        .verify();
   }
 }
