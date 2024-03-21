@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.json;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -354,7 +353,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-  @VisibleForTesting
   public Map<String, RoaringBitmap> convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
     _readLock.lock();
     try {
