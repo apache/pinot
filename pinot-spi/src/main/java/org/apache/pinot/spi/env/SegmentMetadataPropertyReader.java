@@ -20,7 +20,6 @@ package org.apache.pinot.spi.env;
 
 import com.google.common.base.Preconditions;
 import java.io.Reader;
-import java.util.List;
 import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
 
 
@@ -32,54 +31,24 @@ import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReade
  *  - parsing the line by splitting based on first occurrence of separator
  */
 class SegmentMetadataPropertyReader extends PropertiesReader {
-  private boolean _skipUnescapePropertyName;
-  private final String _segmentMetadataVersionHeader;
 
-  public SegmentMetadataPropertyReader(Reader reader, String segmentMetadataVersionHeader) {
+  public SegmentMetadataPropertyReader(Reader reader) {
     super(reader);
-    _segmentMetadataVersionHeader = segmentMetadataVersionHeader;
   }
 
   @Override
   protected void parseProperty(final String line) {
-    // if newer version of the segment metadata(based on version value in the property configuration header)
     // skip the regex based parsing of the line content and splitting the content based on first occurrence of separator
-    if (!_skipUnescapePropertyName && getCommentLines().size() > 0) {
-      setSkipUnescapePropertyNameFlag();
-    }
-
-    if (_skipUnescapePropertyName) {
-      String[] keyValue = line.split(getPropertySeparator());
-      Preconditions.checkArgument(keyValue.length == 2, "property content split should result in key and value");
-      initPropertyName(keyValue[0]);
-      initPropertyValue(keyValue[1]);
-      initPropertySeparator(getPropertySeparator());
-    } else {
-      // for backward compatability, follow the default approach
-      super.parseProperty(line);
-    }
+    String[] keyValue = line.split(getPropertySeparator());
+    Preconditions.checkArgument(keyValue.length == 2, "property content split should result in key and value");
+    initPropertyName(keyValue[0]);
+    initPropertyValue(keyValue[1]);
+    initPropertySeparator(getPropertySeparator());
   }
 
   @Override
   protected String unescapePropertyName(final String name) {
-    // skip the unescaping of the propertyName(key), if newer version of the segment metadata.
-    if (_skipUnescapePropertyName) {
-      return name;
-    }
-    return super.unescapePropertyName(name);
-  }
-
-  // set the `_skipUnescapePropertyName` as true if the header comment line contains the segment metadata version.
-  private void setSkipUnescapePropertyNameFlag() {
-    List<String> commentLines = getCommentLines();
-    if (commentLines.size() > 0) {
-      // assumes that header will have two lines
-      // first one with segment version header
-      // and second as a new line.
-      String headerComment = commentLines.get(0);
-        if (headerComment.contains(_segmentMetadataVersionHeader)) {
-          _skipUnescapePropertyName = true;
-      }
-    }
+    // skip the unescaping of the propertyName(key)
+    return name;
   }
 }

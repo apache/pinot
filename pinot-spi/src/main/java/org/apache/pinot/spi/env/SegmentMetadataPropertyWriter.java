@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.env;
 
-import java.io.IOException;
 import java.io.Writer;
 import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesWriter;
 import org.apache.commons.configuration2.convert.ListDelimiterHandler;
@@ -31,37 +30,14 @@ import org.apache.commons.configuration2.convert.ListDelimiterHandler;
  */
 public class SegmentMetadataPropertyWriter extends PropertiesWriter {
   private boolean _skipEscapePropertyName;
-  private final String _segmentMetadataVersionHeader;
 
-  public SegmentMetadataPropertyWriter(final Writer writer, ListDelimiterHandler handler,
-      String segmentMetadataVersionHeader) {
+  public SegmentMetadataPropertyWriter(final Writer writer, ListDelimiterHandler handler) {
     super(writer, handler);
-    _segmentMetadataVersionHeader = segmentMetadataVersionHeader;
   }
 
   @Override
   protected String escapeKey(final String key) {
-    // skip the escapeKey functionality, if segment metadata has a newer version
-    // if not newer version, follow the escape for backward compatibility.
-    if (_skipEscapePropertyName) {
-      return key;
-    }
+    // skip the escapeKey functionality,
     return super.escapeKey(key);
-  }
-
-  @Override
-  public void writeln(final String s) throws IOException {
-    // check if the header is present for segment metadata property config
-    // and if present set the `_skipEscapePropertyName` flag as true.
-    if (s != null && !_skipEscapePropertyName) {
-      setSkipEscapePropertyNameFlag(s);
-    }
-   super.writeln(s);
-  }
-
-  private void setSkipEscapePropertyNameFlag(String s) {
-    if (s.contains(_segmentMetadataVersionHeader)) {
-      _skipEscapePropertyName = true;
-    }
   }
 }
