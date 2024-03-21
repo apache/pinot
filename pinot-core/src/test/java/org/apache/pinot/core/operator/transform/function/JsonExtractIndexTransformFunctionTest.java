@@ -247,15 +247,6 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
         String.format("jsonExtractIndex(%s,'%s','STRING_ARRAY')", JSON_STRING_SV_COLUMN,
             "$.arrayField[*].arrStringField"), "$.arrayField[*].arrStringField", DataType.STRING, false
     });
-
-    // MV with filters
-    testArguments.add(new Object[]{
-        String.format(
-            "jsonExtractIndex(%s,'%s','INT_ARRAY', '0', 'REGEXP_LIKE(\"$.arrayField[*].arrStringField\", ''.*y.*'')')",
-            JSON_STRING_SV_COLUMN,
-            "$.arrayField[*].arrIntField"), "$.arrayField[?(@.arrStringField =~ /.*y.*/)].arrIntField", DataType.INT,
-        false
-    });
   }
 
   @Test(dataProvider = "testJsonExtractIndexDefaultValue")

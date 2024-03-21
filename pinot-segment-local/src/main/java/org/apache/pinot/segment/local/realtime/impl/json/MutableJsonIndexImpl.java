@@ -168,41 +168,30 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
    * Returns the matching flattened doc ids for the given filter.
    */
   private RoaringBitmap getMatchingFlattenedDocIds(FilterContext filter) {
-    return getMatchingFlattenedDocIds(filter, false);
-  }
-
-  private RoaringBitmap getMatchingFlattenedDocIds(FilterContext filter, boolean allowNestedExclusivePredicate) {
     switch (filter.getType()) {
       case AND: {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
-        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicate);
+        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0));
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicate));
+          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i)));
         }
         return matchingDocIds;
       }
       case OR: {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
-        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicate);
+        RoaringBitmap matchingDocIds = getMatchingFlattenedDocIds(children.get(0));
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicate));
+          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i)));
         }
         return matchingDocIds;
       }
       case PREDICATE: {
         Predicate predicate = filter.getPredicate();
-        if (!allowNestedExclusivePredicate) {
-          Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
-              predicate);
-        }
-
-        MutableRoaringBitmap matchingFlattenedDocs = getMatchingFlattenedDocIds(predicate).toMutableRoaringBitmap();
-        if (isExclusive(predicate.getType())) {
-          matchingFlattenedDocs.flip(0L, _nextFlattenedDocId);
-        }
-        return matchingFlattenedDocs.toRoaringBitmap();
+        Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
+            predicate);
+        return getMatchingFlattenedDocIds(predicate);
       }
       default:
         throw new IllegalStateException();
