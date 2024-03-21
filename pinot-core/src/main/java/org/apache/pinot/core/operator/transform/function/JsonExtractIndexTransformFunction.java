@@ -265,6 +265,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     initIntValuesMV(numDocs);
     String[][] valuesFromIndex = _jsonIndexReader.getValuesMV(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingDocsMap);
+
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
       _intValuesMV[i] = new int[value.length];

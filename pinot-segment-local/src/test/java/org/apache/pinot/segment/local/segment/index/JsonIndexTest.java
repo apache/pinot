@@ -395,15 +395,14 @@ public class JsonIndexTest {
           Map<String, RoaringBitmap> context =
               offHeapIndexReader.getMatchingFlattenedDocsMap(testKeys[i][0], testKeys[i][1]);
           String[][] values = offHeapIndexReader.getValuesMV(docMask, docIdValidLength, context);
+
           for (int j = 0; j < docIdValidLength; j++) {
             Assert.assertEquals(values[j], expectedValues[i][j]);
           }
 
           context = mutableJsonIndex.getMatchingFlattenedDocsMap(testKeys[i][0], testKeys[i][1]);
           values = mutableJsonIndex.getValuesMV(docMask, docIdValidLength, context);
-          for (int j = 0; j < docIdValidLength; j++) {
-            Assert.assertEquals(values[j], expectedValues[i][j]);
-          }
+          Assert.assertEquals(values, expectedValues[i]);
         }
       }
     }
@@ -475,7 +474,7 @@ public class JsonIndexTest {
           values = offHeapIndexReader.getValuesSV(docMask, docMask.length, context, false);
           Assert.assertEquals(values, expectedValues[i]);
 
-          mutableJsonIndex.getMatchingFlattenedDocsMap(testKeys[i], null);
+          context = mutableJsonIndex.getMatchingFlattenedDocsMap(testKeys[i], null);
           values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, true);
           Assert.assertEquals(values, expectedValues[i]);
 

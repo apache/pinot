@@ -341,6 +341,14 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return _docIdMapping.getInt((long) flattenedDocId << 2);
   }
 
+  public void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
+    valueToFlattenedDocIds.replaceAll((key, value) -> {
+      RoaringBitmap docIds = new RoaringBitmap();
+      value.forEach((IntConsumer) flattenedDocId -> docIds.add(getDocId(flattenedDocId)));
+      return docIds;
+    });
+  }
+
   @Override
   public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String jsonPathKey, @Nullable String filterString) {
     RoaringBitmap filteredFlattenedDocIds = null;
@@ -385,14 +393,6 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
     return result;
   }
-  public void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
-    valueToFlattenedDocIds.replaceAll((key, value) -> {
-      RoaringBitmap docIds = new RoaringBitmap();
-      value.forEach((IntConsumer) flattenedDocId -> docIds.add(getDocId(flattenedDocId)));
-      return docIds;
-    });
-  }
-
 
   @Override
   public String[][] getValuesMV(int[] docIds, int length,
