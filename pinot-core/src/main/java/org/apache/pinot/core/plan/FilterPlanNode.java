@@ -53,6 +53,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
@@ -66,6 +67,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 public class FilterPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
+  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
   private final FilterContext _filter;
 
@@ -73,27 +75,35 @@ public class FilterPlanNode implements PlanNode {
   private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators = new ArrayList<>(4);
 
   public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    this(indexSegment, queryContext, null);
+    this(indexSegment, null, queryContext, null);
   }
 
   public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext, @Nullable FilterContext filter) {
+    this(indexSegment, null, queryContext, filter);
+  }
+
+  public FilterPlanNode(IndexSegment indexSegment, @Nullable SegmentContext segmentContext, QueryContext queryContext,
+      @Nullable FilterContext filter) {
     _indexSegment = indexSegment;
+    _segmentContext = segmentContext;
     _queryContext = queryContext;
     _filter = filter != null ? filter : _queryContext.getFilter();
   }
 
   @Override
   public BaseFilterOperator run() {
-    // NOTE: Snapshot the queryableDocIds before reading the numDocs to prevent the latest updates getting lost
-    MutableRoaringBitmap queryableDocIdSnapshot = null;
-    if (!_queryContext.isSkipUpsert()) {
+    MutableRoaringBitmap queryableDocIdsSnapshot = null;
+    if (_segmentContext != null) {
+      queryableDocIdsSnapshot = _segmentContext.getQueryableDocIdsSnapshot();
+    } else if (!_queryContext.isSkipUpsert()) {
+      // NOTE: Snapshot the queryableDocIds before reading the numDocs to prevent the latest updates getting lost
       ThreadSafeMutableRoaringBitmap queryableDocIds = _indexSegment.getQueryableDocIds();
       if (queryableDocIds != null) {
-        queryableDocIdSnapshot = queryableDocIds.getMutableRoaringBitmap();
+        queryableDocIdsSnapshot = queryableDocIds.getMutableRoaringBitmap();
       } else {
         ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
         if (validDocIds != null) {
-          queryableDocIdSnapshot = validDocIds.getMutableRoaringBitmap();
+          queryableDocIdsSnapshot = validDocIds.getMutableRoaringBitmap();
         }
       }
     }
@@ -101,15 +111,15 @@ public class FilterPlanNode implements PlanNode {
 
     if (_filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
-      if (queryableDocIdSnapshot != null) {
-        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdSnapshot, false, numDocs);
+      if (queryableDocIdsSnapshot != null) {
+        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
             numDocs);
       } else {
         return filterOperator;
       }
-    } else if (queryableDocIdSnapshot != null) {
-      return new BitmapBasedFilterOperator(queryableDocIdSnapshot, false, numDocs);
+    } else if (queryableDocIdsSnapshot != null) {
+      return new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
     } else {
       return new MatchAllFilterOperator(numDocs);
     }
@@ -184,16 +194,16 @@ public class FilterPlanNode implements PlanNode {
       if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(0).getIdentifier();
-        return _indexSegment.getDataSource(columnName).getH3Index() != null
-            && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
+        return _indexSegment.getDataSource(columnName).getH3Index() != null && _queryContext.isIndexUseAllowed(
+            columnName, FieldConfig.IndexType.H3);
       }
       return false;
     } else {
       if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(1).getIdentifier();
-        return _indexSegment.getDataSource(columnName).getH3Index() != null
-            && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
+        return _indexSegment.getDataSource(columnName).getH3Index() != null && _queryContext.isIndexUseAllowed(
+            columnName, FieldConfig.IndexType.H3);
       }
       return false;
     }

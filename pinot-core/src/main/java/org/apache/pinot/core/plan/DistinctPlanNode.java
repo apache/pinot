@@ -19,6 +19,7 @@
 package org.apache.pinot.core.plan;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -27,6 +28,7 @@ import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
@@ -36,10 +38,17 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
  */
 public class DistinctPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
+  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
 
   public DistinctPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+    this(indexSegment, null, queryContext);
+  }
+
+  public DistinctPlanNode(IndexSegment indexSegment, @Nullable SegmentContext segmentContext,
+      QueryContext queryContext) {
     _indexSegment = indexSegment;
+    _segmentContext = segmentContext;
     _queryContext = queryContext;
   }
 
@@ -70,7 +79,8 @@ public class DistinctPlanNode implements PlanNode {
     }
 
     BaseProjectOperator<?> projectOperator =
-        new ProjectPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+        new ProjectPlanNode(_indexSegment, _segmentContext, _queryContext, expressions,
+            DocIdSetPlanNode.MAX_DOC_PER_CALL, null).run();
     return new DistinctOperator(_indexSegment, _queryContext, projectOperator);
   }
 }
