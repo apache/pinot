@@ -666,14 +666,17 @@ public class PinotSegmentRestletResource {
   @Path("/segments/{tableName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_SEGMENT)
   @Authenticate(AccessType.DELETE)
-  @ApiOperation(value = "Delete all segments", notes = "Delete all segments")
-  public SuccessResponse deleteAllSegments(
+  @ApiOperation(value = "Delete the list of segments provided in the queryParam else all segments",
+      notes = "Delete the list of segments provided in the queryParam else all segments")
+  public SuccessResponse deleteMultipleSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
           + "will default to the first config that's not null: the table config, then to cluster setting, then '7d'. "
           + "Using 0d or -1d will instantly delete segments without retention")
-      @QueryParam("retention") String retentionPeriod, @Context HttpHeaders headers) {
+      @QueryParam("retention") String retentionPeriod,
+      @ApiParam(value = "Segment names to be deleted if not provided deletes all segments by default",
+          allowMultiple = true) @QueryParam("segments") List<String> segments, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
@@ -681,11 +684,22 @@ public class PinotSegmentRestletResource {
     }
     String tableNameWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    deleteSegmentsInternal(tableNameWithType,
-        _pinotHelixResourceManager.getSegmentsFromPropertyStore(tableNameWithType), retentionPeriod);
-    return new SuccessResponse("All segments of table " + tableNameWithType + " deleted");
+    if (segments == null || segments.isEmpty()) {
+      deleteSegmentsInternal(tableNameWithType,
+          _pinotHelixResourceManager.getSegmentsFromPropertyStore(tableNameWithType), retentionPeriod);
+      return new SuccessResponse("All segments of table " + tableNameWithType + " deleted");
+    } else {
+      int numSegments = segments.size();
+      deleteSegmentsInternal(tableNameWithType, segments, retentionPeriod);
+      if (numSegments <= 5) {
+        return new SuccessResponse("Deleted segments: " + segments + " from table: " + tableNameWithType);
+      } else {
+        return new SuccessResponse("Deleted " + numSegments + " segments from table: " + tableNameWithType);
+      }
+    }
   }
 
+  @Deprecated
   @POST
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
