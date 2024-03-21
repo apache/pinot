@@ -23,12 +23,17 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -47,7 +52,6 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
-import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -213,41 +217,11 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     } else {
       key = JsonUtils.KEY_SEPARATOR + key;
     }
-
-    // Process the array index within the key if exists
-    // E.g. "[*]"=1 -> "."='1'
-    // E.g. "[0]"=1 -> ".$index"='0' && "."='1'
-    // E.g. "[0][1]"=1 -> ".$index"='0' && "..$index"='1' && ".."='1'
-    // E.g. ".foo[*].bar[*].foobar"='abc' -> ".foo..bar..foobar"='abc'
-    // E.g. ".foo[0].bar[1].foobar"='abc' -> ".foo.$index"='0' && ".foo..bar.$index"='1' && ".foo..bar..foobar"='abc'
-    // E.g. ".foo[0][1].bar"='abc' -> ".foo.$index"='0' && ".foo..$index"='1' && ".foo...bar"='abc'
-    RoaringBitmap matchingDocIds = null;
-    int leftBracketIndex;
-    while ((leftBracketIndex = key.indexOf('[')) >= 0) {
-      int rightBracketIndex = key.indexOf(']', leftBracketIndex + 2);
-      Preconditions.checkArgument(rightBracketIndex > 0, "Missing right bracket in key: %s", key);
-
-      String leftPart = key.substring(0, leftBracketIndex);
-      String arrayIndex = key.substring(leftBracketIndex + 1, rightBracketIndex);
-      String rightPart = key.substring(rightBracketIndex + 1);
-
-      if (!arrayIndex.equals(JsonUtils.WILDCARD)) {
-        // "[0]"=1 -> ".$index"='0' && "."='1'
-        // ".foo[1].bar"='abc' -> ".foo.$index"=1 && ".foo..bar"='abc'
-        String searchKey = leftPart + JsonUtils.ARRAY_INDEX_KEY + JsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
-        RoaringBitmap docIds = _postingListMap.get(searchKey);
-        if (docIds != null) {
-          if (matchingDocIds == null) {
-            matchingDocIds = docIds.clone();
-          } else {
-            matchingDocIds.and(docIds);
-          }
-        } else {
-          return new RoaringBitmap();
-        }
-      }
-
-      key = leftPart + JsonUtils.KEY_SEPARATOR + rightPart;
+    Pair<String, RoaringBitmap> pair = getKeyAndFlattenedDocIds(key);
+    key = pair.getLeft();
+    RoaringBitmap matchingDocIds = pair.getRight();
+    if (matchingDocIds != null && matchingDocIds.isEmpty()) {
+      return new RoaringBitmap();
     }
 
     Predicate.Type predicateType = predicate.getType();
@@ -379,53 +353,176 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-  @Override
-  public Map<String, RoaringBitmap> getMatchingDocsMap(String key) {
-    Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
+  public void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
     _readLock.lock();
     try {
-      Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
-      for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
-        MutableRoaringBitmap flattenedDocIds = entry.getValue().toMutableRoaringBitmap();
-        PeekableIntIterator it = flattenedDocIds.getIntIterator();
-        MutableRoaringBitmap postingList = new MutableRoaringBitmap();
-        while (it.hasNext()) {
-          postingList.add(_docIdMapping.getInt(it.next()));
-        }
-        String val = entry.getKey().substring(key.length() + 1);
-        matchingDocsMap.put(val, postingList.toRoaringBitmap());
-      }
+      valueToFlattenedDocIds.replaceAll((key, value) -> {
+        RoaringBitmap docIds = new RoaringBitmap();
+        value.forEach((IntConsumer) flattenedDocId -> docIds.add(_docIdMapping.getInt(flattenedDocId)));
+        return docIds;
+      });
     } finally {
       _readLock.unlock();
     }
-    return matchingDocsMap;
   }
 
   @Override
-  public String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> matchingDocsMap) {
-    Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
-    RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
-
-    for (Map.Entry<String, RoaringBitmap> entry : matchingDocsMap.entrySet()) {
-      RoaringBitmap intersection = RoaringBitmap.and(entry.getValue(), docIdMask);
-      if (intersection.isEmpty()) {
-        continue;
+  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String jsonPathKey) {
+    Map<String, RoaringBitmap> valueToMatchingFlattenedDocIdsMap = new HashMap<>();
+    _readLock.lock();
+    try {
+      Pair<String, RoaringBitmap> result = getKeyAndFlattenedDocIds(jsonPathKey);
+      jsonPathKey = result.getLeft();
+      RoaringBitmap arrayIndexFlattenDocIds = result.getRight();
+      if (arrayIndexFlattenDocIds != null && arrayIndexFlattenDocIds.isEmpty()) {
+        return valueToMatchingFlattenedDocIdsMap;
       }
-      for (int docId : intersection) {
-        docIdToValues.put(docId, entry.getKey());
+      Map<String, RoaringBitmap> subMap = getMatchingKeysMap(jsonPathKey);
+      for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
+        RoaringBitmap flattenedDocIds = entry.getValue().clone();
+        if (arrayIndexFlattenDocIds != null) {
+          flattenedDocIds.and(arrayIndexFlattenDocIds);
+        }
+        if (!flattenedDocIds.isEmpty()) {
+          valueToMatchingFlattenedDocIdsMap.put(entry.getKey().substring(jsonPathKey.length() + 1), flattenedDocIds);
+        }
       }
-    }
 
-    String[] values = new String[docIds.length];
-    for (int i = 0; i < docIds.length; i++) {
-      values[i] = docIdToValues.get(docIds[i]);
+      return valueToMatchingFlattenedDocIdsMap;
+    } finally {
+      _readLock.unlock();
     }
-    return values;
+  }
+
+  /**
+   *  If key doesn't contain the array index, return <original key, null bitmap>
+   *  Elif the key, i.e. the json path provided by user doesn't match any data, return <null, empty bitmap>
+   *  Else, return the json path that is generated by replacing array index with . on the original key
+   *  and the associated flattenDocId bitmap
+   */
+  private Pair<String, RoaringBitmap> getKeyAndFlattenedDocIds(String key) {
+    // Process the array index within the key if exists
+    // E.g. "[*]"=1 -> "."='1'
+    // E.g. "[0]"=1 -> ".$index"='0' && "."='1'
+    // E.g. "[0][1]"=1 -> ".$index"='0' && "..$index"='1' && ".."='1'
+    // E.g. ".foo[*].bar[*].foobar"='abc' -> ".foo..bar..foobar"='abc'
+    // E.g. ".foo[0].bar[1].foobar"='abc' -> ".foo.$index"='0' && ".foo..bar.$index"='1' && ".foo..bar..foobar"='abc'
+    // E.g. ".foo[0][1].bar"='abc' -> ".foo.$index"='0' && ".foo..$index"='1' && ".foo...bar"='abc'
+    RoaringBitmap matchingDocIds = null;
+    int leftBracketIndex;
+    while ((leftBracketIndex = key.indexOf('[')) >= 0) {
+      int rightBracketIndex = key.indexOf(']', leftBracketIndex + 2);
+      Preconditions.checkArgument(rightBracketIndex > 0, "Missing right bracket in key: %s", key);
+
+      String leftPart = key.substring(0, leftBracketIndex);
+      String arrayIndex = key.substring(leftBracketIndex + 1, rightBracketIndex);
+      String rightPart = key.substring(rightBracketIndex + 1);
+
+      if (!arrayIndex.equals(JsonUtils.WILDCARD)) {
+        // "[0]"=1 -> ".$index"='0' && "."='1'
+        // ".foo[1].bar"='abc' -> ".foo.$index"=1 && ".foo..bar"='abc'
+        String searchKey = leftPart + JsonUtils.ARRAY_INDEX_KEY + JsonIndexCreator.KEY_VALUE_SEPARATOR + arrayIndex;
+        RoaringBitmap docIds = _postingListMap.get(searchKey);
+        if (docIds != null) {
+          if (matchingDocIds == null) {
+            matchingDocIds = docIds.clone();
+          } else {
+            matchingDocIds.and(docIds);
+          }
+        } else {
+          return Pair.of(null, new RoaringBitmap());
+        }
+      }
+
+      key = leftPart + JsonUtils.KEY_SEPARATOR + rightPart;
+    }
+    return Pair.of(key, matchingDocIds);
   }
 
   private Map<String, RoaringBitmap> getMatchingKeysMap(String key) {
     return _postingListMap.subMap(key + JsonIndexCreator.KEY_VALUE_SEPARATOR, false,
         key + JsonIndexCreator.KEY_VALUE_SEPARATOR_NEXT_CHAR, false);
+  }
+
+  @Override
+  public String[][] getValuesMV(int[] docIds, int length,
+      Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
+    String[][] result = new String[length][];
+    List<PriorityQueue<Pair<String, Integer>>> docIdToFlattenedDocIdsAndValues = new ArrayList<>();
+    for (int i = 0; i < length; i++) {
+      // Sort based on flattened doc id
+      docIdToFlattenedDocIdsAndValues.add(new PriorityQueue<>(Comparator.comparingInt(Pair::getRight)));
+    }
+    Map<Integer, Integer> docIdToPos = new HashMap<>();
+    for (int i = 0; i < length; i++) {
+      docIdToPos.put(docIds[i], i);
+    }
+
+    _readLock.lock();
+    try {
+      for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingFlattenedDocs.entrySet()) {
+        String value = entry.getKey();
+        RoaringBitmap matchingFlattenedDocIds = entry.getValue();
+        matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> {
+          int docId = _docIdMapping.getInt(flattenedDocId);
+          if (docIdToPos.containsKey(docId)) {
+            docIdToFlattenedDocIdsAndValues.get(docIdToPos.get(docId)).add(Pair.of(value, flattenedDocId));
+          }
+        });
+      }
+    } finally {
+      _readLock.unlock();
+    }
+
+    for (int i = 0; i < length; i++) {
+      PriorityQueue<Pair<String, Integer>> pq = docIdToFlattenedDocIdsAndValues.get(i);
+      result[i] = new String[pq.size()];
+      int j = 0;
+      while (!pq.isEmpty()) {
+        result[i][j++] = pq.poll().getLeft();
+      }
+    }
+
+    return result;
+  }
+
+  @Override
+  public String[] getValuesSV(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs,
+      boolean isFlattenedDocIds) {
+    Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(length);
+    RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(Arrays.copyOfRange(docIds, 0, length));
+    _readLock.lock();
+    try {
+      for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingFlattenedDocs.entrySet()) {
+        String value = entry.getKey();
+        RoaringBitmap matchingDocIds = entry.getValue();
+
+        if (isFlattenedDocIds) {
+          matchingDocIds.forEach((IntConsumer) flattenedDocId -> {
+            int docId = _docIdMapping.getInt(flattenedDocId);
+            if (docIdMask.contains(docId)) {
+              docIdToValues.put(docId, value);
+            }
+          });
+        } else {
+          RoaringBitmap intersection = RoaringBitmap.and(entry.getValue(), docIdMask);
+          if (intersection.isEmpty()) {
+            continue;
+          }
+          for (int docId : intersection) {
+            docIdToValues.put(docId, entry.getKey());
+          }
+        }
+      }
+    } finally {
+      _readLock.unlock();
+    }
+
+    String[] values = new String[length];
+    for (int i = 0; i < length; i++) {
+      values[i] = docIdToValues.get(docIds[i]);
+    }
+    return values;
   }
 
   @Override

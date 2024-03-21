@@ -22,6 +22,7 @@ import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
+import com.jayway.jsonpath.TypeRef;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
 import java.math.BigDecimal;
@@ -38,6 +39,17 @@ import org.testng.annotations.Test;
 
 
 public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunctionTest {
+  private static final TypeRef<List<Integer>> INTEGER_LIST_TYPE = new TypeRef<List<Integer>>() {
+  };
+  private static final TypeRef<List<Long>> LONG_LIST_TYPE = new TypeRef<List<Long>>() {
+  };
+  private static final TypeRef<List<Float>> FLOAT_LIST_TYPE = new TypeRef<List<Float>>() {
+  };
+  private static final TypeRef<List<Double>> DOUBLE_LIST_TYPE = new TypeRef<List<Double>>() {
+  };
+  private static final TypeRef<List<String>> STRING_LIST_TYPE = new TypeRef<List<String>>() {
+  };
+
   // Used to verify index value extraction
   private static final ParseContext JSON_PARSER_CONTEXT = JsonPath.using(
       new Configuration.ConfigurationBuilder().jsonProvider(new JacksonJsonProvider())
@@ -94,6 +106,61 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
         default:
           throw new UnsupportedOperationException("Not support data type - " + resultsDataType);
       }
+    } else {
+      switch (resultsDataType) {
+        case INT:
+          int[][] intValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            List<Integer> values = getValueForKey(_jsonSVValues[i], jsonPath, INTEGER_LIST_TYPE);
+            Assert.assertEquals(intValues[i].length, values.size());
+            for (int j = 0; j < intValues[i].length; j++) {
+              Assert.assertEquals(intValues[i][j], values.get(j));
+            }
+          }
+          break;
+        case LONG:
+          long[][] longValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            List<Long> values = getValueForKey(_jsonSVValues[i], jsonPath, LONG_LIST_TYPE);
+            Assert.assertEquals(longValues[i].length, values.size());
+            for (int j = 0; j < longValues[i].length; j++) {
+              Assert.assertEquals(longValues[i][j], values.get(j));
+            }
+          }
+          break;
+        case FLOAT:
+          float[][] floatValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            List<Float> values = getValueForKey(_jsonSVValues[i], jsonPath, FLOAT_LIST_TYPE);
+            Assert.assertEquals(floatValues[i].length, values.size());
+            for (int j = 0; j < floatValues[i].length; j++) {
+              Assert.assertEquals(floatValues[i][j], values.get(j));
+            }
+          }
+          break;
+        case DOUBLE:
+          double[][] doubleValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            List<Double> values = getValueForKey(_jsonSVValues[i], jsonPath, DOUBLE_LIST_TYPE);
+            Assert.assertEquals(doubleValues[i].length, values.size());
+            for (int j = 0; j < doubleValues[i].length; j++) {
+              Assert.assertEquals(doubleValues[i][j], values.get(j));
+            }
+          }
+          break;
+        case STRING:
+          String[][] stringValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            List<String> values = getValueForKey(_jsonSVValues[i], jsonPath, STRING_LIST_TYPE);
+            Assert.assertEquals(stringValues[i].length, values.size());
+            for (int j = 0; j < stringValues[i].length; j++) {
+              Assert.assertEquals(stringValues[i][j], values.get(j));
+            }
+          }
+          break;
+        default:
+          throw new UnsupportedOperationException("Not support data type - " + resultsDataType);
+      }
     }
   }
 
@@ -125,7 +192,61 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
         String.format("jsonExtractIndex(%s,'%s','STRING')", JSON_STRING_SV_COLUMN,
             "$.stringVal"), "$.stringVal", DataType.STRING, true
     });
+
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','INT')", JSON_STRING_SV_COLUMN,
+            "$.intVals[0]"), "$.intVals[0]", DataType.INT, true
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','LONG')", JSON_STRING_SV_COLUMN,
+            "$.longVals[1]"), "$.longVals[1]", DataType.LONG, true
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','FLOAT')", JSON_STRING_SV_COLUMN,
+            "$.floatVals[0]"), "$.floatVals[0]", DataType.FLOAT, true
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','DOUBLE')", JSON_STRING_SV_COLUMN,
+            "$.doubleVals[1]"), "$.doubleVals[1]", DataType.DOUBLE, true
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','BIG_DECIMAL')", JSON_STRING_SV_COLUMN,
+            "$.bigDecimalVals[0]"), "$.bigDecimalVals[0]", DataType.BIG_DECIMAL, true
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','STRING')", JSON_STRING_SV_COLUMN,
+            "$.stringVals[1]"), "$.stringVals[1]", DataType.STRING, true
+    });
+
+    addMvTests(testArguments);
     return testArguments.toArray(new Object[0][]);
+  }
+
+  private void addMvTests(List<Object[]> testArguments) {
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','INT_ARRAY')", JSON_STRING_SV_COLUMN,
+            "$.intVals[*]"), "$.intVals[*]", DataType.INT, false
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','LONG_ARRAY')", JSON_STRING_SV_COLUMN,
+            "$.longVals[*]"), "$.longVals[*]", DataType.LONG, false
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','DOUBLE_ARRAY')", JSON_STRING_SV_COLUMN,
+            "$.doubleVals[*]"), "$.doubleVals[*]", DataType.DOUBLE, false
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','STRING_ARRAY')", JSON_STRING_SV_COLUMN,
+            "$.stringVals[*]"), "$.stringVals[*]", DataType.STRING, false
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','INT_ARRAY')", JSON_STRING_SV_COLUMN,
+            "$.arrayField[*].arrIntField"), "$.arrayField[*].arrIntField", DataType.INT, false
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','STRING_ARRAY')", JSON_STRING_SV_COLUMN,
+            "$.arrayField[*].arrStringField"), "$.arrayField[*].arrStringField", DataType.STRING, false
+    });
   }
 
   @Test(dataProvider = "testJsonExtractIndexDefaultValue")
@@ -220,5 +341,9 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
       return null;
     }
     return out.toString();
+  }
+
+  private <T> T getValueForKey(String blob, JsonPath path, TypeRef<T> typeRef) {
+    return JSON_PARSER_CONTEXT.parse(blob).read(path, typeRef);
   }
 }

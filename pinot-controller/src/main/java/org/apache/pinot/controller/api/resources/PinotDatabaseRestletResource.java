@@ -21,62 +21,42 @@ package org.apache.pinot.controller.api.resources;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.SCHEMA_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
+@Api(tags = Constants.DATABASE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
 @Path("/")
-public class PinotTableSchema {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableSchema.class);
+public class PinotDatabaseRestletResource {
+  public static final Logger LOGGER = LoggerFactory.getLogger(PinotDatabaseRestletResource.class);
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("/tables/{tableName}/schema")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SCHEMA)
-  @ApiOperation(value = "Get table schema", notes = "Read table schema")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found")
-  })
-  public String getTableSchema(
-      @ApiParam(value = "Table name (without type)", required = true) @PathParam("tableName") String tableName,
-      @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
-    Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
-    if (schema != null) {
-      return schema.toPrettyJsonString();
-    }
-    throw new ControllerApplicationException(LOGGER, "Schema not found for table: " + tableName,
-        Response.Status.NOT_FOUND);
+  @Path("/databases")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_DATABASE)
+  @ApiOperation(value = "List all database names", notes = "Lists all database names")
+  public List<String> listDatabaseNames() {
+    return _pinotHelixResourceManager.getDatabaseNames();
   }
 }

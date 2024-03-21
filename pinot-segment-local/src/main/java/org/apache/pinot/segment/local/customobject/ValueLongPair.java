@@ -35,6 +35,14 @@ public abstract class ValueLongPair<V extends Comparable<V>> implements Comparab
     return _time;
   }
 
+  public void setValue(V value) {
+    _value = value;
+  }
+
+  public void setTime(long time) {
+    _time = time;
+  }
+
   abstract public byte[] toBytes();
 
   @Override
