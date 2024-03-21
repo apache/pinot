@@ -2910,7 +2910,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "      LogicalAggregate(group=[{0}], agg#0=[COUNT($1)])\\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\\n"
         + "          LogicalAggregate(group=[{17}], agg#0=[COUNT()])\\n"
-        + "            LogicalTableScan(table=[[mytable]])\\n"
+        + "            LogicalTableScan(table=[[default, mytable]])\\n"
         + "\"]]}");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
@@ -2924,7 +2924,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "\"Execution Plan.."
         + "LogicalProject\\(.*\\).."
         + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\).."
-        + "    LogicalTableScan\\(table=\\[\\[mytable]]\\)..\""
+        + "    LogicalTableScan\\(table=\\[\\[default, mytable]]\\)..\""
         + "]]}");
     boolean found = pattern.matcher(response2).find();
     assertTrue(found, "Pattern " + pattern + " not found in " + response2);

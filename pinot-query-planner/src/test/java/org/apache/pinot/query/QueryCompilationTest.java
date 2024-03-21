@@ -429,6 +429,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "      \"id\": \"0\",\n"
             + "      \"relOp\": \"LogicalTableScan\",\n"
             + "      \"table\": [\n"
+            + "        \"default\"\n"
             + "        \"a\"\n"
             + "      ],\n"
             + "      \"inputs\": []\n"
