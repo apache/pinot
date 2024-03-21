@@ -40,6 +40,7 @@ public interface JsonIndexReader extends IndexReader {
    * @param length length of the array
    * @param matchingValueToDocs Map from each unique value for the jsonPathKey value to the flattened docId
    *                                     posting list
+   * @param isFlattenedDocIds whether the docIds are flattened or unflattened
    * @return String[] where String[i] is the sv value for docIds[i]
    */
   String[] getValuesSv(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToDocs,
