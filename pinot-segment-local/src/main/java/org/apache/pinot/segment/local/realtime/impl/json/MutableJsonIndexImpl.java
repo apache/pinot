@@ -353,16 +353,14 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-  public Map<String, RoaringBitmap> convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
+  public void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
     _readLock.lock();
     try {
-      Map<String, RoaringBitmap> valueToDocIds = new HashMap<>();
-      for (Map.Entry<String, RoaringBitmap> entry : valueToFlattenedDocIds.entrySet()) {
+      valueToFlattenedDocIds.replaceAll((key, value) -> {
         RoaringBitmap docIds = new RoaringBitmap();
-        entry.getValue().forEach((IntConsumer) flattenedDocId -> docIds.add(_docIdMapping.getInt(flattenedDocId)));
-        valueToDocIds.put(entry.getKey(), docIds);
-      }
-      return valueToDocIds;
+        value.forEach((IntConsumer) flattenedDocId -> docIds.add(_docIdMapping.getInt(flattenedDocId)));
+        return docIds;
+      });
     } finally {
       _readLock.unlock();
     }

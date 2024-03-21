@@ -431,7 +431,7 @@ public class JsonIndexTest {
           String[] values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, true);
           Assert.assertEquals(values, expectedValues[i]);
 
-          context = offHeapIndexReader.convertFlattenedDocIdsToDocIds(context);
+          offHeapIndexReader.convertFlattenedDocIdsToDocIds(context);
           values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, false);
           Assert.assertEquals(values, expectedValues[i]);
 
@@ -439,7 +439,7 @@ public class JsonIndexTest {
           values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, true);
           Assert.assertEquals(values, expectedValues[i]);
 
-          context = mutableJsonIndex.convertFlattenedDocIdsToDocIds(context);
+          mutableJsonIndex.convertFlattenedDocIdsToDocIds(context);
           values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, false);
           Assert.assertEquals(values, expectedValues[i]);
         }
@@ -452,7 +452,7 @@ public class JsonIndexTest {
           String[] values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, true);
           Assert.assertEquals(values, expectedValues[i]);
 
-          context = offHeapIndexReader.convertFlattenedDocIdsToDocIds(context);
+          offHeapIndexReader.convertFlattenedDocIdsToDocIds(context);
           values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, false);
           Assert.assertEquals(values, expectedValues[i]);
 
@@ -460,7 +460,7 @@ public class JsonIndexTest {
           values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, true);
           Assert.assertEquals(values, expectedValues[i]);
 
-          context = mutableJsonIndex.convertFlattenedDocIdsToDocIds(context);
+          mutableJsonIndex.convertFlattenedDocIdsToDocIds(context);
           values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, false);
           Assert.assertEquals(values, expectedValues[i]);
         }
@@ -474,7 +474,7 @@ public class JsonIndexTest {
         values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, true);
         Assert.assertEquals(values, new String[]{"value2", "value1"});
 
-        context = offHeapIndexReader.convertFlattenedDocIdsToDocIds(context);
+        offHeapIndexReader.convertFlattenedDocIdsToDocIds(context);
         docMask = new int[]{0};
         values = offHeapIndexReader.getValuesSv(docMask, docMask.length, context, false);
         Assert.assertEquals(values, new String[]{"value1"});
@@ -491,7 +491,7 @@ public class JsonIndexTest {
         values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, true);
         Assert.assertEquals(values, new String[]{"value2", "value1"});
 
-        context = mutableJsonIndex.convertFlattenedDocIdsToDocIds(context);
+        mutableJsonIndex.convertFlattenedDocIdsToDocIds(context);
         docMask = new int[]{0};
         values = mutableJsonIndex.getValuesSv(docMask, docMask.length, context, false);
         Assert.assertEquals(values, new String[]{"value1"});
@@ -594,11 +594,14 @@ public class JsonIndexTest {
 
       for (int i = 0; i < keys.length; i++) {
         Map<String, RoaringBitmap> onHeapRes = onHeapIndexReader.getMatchingFlattenedDocsMap(keys[i]);
+        onHeapIndexReader.convertFlattenedDocIdsToDocIds(onHeapRes);
         Map<String, RoaringBitmap> offHeapRes = offHeapIndexReader.getMatchingFlattenedDocsMap(keys[i]);
+        offHeapIndexReader.convertFlattenedDocIdsToDocIds(offHeapRes);
         Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingFlattenedDocsMap(keys[i]);
-        Assert.assertEquals(expected.get(i), onHeapIndexReader.convertFlattenedDocIdsToDocIds(onHeapRes));
-        Assert.assertEquals(expected.get(i), offHeapIndexReader.convertFlattenedDocIdsToDocIds(offHeapRes));
-        Assert.assertEquals(mutableJsonIndex.convertFlattenedDocIdsToDocIds(mutableRes), expected.get(i));
+        mutableJsonIndex.convertFlattenedDocIdsToDocIds(mutableRes);
+        Assert.assertEquals(expected.get(i), onHeapRes);
+        Assert.assertEquals(expected.get(i), offHeapRes);
+        Assert.assertEquals(mutableRes, expected.get(i));
       }
     }
   }

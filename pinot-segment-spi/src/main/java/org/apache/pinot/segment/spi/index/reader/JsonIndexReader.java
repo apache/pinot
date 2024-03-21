@@ -65,5 +65,5 @@ public interface JsonIndexReader extends IndexReader {
   /**
    * Converts the flattened docIds to real docIds using the map returned by getMatchingFlattenedDocsMap
    */
-  Map<String, RoaringBitmap> convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> flattenedDocIdsMap);
+  void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> flattenedDocIdsMap);
 }

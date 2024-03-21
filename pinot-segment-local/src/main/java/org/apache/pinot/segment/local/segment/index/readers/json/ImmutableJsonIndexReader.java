@@ -322,14 +322,12 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return _docIdMapping.getInt((long) flattenedDocId << 2);
   }
 
-  public Map<String, RoaringBitmap> convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
-    Map<String, RoaringBitmap> valueToDocIds = new HashMap<>();
-    for (Map.Entry<String, RoaringBitmap> entry : valueToFlattenedDocIds.entrySet()) {
+  public void convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
+    valueToFlattenedDocIds.replaceAll((key, value) -> {
       RoaringBitmap docIds = new RoaringBitmap();
-      entry.getValue().forEach((IntConsumer) flattenedDocId -> docIds.add(getDocId(flattenedDocId)));
-      valueToDocIds.put(entry.getKey(), docIds);
-    }
-    return valueToDocIds;
+      value.forEach((IntConsumer) flattenedDocId -> docIds.add(getDocId(flattenedDocId)));
+      return docIds;
+    });
   }
 
   @Override
