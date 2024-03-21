@@ -105,6 +105,10 @@ public class MockRoutingManagerFactory {
   public TableCache buildTableCache() {
     TableCache mock = mock(TableCache.class);
     when(mock.getTableNameMap()).thenReturn(_tableNameMap);
+    when(mock.getActualTableName(anyString())).thenAnswer(invocationOnMock -> {
+      String tableName = invocationOnMock.getArgument(0);
+      return _tableNameMap.get(tableName);
+    });
     when(mock.getSchema(anyString())).thenAnswer(invocationOnMock -> {
       String schemaName = invocationOnMock.getArgument(0);
       return _schemaMap.get(schemaName);
