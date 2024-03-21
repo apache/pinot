@@ -68,6 +68,11 @@ public class HelixBrokerStarter extends BaseBrokerStarter {
     init(brokerConf);
   }
 
+  @Override
+  public String toString() {
+    return getClass().getSimpleName() + ": clusterName=" + _clusterName + ", instanceId=" + _instanceId;
+  }
+
   public static HelixBrokerStarter getDefault()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
