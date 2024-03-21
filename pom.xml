@@ -193,7 +193,7 @@
     <scala.compat.version>2.12</scala.compat.version>
 
     <flink.version>1.14.6</flink.version>
-    <commons-configuration2.version>2.9.0</commons-configuration2.version>
+    <commons-configuration2.version>2.10.1</commons-configuration2.version>
 
     <kotlin.stdlib.version>1.9.22</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
