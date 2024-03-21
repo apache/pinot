@@ -97,7 +97,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     DataType dataType = isSingleValue ? DataType.valueOf(resultsType)
         : DataType.valueOf(resultsType.substring(0, resultsType.length() - 6));
 
-    if (arguments.size() == 4) {
+    if (arguments.size() >= 4) {
       TransformFunction fourthArgument = arguments.get(3);
       if (!(fourthArgument instanceof LiteralTransformFunction)) {
         throw new IllegalArgumentException("Default value must be a literal");
