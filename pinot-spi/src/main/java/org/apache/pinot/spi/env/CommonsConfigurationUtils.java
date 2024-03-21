@@ -19,7 +19,10 @@
 package org.apache.pinot.spi.env;
 
 import com.google.common.base.Preconditions;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -44,6 +47,7 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class CommonsConfigurationUtils {
   private static final Character DEFAULT_LIST_DELIMITER = ',';
+  private static final String SEGMENT_VERSION_IDENTIFIER = "segment.metadata.version";
 
   private CommonsConfigurationUtils() {
   }
@@ -56,7 +60,7 @@ public class CommonsConfigurationUtils {
   public static PropertiesConfiguration fromFile(File file)
       throws ConfigurationException {
     return fromFile(file, false, true,
-        PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory, null);
+        PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
   }
 
   /**
@@ -111,16 +115,35 @@ public class CommonsConfigurationUtils {
     return config;
   }
 
+  /**
+   * Instantiate a Segment Metadata {@link PropertiesConfiguration} from a {@link File}.
+   * @param file containing properties
+   * @param setIOFactory representing to set the IOFactory or not
+   * @param setDefaultDelimiter representing to set the default list delimiter.
+   * @return a {@link PropertiesConfiguration} instance.
+   */
   public static PropertiesConfiguration segmentMetadataFromFile(File file, boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind, String segmentVersionHeader)
+      boolean setDefaultDelimiter)
       throws ConfigurationException {
-    return fromFile(file, setIOFactory, setDefaultDelimiter, ioFactoryKind, segmentVersionHeader);
-  }
+    String fileFirstLine = null;
 
-  public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
-      throws ConfigurationException {
-    return fromFile(file, setIOFactory, setDefaultDelimiter, ioFactoryKind, null);
+    if (file.exists()) {
+      try {
+        BufferedReader reader = new BufferedReader(new FileReader(file));
+        fileFirstLine = reader.readLine();
+        reader.close();
+      } catch (IOException exception) {
+        throw new ConfigurationException(
+            String.format("Error occurred while reading segment metadata file %s ", file.getName()), exception);
+      }
+    }
+
+    PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory;
+
+    if (fileFirstLine != null && fileFirstLine.contains(SEGMENT_VERSION_IDENTIFIER)) {
+       ioFactoryKind = PropertyIOFactoryKind.SegmentMetadataIOFactory;
+    }
+    return fromFile(file, setIOFactory, setDefaultDelimiter, ioFactoryKind);
   }
 
   /**
@@ -128,14 +151,12 @@ public class CommonsConfigurationUtils {
    * @param file containing properties
    * @param setIOFactory representing to set the IOFactory or not
    * @param setDefaultDelimiter representing to set the default list delimiter.
-   * @param headerContentToCheck validates property configuration header content based on presence.
    * @return a {@link PropertiesConfiguration} instance.
    */
   public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind, String headerContentToCheck)
+      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
-    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter,
-        ioFactoryKind, headerContentToCheck);
+    PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, ioFactoryKind);
     FileHandler fileHandler = new FileHandler(config);
     // check if file exists, load the properties otherwise set the file.
     if (file.exists()) {
@@ -144,6 +165,15 @@ public class CommonsConfigurationUtils {
       fileHandler.setFile(file);
     }
     return config;
+  }
+
+  public static void saveSegmentMetadataToFile(PropertiesConfiguration propertiesConfiguration, File file,
+      String versionHeader) {
+      if (StringUtils.isNotEmpty(versionHeader)) {
+        String header = String.format("%s=%s", SEGMENT_VERSION_IDENTIFIER, versionHeader);
+        propertiesConfiguration.setHeader(header);
+      }
+    saveToFile(propertiesConfiguration, file);
   }
 
   /**
@@ -289,11 +319,6 @@ public class CommonsConfigurationUtils {
     return value.replace("\0\0", ",");
   }
 
-  private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind) {
-    return createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, ioFactoryKind, null);
-  }
-
   /**
    * creates the instance of the {@link org.apache.commons.configuration2.PropertiesConfiguration}
    * with custom od default {@link org.apache.commons.configuration2.PropertiesConfiguration.IOFactory}
@@ -302,16 +327,15 @@ public class CommonsConfigurationUtils {
    * @param setIOFactory sets the IOFactory
    * @param setDefaultDelimiter sets the default list delimiter.
    * @param ioFactoryKind IOFactory kind
-   * @param headerToCheck header content to validate.
    * @return PropertiesConfiguration
    */
   private static PropertiesConfiguration createPropertiesConfiguration(boolean setIOFactory,
-      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind, String headerToCheck) {
+      boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind) {
     PropertiesConfiguration config = new PropertiesConfiguration();
 
     // setting IO Reader Factory
     if (setIOFactory) {
-      config.setIOFactory(createPropertyIOFactory(ioFactoryKind, headerToCheck));
+      config.setIOFactory(createPropertyIOFactory(ioFactoryKind));
     }
 
     // setting DEFAULT_LIST_DELIMITER
@@ -326,17 +350,14 @@ public class CommonsConfigurationUtils {
    * Creates the IOFactory based on the provided kind.
    *
    * @param ioFactoryKind IOFactory kind
-   * @param headerContentToCheck header content to validate.
    * @return IOFactory
    */
-  private static IOFactory createPropertyIOFactory(PropertyIOFactoryKind ioFactoryKind, String headerContentToCheck) {
+  private static IOFactory createPropertyIOFactory(PropertyIOFactoryKind ioFactoryKind) {
     switch (ioFactoryKind) {
       case ConfigFileIOFactory:
         return new ConfigFilePropertyIOFactory();
       case SegmentMetadataIOFactory:
-        Preconditions.checkNotNull(headerContentToCheck,
-            "Segment metadata version header should not be null for SegmentMetadataProperty configuration");
-        return new SegmentMetadataPropertyIOFactory(headerContentToCheck);
+        return new SegmentMetadataPropertyIOFactory();
       default:
         return new PropertiesConfiguration.DefaultIOFactory();
     }

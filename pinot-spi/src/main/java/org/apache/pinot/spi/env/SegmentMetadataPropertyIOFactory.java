@@ -32,19 +32,13 @@ import org.apache.commons.configuration2.convert.ListDelimiterHandler;
  * Purpose: factory class for creating the custom segment metadata property reader and writer.
  */
 class SegmentMetadataPropertyIOFactory extends DefaultIOFactory {
-
-  private final String _segmentMetadataVersionHeader;
-  public SegmentMetadataPropertyIOFactory(String segmentMetadataVersionHeader) {
-    _segmentMetadataVersionHeader = segmentMetadataVersionHeader;
-  }
-
   @Override
-  public PropertiesReader createPropertiesReader(Reader in) {
-    return new SegmentMetadataPropertyReader(in, _segmentMetadataVersionHeader);
+  public PropertiesReader createPropertiesReader(Reader reader) {
+    return new SegmentMetadataPropertyReader(reader);
   }
 
   @Override
   public PropertiesWriter createPropertiesWriter(Writer out, ListDelimiterHandler handler) {
-    return new SegmentMetadataPropertyWriter(out, handler, _segmentMetadataVersionHeader);
+    return new SegmentMetadataPropertyWriter(out, handler);
   }
 }
