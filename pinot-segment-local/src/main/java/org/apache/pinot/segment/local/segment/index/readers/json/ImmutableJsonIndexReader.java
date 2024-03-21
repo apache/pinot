@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.json;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.nio.ByteOrder;
@@ -342,7 +341,6 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return _docIdMapping.getInt((long) flattenedDocId << 2);
   }
 
-  @VisibleForTesting
   public Map<String, RoaringBitmap> convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
     Map<String, RoaringBitmap> valueToDocIds = new HashMap<>();
     for (Map.Entry<String, RoaringBitmap> entry : valueToFlattenedDocIds.entrySet()) {
@@ -436,19 +434,30 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
   }
 
   @Override
-  public String[] getValuesSv(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
+  public String[] getValuesSv(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingDocs,
+      boolean isFlattenedDocIds) {
     Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
     RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
 
-    for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingFlattenedDocs.entrySet()) {
+    for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingDocs.entrySet()) {
       String value = entry.getKey();
-      RoaringBitmap matchingFlattenedDocIds = entry.getValue();
-      matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> {
-        int docId = getDocId(flattenedDocId);
-        if (docIdMask.contains(docId)) {
-          docIdToValues.put(docId, value);
+      RoaringBitmap matchingDocIds = entry.getValue();
+      if (isFlattenedDocIds) {
+        matchingDocIds.forEach((IntConsumer) flattenedDocId -> {
+          int docId = getDocId(flattenedDocId);
+          if (docIdMask.contains(docId)) {
+            docIdToValues.put(docId, value);
+          }
+        });
+      } else {
+        RoaringBitmap intersection = RoaringBitmap.and(matchingDocIds, docIdMask);
+        if (intersection.isEmpty()) {
+          continue;
         }
-      });
+        for (int docId : intersection) {
+          docIdToValues.put(docId, entry.getKey());
+        }
+      }
     }
 
     String[] values = new String[length];

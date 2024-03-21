@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.json;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -366,7 +365,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-  @VisibleForTesting
   public Map<String, RoaringBitmap> convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
     _readLock.lock();
     try {
@@ -514,20 +512,32 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   @Override
-  public String[] getValuesSv(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
+  public String[] getValuesSv(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs,
+      boolean isFlattenedDocIds) {
     Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(length);
     RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(Arrays.copyOfRange(docIds, 0, length));
     _readLock.lock();
     try {
       for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingFlattenedDocs.entrySet()) {
         String value = entry.getKey();
-        RoaringBitmap matchingFlattenedDocIds = entry.getValue();
-        matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> {
-          int docId = _docIdMapping.getInt(flattenedDocId);
-          if (docIdMask.contains(docId)) {
-            docIdToValues.put(docId, value);
+        RoaringBitmap matchingDocIds = entry.getValue();
+
+        if (isFlattenedDocIds) {
+          matchingDocIds.forEach((IntConsumer) flattenedDocId -> {
+            int docId = _docIdMapping.getInt(flattenedDocId);
+            if (docIdMask.contains(docId)) {
+              docIdToValues.put(docId, value);
+            }
+          });
+        } else {
+          RoaringBitmap intersection = RoaringBitmap.and(entry.getValue(), docIdMask);
+          if (intersection.isEmpty()) {
+            continue;
           }
-        });
+          for (int docId : intersection) {
+            docIdToValues.put(docId, entry.getKey());
+          }
+        }
       }
     } finally {
       _readLock.unlock();
