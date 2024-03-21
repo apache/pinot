@@ -53,11 +53,11 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    // Check that there are exactly 3 or 4 or 5 arguments
-    if (arguments.size() < 3 || arguments.size() > 5) {
+    // Check that there are exactly 3 or 4
+    if (arguments.size() < 3 || arguments.size() > 4) {
       throw new IllegalArgumentException(
-          "Expected 3/4/5 arguments for transform function: jsonExtractIndex(jsonFieldName, 'jsonPath', 'resultsType',"
-              + " ['defaultValue'], ['jsonFilterExpression'])");
+          "Expected 3/4 arguments for transform function: jsonExtractIndex(jsonFieldName, 'jsonPath', 'resultsType',"
+              + " ['defaultValue'])");
     }
 
     TransformFunction firstArgument = arguments.get(0);
@@ -105,18 +105,9 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
     }
 
-    String filterJsonPath = null;
-    if (arguments.size() == 5) {
-      TransformFunction fifthArgument = arguments.get(4);
-      if (!(fifthArgument instanceof LiteralTransformFunction)) {
-        throw new IllegalArgumentException("JSON path filter argument must be a literal");
-      }
-      filterJsonPath = ((LiteralTransformFunction) fifthArgument).getStringLiteral();
-    }
-
     _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
     _valueToMatchingFlattenedDocIdsMap =
-        _jsonIndexReader.getValueToFlattenedDocIdsMap(inputJsonPath.substring(1), filterJsonPath);
+        _jsonIndexReader.getMatchingFlattenedDocsMap(inputJsonPath.substring(1));
   }
 
   @Override

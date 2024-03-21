@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.segment.local.realtime.impl.json;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -32,7 +34,6 @@ import java.util.PriorityQueue;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -52,7 +53,6 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.roaringbitmap.IntConsumer;
-import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -365,58 +365,48 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
   }
 
-  @Override
-  public Map<String, RoaringBitmap> getMatchingDocsMap(String key) {
-    Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
+  @VisibleForTesting
+  public Map<String, RoaringBitmap> convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
     _readLock.lock();
     try {
-      Pair<String, RoaringBitmap> result = getKeyAndFlattenDocId(key);
-      key = result.getLeft();
-      RoaringBitmap arrayIndexFlattenDocIds = result.getRight();
-      if (arrayIndexFlattenDocIds != null && arrayIndexFlattenDocIds.isEmpty()) {
-        return matchingDocsMap;
+      Map<String, RoaringBitmap> valueToDocIds = new HashMap<>();
+      for (Map.Entry<String, RoaringBitmap> entry : valueToFlattenedDocIds.entrySet()) {
+        RoaringBitmap docIds = new RoaringBitmap();
+        entry.getValue().forEach((IntConsumer) flattenedDocId -> docIds.add(_docIdMapping.getInt(flattenedDocId)));
+        valueToDocIds.put(entry.getKey(), docIds);
       }
-      Map<String, RoaringBitmap> subMap = getMatchingKeysMap(key);
-      for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
-        RoaringBitmap kvPairFlattenedDocIds = entry.getValue();
-        PeekableIntIterator it = arrayIndexFlattenDocIds == null ? kvPairFlattenedDocIds.getIntIterator()
-                : RoaringBitmap.and(arrayIndexFlattenDocIds, kvPairFlattenedDocIds).getIntIterator();
-        if (!it.hasNext()) {
-          continue;
-        }
-        MutableRoaringBitmap postingList = new MutableRoaringBitmap();
-        while (it.hasNext()) {
-          postingList.add(_docIdMapping.getInt(it.next()));
-        }
-        String val = entry.getKey().substring(key.length() + 1);
-        matchingDocsMap.put(val, postingList.toRoaringBitmap());
-      }
+      return valueToDocIds;
     } finally {
       _readLock.unlock();
     }
-    return matchingDocsMap;
   }
 
   @Override
-  public String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> matchingDocsMap) {
-    Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
-    RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
-
-    for (Map.Entry<String, RoaringBitmap> entry : matchingDocsMap.entrySet()) {
-      RoaringBitmap intersection = RoaringBitmap.and(entry.getValue(), docIdMask);
-      if (intersection.isEmpty()) {
-        continue;
+  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String jsonPathKey) {
+    Map<String, RoaringBitmap> valueToMatchingFlattenedDocIdsMap = new HashMap<>();
+    _readLock.lock();
+    try {
+      Pair<String, RoaringBitmap> result = getKeyAndFlattenDocId(jsonPathKey);
+      jsonPathKey = result.getLeft();
+      RoaringBitmap arrayIndexFlattenDocIds = result.getRight();
+      if (arrayIndexFlattenDocIds != null && arrayIndexFlattenDocIds.isEmpty()) {
+        return valueToMatchingFlattenedDocIdsMap;
       }
-      for (int docId : intersection) {
-        docIdToValues.put(docId, entry.getKey());
+      Map<String, RoaringBitmap> subMap = getMatchingKeysMap(jsonPathKey);
+      for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
+        RoaringBitmap flattenedDocIds = entry.getValue().clone();
+        if (arrayIndexFlattenDocIds != null) {
+          flattenedDocIds.and(arrayIndexFlattenDocIds);
+        }
+        if (!flattenedDocIds.isEmpty()) {
+          valueToMatchingFlattenedDocIdsMap.put(entry.getKey().substring(jsonPathKey.length() + 1), flattenedDocIds);
+        }
       }
-    }
 
-    String[] values = new String[docIds.length];
-    for (int i = 0; i < docIds.length; i++) {
-      values[i] = docIdToValues.get(docIds[i]);
+      return valueToMatchingFlattenedDocIdsMap;
+    } finally {
+      _readLock.unlock();
     }
-    return values;
   }
 
   /**
@@ -470,44 +460,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   @Override
-  public Map<String, RoaringBitmap> getValueToFlattenedDocIdsMap(String jsonPathKey,
-      @Nullable String filterString) {
-    Map<String, RoaringBitmap> valueToMatchingFlattenedDocIdsMap = new HashMap<>();
-    _readLock.lock();
-    try {
-      RoaringBitmap filteredFlattenedDocIds = null;
-      FilterContext filter;
-      if (filterString != null) {
-        filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
-        Preconditions.checkArgument(!filter.isConstant(), "Invalid json match filter: " + filterString);
-        filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter, true);
-      }
-
-      Pair<String, RoaringBitmap> result = getKeyAndFlattenDocId(jsonPathKey);
-      jsonPathKey = result.getLeft();
-      RoaringBitmap arrayIndexFlattenDocIds = result.getRight();
-      if (arrayIndexFlattenDocIds != null && arrayIndexFlattenDocIds.isEmpty()) {
-        return valueToMatchingFlattenedDocIdsMap;
-      }
-      Map<String, RoaringBitmap> subMap = getMatchingKeysMap(jsonPathKey);
-      for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
-        RoaringBitmap flattenedDocIds = entry.getValue().clone();
-        if (filteredFlattenedDocIds != null) {
-          flattenedDocIds.and(filteredFlattenedDocIds);
-        }
-        if (arrayIndexFlattenDocIds != null) {
-          flattenedDocIds.and(arrayIndexFlattenDocIds);
-        }
-        valueToMatchingFlattenedDocIdsMap.put(entry.getKey().substring(jsonPathKey.length() + 1), flattenedDocIds);
-      }
-
-      return valueToMatchingFlattenedDocIdsMap;
-    } finally {
-      _readLock.unlock();
-    }
-  }
-
-  @Override
   public String[][] getValuesForMv(int[] docIds, int length,
       Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
     String[][] result = new String[length][];
@@ -551,8 +503,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
 
   @Override
   public String[] getValuesForSv(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
-    String[] result = new String[length];
-
+    Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(length);
+    RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(Arrays.copyOfRange(docIds, 0, length));
     _readLock.lock();
     try {
       for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingFlattenedDocs.entrySet()) {
@@ -560,8 +512,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         RoaringBitmap matchingFlattenedDocIds = entry.getValue();
         matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> {
           int docId = _docIdMapping.getInt(flattenedDocId);
-          if (docId < length) {
-            result[docId] = value;
+          if (docIdMask.contains(docId)) {
+            docIdToValues.put(docId, value);
           }
         });
       }
@@ -569,7 +521,11 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       _readLock.unlock();
     }
 
-    return result;
+    String[] values = new String[length];
+    for (int i = 0; i < length; i++) {
+      values[i] = docIdToValues.get(docIds[i]);
+    }
+    return values;
   }
 
   @Override

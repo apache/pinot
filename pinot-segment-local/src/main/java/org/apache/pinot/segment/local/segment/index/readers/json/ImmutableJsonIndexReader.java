@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.json;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.nio.ByteOrder;
@@ -28,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.regex.Pattern;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -342,48 +342,19 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     return _docIdMapping.getInt((long) flattenedDocId << 2);
   }
 
-  @Override
-  public Map<String, RoaringBitmap> getMatchingDocsMap(String key) {
-    Map<String, RoaringBitmap> matchingDocsMap = new HashMap<>();
-    Pair<String, MutableRoaringBitmap> result = getKeyAndFlattenDocId(key);
-    key = result.getLeft();
-    MutableRoaringBitmap arrayIndexFlattenDocIds = result.getRight();
-    if (arrayIndexFlattenDocIds != null && arrayIndexFlattenDocIds.isEmpty()) {
-      return matchingDocsMap;
+  @VisibleForTesting
+  public Map<String, RoaringBitmap> convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> valueToFlattenedDocIds) {
+    Map<String, RoaringBitmap> valueToDocIds = new HashMap<>();
+    for (Map.Entry<String, RoaringBitmap> entry : valueToFlattenedDocIds.entrySet()) {
+      RoaringBitmap docIds = new RoaringBitmap();
+      entry.getValue().forEach((IntConsumer) flattenedDocId -> docIds.add(getDocId(flattenedDocId)));
+      valueToDocIds.put(entry.getKey(), docIds);
     }
-    int[] dictIds = getDictIdRangeForKey(key);
-    for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
-      // get docIds from posting list, convert these to the actual docIds
-      ImmutableRoaringBitmap flattenedDocIds = _invertedIndex.getDocIds(dictId);
-      PeekableIntIterator it = arrayIndexFlattenDocIds == null ? flattenedDocIds.getIntIterator()
-              : intersect(arrayIndexFlattenDocIds.clone(), flattenedDocIds);
-      if (!it.hasNext()) {
-        continue;
-      }
-      RoaringBitmap realDocIds = new RoaringBitmap();
-      while (it.hasNext()) {
-        realDocIds.add(getDocId(it.next()));
-      }
-      matchingDocsMap.put(_dictionary.getStringValue(dictId).substring(key.length() + 1), realDocIds);
-    }
-
-    return matchingDocsMap;
+    return valueToDocIds;
   }
 
   @Override
-  public Map<String, RoaringBitmap> getValueToFlattenedDocIdsMap(String jsonPathKey,
-      @Nullable String filterString) {
-    RoaringBitmap filteredFlattenedDocIds = null;
-    if (filterString != null) {
-      FilterContext filter;
-      try {
-        filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
-        Preconditions.checkArgument(!filter.isConstant());
-      } catch (Exception e) {
-        throw new BadQueryRequestException("Invalid json match filter: " + filterString);
-      }
-      filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter, true).toRoaringBitmap();
-    }
+  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String jsonPathKey) {
     Map<String, RoaringBitmap> result = new HashMap<>();
     Pair<String, MutableRoaringBitmap> pathKey = getKeyAndFlattenDocId(jsonPathKey);
     if (pathKey.getRight() != null && pathKey.getRight().isEmpty()) {
@@ -399,14 +370,13 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
     for (int dictId = dictIds[0]; dictId < dictIds[1]; dictId++) {
       String key = _dictionary.getStringValue(dictId);
       RoaringBitmap docIds = _invertedIndex.getDocIds(dictId).toRoaringBitmap();
-      if (filteredFlattenedDocIds != null) {
-        docIds.and(filteredFlattenedDocIds);
-      }
-
       if (arrayIndexFlattenDocIds != null) {
         docIds.and(arrayIndexFlattenDocIds);
       }
-      result.put(key.substring(jsonPathKey.length() + 1), docIds);
+
+      if (!docIds.isEmpty()) {
+        result.put(key.substring(jsonPathKey.length() + 1), docIds);
+      }
     }
 
     return result;
@@ -451,39 +421,22 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
 
   @Override
   public String[] getValuesForSv(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
-    String[] result = new String[length];
+    Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
+    RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
 
     for (Map.Entry<String, RoaringBitmap> entry : valueToMatchingFlattenedDocs.entrySet()) {
       String value = entry.getKey();
       RoaringBitmap matchingFlattenedDocIds = entry.getValue();
       matchingFlattenedDocIds.forEach((IntConsumer) flattenedDocId -> {
         int docId = getDocId(flattenedDocId);
-        if (docId < length) {
-          result[docId] = value;
+        if (docIdMask.contains(docId)) {
+          docIdToValues.put(docId, value);
         }
       });
     }
 
-    return result;
-  }
-
-  @Override
-  public String[] getValuesForKeyAndDocs(int[] docIds, Map<String, RoaringBitmap> matchingDocsMap) {
-    Int2ObjectOpenHashMap<String> docIdToValues = new Int2ObjectOpenHashMap<>(docIds.length);
-    RoaringBitmap docIdMask = RoaringBitmap.bitmapOf(docIds);
-
-    for (Map.Entry<String, RoaringBitmap> entry : matchingDocsMap.entrySet()) {
-      RoaringBitmap intersection = RoaringBitmap.and(entry.getValue(), docIdMask);
-      if (intersection.isEmpty()) {
-        continue;
-      }
-      for (int docId : intersection) {
-        docIdToValues.put(docId, entry.getKey());
-      }
-    }
-
-    String[] values = new String[docIds.length];
-    for (int i = 0; i < docIds.length; i++) {
+    String[] values = new String[length];
+    for (int i = 0; i < length; i++) {
       values[i] = docIdToValues.get(docIds[i]);
     }
     return values;
