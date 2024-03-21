@@ -96,7 +96,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
     if (_sealed) {
       return _clpStatsCollector.getCLPStats();
     }
-    throw new IllegalStateException("you must seal the collector first before asking for clp stats");
+    throw new IllegalStateException("The collector must be sealed before calling getCLPStats");
   }
 
   @Override

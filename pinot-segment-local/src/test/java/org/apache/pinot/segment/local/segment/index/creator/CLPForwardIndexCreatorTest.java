@@ -71,6 +71,7 @@ public class CLPForwardIndexCreatorTest {
         "2023/10/27 16:35:10.607 INFO [ControllerResponseFilter] [grizzly-http-server-6] Handled request from 0.0"
             + ".0.0 GET https://pinot-pinot-broker-headless.managed.svc.cluster.local:8093/tables, content-type "
             + "application/json status code 200 OK");
+    logLines.add("null");
 
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec("column1", FieldSpec.DataType.STRING, true));
@@ -92,7 +93,7 @@ public class CLPForwardIndexCreatorTest {
 
     File indexFile = new File(TEMP_DIR, "column1" + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     CLPForwardIndexCreatorV1 clpForwardIndexCreatorV1 =
-        new CLPForwardIndexCreatorV1(TEMP_DIR, "column1", 4, statsCollector);
+        new CLPForwardIndexCreatorV1(TEMP_DIR, "column1", logLines.size(), statsCollector);
 
     for (String logLine : logLines) {
       clpForwardIndexCreatorV1.putString(logLine);

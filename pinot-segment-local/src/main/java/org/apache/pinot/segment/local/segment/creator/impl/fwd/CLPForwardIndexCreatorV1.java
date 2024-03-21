@@ -265,7 +265,7 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
   @Override
   public void close()
       throws IOException {
-    // Delete all temp file
+    // Delete all temp files
     _dataFile.close();
     FileUtils.deleteDirectory(_intermediateFilesDir);
   }

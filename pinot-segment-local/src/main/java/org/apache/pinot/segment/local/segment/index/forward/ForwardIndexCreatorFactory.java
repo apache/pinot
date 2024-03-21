@@ -72,7 +72,6 @@ public class ForwardIndexCreatorFactory {
       // Dictionary disabled columns
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
-        // CLP compression codec
         return new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
       }
       ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();

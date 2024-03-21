@@ -73,6 +73,7 @@ public class CLPMutableForwardIndexTest {
           "2023/10/27 16:35:10.607 INFO [ControllerResponseFilter] [grizzly-http-server-6] Handled request from 0.0"
               + ".0.0 GET https://pinot-pinot-broker-headless.managed.svc.cluster.local:8093/tables, content-type "
               + "application/json status code 200 OK");
+      logLines.add("null");
 
       for (int i = 0; i < rows; i++) {
         readerWriter.setString(i, logLines.get(i));
