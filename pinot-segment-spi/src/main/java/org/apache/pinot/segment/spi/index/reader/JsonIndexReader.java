@@ -38,11 +38,12 @@ public interface JsonIndexReader extends IndexReader {
    * For an array of docIds and context specific to a JSON key, returns the corresponding sv value for each docId.
    * @param docIds array of docIds
    * @param length length of the array
-   * @param matchingValueToFlattenedDocs Map from each unique value for the jsonPathKey value to the flattened docId
+   * @param matchingValueToDocs Map from each unique value for the jsonPathKey value to the flattened docId
    *                                     posting list
    * @return String[] where String[i] is the sv value for docIds[i]
    */
-  String[] getValuesSv(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToFlattenedDocs);
+  String[] getValuesSv(int[] docIds, int length, Map<String, RoaringBitmap> matchingValueToDocs,
+      boolean isFlattenedDocIds);
 
   /**
    * For an array of docIds and context specific to a JSON key, returns the corresponding mv array for each docId.
@@ -59,4 +60,9 @@ public interface JsonIndexReader extends IndexReader {
    * avoid reading and converting the posting list of flattened docIds to real docIds
    */
   Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String key);
+
+  /**
+   * Converts the flattened docIds to real docIds using the map returned by getMatchingFlattenedDocsMap
+   */
+  Map<String, RoaringBitmap> convertFlattenedDocIdsToDocIds(Map<String, RoaringBitmap> flattenedDocIdsMap);
 }
