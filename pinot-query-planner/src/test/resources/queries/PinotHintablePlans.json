@@ -32,11 +32,11 @@
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col1=[$0])",
           "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col2=[$1], col3=[$2])",
           "\n          LogicalFilter(condition=[<($2, 0)])",
-          "\n            LogicalTableScan(table=[[b]])",
+          "\n            LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -47,11 +47,11 @@
           "Execution Plan",
           "\nLogicalJoin(condition=[=($0, $2)], joinType=[semi])",
           "\n  LogicalProject(col1=[$0], col2=[$1])",
-          "\n    LogicalTableScan(table=[[a]])",
+          "\n    LogicalTableScan(table=[[default, a]])",
           "\n  PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n    LogicalProject(col2=[$1])",
           "\n      LogicalFilter(condition=[>($2, 0)])",
-          "\n        LogicalTableScan(table=[[b]])",
+          "\n        LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -63,15 +63,15 @@
           "\nLogicalJoin(condition=[=($1, $2)], joinType=[semi])",
           "\n  LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n      LogicalProject(col2=[$1])",
           "\n        LogicalFilter(condition=[>($2, 0)])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n  PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n    LogicalProject(col1=[$0])",
           "\n      LogicalFilter(condition=[>($2, 0)])",
-          "\n        LogicalTableScan(table=[[c]])",
+          "\n        LogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       },
@@ -86,15 +86,15 @@
           "\n      LogicalJoin(condition=[=($1, $3)], joinType=[semi])",
           "\n        LogicalJoin(condition=[=($0, $3)], joinType=[semi])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n          PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n            LogicalProject(col2=[$1])",
           "\n              LogicalFilter(condition=[>($2, 0)])",
-          "\n                LogicalTableScan(table=[[b]])",
+          "\n                LogicalTableScan(table=[[default, b]])",
           "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n          LogicalProject(col1=[$0])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[c]])",
+          "\n              LogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       },
@@ -106,11 +106,11 @@
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
           "\n  LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
           "\n    LogicalProject(col1=[$0], col3=[$2])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n      LogicalProject(col2=[$1])",
           "\n        LogicalFilter(condition=[>($2, 0)])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -124,11 +124,11 @@
           "\n    LogicalAggregate(group=[{1}], agg#0=[$SUM0($2)])",
           "\n      LogicalJoin(condition=[=($0, $3)], joinType=[semi])",
           "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n          LogicalProject(col2=[$1])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -142,7 +142,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($0, _UTF-8'a'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -157,7 +157,7 @@
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col2=[$1], col3=[$2], $f2=[CAST($0):DECIMAL(1000, 500) NOT NULL])",
           "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -170,7 +170,7 @@
           "\n  LogicalAggregate(group=[{0}], EXPR$1=[COUNT()], EXPR$2=[$SUM0($1)], EXPR$3=[$SUM0($2)])",
           "\n    LogicalProject(col2=[$1], col3=[$2], $f2=[CAST($0):DECIMAL(1000, 500) NOT NULL])",
           "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -182,7 +182,7 @@
           "\nLogicalAggregate(group=[{0}], EXPR$1=[COUNT()], EXPR$2=[$SUM0($1)], EXPR$3=[$SUM0($2)])",
           "\n  LogicalProject(col2=[$1], col3=[$2], $f2=[CAST($0):DECIMAL(1000, 500) NOT NULL])",
           "\n    LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       }
@@ -199,11 +199,11 @@
           "\n  LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[>($2, 0)])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -215,7 +215,7 @@
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalAggregate(group=[{1}], agg#0=[$SUM0($2)])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -227,7 +227,7 @@
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -242,11 +242,11 @@
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -261,11 +261,11 @@
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -280,11 +280,11 @@
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[inner])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -298,11 +298,11 @@
           "\n    LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
           "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n          LogicalProject(col1=[$0])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -316,11 +316,11 @@
           "\n    LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
           "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n          LogicalProject(col1=[$0])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -334,11 +334,11 @@
           "\n    LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)])",
           "\n      LogicalJoin(condition=[=($1, $3)], joinType=[semi])",
           "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n          LogicalProject(col1=[$0])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -352,7 +352,7 @@
           "\n    LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)])",
           "\n      LogicalJoin(condition=[=($1, $3)], joinType=[semi])",
           "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n          LogicalProject(col1=[$0])",
           "\n            LogicalFilter(condition=[>($1, 1)])",
@@ -360,7 +360,7 @@
           "\n                PinotLogicalExchange(distribution=[hash[0]])",
           "\n                  LogicalAggregate(group=[{0}], agg#0=[COUNT()])",
           "\n                    LogicalFilter(condition=[>($2, 0)])",
-          "\n                      LogicalTableScan(table=[[b]])",
+          "\n                      LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -376,11 +376,11 @@
           "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
           "\n          LogicalJoin(condition=[=($1, $3)], joinType=[semi])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n              LogicalProject(col1=[$0])",
           "\n                LogicalFilter(condition=[>($2, 0)])",
-          "\n                  LogicalTableScan(table=[[b]])",
+          "\n                  LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -396,11 +396,11 @@
           "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)])",
           "\n          LogicalJoin(condition=[=($1, $3)], joinType=[semi])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n              LogicalProject(col1=[$0])",
           "\n                LogicalFilter(condition=[>($2, 0)])",
-          "\n                  LogicalTableScan(table=[[b]])",
+          "\n                  LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -412,11 +412,11 @@
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
           "\n  LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
           "\n    LogicalProject(col2=[$1], col3=[$2])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n      LogicalProject(col1=[$0])",
           "\n        LogicalFilter(condition=[>($2, 0)])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -428,11 +428,11 @@
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
           "\n  LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
           "\n    LogicalProject(col2=[$1], col3=[$2])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n      LogicalProject(col1=[$0])",
           "\n        LogicalFilter(condition=[>($2, 0)])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -446,11 +446,11 @@
           "\n    LogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)], agg#1=[COUNT()])",
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
           "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n          LogicalProject(col1=[$0])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -464,11 +464,11 @@
           "\n    LogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
           "\n      LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
           "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n          LogicalProject(col1=[$0])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -481,11 +481,11 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalJoin(condition=[=($0, $1)], joinType=[semi])",
           "\n      LogicalProject(col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n      PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n        LogicalProject(col1=[$0])",
           "\n          LogicalFilter(condition=[>($2, 0)])",
-          "\n            LogicalTableScan(table=[[b]])",
+          "\n            LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -499,11 +499,11 @@
           "\n    LogicalProject(col1=[$0], col3=[$2])",
           "\n      LogicalJoin(condition=[=($1, $3)], joinType=[semi])",
           "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
           "\n          LogicalProject(col1=[$0])",
           "\n            LogicalFilter(condition=[>($2, 0)])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       }

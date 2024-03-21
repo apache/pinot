@@ -9,7 +9,7 @@
           "\nLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -22,7 +22,7 @@
           "\n  LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)], agg#2=[MAX($3)], agg#3=[MIN($4)])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)], agg#1=[COUNT()], agg#2=[MAX($2)], agg#3=[MIN($2)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -35,7 +35,7 @@
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalAggregate(group=[{0}], agg#0=[$SUM0($2)])",
           "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -49,7 +49,7 @@
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalAggregate(group=[{0}], agg#0=[COUNT()])",
           "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -63,7 +63,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalAggregate(group=[{0, 1}], agg#0=[$SUM0($2)])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($0, _UTF-8'a'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -78,7 +78,7 @@
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[$SUM0($2)], agg#2=[MAX($2)], agg#3=[MIN($2)])",
           "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -93,7 +93,7 @@
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalAggregate(group=[{0}], agg#0=[COUNT()], agg#1=[$SUM0($2)], agg#2=[MAX($2)], agg#3=[MIN($2)])",
           "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -105,7 +105,7 @@
           "\nLogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalProject(col1=[$0], col3=[$2])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -118,7 +118,7 @@
           "\n  LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -131,7 +131,7 @@
           "\n  LogicalAggregate(group=[{0}], EXPR$1=[$SUM0($1)], agg#1=[COUNT()], EXPR$3=[MAX($1)], EXPR$4=[MIN($1)])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -144,7 +144,7 @@
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalProject(col1=[$0], col3=[$2])",
           "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -157,7 +157,7 @@
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalProject(col1=[$0], col3=[$2])",
           "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -171,7 +171,7 @@
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalProject(col1=[$0])",
           "\n      LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -185,7 +185,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($0, _UTF-8'a'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -200,7 +200,7 @@
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col1=[$0], col3=[$2])",
           "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -215,7 +215,7 @@
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col1=[$0], col3=[$2])",
           "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -230,7 +230,7 @@
           "\n      PinotLogicalExchange(distribution=[hash[0]])",
           "\n        LogicalProject(col1=[$0], col3=[$2])",
           "\n          LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       }
