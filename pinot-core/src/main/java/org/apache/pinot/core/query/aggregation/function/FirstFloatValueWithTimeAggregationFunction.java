@@ -22,10 +22,10 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
+import org.roaringbitmap.IntIterator;
 
 
 /**
@@ -41,8 +41,9 @@ import org.apache.pinot.segment.local.customobject.ValueLongPair;
 public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAggregationFunction<Float> {
   private final static ValueLongPair<Float> DEFAULT_VALUE_TIME_PAIR = new FloatLongPair(Float.NaN, Long.MAX_VALUE);
 
-  public FirstFloatValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol) {
-    super(dataCol, timeCol, ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE);
+  public FirstFloatValueWithTimeAggregationFunction(ExpressionContext dataCol, ExpressionContext timeCol,
+      boolean nullHandlingEnabled) {
+    super(dataCol, timeCol, ObjectSerDeUtils.FLOAT_LONG_PAIR_SER_DE, nullHandlingEnabled);
   }
 
   @Override
@@ -56,22 +57,8 @@ public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAgg
   }
 
   @Override
-  public void aggregateResultWithRawData(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, BlockValSet timeValSet) {
-    ValueLongPair<Float> defaultValueLongPair = getDefaultValueTimePair();
-    Float firstData = defaultValueLongPair.getValue();
-    long firstTime = defaultValueLongPair.getTime();
-    float[] floatValues = blockValSet.getFloatValuesSV();
-    long[] timeValues = timeValSet.getLongValuesSV();
-    for (int i = 0; i < length; i++) {
-      float data = floatValues[i];
-      long time = timeValues[i];
-      if (time <= firstTime) {
-        firstTime = time;
-        firstData = data;
-      }
-    }
-    setAggregationResult(aggregationResultHolder, firstData, firstTime);
+  public Float readCell(BlockValSet block, int docId) {
+    return block.getFloatValuesSV()[docId];
   }
 
   @Override
@@ -79,11 +66,15 @@ public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAgg
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, BlockValSet timeValSet) {
     float[] floatValues = blockValSet.getFloatValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
-    for (int i = 0; i < length; i++) {
-      float data = floatValues[i];
-      long time = timeValues[i];
-      setGroupByResult(groupKeyArray[i], groupByResultHolder, data, time);
-    }
+
+    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
+    forEachNotNull(length, nullIdxIterator, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        float data = floatValues[i];
+        long time = timeValues[i];
+        setGroupByResult(groupKeyArray[i], groupByResultHolder, data, time);
+      }
+    });
   }
 
   @Override
@@ -91,13 +82,17 @@ public class FirstFloatValueWithTimeAggregationFunction extends FirstWithTimeAgg
       GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, BlockValSet timeValSet) {
     float[] floatValues = blockValSet.getFloatValuesSV();
     long[] timeValues = timeValSet.getLongValuesSV();
-    for (int i = 0; i < length; i++) {
-      float value = floatValues[i];
-      long time = timeValues[i];
-      for (int groupKey : groupKeysArray[i]) {
-        setGroupByResult(groupKey, groupByResultHolder, value, time);
+
+    IntIterator nullIdxIterator = orNullIterator(blockValSet, timeValSet);
+    forEachNotNull(length, nullIdxIterator, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        float value = floatValues[i];
+        long time = timeValues[i];
+        for (int groupKey : groupKeysArray[i]) {
+          setGroupByResult(groupKey, groupByResultHolder, value, time);
+        }
       }
-    }
+    });
   }
 
   @Override
