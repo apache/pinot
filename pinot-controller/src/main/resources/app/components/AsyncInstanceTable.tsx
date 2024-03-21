@@ -100,8 +100,7 @@ export const AsyncInstanceTable = ({
       instanceDetails.then((instanceDetailsData) => {
         setInstanceData(instanceDetailsData);
       });
-    }
-    else if (showInstanceDetails && cluster.length == 0) {
+    } else if (showInstanceDetails && cluster.length == 0) {
       instances.then((instancesData) => {
         const defaultLoadingArray = Array(4).fill(Loading);
         setInstanceData({
@@ -109,8 +108,7 @@ export const AsyncInstanceTable = ({
           records:  [[instancesData[0], ...defaultLoadingArray ]],
         });
       });
-    }
-    else {
+    } else {
       instances.then((instancesData) => {
         setInstanceData({
           columns: instanceColumns,
