@@ -132,7 +132,7 @@
     <grizzly.version>2.4.4</grizzly.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.9</swagger.version>
-    <hadoop.version>3.3.6</hadoop.version>
+    <hadoop.version>3.4.0</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.0</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
