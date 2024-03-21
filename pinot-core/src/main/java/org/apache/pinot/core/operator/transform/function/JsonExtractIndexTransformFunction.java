@@ -120,7 +120,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initIntValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[] valuesFromIndex = _jsonIndexReader.getValuesSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[inputDocIds[i]];
@@ -142,7 +142,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initLongValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[] valuesFromIndex = _jsonIndexReader.getValuesSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
@@ -164,7 +164,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initFloatValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[] valuesFromIndex = _jsonIndexReader.getValuesSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
@@ -186,7 +186,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initDoubleValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[] valuesFromIndex = _jsonIndexReader.getValuesSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
@@ -208,7 +208,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initBigDecimalValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[] valuesFromIndex = _jsonIndexReader.getValuesSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
@@ -230,7 +230,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     int numDocs = valueBlock.getNumDocs();
     int[] inputDocIds = valueBlock.getDocIds();
     initStringValuesSV(numDocs);
-    String[] valuesFromIndex = _jsonIndexReader.getValuesForSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[] valuesFromIndex = _jsonIndexReader.getValuesSv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String value = valuesFromIndex[i];
@@ -251,7 +251,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   public int[][] transformToIntValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initIntValuesMV(numDocs);
-    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
 
     for (int i = 0; i < numDocs; i++) {
@@ -268,7 +268,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   public long[][] transformToLongValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initLongValuesMV(numDocs);
-    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
@@ -284,7 +284,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   public float[][] transformToFloatValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initFloatValuesMV(numDocs);
-    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
@@ -300,7 +300,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   public double[][] transformToDoubleValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initDoubleValuesMV(numDocs);
-    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
@@ -316,7 +316,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
   public String[][] transformToStringValuesMV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initStringValuesMV(numDocs);
-    String[][] valuesFromIndex = _jsonIndexReader.getValuesForMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
+    String[][] valuesFromIndex = _jsonIndexReader.getValuesMv(valueBlock.getDocIds(), valueBlock.getNumDocs(),
         _valueToMatchingFlattenedDocIdsMap);
     for (int i = 0; i < numDocs; i++) {
       String[] value = valuesFromIndex[i];
