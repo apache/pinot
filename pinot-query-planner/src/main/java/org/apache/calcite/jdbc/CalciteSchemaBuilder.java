@@ -20,7 +20,6 @@ package org.apache.calcite.jdbc;
 
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.calcite.schema.Function;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.SchemaPlus;

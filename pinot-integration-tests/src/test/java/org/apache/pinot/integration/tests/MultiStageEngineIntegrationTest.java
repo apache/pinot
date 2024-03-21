@@ -56,7 +56,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
   private static final String TABLE_NAME_WITH_DATABASE = "db1." + DEFAULT_TABLE_NAME;
   private String _tableName = DEFAULT_TABLE_NAME;
-  private List<File> _avroFiles = new ArrayList<>();
 
   @Override
   protected String getSchemaFileName() {
@@ -82,25 +81,25 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     addTableConfig(tableConfig);
 
     // Unpack the Avro files
-    _avroFiles = unpackAvroData(_tempDir);
+    List<File> avroFiles = unpackAvroData(_tempDir);
 
     // Create and upload segments
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(_avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
     // Set up the H2 connection
-    setUpH2Connection(_avroFiles);
+    setUpH2Connection(avroFiles);
 
     // Initialize the query generator
-    setUpQueryGenerator(_avroFiles);
+    setUpQueryGenerator(avroFiles);
 
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
 
-    setupTableWithNonDefaultDatabase();
+    setupTableWithNonDefaultDatabase(avroFiles);
   }
 
-  private void setupTableWithNonDefaultDatabase()
+  private void setupTableWithNonDefaultDatabase(List<File> avroFiles)
       throws Exception {
     _tableName = TABLE_NAME_WITH_DATABASE;
     String defaultCol = "ActualElapsedTime";
@@ -120,7 +119,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Create and upload segments to 'db1.mytable'
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(_avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, tableConfig, schema, 0, _segmentDir, _tarDir);
     uploadSegments(getTableName(), _tarDir);
 
     // Wait for all documents loaded
