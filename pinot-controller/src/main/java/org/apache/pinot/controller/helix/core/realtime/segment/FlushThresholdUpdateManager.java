@@ -38,14 +38,21 @@ public class FlushThresholdUpdateManager {
    */
   public FlushThresholdUpdater getFlushThresholdUpdater(StreamConfig streamConfig) {
     String realtimeTableName = streamConfig.getTableNameWithType();
-    int flushThresholdRows = streamConfig.getFlushThresholdRows();
 
+    int flushThresholdRows = streamConfig.getFlushThresholdRows();
     if (flushThresholdRows > 0) {
       _flushThresholdUpdaterMap.remove(realtimeTableName);
       return new DefaultFlushThresholdUpdater(flushThresholdRows);
-    } else {
+    }
+
+    // Legacy behavior: when flush threshold rows is explicitly set to 0, use segment size based flush threshold
+    long flushThresholdSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
+    if (flushThresholdRows == 0 || flushThresholdSegmentSizeBytes > 0) {
       return _flushThresholdUpdaterMap.computeIfAbsent(realtimeTableName,
           k -> new SegmentSizeBasedFlushThresholdUpdater());
+    } else {
+      _flushThresholdUpdaterMap.remove(realtimeTableName);
+      return new DefaultFlushThresholdUpdater(StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
     }
   }
 

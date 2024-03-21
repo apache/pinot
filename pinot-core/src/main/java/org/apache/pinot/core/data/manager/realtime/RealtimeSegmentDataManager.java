@@ -1455,10 +1455,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
 
     // Read the max number of rows
-    int segmentMaxRowCount = _streamConfig.getFlushThresholdRows();
-    int flushThresholdSize = segmentZKMetadata.getSizeThresholdToFlushSegment();
-    if (flushThresholdSize > 0) {
-      segmentMaxRowCount = flushThresholdSize;
+    int segmentMaxRowCount = segmentZKMetadata.getSizeThresholdToFlushSegment();
+    if (segmentMaxRowCount <= 0) {
+      segmentMaxRowCount = _streamConfig.getFlushThresholdRows();
+    }
+    if (segmentMaxRowCount <= 0) {
+      segmentMaxRowCount = StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS;
     }
     _segmentMaxRowCount = segmentMaxRowCount;
 

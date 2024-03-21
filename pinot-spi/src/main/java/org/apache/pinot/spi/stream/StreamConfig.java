@@ -222,7 +222,6 @@ public class StreamConfig {
   }
 
   private long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {
-    long segmentSizeBytes = -1;
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE;
     String flushThresholdSegmentSizeStr = streamConfigMap.get(key);
     if (flushThresholdSegmentSizeStr == null) {
@@ -230,19 +229,14 @@ public class StreamConfig {
       key = StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE;
       flushThresholdSegmentSizeStr = streamConfigMap.get(key);
     }
-
     if (flushThresholdSegmentSizeStr != null) {
       try {
-        segmentSizeBytes = DataSizeUtils.toBytes(flushThresholdSegmentSizeStr);
+        return DataSizeUtils.toBytes(flushThresholdSegmentSizeStr);
       } catch (Exception e) {
-        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", key, flushThresholdSegmentSizeStr,
-            DataSizeUtils.fromBytes(DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES));
+        throw new IllegalArgumentException("Invalid config " + key + ": " + flushThresholdSegmentSizeStr);
       }
-    }
-    if (segmentSizeBytes > 0) {
-      return segmentSizeBytes;
     } else {
-      return DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES;
+      return -1;
     }
   }
 
@@ -261,17 +255,12 @@ public class StreamConfig {
     }
     if (flushThresholdRowsStr != null) {
       try {
-        int flushThresholdRows = Integer.parseInt(flushThresholdRowsStr);
-        // Flush threshold rows 0 means using segment size based flush threshold
-        Preconditions.checkState(flushThresholdRows >= 0);
-        return flushThresholdRows;
+        return Integer.parseInt(flushThresholdRowsStr);
       } catch (Exception e) {
-        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", key, flushThresholdRowsStr,
-            DEFAULT_FLUSH_THRESHOLD_ROWS);
-        return DEFAULT_FLUSH_THRESHOLD_ROWS;
+        throw new IllegalArgumentException("Invalid config " + key + ": " + flushThresholdRowsStr);
       }
     } else {
-      return DEFAULT_FLUSH_THRESHOLD_ROWS;
+      return -1;
     }
   }
 
@@ -291,9 +280,7 @@ public class StreamConfig {
           // For backward-compatibility, parse it as milliseconds value
           return Long.parseLong(flushThresholdTimeStr);
         } catch (NumberFormatException nfe) {
-          LOGGER.warn("Invalid config {}: {}, defaulting to: {}", key, flushThresholdTimeStr,
-              DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
-          return DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS;
+          throw new IllegalArgumentException("Invalid config " + key + ": " + flushThresholdTimeStr);
         }
       }
     } else {
