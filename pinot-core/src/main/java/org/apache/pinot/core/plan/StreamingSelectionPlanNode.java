@@ -20,12 +20,14 @@ package org.apache.pinot.core.plan;
 
 import com.google.common.base.Preconditions;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 
 
 /**
@@ -35,20 +37,28 @@ import org.apache.pinot.segment.spi.IndexSegment;
  */
 public class StreamingSelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
+  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
 
   public StreamingSelectionPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+    this(indexSegment, null, queryContext);
+  }
+
+  public StreamingSelectionPlanNode(IndexSegment indexSegment, @Nullable SegmentContext segmentContext,
+      QueryContext queryContext) {
     Preconditions.checkState(queryContext.getOrderByExpressions() == null,
         "Selection order-by is not supported for streaming");
     _indexSegment = indexSegment;
+    _segmentContext = segmentContext;
     _queryContext = queryContext;
   }
 
   @Override
   public StreamingSelectionOnlyOperator run() {
     List<ExpressionContext> expressions = SelectionOperatorUtils.extractExpressions(_queryContext, _indexSegment);
-    BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_indexSegment, _queryContext, expressions,
-        Math.min(_queryContext.getLimit(), DocIdSetPlanNode.MAX_DOC_PER_CALL)).run();
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(_indexSegment, _segmentContext, _queryContext, expressions,
+            Math.min(_queryContext.getLimit(), DocIdSetPlanNode.MAX_DOC_PER_CALL), null).run();
     return new StreamingSelectionOnlyOperator(_indexSegment, _queryContext, expressions, projectOperator);
   }
 }

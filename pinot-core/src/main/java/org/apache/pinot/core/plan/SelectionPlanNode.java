@@ -35,6 +35,7 @@ import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOpera
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
@@ -44,10 +45,17 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
  */
 public class SelectionPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
+  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
 
   public SelectionPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
+    this(indexSegment, null, queryContext);
+  }
+
+  public SelectionPlanNode(IndexSegment indexSegment, @Nullable SegmentContext segmentContext,
+      QueryContext queryContext) {
     _indexSegment = indexSegment;
+    _segmentContext = segmentContext;
     _queryContext = queryContext;
   }
 
@@ -58,7 +66,8 @@ public class SelectionPlanNode implements PlanNode {
 
     if (limit == 0) {
       // Empty selection (LIMIT 0)
-      BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_indexSegment, _queryContext, expressions, 0).run();
+      BaseProjectOperator<?> projectOperator =
+          new ProjectPlanNode(_indexSegment, _segmentContext, _queryContext, expressions, 0, null).run();
       return new EmptySelectionOperator(_indexSegment, _queryContext, expressions, projectOperator);
     }
 
@@ -68,7 +77,7 @@ public class SelectionPlanNode implements PlanNode {
       // ie: SELECT ... FROM Table WHERE ... LIMIT 10
       int maxDocsPerCall = Math.min(limit, DocIdSetPlanNode.MAX_DOC_PER_CALL);
       BaseProjectOperator<?> projectOperator =
-          new ProjectPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall).run();
+          new ProjectPlanNode(_indexSegment, _segmentContext, _queryContext, expressions, maxDocsPerCall, null).run();
       return new SelectionOnlyOperator(_indexSegment, _queryContext, expressions, projectOperator);
     }
     int numOrderByExpressions = orderByExpressions.size();
@@ -87,12 +96,12 @@ public class SelectionPlanNode implements PlanNode {
           maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
         }
         BaseProjectOperator<?> projectOperator =
-            new ProjectPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall).run();
+            new ProjectPlanNode(_indexSegment, _segmentContext, _queryContext, expressions, maxDocsPerCall, null).run();
         return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
       } else {
         BaseProjectOperator<?> projectOperator =
-            new ProjectPlanNode(_indexSegment, _queryContext, expressions, maxDocsPerCall).run();
+            new ProjectPlanNode(_indexSegment, _segmentContext, _queryContext, expressions, maxDocsPerCall, null).run();
         return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
       }
@@ -101,7 +110,8 @@ public class SelectionPlanNode implements PlanNode {
       // All output expressions are ordered
       // ie: SELECT not_sorted1, not_sorted2 FROM Table WHERE ... ORDER BY not_sorted1, not_sorted2 LIMIT 10 OFFSET 5
       BaseProjectOperator<?> projectOperator =
-          new ProjectPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+          new ProjectPlanNode(_indexSegment, _segmentContext, _queryContext, expressions,
+              DocIdSetPlanNode.MAX_DOC_PER_CALL, null).run();
       return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, projectOperator);
     }
     // Not all output expressions are ordered, only fetch the order-by expressions and docId to avoid the
@@ -111,8 +121,9 @@ public class SelectionPlanNode implements PlanNode {
     for (OrderByExpressionContext orderByExpression : orderByExpressions) {
       expressionsToTransform.add(orderByExpression.getExpression());
     }
-    BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_indexSegment, _queryContext, expressionsToTransform,
-        DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(_indexSegment, _segmentContext, _queryContext, expressionsToTransform,
+            DocIdSetPlanNode.MAX_DOC_PER_CALL, null).run();
     return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, projectOperator);
   }
 

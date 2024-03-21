@@ -31,6 +31,8 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -252,5 +254,9 @@ public interface TableDataManager {
    * @param segmentNameStr name of segment for which the state change is being handled
    */
   default void onConsumingToOnline(String segmentNameStr) {
+  }
+
+  default Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments) {
+    return null;
   }
 }

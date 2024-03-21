@@ -67,6 +67,7 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.local.utils.tablestate.TableStateUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
@@ -787,5 +788,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       isValid = false;
     }
     return isValid;
+  }
+
+  @Override
+  public Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments) {
+    return isUpsertEnabled() ? _tableUpsertMetadataManager.getSegmentContexts(selectedSegments) : null;
   }
 }
