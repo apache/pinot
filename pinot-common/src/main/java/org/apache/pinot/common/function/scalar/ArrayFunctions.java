@@ -230,7 +230,7 @@ public class ArrayFunctions {
 
   @ScalarFunction(names = {"array", "arrayValueConstructor"}, isVarArg = true)
   public static Object arrayValueConstructor(Object... arr) {
-    if (arr == null || arr.length == 0 || arr[0] == null) {
+    if (arr == null || arr.length == 0) {
       return arr;
     }
     Class<?> clazz = arr[0].getClass();
