@@ -86,8 +86,8 @@ public class HashUtils {
     byte[][] allValueBytes = new byte[values.length][];
     int totalLen = 0;
     for (int j = 0; j < allValueBytes.length; j++) {
-      allValueBytes[j] = values[j] == null ? "null".getBytes(StandardCharsets.UTF_8) :
-          values[j].toString().getBytes(StandardCharsets.UTF_8);
+      allValueBytes[j] = values[j] == null ? "null".getBytes(StandardCharsets.UTF_8)
+          : values[j].toString().getBytes(StandardCharsets.UTF_8);
       totalLen += allValueBytes[j].length;
     }
     byte[] result = new byte[totalLen];
