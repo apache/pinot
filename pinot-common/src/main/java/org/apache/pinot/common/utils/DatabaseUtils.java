@@ -20,6 +20,7 @@ package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
@@ -115,19 +116,18 @@ public class DatabaseUtils {
    * @param queryOptions Query option from request
    * @param headers http headers from request
    * @return extracted database name.
-   * If queryOptions and headers have conflicting database context an {@link IllegalArgumentException} is thrown
+   * <br>If database context is not provided at all return {@link CommonConstants#DEFAULT_DATABASE}.
+   * <br>If queryOptions and headers have conflicting database context an {@link IllegalArgumentException} is thrown.
    */
-  public static @Nullable String extractDatabaseFromQueryRequest(
-      Map<String, String> queryOptions, HttpHeaders headers) {
-    String databaseFromOptions = queryOptions.get(CommonConstants.DATABASE);
-    String databaseFromHeaders = headers.getHeaderString(CommonConstants.DATABASE);
+  public static String extractDatabaseFromQueryRequest(
+      @Nullable Map<String, String> queryOptions, @Nullable HttpHeaders headers) {
+    String databaseFromOptions = queryOptions == null ? null : queryOptions.get(CommonConstants.DATABASE);
+    String databaseFromHeaders = headers == null ? null : headers.getHeaderString(CommonConstants.DATABASE);
     if (databaseFromHeaders != null && databaseFromOptions != null) {
       Preconditions.checkArgument(databaseFromOptions.equals(databaseFromHeaders), "Database context mismatch : "
           + "from headers %s, from query options %s", databaseFromHeaders, databaseFromOptions);
     }
-    if (databaseFromHeaders != null) {
-      return databaseFromHeaders;
-    }
-    return databaseFromOptions;
+    String database = databaseFromHeaders != null ? databaseFromHeaders : databaseFromOptions;
+    return Objects.requireNonNullElse(database, CommonConstants.DEFAULT_DATABASE);
   }
 }

@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -337,11 +338,9 @@ public class QueryEnvironment {
     Properties catalogReaderConfigProperties = new Properties();
     catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
     CalciteConnectionConfigImpl connConfig = new CalciteConnectionConfigImpl(catalogReaderConfigProperties);
-    if (StringUtils.isEmpty(schemaPath) || schemaPath.equals(CommonConstants.DEFAULT_DATABASE)) {
-      return new PinotCalciteCatalogReader(_rootSchema, Collections.emptyList(), _typeFactory,
-          connConfig);
-    }
-    return new PinotCalciteCatalogReader(_rootSchema, Collections.singletonList(schemaPath), _typeFactory, connConfig);
+    return new PinotCalciteCatalogReader(_rootSchema,
+        Collections.singletonList(Objects.requireNonNullElse(schemaPath, CommonConstants.DEFAULT_DATABASE)),
+        _typeFactory, connConfig);
   }
 
   private FrameworkConfig getConfig(Prepare.CatalogReader catalogReader) {
