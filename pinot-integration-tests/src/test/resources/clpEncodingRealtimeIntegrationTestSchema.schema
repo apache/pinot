@@ -1,0 +1,18 @@
+{
+  "schemaName": "clpEncodingIT",
+  "dimensionFieldSpecs": [
+    {
+      "name": "logLine",
+      "dataType": "STRING"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "timestampInEpoch",
+      "dataType": "LONG",
+      "notNull": false,
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}

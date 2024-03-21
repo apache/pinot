@@ -21,6 +21,8 @@ package org.apache.pinot.segment.local.realtime.converter.stats;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndex;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
@@ -30,7 +32,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import static org.apache.pinot.segment.spi.Constants.UNKNOWN_CARDINALITY;
 
 
-public class MutableNoDictionaryColStatistics implements ColumnStatistics {
+public class MutableNoDictionaryColStatistics implements ColumnStatistics, CLPStatsProvider {
   private final DataSourceMetadata _dataSourceMetadata;
   private final MutableForwardIndex _forwardIndex;
 
@@ -110,5 +112,14 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics {
   @Override
   public Set<Integer> getPartitions() {
     return _dataSourceMetadata.getPartitions();
+  }
+
+  @Override
+  public CLPStats getCLPStats() {
+    if (_forwardIndex instanceof CLPMutableForwardIndex) {
+      return ((CLPMutableForwardIndex) _forwardIndex).getCLPStats();
+    }
+    throw new IllegalStateException(
+        "CLP stats not available for column: " + _dataSourceMetadata.getFieldSpec().getName());
   }
 }

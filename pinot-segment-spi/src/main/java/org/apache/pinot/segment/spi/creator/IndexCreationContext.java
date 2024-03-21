@@ -22,12 +22,14 @@ import java.io.File;
 import java.util.Objects;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
 /**
- * Provides parameters for constructing indexes via {@link IndexType#createIndexCreator(IndexCreationContext, Object)}.
+ * Provides parameters for constructing indexes via
+ * {@link IndexType#createIndexCreator(IndexCreationContext, IndexConfig)}.
  * The responsibility for ensuring that the correct parameters for a particular
  * index type lies with the caller.
  */
@@ -88,7 +90,10 @@ public interface IndexCreationContext {
    */
   boolean isTextCommitOnClose();
 
+  ColumnStatistics getColumnStatistics();
+
   final class Builder {
+    private ColumnStatistics _columnStatistics;
     private File _indexDir;
     private int _lengthOfLongestEntry;
     private int _maxNumberOfMultiValueElements;
@@ -116,9 +121,15 @@ public interface IndexCreationContext {
           .withMaxValue((Comparable<?>) columnIndexCreationInfo.getMax())
           .withTotalNumberOfEntries(columnIndexCreationInfo.getTotalNumberOfEntries())
           .withSortedUniqueElementsArray(columnIndexCreationInfo.getSortedUniqueElementsArray())
+          .withColumnStatistics(columnIndexCreationInfo.getColumnStatistics())
           .withCardinality(columnIndexCreationInfo.getDistinctValueCount())
           .withFixedLength(columnIndexCreationInfo.isFixedLength())
           .sorted(columnIndexCreationInfo.isSorted());
+    }
+
+    public Builder withColumnStatistics(ColumnStatistics columnStatistics) {
+      _columnStatistics = columnStatistics;
+      return this;
     }
 
     public Builder withIndexDir(File indexDir) {
@@ -222,7 +233,7 @@ public interface IndexCreationContext {
       return new Common(Objects.requireNonNull(_indexDir), _lengthOfLongestEntry, _maxNumberOfMultiValueElements,
           _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
           _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled,
-          _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose);
+          _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose, _columnStatistics);
     }
 
     public Builder withSortedUniqueElementsArray(Object sortedUniqueElementsArray) {
@@ -255,13 +266,14 @@ public interface IndexCreationContext {
     private final boolean _optimizeDictionary;
     private final boolean _fixedLength;
     private final boolean _textCommitOnClose;
+    private final ColumnStatistics _columnStatistics;
 
     public Common(File indexDir, int lengthOfLongestEntry,
         int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
         FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
         int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
         boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary,
-        boolean fixedLength, boolean textCommitOnClose) {
+        boolean fixedLength, boolean textCommitOnClose, ColumnStatistics columnStatistics) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
@@ -280,6 +292,7 @@ public interface IndexCreationContext {
       _optimizeDictionary = optimizeDictionary;
       _fixedLength = fixedLength;
       _textCommitOnClose = textCommitOnClose;
+      _columnStatistics = columnStatistics;
     }
 
     public FieldSpec getFieldSpec() {
@@ -359,6 +372,11 @@ public interface IndexCreationContext {
     @Override
     public boolean isTextCommitOnClose() {
       return _textCommitOnClose;
+    }
+
+    @Override
+    public ColumnStatistics getColumnStatistics() {
+      return _columnStatistics;
     }
   }
 }
