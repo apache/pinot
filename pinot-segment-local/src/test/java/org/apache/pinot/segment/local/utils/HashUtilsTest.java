@@ -40,8 +40,15 @@ public class HashUtilsTest {
     testHashUUID(new UUID[]{UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()});
 
     // Test failure scenario
-    String[] invalidUUID = new String[]{"some-random-string"};
-    Assert.assertEquals(HashUtils.hashUUID(invalidUUID), invalidUUID[0].getBytes(StandardCharsets.UTF_8));
+    String[] invalidUUIDs = new String[]{"some-random-string"};
+    Assert.assertEquals(HashUtils.hashUUID(invalidUUIDs), invalidUUIDs[0].getBytes(StandardCharsets.UTF_8));
+    // Test scenario when one of the values is null
+    invalidUUIDs = new String[]{UUID.randomUUID().toString(), null};
+    byte[] hashResult = HashUtils.hashUUID(invalidUUIDs);
+    Assert.assertNotNull(hashResult);
+    byte[] lastFourBytes = new byte[4];
+    System.arraycopy(hashResult, hashResult.length - 4, lastFourBytes, 0, lastFourBytes.length);
+    Assert.assertEquals(new String(lastFourBytes, StandardCharsets.UTF_8), "null");
   }
 
   private void testHashUUID(UUID[] uuids) {
