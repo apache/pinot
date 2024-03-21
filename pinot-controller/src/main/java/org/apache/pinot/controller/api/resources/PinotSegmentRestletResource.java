@@ -666,8 +666,8 @@ public class PinotSegmentRestletResource {
   @Path("/segments/{tableName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_SEGMENT)
   @Authenticate(AccessType.DELETE)
-  @ApiOperation(value = "Delete the list of segments provided in the payload else all segments",
-      notes = "Delete the list of segments provided in the payload else all segments")
+  @ApiOperation(value = "Delete the list of segments provided in the queryParam else all segments",
+      notes = "Delete the list of segments provided in the queryParam else all segments")
   public SuccessResponse deleteMultipleSegments(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
