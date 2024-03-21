@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteSVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
@@ -68,7 +69,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
   public static final String INDEX_DISPLAY_NAME = "forward";
   // For multi-valued column, forward-index.
   // Maximum number of multi-values per row. We assert on this.
-  private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
+  public static final int MAX_MULTI_VALUES_PER_ROW = 1000;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT = 100;
   private static final int NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT = 100_000;
   private static final List<String> EXTENSIONS = Lists.newArrayList(
@@ -283,6 +284,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           // Use a smaller capacity as opposed to segment flush size
           int initialCapacity = Math.min(context.getCapacity(),
               NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
+          if (config.getCompressionCodec() == CompressionCodec.CLP) {
+            return new CLPMutableForwardIndex(column, storedType, context.getMemoryManager(), context.getCapacity());
+          }
           return new VarByteSVMutableForwardIndex(storedType, context.getMemoryManager(), allocationContext,
               initialCapacity, NODICT_VARIABLE_WIDTH_ESTIMATED_AVERAGE_VALUE_LENGTH_DEFAULT);
         }
