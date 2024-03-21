@@ -35,26 +35,17 @@ public class HashUtilsTest {
   }
 
   @Test
-  public void testHashUUIDv4() {
-    testHashUUIDv4(new UUID[]{UUID.randomUUID()});
-    testHashUUIDv4(new UUID[]{UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()});
+  public void testHashUUID() {
+    testHashUUID(new UUID[]{UUID.randomUUID()});
+    testHashUUID(new UUID[]{UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()});
 
     // Test failure scenario
-    byte[] invalidType4UUID = new byte[8];
-    // Set byte 0 to an arbitrary value. Hash function below should return the input array as is.
-    invalidType4UUID[0] = 0x10;
-    Assert.assertEquals(HashUtils.hashUUIDv4(invalidType4UUID), invalidType4UUID);
+    String[] invalidUUID = new String[]{"some-random-string"};
+    Assert.assertEquals(HashUtils.hashUUID(invalidUUID), invalidUUID[0].getBytes(StandardCharsets.UTF_8));
   }
 
-  private void testHashUUIDv4(UUID[] uuids) {
-    StringBuilder concatenatedUUID = new StringBuilder();
-    for (UUID uuid : uuids) {
-      concatenatedUUID.append(uuid);
-    }
-    byte[] inputBytes = concatenatedUUID.toString().getBytes(StandardCharsets.UTF_8);
-    // Ensure test data is valid. Each UUID in string form should be 36 bytes.
-    Assert.assertEquals(inputBytes.length, 36 * uuids.length);
-    byte[] convertedBytes = HashUtils.hashUUIDv4(inputBytes);
+  private void testHashUUID(UUID[] uuids) {
+    byte[] convertedBytes = HashUtils.hashUUID(uuids);
     // After hashing, each UUID should take 16 bytes.
     Assert.assertEquals(convertedBytes.length, 16 * uuids.length);
     // Below we reconstruct each UUID from the reduced 16-byte representation, and ensure it is the same as the input.

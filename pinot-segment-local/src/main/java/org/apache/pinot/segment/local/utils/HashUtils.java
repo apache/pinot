@@ -41,32 +41,38 @@ public class HashUtils {
   }
 
   /**
-   * For use-cases where the primary-key is set to columns that are guaranteed to be type-4 UUIDs, this hash-function
-   * will reduce the number of bytes required from 36 to 16 for each UUID, without losing any precision. This leverages
-   * the fact that a type-4 UUID is essentially a 16-byte value.
+   * Returns a byte array that is a concatenation of the binary representation of each of the passed UUID values. This
+   * is done by getting a String from each value by calling {@link Object#toString()}, which is then used to create a
+   * {@link UUID} object. The 16 bytes of each UUID are appended to a buffer which is then returned in the result.
+   * If any of the value is not a valid UUID, then this function appends to UTF-8 string bytes of all elements and
+   * returns that in the result.
    */
-  public static byte[] hashUUIDv4(byte[] bytes) {
-    if (bytes.length % 36 != 0) {
-      return bytes;
-    }
-    byte[] resultBytes = new byte[(bytes.length / 36) * 16];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(resultBytes).order(ByteOrder.BIG_ENDIAN);
-    for (int chunk = 0; chunk < bytes.length; chunk += 36) {
-      byte[] tempBytes = new byte[36];
-      System.arraycopy(bytes, chunk, tempBytes, 0, tempBytes.length);
+  public static byte[] hashUUID(Object[] values) {
+    byte[] result = new byte[values.length * 16];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(result).order(ByteOrder.BIG_ENDIAN);
+    for (Object value : values) {
+      String uuidString = value.toString();
       UUID uuid;
       try {
-        uuid = UUID.fromString(new String(tempBytes, StandardCharsets.UTF_8));
-      } catch (Exception e) {
-        // In case of failures, make the hash no-op.
-        return bytes;
+        uuid = UUID.fromString(uuidString);
+      } catch (Throwable t) {
+        byte[][] allValueBytes = new byte[values.length][];
+        int totalLen = 0;
+        for (int j = 0; j < allValueBytes.length; j++) {
+          allValueBytes[j] = values[j].toString().getBytes(StandardCharsets.UTF_8);
+          totalLen += allValueBytes[j].length;
+        }
+        result = new byte[totalLen];
+        for (int j = 0, offset = 0; j < allValueBytes.length; j++) {
+          System.arraycopy(allValueBytes[j], 0, result, offset, allValueBytes[j].length);
+          offset += allValueBytes[j].length;
+        }
+        return result;
       }
-      long lsb = uuid.getLeastSignificantBits();
-      long msb = uuid.getMostSignificantBits();
-      byteBuffer.putLong(msb);
-      byteBuffer.putLong(lsb);
+      byteBuffer.putLong(uuid.getMostSignificantBits());
+      byteBuffer.putLong(uuid.getLeastSignificantBits());
     }
-    return resultBytes;
+    return result;
   }
 
   public static Object hashPrimaryKey(PrimaryKey primaryKey, HashFunction hashFunction) {
@@ -77,8 +83,8 @@ public class HashUtils {
         return new ByteArray(HashUtils.hashMD5(primaryKey.asBytes()));
       case MURMUR3:
         return new ByteArray(HashUtils.hashMurmur3(primaryKey.asBytes()));
-      case UUID_V4:
-        return new ByteArray(HashUtils.hashUUIDv4(primaryKey.asBytes()));
+      case UUID:
+        return new ByteArray(HashUtils.hashUUID(primaryKey.getValues()));
       default:
         throw new IllegalArgumentException(String.format("Unrecognized hash function %s", hashFunction));
     }

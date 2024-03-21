@@ -19,5 +19,5 @@
 package org.apache.pinot.spi.config.table;
 
 public enum HashFunction {
-  NONE, MD5, MURMUR3, UUID_V4
+  NONE, MD5, MURMUR3, UUID
 }
