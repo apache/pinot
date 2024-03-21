@@ -62,24 +62,12 @@
       <artifactId>pinot-integration-test-base</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-math3</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-integration-tests</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-math3</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -104,10 +92,6 @@
       <artifactId>pinot-segment-local</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-math3</artifactId>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>

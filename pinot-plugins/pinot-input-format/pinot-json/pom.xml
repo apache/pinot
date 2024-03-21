@@ -36,11 +36,4 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
   </properties>
-
-  <dependencies>
-    <dependency>
-      <groupId>commons-lang</groupId>
-      <artifactId>commons-lang</artifactId>
-    </dependency>
-  </dependencies>
 </project>
