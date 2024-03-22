@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi;
 
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -27,11 +28,29 @@ public class SegmentContext {
   public SegmentContext() {
   }
 
+  public SegmentContext(IndexSegment segment) {
+    _queryableDocIdsSnapshot = getQueryableDocIdsSnapshotFromSegment(segment);
+  }
+
   public MutableRoaringBitmap getQueryableDocIdsSnapshot() {
     return _queryableDocIdsSnapshot;
   }
 
   public void setQueryableDocIdsSnapshot(MutableRoaringBitmap queryableDocIdsSnapshot) {
     _queryableDocIdsSnapshot = queryableDocIdsSnapshot;
+  }
+
+  public static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
+    MutableRoaringBitmap queryableDocIdsSnapshot = null;
+    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
+    if (queryableDocIds != null) {
+      queryableDocIdsSnapshot = queryableDocIds.getMutableRoaringBitmap();
+    } else {
+      ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+      if (validDocIds != null) {
+        queryableDocIdsSnapshot = validDocIds.getMutableRoaringBitmap();
+      }
+    }
+    return queryableDocIdsSnapshot;
   }
 }

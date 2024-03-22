@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -155,7 +156,10 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     Operator<?> operator = PLAN_MAKER.makeSegmentPlanNode(_indexSegment, queryContext).run();
     assertTrue(operatorClass.isInstance(operator));
-    Operator<?> upsertOperator = PLAN_MAKER.makeSegmentPlanNode(_upsertIndexSegment, queryContext).run();
+    Operator<?> upsertOperator =
+        PLAN_MAKER.makeSegmentPlanNode(_upsertIndexSegment, new SegmentContext(_upsertIndexSegment), queryContext)
+            .run();
+    System.out.println(upsertOperator.toExplainString());
     assertTrue(upsertOperatorClass.isInstance(upsertOperator));
   }
 
@@ -200,8 +204,8 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
     });
     // MINMAXRANGE from dictionary with match all filter
     entries.add(new Object[]{
-        "select minmaxrange(daysSinceEpoch) from testTable where column1 > 10", NonScanBasedAggregationOperator.class,
-        AggregationOperator.class
+        "select minmaxrange(daysSinceEpoch) from testTable where column1 > 10", NonScanBasedAggregationOperator.class
+        , AggregationOperator.class
     });
     // Aggregation
     entries.add(new Object[]{
