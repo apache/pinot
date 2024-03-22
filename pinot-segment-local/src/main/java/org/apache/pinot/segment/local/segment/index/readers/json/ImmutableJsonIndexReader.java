@@ -131,23 +131,14 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
    * Returns the matching flattened doc ids for the given filter.
    */
   private MutableRoaringBitmap getMatchingFlattenedDocIds(FilterContext filter) {
-    return getMatchingFlattenedDocIds(filter, false);
-  }
-
-  /**
-   * When operator requires flattened doc IDs (eg: jsonExtractIndexArray), nested exclusive predicates are allowed.
-   * When operator requires unflattened doc IDs, nested exclusive predicates are not allowed.
-   */
-  private MutableRoaringBitmap getMatchingFlattenedDocIds(FilterContext filter,
-      boolean allowNestedExclusivePredicates) {
     switch (filter.getType()) {
       case AND: {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
         MutableRoaringBitmap matchingDocIds =
-            getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicates);
+            getMatchingFlattenedDocIds(children.get(0));
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicates));
+          matchingDocIds.and(getMatchingFlattenedDocIds(children.get(i)));
         }
         return matchingDocIds;
       }
@@ -155,24 +146,17 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         List<FilterContext> children = filter.getChildren();
         int numChildren = children.size();
         MutableRoaringBitmap matchingDocIds =
-            getMatchingFlattenedDocIds(children.get(0), allowNestedExclusivePredicates);
+            getMatchingFlattenedDocIds(children.get(0));
         for (int i = 1; i < numChildren; i++) {
-          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i), allowNestedExclusivePredicates));
+          matchingDocIds.or(getMatchingFlattenedDocIds(children.get(i)));
         }
         return matchingDocIds;
       }
       case PREDICATE: {
         Predicate predicate = filter.getPredicate();
-        if (!allowNestedExclusivePredicates) {
-          Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
-              predicate);
-        }
-
-        MutableRoaringBitmap matchingFlattenedDocs = getMatchingFlattenedDocIds(predicate);
-        if (isExclusive(predicate.getType())) {
-          matchingFlattenedDocs.flip(0L, _numFlattenedDocs);
-        }
-        return matchingFlattenedDocs;
+        Preconditions
+            .checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested", predicate);
+        return getMatchingFlattenedDocIds(predicate);
       }
       default:
         throw new IllegalStateException();
@@ -360,7 +344,7 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       } catch (Exception e) {
         throw new BadQueryRequestException("Invalid json match filter: " + filterString);
       }
-      filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter, true).toRoaringBitmap();
+      filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter).toRoaringBitmap();
     }
 
     Map<String, RoaringBitmap> result = new HashMap<>();
