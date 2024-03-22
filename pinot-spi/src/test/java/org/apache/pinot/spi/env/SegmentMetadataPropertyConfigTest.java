@@ -37,7 +37,6 @@ import static org.testng.Assert.assertNull;
 
 
 public class SegmentMetadataPropertyConfigTest {
-  private static final String SEGMENT_VERSION_IDENTIFIER = "segment.metadata.version";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "SegmentMetadataPropertyConfigTest");
   private static final File CONFIG_FILE = new File(TEMP_DIR, "config");
   private static final String[] TEST_PROPERTY_KEY = { "test1", "test2_key", "test3_key_",
@@ -143,7 +142,7 @@ public class SegmentMetadataPropertyConfigTest {
 
   @Test
   //Test requires 'segment-metadata-with-version-header.properties' sample segment metadata file in resources folder
-  public void testSampleSegmentMetadataWithVersionHeader()
+  public void testSegmentMetadataWithVersionHeader()
       throws ConfigurationException {
     File oldSegmentProperties = new File(
         Objects.requireNonNull(
