@@ -36,6 +36,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -71,7 +72,7 @@ import org.slf4j.LoggerFactory;
  *       thus requires canonicalization.</li>
  * </ul>
  */
-public class LeafStageTransferableBlockOperator extends MultiStageOperator {
+public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafStageTransferableBlockOperator.StatKey> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
@@ -106,12 +107,17 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   }
 
   @Override
+  public Class<StatKey> getStatKeyClass() {
+    return StatKey.class;
+  }
+
+  @Override
   protected Logger logger() {
     return LOGGER;
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public List<MultiStageOperator<?>> getChildOperators() {
     return Collections.emptyList();
   }
 
@@ -423,6 +429,24 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     public void send(BaseResultsBlock block)
         throws InterruptedException, TimeoutException {
       addResultsBlock(block);
+    }
+  }
+
+  public enum StatKey implements StatMap.Key {
+    NUM_ROWS(StatMap.Type.LONG),
+    NUM_BLOCK(StatMap.Type.INT),
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG);
+
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
     }
   }
 }

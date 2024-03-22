@@ -49,16 +49,16 @@ import org.slf4j.LoggerFactory;
     3) All boolean scalar functions we have that take tranformOperand.
     Note: Scalar functions are the ones we have in v1 engine and only do function name and arg # matching.
  */
-public class FilterOperator extends MultiStageOperator {
+public class FilterOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterOperator.class);
   private static final String EXPLAIN_NAME = "FILTER";
 
-  private final MultiStageOperator _upstreamOperator;
+  private final MultiStageOperator<?> _upstreamOperator;
   private final TransformOperand _filterOperand;
   private final DataSchema _dataSchema;
 
-  public FilterOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, DataSchema dataSchema,
+  public FilterOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator, DataSchema dataSchema,
       RexExpression filter) {
     super(context);
     _upstreamOperator = upstreamOperator;
@@ -69,12 +69,17 @@ public class FilterOperator extends MultiStageOperator {
   }
 
   @Override
+  public Class<BaseStatKeys> getStatKeyClass() {
+    return BaseStatKeys.class;
+  }
+
+  @Override
   protected Logger logger() {
     return LOGGER;
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public List<MultiStageOperator<?>> getChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
 

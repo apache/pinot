@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
@@ -43,7 +44,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
  * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
-public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
+public abstract class BaseMailboxReceiveOperator<K extends Enum<K> & StatMap.Key> extends MultiStageOperator<K> {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
@@ -80,7 +81,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public List<MultiStageOperator<?>> getChildOperators() {
     return Collections.emptyList();
   }
 
@@ -98,9 +99,9 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
 
   private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
     private final ReceivingMailbox _mailbox;
-    private final BaseMailboxReceiveOperator _operator;
+    private final BaseMailboxReceiveOperator<?> _operator;
 
-    public ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator operator) {
+    public ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator<?> operator) {
       _mailbox = mailbox;
       _operator = operator;
     }

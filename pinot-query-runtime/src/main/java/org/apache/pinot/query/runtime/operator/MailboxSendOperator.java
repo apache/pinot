@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  *
  * TODO: Add support to sort the data prior to sending if sorting is enabled
  */
-public class MailboxSendOperator extends MultiStageOperator {
+public class MailboxSendOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
   public static final EnumSet<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
       EnumSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
           RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED);
@@ -57,13 +57,13 @@ public class MailboxSendOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
 
-  private final MultiStageOperator _sourceOperator;
+  private final MultiStageOperator<?> _sourceOperator;
   private final BlockExchange _exchange;
   private final List<RexExpression> _collationKeys;
   private final List<RelFieldCollation.Direction> _collationDirections;
   private final boolean _isSortOnSender;
 
-  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
+  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator<?> sourceOperator,
       RelDistribution.Type distributionType, @Nullable List<Integer> distributionKeys,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender, int receiverStageId) {
@@ -104,12 +104,17 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
+  public Class<BaseStatKeys> getStatKeyClass() {
+    return BaseStatKeys.class;
+  }
+
+  @Override
   protected Logger logger() {
     return LOGGER;
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public List<MultiStageOperator<?>> getChildOperators() {
     return Collections.singletonList(_sourceOperator);
   }
 

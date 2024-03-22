@@ -30,13 +30,18 @@ import org.slf4j.LoggerFactory;
 /**
  * Minus/Except operator.
  */
-public class MinusOperator extends SetOperator {
+public class MinusOperator extends SetOperator<MultiStageOperator.BaseStatKeys> {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinusOperator.class);
   private static final String EXPLAIN_NAME = "MINUS";
 
-  public MinusOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public MinusOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator<?>> upstreamOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, upstreamOperators, dataSchema);
+  }
+
+  @Override
+  public Class<BaseStatKeys> getStatKeyClass() {
+    return BaseStatKeys.class;
   }
 
   @Override

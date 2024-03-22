@@ -35,7 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-class PipelineBreakerOperator extends MultiStageOperator {
+class PipelineBreakerOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerOperator.class);
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
 
@@ -51,6 +51,16 @@ class PipelineBreakerOperator extends MultiStageOperator {
     for (int workerKey : workerMap.keySet()) {
       _resultMap.put(workerKey, new ArrayList<>());
     }
+  }
+
+  @Override
+  public List<MultiStageOperator<?>> getChildOperators() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Class<BaseStatKeys> getStatKeyClass() {
+    return BaseStatKeys.class;
   }
 
   @Override

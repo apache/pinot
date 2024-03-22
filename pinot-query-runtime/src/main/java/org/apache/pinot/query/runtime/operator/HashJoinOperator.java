@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 // TODO: Support memory size based resource limit.
-public class HashJoinOperator extends MultiStageOperator {
+public class HashJoinOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HashJoinOperator.class);
   private static final String EXPLAIN_NAME = "HASH_JOIN";
@@ -84,8 +84,8 @@ public class HashJoinOperator extends MultiStageOperator {
   // Only used for right join and full join to output non-matched right rows.
   private final Map<Object, BitSet> _matchedRightRows;
 
-  private final MultiStageOperator _leftTableOperator;
-  private final MultiStageOperator _rightTableOperator;
+  private final MultiStageOperator<?> _leftTableOperator;
+  private final MultiStageOperator<?> _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
   private final int _leftColumnSize;
@@ -116,8 +116,8 @@ public class HashJoinOperator extends MultiStageOperator {
 
   private int _currentRowsInHashTable = 0;
 
-  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftTableOperator,
-      MultiStageOperator rightTableOperator, DataSchema leftSchema, JoinNode node) {
+  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator<?> leftTableOperator,
+      MultiStageOperator<?> rightTableOperator, DataSchema leftSchema, JoinNode node) {
     super(context);
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
@@ -148,6 +148,11 @@ public class HashJoinOperator extends MultiStageOperator {
     Map<String, String> metadata = context.getOpChainMetadata();
     _maxRowsInHashTable = getMaxRowInJoin(metadata, node.getJoinHints());
     _joinOverflowMode = getJoinOverflowMode(metadata, node.getJoinHints());
+  }
+
+  @Override
+  public Class<BaseStatKeys> getStatKeyClass() {
+    return BaseStatKeys.class;
   }
 
   @Override
@@ -186,7 +191,7 @@ public class HashJoinOperator extends MultiStageOperator {
 
   // TODO: Separate left and right table operator.
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public List<MultiStageOperator<?>> getChildOperators() {
     return ImmutableList.of(_leftTableOperator, _rightTableOperator);
   }
 

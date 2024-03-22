@@ -32,7 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class LiteralValueOperator extends MultiStageOperator {
+public class LiteralValueOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
   private static final String EXPLAIN_NAME = "LITERAL_VALUE_PROVIDER";
   private static final Logger LOGGER = LoggerFactory.getLogger(LiteralValueOperator.class);
 
@@ -50,12 +50,17 @@ public class LiteralValueOperator extends MultiStageOperator {
   }
 
   @Override
+  public Class<BaseStatKeys> getStatKeyClass() {
+    return BaseStatKeys.class;
+  }
+
+  @Override
   protected Logger logger() {
     return LOGGER;
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public List<MultiStageOperator<?>> getChildOperators() {
     return ImmutableList.of();
   }
 

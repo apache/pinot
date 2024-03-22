@@ -20,6 +20,8 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Joiner;
 import java.util.List;
+import java.util.function.Consumer;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -30,7 +32,8 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 
 
-public abstract class MultiStageOperator implements Operator<TransferableBlock>, AutoCloseable {
+public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
+    implements Operator<TransferableBlock>, AutoCloseable {
 
   protected final OpChainExecutionContext _context;
   protected final String _operatorId;
@@ -94,15 +97,13 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
-    throw new UnsupportedOperationException();
-  }
+  public abstract List<MultiStageOperator<?>> getChildOperators();
 
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
   @Override
   public void close() {
-    for (MultiStageOperator op : getChildOperators()) {
+    for (MultiStageOperator<?> op : getChildOperators()) {
       try {
         op.close();
       } catch (Exception e) {
@@ -113,13 +114,52 @@ public abstract class MultiStageOperator implements Operator<TransferableBlock>,
   }
 
   public void cancel(Throwable e) {
-    for (MultiStageOperator op : getChildOperators()) {
+    for (MultiStageOperator<?> op : getChildOperators()) {
       try {
         op.cancel(e);
       } catch (Exception e2) {
         logger().error("Failed to cancel operator:" + op + "with error:" + e + " with exception:" + e2);
         // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
       }
+    }
+  }
+
+  public void forEachOperator(Consumer<MultiStageOperator<?>> consumer) {
+    consumer.accept(this);
+    for (MultiStageOperator<?> child : getChildOperators()) {
+      child.forEachOperator(consumer);
+    }
+  }
+
+  public abstract Class<K> getStatKeyClass();
+
+  public enum Type {
+    AGGREGATE,
+    FILTER,
+    HASH_JOIN,
+    INTERSECT,
+    LEAF,
+    MAILBOX_RECEIVE,
+    MAILBOX_SEND,
+    PIPELINE,
+    SORT,
+    TRANSFORM,
+    UNION,
+    WINDOW
+  }
+
+  public enum BaseStatKeys implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG),;
+    private final StatMap.Type _type;
+
+    BaseStatKeys(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
     }
   }
 }

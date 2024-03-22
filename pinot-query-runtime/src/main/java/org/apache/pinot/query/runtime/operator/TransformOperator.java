@@ -44,17 +44,17 @@ import org.slf4j.LoggerFactory;
  * Note: Function transform only runs functions from v1 engine scalar function factory, which only does argument count
  * and canonicalized function name matching (lower case).
  */
-public class TransformOperator extends MultiStageOperator {
+public class TransformOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
   private static final String EXPLAIN_NAME = "TRANSFORM";
 
-  private final MultiStageOperator _upstreamOperator;
+  private final MultiStageOperator<?> _upstreamOperator;
   private final List<TransformOperand> _transformOperandsList;
   private final int _resultColumnSize;
   // TODO: Check type matching between resultSchema and the actual result.
   private final DataSchema _resultSchema;
 
-  public TransformOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+  public TransformOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator,
       DataSchema resultSchema, List<RexExpression> transforms, DataSchema upstreamDataSchema) {
     super(context);
     Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
@@ -70,12 +70,17 @@ public class TransformOperator extends MultiStageOperator {
   }
 
   @Override
+  public Class<BaseStatKeys> getStatKeyClass() {
+    return BaseStatKeys.class;
+  }
+
+  @Override
   protected Logger logger() {
     return LOGGER;
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public List<MultiStageOperator<?>> getChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
 

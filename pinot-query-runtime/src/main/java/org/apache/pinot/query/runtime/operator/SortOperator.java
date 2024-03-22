@@ -39,11 +39,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SortOperator extends MultiStageOperator {
+public class SortOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
   private static final String EXPLAIN_NAME = "SORT";
   private static final Logger LOGGER = LoggerFactory.getLogger(SortOperator.class);
 
-  private final MultiStageOperator _upstreamOperator;
+  private final MultiStageOperator<?> _upstreamOperator;
   private final int _fetch;
   private final int _offset;
   private final DataSchema _dataSchema;
@@ -53,7 +53,7 @@ public class SortOperator extends MultiStageOperator {
 
   private boolean _hasConstructedSortedBlock;
 
-  public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+  public SortOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator,
       List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
       List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
       boolean isInputSorted) {
@@ -63,8 +63,8 @@ public class SortOperator extends MultiStageOperator {
   }
 
   @VisibleForTesting
-  SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections,
+  SortOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator,
+      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
       List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
       boolean isInputSorted, int defaultHolderCapacity, int defaultResponseLimit) {
     super(context);
@@ -92,12 +92,17 @@ public class SortOperator extends MultiStageOperator {
   }
 
   @Override
+  public Class<BaseStatKeys> getStatKeyClass() {
+    return BaseStatKeys.class;
+  }
+
+  @Override
   protected Logger logger() {
     return LOGGER;
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public List<MultiStageOperator<?>> getChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
 

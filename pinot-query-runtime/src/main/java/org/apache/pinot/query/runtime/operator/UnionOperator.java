@@ -31,13 +31,18 @@ import org.slf4j.LoggerFactory;
 /**
  * Union operator for UNION ALL queries.
  */
-public class UnionOperator extends SetOperator {
+public class UnionOperator extends SetOperator<MultiStageOperator.BaseStatKeys> {
   private static final Logger LOGGER = LoggerFactory.getLogger(UnionOperator.class);
   private static final String EXPLAIN_NAME = "UNION";
 
-  public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator<?>> upstreamOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, upstreamOperators, dataSchema);
+  }
+
+  @Override
+  public Class<BaseStatKeys> getStatKeyClass() {
+    return BaseStatKeys.class;
   }
 
   @Override
@@ -53,7 +58,7 @@ public class UnionOperator extends SetOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    for (MultiStageOperator upstreamOperator : getChildOperators()) {
+    for (MultiStageOperator<?> upstreamOperator : getChildOperators()) {
       TransferableBlock block = upstreamOperator.nextBlock();
       if (!block.isEndOfStreamBlock()) {
         return block;

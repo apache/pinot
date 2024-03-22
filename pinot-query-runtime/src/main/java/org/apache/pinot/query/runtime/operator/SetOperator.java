@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.data.table.Record;
@@ -40,12 +41,12 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * The right child operator is consumed in a blocking manner, and the left child operator is consumed in a non-blocking
  * UnionOperator: The right child operator is consumed in a blocking manner.
  */
-public abstract class SetOperator extends MultiStageOperator {
+public abstract class SetOperator<K extends Enum<K> & StatMap.Key> extends MultiStageOperator<K> {
   protected final Set<Record> _rightRowSet;
 
-  private final List<MultiStageOperator> _upstreamOperators;
-  private final MultiStageOperator _leftChildOperator;
-  private final MultiStageOperator _rightChildOperator;
+  private final List<MultiStageOperator<?>> _upstreamOperators;
+  private final MultiStageOperator<?> _leftChildOperator;
+  private final MultiStageOperator<?> _rightChildOperator;
 
   private final DataSchema _dataSchema;
 
@@ -53,7 +54,7 @@ public abstract class SetOperator extends MultiStageOperator {
   private boolean _isTerminated;
   private TransferableBlock _upstreamErrorBlock;
 
-  public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> upstreamOperators,
+  public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator<?>> upstreamOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext);
     _dataSchema = dataSchema;
@@ -66,7 +67,7 @@ public abstract class SetOperator extends MultiStageOperator {
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public List<MultiStageOperator<?>> getChildOperators() {
     return _upstreamOperators;
   }
 
