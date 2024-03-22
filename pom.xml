@@ -216,6 +216,7 @@
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
     <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
+    <bouncycastle.version>1.77</bouncycastle.version>
   </properties>
 
   <profiles>
@@ -1480,6 +1481,33 @@
         <groupId>io.github.hakky54</groupId>
         <artifactId>sslcontext-kickstart-for-netty</artifactId>
         <version>${sslcontext.kickstart.version}</version>
+      </dependency>
+
+      <!-- bouncycastle libraries are used by Kafka and Pulsar plugins -->
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcpkix-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk18on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcpkix-jdk15to18</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-ext-jdk15to18</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk15to18</artifactId>
+        <version>${bouncycastle.version}</version>
       </dependency>
 
     </dependencies>

@@ -44,7 +44,6 @@
     <simpleclient_common.version>0.16.0</simpleclient_common.version>
     <grpc-proto.version>2.29.0</grpc-proto.version>
     <grpc-context.version>1.60.1</grpc-context.version>
-    <bouncycastle.version>1.75</bouncycastle.version>
     <caffeine.version>2.6.2</caffeine.version>
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
@@ -188,17 +187,14 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk15to18</artifactId>
-      <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-ext-jdk15to18</artifactId>
-      <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk15to18</artifactId>
-      <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>

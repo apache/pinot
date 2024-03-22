@@ -37,7 +37,6 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <kafka.lib.version>2.8.1</kafka.lib.version>
     <phase.prop>package</phase.prop>
-    <bouncycastle.version>1.70</bouncycastle.version>
   </properties>
 
   <dependencies>
@@ -114,14 +113,12 @@
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk15on</artifactId>
-      <version>${bouncycastle.version}</version>
+      <artifactId>bcprov-jdk18on</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
-      <artifactId>bcpkix-jdk15on</artifactId>
-      <version>${bouncycastle.version}</version>
+      <artifactId>bcpkix-jdk18on</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
