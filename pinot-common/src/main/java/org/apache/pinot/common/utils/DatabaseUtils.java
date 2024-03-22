@@ -19,6 +19,8 @@
 package org.apache.pinot.common.utils;
 
 import com.google.common.base.Preconditions;
+import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.commons.lang3.StringUtils;
@@ -83,5 +85,49 @@ public class DatabaseUtils {
 
   public static String translateTableName(String tableName, HttpHeaders headers) {
     return translateTableName(tableName, headers, false);
+  }
+
+  /**
+   * Checks if the fully qualified {@code tableName} belongs to the provided {@code databaseName}
+   * @param tableName fully qualified table name
+   * @param databaseName database name
+   * @return true if
+   * <ul>
+   *   <li>
+   *     tableName is prefixed with "databaseName." or
+   *   </li>
+   *   <li>
+   *     databaseName is null or "default" and tableName does not have a '.'
+   *   </li>
+   * </ul>
+   * else false
+   */
+  public static boolean isPartOfDatabase(String tableName, @Nullable String databaseName) {
+    // assumes tableName will not have default database prefix ('default.')
+    if (StringUtils.isEmpty(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
+      return !tableName.contains(".");
+    } else {
+      return tableName.startsWith(databaseName + ".");
+    }
+  }
+
+  /**
+   * Extract database context from headers and query options
+   * @param queryOptions Query option from request
+   * @param headers http headers from request
+   * @return extracted database name.
+   * <br>If database context is not provided at all return {@link CommonConstants#DEFAULT_DATABASE}.
+   * <br>If queryOptions and headers have conflicting database context an {@link IllegalArgumentException} is thrown.
+   */
+  public static String extractDatabaseFromQueryRequest(
+      @Nullable Map<String, String> queryOptions, @Nullable HttpHeaders headers) {
+    String databaseFromOptions = queryOptions == null ? null : queryOptions.get(CommonConstants.DATABASE);
+    String databaseFromHeaders = headers == null ? null : headers.getHeaderString(CommonConstants.DATABASE);
+    if (databaseFromHeaders != null && databaseFromOptions != null) {
+      Preconditions.checkArgument(databaseFromOptions.equals(databaseFromHeaders), "Database context mismatch : "
+          + "from headers %s, from query options %s", databaseFromHeaders, databaseFromOptions);
+    }
+    String database = databaseFromHeaders != null ? databaseFromHeaders : databaseFromOptions;
+    return Objects.requireNonNullElse(database, CommonConstants.DEFAULT_DATABASE);
   }
 }

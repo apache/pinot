@@ -98,8 +98,7 @@ public class PinotCalciteCatalogReader implements Prepare.CatalogReader {
   public PinotCalciteCatalogReader(CalciteSchema rootSchema,
       List<String> defaultSchema, RelDataTypeFactory typeFactory, CalciteConnectionConfig config) {
     this(rootSchema, SqlNameMatchers.withCaseSensitive(config != null && config.caseSensitive()),
-        ImmutableList.of(Objects.requireNonNull(defaultSchema, "defaultSchema"),
-            ImmutableList.of()),
+        ImmutableList.of(Objects.requireNonNull(defaultSchema, "defaultSchema")),
         typeFactory, config);
   }
 
