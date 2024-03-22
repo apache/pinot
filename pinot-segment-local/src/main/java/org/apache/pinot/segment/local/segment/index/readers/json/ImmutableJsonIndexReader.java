@@ -345,8 +345,8 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
         throw new BadQueryRequestException("Invalid json match filter: " + filterString);
       }
       if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
-        // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in order
-        // to get the correct result, and it cannot be nested
+        // Handle exclusive predicate separately because the flip can only be applied to the
+        // unflattened doc ids in order to get the correct result, and it cannot be nested
         filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate()).toRoaringBitmap();
         filteredFlattenedDocIds.flip(0, _numFlattenedDocs);
       } else {

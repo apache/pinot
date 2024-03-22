@@ -378,8 +378,8 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
         Preconditions.checkArgument(!filter.isConstant(), "Invalid json match filter: " + filterString);
         if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
-          // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in order
-          // to get the correct result, and it cannot be nested
+          // Handle exclusive predicate separately because the flip can only be applied to the
+          // unflattened doc ids in order to get the correct result, and it cannot be nested
           filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
           filteredFlattenedDocIds.flip(0, (long) _nextFlattenedDocId);
         } else {
