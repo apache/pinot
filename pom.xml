@@ -217,6 +217,7 @@
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
     <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
     <bouncycastle.version>1.77</bouncycastle.version>
+    <airlift.version>0.26</airlift.version>
   </properties>
 
   <profiles>
@@ -1510,6 +1511,11 @@
         <version>${bouncycastle.version}</version>
       </dependency>
 
+      <dependency>
+        <groupId>io.airlift</groupId>
+        <artifactId>aircompressor</artifactId>
+        <version>${airlift.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>
