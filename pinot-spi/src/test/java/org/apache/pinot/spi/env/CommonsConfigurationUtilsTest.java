@@ -27,6 +27,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -52,6 +53,31 @@ public class CommonsConfigurationUtilsTest {
   public void tearDown()
       throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
+  }
+
+  @Test
+  public void testSegmentMetadataFromFile() {
+    // load the existing config and check the properties config instance
+    try {
+      PropertiesConfiguration config = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, false, true);
+      assertNotNull(config);
+
+      config.setProperty("testKey", "testValue");
+
+      // add the segment version header to the file and read it again
+      CommonsConfigurationUtils.saveSegmentMetadataToFile(config, CONFIG_FILE, "version1");
+
+      // reading the property with header.
+      config = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, false, true);
+      assertNotNull(config);
+      assertNotNull(config.getHeader());
+    } catch (Exception ex) {
+      Assert.fail("should not throw ConfigurationException exception with valid file");
+    }
+
+    // load the non-existing file and expect the exception
+    Assert.expectThrows(NullPointerException.class,
+        () -> CommonsConfigurationUtils.segmentMetadataFromFile(null, false, true));
   }
 
   @Test

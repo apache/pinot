@@ -134,24 +134,17 @@ public class CommonsConfigurationUtils {
   public static PropertiesConfiguration segmentMetadataFromFile(File file, boolean setIOFactory,
       boolean setDefaultDelimiter)
       throws ConfigurationException {
-    String fileFirstLine = null;
-
-    if (file.exists()) {
-      try {
-        BufferedReader reader = new BufferedReader(new FileReader(file));
-        fileFirstLine = reader.readLine();
-        reader.close();
-      } catch (IOException exception) {
-        throw new ConfigurationException(
-            String.format("Error occurred while reading segment metadata file %s ", file.getName()), exception);
-      }
-    }
-
     PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory;
 
-    if (fileFirstLine != null && fileFirstLine.contains(SEGMENT_VERSION_IDENTIFIER)) {
-       ioFactoryKind = PropertyIOFactoryKind.SegmentMetadataIOFactory;
+    try {
+      if (checkHeaderExistsInSegmentMetadata(file)) {
+        ioFactoryKind = PropertyIOFactoryKind.SegmentMetadataIOFactory;
+      }
+    } catch (IOException exception) {
+      throw new ConfigurationException(
+          String.format("Error occurred while reading segment metadata file %s ", file.getName()), exception);
     }
+
     return fromFile(file, setIOFactory, setDefaultDelimiter, ioFactoryKind);
   }
 
@@ -166,6 +159,7 @@ public class CommonsConfigurationUtils {
   public static PropertiesConfiguration fromFile(File file, boolean setIOFactory,
       boolean setDefaultDelimiter, PropertyIOFactoryKind ioFactoryKind)
       throws ConfigurationException {
+    Preconditions.checkNotNull(file, "File object can not be null for loading configurations");
     PropertiesConfiguration config = createPropertiesConfiguration(setIOFactory, setDefaultDelimiter, ioFactoryKind);
     FileHandler fileHandler = new FileHandler(config);
     // check if file exists, load the properties otherwise set the file.
@@ -184,6 +178,9 @@ public class CommonsConfigurationUtils {
       if (StringUtils.isNotEmpty(versionHeader)) {
         String header = String.format("%s=%s", SEGMENT_VERSION_IDENTIFIER, versionHeader);
         propertiesConfiguration.setHeader(header);
+
+        // setIO appropriate factory
+        propertiesConfiguration.setIOFactory(createPropertyIOFactory(PropertyIOFactoryKind.SegmentMetadataIOFactory));
       }
     saveToFile(propertiesConfiguration, file);
   }
@@ -373,5 +370,26 @@ public class CommonsConfigurationUtils {
       default:
         return new PropertiesConfiguration.DefaultIOFactory();
     }
+  }
+
+  /**
+   * checks whether the segment metadata file first line is version header or not.
+   * @param segmentMetadataFile segment metadata file
+   * @return boolean
+   * @throws IOException exception.
+   */
+  private static boolean checkHeaderExistsInSegmentMetadata(File segmentMetadataFile) throws IOException {
+    Preconditions.checkNotNull(segmentMetadataFile,
+        "Segment Metadata file object can not be null for loading configurations");
+
+    if (segmentMetadataFile.exists()) {
+      BufferedReader reader = new BufferedReader(new FileReader(segmentMetadataFile));
+      String fileFirstLine = reader.readLine();
+      reader.close(); // close the reader
+
+      // check whether the segment has the version header or not
+      return StringUtils.contains(fileFirstLine, SEGMENT_VERSION_IDENTIFIER);
+    }
+    return false;
   }
 }
