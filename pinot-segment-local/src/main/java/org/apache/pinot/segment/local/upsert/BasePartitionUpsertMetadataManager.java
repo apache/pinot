@@ -1084,27 +1084,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     for (IndexSegment segment : selectedSegments) {
       if (_trackedSegments.contains(segment)) {
         segmentContexts.computeIfAbsent(segment, k -> new SegmentContext())
-            .setQueryableDocIdsSnapshot(getSegmentUpsertView(segment));
+            .setQueryableDocIdsSnapshot(SegmentContext.getQueryableDocIdsSnapshotFromSegment(segment));
       }
     }
-  }
-
-  /**
-   * The table partition's data view is formed with the validDocIds bitmap or queryableDocIds bitmap of its all
-   * segments. Using the queryableDocIds if existing.
-   */
-  private static MutableRoaringBitmap getSegmentUpsertView(IndexSegment segment) {
-    MutableRoaringBitmap upsertView = null;
-    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
-    if (queryableDocIds != null) {
-      upsertView = queryableDocIds.getMutableRoaringBitmap();
-    } else {
-      ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
-      if (validDocIds != null) {
-        upsertView = validDocIds.getMutableRoaringBitmap();
-      }
-    }
-    return upsertView;
   }
 
   protected void doClose()

@@ -46,6 +46,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -299,6 +300,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   public void onConsumingToOnline(String segmentNameStr) {
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     _ingestionDelayTracker.markPartitionForVerification(segmentName.getPartitionGroupId());
+  }
+
+  @Override
+  public Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
+      Map<String, String> queryOptions) {
+    if (isUpsertEnabled() && !QueryOptionsUtils.isSkipUpsert(queryOptions)) {
+      return _tableUpsertMetadataManager.getSegmentContexts(selectedSegments);
+    }
+    return null;
   }
 
   /**
@@ -788,14 +798,5 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       isValid = false;
     }
     return isValid;
-  }
-
-  @Override
-  public Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
-      boolean isSkipUpsert) {
-    if (!isSkipUpsert && isUpsertEnabled()) {
-      return _tableUpsertMetadataManager.getSegmentContexts(selectedSegments);
-    }
-    return null;
   }
 }
