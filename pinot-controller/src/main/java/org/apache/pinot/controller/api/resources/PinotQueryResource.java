@@ -260,6 +260,8 @@ public class PinotQueryResource {
               .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
       tableName = _pinotHelixResourceManager.getActualTableName(inputTableName,
           httpHeaders.getHeaderString(CommonConstants.DATABASE));
+    } catch (IllegalArgumentException e) {
+      return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
       try {
