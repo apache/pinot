@@ -218,6 +218,7 @@
     <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
     <bouncycastle.version>1.77</bouncycastle.version>
     <airlift.version>0.26</airlift.version>
+    <pulsar.version>2.11.4</pulsar.version>
   </properties>
 
   <profiles>
@@ -1482,6 +1483,18 @@
         <groupId>io.github.hakky54</groupId>
         <artifactId>sslcontext-kickstart-for-netty</artifactId>
         <version>${sslcontext.kickstart.version}</version>
+      </dependency>
+
+      <!-- Pulsar -->
+      <dependency>
+        <groupId>org.apache.pulsar</groupId>
+        <artifactId>pulsar-client-original</artifactId>
+        <version>${pulsar.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pulsar</groupId>
+        <artifactId>pulsar-client-admin-original</artifactId>
+        <version>${pulsar.version}</version>
       </dependency>
 
       <!-- bouncycastle libraries are used by Kafka and Pulsar plugins -->

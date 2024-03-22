@@ -37,7 +37,6 @@
   <properties>
     <phase.prop>package</phase.prop>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <pulsar.version>2.11.0</pulsar.version>
     <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
     <jersey-container-grizzly2-http.version>2.39</jersey-container-grizzly2-http.version>
@@ -60,7 +59,6 @@
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client-original</artifactId>
-      <version>${pulsar.version}</version>
       <exclusions>
         <exclusion>
           <groupId>javax.ws.rs</groupId>
@@ -87,7 +85,6 @@
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client-admin-original</artifactId>
-      <version>${pulsar.version}</version>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
