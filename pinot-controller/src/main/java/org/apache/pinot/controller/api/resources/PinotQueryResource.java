@@ -73,6 +73,7 @@ import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -253,15 +254,15 @@ public class PinotQueryResource {
     if (queryOptions != null) {
       queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
     }
-    String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+    String database = null;
     try {
       String inputTableName =
           sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
               .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
-      tableName = _pinotHelixResourceManager.getActualTableName(inputTableName,
-          httpHeaders.getHeaderString(CommonConstants.DATABASE));
-    } catch (IllegalArgumentException e) {
-      return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
+      database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+      tableName = _pinotHelixResourceManager.getActualTableName(inputTableName, database);
+    } catch (DatabaseConflictException e) {
+      return QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e).toString();
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
       try {

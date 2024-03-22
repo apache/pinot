@@ -71,6 +71,7 @@ import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
+import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -146,6 +147,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           queryPlanResult = queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
           break;
       }
+    } catch (DatabaseConflictException e) {
+      LOGGER.info("{}. Request {}: {}", e.getMessage(), requestId, query);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+      requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     } catch (WebApplicationException e) {
       throw e;
     } catch (RuntimeException e) {
