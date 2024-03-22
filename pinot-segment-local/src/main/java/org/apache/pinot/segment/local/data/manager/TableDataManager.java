@@ -256,7 +256,10 @@ public interface TableDataManager {
   default void onConsumingToOnline(String segmentNameStr) {
   }
 
-  default Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments) {
+  // TODO: Should this interface be put in pinot.core where RealtimeTableDataManager/OfflineDataDataManager/etc.
+  //       classes are placed. Then we can pass queryContext into this method instead of individual query option.
+  default Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
+      boolean isSkipUpsert) {
     return null;
   }
 }

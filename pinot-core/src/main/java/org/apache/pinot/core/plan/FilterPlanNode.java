@@ -55,7 +55,6 @@ import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndex
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -92,21 +91,8 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public BaseFilterOperator run() {
-    MutableRoaringBitmap queryableDocIdsSnapshot = null;
-    if (_segmentContext != null) {
-      queryableDocIdsSnapshot = _segmentContext.getQueryableDocIdsSnapshot();
-    } else if (!_queryContext.isSkipUpsert()) {
-      // NOTE: Snapshot the queryableDocIds before reading the numDocs to prevent the latest updates getting lost
-      ThreadSafeMutableRoaringBitmap queryableDocIds = _indexSegment.getQueryableDocIds();
-      if (queryableDocIds != null) {
-        queryableDocIdsSnapshot = queryableDocIds.getMutableRoaringBitmap();
-      } else {
-        ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
-        if (validDocIds != null) {
-          queryableDocIdsSnapshot = validDocIds.getMutableRoaringBitmap();
-        }
-      }
-    }
+    MutableRoaringBitmap queryableDocIdsSnapshot =
+        _segmentContext == null ? null : _segmentContext.getQueryableDocIdsSnapshot();
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
 
     if (_filter != null) {
