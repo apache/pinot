@@ -43,6 +43,7 @@ import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 
@@ -272,7 +273,7 @@ public class QueryEnvironmentTestBase {
     RoutingManager routingManager = factory.buildRoutingManager(partitionInfoMap);
     TableCache tableCache = factory.buildTableCache();
     return new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
+        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache), CommonConstants.DEFAULT_DATABASE),
         new WorkerManager("localhost", reducerPort, routingManager), tableCache);
   }
 

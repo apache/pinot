@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.query.catalog;
 
+import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelProtoDataType;
@@ -31,6 +33,7 @@ import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static java.util.Objects.requireNonNull;
@@ -45,6 +48,7 @@ import static java.util.Objects.requireNonNull;
 public class PinotCatalog implements Schema {
 
   private final TableCache _tableCache;
+  private final String _databaseName;
 
   /**
    * PinotCatalog needs have access to the actual {@link TableCache} object because TableCache hosts the actual
@@ -52,6 +56,12 @@ public class PinotCatalog implements Schema {
    */
   public PinotCatalog(TableCache tableCache) {
     _tableCache = tableCache;
+    _databaseName = null;
+  }
+
+  public PinotCatalog(String databaseName, TableCache tableCache) {
+    _tableCache = tableCache;
+    _databaseName = databaseName;
   }
 
   /**
@@ -61,11 +71,12 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Table getTable(String name) {
-    String tableName = TableNameBuilder.extractRawTableName(name);
+    String rawTableName = TableNameBuilder.extractRawTableName(name);
+    String physicalTableName = DatabaseUtils.translateTableName(rawTableName, _databaseName);
+    String tableName = _tableCache.getActualTableName(physicalTableName);
+    Preconditions.checkArgument(tableName != null, String.format("Table does not exist: '%s'", physicalTableName));
     org.apache.pinot.spi.data.Schema schema = _tableCache.getSchema(tableName);
-    if (schema == null) {
-      throw new IllegalArgumentException(String.format("Could not find schema for table: '%s'", tableName));
-    }
+    Preconditions.checkArgument(schema != null, String.format("Could not find schema for table: '%s'", tableName));
     return new PinotTable(schema);
   }
 
@@ -75,7 +86,9 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    return _tableCache.getTableNameMap().keySet();
+    return _tableCache.getTableNameMap().keySet().stream()
+        .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
+        .collect(Collectors.toSet());
   }
 
   @Override
@@ -90,7 +103,7 @@ public class PinotCatalog implements Schema {
 
   /**
    * {@code PinotCatalog} doesn't need to return function collections b/c they are already registered.
-   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema)}
+   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema, String)}
    */
   @Override
   public Collection<Function> getFunctions(String name) {
@@ -99,7 +112,7 @@ public class PinotCatalog implements Schema {
 
   /**
    * {@code PinotCatalog} doesn't need to return function name set b/c they are already registered.
-   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema)}
+   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema, String)}
    */
   @Override
   public Set<String> getFunctionNames() {

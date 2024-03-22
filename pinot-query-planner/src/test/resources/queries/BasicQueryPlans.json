@@ -6,7 +6,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT * FROM d",
         "output": [
           "Execution Plan",
-          "\nLogicalTableScan(table=[[d]])",
+          "\nLogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -18,7 +18,7 @@
           "\nLogicalSort(offset=[0], fetch=[0])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[0])",
-          "\n      LogicalTableScan(table=[[d]])",
+          "\n      LogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -30,7 +30,7 @@
           "\nLogicalSort(offset=[0], fetch=[0])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[0])",
-          "\n      LogicalTableScan(table=[[d]])",
+          "\n      LogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -41,7 +41,7 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], EXPR$1=[+($2, $6)])",
           "\n  LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n    LogicalTableScan(table=[[a]])",
+          "\n    LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -52,7 +52,7 @@
           "Execution Plan",
           "\nLogicalProject(col1=[$0], colsum=[+($2, $6)])",
           "\n  LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
-          "\n    LogicalTableScan(table=[[a]])",
+          "\n    LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -65,7 +65,7 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
           "\n      LogicalProject(EXPR$0=[DATETRUNC(_UTF-8'DAY', $6)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -78,7 +78,7 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
           "\n    LogicalSort(fetch=[10])",
           "\n      LogicalProject(day=[DATETRUNC(_UTF-8'DAY', $6)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -92,7 +92,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()])",
           "\n        LogicalProject($f0=[CAST(CASE(>($2, 10), _UTF-8'1':VARCHAR CHARACTER SET \"UTF-8\", >($2, 20), _UTF-8'2':VARCHAR CHARACTER SET \"UTF-8\", >($2, 30), _UTF-8'3':VARCHAR CHARACTER SET \"UTF-8\", >($2, 40), _UTF-8'4':VARCHAR CHARACTER SET \"UTF-8\", >($2, 50), _UTF-8'5':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'0':VARCHAR CHARACTER SET \"UTF-8\")):DECIMAL(1000, 500) NOT NULL])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -106,7 +106,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n        LogicalProject(EXPR$1=[ARRAYTOMV($6)], col3=[$2])",
-          "\n          LogicalTableScan(table=[[e]])",
+          "\n          LogicalTableScan(table=[[default, e]])",
           "\n"
         ]
       }

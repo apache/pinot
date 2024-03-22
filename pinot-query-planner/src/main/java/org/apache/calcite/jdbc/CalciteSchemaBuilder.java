@@ -51,8 +51,8 @@ public class CalciteSchemaBuilder {
    * @param root schema to use as a root schema
    * @return calcite schema with given schema as the root
    */
-  public static CalciteSchema asRootSchema(Schema root) {
-    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, "", root);
+  public static CalciteSchema asRootSchema(Schema root, String name) {
+    CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, name, root);
     SchemaPlus schemaPlus = rootSchema.plus();
     for (Map.Entry<String, List<Function>> e : FunctionRegistry.getRegisteredCalciteFunctionMap().entrySet()) {
       for (Function f : e.getValue()) {

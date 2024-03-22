@@ -88,7 +88,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         + "    PinotLogicalExchange(distribution=[hash])\n"
         + "      LogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0])\n"
         + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
-        + "          LogicalTableScan(table=[[a]])\n");
+        + "          LogicalTableScan(table=[[default, a]])\n");
   }
 
   private static void assertGroupBySingletonAfterJoin(DispatchableSubPlan dispatchableSubPlan, boolean shouldRewrite) {
@@ -429,6 +429,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "      \"id\": \"0\",\n"
             + "      \"relOp\": \"LogicalTableScan\",\n"
             + "      \"table\": [\n"
+            + "        \"default\",\n"
             + "        \"a\"\n"
             + "      ],\n"
             + "      \"inputs\": []\n"
@@ -466,10 +467,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
             + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0])\n"
-            + "        LogicalTableScan(table=[[a]])\n"
+            + "        LogicalTableScan(table=[[default, a]])\n"
             + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0], col3=[$2])\n"
-            + "        LogicalTableScan(table=[[b]])\n"
+            + "        LogicalTableScan(table=[[default, b]])\n"
         },
     };
     //@formatter:on

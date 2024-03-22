@@ -151,5 +151,9 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.yscope.clp</groupId>
+      <artifactId>clp-ffi</artifactId>
+    </dependency>
   </dependencies>
 </project>

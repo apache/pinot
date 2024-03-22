@@ -71,13 +71,13 @@ import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.TableConfigs;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -85,9 +85,14 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  * Endpoints for CRUD of {@link TableConfigs}.
  * {@link TableConfigs} is a group of the offline table config, realtime table config and schema for the same tableName.
  */
-@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY),
+    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
 @Path("/")
 public class TableConfigsRestletResource {
 
@@ -117,7 +122,7 @@ public class TableConfigsRestletResource {
   @Authenticate(AccessType.READ)
   @ApiOperation(value = "Lists all TableConfigs in cluster", notes = "Lists all TableConfigs in cluster")
   public String listConfigs(@Context HttpHeaders headers) {
-    String databaseName = headers.getHeaderString(CommonConstants.DATABASE);
+    String databaseName = headers.getHeaderString(DATABASE);
     try {
       List<String> rawTableNames = _pinotHelixResourceManager.getAllRawTables(databaseName);
       Collections.sort(rawTableNames);
