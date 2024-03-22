@@ -48,7 +48,6 @@
     <caffeine.version>2.6.2</caffeine.version>
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
-    <commons-collections.version>4.4</commons-collections.version>
     <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
   </properties>
 
@@ -69,8 +68,8 @@
           <artifactId>javax.ws.rs-api</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>commons-codec</groupId>
-          <artifactId>commons-codec</artifactId>
+          <groupId>commons-configuration</groupId>
+          <artifactId>commons-configuration</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.bouncycastle</groupId>
@@ -135,10 +134,6 @@
       <version>${grpc-context.version}</version>
     </dependency>
     <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
-    </dependency>
-    <dependency>
       <groupId>io.prometheus</groupId>
       <artifactId>simpleclient</artifactId>
       <version>${simpleclient_common.version}</version>
@@ -170,11 +165,6 @@
           <artifactId>grpc-context</artifactId>
         </exclusion>
       </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-collections4</artifactId>
-      <version>${commons-collections.version}</version>
     </dependency>
     <dependency>
       <groupId>javax.annotation</groupId>
@@ -214,10 +204,6 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
       <exclusions>
-        <exclusion>
-          <groupId>commons-codec</groupId>
-          <artifactId>commons-codec</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>commons-logging</groupId>
           <artifactId>commons-logging</artifactId>

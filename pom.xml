@@ -111,16 +111,29 @@
     <build.profile.id>dev</build.profile.id>
     <jdk.version>11</jdk.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <!-- Only unit tests are run by default. -->
-    <skip.integration.tests>true</skip.integration.tests>
-    <skip.unit.tests>false</skip.unit.tests>
-    <!-- Configuration for unit/integration tests section 1 of 3 (properties) STARTS HERE.
+
+    <!-- Configuration for unit/integration tests
       Property for running integration tests with profiles
       at the command line, where you do:
       mvn integration-test -P integration-test
       See also: the surefire plugin section and the profiles section.-->
+    <!-- Only unit tests are run by default. -->
+    <skip.integration.tests>true</skip.integration.tests>
+    <skip.unit.tests>false</skip.unit.tests>
+    <!-- Sets the VM argument line used when unit tests are run. -->
+    <argLine>-Xms4g -Xmx4g</argLine>
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
-    <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
+    <surefire.version>3.2.5</surefire.version>
+    <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
+
+    <!-- Checkstyle violation prop.-->
+    <checkstyle.violation.severity>warning</checkstyle.violation.severity>
+    <checkstyle.fail.on.violation>true</checkstyle.fail.on.violation>
+
+    <!-- Configuration for Packaging -->
+    <shade.prefix>org.apache.pinot.shaded</shade.prefix>
+    <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
+
     <avro.version>1.11.3</avro.version>
     <parquet.version>1.13.1</parquet.version>
     <helix.version>1.3.1</helix.version>
@@ -139,10 +152,6 @@
     <calcite.version>1.30.0</calcite.version>
     <lucene.version>9.8.0</lucene.version>
     <reflections.version>0.9.11</reflections.version>
-    <!-- commons-configuration, hadoop-common, hadoop-client use commons-lang -->
-    <commons-lang.version>2.6</commons-lang.version>
-    <!-- hadoop-common, spark-core use commons-net -->
-    <commons-net.version>3.10.0</commons-net.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.25</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.5</snappy-java.version>
@@ -164,6 +173,23 @@
     <woodstox.version>6.4.0</woodstox.version>
     <sslcontext.kickstart.version>8.2.0</sslcontext.kickstart.version>
 
+    <!-- Apache Commons Libraries -->
+    <commons-lang3.version>3.14.0</commons-lang3.version>
+    <commons-collections4.version>4.4</commons-collections4.version>
+    <commons-text.version>1.11.0</commons-text.version>
+    <commons-compress.version>1.26.1</commons-compress.version>
+    <commons-math3.version>3.6.1</commons-math3.version>
+    <commons-csv.version>1.10.0</commons-csv.version>
+    <commons-configuration2.version>2.10.1</commons-configuration2.version>
+    <commons-io.version>2.15.1</commons-io.version>
+    <commons-codec.version>1.16.1</commons-codec.version>
+    <commons-cli.version>1.6.0</commons-cli.version>
+    <commons-net.version>3.10.0</commons-net.version>
+    <!-- Legacy Apache Commons Libraries -->
+    <commons-lang.version>2.6</commons-lang.version>
+    <commons-collections.version>3.2.2</commons-collections.version>
+    <commons-math.version>2.2</commons-math.version>
+
     <!-- Google Libraries -->
     <google.cloud.libraries.version>26.32.0</google.cloud.libraries.version>
     <google.auth.version>1.23.0</google.auth.version>
@@ -175,25 +201,11 @@
 
     <confluent.version>7.6.0</confluent.version>
 
-    <!-- Sets the VM argument line used when unit tests are run. -->
-    <argLine>-Xms4g -Xmx4g</argLine>
-
-    <!-- Checkstyle violation prop.-->
-    <checkstyle.violation.severity>warning</checkstyle.violation.severity>
-    <checkstyle.fail.on.violation>true</checkstyle.fail.on.violation>
-
-    <!-- Configuration for Packaging -->
-    <shade.prefix>org.apache.pinot.shaded</shade.prefix>
-    <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
-    <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
-    <surefire.version>3.2.5</surefire.version>
-
     <!-- Configuration for Scala -->
     <scala.version>2.12.18</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
     <flink.version>1.14.6</flink.version>
-    <commons-configuration2.version>2.9.0</commons-configuration2.version>
 
     <kotlin.stdlib.version>1.9.22</kotlin.stdlib.version>
     <okio.version>3.9.0</okio.version>
@@ -427,38 +439,6 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>commons-cli</groupId>
-        <artifactId>commons-cli</artifactId>
-        <version>1.6.0</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-lang3</artifactId>
-        <version>3.12.0</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-collections</groupId>
-        <artifactId>commons-collections</artifactId>
-        <version>3.2.2</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-configuration2</artifactId>
-        <version>${commons-configuration2.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>commons-io</groupId>
-        <artifactId>commons-io</artifactId>
-        <version>2.11.0</version>
-      </dependency>
-
-      <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpmime</artifactId>
         <version>4.5.13</version>
@@ -533,11 +513,6 @@
         <groupId>org.lz4</groupId>
         <artifactId>lz4-java</artifactId>
         <version>${lz4-java.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-compress</artifactId>
-        <version>1.26.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.thrift</groupId>
@@ -673,16 +648,6 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>commons-beanutils</groupId>
-        <artifactId>commons-beanutils</artifactId>
-        <version>1.9.4</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-codec</groupId>
-        <artifactId>commons-codec</artifactId>
-        <version>1.16.0</version>
-      </dependency>
-      <dependency>
         <groupId>com.thoughtworks.paranamer</groupId>
         <artifactId>paranamer</artifactId>
         <version>2.8</version>
@@ -695,6 +660,85 @@
         <version>${jackson.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+
+      <!-- Apache Commons Libraries -->
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>${commons-lang3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-collections4</artifactId>
+        <version>${commons-collections4.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-text</artifactId>
+        <version>${commons-text.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-compress</artifactId>
+        <version>${commons-compress.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-math3</artifactId>
+        <version>${commons-math3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-csv</artifactId>
+        <version>${commons-csv.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-configuration2</artifactId>
+        <version>${commons-configuration2.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>${commons-io.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-codec</groupId>
+        <artifactId>commons-codec</artifactId>
+        <version>${commons-codec.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-cli</groupId>
+        <artifactId>commons-cli</artifactId>
+        <version>${commons-cli.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-net</groupId>
+        <artifactId>commons-net</artifactId>
+        <version>${commons-net.version}</version>
+      </dependency>
+      <!-- Legacy Apache Commons Libraries -->
+      <dependency>
+        <groupId>commons-lang</groupId>
+        <artifactId>commons-lang</artifactId>
+        <version>${commons-lang.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-collections</groupId>
+        <artifactId>commons-collections</artifactId>
+        <version>${commons-collections.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-math</artifactId>
+        <version>${commons-math.version}</version>
       </dependency>
 
       <!-- Google Libraries -->
@@ -773,10 +817,6 @@
           <exclusion>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-text</artifactId>
           </exclusion>
           <exclusion>
             <groupId>commons-logging</groupId>
@@ -1259,11 +1299,6 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-math</artifactId>
-        <version>2.1</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.maven.surefire</groupId>
         <artifactId>surefire-testng</artifactId>
         <version>${surefire.version}</version>
@@ -1273,11 +1308,6 @@
         <artifactId>mockito-core</artifactId>
         <version>5.11.0</version>
         <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-csv</artifactId>
-        <version>1.10.0</version>
       </dependency>
       <dependency>
         <groupId>com.h2database</groupId>
@@ -1304,27 +1334,11 @@
         <artifactId>tyrus-standalone-client</artifactId>
         <version>2.1.4</version>
       </dependency>
-      <!-- hadoop-common & jmh-core use common-math3 -->
-      <dependency>
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-math3</artifactId>
-        <version>3.2</version>
-      </dependency>
       <!-- kafka_2.10 & jmh-core use jopt-simple -->
       <dependency>
         <groupId>net.sf.jopt-simple</groupId>
         <artifactId>jopt-simple</artifactId>
         <version>4.6</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-lang</groupId>
-        <artifactId>commons-lang</artifactId>
-        <version>${commons-lang.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-net</groupId>
-        <artifactId>commons-net</artifactId>
-        <version>${commons-net.version}</version>
       </dependency>
       <dependency>
         <groupId>org.reflections</groupId>
