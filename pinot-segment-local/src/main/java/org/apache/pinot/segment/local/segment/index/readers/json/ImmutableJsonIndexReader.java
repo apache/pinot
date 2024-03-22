@@ -344,9 +344,30 @@ public class ImmutableJsonIndexReader implements JsonIndexReader {
       } catch (Exception e) {
         throw new BadQueryRequestException("Invalid json match filter: " + filterString);
       }
-      filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter).toRoaringBitmap();
+      if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
+        // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in order
+        // to get the correct result, and it cannot be nested
+        filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate()).toRoaringBitmap();
+        filteredFlattenedDocIds.flip(0, _numFlattenedDocs);
+      } else {
+        filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter).toRoaringBitmap();
+      }
     }
-
+    // Support 2 formats:
+    // - JSONPath format (e.g. "$.a[1].b"='abc', "$[0]"=1, "$"='abc')
+    // - Legacy format (e.g. "a[1].b"='abc')
+    if (_version == BaseJsonIndexCreator.VERSION_2) {
+      if (jsonPathKey.startsWith("$")) {
+        jsonPathKey = jsonPathKey.substring(1);
+      } else {
+        jsonPathKey = JsonUtils.KEY_SEPARATOR + jsonPathKey;
+      }
+    } else {
+      // For V1 backward-compatibility
+      if (jsonPathKey.startsWith("$.")) {
+        jsonPathKey = jsonPathKey.substring(2);
+      }
+    }
     Map<String, RoaringBitmap> result = new HashMap<>();
     Pair<String, MutableRoaringBitmap> pathKey = getKeyAndFlattenedDocIds(jsonPathKey);
     if (pathKey.getRight() != null && pathKey.getRight().isEmpty()) {

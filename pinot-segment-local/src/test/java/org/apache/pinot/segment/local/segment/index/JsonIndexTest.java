@@ -349,20 +349,19 @@ public class JsonIndexTest {
 
     String[][] testKeys = new String[][]{
         // Without filters
-        {".arrField[*].intKey01", null},
-        {".arrField[*].stringKey01", null},
+        {"$.arrField[*].intKey01", null},
+        {"$.arrField[*].stringKey01", null},
 
         // With regexp filter
-        {".arrField[*].intKey01", "REGEXP_LIKE(\"arrField..stringKey01\", '.*f.*')"},
+        {"$.arrField[*].intKey01", "REGEXP_LIKE(\"arrField..stringKey01\", '.*f.*')"},
         // With range filter
-        {".arrField[*].stringKey01", "\"arrField..intKey01\" > 2"},
+        {"$.arrField[*].stringKey01", "\"arrField..intKey01\" > 2"},
         // With AND filters
-        {".arrField[*].intKey01", "\"arrField..intKey01\" > 2 AND REGEXP_LIKE(\"arrField..stringKey01\", "
+        {"$.arrField[*].intKey01", "\"arrField..intKey01\" > 2 AND REGEXP_LIKE(\"arrField..stringKey01\", "
             + "'[a-b][a-b].*')"},
-        // Nested exclusive filters
-        {".arrField[*].intKey01", "\"arrField..stringKey01\" != 'bar' AND \"arrField..stringKey01\" != 'fuzz'"},
-        // Nested exclusive filters within same array element
-        {".arrField[*].intKey01", "\"arrField..stringKey01\" != 'bar' OR \"arrField..intKey01\" != '3'"},
+        // Exclusive filters
+        {"$.arrField[*].intKey01", "\"arrField[*].stringKey01\" != 'bar'"},
+        {"$.arrField[*].stringKey01", "\"arrField[*].intKey01\" != '3'"},
     };
 
     String colName = "col";
@@ -388,8 +387,8 @@ public class JsonIndexTest {
             {{"1", "5"}, {"1", "3"}},
             {{"bar", "fuzz"}, {"test", "testf2"}},
             {{"3"}, {}},
-            {{"1", "1"}, {"1", "1", "6", "3"}},
-            {{"1", "1", "5"}, {"1", "1", "6", "3"}}
+            {{"1", "1", "5"}, {"1", "1", "6", "3"}},
+            {{"abc", "foo", "fuzz"}, {"pqr", "foo", "test"}}
         };
         for (int i = 0; i < testKeys.length; i++) {
           Map<String, RoaringBitmap> context =
@@ -420,7 +419,7 @@ public class JsonIndexTest {
     };
     // CHECKSTYLE:ON
     // @formatter: on
-    String[] testKeys = new String[]{".field1", ".field2", ".field3", ".field4"};
+    String[] testKeys = new String[]{"$.field1", "$.field2", "$.field3", "$.field4"};
 
     String colName = "col";
     try (
@@ -484,7 +483,7 @@ public class JsonIndexTest {
         }
 
         // Immutable index, context is reused for the second method call
-        Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingFlattenedDocsMap(".field1", null);
+        Map<String, RoaringBitmap> context = offHeapIndexReader.getMatchingFlattenedDocsMap("$.field1", null);
         docMask = new int[]{0};
         String[] values = offHeapIndexReader.getValuesSV(docMask, docMask.length, context, true);
         Assert.assertEquals(values, new String[]{"value1"});
@@ -501,7 +500,7 @@ public class JsonIndexTest {
         Assert.assertEquals(values, new String[]{"value2", "value1"});
 
         // Mutable index, context is reused for the second method call
-        context = mutableJsonIndex.getMatchingFlattenedDocsMap(".field1", null);;
+        context = mutableJsonIndex.getMatchingFlattenedDocsMap("$.field1", null);;
         docMask = new int[]{0};
         values = mutableJsonIndex.getValuesSV(docMask, docMask.length, context, true);
         Assert.assertEquals(values, new String[]{"value1"});
@@ -543,9 +542,9 @@ public class JsonIndexTest {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
-      Map<String, RoaringBitmap> onHeapRes = onHeapIndexReader.getMatchingFlattenedDocsMap("", null);
-      Map<String, RoaringBitmap> offHeapRes = offHeapIndexReader.getMatchingFlattenedDocsMap("", null);
-      Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingFlattenedDocsMap("", null);
+      Map<String, RoaringBitmap> onHeapRes = onHeapIndexReader.getMatchingFlattenedDocsMap("$", null);
+      Map<String, RoaringBitmap> offHeapRes = offHeapIndexReader.getMatchingFlattenedDocsMap("$", null);
+      Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingFlattenedDocsMap("$", null);
       Map<String, RoaringBitmap> expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT,
           RoaringBitmap.bitmapOf(0));
       Assert.assertEquals(expectedRes, onHeapRes);
@@ -581,8 +580,8 @@ public class JsonIndexTest {
     File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     Assert.assertTrue(offHeapIndexFile.exists());
 
-    String[] keys = {".foo[0].bar[1]", ".foo[1].bar[0]", ".foo2[0]", ".foo[100].bar[100]", ".foo[0].bar[*]",
-            ".foo[*].bar[0]", ".foo[*].bar[*]"};
+    String[] keys = {"$.foo[0].bar[1]", "$.foo[1].bar[0]", "$.foo2[0]", "$.foo[100].bar[100]", "$.foo[0].bar[*]",
+            "$.foo[*].bar[0]", "$.foo[*].bar[*]"};
     List<Map<String, RoaringBitmap>> expected = List.of(
             Map.of("y", RoaringBitmap.bitmapOf(0), "z", RoaringBitmap.bitmapOf(1)),
             Map.of("a", RoaringBitmap.bitmapOf(0)),

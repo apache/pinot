@@ -191,7 +191,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         Predicate predicate = filter.getPredicate();
         Preconditions.checkArgument(!isExclusive(predicate.getType()), "Exclusive predicate: %s cannot be nested",
             predicate);
-
         return getMatchingFlattenedDocIds(predicate);
       }
       default:
@@ -378,9 +377,23 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       if (filterString != null) {
         filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
         Preconditions.checkArgument(!filter.isConstant(), "Invalid json match filter: " + filterString);
-        filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter);
+        if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
+          // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in order
+          // to get the correct result, and it cannot be nested
+          filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
+          filteredFlattenedDocIds.flip(0, (long) _nextFlattenedDocId);
+        } else {
+          filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter);
+        }
       }
-
+      // Support 2 formats:
+      // - JSONPath format (e.g. "$.a[1].b"='abc', "$[0]"=1, "$"='abc')
+      // - Legacy format (e.g. "a[1].b"='abc')
+      if (jsonPathKey.startsWith("$")) {
+        jsonPathKey = jsonPathKey.substring(1);
+      } else {
+        jsonPathKey = JsonUtils.KEY_SEPARATOR + jsonPathKey;
+      }
       Pair<String, RoaringBitmap> result = getKeyAndFlattenedDocIds(jsonPathKey);
       jsonPathKey = result.getLeft();
       RoaringBitmap arrayIndexFlattenDocIds = result.getRight();

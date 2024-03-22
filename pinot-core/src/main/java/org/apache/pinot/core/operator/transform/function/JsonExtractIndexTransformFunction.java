@@ -76,13 +76,12 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     if (!(secondArgument instanceof LiteralTransformFunction)) {
       throw new IllegalArgumentException("JSON path argument must be a literal");
     }
-    String inputJsonPath = ((LiteralTransformFunction) secondArgument).getStringLiteral();
+    _jsonPathString = ((LiteralTransformFunction) secondArgument).getStringLiteral();
     try {
-      JsonPathCache.INSTANCE.getOrCompute(inputJsonPath);
+      JsonPathCache.INSTANCE.getOrCompute(_jsonPathString);
     } catch (Exception e) {
       throw new IllegalArgumentException("JSON path argument is not a valid JSON path");
     }
-    _jsonPathString = inputJsonPath.substring(1); // remove $ prefix
 
     TransformFunction thirdArgument = arguments.get(2);
     if (!(thirdArgument instanceof LiteralTransformFunction)) {
@@ -90,7 +89,7 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     }
     String resultsType = ((LiteralTransformFunction) thirdArgument).getStringLiteral().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
-    if (isSingleValue && inputJsonPath.contains("[*]")) {
+    if (isSingleValue && _jsonPathString.contains("[*]")) {
       throw new IllegalArgumentException(
           "[*] syntax in json path is unsupported for singleValue field json_extract_index");
     }
