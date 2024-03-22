@@ -791,7 +791,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   @Override
-  public Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments) {
-    return isUpsertEnabled() ? _tableUpsertMetadataManager.getSegmentContexts(selectedSegments) : null;
+  public Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
+      boolean isSkipUpsert) {
+    if (!isSkipUpsert && isUpsertEnabled()) {
+      return _tableUpsertMetadataManager.getSegmentContexts(selectedSegments);
+    }
+    return null;
   }
 }
