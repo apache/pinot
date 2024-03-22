@@ -47,6 +47,7 @@ import static org.testng.Assert.assertTrue;
 
 public class PinotSegmentRestletResourceTest {
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
+  private static final String TEST_RAW_OFFLINE_TABLE_NAME = "offlineTableName1";
 
   @BeforeClass
   public void setUp()
@@ -200,6 +201,40 @@ public class PinotSegmentRestletResourceTest {
     reply = ControllerTest.sendDeleteRequest(urlBuilder.forSegmentDeleteWithTimeWindowAPI(
         rawTableName, 10L, 21L));
     assertTrue(reply.contains("Deleted 1 segments"));
+  }
+
+  @Test
+  public void testDeleteMultipleSegments()
+      throws Exception {
+    // Adding table and segment
+    TEST_INSTANCE.addDummySchema(TEST_RAW_OFFLINE_TABLE_NAME);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TEST_RAW_OFFLINE_TABLE_NAME);
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_RAW_OFFLINE_TABLE_NAME).setNumReplicas(1)
+            .setDeletedSegmentsRetentionPeriod("0d").build();
+    PinotHelixResourceManager resourceManager = TEST_INSTANCE.getHelixResourceManager();
+    resourceManager.addTable(tableConfig);
+    SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_RAW_OFFLINE_TABLE_NAME,
+        "segment1");
+    resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
+    segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_RAW_OFFLINE_TABLE_NAME,
+        "segment2");
+    resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
+    segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(TEST_RAW_OFFLINE_TABLE_NAME,
+        "segment3");
+    resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
+
+    // Send query and verify
+    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
+    // case 1: send list of segments
+    String reply = ControllerTest.sendDeleteRequest(urlBuilder.forDeleteMultipleSegments(
+        TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), List.of("segment1")));
+    assertTrue(reply.contains("Deleted segments: [segment1] from table: offlineTableName1_OFFLINE"));
+
+    // case 2: delete all remaining segments
+    reply = ControllerTest.sendDeleteRequest(urlBuilder.forDeleteMultipleSegments(
+        TEST_RAW_OFFLINE_TABLE_NAME, TableType.OFFLINE.toString(), Collections.emptyList()));
+    assertTrue(reply.contains("All segments of table offlineTableName1_OFFLINE deleted"));
   }
 
   private void checkCrcRequest(String tableName, Map<String, SegmentMetadata> metadataTable, int expectedSize)

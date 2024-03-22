@@ -126,6 +126,9 @@ public class FieldConfig extends BaseJsonConfig {
     SNAPPY(true, false),
     ZSTANDARD(true, false),
     LZ4(true, false),
+    // CLP is a special type of compression codec that isn't generally applicable to all RAW columns and has a
+    // special handling for log lines (see {@link CLPForwardIndexCreatorV1})
+    CLP(false, false),
 
     // For MV dictionary encoded forward index, add a second level dictionary encoding for the multi-value entries
     MV_ENTRY_DICT(false, true);

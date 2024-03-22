@@ -70,12 +70,21 @@ public class SegmentDictionaryCreator implements IndexCreator {
   private Object2IntOpenHashMap<Object> _objectValueToIndexMap;
   private int _numBytesPerEntry = 0;
 
+  public SegmentDictionaryCreator(String columnName, DataType storedType, File indexFile,
+      boolean useVarLengthDictionary) {
+    _columnName = columnName;
+    _storedType = storedType;
+    _dictionaryFile = indexFile;
+    _useVarLengthDictionary = useVarLengthDictionary;
+  }
+
   public SegmentDictionaryCreator(FieldSpec fieldSpec, File indexDir, boolean useVarLengthDictionary) {
     _columnName = fieldSpec.getName();
     _storedType = fieldSpec.getDataType().getStoredType();
     _dictionaryFile = new File(indexDir, _columnName + DictionaryIndexType.getFileExtension());
     _useVarLengthDictionary = useVarLengthDictionary;
   }
+
   @Override
   public void add(@Nonnull Object value, int dictId)
       throws IOException {

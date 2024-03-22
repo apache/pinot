@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.forward;
 
 import java.io.File;
 import java.io.IOException;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueEntryDictForwardIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
@@ -34,6 +35,7 @@ import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -69,6 +71,9 @@ public class ForwardIndexCreatorFactory {
     } else {
       // Dictionary disabled columns
       DataType storedType = fieldSpec.getDataType().getStoredType();
+      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+        return new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
+      }
       ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
       if (chunkCompressionType == null) {
         chunkCompressionType = ForwardIndexType.getDefaultCompressionType(fieldSpec.getFieldType());
