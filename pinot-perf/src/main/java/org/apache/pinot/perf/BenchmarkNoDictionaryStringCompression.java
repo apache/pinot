@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import net.jpountz.lz4.LZ4Factory;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -60,205 +59,161 @@ public class BenchmarkNoDictionaryStringCompression {
   @Param({"500000", "1000000", "2000000", "3000000", "4000000", "5000000"})
   public static int _rowLength;
 
-  public static Random _random = new Random();
+  private static final int MAX_CHARS_IN_LINE = 30;
+  private static final Random RANDOM = new Random();
+  private static final ChunkCompressor LZ4_COMPRESSOR = ChunkCompressorFactory.getCompressor(ChunkCompressionType.LZ4);
+  private static final ChunkDecompressor LZ4_DECOMPRESSOR =
+      ChunkCompressorFactory.getDecompressor(ChunkCompressionType.LZ4);
+  private static final ChunkCompressor GZIP_COMPRESSOR =
+      ChunkCompressorFactory.getCompressor(ChunkCompressionType.GZIP);
+  private static final ChunkDecompressor GZIP_DECOMPRESSOR =
+      ChunkCompressorFactory.getDecompressor(ChunkCompressionType.GZIP);
 
   @State(Scope.Thread)
-  public static class BenchmarkNoDictionaryStringCompressionState {
-    private static ByteBuffer _uncompressedString;
-    private static ByteBuffer _snappyCompressedStringInput;
-    private static ByteBuffer _zstandardCompressedStringInput;
-    private static ByteBuffer _snappyCompressedStringOutput;
-    private static ByteBuffer _zstandardCompressedStringOutput;
-    private static ByteBuffer _snappyStringDecompressed;
-    private static ByteBuffer _zstandardStringDecompressed;
-    private static ByteBuffer _lz4CompressedStringOutput;
-    private static ByteBuffer _lz4CompressedStringInput;
-    private static ByteBuffer _lz4StringDecompressed;
-    private static ByteBuffer _gzipCompressedStringOutput;
-    private static ByteBuffer _gzipCompressedStringInput;
-    private static ByteBuffer _gzipStringDecompressed;
+  public static class CompressionBuffers {
 
-    private static LZ4Factory _factory;
-    private static ChunkCompressor _gzipCompressor;
-    private static ChunkDecompressor _gzipDecompressor;
+    private ByteBuffer _snappyCompressedStringInput;
+    private ByteBuffer _zstandardCompressedStringInput;
+    private ByteBuffer _lz4CompressedStringInput;
+    private ByteBuffer _gzipCompressedStringInput;
+    private ByteBuffer _uncompressedString;
+    private ByteBuffer _stringDecompressed;
+    private ByteBuffer _stringCompressed;
+
+    @Setup(Level.Trial)
+    public void setUp0() {
+      // generate random block of text alongside initialising memory buffers
+      byte[][] tempRows = new byte[_rowLength][];
+      int size = 0;
+      for (int i = 0; i < _rowLength; i++) {
+        String value = RandomStringUtils.random(RANDOM.nextInt(MAX_CHARS_IN_LINE), true, true);
+        byte[] bytes = value.getBytes(UTF_8);
+        tempRows[i] = bytes;
+        size += bytes.length;
+      }
+      _uncompressedString = ByteBuffer.allocateDirect(size);
+      for (int i = 0; i < _rowLength; i++) {
+        _uncompressedString.put(tempRows[i]);
+      }
+      _uncompressedString.flip();
+
+      int capacity = _uncompressedString.capacity() * 2;
+      _stringDecompressed = ByteBuffer.allocateDirect(capacity);
+      _stringCompressed = ByteBuffer.allocateDirect(capacity);
+      _snappyCompressedStringInput = ByteBuffer.allocateDirect(capacity);
+      _zstandardCompressedStringInput = ByteBuffer.allocateDirect(capacity);
+      _lz4CompressedStringInput = ByteBuffer.allocateDirect(capacity);
+      _gzipCompressedStringInput = ByteBuffer.allocateDirect(capacity);
+    }
 
     @Setup(Level.Invocation)
     public void setUp()
         throws Exception {
 
-      initializeCompressors();
-      generateRandomStringBuffer();
-      allocateMemory();
+      _uncompressedString.rewind();
+      _snappyCompressedStringInput.clear();
+      _zstandardCompressedStringInput.clear();
+      _lz4CompressedStringInput.clear();
+      _gzipCompressedStringInput.clear();
+      _stringDecompressed.clear();
+      _stringCompressed.clear();
 
+      // prepare compressed buffers
       Snappy.compress(_uncompressedString, _snappyCompressedStringInput);
       Zstd.compress(_zstandardCompressedStringInput, _uncompressedString);
       // ZSTD compressor with change the position of _uncompressedString, a flip() operation over input to reset
       // position for lz4 is required
       _uncompressedString.flip();
-      _factory.fastCompressor().compress(_uncompressedString, _lz4CompressedStringInput);
-      _gzipCompressor.compress(_uncompressedString, _gzipCompressedStringInput);
-
-      _zstandardStringDecompressed.rewind();
       _zstandardCompressedStringInput.flip();
+
+      LZ4_COMPRESSOR.compress(_uncompressedString, _lz4CompressedStringInput);
       _uncompressedString.flip();
-      _snappyStringDecompressed.flip();
-      _lz4CompressedStringInput.flip();
-      _gzipCompressedStringInput.flip();
-    }
 
-    private void initializeCompressors() {
-      //Initialize compressors and decompressors for lz4 and zip
-      _factory = LZ4Factory.fastestInstance();
-      _gzipCompressor = ChunkCompressorFactory.getCompressor(ChunkCompressionType.GZIP);
-      _gzipDecompressor = ChunkCompressorFactory.getDecompressor(ChunkCompressionType.GZIP);
-    }
-
-    private void generateRandomStringBuffer() {
-      String[] tempRows = new String[_rowLength];
-      int maxStringLengthInBytes = 0;
-      int numChars = 100;
-
-      for (int i = 0; i < _rowLength; i++) {
-        String value = RandomStringUtils.random(_random.nextInt(numChars), true, true);
-        maxStringLengthInBytes = Math.max(maxStringLengthInBytes, value.getBytes(UTF_8).length);
-        tempRows[i] = value;
-      }
-
-      _uncompressedString = ByteBuffer.allocateDirect(_rowLength * maxStringLengthInBytes);
-      for (int i = 0; i < _rowLength; i++) {
-        _uncompressedString.put(tempRows[i].getBytes(UTF_8));
-      }
+      GZIP_COMPRESSOR.compress(_uncompressedString, _gzipCompressedStringInput);
       _uncompressedString.flip();
-    }
-
-    private void allocateMemory() {
-      _snappyCompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _zstandardCompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _snappyStringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _zstandardStringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _snappyCompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _zstandardCompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _lz4StringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _lz4CompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _lz4CompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _gzipCompressedStringOutput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _gzipCompressedStringInput = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
-      _gzipStringDecompressed = ByteBuffer.allocateDirect(_uncompressedString.capacity() * 2);
     }
 
     @TearDown(Level.Invocation)
     public void tearDown()
         throws Exception {
-      _snappyCompressedStringOutput.clear();
-      _snappyStringDecompressed.clear();
-      _zstandardCompressedStringOutput.clear();
-      _zstandardStringDecompressed.clear();
-      _lz4CompressedStringOutput.clear();
-      _lz4StringDecompressed.clear();
-      _gzipCompressedStringOutput.clear();
-      _gzipStringDecompressed.clear();
-
-      _uncompressedString.rewind();
-      _zstandardCompressedStringInput.rewind();
-      _lz4CompressedStringInput.rewind();
-      _gzipCompressedStringInput.rewind();
+      _snappyCompressedStringInput.clear();
+      _zstandardCompressedStringInput.clear();
+      _lz4CompressedStringInput.clear();
+      _gzipCompressedStringInput.clear();
+      _uncompressedString.clear();
+      _stringDecompressed.clear();
+      _stringCompressed.clear();
     }
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkSnappyStringCompression(BenchmarkNoDictionaryStringCompressionState state)
+  public int benchmarkSnappyStringCompression(CompressionBuffers state)
       throws IOException {
-    int size = Snappy.compress(state._uncompressedString, state._snappyCompressedStringOutput);
+    int size = Snappy.compress(state._uncompressedString, state._stringCompressed);
     return size;
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkSnappyStringDecompression(BenchmarkNoDictionaryStringCompressionState state)
+  public int benchmarkSnappyStringDecompression(CompressionBuffers state)
       throws IOException {
-    int size = Snappy.uncompress(state._snappyCompressedStringInput, state._snappyStringDecompressed);
+    int size = Snappy.uncompress(state._snappyCompressedStringInput, state._stringDecompressed);
     return size;
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkZstandardStringCompression(BenchmarkNoDictionaryStringCompressionState state)
-      throws IOException {
-    int size = Zstd.compress(state._zstandardCompressedStringOutput, state._uncompressedString);
+  public int benchmarkZstandardStringCompression(CompressionBuffers state) {
+    int size = Zstd.compress(state._stringCompressed, state._uncompressedString);
     return size;
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkZstandardStringDecompression(BenchmarkNoDictionaryStringCompressionState state)
-      throws IOException {
-    int size = Zstd.decompress(state._zstandardStringDecompressed, state._zstandardCompressedStringInput);
+  public int benchmarkZstandardStringDecompression(CompressionBuffers state) {
+    int size = Zstd.decompress(state._stringDecompressed, state._zstandardCompressedStringInput);
     return size;
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkLZ4StringCompression(
-      BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
+  public int benchmarkLZ4HCStringCompression(CompressionBuffers state)
       throws IOException {
-    state._factory.fastCompressor().compress(state._uncompressedString, state._lz4CompressedStringOutput);
-    return state._lz4CompressedStringOutput.position();
+    LZ4_COMPRESSOR.compress(state._uncompressedString, state._stringCompressed);
+    return state._stringCompressed.position();
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkLZ4StringDecompression(
-      BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
+  public int benchmarkLZ4HCStringDecompression(CompressionBuffers state)
       throws IOException {
-    state._factory.fastDecompressor().decompress(state._lz4CompressedStringInput, state._lz4StringDecompressed);
-    return state._lz4StringDecompressed.position();
+    LZ4_DECOMPRESSOR.decompress(state._lz4CompressedStringInput, state._stringDecompressed);
+    return state._stringDecompressed.position();
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkLZ4HCStringCompression(
-      BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
+  public int benchmarkGZIPStringCompression(CompressionBuffers state)
       throws IOException {
-    state._factory.highCompressor().compress(state._uncompressedString, state._lz4CompressedStringOutput);
-    return state._lz4CompressedStringOutput.position();
+    GZIP_COMPRESSOR.compress(state._uncompressedString, state._stringCompressed);
+    return state._stringCompressed.position();
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkLZ4HCStringDecompression(
-      BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
+  public int benchmarkGZIPStringDecompression(CompressionBuffers state)
       throws IOException {
-    state._factory.fastDecompressor().decompress(state._lz4CompressedStringInput, state._lz4StringDecompressed);
-    return state._lz4StringDecompressed.position();
-  }
-
-  @Benchmark
-  @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkGZIPStringCompression(
-      BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
-      throws IOException {
-    state._gzipCompressor.compress(state._uncompressedString, state._gzipCompressedStringOutput);
-    return state._gzipCompressedStringOutput.position();
-  }
-
-  @Benchmark
-  @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  public int benchmarkGZIPStringDecompression(
-      BenchmarkNoDictionaryStringCompression.BenchmarkNoDictionaryStringCompressionState state)
-      throws IOException {
-    state._gzipDecompressor.decompress(state._gzipCompressedStringInput, state._gzipStringDecompressed);
-    return state._gzipStringDecompressed.position();
+    GZIP_DECOMPRESSOR.decompress(state._gzipCompressedStringInput, state._stringDecompressed);
+    return state._stringDecompressed.position();
   }
 
   public static void main(String[] args)

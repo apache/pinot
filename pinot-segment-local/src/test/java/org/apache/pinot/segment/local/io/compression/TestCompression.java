@@ -102,7 +102,7 @@ public class TestCompression {
           compressor.compress(rawInput.slice(), compressed[idx]);
 
           // small context switch
-          TimeUnit.MILLISECONDS.sleep(1l + (long) (ThreadLocalRandom.current().nextDouble() * 10.0));
+          TimeUnit.MILLISECONDS.sleep(1L + (long) (ThreadLocalRandom.current().nextDouble() * 10.0));
 
           // decompress
           ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(type);
