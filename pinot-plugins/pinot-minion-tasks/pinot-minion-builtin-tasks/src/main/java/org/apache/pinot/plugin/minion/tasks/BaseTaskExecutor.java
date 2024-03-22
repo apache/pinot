@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MinionMeter;
+import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
@@ -33,6 +35,7 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   protected static final MinionContext MINION_CONTEXT = MinionContext.getInstance();
 
   protected boolean _cancelled = false;
+  protected final MinionMetrics _minionMetrics = MinionMetrics.get();
 
   @Override
   public void cancel() {
@@ -67,5 +70,11 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
      * and task status would be left unchanged without proper cleanup.
      */
     return segmentZKMetadata == null ? -1 : segmentZKMetadata.getCrc();
+  }
+
+  public static void addTaskMeterMetrics(MinionMeter meter, long unitCount, String tableName, String taskType) {
+    MinionMetrics.get().addMeteredGlobalValue(meter, unitCount);
+    MinionMetrics.get().addMeteredTableValue(tableName, meter, unitCount);
+    MinionMetrics.get().addMeteredTableValue(tableName, taskType, meter, unitCount);
   }
 }

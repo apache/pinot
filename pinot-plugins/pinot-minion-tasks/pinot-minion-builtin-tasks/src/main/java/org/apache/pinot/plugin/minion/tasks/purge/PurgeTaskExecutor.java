@@ -25,12 +25,14 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.metrics.MinionTimer;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.minion.SegmentPurger;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
+import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutor;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -76,6 +78,11 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     if (purgedSegmentFile == null) {
       purgedSegmentFile = indexDir;
     }
+
+    BaseTaskExecutor.addTaskMeterMetrics(MinionMeter.RECORDS_PER_SEGMENT, segmentPurger.getTotalRecordsProcessed(),
+        tableNameWithType, taskType);
+    BaseTaskExecutor.addTaskMeterMetrics(MinionMeter.RECORDS_PURGED_PER_SEGMENT,
+        segmentPurger.getNumRecordsPurged(), tableNameWithType, taskType);
 
     return new SegmentConversionResult.Builder().setFile(purgedSegmentFile).setTableNameWithType(tableNameWithType)
         .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY))

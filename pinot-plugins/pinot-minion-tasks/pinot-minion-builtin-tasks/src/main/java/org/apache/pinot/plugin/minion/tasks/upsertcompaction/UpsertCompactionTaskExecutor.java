@@ -23,12 +23,14 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
+import org.apache.pinot.plugin.minion.tasks.BaseTaskExecutor;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -110,6 +112,8 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
         new SegmentConversionResult.Builder().setFile(compactedSegmentFile).setTableNameWithType(tableNameWithType)
             .setSegmentName(segmentName).build();
 
+    BaseTaskExecutor.addTaskMeterMetrics(MinionMeter.RECORDS_PER_SEGMENT, segmentMetadata.getTotalDocs(),
+        tableNameWithType, taskType);
     long endMillis = System.currentTimeMillis();
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
 

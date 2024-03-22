@@ -36,7 +36,6 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
-import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -59,8 +58,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleSegmentConversionExecutor.class);
-
-  protected final MinionMetrics _minionMetrics = MinionMetrics.get();
 
   // Tracking finer grained progress status.
   protected PinotTaskConfig _pinotTaskConfig;
@@ -123,6 +120,11 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
       }
 
+      // Segment download metrics
+      long downloadSegmentSize = FileUtils.sizeOfDirectory(indexDir);
+      addTaskMeterMetrics(MinionMeter.SEGMENT_SIZE_DOWNLOADED, downloadSegmentSize, tableNameWithType, taskType);
+      addTaskMeterMetrics(MinionMeter.SEGMENTS_DOWNLOADED, 1L, tableNameWithType, taskType);
+
       // Convert the segment
       File workingDir = new File(tempDataDir, "workingDir");
       Preconditions.checkState(workingDir.mkdir());
@@ -135,6 +137,12 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       if (convertedSegmentDir == null) {
         return segmentConversionResult;
       }
+
+      // Segment upload metrics
+      long uploadSegmentSize = FileUtils.sizeOfDirectory(workingDir);
+      addTaskMeterMetrics(MinionMeter.SEGMENT_SIZE_UPLOADED, uploadSegmentSize, tableNameWithType, taskType);
+      addTaskMeterMetrics(MinionMeter.SEGMENTS_UPLOADED, 1L, tableNameWithType, taskType);
+
       // Tar the converted segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Compressing segment: " + segmentName);
       File convertedTarredSegmentFile =

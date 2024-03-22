@@ -53,6 +53,7 @@ public class SegmentPurger {
 
   private int _numRecordsPurged;
   private int _numRecordsModified;
+  private int _totalRecordsProcessed;
 
   public SegmentPurger(File indexDir, File workingDir, TableConfig tableConfig, Schema schema,
       @Nullable RecordPurger recordPurger, @Nullable RecordModifier recordModifier) {
@@ -70,7 +71,9 @@ public class SegmentPurger {
       throws Exception {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
     String segmentName = segmentMetadata.getName();
-    LOGGER.info("Start purging table: {}, segment: {}", _tableConfig.getTableName(), segmentName);
+    String tableNameWithType = _tableConfig.getTableName();
+    _totalRecordsProcessed = segmentMetadata.getTotalDocs();
+    LOGGER.info("Start purging table: {}, segment: {}", tableNameWithType, segmentName);
 
     try (PurgeRecordReader purgeRecordReader = new PurgeRecordReader()) {
       // Make a first pass through the data to see if records need to be purged or modified
@@ -107,8 +110,9 @@ public class SegmentPurger {
       driver.build();
     }
 
-    LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records",
-        _tableConfig.getTableName(), segmentName, _numRecordsPurged, _numRecordsModified);
+    LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", tableNameWithType,
+        segmentName, _numRecordsPurged, _numRecordsModified);
+
     return new File(_workingDir, segmentName);
   }
 
@@ -127,6 +131,11 @@ public class SegmentPurger {
   public int getNumRecordsModified() {
     return _numRecordsModified;
   }
+
+  public int getTotalRecordsProcessed() {
+    return _totalRecordsProcessed;
+  }
+
 
   private class PurgeRecordReader implements RecordReader {
     final PinotSegmentRecordReader _pinotSegmentRecordReader;

@@ -40,6 +40,7 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -51,6 +52,7 @@ import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -209,6 +211,14 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         if (!FileUtils.deleteQuietly(tarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
         }
+
+        // Sizes of segments downloaded.
+        SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+        long downloadSegmentSize = FileUtils.sizeOfDirectory(indexDir);
+        addTaskMeterMetrics(MinionMeter.SEGMENT_SIZE_DOWNLOADED, downloadSegmentSize, tableNameWithType, taskType);
+        addTaskMeterMetrics(MinionMeter.SEGMENTS_DOWNLOADED, 1, tableNameWithType, taskType);
+        addTaskMeterMetrics(MinionMeter.RECORDS_PER_SEGMENT, segmentMetadata.getTotalDocs(), tableNameWithType,
+            taskType);
       }
 
       // Convert the segments
@@ -224,11 +234,17 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       List<File> tarredSegmentFiles = new ArrayList<>(numOutputSegments);
       int count = 1;
       for (SegmentConversionResult segmentConversionResult : segmentConversionResults) {
+        File convertedSegmentDir = segmentConversionResult.getFile();
+
+        // Sizes of segments to be uploaded.
+        long uploadSegmentSize = FileUtils.sizeOfDirectory(convertedSegmentDir);
+        addTaskMeterMetrics(MinionMeter.SEGMENT_SIZE_UPLOADED, uploadSegmentSize, tableNameWithType, taskType);
+        addTaskMeterMetrics(MinionMeter.SEGMENTS_UPLOADED, 1, tableNameWithType, taskType);
+
         // Tar the converted segment
         _eventObserver.notifyProgress(_pinotTaskConfig, String
             .format("Compressing segment: %s (%d out of %d)", segmentConversionResult.getSegmentName(), count++,
                 numOutputSegments));
-        File convertedSegmentDir = segmentConversionResult.getFile();
         File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
             segmentConversionResult.getSegmentName() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
         TarGzCompressionUtils.createTarGzFile(convertedSegmentDir, convertedSegmentTarFile);
