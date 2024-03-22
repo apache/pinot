@@ -65,11 +65,12 @@ public class FlushThresholdUpdaterTest {
     assertTrue(flushThresholdUpdater instanceof DefaultFlushThresholdUpdater);
     assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(), 1234);
 
-    // Flush threshold rows set to 0 and Segment Rows larger than 0 - SegmentRowsBasedFlushThresholdUpdater should be returned
-    FlushThresholdUpdater segmentRowsFlushThresholdUpdater = flushThresholdUpdateManager
-        .getFlushThresholdUpdater(mockSegmentRowsStreamConfig(StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS));
-    assertTrue(segmentRowsFlushThresholdUpdater instanceof SegmentRowsBasedFlushThresholdUpdater);
-    assertEquals(((SegmentRowsBasedFlushThresholdUpdater) segmentRowsFlushThresholdUpdater).getTableFlushSize(),
+    // Flush threshold rows set to 0 and Segment Rows larger than 0 -
+    // FixedFlushThresholdUpdater should be returned
+    FlushThresholdUpdater segmentRowsFlushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(
+        mockSegmentRowsStreamConfig(StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS));
+    assertTrue(segmentRowsFlushThresholdUpdater instanceof FixedFlushThresholdUpdater);
+    assertEquals(((FixedFlushThresholdUpdater) segmentRowsFlushThresholdUpdater).getTableFlushSize(),
         StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
 
     // Flush threshold rows set to 0 - SegmentSizeBasedFlushThresholdUpdater should be returned
@@ -124,7 +125,7 @@ public class FlushThresholdUpdaterTest {
   @Test
   public void testSegmentRowBasedFlushThreshold() {
     StreamConfig streamConfig = mockSegmentRowsStreamConfig(10000);
-    SegmentRowsBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentRowsBasedFlushThresholdUpdater(10000);
+    FixedFlushThresholdUpdater flushThresholdUpdater = new FixedFlushThresholdUpdater(10000);
     SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
     CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
     int maxNumPartitionsPerInstance = 4;

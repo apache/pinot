@@ -28,10 +28,10 @@ import org.apache.pinot.spi.stream.StreamConfig;
  * The default flush threshold updation strategy, which computes the flush threshold size of the segment
  * by dividing the flush threshold of the table by the max number of partitions consuming on an instance
  */
-public class SegmentRowsBasedFlushThresholdUpdater implements FlushThresholdUpdater {
+public class FixedFlushThresholdUpdater implements FlushThresholdUpdater {
   private final int _tableFlushSize;
 
-  SegmentRowsBasedFlushThresholdUpdater(int tableFlushSize) {
+  FixedFlushThresholdUpdater(int tableFlushSize) {
     _tableFlushSize = tableFlushSize;
   }
 
