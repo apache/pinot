@@ -103,9 +103,7 @@ public class KinesisStreamMetadataProviderTest {
       throws Exception {
     List<PartitionGroupConsumptionStatus> currentPartitionGroupMeta = new ArrayList<>();
 
-    Map<String, String> shardToSequenceMap = new HashMap<>();
-    shardToSequenceMap.put("0", "1");
-    KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset(shardToSequenceMap);
+    KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset("0", "1");
 
     currentPartitionGroupMeta.add(new PartitionGroupConsumptionStatus(0, 1, kinesisPartitionGroupOffset,
         kinesisPartitionGroupOffset, "CONSUMING"));
@@ -123,9 +121,8 @@ public class KinesisStreamMetadataProviderTest {
     expect(_streamConsumerFactory
         .createPartitionGroupConsumer(capture(stringCapture), capture(partitionGroupMetadataCapture)))
         .andReturn(_partitionGroupConsumer).anyTimes();
-    expect(_partitionGroupConsumer
-        .fetchMessages(capture(checkpointArgs), capture(checkpointArgs), captureInt(intArguments)))
-        .andReturn(new KinesisRecordsBatch(new ArrayList<>(), "0", true)).anyTimes();
+    expect(_partitionGroupConsumer.fetchMessages(capture(checkpointArgs), captureInt(intArguments))).andReturn(
+        new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true)).anyTimes();
 
     replay(_kinesisConnectionHandler, _streamConsumerFactory, _partitionGroupConsumer);
 
@@ -143,7 +140,7 @@ public class KinesisStreamMetadataProviderTest {
 
     Map<String, String> shardToSequenceMap = new HashMap<>();
     shardToSequenceMap.put("1", "1");
-    KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset(shardToSequenceMap);
+    KinesisPartitionGroupOffset kinesisPartitionGroupOffset = new KinesisPartitionGroupOffset("1", "1");
 
     currentPartitionGroupMeta.add(new PartitionGroupConsumptionStatus(0, 1, kinesisPartitionGroupOffset,
         kinesisPartitionGroupOffset, "CONSUMING"));
@@ -162,9 +159,8 @@ public class KinesisStreamMetadataProviderTest {
     expect(_streamConsumerFactory
         .createPartitionGroupConsumer(capture(stringCapture), capture(partitionGroupMetadataCapture)))
         .andReturn(_partitionGroupConsumer).anyTimes();
-    expect(_partitionGroupConsumer
-        .fetchMessages(capture(checkpointArgs), capture(checkpointArgs), captureInt(intArguments)))
-        .andReturn(new KinesisRecordsBatch(new ArrayList<>(), "0", true)).anyTimes();
+    expect(_partitionGroupConsumer.fetchMessages(capture(checkpointArgs), captureInt(intArguments))).andReturn(
+        new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true)).anyTimes();
 
     replay(_kinesisConnectionHandler, _streamConsumerFactory, _partitionGroupConsumer);
 

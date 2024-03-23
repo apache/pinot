@@ -31,14 +31,13 @@ import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.junit.Assert.assertTrue;
 
 public class PulsarConfigTest {
   public static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
-
   public static final String STREAM_TYPE = "pulsar";
   public static final String STREAM_PULSAR_BROKER_LIST = "pulsar://localhost:6650";
   public static final String STREAM_PULSAR_CONSUMER_TYPE = "simple";
+
   Map<String, String> getCommonStreamConfigMap() {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", STREAM_TYPE);
@@ -55,7 +54,7 @@ public class PulsarConfigTest {
   }
 
   @Test
-  public void testParsingMetadataConfigWithConfiguredFields() throws Exception {
+  public void testParsingMetadataConfigWithConfiguredFields() {
     Map<String, String> streamConfigMap = getCommonStreamConfigMap();
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE), "true");
@@ -66,21 +65,20 @@ public class PulsarConfigTest {
     Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
         pulsarConfig.getMetadataFields();
     Assert.assertEquals(metadataFieldsToExtract.size(), 6);
-    Assert.assertTrue(metadataFieldsToExtract.containsAll(ImmutableList.of(
-        PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID,
-        PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID_BYTES_B64,
-        PulsarStreamMessageMetadata.PulsarMessageMetadataValue.PUBLISH_TIME,
-        PulsarStreamMessageMetadata.PulsarMessageMetadataValue.EVENT_TIME,
-        PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_KEY,
-        PulsarStreamMessageMetadata.PulsarMessageMetadataValue.TOPIC_NAME)));
+    Assert.assertTrue(metadataFieldsToExtract.containsAll(
+        ImmutableList.of(PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID,
+            PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID_BYTES_B64,
+            PulsarStreamMessageMetadata.PulsarMessageMetadataValue.PUBLISH_TIME,
+            PulsarStreamMessageMetadata.PulsarMessageMetadataValue.EVENT_TIME,
+            PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_KEY,
+            PulsarStreamMessageMetadata.PulsarMessageMetadataValue.TOPIC_NAME)));
   }
 
   @Test
-  public void testParsingMetadataConfigWithoutConfiguredFields() throws Exception {
+  public void testParsingMetadataConfigWithoutConfiguredFields() {
     Map<String, String> streamConfigMap = getCommonStreamConfigMap();
     streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE),
-        "true");
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE), "true");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
     PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
     Set<PulsarStreamMessageMetadata.PulsarMessageMetadataValue> metadataFieldsToExtract =
@@ -89,11 +87,10 @@ public class PulsarConfigTest {
   }
 
   @Test
-  public void testParsingNoMetadataConfig() throws Exception {
+  public void testParsingNoMetadataConfig() {
     Map<String, String> streamConfigMap = getCommonStreamConfigMap();
     streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE),
-        "false");
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE), "false");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
     PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
     Assert.assertFalse(pulsarConfig.isPopulateMetadata());
@@ -103,13 +100,11 @@ public class PulsarConfigTest {
   }
 
   @Test
-  public void testParsingNoMetadataConfigWithConfiguredFields() throws Exception {
+  public void testParsingNoMetadataConfigWithConfiguredFields() {
     Map<String, String> streamConfigMap = getCommonStreamConfigMap();
     streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE),
-        "false");
-    streamConfigMap.put(
-        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.METADATA_FIELDS),
+        StreamConfigProperties.constructStreamProperty(STREAM_TYPE, StreamConfigProperties.METADATA_POPULATE), "false");
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.METADATA_FIELDS),
         "messageId,messageIdBytes, publishTime, eventTime, key, topicName, ");
     StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
     PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
@@ -120,55 +115,42 @@ public class PulsarConfigTest {
   }
 
   @Test
-  public void testParsingConfigForOAuth() throws Exception {
+  public void testParsingConfigForOAuth()
+      throws Exception {
     Path testFile = null;
     try {
       testFile = Files.createTempFile("test_cred_file", ".json");
       Map<String, String> streamConfigMap = getCommonStreamConfigMap();
       streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_ISSUER_URL),
           "http://auth.test.com");
-      streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
-              PulsarConfig.OAUTH_CREDS_FILE_PATH), "file://" + testFile.toFile().getAbsolutePath());
+      streamConfigMap.put(
+          StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_CREDS_FILE_PATH),
+          "file://" + testFile.toFile().getAbsolutePath());
       streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_AUDIENCE),
           "urn:test:test");
       StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
 
       PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId");
       Assert.assertEquals(pulsarConfig.getIssuerUrl(), "http://auth.test.com");
-      Assert.assertEquals(pulsarConfig.getCredentialsFilePath(),
-          "file://" + testFile.toFile().getAbsolutePath());
+      Assert.assertEquals(pulsarConfig.getCredentialsFilePath(), "file://" + testFile.toFile().getAbsolutePath());
       Assert.assertEquals(pulsarConfig.getAudience(), "urn:test:test");
-      PulsarPartitionLevelConnectionHandler pulsarPartitionLevelConnectionHandler =
-          new PulsarPartitionLevelConnectionHandler("testId", streamConfig);
-      assertTrue(pulsarPartitionLevelConnectionHandler.getAuthenticationFactory(pulsarConfig).isPresent());
-    } catch (Exception e) {
-      Assert.fail("Should not throw exception", e);
     } finally {
       Optional.ofNullable(testFile).map(Path::toFile).ifPresent(File::delete);
     }
   }
 
-  @Test
-  public void testParsingConfigFailFileValidationForOAuth() throws Exception {
+  @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Invalid credentials "
+      + "file path: .*")
+  public void testParsingConfigFailFileValidationForOAuth() {
     String testFilePath = "file://path/to/file.json";
-
-    try {
-      Map<String, String> streamConfigMap = getCommonStreamConfigMap();
-      streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_ISSUER_URL),
-          "http://auth.test.com");
-      streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE,
-              PulsarConfig.OAUTH_CREDS_FILE_PATH),
-          testFilePath);
-      streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_AUDIENCE),
-          "urn:test:test");
-      StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
-      PulsarConfig pulsarConfig = new PulsarConfig(streamConfig, "testId"); //will throw exception
-    } catch (IllegalArgumentException mue) {
-      //expected case.
-      String errorMessage = String.format("Invalid credentials file path: %s. File does not exist.", testFilePath);
-      Assert.assertEquals(errorMessage, mue.getMessage());
-    } catch (Exception e) {
-      Assert.fail("Should not throw other exception", e);
-    }
+    Map<String, String> streamConfigMap = getCommonStreamConfigMap();
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_ISSUER_URL),
+        "http://auth.test.com");
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_CREDS_FILE_PATH),
+        testFilePath);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(STREAM_TYPE, PulsarConfig.OAUTH_AUDIENCE),
+        "urn:test:test");
+    StreamConfig streamConfig = new StreamConfig(TABLE_NAME_WITH_TYPE, streamConfigMap);
+    new PulsarConfig(streamConfig, "testId");
   }
 }

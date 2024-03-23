@@ -24,121 +24,110 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 
 
 /**
- * Interface wrapping stream consumer. Throws IndexOutOfBoundsException when trying to access a message at an
- * invalid index.
- * @param <T>
+ * Interface wrapping streaming messages. Throws IndexOutOfBoundsException when trying to access a message at an invalid
+ * index.
+ * @param <T> type of the stream message values.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface MessageBatch<T> {
+
   /**
-   * @return number of available messages
+   * Returns the number of available messages (excluding tombstone).
    */
   int getMessageCount();
 
   /**
-   * @return number of messages returned from the stream
+   * Returns the number of messages returned from the stream (including tombstone).
    */
   default int getUnfilteredMessageCount() {
     return getMessageCount();
   }
 
   /**
-   * Returns the message at a particular index inside a set of messages returned from the stream.
-   * @param index
-   * @return
+   * Returns the stream message at the given index within the batch.
    */
-  @Deprecated
-  T getMessageAtIndex(int index);
-
-  // for backward-compatibility
-  default byte[] getMessageBytesAtIndex(int index) {
-    return (byte[]) getMessageAtIndex(index);
-  }
-
   default StreamMessage<T> getStreamMessage(int index) {
-    return new LegacyStreamMessage(getMessageBytesAtIndex(index), (StreamMessageMetadata) getMetadataAtIndex(index));
-  }
-
-  class LegacyStreamMessage extends StreamMessage {
-    public LegacyStreamMessage(byte[] value, StreamMessageMetadata metadata) {
-      super(value, value.length, metadata);
-    }
-  }
-  /**
-   * Returns the offset of the message at a particular index inside a set of messages returned from the stream.
-   * @param index
-   * @return
-   */
-  int getMessageOffsetAtIndex(int index);
-
-  /**
-   * Returns the length of the message at a particular index inside a set of messages returned from the stream.
-   * @param index
-   * @return
-   */
-  int getMessageLengthAtIndex(int index);
-
-  /**
-   * Returns the metadata associated with the message at a particular index. This typically includes the timestamp
-   * when the message was ingested by the upstream stream-provider and other relevant metadata.
-   */
-  default RowMetadata getMetadataAtIndex(int index) {
-    return null;
+    byte[] value = getMessageBytesAtIndex(index);
+    StreamMessageMetadata metadata = (StreamMessageMetadata) getMetadataAtIndex(index);
+    //noinspection unchecked
+    return (StreamMessage<T>) new StreamMessage<>(value, value.length, metadata);
   }
 
   /**
-   * Returns the offset of the next message.
-   * @param index
-   * @return
-   */
-  @Deprecated
-  long getNextStreamMessageOffsetAtIndex(int index);
-
-  /**
-   * Returns the offset of the next message.
-   * @param index
-   * @return
-   */
-  default StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
-    return new LongMsgOffset(getNextStreamMessageOffsetAtIndex(index));
-  }
-
-  /**
-   * @return last offset in the batch
+   * Returns the start offset of the next batch.
    */
   default StreamPartitionMsgOffset getOffsetOfNextBatch() {
     return getNextStreamPartitionMsgOffsetAtIndex(getMessageCount() - 1);
   }
 
   /**
-   * Returns true if end of the consumer detects that no more records can be read from this partition group for good
+   * Returns the offset of the first message (including tombstone) in the batch.
+   * This is useful to determine if there were gaps in the stream.
+   */
+  @Nullable
+  default StreamPartitionMsgOffset getFirstMessageOffset() {
+    int numMessages = getMessageCount();
+    if (numMessages == 0) {
+      return null;
+    }
+    StreamMessageMetadata firstMessageMetadata = getStreamMessage(0).getMetadata();
+    return firstMessageMetadata != null ? firstMessageMetadata.getOffset() : null;
+  }
+
+  /**
+   * Returns the message metadata for the last message (including tombstone) in the batch.
+   * This is useful while determining ingestion delay for a message batch.
+   */
+  @Nullable
+  default StreamMessageMetadata getLastMessageMetadata() {
+    int numMessages = getMessageCount();
+    if (numMessages == 0) {
+      return null;
+    }
+    return getStreamMessage(numMessages - 1).getMetadata();
+  }
+
+  /**
+   * Returns {code true} if the current batch is the end of the consumer, and no more messages can be read from this
+   * partition group.
    */
   default boolean isEndOfPartitionGroup() {
     return false;
   }
 
-  /**
-   * Return the offset of the first message in the batch.
-   * The first offset of the batch is useful to determine if there were gaps in the stream.
-   *
-   * @return null by default
-   */
-  @Nullable
-  default public StreamPartitionMsgOffset getFirstMessageOffset() {
+  @Deprecated
+  default T getMessageAtIndex(int index) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Deprecated
+  default byte[] getMessageBytesAtIndex(int index) {
+    return (byte[]) getMessageAtIndex(index);
+  }
+
+  @Deprecated
+  default int getMessageLengthAtIndex(int index) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Deprecated
+  default int getMessageOffsetAtIndex(int index) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Deprecated
+  default RowMetadata getMetadataAtIndex(int index) {
     return null;
   }
 
-  /**
-   * This is useful while determining ingestion delay for a message batch. Retaining metadata for last filtered message
-   * in a batch can enable us to estimate the ingestion delay for the batch.
-   * Note that a batch can be fully filtered, and we can still retain the metadata for the last filtered message to
-   * facilitate computing ingestion delay in the face of a fully filtered batch.
-   *
-   * @return null by default.
-   */
-  @Nullable
-  default public StreamMessageMetadata getLastMessageMetadata() {
-    return null;
+  @Deprecated
+  default long getNextStreamMessageOffsetAtIndex(int index) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Deprecated
+  default StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
+    return new LongMsgOffset(getNextStreamMessageOffsetAtIndex(index));
   }
 }

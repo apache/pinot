@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.stream;
 
 public class LongMsgOffsetFactory implements StreamPartitionMsgOffsetFactory {
+
   @Override
   public void init(StreamConfig streamConfig) {
   }
@@ -26,10 +27,5 @@ public class LongMsgOffsetFactory implements StreamPartitionMsgOffsetFactory {
   @Override
   public StreamPartitionMsgOffset create(String offsetStr) {
     return new LongMsgOffset(offsetStr);
-  }
-
-  @Override
-  public StreamPartitionMsgOffset create(StreamPartitionMsgOffset other) {
-    return new LongMsgOffset(other);
   }
 }

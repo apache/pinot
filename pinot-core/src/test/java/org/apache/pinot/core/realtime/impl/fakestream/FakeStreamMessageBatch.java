@@ -19,50 +19,43 @@
 package org.apache.pinot.core.realtime.impl.fakestream;
 
 import java.util.List;
+import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 /**
  * MessageBatch implementation for the fake stream
  */
-public class FakeStreamMessageBatch implements MessageBatch<byte[]> {
-  private List<Integer> _messageOffsets;
-  private List<byte[]> _messageBytes;
+class FakeStreamMessageBatch implements MessageBatch<byte[]> {
+  private final List<byte[]> _values;
+  private final List<Integer> _offsets;
+  private final int _offsetOfNextBatch;
 
-  FakeStreamMessageBatch(List<Integer> messageOffsets, List<byte[]> messageBytes) {
-    _messageOffsets = messageOffsets;
-    _messageBytes = messageBytes;
+  FakeStreamMessageBatch(List<byte[]> values, List<Integer> offsets, int offsetOfNextBatch) {
+    _values = values;
+    _offsets = offsets;
+    _offsetOfNextBatch = offsetOfNextBatch;
   }
 
   @Override
   public int getMessageCount() {
-    return _messageOffsets.size();
+    return _values.size();
   }
 
   @Override
-  public byte[] getMessageAtIndex(int index) {
-    return _messageBytes.get(index);
+  public BytesStreamMessage getStreamMessage(int index) {
+    byte[] value = _values.get(index);
+    int offset = _offsets.get(index);
+    return new BytesStreamMessage(value,
+        new StreamMessageMetadata.Builder().setOffset(new LongMsgOffset(offset), new LongMsgOffset(offset + 1))
+            .build());
   }
 
   @Override
-  public int getMessageOffsetAtIndex(int index) {
-    return _messageOffsets.get(index);
-  }
-
-  @Override
-  public int getMessageLengthAtIndex(int index) {
-    return _messageBytes.get(index).length;
-  }
-
-  @Override
-  public long getNextStreamMessageOffsetAtIndex(int index) {
-    throw new UnsupportedOperationException("This method is deprecated");
-  }
-
-  @Override
-  public StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
-    return new LongMsgOffset(_messageOffsets.get(index) + 1);
+  public StreamPartitionMsgOffset getOffsetOfNextBatch() {
+    return new LongMsgOffset(_offsetOfNextBatch);
   }
 }
