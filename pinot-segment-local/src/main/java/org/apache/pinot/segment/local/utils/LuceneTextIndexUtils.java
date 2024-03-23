@@ -31,22 +31,27 @@ import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.WildcardQuery;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class LuceneTextIndexUtils {
-  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexUtils.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexUtils.class);
 
   private LuceneTextIndexUtils() {
   }
 
-  // Convert a boolean query with literal matching for each clause to a span query which enables prefix and suffix
-  // matching for terms with .* prefix or suffix.
+  /**
+   *
+   * @param query a Lucene query
+   * @return a span query with 0 slop and the original clause order if the input query is boolean query with one or more
+   * prefix or wildcard subqueries; the same query otherwise.
+   */
   public static Query convertToMultiTermSpanQuery(Query query) {
     if (!(query instanceof BooleanQuery)) {
       return query;
     }
-    LOGGER.info("Perform rewriting for the phrase query {}.", query);
+    LOGGER.debug("Perform rewriting for the phrase query {}.", query);
     ArrayList<SpanQuery> spanQueryLst = new ArrayList<>();
     boolean prefixOrSuffixQueryFound = false;
     for (BooleanClause clause : ((BooleanQuery) query).clauses()) {
@@ -65,8 +70,7 @@ public class LuceneTextIndexUtils {
       return query;
     }
     SpanNearQuery spanNearQuery = new SpanNearQuery(spanQueryLst.toArray(new SpanQuery[0]), 0, true);
-    IndexSearcher.setMaxClauseCount(Integer.MAX_VALUE);
-    LOGGER.info("The phrase query {} is re-written as {}", query, spanNearQuery);
+    LOGGER.debug("The phrase query {} is re-written as {}", query, spanNearQuery);
     return spanNearQuery;
   }
 }

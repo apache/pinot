@@ -123,7 +123,9 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       IndexSearcher indexSearcher = null;
       try {
         QueryParser parser = new QueryParser(_column, _analyzer);
-        parser.setAllowLeadingWildcard(true);
+        if (_enablePrefixSuffixMatchingInPhraseQueries) {
+          parser.setAllowLeadingWildcard(true);
+        }
         Query query = parser.parse(searchQuery);
         if (_enablePrefixSuffixMatchingInPhraseQueries) {
           query = LuceneTextIndexUtils.convertToMultiTermSpanQuery(query);
