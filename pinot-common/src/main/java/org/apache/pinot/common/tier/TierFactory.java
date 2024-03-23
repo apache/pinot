@@ -20,7 +20,7 @@ package org.apache.pinot.common.tier;
 
 import com.google.common.collect.Sets;
 import java.util.Collections;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.config.table.TierConfig;
 

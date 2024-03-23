@@ -187,7 +187,6 @@
     <commons-net.version>3.10.0</commons-net.version>
     <!-- Legacy Apache Commons Libraries -->
     <commons-lang.version>2.6</commons-lang.version>
-    <commons-collections.version>3.2.2</commons-collections.version>
     <commons-math.version>2.2</commons-math.version>
 
     <!-- Google Libraries -->
@@ -733,11 +732,6 @@
         <version>${commons-lang.version}</version>
       </dependency>
       <dependency>
-        <groupId>commons-collections</groupId>
-        <artifactId>commons-collections</artifactId>
-        <version>${commons-collections.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-math</artifactId>
         <version>${commons-math.version}</version>
@@ -831,6 +825,10 @@
           <exclusion>
             <groupId>org.jboss.xnio</groupId>
             <artifactId>xnio-api</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>commons-collections</groupId>
+            <artifactId>commons-collections</artifactId>
           </exclusion>
         </exclusions>
       </dependency>
@@ -1423,6 +1421,12 @@
         <groupId>org.apache.flink</groupId>
         <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
         <version>${flink.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-collections</groupId>
+            <artifactId>commons-collections</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
