@@ -34,7 +34,6 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <spark.version>3.5.0</spark.version>
-    <airlift.version>0.21</airlift.version>
   </properties>
   <dependencies>
     <dependency>
@@ -91,10 +90,6 @@
       <artifactId>pinot-orc</artifactId>
       <version>${project.version}</version>
       <exclusions>
-        <exclusion>
-          <groupId>io.airlift</groupId>
-          <artifactId>aircompressor</artifactId>
-        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
@@ -155,10 +150,6 @@
         <exclusion>
           <groupId>com.google.errorprone</groupId>
           <artifactId>error_prone_annotations</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>io.airlift</groupId>
-          <artifactId>aircompressor</artifactId>
         </exclusion>
         <exclusion>
           <groupId>javax.annotation</groupId>
@@ -232,7 +223,6 @@
     <dependency>
       <groupId>io.airlift</groupId>
       <artifactId>aircompressor</artifactId>
-      <version>${airlift.version}</version>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>
