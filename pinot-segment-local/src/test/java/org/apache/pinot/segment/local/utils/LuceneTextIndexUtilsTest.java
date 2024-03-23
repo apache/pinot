@@ -67,9 +67,8 @@ public class LuceneTextIndexUtilsTest {
         .add(new BooleanClause(prefixQuery, BooleanClause.Occur.SHOULD))
         .add(new BooleanClause(prefixQuery, BooleanClause.Occur.SHOULD));
 
-    SpanQuery[] spanQueries3 =
-        {new SpanMultiTermQueryWrapper<>(wildcardQuery), new SpanMultiTermQueryWrapper<>(prefixQuery),
-            new SpanMultiTermQueryWrapper<>(prefixQuery),};
+    SpanQuery[] spanQueries3 = {new SpanMultiTermQueryWrapper<>(wildcardQuery), new SpanMultiTermQueryWrapper<>(
+        prefixQuery), new SpanMultiTermQueryWrapper<>(prefixQuery),};
     expectedQuery = new SpanNearQuery(spanQueries3, 0, true);
     Assert.assertEquals(expectedQuery, LuceneTextIndexUtils.convertToMultiTermSpanQuery(builder.build()));
 
