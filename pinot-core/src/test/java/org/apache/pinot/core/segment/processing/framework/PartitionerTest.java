@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.framework;
 
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.core.segment.processing.partitioner.ColumnValuePartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.NoOpPartitioner;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;

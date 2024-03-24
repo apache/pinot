@@ -20,7 +20,7 @@ package org.apache.pinot.controller.tuner;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TunerConfig;

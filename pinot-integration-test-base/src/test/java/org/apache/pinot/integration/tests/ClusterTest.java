@@ -44,9 +44,9 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.math.RandomUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
@@ -160,7 +160,7 @@ public abstract class ClusterTest extends ControllerTest {
     brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
     brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
     brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT,
-        NetUtils.findOpenPort(DEFAULT_BROKER_PORT + brokerId + RandomUtils.nextInt(10000)));
+        NetUtils.findOpenPort(DEFAULT_BROKER_PORT + brokerId + RandomUtils.nextInt(0, 10000)));
     brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
     brokerConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     overrideBrokerConf(brokerConf);

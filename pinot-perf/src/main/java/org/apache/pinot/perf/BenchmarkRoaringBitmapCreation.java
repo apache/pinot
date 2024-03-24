@@ -24,7 +24,7 @@ import java.lang.ref.SoftReference;
 import java.nio.ByteOrder;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.math.RandomUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
@@ -82,11 +82,12 @@ public class BenchmarkRoaringBitmapCreation {
     _bitmapInvertedIndexWriter = new BitmapInvertedIndexWriter(bufferFile, _numBitmaps);
     // Insert between 10-1000 values per bitmap
     for (int i = 0; i < _numBitmaps; i++) {
-      int size = 10 + RandomUtils.nextInt(990);
+      int size = 10 + RandomUtils.nextInt(0, 990);
       int[] data = new int[size];
       for (int j = 0; j < size; j++) {
+        // docIds will repeat across bitmaps, but doesn't matter for purpose of this benchmark
         data[j] = RandomUtils
-            .nextInt(NUM_DOCS); // docIds will repeat across bitmaps, but doesn't matter for purpose of this benchmark
+            .nextInt(0, NUM_DOCS);
       }
       RoaringBitmap bitmap = RoaringBitmap.bitmapOf(data);
       _bitmapInvertedIndexWriter.add(bitmap);
@@ -110,7 +111,7 @@ public class BenchmarkRoaringBitmapCreation {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public boolean cacheReferences() {
-    int dictId = RandomUtils.nextInt(_dictIdsToRead);
+    int dictId = RandomUtils.nextInt(0, _dictIdsToRead);
     ImmutableRoaringBitmap roaringBitmapFromCache = getRoaringBitmapFromCache(dictId);
     return roaringBitmapFromCache.isEmpty();
   }
@@ -119,7 +120,7 @@ public class BenchmarkRoaringBitmapCreation {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public boolean alwaysBuild() {
-    int dictId = RandomUtils.nextInt(_dictIdsToRead);
+    int dictId = RandomUtils.nextInt(0, _dictIdsToRead);
     ImmutableRoaringBitmap immutableRoaringBitmap = buildRoaringBitmap(dictId);
     return immutableRoaringBitmap.isEmpty();
   }
@@ -128,7 +129,7 @@ public class BenchmarkRoaringBitmapCreation {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public boolean alwaysBuildCachedOffsetAndLength() {
-    int dictId = RandomUtils.nextInt(_dictIdsToRead);
+    int dictId = RandomUtils.nextInt(0, _dictIdsToRead);
     ImmutableRoaringBitmap immutableRoaringBitmap = buildRoaringBitmapUsingOffsetPairFromCache(dictId);
     return immutableRoaringBitmap.isEmpty();
   }

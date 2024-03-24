@@ -22,7 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang.math.IntRange;
+import org.apache.commons.lang3.Range;
 import org.apache.pinot.controller.recommender.data.DataGenerationHelpers;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
@@ -153,7 +153,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       String column = sa.getColumn();
 
       if (sa.isRange()) {
-        spec.getRangeMap().put(column, new IntRange(sa.getRangeStart(), sa.getRangeEnd()));
+        spec.getRangeMap().put(column, Range.of(sa.getRangeStart(), sa.getRangeEnd()));
       } else if (sa.getPattern() != null) {
         spec.getPatternMap().put(column, sa.getPattern());
       } else {
