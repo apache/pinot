@@ -27,8 +27,12 @@ import java.util.function.Consumer;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class TaskGeneratorUtils {
@@ -105,5 +109,20 @@ public class TaskGeneratorUtils {
         }
       }
     }
+  }
+
+  /**
+   * Extract minionInstanceTag from the task config map. Returns "minion_untagged" in case of no config found.
+   */
+  public static String extractMinionInstanceTag(TableConfig tableConfig, String taskType) {
+    TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
+    if (tableTaskConfig != null) {
+      Map<String, String> configs = tableTaskConfig.getConfigsForTaskType(taskType);
+      if (configs != null && !configs.isEmpty()) {
+        return configs.getOrDefault(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG,
+            CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+      }
+    }
+    return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
   }
 }

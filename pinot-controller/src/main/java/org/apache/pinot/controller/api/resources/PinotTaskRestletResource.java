@@ -621,12 +621,15 @@ public class PinotTaskRestletResource {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (taskType != null) {
       // Schedule task for the given task type
-      String taskName = tableName != null ? _pinotTaskManager.scheduleTask(taskType, tableName)
+      List<String> taskNames = tableName != null ? _pinotTaskManager.scheduleTask(taskType, tableName)
           : _pinotTaskManager.scheduleTask(taskType);
-      return Collections.singletonMap(taskType, taskName);
+      return Collections.singletonMap(taskType, taskNames == null ? null : StringUtils.join(taskNames, ','));
     } else {
       // Schedule tasks for all task types
-      return tableName != null ? _pinotTaskManager.scheduleTasks(tableName) : _pinotTaskManager.scheduleTasks();
+      Map<String, List<String>> allTaskNames =
+          tableName != null ? _pinotTaskManager.scheduleTasks(tableName) : _pinotTaskManager.scheduleTasks();
+      return allTaskNames.entrySet().stream()
+          .collect(Collectors.toMap(Map.Entry::getKey, entry -> String.join(",", entry.getValue())));
     }
   }
 

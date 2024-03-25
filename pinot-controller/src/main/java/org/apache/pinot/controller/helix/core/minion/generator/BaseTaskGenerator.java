@@ -120,4 +120,15 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
       throws Exception {
     throw new UnknownTaskTypeException("Adhoc task generation is not supported for task type - " + this.getTaskType());
   }
+
+  @Override
+  public void generateTasks(List<TableConfig> tableConfigs, List<PinotTaskConfig> pinotTaskConfigs)
+      throws Exception {
+    pinotTaskConfigs.addAll(generateTasks(tableConfigs));
+  }
+
+  @Override
+  public String getMinionInstanceTag(TableConfig tableConfig) {
+    return TaskGeneratorUtils.extractMinionInstanceTag(tableConfig, getTaskType());
+  }
 }
