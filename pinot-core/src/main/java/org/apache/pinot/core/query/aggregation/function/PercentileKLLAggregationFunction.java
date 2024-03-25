@@ -61,14 +61,14 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * </p>
  */
 public class PercentileKLLAggregationFunction
-    extends BaseSingleInputAggregationFunction<KllDoublesSketch, Comparable<?>> {
+    extends NullableSingleInputAggregationFunction<KllDoublesSketch, Comparable<?>> {
   protected static final int DEFAULT_K_VALUE = 200;
 
   protected final double _percentile;
   protected int _kValue;
 
-  public PercentileKLLAggregationFunction(List<ExpressionContext> arguments) {
-    super(arguments.get(0));
+  public PercentileKLLAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(arguments.get(0), nullHandlingEnabled);
 
     // Check that there are correct number of arguments
     int numArguments = arguments.size();
@@ -107,14 +107,18 @@ public class PercentileKLLAggregationFunction
     if (valueType == DataType.BYTES) {
       // Assuming the column contains serialized data sketch
       KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-      for (int i = 0; i < length; i++) {
-        sketch.merge(deserializedSketches[i]);
-      }
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          sketch.merge(deserializedSketches[i]);
+        }
+      });
     } else {
       double[] values = valueSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        sketch.update(values[i]);
-      }
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          sketch.update(values[i]);
+        }
+      });
     }
   }
 
@@ -127,16 +131,20 @@ public class PercentileKLLAggregationFunction
     if (valueType == DataType.BYTES) {
       // serialized sketch
       KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-      for (int i = 0; i < length; i++) {
-        KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
-        sketch.merge(deserializedSketches[i]);
-      }
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
+          sketch.merge(deserializedSketches[i]);
+        }
+      });
     } else {
       double[] values = valueSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
-        sketch.update(values[i]);
-      }
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKeyArray[i]);
+          sketch.update(values[i]);
+        }
+      });
     }
   }
 
@@ -149,20 +157,24 @@ public class PercentileKLLAggregationFunction
     if (valueType == DataType.BYTES) {
       // serialized sketch
       KllDoublesSketch[] deserializedSketches = deserializeSketches(blockValSetMap.get(_expression).getBytesValuesSV());
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
-          sketch.merge(deserializedSketches[i]);
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
+            sketch.merge(deserializedSketches[i]);
+          }
         }
-      }
+      });
     } else {
       double[] values = valueSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        for (int groupKey : groupKeysArray[i]) {
-          KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
-          sketch.update(values[i]);
+      forEachNotNull(length, valueSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            KllDoublesSketch sketch = getOrCreateSketch(groupByResultHolder, groupKey);
+            sketch.update(values[i]);
+          }
         }
-      }
+      });
     }
   }
 
@@ -241,6 +253,9 @@ public class PercentileKLLAggregationFunction
 
   @Override
   public Comparable<?> extractFinalResult(KllDoublesSketch sketch) {
+    if (sketch.isEmpty() && _nullHandlingEnabled) {
+      return null;
+    }
     return sketch.getQuantile(_percentile / 100);
   }
 }

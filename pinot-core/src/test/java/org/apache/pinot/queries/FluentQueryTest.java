@@ -112,7 +112,7 @@ public class FluentQueryTest {
     }
   }
 
-  static class TableWithSegments {
+  public static class TableWithSegments {
     protected final TableConfig _tableConfig;
     protected final Schema _schema;
     protected final File _indexDir;
