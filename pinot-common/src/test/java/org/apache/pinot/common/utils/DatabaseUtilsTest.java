@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
@@ -72,7 +73,7 @@ public class DatabaseUtilsTest {
       try {
         DatabaseUtils.translateTableName(tableName, databaseName);
         fail();
-      } catch (IllegalArgumentException ignored) {
+      } catch (IllegalArgumentException | DatabaseConflictException ignored) {
         return;
       }
     }
