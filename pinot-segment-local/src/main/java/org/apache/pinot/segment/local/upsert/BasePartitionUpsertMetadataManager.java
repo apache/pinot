@@ -211,6 +211,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       // normal segment loading logic, the one doing more costly checks on the upsert metadata.
       _logger.warn("Failed to preload segments from partition: {} of table: {}, skipping", _partitionId,
           _tableNameWithType, e);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_PRELOAD_FAILURE, 1);
       if (e instanceof InterruptedException) {
         // Restore the interrupted status in case the upper callers want to check.
         Thread.currentThread().interrupt();
