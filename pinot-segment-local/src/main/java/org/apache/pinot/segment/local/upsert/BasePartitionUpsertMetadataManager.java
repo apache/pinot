@@ -199,7 +199,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         return;
       }
       // From now on, the _isPreloading flag is true until the segments are preloaded.
+      long startTime = System.currentTimeMillis();
       doPreloadSegments(tableDataManager, indexLoadingConfig, helixManager, segmentPreloadExecutor);
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_PRELOAD_TIME_MS, duration,
+          TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       // Even if preloading fails, we should continue to complete the initialization, so that TableDataManager can be
       // created. Once TableDataManager is created, no more segment preloading would happen, and the normal segment
