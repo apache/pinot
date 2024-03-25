@@ -32,7 +32,7 @@
       "stream.kafka.consumer.prop.auto.offset.reset": "largest",
       "stream.kafka.broker.list": "localhost:19092",
       "realtime.segment.flush.threshold.time": "12h",
-      "realtime.segment.flush.threshold.size": "100M"
+      "realtime.segment.flush.threshold.size": "100000"
     }
   },
   "metadata": {
