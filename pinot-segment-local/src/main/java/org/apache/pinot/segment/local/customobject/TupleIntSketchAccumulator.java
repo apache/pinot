@@ -20,53 +20,61 @@ package org.apache.pinot.segment.local.customobject;
 
 import java.util.Comparator;
 import javax.annotation.Nonnull;
-import org.apache.datasketches.theta.SetOperationBuilder;
-import org.apache.datasketches.theta.Sketch;
-import org.apache.datasketches.theta.Union;
+import org.apache.datasketches.tuple.Sketch;
+import org.apache.datasketches.tuple.Union;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 
 
 /**
- * Intermediate state used by {@code DistinctCountThetaSketchAggregationFunction} which gives
+ * Intermediate state used by {@code IntegerTupleSketchAggregationFunction} which gives
  * the end user more control over how sketches are merged for performance.
  * In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
- * processing beyond the minimum Theta value.
+ * processing beyond the minimum Theta value.  This applies to Tuple sketches because they are an extension of the
+ * Theta sketch.
  * The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
  * that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
  * set to the minimum immediately, further gains can be realised.
  */
-public class ThetaSketchAccumulator extends CustomObjectAccumulator<Sketch> {
-  private SetOperationBuilder _setOperationBuilder = new SetOperationBuilder();
-  private Union _union;
+public class TupleIntSketchAccumulator extends CustomObjectAccumulator<Sketch<IntegerSummary>> {
+  private IntegerSummarySetOperations _setOperations;
+  private int _nominalEntries;
+  private Union<IntegerSummary> _union;
 
-  public ThetaSketchAccumulator() {
+  public TupleIntSketchAccumulator() {
   }
 
   // Note: The accumulator is serialized as a sketch.  This means that the majority of the processing
   // happens on serialization. Therefore, when deserialized, the values may be null and will
   // require re-initialisation. Since the primary use case is at query time for the Broker
   // and Server, these properties are already in memory and are re-set.
-  public ThetaSketchAccumulator(SetOperationBuilder setOperationBuilder, int threshold) {
+  public TupleIntSketchAccumulator(IntegerSummarySetOperations setOperations, int nominalEntries, int threshold) {
     super(threshold);
-    _setOperationBuilder = setOperationBuilder;
+    _nominalEntries = nominalEntries;
+    _setOperations = setOperations;
   }
 
-  public void setSetOperationBuilder(SetOperationBuilder setOperationBuilder) {
-    _setOperationBuilder = setOperationBuilder;
+  public void setSetOperations(IntegerSummarySetOperations setOperations) {
+    _setOperations = setOperations;
+  }
+
+  public void setNominalEntries(int nominalEntries) {
+    _nominalEntries = nominalEntries;
   }
 
   @Nonnull
   @Override
-  public Sketch getResult() {
+  public Sketch<IntegerSummary> getResult() {
     return unionAll();
   }
 
-  private Sketch unionAll() {
+  private Sketch<IntegerSummary> unionAll() {
     if (_union == null) {
-      _union = _setOperationBuilder.buildUnion();
+      _union = new Union<>(_nominalEntries, _setOperations);
     }
     // Return the default update "gadget" sketch as a compact sketch
     if (isEmpty()) {
-      return _union.getResult(false, null);
+      return _union.getResult();
     }
     // Corner-case: the parameters are not strictly respected when there is a single sketch.
     // This single sketch might have been the result of a previously accumulated union and
@@ -86,11 +94,11 @@ public class ThetaSketchAccumulator extends CustomObjectAccumulator<Sketch> {
     // which results in fewer redundant entries being retained and subsequently discarded during the
     // union operation.
     _accumulator.sort(Comparator.comparingDouble(Sketch::getTheta));
-    for (Sketch accumulatedSketch : _accumulator) {
+    for (Sketch<IntegerSummary> accumulatedSketch : _accumulator) {
       _union.union(accumulatedSketch);
     }
     _accumulator.clear();
 
-    return _union.getResult(false, null);
+    return _union.getResult();
   }
 }
