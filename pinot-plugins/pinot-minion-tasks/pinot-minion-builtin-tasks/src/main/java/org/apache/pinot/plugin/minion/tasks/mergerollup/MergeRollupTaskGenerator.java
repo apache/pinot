@@ -199,13 +199,14 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             : a.getSegmentName().compareTo(b.getSegmentName());
       });
 
-      // Sort merge levels based on bucket time period
+      // Sort merge levels based on bucket time period and level name
       Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
       Map<String, Map<String, String>> mergeLevelToConfigs = MergeRollupTaskUtils.getLevelToConfigMap(taskConfigs);
       List<Map.Entry<String, Map<String, String>>> sortedMergeLevelConfigs =
           new ArrayList<>(mergeLevelToConfigs.entrySet());
-      sortedMergeLevelConfigs.sort(Comparator.comparingLong(
-          e -> TimeUtils.convertPeriodToMillis(e.getValue().get(MinionConstants.MergeTask.BUCKET_TIME_PERIOD_KEY))));
+      sortedMergeLevelConfigs.sort(Comparator.<Map.Entry<String, Map<String, String>>, Long>comparing(
+              e -> TimeUtils.convertPeriodToMillis(e.getValue().get(MinionConstants.MergeTask.BUCKET_TIME_PERIOD_KEY)))
+          .thenComparing(Map.Entry::getKey));
 
       // Get incomplete merge levels
       Set<String> inCompleteMergeLevels = new HashSet<>();
@@ -313,7 +314,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         List<SegmentZKMetadata> selectedSegmentsForBucket = new ArrayList<>();
         boolean hasUnmergedSegments = false;
         boolean hasSpilledOverData = false;
-        boolean areAllSegmentsReadyToMerge = true;
+        boolean isAllSegmentsReadyToMerge = true;
 
         // The for loop terminates in following cases:
         // 1. Found buckets with unmerged segments:
@@ -334,7 +335,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
                 hasUnmergedSegments = true;
               }
               if (!isMergedSegment(preSelectedSegment, lowerMergeLevel, sortedMergeLevels)) {
-                areAllSegmentsReadyToMerge = false;
+                isAllSegmentsReadyToMerge = false;
               }
               if (hasSpilledOverData(preSelectedSegment, bucketMs)) {
                 hasSpilledOverData = true;
@@ -345,20 +346,24 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             // Haven't find the first overlapping segment, continue to the next segment
           } else {
             // Has gone through all overlapping segments for current bucket
-            if (hasUnmergedSegments && areAllSegmentsReadyToMerge) {
+            if (hasUnmergedSegments && isAllSegmentsReadyToMerge) {
               // Add the bucket if there are unmerged segments
               selectedSegmentsForAllBuckets.add(selectedSegmentsForBucket);
             }
 
-            if (selectedSegmentsForAllBuckets.size() == maxNumParallelBuckets || hasSpilledOverData) {
+            if (selectedSegmentsForAllBuckets.size() == maxNumParallelBuckets
+                || hasSpilledOverData && hasUnmergedSegments && isAllSegmentsReadyToMerge) {
               // If there are enough buckets or found spilled over data, schedule merge tasks
+              // Note: the check for hasUnmergedSegments && isAllSegmentsReadyToMerge is needed for processAll mode.
+              // This check prevents a scenario where lower-level merge discontinues scheduling due to the higher-level
+              // segments being considered as spilled-over data based on lower-level criteria.
               break;
             } else {
               // Start with a new bucket
               // TODO: If there are many small merged segments, we should merge them again
               selectedSegmentsForBucket = new ArrayList<>();
               hasUnmergedSegments = false;
-              areAllSegmentsReadyToMerge = true;
+              isAllSegmentsReadyToMerge = true;
               bucketStartMs = (startTimeMs / bucketMs) * bucketMs;
               bucketEndMs = bucketStartMs + bucketMs;
               if (!isValidBucketEndTime(bucketEndMs, bufferMs, lowerMergeLevel, mergeRollupTaskMetadata, processAll)) {
@@ -368,7 +373,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
                 hasUnmergedSegments = true;
               }
               if (!isMergedSegment(preSelectedSegment, lowerMergeLevel, sortedMergeLevels)) {
-                areAllSegmentsReadyToMerge = false;
+                isAllSegmentsReadyToMerge = false;
               }
               if (hasSpilledOverData(preSelectedSegment, bucketMs)) {
                 hasSpilledOverData = true;
@@ -379,7 +384,7 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         }
 
         // Add the last bucket if it contains unmerged segments and is not added before
-        if (hasUnmergedSegments && areAllSegmentsReadyToMerge && (selectedSegmentsForAllBuckets.isEmpty() || (
+        if (hasUnmergedSegments && isAllSegmentsReadyToMerge && (selectedSegmentsForAllBuckets.isEmpty() || (
             selectedSegmentsForAllBuckets.get(selectedSegmentsForAllBuckets.size() - 1)
                 != selectedSegmentsForBucket))) {
           selectedSegmentsForAllBuckets.add(selectedSegmentsForBucket);
@@ -659,7 +664,9 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         .getSegmentGroups(tableConfig, _clusterInfoAccessor, selectedSegments);
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
-    for (List<SegmentZKMetadata> segments : segmentGroups) {
+    long segmentPrefixTimestamp = System.currentTimeMillis();
+    for (int segmentGroupIndex = 0; segmentGroupIndex < segmentGroups.size(); segmentGroupIndex++) {
+      List<SegmentZKMetadata> segments = segmentGroups.get(segmentGroupIndex);
       int numRecordsPerTask = 0;
       List<List<String>> segmentNamesList = new ArrayList<>();
       List<List<String>> downloadURLsList = new ArrayList<>();
@@ -717,10 +724,19 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
         // Segment name conflict happens when the current method "createPinotTaskConfigs" is invoked more than once
         // within the same epoch millisecond, which may happen when there are multiple partitions.
         // To prevent such name conflict, we include a partitionSeqSuffix to the segment name.
+        String segmentNamePrefixValue;
+        if (segmentGroups.size() == 1) {
+          segmentNamePrefixValue = MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + DELIMITER_IN_SEGMENT_NAME
+              + segmentPrefixTimestamp + partitionSuffix + DELIMITER_IN_SEGMENT_NAME + i
+              + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(tableNameWithType);
+        } else {
+          segmentNamePrefixValue = MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + DELIMITER_IN_SEGMENT_NAME
+              + segmentPrefixTimestamp + partitionSuffix + DELIMITER_IN_SEGMENT_NAME + segmentGroupIndex
+              + DELIMITER_IN_SEGMENT_NAME + i + DELIMITER_IN_SEGMENT_NAME
+              + TableNameBuilder.extractRawTableName(tableNameWithType);
+        }
         configs.put(MergeRollupTask.SEGMENT_NAME_PREFIX_KEY,
-            MergeRollupTask.MERGED_SEGMENT_NAME_PREFIX + mergeLevel + DELIMITER_IN_SEGMENT_NAME
-                + System.currentTimeMillis() + partitionSuffix + DELIMITER_IN_SEGMENT_NAME + i
-                + DELIMITER_IN_SEGMENT_NAME + TableNameBuilder.extractRawTableName(tableNameWithType));
+            segmentNamePrefixValue);
         pinotTaskConfigs.add(new PinotTaskConfig(MergeRollupTask.TASK_TYPE, configs));
       }
     }
