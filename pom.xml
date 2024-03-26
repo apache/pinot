@@ -1701,6 +1701,22 @@
               </goals>
               <phase>validate</phase>
             </execution>
+            <execution>
+              <id>enforce-banned-dependencies</id>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <rules>
+                  <bannedDependencies>
+                    <excludes>
+                      <exclude>commons-logging:commons-logging</exclude>
+                    </excludes>
+                  </bannedDependencies>
+                </rules>
+                <fail>true</fail> <!-- Fail the build if banned dependencies are found -->
+              </configuration>
+            </execution>
           </executions>
           <configuration>
             <rules>
