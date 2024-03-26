@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.compression;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -25,7 +26,7 @@ import java.nio.ByteBuffer;
 /**
  * Interface to compress a chunk of data.
  */
-public interface ChunkCompressor {
+public interface ChunkCompressor extends Closeable {
 
   /**
    * This method compresses the given data. The output compressed ByteBuffer is returned ready for read.
@@ -51,4 +52,9 @@ public interface ChunkCompressor {
    * @return this compressor's type
    */
   ChunkCompressionType compressionType();
+
+  @Override
+  default void close() throws IOException {
+    // no-op
+  }
 }

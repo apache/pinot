@@ -54,18 +54,20 @@ public class TestCompression {
   @Test(dataProvider = "formats")
   public void testRoundtrip(ChunkCompressionType type, ByteBuffer rawInput)
       throws IOException {
-    ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type);
-    assertEquals(compressor.compressionType(), type, "upgrade is opt in");
-    roundtrip(compressor, rawInput);
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type)) {
+      assertEquals(compressor.compressionType(), type, "upgrade is opt in");
+      roundtrip(compressor, rawInput);
+    }
   }
 
   @Test(dataProvider = "formats")
   public void testRoundtripWithUpgrade(ChunkCompressionType type, ByteBuffer rawInput)
       throws IOException {
-    ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type, true);
-    assertNotEquals(compressor.compressionType(), ChunkCompressionType.LZ4,
-        "LZ4 compression type does not support length prefix");
-    roundtrip(compressor, rawInput);
+    try(ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type, true)) {
+      assertNotEquals(compressor.compressionType(), ChunkCompressionType.LZ4,
+          "LZ4 compression type does not support length prefix");
+      roundtrip(compressor, rawInput);
+    }
   }
 
   @Test(dataProvider = "formats")
@@ -97,21 +99,23 @@ public class TestCompression {
       workers[i] = new Thread(() -> {
         try {
           // compress
-          ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type);
-          compressed[idx] = ByteBuffer.allocateDirect(compressor.maxCompressedSize(rawInput.limit()));
-          compressor.compress(rawInput.slice(), compressed[idx]);
+          try(ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type)) {
+            compressed[idx] = ByteBuffer.allocateDirect(compressor.maxCompressedSize(rawInput.limit()));
+            compressor.compress(rawInput.slice(), compressed[idx]);
+          }
 
           // small context switch
           TimeUnit.MILLISECONDS.sleep(1L + (long) (ThreadLocalRandom.current().nextDouble() * 10.0));
 
           // decompress
-          ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(type);
-          int size = decompressor.decompressedLength(compressed[idx]);
-          if (type == ChunkCompressionType.LZ4 || type == ChunkCompressionType.GZIP) {
-            size = rawInput.limit();
+          try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(type)) {
+            int size = decompressor.decompressedLength(compressed[idx]);
+            if (type == ChunkCompressionType.LZ4 || type == ChunkCompressionType.GZIP) {
+              size = rawInput.limit();
+            }
+            decompressed[idx] = ByteBuffer.allocateDirect(size);
+            decompressor.decompress(compressed[idx], decompressed[idx]);
           }
-          decompressed[idx] = ByteBuffer.allocateDirect(size);
-          decompressor.decompress(compressed[idx], decompressed[idx]);
         } catch (Throwable e) {
           e.printStackTrace();
           errors.incrementAndGet();
@@ -143,17 +147,18 @@ public class TestCompression {
       throws IOException {
     ByteBuffer compressedOutput = ByteBuffer.allocateDirect(compressor.maxCompressedSize(rawInput.limit()));
     compressor.compress(rawInput.slice(), compressedOutput);
-    ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(compressor.compressionType());
-    int decompressedLength = decompressor.decompressedLength(compressedOutput);
-    boolean isLz4OrGzip = compressor.compressionType() == ChunkCompressionType.LZ4
-        || compressor.compressionType() == ChunkCompressionType.GZIP;
-    assertTrue(isLz4OrGzip || decompressedLength > 0);
-    ByteBuffer decompressedOutput = ByteBuffer.allocateDirect(isLz4OrGzip ? rawInput.limit() : decompressedLength);
-    decompressor.decompress(compressedOutput, decompressedOutput);
-    byte[] expected = new byte[rawInput.limit()];
-    rawInput.get(expected);
-    byte[] actual = new byte[decompressedOutput.limit()];
-    decompressedOutput.get(actual);
-    assertEquals(actual, expected, "content differs after compression roundt rip");
+    try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(compressor.compressionType())) {
+      int decompressedLength = decompressor.decompressedLength(compressedOutput);
+      boolean isLz4OrGzip = compressor.compressionType() == ChunkCompressionType.LZ4
+          || compressor.compressionType() == ChunkCompressionType.GZIP;
+      assertTrue(isLz4OrGzip || decompressedLength > 0);
+      ByteBuffer decompressedOutput = ByteBuffer.allocateDirect(isLz4OrGzip ? rawInput.limit() : decompressedLength);
+      decompressor.decompress(compressedOutput, decompressedOutput);
+      byte[] expected = new byte[rawInput.limit()];
+      rawInput.get(expected);
+      byte[] actual = new byte[decompressedOutput.limit()];
+      decompressedOutput.get(actual);
+      assertEquals(actual, expected, "content differs after compression roundt rip");
+    }
   }
 }

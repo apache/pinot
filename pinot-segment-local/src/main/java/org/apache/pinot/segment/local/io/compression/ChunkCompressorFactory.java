@@ -70,7 +70,7 @@ public class ChunkCompressorFactory {
         return LZ4WithLengthCompressor.INSTANCE;
 
       case GZIP:
-        return GzipCompressor.INSTANCE.get();
+        return new GzipCompressor();
 
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);
@@ -101,7 +101,7 @@ public class ChunkCompressorFactory {
         return LZ4WithLengthDecompressor.INSTANCE;
 
       case GZIP:
-        return GzipDecompressor.INSTANCE.get();
+        return new GzipDecompressor();
 
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);

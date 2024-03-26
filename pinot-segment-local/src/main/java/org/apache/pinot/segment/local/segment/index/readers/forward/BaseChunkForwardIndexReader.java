@@ -446,9 +446,10 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
+    _chunkDecompressor.close();
   }
 
   private boolean isContiguousRange(int[] docIds, int length) {

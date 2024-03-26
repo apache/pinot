@@ -30,11 +30,9 @@ import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
  */
 class GzipDecompressor implements ChunkDecompressor {
 
-  static final ThreadLocal<GzipDecompressor> INSTANCE = ThreadLocal.withInitial(GzipDecompressor::new);
-
   private final Inflater _decompressor;
 
-  private GzipDecompressor() {
+  public GzipDecompressor() {
     _decompressor = new Inflater();
   }
 
@@ -55,5 +53,11 @@ class GzipDecompressor implements ChunkDecompressor {
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
     return -1;
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    _decompressor.end();
   }
 }

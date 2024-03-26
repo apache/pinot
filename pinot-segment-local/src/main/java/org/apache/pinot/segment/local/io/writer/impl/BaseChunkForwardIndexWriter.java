@@ -114,6 +114,7 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
     _header.flip();
     _dataFile.write(_header, 0);
     _dataFile.close();
+    _chunkCompressor.close();
   }
 
   /**
