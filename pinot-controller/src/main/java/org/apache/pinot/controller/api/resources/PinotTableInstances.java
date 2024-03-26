@@ -177,8 +177,8 @@ public class PinotTableInstances {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
   })
   public Map<String, List<InstanceInfo>> getLiveBrokers(@Context HttpHeaders headers,
-          @ApiParam(value = "Table name list(with or without type)", allowMultiple = true)
-          @QueryParam("tables") List<String> tables) {
+      @ApiParam(value = "Table names (with or without type)", allowMultiple = true) @QueryParam("tables")
+      List<String> tables) {
     try {
       return _pinotHelixResourceManager.getTableToLiveBrokersMapping(headers.getHeaderString(DATABASE), tables);
     } catch (Exception e) {

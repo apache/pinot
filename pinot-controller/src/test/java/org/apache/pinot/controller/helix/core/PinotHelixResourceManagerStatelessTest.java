@@ -411,22 +411,22 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertThrows(TableNotFoundException.class, () -> _helixResourceManager.getLiveBrokersForTable("fake_REALTIME"));
 
     // Test retrieving table name to live broker mapping for table without type suffix
-    Map<String, List<InstanceInfo>> rawTableToLiveBrokersMapping = _helixResourceManager
-            .getTableToLiveBrokersMapping(null, new ArrayList<>(Collections.singletonList(RAW_TABLE_NAME)));
+    Map<String, List<InstanceInfo>> rawTableToLiveBrokersMapping =
+        _helixResourceManager.getTableToLiveBrokersMapping(null, List.of(RAW_TABLE_NAME));
     assertEquals(rawTableToLiveBrokersMapping.size(), 2);
     assertEquals(rawTableToLiveBrokersMapping.get(OFFLINE_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
     assertEquals(rawTableToLiveBrokersMapping.get(REALTIME_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
 
     // Test retrieving table names list to live broker mapping for each table without type suffix
-    Map<String, List<InstanceInfo>> tablesListToLiveBrokersMapping = _helixResourceManager
-            .getTableToLiveBrokersMapping(new ArrayList<>(Arrays.asList(OFFLINE_TABLE_NAME, REALTIME_TABLE_NAME)));
+    Map<String, List<InstanceInfo>> tablesListToLiveBrokersMapping =
+        _helixResourceManager.getTableToLiveBrokersMapping(List.of(OFFLINE_TABLE_NAME, REALTIME_TABLE_NAME));
     assertEquals(tablesListToLiveBrokersMapping.size(), 2);
     assertEquals(tablesListToLiveBrokersMapping.get(OFFLINE_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
     assertEquals(tablesListToLiveBrokersMapping.get(REALTIME_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
 
     // Test retrieving table name to live broker mapping for table with type suffix
-    Map<String, List<InstanceInfo>> offlineTableToLiveBrokersMapping = _helixResourceManager
-            .getTableToLiveBrokersMapping(new ArrayList<>(Collections.singletonList(OFFLINE_TABLE_NAME)));
+    Map<String, List<InstanceInfo>> offlineTableToLiveBrokersMapping =
+        _helixResourceManager.getTableToLiveBrokersMapping(List.of(OFFLINE_TABLE_NAME));
     assertEquals(offlineTableToLiveBrokersMapping.size(), 1);
     assertEquals(offlineTableToLiveBrokersMapping.get(OFFLINE_TABLE_NAME).size(), NUM_BROKER_INSTANCES);
 
@@ -435,8 +435,8 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(tableToLiveBrokersMapping.size(), 2);
 
     // Test retrieving the live brokers for table with non-existent table-type
-    assertThrows(TableNotFoundException.class, () -> _helixResourceManager
-            .getTableToLiveBrokersMapping(new ArrayList<>(Collections.singletonList("fake"))));
+    assertThrows(TableNotFoundException.class,
+        () -> _helixResourceManager.getTableToLiveBrokersMapping(List.of("fake")));
 
     // Delete the tables
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
