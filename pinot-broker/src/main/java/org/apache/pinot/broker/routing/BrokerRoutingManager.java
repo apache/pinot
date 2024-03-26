@@ -805,7 +805,13 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       int numTotalSelectedSegments = selectedSegments.size();
       if (!selectedSegments.isEmpty()) {
         for (SegmentPruner segmentPruner : _segmentPruners) {
-          selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
+          try {
+            selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
+          } catch (Exception e) {
+            // Pruning errors should get logged, but they shouldn't outright fail the query.
+            LOGGER.error("Caught exception while pruning segments for table: {} with pruner: {}", _tableNameWithType,
+                segmentPruner.getClass().getName(), e);
+          }
         }
       }
       int numPrunedSegments = numTotalSelectedSegments - selectedSegments.size();
