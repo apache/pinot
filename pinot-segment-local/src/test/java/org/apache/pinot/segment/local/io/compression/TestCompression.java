@@ -63,7 +63,7 @@ public class TestCompression {
   @Test(dataProvider = "formats")
   public void testRoundtripWithUpgrade(ChunkCompressionType type, ByteBuffer rawInput)
       throws IOException {
-    try(ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type, true)) {
+    try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type, true)) {
       assertNotEquals(compressor.compressionType(), ChunkCompressionType.LZ4,
           "LZ4 compression type does not support length prefix");
       roundtrip(compressor, rawInput);
@@ -99,7 +99,7 @@ public class TestCompression {
       workers[i] = new Thread(() -> {
         try {
           // compress
-          try(ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type)) {
+          try (ChunkCompressor compressor = ChunkCompressorFactory.getCompressor(type)) {
             compressed[idx] = ByteBuffer.allocateDirect(compressor.maxCompressedSize(rawInput.limit()));
             compressor.compress(rawInput.slice(), compressed[idx]);
           }
