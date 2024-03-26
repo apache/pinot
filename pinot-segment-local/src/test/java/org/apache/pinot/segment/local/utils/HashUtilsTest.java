@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -30,5 +32,44 @@ public class HashUtilsTest {
         "5eb63bbbe01eeed093cb22bb8f5acdc3");
     Assert.assertEquals(BytesUtils.toHexString(HashUtils.hashMurmur3("hello world".getBytes())),
         "0e617feb46603f53b163eb607d4697ab");
+  }
+
+  @Test
+  public void testHashUUID() {
+    testHashUUID(new UUID[]{UUID.randomUUID()});
+    testHashUUID(new UUID[]{UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()});
+
+    // Test failure scenario
+    String[] invalidUUIDs = new String[]{"some-random-string"};
+    Assert.assertEquals(HashUtils.hashUUID(invalidUUIDs), invalidUUIDs[0].getBytes(StandardCharsets.UTF_8));
+    // Test scenario when one of the values is null
+    invalidUUIDs = new String[]{UUID.randomUUID().toString(), null};
+    byte[] hashResult = HashUtils.hashUUID(invalidUUIDs);
+    Assert.assertNotNull(hashResult);
+    byte[] lastFourBytes = new byte[4];
+    System.arraycopy(hashResult, hashResult.length - 4, lastFourBytes, 0, lastFourBytes.length);
+    Assert.assertEquals(new String(lastFourBytes, StandardCharsets.UTF_8), "null");
+  }
+
+  private void testHashUUID(UUID[] uuids) {
+    byte[] convertedBytes = HashUtils.hashUUID(uuids);
+    // After hashing, each UUID should take 16 bytes.
+    Assert.assertEquals(convertedBytes.length, 16 * uuids.length);
+    // Below we reconstruct each UUID from the reduced 16-byte representation, and ensure it is the same as the input.
+    int convertedByteIndex = 0;
+    int uuidIndex = 0;
+    while (convertedByteIndex < convertedBytes.length) {
+      long msb = 0;
+      long lsb = 0;
+      for (int i = 0; i < 8; i++, convertedByteIndex++) {
+        msb = (msb << 8) | (convertedBytes[convertedByteIndex] & 0xFF);
+      }
+      for (int i = 0; i < 8; i++, convertedByteIndex++) {
+        lsb = (lsb << 8) | (convertedBytes[convertedByteIndex] & 0xFF);
+      }
+      UUID reconstructedUUID = new UUID(msb, lsb);
+      Assert.assertEquals(reconstructedUUID, uuids[uuidIndex]);
+      uuidIndex++;
+    }
   }
 }
