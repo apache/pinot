@@ -3989,7 +3989,7 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Returns map of tableName in default database to list of live brokers
+   * Returns map of tableName to list of live brokers
    * @param databaseName database to get the tables from
    * @return Map of tableName to list of ONLINE brokers serving the table
    */
