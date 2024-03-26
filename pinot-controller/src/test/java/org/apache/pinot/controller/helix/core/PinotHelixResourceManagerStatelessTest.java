@@ -434,10 +434,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     tableToLiveBrokersMapping = _helixResourceManager.getTableToLiveBrokersMapping();
     assertEquals(tableToLiveBrokersMapping.size(), 2);
 
-    // Test retrieving the live brokers for table with non-existent table-type
-    assertThrows(TableNotFoundException.class,
-        () -> _helixResourceManager.getTableToLiveBrokersMapping(List.of("fake")));
-
     // Delete the tables
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
