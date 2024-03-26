@@ -19,13 +19,16 @@
 package org.apache.pinot.core.plan.maker;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -47,10 +50,21 @@ public interface PlanMaker {
   Plan makeInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext, ExecutorService executorService,
       ServerMetrics serverMetrics);
 
+  default Plan makeInstancePlan(List<IndexSegment> indexSegments,
+      @Nullable Map<IndexSegment, SegmentContext> segmentContexts, QueryContext queryContext,
+      ExecutorService executorService, ServerMetrics serverMetrics) {
+    return makeInstancePlan(indexSegments, queryContext, executorService, serverMetrics);
+  }
+
   /**
    * Returns a segment level {@link PlanNode} which contains the logical execution plan for one segment.
    */
   PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext);
+
+  default PlanNode makeSegmentPlanNode(IndexSegment indexSegment, @Nullable SegmentContext segmentContext,
+      QueryContext queryContext) {
+    return makeSegmentPlanNode(indexSegment, queryContext);
+  }
 
   /**
    * Returns an instance level {@link Plan} for a streaming query which contains the logical execution plan for multiple
@@ -59,9 +73,20 @@ public interface PlanMaker {
   Plan makeStreamingInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer, ServerMetrics serverMetrics);
 
+  default Plan makeStreamingInstancePlan(List<IndexSegment> indexSegments,
+      @Nullable Map<IndexSegment, SegmentContext> segmentContexts, QueryContext queryContext,
+      ExecutorService executorService, ResultsBlockStreamer streamer, ServerMetrics serverMetrics) {
+    return makeStreamingInstancePlan(indexSegments, queryContext, executorService, streamer, serverMetrics);
+  }
+
   /**
    * Returns a segment level {@link PlanNode} for a streaming query which contains the logical execution plan for one
    * segment.
    */
   PlanNode makeStreamingSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext);
+
+  default PlanNode makeStreamingSegmentPlanNode(IndexSegment indexSegment, @Nullable SegmentContext segmentContext,
+      QueryContext queryContext) {
+    return makeStreamingSegmentPlanNode(indexSegment, queryContext);
+  }
 }
