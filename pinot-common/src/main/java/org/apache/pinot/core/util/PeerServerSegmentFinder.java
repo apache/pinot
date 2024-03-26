@@ -21,9 +21,9 @@ package org.apache.pinot.core.util;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.ListUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
@@ -73,7 +73,7 @@ public class PeerServerSegmentFinder {
     String clusterName = helixManager.getClusterName();
     if (clusterName == null) {
       _logger.error("ClusterName not found");
-      return ListUtils.EMPTY_LIST;
+      return Collections.emptyList();
     }
     final List<URI> onlineServerURIs = new ArrayList<>();
     try {
