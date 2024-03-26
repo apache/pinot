@@ -62,10 +62,10 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
-import org.apache.pinot.query.runtime.operator.OpChainStats;
 import org.apache.pinot.query.runtime.operator.OperatorStats;
 import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -252,7 +252,7 @@ public class QueryDispatcher {
   }
 
   @VisibleForTesting
-  public static ResultTable runReducer(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
+  public static QueryResult runReducer(long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions, @Nullable Map<Integer, ExecutionStatsAggregator> statsAggregatorMap,
       MailboxService mailboxService) {
     // NOTE: Reduce stage is always stage 0
@@ -272,16 +272,16 @@ public class QueryDispatcher {
     MailboxReceiveOperator receiveOperator =
         new MailboxReceiveOperator(opChainExecutionContext, receiveNode.getDistributionType(),
             receiveNode.getSenderStageId());
-    ResultTable resultTable =
-        getResultTable(receiveOperator, receiveNode.getDataSchema(), dispatchableSubPlan.getQueryResultFields());
-    collectStats(dispatchableSubPlan, opChainExecutionContext.getStats(), statsAggregatorMap);
-    return resultTable;
+    QueryResult queryResult =
+        getQueryResult(receiveOperator, receiveNode.getDataSchema(), dispatchableSubPlan.getQueryResultFields());
+    collectStats(dispatchableSubPlan, queryResult._statsHolder, statsAggregatorMap);
+    return queryResult;
   }
 
-  private static void collectStats(DispatchableSubPlan dispatchableSubPlan, OpChainStats opChainStats,
+  private static void collectStats(DispatchableSubPlan dispatchableSubPlan, StageStatsHolder statsHolder,
       @Nullable Map<Integer, ExecutionStatsAggregator> statsAggregatorMap) {
     if (MapUtils.isNotEmpty(statsAggregatorMap)) {
-      for (OperatorStats operatorStats : opChainStats.getOperatorStatsMap().values()) {
+      for (OperatorStats operatorStats : stageStats.getOperatorStatsMap().values()) {
         ExecutionStatsAggregator rootStatsAggregator = statsAggregatorMap.get(0);
         rootStatsAggregator.aggregate(null, operatorStats.getExecutionStats(), new HashMap<>());
         ExecutionStatsAggregator stageStatsAggregator = statsAggregatorMap.get(operatorStats.getStageId());
@@ -294,7 +294,7 @@ public class QueryDispatcher {
     }
   }
 
-  private static ResultTable getResultTable(MailboxReceiveOperator receiveOperator, DataSchema sourceDataSchema,
+  private static QueryResult getQueryResult(MailboxReceiveOperator receiveOperator, DataSchema sourceDataSchema,
       List<Pair<Integer, String>> resultFields) {
     int numColumns = resultFields.size();
     String[] columnNames = new String[numColumns];
@@ -308,6 +308,7 @@ public class QueryDispatcher {
 
     ArrayList<Object[]> resultRows = new ArrayList<>();
     TransferableBlock block = receiveOperator.nextBlock();
+
     while (!TransferableBlockUtils.isEndOfStream(block)) {
       DataBlock dataBlock = block.getDataBlock();
       int numRows = dataBlock.getNumberOfRows();
@@ -328,11 +329,16 @@ public class QueryDispatcher {
       }
       block = receiveOperator.nextBlock();
     }
+    StageStatsHolder statsHolder;
     if (block.isErrorBlock()) {
       throw new RuntimeException("Received error query execution result block: " + block.getExceptions());
+    } else {
+      assert block.isSuccessfulEndOfStreamBlock();
+      statsHolder = block.getStatsHolder();
+      assert statsHolder != null;
     }
 
-    return new ResultTable(resultDataSchema, resultRows);
+    return new QueryResult(new ResultTable(resultDataSchema, resultRows), statsHolder);
   }
 
   public void shutdown() {
@@ -340,5 +346,23 @@ public class QueryDispatcher {
       dispatchClient.getChannel().shutdown();
     }
     _dispatchClientMap.clear();
+  }
+
+  public static class QueryResult {
+    private final ResultTable _resultTable;
+    private final StageStatsHolder _statsHolder;
+
+    public QueryResult(ResultTable resultTable, StageStatsHolder statsHolder) {
+      _resultTable = resultTable;
+      _statsHolder = statsHolder;
+    }
+
+    public ResultTable getResultTable() {
+      return _resultTable;
+    }
+
+    public StageStatsHolder getStatsHolder() {
+      return _statsHolder;
+    }
   }
 }

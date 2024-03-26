@@ -34,6 +34,23 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
+/**
+ * A map that stores statistics.
+ *
+ * Statistics must be keyed by an enum that implements {@link StatMap.Key}.
+ *
+ * A stat map efficiently store, serialize and deserialize these statistics.
+ *
+ * Serialization and deserialization is backward and forward compatible as long as the only change in the keys are:
+ * <ul>
+ *   <li>Adding new keys</li>
+ *   <li>Change the name of the keys</li>
+ * </ul>
+ *
+ * Any other change (like changing the type of key, changing their literal order are not supported or removing keys)
+ * are backward incompatible changes.
+ * @param <K>
+ */
 public class StatMap<K extends Enum<K> & StatMap.Key> {
   private final Family<K> _family;
   @Nullable
@@ -84,6 +101,10 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   }
 
   public void add(K key, int value) {
+    if (key.getType() == Type.DOUBLE) {
+      add(key, (double) value);
+      return;
+    }
     Preconditions.checkArgument(key.getType() == Type.INT);
     int index = _family.getIndex(key);
     assert _intValues != null : "Int values should not be null because " + key + " is of type INT";
@@ -232,7 +253,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
 
     int[] keys;
     keys = readKeys(input, bytesPerId, _family._numIntsValues);
-    int[] intValues;
     if (_family._numIntsValues != 0) {
       assert _intValues != null : "Int values should not be null because there are int keys";
       for (int intKey : keys) {
@@ -347,9 +367,24 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
 
     output.writeInt(bytesPerId);
 
+    writeInts(output, bytesPerId);
+    writeLongs(output, bytesPerId);
+    writeDoubles(output, bytesPerId);
+    writeBooleans(output, bytesPerId);
+    writeStrings(output, bytesPerId);
+  }
+
+  private void writeInts(DataOutput output, int bytesPerId)
+      throws IOException {
     if (_intValues == null) {
       writeInt(output, bytesPerId, 0); // No values to write
+    } else if (isDense(Type.INT)) {
+      output.writeBoolean(true);
+      for (int intValue : _intValues) {
+        output.writeInt(intValue);
+      }
     } else {
+      output.writeBoolean(false);
       writeValuedKeys(output, Type.INT, bytesPerId, _intValues.length, i -> _intValues[i] != 0);
       for (int intValue : _intValues) {
         if (intValue != 0) {
@@ -357,10 +392,19 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         }
       }
     }
+  }
 
+  private void writeLongs(DataOutput output, int bytesPerId)
+      throws IOException {
     if (_longValues == null) {
       writeInt(output, bytesPerId, 0); // No values to write
+    } else if (isDense(Type.LONG)) {
+      output.writeBoolean(true);
+      for (long longValue : _longValues) {
+        output.writeLong(longValue);
+      }
     } else {
+      output.writeBoolean(false);
       writeValuedKeys(output, Type.LONG, bytesPerId, _longValues.length, i -> _longValues[i] != 0);
       for (long longValue : _longValues) {
         if (longValue != 0) {
@@ -368,10 +412,19 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         }
       }
     }
+  }
 
+  private void writeDoubles(DataOutput output, int bytesPerId)
+      throws IOException {
     if (_doubleValues == null) {
       writeInt(output, bytesPerId, 0); // No values to write
+    } else if (isDense(Type.DOUBLE)) {
+      output.writeBoolean(true);
+      for (double doubleValue : _doubleValues) {
+        output.writeDouble(doubleValue);
+      }
     } else {
+      output.writeBoolean(false);
       writeValuedKeys(output, Type.DOUBLE, bytesPerId, _doubleValues.length, i -> _doubleValues[i] != 0);
       for (double doubleValue : _doubleValues) {
         if (doubleValue != 0) {
@@ -379,10 +432,19 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         }
       }
     }
+  }
 
+  private void writeBooleans(DataOutput output, int bytesPerId)
+      throws IOException {
     if (_booleanValues == null) {
       writeInt(output, bytesPerId, 0); // No values to write
+    } else if (isDense(Type.BOOLEAN)) {
+      output.writeBoolean(true);
+      for (boolean booleanValue : _booleanValues) {
+        output.writeBoolean(booleanValue);
+      }
     } else {
+      output.writeBoolean(false);
       writeValuedKeys(output, Type.BOOLEAN, bytesPerId, _booleanValues.length, i -> _booleanValues[i]);
       for (boolean booleanValue : _booleanValues) {
         if (booleanValue) {
@@ -390,11 +452,22 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         }
       }
     }
+  }
 
+  private void writeStrings(DataOutput output, int bytesPerId)
+      throws IOException {
     if (_referenceValues == null) {
       // if new ref types are added, we would need to add one 0 per ref type
       writeInt(output, bytesPerId, 0); // No values to write
+    } else if (isDense(Type.STRING)) {
+      output.writeBoolean(true);
+      for (Object referenceValue : _referenceValues) {
+        if (referenceValue != null) { // If new ref types are added, we would need to change this to `instanceof String`
+          output.writeUTF((String) referenceValue);
+        }
+      }
     } else {
+      output.writeBoolean(false);
       // If new ref types are added, we would need to change this to `instanceof String`
       writeValuedKeys(output, Type.STRING, bytesPerId, _referenceValues.length, i -> _referenceValues[i] != null);
       for (Object referenceValue : _referenceValues) {
@@ -403,6 +476,54 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         }
       }
     }
+  }
+
+  private boolean isDense(Type type) {
+    int count;
+    int max;
+    double threshold;
+    switch (type) {
+      case INT: {
+        threshold = 0.5;
+        max = _family._numIntsValues;
+        count = _intValues == null ? 0 : (int) Arrays.stream(_intValues).filter(value -> value != 0).count();
+        break;
+      }
+      case LONG: {
+        threshold = 0.8;
+        max = _family._numLongValues;
+        count = _longValues == null ? 0 : (int) Arrays.stream(_longValues).filter(value -> value != 0).count();
+        break;
+      }
+      case DOUBLE: {
+        threshold = 0.8;
+        max = _family._numDoubleValues;
+        count = _doubleValues == null ? 0 : (int) Arrays.stream(_doubleValues).filter(value -> value != 0).count();
+        break;
+      }
+      case BOOLEAN: {
+        threshold = 0.2;
+        max = _family._numBooleanValues;
+        count = 0;
+        if (_booleanValues != null) {
+          for (boolean booleanValue : _booleanValues) {
+            if (booleanValue) {
+              count++;
+            }
+          }
+        }
+        break;
+      }
+      case STRING: {
+        threshold = 0.9;
+        max = _family._numReferenceValues;
+        count = _referenceValues == null ? 0 : (int) Arrays.stream(_referenceValues).filter(Objects::nonNull).count();
+        break;
+      }
+      default:
+        throw new IllegalArgumentException("Unsupported type: " + type);
+    }
+    return count / (double) max > threshold;
   }
 
   private void writeValuedKeys(DataOutput output, Type type, int bytesPerId, int length,
@@ -424,12 +545,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public static <K extends Enum<K> & Key> StatMap<K> deserialize(DataInput input, Class<K> keyClass)
       throws IOException {
     Family<K> family = new Family<>(keyClass);
-    int bitsPerId = 32 - Integer.numberOfLeadingZeros(Math.abs(family._maxIndex));
-    int maxBytesPerId = (bitsPerId + 7) / 8;
 
     int bytesPerId = input.readInt();
-    Preconditions.checkArgument(bytesPerId <= maxBytesPerId, "Invalid bytes per id: %s. Max expected = %s",
-        bytesPerId, maxBytesPerId);
 
     int[] intKeys = readKeys(input, bytesPerId, family._numIntsValues);
     int[] intValues;
@@ -500,11 +617,24 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
 
   private static int[] readKeys(DataInput input, int bytesPerId, int maxExpectedKeys)
       throws IOException {
-    int numKeys = readInt(input, bytesPerId);
-    assert numKeys <= maxExpectedKeys : "Invalid number of keys: " + numKeys + ". Max expected = " + maxExpectedKeys;
-    int[] keys = new int[numKeys];
-    for (int i = 0; i < numKeys; i++) {
-      keys[i] = readInt(input, bytesPerId);
+    // sender may have more or less keys than expected.
+    // In case it has less, receiver extra keys will not be populated
+    // In case it has more, sender extra keys will be ignored
+
+    int numKeys = Math.min(readInt(input, bytesPerId), maxExpectedKeys);
+    int[] keys;
+    keys = new int[numKeys];
+    boolean isDense = input.readBoolean();
+    if (isDense) {
+      // we could implement a more efficient algorithm that doesn't need to allocate keys in this case, but doesn't seem
+      // worth it for now as it would make the code even more complex.
+      for (int i = 0; i < numKeys; i++) {
+        keys[i] = i;
+      }
+    } else {
+      for (int i = 0; i < numKeys; i++) {
+        keys[i] = readInt(input, bytesPerId);
+      }
     }
     return keys;
   }
@@ -557,6 +687,10 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   @Override
   public String toString() {
     return asJson().toString();
+  }
+
+  public Class<K> getKeyClass() {
+    return _family._keyClass;
   }
 
   private static class Family<K extends Enum<K> & Key> {

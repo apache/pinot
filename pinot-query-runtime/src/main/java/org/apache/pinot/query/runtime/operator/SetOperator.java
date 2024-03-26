@@ -22,8 +22,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.data.table.Record;
@@ -31,6 +31,7 @@ import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -41,7 +42,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * The right child operator is consumed in a blocking manner, and the left child operator is consumed in a non-blocking
  * UnionOperator: The right child operator is consumed in a blocking manner.
  */
-public abstract class SetOperator<K extends Enum<K> & StatMap.Key> extends MultiStageOperator<K> {
+public abstract class SetOperator extends MultiStageOperator.WithBasicStats {
   protected final Set<Record> _rightRowSet;
 
   private final List<MultiStageOperator<?>> _upstreamOperators;
@@ -51,8 +52,9 @@ public abstract class SetOperator<K extends Enum<K> & StatMap.Key> extends Multi
   private final DataSchema _dataSchema;
 
   private boolean _isRightSetBuilt;
-  private boolean _isTerminated;
   private TransferableBlock _upstreamErrorBlock;
+  @Nullable
+  private StageStatsHolder _rightStatsHolder = null;
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator<?>> upstreamOperators,
       DataSchema dataSchema) {
@@ -63,7 +65,6 @@ public abstract class SetOperator<K extends Enum<K> & StatMap.Key> extends Multi
     _rightChildOperator = getChildOperators().get(1);
     _rightRowSet = new HashSet<>();
     _isRightSetBuilt = false;
-    _isTerminated = false;
   }
 
   @Override
@@ -93,9 +94,6 @@ public abstract class SetOperator<K extends Enum<K> & StatMap.Key> extends Multi
 
   @Override
   protected TransferableBlock getNextBlock() {
-    if (_isTerminated) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
-    }
     if (!_isRightSetBuilt) {
       // construct a SET with all the right side rows.
       constructRightBlockSet();
@@ -122,6 +120,8 @@ public abstract class SetOperator<K extends Enum<K> & StatMap.Key> extends Multi
       _upstreamErrorBlock = block;
     } else {
       _isRightSetBuilt = true;
+      _rightStatsHolder = block.getStatsHolder();
+      assert _rightStatsHolder != null;
     }
   }
 
@@ -134,7 +134,12 @@ public abstract class SetOperator<K extends Enum<K> & StatMap.Key> extends Multi
       return _upstreamErrorBlock;
     }
     if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      assert _rightStatsHolder != null;
+      StageStatsHolder leftStatsHolder = leftBlock.getStatsHolder();
+      assert leftStatsHolder != null;
+      _rightStatsHolder.merge(leftStatsHolder);
+      addStats(_rightStatsHolder);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightStatsHolder);
     }
     for (Object[] row : leftBlock.getContainer()) {
       if (handleRowMatched(row)) {

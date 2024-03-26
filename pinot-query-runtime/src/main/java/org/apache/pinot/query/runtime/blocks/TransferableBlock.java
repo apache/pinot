@@ -19,9 +19,12 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.base.Preconditions;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -32,8 +35,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
-import org.apache.pinot.query.runtime.operator.OperatorStats;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
 
 
 /**
@@ -42,14 +44,17 @@ import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
  */
 public class TransferableBlock implements Block {
   private final DataBlock.Type _type;
+  @Nullable
   private final DataSchema _dataSchema;
   private final int _numRows;
 
   private List<Object[]> _container;
   private DataBlock _dataBlock;
   private Map<Integer, String> _errCodeToExceptionMap;
+  @Nullable
+  private final StageStatsHolder _statsHolder;
 
-  public TransferableBlock(List<Object[]> container, DataSchema dataSchema, DataBlock.Type type) {
+  public TransferableBlock(List<Object[]> container, @Nullable DataSchema dataSchema, DataBlock.Type type) {
     _container = container;
     _dataSchema = dataSchema;
     Preconditions.checkArgument(type == DataBlock.Type.ROW || type == DataBlock.Type.COLUMNAR,
@@ -57,6 +62,7 @@ public class TransferableBlock implements Block {
     _type = type;
     _numRows = _container.size();
     _errCodeToExceptionMap = new HashMap<>();
+    _statsHolder = null;
   }
 
   public TransferableBlock(DataBlock dataBlock) {
@@ -66,19 +72,38 @@ public class TransferableBlock implements Block {
         : dataBlock instanceof RowDataBlock ? DataBlock.Type.ROW : DataBlock.Type.METADATA;
     _numRows = _dataBlock.getNumberOfRows();
     _errCodeToExceptionMap = null;
+    _statsHolder = null;
   }
 
-  public Map<String, OperatorStats> getResultMetadata() {
+  public TransferableBlock(StageStatsHolder stats) {
+    _statsHolder = stats;
+    _type = DataBlock.Type.METADATA;
+    _numRows = 0;
+    _dataSchema = null;
+    _errCodeToExceptionMap = null;
+  }
+
+  public List<ByteBuffer> getSerializedStatsByStage() {
     if (isSuccessfulEndOfStreamBlock()) {
-      return OperatorUtils.getOperatorStatsFromMetadata((MetadataBlock) _dataBlock);
+      List<ByteBuffer> statsByStage = ((MetadataBlock) _dataBlock).getStatsByStage();
+      if (statsByStage == null) {
+        return new ArrayList<>();
+      }
+      return statsByStage;
     }
-    return new HashMap<>();
+    return new ArrayList<>();
+  }
+
+  @Nullable
+  public StageStatsHolder getStatsHolder() {
+    return _statsHolder;
   }
 
   public int getNumRows() {
     return _numRows;
   }
 
+  @Nullable
   public DataSchema getDataSchema() {
     return _dataSchema;
   }

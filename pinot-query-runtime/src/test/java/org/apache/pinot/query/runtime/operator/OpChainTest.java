@@ -224,7 +224,7 @@ public class OpChainTest {
     while (!secondStageReceiveOp.nextBlock().isEndOfStreamBlock()) {
       // Drain the mailbox
     }
-    assertEquals(secondStageContext.getStats().getOperatorStatsMap().size(), numOperators + 1);
+    assertEquals(secondStageContext.getCurrentStageStats().getOperatorStatsMap().size(), numOperators + 1);
   }
 
   @Test
@@ -261,7 +261,7 @@ public class OpChainTest {
         assertTrue(opChain.getStats().getOperatorStatsMap().containsKey(operator.getOperatorId()));
       }
     }
-    assertEquals(secondStageContext.getStats().getOperatorStatsMap().size(), 2);
+    assertEquals(secondStageContext.getCurrentStageStats().getOperatorStatsMap().size(), 2);
   }
 
   private Stack<MultiStageOperator> getFullOpChain(OpChainExecutionContext context, long waitTimeInMillis) {

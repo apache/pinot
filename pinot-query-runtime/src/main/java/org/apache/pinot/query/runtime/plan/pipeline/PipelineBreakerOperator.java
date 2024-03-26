@@ -31,11 +31,12 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-class PipelineBreakerOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
+class PipelineBreakerOperator extends MultiStageOperator.WithBasicStats {
   private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerOperator.class);
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
 
@@ -43,6 +44,8 @@ class PipelineBreakerOperator extends MultiStageOperator<MultiStageOperator.Base
 
   private Map<Integer, List<TransferableBlock>> _resultMap;
   private TransferableBlock _errorBlock;
+  @Nullable
+  private StageStatsHolder _statsHolder = null;
 
   public PipelineBreakerOperator(OpChainExecutionContext context, Map<Integer, Operator<TransferableBlock>> workerMap) {
     super(context);
@@ -59,8 +62,13 @@ class PipelineBreakerOperator extends MultiStageOperator<MultiStageOperator.Base
   }
 
   @Override
-  public Class<BaseStatKeys> getStatKeyClass() {
-    return BaseStatKeys.class;
+  public Type getType() {
+    return Type.PIPELINE_BREAKER;
+  }
+
+  public StageStatsHolder getStatsHolder() {
+    assert _statsHolder != null : "This method should not be called before blocks have been processed";
+    return _statsHolder;
   }
 
   @Override
@@ -119,9 +127,19 @@ class PipelineBreakerOperator extends MultiStageOperator<MultiStageOperator.Base
         if (block.isDataBlock()) {
           _resultMap.get(entry.getKey()).add(block);
           entries.offer(entry);
+        } else if (block.isSuccessfulEndOfStreamBlock()) {
+          StageStatsHolder statsHolder = block.getStatsHolder();
+          assert statsHolder != null;
+          if (_statsHolder == null) {
+            _statsHolder = statsHolder;
+          } else {
+            _statsHolder.merge(statsHolder);
+          }
         }
       }
     }
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    assert _statsHolder != null;
+    addStats(_statsHolder);
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(_statsHolder);
   }
 }

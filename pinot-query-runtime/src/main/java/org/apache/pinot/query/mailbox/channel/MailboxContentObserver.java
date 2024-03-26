@@ -67,13 +67,13 @@ public class MailboxContentObserver implements StreamObserver<MailboxContent> {
       if (dataBlock instanceof MetadataBlock) {
         Map<Integer, String> exceptions = dataBlock.getExceptions();
         if (exceptions.isEmpty()) {
-          block = TransferableBlockUtils.getEndOfStreamTransferableBlock(((MetadataBlock) dataBlock).getStats());
+          block = TransferableBlockUtils.wrap(dataBlock);
         } else {
           _mailbox.setErrorBlock(TransferableBlockUtils.getErrorTransferableBlock(exceptions));
           return;
         }
       } else {
-        block = new TransferableBlock(dataBlock);
+        block = TransferableBlockUtils.wrap(dataBlock);
       }
 
       long timeoutMs = Context.current().getDeadline().timeRemaining(TimeUnit.MILLISECONDS);

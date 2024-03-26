@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  *  TODO: Once sorting on the {@code MailboxSendOperator} is available, modify this to use a k-way merge instead of
  *        resorting via the PriorityQueue.
  */
-public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator<MultiStageOperator.BaseStatKeys> {
+public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedMailboxReceiveOperator.class);
 
   private static final String EXPLAIN_NAME = "SORTED_MAILBOX_RECEIVE";
@@ -68,11 +68,6 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator<Mul
     _collationDirections = collationDirections;
     _collationNullDirections = collationNullDirections;
     _isSortOnSender = isSortOnSender;
-  }
-
-  @Override
-  public Class<BaseStatKeys> getStatKeyClass() {
-    return BaseStatKeys.class;
   }
 
   @Override
@@ -101,7 +96,10 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator<Mul
       } else {
         assert block.isSuccessfulEndOfStreamBlock();
         if (!_rows.isEmpty()) {
-          _eosBlock = block;
+          // the multiConsumer has already merged stages from upstream, but doesn't know about this operator
+          // specific stats.
+          _eosBlock = updateEosBlock(block);
+
           // TODO: This might not be efficient because we are sorting all the received rows. We should use a k-way merge
           //       when sender side is sorted.
           _rows.sort(

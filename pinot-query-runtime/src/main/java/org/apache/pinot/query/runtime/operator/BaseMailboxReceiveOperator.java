@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
@@ -44,7 +43,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
  * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
-public abstract class BaseMailboxReceiveOperator<K extends Enum<K> & StatMap.Key> extends MultiStageOperator<K> {
+public abstract class BaseMailboxReceiveOperator extends MultiStageOperator.WithBasicStats {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
@@ -71,13 +70,19 @@ public abstract class BaseMailboxReceiveOperator<K extends Enum<K> & StatMap.Key
         .map(mailboxId -> new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this))
         .collect(Collectors.toList());
     _multiConsumer =
-        new BlockingMultiStreamConsumer.OfTransferableBlock(context.getId(), context.getDeadlineMs(), asyncStreams);
+        new BlockingMultiStreamConsumer.OfTransferableBlock(context.getStageId(), context.getId(),
+            context.getDeadlineMs(), asyncStreams);
   }
 
   @Override
   protected void earlyTerminate() {
     _isEarlyTerminated = true;
     _multiConsumer.earlyTerminate();
+  }
+
+  @Override
+  public Type getType() {
+    return Type.MAILBOX_RECEIVE;
   }
 
   @Override
@@ -99,9 +104,9 @@ public abstract class BaseMailboxReceiveOperator<K extends Enum<K> & StatMap.Key
 
   private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
     private final ReceivingMailbox _mailbox;
-    private final BaseMailboxReceiveOperator<?> _operator;
+    private final BaseMailboxReceiveOperator _operator;
 
-    public ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator<?> operator) {
+    public ReadMailboxAsyncStream(ReceivingMailbox mailbox, BaseMailboxReceiveOperator operator) {
       _mailbox = mailbox;
       _operator = operator;
     }
@@ -117,7 +122,6 @@ public abstract class BaseMailboxReceiveOperator<K extends Enum<K> & StatMap.Key
       TransferableBlock block = _mailbox.poll();
       if (block != null && block.isSuccessfulEndOfStreamBlock()) {
         _operator._mailboxService.releaseReceivingMailbox(_mailbox);
-        _operator._opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
       }
       return block;
     }

@@ -26,13 +26,12 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class LiteralValueOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
+public class LiteralValueOperator extends MultiStageOperator.WithBasicStats {
   private static final String EXPLAIN_NAME = "LITERAL_VALUE_PROVIDER";
   private static final Logger LOGGER = LoggerFactory.getLogger(LiteralValueOperator.class);
 
@@ -76,8 +75,13 @@ public class LiteralValueOperator extends MultiStageOperator<MultiStageOperator.
       _isLiteralBlockReturned = true;
       return _rexLiteralBlock;
     } else {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return createLeafBlock();
     }
+  }
+
+  @Override
+  public Type getType() {
+    return Type.LITERAL;
   }
 
   private TransferableBlock constructBlock(List<List<RexExpression>> rexLiteralRows) {

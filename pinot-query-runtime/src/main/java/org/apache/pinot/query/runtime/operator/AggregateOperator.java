@@ -29,7 +29,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -48,7 +48,6 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode.AggType;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -60,7 +59,7 @@ import org.slf4j.LoggerFactory;
  * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
  * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
  */
-public class AggregateOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
+public class AggregateOperator extends MultiStageOperator<AggregateOperator.AggregateStats> {
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
@@ -72,6 +71,8 @@ public class AggregateOperator extends MultiStageOperator<MultiStageOperator.Bas
   private final AggType _aggType;
   private final MultistageAggregationExecutor _aggregationExecutor;
   private final MultistageGroupByExecutor _groupByExecutor;
+  @Nullable
+  private TransferableBlock _eosBlock;
 
   private boolean _hasConstructedAggregateBlock;
 
@@ -122,8 +123,19 @@ public class AggregateOperator extends MultiStageOperator<MultiStageOperator.Bas
   }
 
   @Override
-  public Class<BaseStatKeys> getStatKeyClass() {
-    return BaseStatKeys.class;
+  public Class<AggregateStats> getStatKeyClass() {
+    return AggregateStats.class;
+  }
+
+  @Override
+  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
+    _statMap.add(AggregateStats.EXECUTION_TIME_MS, executionTimeMs);
+    _statMap.add(AggregateStats.EMITTED_ROWS, block.getNumRows());
+  }
+
+  @Override
+  public Type getType() {
+    return Type.AGGREGATE;
   }
 
   @Override
@@ -145,29 +157,30 @@ public class AggregateOperator extends MultiStageOperator<MultiStageOperator.Bas
   @Override
   protected TransferableBlock getNextBlock() {
     if (_hasConstructedAggregateBlock) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      assert _eosBlock != null;
+      return _eosBlock;
     }
     TransferableBlock finalBlock = _aggregationExecutor != null ? consumeAggregation() : consumeGroupBy();
     // returning upstream error block if finalBlock contains error.
     if (finalBlock.isErrorBlock()) {
       return finalBlock;
     }
-    return produceAggregatedBlock();
+    return produceAggregatedBlock(finalBlock);
   }
 
-  private TransferableBlock produceAggregatedBlock() {
+  private TransferableBlock produceAggregatedBlock(TransferableBlock finalBlock) {
     _hasConstructedAggregateBlock = true;
     if (_aggregationExecutor != null) {
       return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
     } else {
       List<Object[]> rows = _groupByExecutor.getResult();
+      _eosBlock = updateEosBlock(finalBlock);
       if (rows.isEmpty()) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        return _eosBlock;
       } else {
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
-          OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
-          operatorStats.recordSingleStat(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
+          _statMap.put(AggregateStats.NUM_GROUPS_LIMIT_REACHED, true);
           _inputOperator.earlyTerminate();
         }
         return dataBlock;
@@ -418,6 +431,23 @@ public class AggregateOperator extends MultiStageOperator<MultiStageOperator.Bas
       return values;
     } else {
       return DataBlockExtractUtils.extractColumn(block.getDataBlock(), colId);
+    }
+  }
+
+  public enum AggregateStats implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG),
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
+
+    private final StatMap.Type _type;
+
+    AggregateStats(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
     }
   }
 }

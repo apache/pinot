@@ -37,7 +37,6 @@ import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
@@ -109,6 +108,17 @@ public class MailboxSendOperator extends MultiStageOperator<MultiStageOperator.B
   }
 
   @Override
+  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
+    _statMap.add(BaseStatKeys.EXECUTION_TIME_MS, executionTimeMs);
+    _statMap.add(BaseStatKeys.EMITTED_ROWS, block.getNumRows());
+  }
+
+  @Override
+  public Type getType() {
+    return Type.MAILBOX_SEND;
+  }
+
+  @Override
   protected Logger logger() {
     return LOGGER;
   }
@@ -129,12 +139,9 @@ public class MailboxSendOperator extends MultiStageOperator<MultiStageOperator.B
     try {
       TransferableBlock block = _sourceOperator.nextBlock();
       if (block.isSuccessfulEndOfStreamBlock()) {
-        // Stats need to be populated here because the block is being sent to the mailbox
-        // and the receiving opChain will not be able to access the stats from the previous opChain
-        TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
-            OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+        updateEosBlock(block);
         // no need to check early terminate signal b/c the current block is already EOS
-        sendTransferableBlock(eosBlockWithStats);
+        sendTransferableBlock(block);
       } else {
         if (sendTransferableBlock(block)) {
           earlyTerminate();
@@ -143,7 +150,7 @@ public class MailboxSendOperator extends MultiStageOperator<MultiStageOperator.B
       return block;
     } catch (QueryCancelledException e) {
       LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return createLeafBlock();
     } catch (TimeoutException e) {
       LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
       return TransferableBlockUtils.getErrorTransferableBlock(e);

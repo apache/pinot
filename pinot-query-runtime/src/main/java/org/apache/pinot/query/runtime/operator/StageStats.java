@@ -3,90 +3,77 @@ package org.apache.pinot.query.runtime.operator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.base.Stopwatch;
-import com.google.common.base.Suppliers;
+import com.google.common.base.Preconditions;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
+/**
+ * {@code StageStats} tracks execution statistics for a stage.
+ *
+ * Instances of this class may not have the complete stat information for the stage. Specifically, while the query
+ * is being executed, each OpChain will contain its own partial view of the stats.
+ * The final stats for the stage are obtained in the execution root (usually the broker) by
+ * {@link #merge(StageStats) merging} the partial views from all OpChains.
+ */
 public class StageStats {
 
-  // use memoized supplier so that the timing doesn't start until the
-  // first time we get the timer
-  private final Supplier<ThreadResourceUsageProvider> _exTimer =
-      Suppliers.memoize(ThreadResourceUsageProvider::new)::get;
+  private final List<MultiStageOperator.Type> _operatorTypes;
+  private final List<StatMap<?>> _operatorStats;
 
-  // this is used to make sure that toString() doesn't have side
-  // effects (accidentally starting the timer)
-  private volatile boolean _exTimerStarted = false;
-
-  private final Stopwatch _executeStopwatch = Stopwatch.createUnstarted();
-  private final Stopwatch _queuedStopwatch = Stopwatch.createUnstarted();
-  private final AtomicLong _queuedCount = new AtomicLong();
-  private final StatMap<StatKey> _ownStats = new StatMap<>(StatKey.class);
-
-  private final MultiStageOperator<?> _root;
-  private final ConcurrentHashMap<MultiStageOperator<?>, StatMap<?>> _operatorStatsMap = new ConcurrentHashMap<>();
-
-  public StageStats(MultiStageOperator<?> root) {
-    _root = root;
+  public StageStats() {
+    this(new ArrayList<>(), new ArrayList<>());
   }
 
-  public void executing() {
-    startExecutionTimer();
-    if (_queuedStopwatch.isRunning()) {
-      long elapsed = _queuedStopwatch.stop().elapsed(TimeUnit.MILLISECONDS);
-      _queuedStopwatch.reset();
-      _ownStats.add(StatKey.QUEUED_TIME, elapsed);
-    }
+  public StageStats(List<MultiStageOperator.Type> operatorTypes, List<StatMap<?>> operatorStats) {
+    Preconditions.checkArgument(operatorTypes.size() == operatorStats.size(),
+        "Operator types and stats must have the same size");
+    _operatorTypes = operatorTypes;
+    _operatorStats = operatorStats;
   }
 
-  private void startExecutionTimer() {
-    _exTimerStarted = true;
-    _exTimer.get();
-    if (!_executeStopwatch.isRunning()) {
-      _executeStopwatch.start();
-    }
+  /**
+   * Return the stats associated with the given operator index.
+   *
+   * The operator index used here is the index of the operator in the operator tree, in the order of the inorder
+   * traversal.
+   * That means that the first value is the leftmost leaf, and the last value is the root.
+   *
+   * It is the operator responsibility to store here its own stats and that must be done just before the end of stream
+   * block is sent. This means that calling this method before the stats is added will throw an index out of bounds.
+   *
+   * @param operatorIdx The operator index in inorder traversal of the operator tree.
+   * @return The value of the stat or null if no stat is registered.
+   * @throws IndexOutOfBoundsException if there is no stats for the given operator index.
+   */
+  public StatMap<?> getOperatorStats(int operatorIdx) {
+    return _operatorStats.get(operatorIdx);
   }
 
-  public void queued() {
-    _queuedCount.incrementAndGet();
-    _ownStats.add(StatKey.QUEUED_COUNT, 1);
-    if (!_queuedStopwatch.isRunning()) {
-      _queuedStopwatch.start();
-    }
-    if (_executeStopwatch.isRunning()) {
-      long elapsed = _executeStopwatch.stop().elapsed(TimeUnit.MILLISECONDS);
-      _executeStopwatch.reset();
-      _ownStats.add(StatKey.EXECUTION_TIME, elapsed);
-    }
+  public MultiStageOperator.Type getLastType() {
+    return _operatorTypes.get(_operatorTypes.size() - 1);
   }
 
-  public long getExecutionTime() {
-    return _executeStopwatch.elapsed(TimeUnit.MILLISECONDS);
+  public StatMap<?> getLastOperatorStats() {
+    return _operatorStats.get(_operatorStats.size() - 1);
   }
 
   public JsonNode asJson() {
-    ObjectNode json = _ownStats.asJson();
+    ObjectNode json = JsonUtils.newObjectNode();
 
     ArrayNode operationStats = JsonUtils.newArrayNode();
-    _root.forEachOperator(op -> {
-      StatMap<?> stats = _operatorStatsMap.get(op);
+    for (StatMap<?> stats : _operatorStats) {
       if (stats == null) {
         operationStats.addNull();
       } else {
         operationStats.add(stats.asJson());
       }
-    });
+    }
     json.set("operationStats", operationStats);
 
     return json;
@@ -94,25 +81,22 @@ public class StageStats {
 
   public void serialize(DataOutput output)
       throws IOException {
-    _ownStats.serialize(output);
-    try {
-      _root.forEachOperator(op -> {
-        try {
-          StatMap<?> stats = _operatorStatsMap.get(op);
-          if (stats == null) {
-            output.writeBoolean(false);
-          } else {
-            output.writeBoolean(true);
-            stats.serialize(output);
-          }
-        } catch (IOException ex) {
-          throw new UncheckedIOException(ex);
-        }
-      });
-    } catch (UncheckedIOException ex) {
-      throw ex.getCause();
+    output.writeInt(_operatorTypes.size());
+    assert MultiStageOperator.Type.values().length < 256 : "Too many operator types. Need to increase the number of "
+        + "bytes size per operator type";
+    for (MultiStageOperator.Type operatorType : _operatorTypes) {
+      output.writeByte(operatorType.ordinal());
+    }
+    for (StatMap<?> stats : _operatorStats) {
+      if (stats == null) {
+        output.writeBoolean(false);
+      } else {
+        output.writeBoolean(true);
+        stats.serialize(output);
+      }
     }
   }
+
   /**
    * Merges the stats from another StageStats object into this one.
    *
@@ -124,42 +108,40 @@ public class StageStats {
   // There is also a dynamic check in the StatMap.merge() method.
   @SuppressWarnings("unchecked")
   public void merge(StageStats other) {
-    _ownStats.merge(other._ownStats);
-    _root.forEachOperator(op -> {
-      StatMap otherStats = other._operatorStatsMap.get(op);
-      StatMap myStats = _operatorStatsMap.get(op);
+    Preconditions.checkState(_operatorTypes.equals(other._operatorTypes), "Cannot merge stats from "
+        + "different stages");
+    for (int i = 0; i < _operatorStats.size(); i++) {
+      StatMap otherStats = other._operatorStats.get(i);
+      StatMap myStats = _operatorStats.get(i);
       if (myStats == null) {
-        _operatorStatsMap.put(op, otherStats);
+        _operatorStats.set(i, otherStats);
       } else if (otherStats != null) {
         myStats.merge(otherStats);
       }
-    });
+    }
   }
 
-  public void merge(DataInput input)
+  /**
+   * Same as {@link #merge(StageStats)} but reads the stats from a DataInput, so it should be slightly faster given
+   * it doesn't need to create new objects.
+   */
+  public static StageStats deserialize(DataInput input)
       throws IOException {
-    _ownStats.merge(input);
-    try {
-      _root.forEachOperator(op -> {
-        try {
-          if (input.readBoolean()) {
-            _operatorStatsMap.compute(op, (opKey, existingStats) -> {
-              try {
-                StatMap<?> result = existingStats == null ? new StatMap<>(op.getStatKeyClass()) : existingStats;
-                result.merge(input);
-                return result;
-              } catch (IOException ex) {
-                throw new UncheckedIOException(ex);
-              }
-            });
-          }
-        } catch (IOException ex) {
-          throw new UncheckedIOException(ex);
-        }
-      });
-    } catch (UncheckedIOException ex) {
-      throw ex.getCause();
+    int numOperators = input.readInt();
+    List<MultiStageOperator.Type> operatorTypes = new ArrayList<>(numOperators);
+    for (int i = 0; i < numOperators; i++) {
+      // This assumes the number of operator types at serialized time is the same as at deserialization time.
+      operatorTypes.add(MultiStageOperator.Type.values()[input.readByte()]);
     }
+    List<StatMap<?>> operatorStats = new ArrayList<>(numOperators);
+    for (int i = 0; i < numOperators; i++) {
+      if (input.readBoolean()) {
+        operatorStats.add(operatorTypes.get(i).deserializeStats(input));
+      } else {
+        operatorStats.add(null);
+      }
+    }
+    return new StageStats(operatorTypes, operatorStats);
   }
 
   @Override
@@ -167,19 +149,13 @@ public class StageStats {
     return asJson().toString();
   }
 
-  public enum StatKey implements StatMap.Key {
-    EXECUTION_TIME(StatMap.Type.LONG),
-    QUEUED_TIME(StatMap.Type.LONG),
-    QUEUED_COUNT(StatMap.Type.INT);
-    private final StatMap.Type _type;
+  public void addLastOperator(MultiStageOperator.Type type, StatMap<?> statMap) {
+    _operatorTypes.add(type);
+    _operatorStats.add(statMap);
+  }
 
-    StatKey(StatMap.Type type) {
-      _type = type;
-    }
-
-    @Override
-    public StatMap.Type getType() {
-      return _type;
-    }
+  public void concat(StageStats other) {
+    _operatorTypes.addAll(other._operatorTypes);
+    _operatorStats.addAll(other._operatorStats);
   }
 }

@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Intersect operator.
  */
-public class IntersectOperator extends SetOperator<MultiStageOperator.BaseStatKeys> {
+public class IntersectOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(IntersectOperator.class);
   private static final String EXPLAIN_NAME = "INTERSECT";
 
@@ -41,8 +41,8 @@ public class IntersectOperator extends SetOperator<MultiStageOperator.BaseStatKe
   }
 
   @Override
-  public Class<BaseStatKeys> getStatKeyClass() {
-    return BaseStatKeys.class;
+  public Type getType() {
+    return Type.INTERSECT;
   }
 
   @Override

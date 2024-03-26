@@ -24,6 +24,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,9 +32,11 @@ import org.slf4j.LoggerFactory;
 /**
  * Union operator for UNION ALL queries.
  */
-public class UnionOperator extends SetOperator<MultiStageOperator.BaseStatKeys> {
+public class UnionOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UnionOperator.class);
   private static final String EXPLAIN_NAME = "UNION";
+  @Nullable
+  private StageStatsHolder _statsHolder = null;
 
   public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator<?>> upstreamOperators,
       DataSchema dataSchema) {
@@ -41,13 +44,13 @@ public class UnionOperator extends SetOperator<MultiStageOperator.BaseStatKeys> 
   }
 
   @Override
-  public Class<BaseStatKeys> getStatKeyClass() {
-    return BaseStatKeys.class;
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override
-  protected Logger logger() {
-    return LOGGER;
+  public Type getType() {
+    return Type.UNION;
   }
 
   @Nullable
@@ -62,9 +65,19 @@ public class UnionOperator extends SetOperator<MultiStageOperator.BaseStatKeys> 
       TransferableBlock block = upstreamOperator.nextBlock();
       if (!block.isEndOfStreamBlock()) {
         return block;
+      } else {
+        StageStatsHolder statsHolder = block.getStatsHolder();
+        assert statsHolder != null;
+        if (_statsHolder == null) {
+          _statsHolder = statsHolder;
+        } else {
+          _statsHolder.merge(statsHolder);
+        }
       }
     }
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    assert _statsHolder != null : "Should have at least one EOS block from the upstream operators";
+    addStats(_statsHolder);
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(_statsHolder);
   }
 
   @Override

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
@@ -27,7 +26,7 @@ import java.util.Map;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -297,13 +296,12 @@ public class AggregateOperatorTest {
     Mockito.verify(_input).earlyTerminate();
 
     // Then:
-    Assert.assertTrue(block1.getNumRows() == 1, "when group limit reach it should only return that many groups");
+    Assert.assertEquals(block1.getNumRows(), 1, "when group limit reach it should only return that many groups");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
-    String operatorId =
-        Joiner.on("_").join(AggregateOperator.class.getSimpleName(), context.getStageId(), context.getServer());
-    OperatorStats operatorStats = context.getStats().getOperatorStats(context, operatorId);
-    Assert.assertEquals(operatorStats.getExecutionStats().get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()),
-        "true");
+    StatMap<AggregateOperator.AggregateStats> aggrStats =
+        OperatorTestUtil.getStatMap(AggregateOperator.AggregateStats.class, block2);
+    Assert.assertTrue(aggrStats.getBoolean(AggregateOperator.AggregateStats.NUM_GROUPS_LIMIT_REACHED),
+        "num groups limit should be reached");
   }
 
   private static RexExpression.FunctionCall getSum(RexExpression arg) {

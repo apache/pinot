@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
     3) All boolean scalar functions we have that take tranformOperand.
     Note: Scalar functions are the ones we have in v1 engine and only do function name and arg # matching.
  */
-public class FilterOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
+public class FilterOperator extends MultiStageOperator.WithBasicStats {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterOperator.class);
   private static final String EXPLAIN_NAME = "FILTER";
@@ -69,8 +69,8 @@ public class FilterOperator extends MultiStageOperator<MultiStageOperator.BaseSt
   }
 
   @Override
-  public Class<BaseStatKeys> getStatKeyClass() {
-    return BaseStatKeys.class;
+  public Type getType() {
+    return Type.FILTER;
   }
 
   @Override
@@ -93,7 +93,7 @@ public class FilterOperator extends MultiStageOperator<MultiStageOperator.BaseSt
   protected TransferableBlock getNextBlock() {
     TransferableBlock block = _upstreamOperator.nextBlock();
     if (block.isEndOfStreamBlock()) {
-      return block;
+      return updateEosBlock(block);
     }
     List<Object[]> resultRows = new ArrayList<>();
     for (Object[] row : block.getContainer()) {

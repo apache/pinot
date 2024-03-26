@@ -35,6 +35,9 @@ public class StatMapTest {
     if (stat.getType() == StatMap.Type.INT) {
       throw new SkipException("Skipping INT test");
     }
+    if (stat.getType() == StatMap.Type.LONG) {
+      throw new SkipException("Skipping LONG test");
+    }
     StatMap<MyStats> statMap = new StatMap<>(MyStats.class);
     statMap.add(stat, 1);
   }

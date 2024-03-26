@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -31,6 +30,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
@@ -41,7 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.mockito.MockitoAnnotations.openMocks;
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -172,9 +172,10 @@ public class MailboxSendOperatorTest {
     assertTrue(blocks.get(2).isSuccessfulEndOfStreamBlock(), "expected to send EOS block to exchange on third call");
 
     // EOS block should contain statistics
-    Map<String, OperatorStats> resultMetadata = blocks.get(2).getResultMetadata();
-    assertEquals(resultMetadata.size(), 1);
-    assertTrue(resultMetadata.containsKey(mailboxSendOperator.getOperatorId()));
+    StageStatsHolder resultMetadata = blocks.get(2).getStatsHolder();
+    StageStats stageStats = resultMetadata.getCurrentStats();
+    assertNotNull(stageStats, "expected to have stats for sender stage");
+    assertNotNull(stageStats.getOperatorStats(0));
   }
 
   @Test

@@ -30,7 +30,6 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 public interface DataBlock {
-  Map<String, String> getMetadata();
 
   DataSchema getDataSchema();
 

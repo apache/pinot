@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  * Note: Function transform only runs functions from v1 engine scalar function factory, which only does argument count
  * and canonicalized function name matching (lower case).
  */
-public class TransformOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
+public class TransformOperator extends MultiStageOperator.WithBasicStats {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
   private static final String EXPLAIN_NAME = "TRANSFORM";
 
@@ -70,11 +70,6 @@ public class TransformOperator extends MultiStageOperator<MultiStageOperator.Bas
   }
 
   @Override
-  public Class<BaseStatKeys> getStatKeyClass() {
-    return BaseStatKeys.class;
-  }
-
-  @Override
   protected Logger logger() {
     return LOGGER;
   }
@@ -82,6 +77,11 @@ public class TransformOperator extends MultiStageOperator<MultiStageOperator.Bas
   @Override
   public List<MultiStageOperator<?>> getChildOperators() {
     return ImmutableList.of(_upstreamOperator);
+  }
+
+  @Override
+  public Type getType() {
+    return Type.TRANSFORM;
   }
 
   @Nullable
@@ -94,7 +94,7 @@ public class TransformOperator extends MultiStageOperator<MultiStageOperator.Bas
   protected TransferableBlock getNextBlock() {
     TransferableBlock block = _upstreamOperator.nextBlock();
     if (block.isEndOfStreamBlock()) {
-      return block;
+      return updateEosBlock(block);
     }
     List<Object[]> container = block.getContainer();
     List<Object[]> resultRows = new ArrayList<>(container.size());

@@ -33,10 +33,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -54,6 +54,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,7 +73,7 @@ import org.slf4j.LoggerFactory;
  *       thus requires canonicalization.</li>
  * </ul>
  */
-public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafStageTransferableBlockOperator.StatKey> {
+public class LeafStageTransferableBlockOperator extends MultiStageOperator<DataTable.MetadataKey> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
@@ -90,7 +91,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
 
   private Future<Void> _executionFuture;
   private volatile Map<Integer, String> _exceptions;
-  private volatile Map<String, String> _executionStats;
 
   public LeafStageTransferableBlockOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests,
       DataSchema dataSchema, QueryExecutor queryExecutor, ExecutorService executorService) {
@@ -107,8 +107,19 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
   }
 
   @Override
-  public Class<StatKey> getStatKeyClass() {
-    return StatKey.class;
+  public Class<DataTable.MetadataKey> getStatKeyClass() {
+    return DataTable.MetadataKey.class;
+  }
+
+  @Override
+  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
+    _statMap.add(DataTable.MetadataKey.TIME_USED_MS, executionTimeMs);
+    _statMap.add(DataTable.MetadataKey.NUM_DOCS_SCANNED, block.getNumRows());
+  }
+
+  @Override
+  public Type getType() {
+    return Type.LEAF;
   }
 
   @Override
@@ -150,14 +161,37 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
     }
   }
 
-  private TransferableBlock constructMetadataBlock() {
-    // All data blocks have been returned. Record the stats and return EOS.
-    Map<String, String> executionStats = _executionStats;
+  private void mergeExecutionStats(@Nullable Map<String, String> executionStats) {
     if (executionStats != null) {
-      OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, getOperatorId());
-      operatorStats.recordExecutionStats(executionStats);
+      for (Map.Entry<String, String> entry : executionStats.entrySet()) {
+        DataTable.MetadataKey key = DataTable.MetadataKey.getByName(entry.getKey());
+        if (key == null) {
+          LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
+          continue;
+        }
+        switch (key.getValueType()) {
+          case INT:
+            _statMap.add(key, Integer.parseInt(entry.getValue()));
+            break;
+          case LONG:
+            _statMap.add(key, Long.parseLong(entry.getValue()));
+            break;
+          case STRING:
+            _statMap.put(key, entry.getValue());
+            break;
+          default:
+            LOGGER.debug("Skipping unknown value type: {}", key.getValueType());
+            break;
+        }
+      }
     }
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+  }
+
+  private TransferableBlock constructMetadataBlock() {
+    StageStats stageStats = new StageStats();
+    stageStats.addLastOperator(Type.LEAF, _statMap);
+    StageStatsHolder stageStatsHolder = StageStatsHolder.create(_context.getStageId(), stageStats);
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(stageStatsHolder);
   }
 
   private Future<Void> startExecution() {
@@ -185,11 +219,14 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
               addResultsBlock(resultsBlock);
             }
             // Collect the execution stats
-            _executionStats = instanceResponseBlock.getResponseMetadata();
+            mergeExecutionStats(instanceResponseBlock.getResponseMetadata());
           }
         } else {
           assert _requests.size() == 2;
-          Future<?>[] futures = new Future[2];
+          Future<Map<String, String>>[] futures = new Future[2];
+          // TODO: this latch mechanism is not the most elegant. We should change it to use a CompletionService.
+          //  In order to interrupt the execution in case of error, we could different mechanisms like throwing in the
+          //  future, or using a shared volatile variable.
           CountDownLatch latch = new CountDownLatch(2);
           for (int i = 0; i < 2; i++) {
             ServerQueryRequest request = _requests.get(i);
@@ -205,6 +242,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
                   // Drain the latch when receiving exception block and not wait for the other thread to finish
                   _exceptions = exceptions;
                   latch.countDown();
+                  return Collections.emptyMap();
                 } else {
                   // NOTE: Instance response block might contain data (not metadata only) when all the segments are
                   //       pruned. Add the results block if it contains data.
@@ -213,16 +251,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
                     addResultsBlock(resultsBlock);
                   }
                   // Collect the execution stats
-                  Map<String, String> executionStats = instanceResponseBlock.getResponseMetadata();
-                  synchronized (LeafStageTransferableBlockOperator.this) {
-                    if (_executionStats == null) {
-                      _executionStats = executionStats;
-                    } else {
-                      aggregateExecutionStats(_executionStats, executionStats);
-                    }
-                  }
+                  return instanceResponseBlock.getResponseMetadata();
                 }
-                return null;
               } finally {
                 latch.countDown();
               }
@@ -233,9 +263,17 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
               throw new TimeoutException("Timed out waiting for leaf stage to finish");
             }
             // Propagate the exception thrown by the leaf stage
-            for (Future<?> future : futures) {
-              future.get();
+            for (Future<Map<String, String>> future : futures) {
+              Map<String, String> stats =
+                  future.get(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+              mergeExecutionStats(stats);
             }
+          } catch (TimeoutException e) {
+            // Cancel all the futures and throw the exception
+            for (Future<?> future : futures) {
+              future.cancel(true);
+            }
+            throw new TimeoutException("Timed out waiting for leaf stage to finish");
           } finally {
             for (Future<?> future : futures) {
               future.cancel(true);
@@ -429,24 +467,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
     public void send(BaseResultsBlock block)
         throws InterruptedException, TimeoutException {
       addResultsBlock(block);
-    }
-  }
-
-  public enum StatKey implements StatMap.Key {
-    NUM_ROWS(StatMap.Type.LONG),
-    NUM_BLOCK(StatMap.Type.INT),
-    EXECUTION_TIME_MS(StatMap.Type.LONG),
-    EMITTED_ROWS(StatMap.Type.LONG);
-
-    private final StatMap.Type _type;
-
-    StatKey(StatMap.Type type) {
-      _type = type;
-    }
-
-    @Override
-    public StatMap.Type getType() {
-      return _type;
     }
   }
 }

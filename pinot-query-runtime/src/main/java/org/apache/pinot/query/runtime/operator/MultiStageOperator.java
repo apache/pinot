@@ -19,13 +19,18 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Stopwatch;
+import java.io.DataInput;
+import java.io.IOException;
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -37,17 +42,28 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
 
   protected final OpChainExecutionContext _context;
   protected final String _operatorId;
-  protected final OpChainStats _opChainStats;
+  protected final StatMap<K> _statMap = new StatMap<>(getStatKeyClass());
   protected boolean _isEarlyTerminated;
 
   public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
     _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
-    _opChainStats = _context.getStats();
     _isEarlyTerminated = false;
   }
 
   protected abstract Logger logger();
+
+  public abstract Type getType();
+
+  /**
+   * Returns the class of the stat key.
+   *
+   * Note for implementations: This method may be called before the constructor of the implementing class is finished.
+   * Therefore must not relay on any state of the implementing class.
+   */
+  public abstract Class<K> getStatKeyClass();
+
+  protected abstract void recordExecutionStats(long executionTimeMs, TransferableBlock block);
 
   @Override
   public TransferableBlock nextBlock() {
@@ -57,15 +73,13 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       TransferableBlock nextBlock;
       if (shouldCollectStats()) {
-        OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
-        operatorStats.startTimer();
+        Stopwatch executeStopwatch = Stopwatch.createStarted();
         try {
           nextBlock = getNextBlock();
         } catch (Exception e) {
           nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
         }
-        operatorStats.recordRow(1, nextBlock.getNumRows());
-        operatorStats.endTimer(nextBlock);
+        recordExecutionStats(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), nextBlock);
       } else {
         try {
           nextBlock = getNextBlock();
@@ -87,9 +101,13 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
 
   protected void earlyTerminate() {
     _isEarlyTerminated = true;
-    for (MultiStageOperator child : getChildOperators()) {
+    for (MultiStageOperator<?> child : getChildOperators()) {
       child.earlyTerminate();
     }
+  }
+
+  protected void addStats(StageStatsHolder holder) {
+    holder.getCurrentStats().addLastOperator(getType(), _statMap);
   }
 
   protected boolean shouldCollectStats() {
@@ -124,28 +142,74 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     }
   }
 
-  public void forEachOperator(Consumer<MultiStageOperator<?>> consumer) {
-    consumer.accept(this);
-    for (MultiStageOperator<?> child : getChildOperators()) {
-      child.forEachOperator(consumer);
+  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos) {
+    assert upstreamEos.isSuccessfulEndOfStreamBlock();
+    StageStatsHolder statsHolder = upstreamEos.getStatsHolder();
+    assert statsHolder != null;
+    addStats(statsHolder);
+    return upstreamEos;
+  }
+
+  protected TransferableBlock createLeafBlock() {
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(
+        StageStatsHolder.create(_context.getStageId(), getType(), _statMap));
+  }
+
+  public abstract static class WithBasicStats extends MultiStageOperator<BaseStatKeys> {
+    public WithBasicStats(OpChainExecutionContext context) {
+      super(context);
+    }
+
+    @Override
+    public Class<BaseStatKeys> getStatKeyClass() {
+      return BaseStatKeys.class;
+    }
+
+    @Override
+    protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
+      _statMap.add(BaseStatKeys.EXECUTION_TIME_MS, executionTimeMs);
+      _statMap.add(BaseStatKeys.EMITTED_ROWS, block.getNumRows());
     }
   }
 
-  public abstract Class<K> getStatKeyClass();
-
   public enum Type {
-    AGGREGATE,
+    AGGREGATE {
+      @Override
+      public StatMap<AggregateOperator.AggregateStats> deserializeStats(DataInput input)
+          throws IOException {
+        return StatMap.deserialize(input, AggregateOperator.AggregateStats.class);
+      }
+    },
     FILTER,
-    HASH_JOIN,
+    HASH_JOIN {
+      @Override
+      public StatMap<HashJoinOperator.HashJoinStats> deserializeStats(DataInput input)
+          throws IOException {
+        return StatMap.deserialize(input, HashJoinOperator.HashJoinStats.class);
+      }
+    },
     INTERSECT,
-    LEAF,
+    LEAF {
+      @Override
+      public StatMap<DataTable.MetadataKey> deserializeStats(DataInput input)
+          throws IOException {
+        return StatMap.deserialize(input, DataTable.MetadataKey.class);
+      }
+    },
+    LITERAL,
     MAILBOX_RECEIVE,
     MAILBOX_SEND,
-    PIPELINE,
+    MINUS,
+    PIPELINE_BREAKER,
     SORT,
     TRANSFORM,
     UNION,
-    WINDOW
+    WINDOW;
+
+    public <K extends Enum<K> & StatMap.Key> StatMap<K> deserializeStats(DataInput input)
+        throws IOException {
+      return (StatMap<K>) StatMap.deserialize(input, BaseStatKeys.class);
+    }
   }
 
   public enum BaseStatKeys implements StatMap.Key {
