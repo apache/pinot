@@ -53,11 +53,11 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
-    // Check that there are exactly 3 or 4 arguments
-    if (arguments.size() < 3 || arguments.size() > 4) {
+    // Check that there are exactly 3 or 4 or 5 arguments
+    if (arguments.size() < 3 || arguments.size() > 5) {
       throw new IllegalArgumentException(
-          "Expected 3/4 arguments for transform function: jsonExtractIndex(jsonFieldName, 'jsonPath', 'resultsType',"
-              + " ['defaultValue'])");
+          "Expected 3/4/5 arguments for transform function: jsonExtractIndex(jsonFieldName, 'jsonPath', 'resultsType',"
+              + " ['defaultValue'], ['jsonFilterExpression'])");
     }
 
     TransformFunction firstArgument = arguments.get(0);
@@ -76,13 +76,12 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     if (!(secondArgument instanceof LiteralTransformFunction)) {
       throw new IllegalArgumentException("JSON path argument must be a literal");
     }
-    String inputJsonPath = ((LiteralTransformFunction) secondArgument).getStringLiteral();
+    _jsonPathString = ((LiteralTransformFunction) secondArgument).getStringLiteral();
     try {
-      JsonPathCache.INSTANCE.getOrCompute(inputJsonPath);
+      JsonPathCache.INSTANCE.getOrCompute(_jsonPathString);
     } catch (Exception e) {
       throw new IllegalArgumentException("JSON path argument is not a valid JSON path");
     }
-    _jsonPathString = inputJsonPath.substring(1); // remove $ prefix
 
     TransformFunction thirdArgument = arguments.get(2);
     if (!(thirdArgument instanceof LiteralTransformFunction)) {
@@ -90,14 +89,14 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
     }
     String resultsType = ((LiteralTransformFunction) thirdArgument).getStringLiteral().toUpperCase();
     boolean isSingleValue = !resultsType.endsWith("_ARRAY");
-    if (isSingleValue && inputJsonPath.contains("[*]")) {
+    if (isSingleValue && _jsonPathString.contains("[*]")) {
       throw new IllegalArgumentException(
           "[*] syntax in json path is unsupported for singleValue field json_extract_index");
     }
     DataType dataType = isSingleValue ? DataType.valueOf(resultsType)
         : DataType.valueOf(resultsType.substring(0, resultsType.length() - 6));
 
-    if (arguments.size() == 4) {
+    if (arguments.size() >= 4) {
       TransformFunction fourthArgument = arguments.get(3);
       if (!(fourthArgument instanceof LiteralTransformFunction)) {
         throw new IllegalArgumentException("Default value must be a literal");
@@ -105,8 +104,17 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
       _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
     }
 
+    String filterJsonPath = null;
+    if (arguments.size() == 5) {
+      TransformFunction fifthArgument = arguments.get(4);
+      if (!(fifthArgument instanceof LiteralTransformFunction)) {
+        throw new IllegalArgumentException("JSON path filter argument must be a literal");
+      }
+      filterJsonPath = ((LiteralTransformFunction) fifthArgument).getStringLiteral();
+    }
+
     _resultMetadata = new TransformResultMetadata(dataType, isSingleValue, false);
-    _valueToMatchingDocsMap = _jsonIndexReader.getMatchingFlattenedDocsMap(_jsonPathString);
+    _valueToMatchingDocsMap = _jsonIndexReader.getMatchingFlattenedDocsMap(_jsonPathString, filterJsonPath);
     if (isSingleValue) {
       // For single value result type, it's more efficient to use original docIDs map
       _jsonIndexReader.convertFlattenedDocIdsToDocIds(_valueToMatchingDocsMap);
