@@ -155,26 +155,19 @@ public final class TableConfigUtils {
     if (!skipTypes.contains(ValidationType.ALL)) {
       validateTableSchemaConfig(tableConfig);
       validateValidationConfig(tableConfig, schema);
-
-      StreamConfig streamConfig = null;
       validateIngestionConfig(tableConfig, schema, disableGroovy);
+
       // Only allow realtime tables with non-null stream.type and LLC consumer.type
       if (tableConfig.getTableType() == TableType.REALTIME) {
         Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+        StreamConfig streamConfig;
         try {
           // Validate that StreamConfig can be created
           streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
         } catch (Exception e) {
           throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
         }
-        validateDecoder(streamConfig);
-        // if segmentSizeBytes is specified, rows must be zero.
-        if (streamConfigMap.containsKey(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE)
-            || streamConfigMap.containsKey(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE)) {
-          Preconditions.checkState(streamConfig.getFlushThresholdRows() == 0,
-              String.format("Invalid config: %s=%d, it must be set to 0 for size based segment threshold to work.",
-                  StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, streamConfig.getFlushThresholdRows()));
-        }
+        validateStreamConfig(streamConfig);
       }
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
@@ -590,7 +583,17 @@ public final class TableConfigUtils {
   }
 
   @VisibleForTesting
-  static void validateDecoder(StreamConfig streamConfig) {
+  static void validateStreamConfig(StreamConfig streamConfig) {
+    // Validate flush threshold
+    Preconditions.checkState(streamConfig.getFlushThresholdTimeMillis() > 0, "Invalid flush threshold time: %s",
+        streamConfig.getFlushThresholdTimeMillis());
+    int flushThresholdRows = streamConfig.getFlushThresholdRows();
+    long flushThresholdSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
+    Preconditions.checkState(!(flushThresholdRows > 0 && flushThresholdSegmentSizeBytes > 0),
+        "Flush threshold rows: %s and flush threshold segment size: %s cannot be both set", flushThresholdRows,
+        flushThresholdSegmentSizeBytes);
+
+    // Validate decoder
     if (streamConfig.getDecoderClass().equals("org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder")) {
       String descriptorFilePath = "descriptorFile";
       String protoClassName = "protoClassName";

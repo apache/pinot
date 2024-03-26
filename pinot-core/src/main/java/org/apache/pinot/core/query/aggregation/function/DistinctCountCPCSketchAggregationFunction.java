@@ -21,16 +21,17 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.datasketches.cpc.CpcSketch;
-import org.apache.datasketches.cpc.CpcUnion;
+import org.apache.datasketches.memory.Memory;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -80,8 +81,10 @@ import org.roaringbitmap.RoaringBitmap;
  */
 @SuppressWarnings({"rawtypes"})
 public class DistinctCountCPCSketchAggregationFunction
-    extends BaseSingleInputAggregationFunction<CpcSketch, Comparable> {
-  protected final int _lgK;
+    extends BaseSingleInputAggregationFunction<CpcSketchAccumulator, Comparable> {
+  private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
+  protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
+  protected int _lgNominalEntries;
 
   public DistinctCountCPCSketchAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
@@ -92,9 +95,22 @@ public class DistinctCountCPCSketchAggregationFunction
     Preconditions.checkArgument(numExpressions <= 2, "DistinctCountCPC expects 1 or 2 arguments, got: %s",
         numExpressions);
     if (arguments.size() == 2) {
-      _lgK = arguments.get(1).getLiteral().getIntValue();
+      ExpressionContext secondArgument = arguments.get(1);
+      Preconditions.checkArgument(secondArgument.getType() == ExpressionContext.Type.LITERAL,
+          "CPC Sketch Aggregation Function expects the second argument to be a literal (parameters)," + " but got: ",
+          secondArgument.getType());
+
+      if (secondArgument.getLiteral().getType() == FieldSpec.DataType.STRING) {
+        Parameters parameters = new Parameters(secondArgument.getLiteral().getStringValue());
+        // Allows the user to trade-off memory usage for merge CPU; higher values use more memory
+        _accumulatorThreshold = parameters.getAccumulatorThreshold();
+        // Nominal entries controls sketch accuracy and size
+        _lgNominalEntries = parameters.getLgNominalEntries();
+      } else {
+        _lgNominalEntries = secondArgument.getLiteral().getIntValue();
+      }
     } else {
-      _lgK = CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
+      _lgNominalEntries = CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
     }
   }
 
@@ -123,15 +139,11 @@ public class DistinctCountCPCSketchAggregationFunction
     if (storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
-        CpcSketch cpcSketch = aggregationResultHolder.getResult();
-        CpcUnion union = new CpcUnion(_lgK);
-        if (cpcSketch != null) {
-          union.update(cpcSketch);
+        CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(aggregationResultHolder);
+        CpcSketch[] sketches = deserializeSketches(bytesValues, length);
+        for (CpcSketch sketch : sketches) {
+          cpcSketchAccumulator.apply(sketch);
         }
-        for (int i = 0; i < length; i++) {
-          union.update(ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytesValues[i]));
-        }
-        aggregationResultHolder.setValue(union.getResult());
       } catch (Exception e) {
         throw new RuntimeException("Caught exception while merging CPC sketches", e);
       }
@@ -182,6 +194,8 @@ public class DistinctCountCPCSketchAggregationFunction
       default:
         throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_CPC aggregation function: " + storedType);
     }
+    CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(aggregationResultHolder);
+    cpcSketchAccumulator.apply(cpcSketch);
   }
 
   @Override
@@ -191,24 +205,17 @@ public class DistinctCountCPCSketchAggregationFunction
 
     // Treat BYTES value as serialized CPC Sketch
     DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    if (storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
+        CpcSketch[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
-          CpcSketch value = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytesValues[i]);
-          int groupKey = groupKeyArray[i];
-          CpcSketch cpcSketch = groupByResultHolder.getResult(groupKey);
-          if (cpcSketch != null) {
-            CpcUnion union = new CpcUnion(_lgK);
-            union.update(cpcSketch);
-            union.update(value);
-            groupByResultHolder.setValueForKey(groupKey, union.getResult());
-          } else {
-            groupByResultHolder.setValueForKey(groupKey, value);
-          }
+          CpcSketchAccumulator cpcSketchAccumulator = getAccumulator(groupByResultHolder, groupKeyArray[i]);
+          CpcSketch sketch = sketches[i];
+          cpcSketchAccumulator.apply(sketch);
         }
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while merging CPC sketches", e);
+        throw new RuntimeException("Caught exception while aggregating CPC Sketches", e);
       }
       return;
     }
@@ -267,25 +274,19 @@ public class DistinctCountCPCSketchAggregationFunction
 
     // Treat BYTES value as serialized CPC Sketch
     DataType storedType = blockValSet.getValueType().getStoredType();
-    if (storedType == DataType.BYTES) {
+    boolean singleValue = blockValSet.isSingleValue();
+
+    if (singleValue && storedType == DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
+        CpcSketch[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
-          CpcSketch value = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytesValues[i]);
           for (int groupKey : groupKeysArray[i]) {
-            CpcSketch cpcSketch = groupByResultHolder.getResult(groupKey);
-            if (cpcSketch != null) {
-              CpcUnion union = new CpcUnion(_lgK);
-              union.update(cpcSketch);
-              union.update(value);
-              groupByResultHolder.setValueForKey(groupKey, union.getResult());
-            } else {
-              groupByResultHolder.setValueForKey(groupKey, value);
-            }
+            getAccumulator(groupByResultHolder, groupKey).apply(sketches[i]);
           }
         }
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while merging CPC sketches", e);
+        throw new RuntimeException("Caught exception while aggregating CPC sketches", e);
       }
       return;
     }
@@ -348,51 +349,50 @@ public class DistinctCountCPCSketchAggregationFunction
   }
 
   @Override
-  public CpcSketch extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public CpcSketchAccumulator extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      return new CpcSketch(_lgK);
+      return new CpcSketchAccumulator(_lgNominalEntries, _accumulatorThreshold);
     }
 
-    if (result instanceof DictIdsWrapper) {
+    if (result instanceof CpcSketch) {
+      return convertSketchAccumulator(result);
+    } else if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to CpcSketch
-      return convertToCpcSketch((DictIdsWrapper) result);
+      return convertSketchAccumulator(dictionaryToCpcSketch((DictIdsWrapper) result));
     } else {
-      // For non-dictionary-encoded expression, directly return the CpcSketch
-      return (CpcSketch) result;
+      return (CpcSketchAccumulator) result;
     }
   }
 
   @Override
-  public CpcSketch extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public CpcSketchAccumulator extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Object result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
-      return new CpcSketch(_lgK);
+      return new CpcSketchAccumulator(_lgNominalEntries, _accumulatorThreshold);
     }
 
-    if (result instanceof DictIdsWrapper) {
+    if (result instanceof CpcSketch) {
+      return convertSketchAccumulator(result);
+    } else if (result instanceof DictIdsWrapper) {
       // For dictionary-encoded expression, convert dictionary ids to CpcSketch
-      return convertToCpcSketch((DictIdsWrapper) result);
+      return convertSketchAccumulator(dictionaryToCpcSketch((DictIdsWrapper) result));
     } else {
-      // For non-dictionary-encoded expression, directly return the CpcSketch
-      return (CpcSketch) result;
+      return (CpcSketchAccumulator) result;
     }
   }
 
   @Override
-  public CpcSketch merge(CpcSketch intermediateResult1, CpcSketch intermediateResult2) {
-    if (intermediateResult1 == null && intermediateResult2 != null) {
+  public CpcSketchAccumulator merge(CpcSketchAccumulator intermediateResult1,
+      CpcSketchAccumulator intermediateResult2) {
+    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
       return intermediateResult2;
-    } else if (intermediateResult1 != null && intermediateResult2 == null) {
-      return intermediateResult1;
-    } else if (intermediateResult1 == null) {
-      return new CpcSketch(_lgK);
     }
-
-    CpcUnion union = new CpcUnion(_lgK);
-    union.update(intermediateResult1);
-    union.update(intermediateResult2);
-    return union.getResult();
+    if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
+      return intermediateResult1;
+    }
+    intermediateResult1.merge(intermediateResult2);
+    return intermediateResult1;
   }
 
   @Override
@@ -406,8 +406,22 @@ public class DistinctCountCPCSketchAggregationFunction
   }
 
   @Override
-  public Comparable extractFinalResult(CpcSketch intermediateResult) {
-    return Math.round(intermediateResult.getEstimate());
+  public Comparable extractFinalResult(CpcSketchAccumulator intermediateResult) {
+    intermediateResult.setLgNominalEntries(_lgNominalEntries);
+    intermediateResult.setThreshold(_accumulatorThreshold);
+    return Math.round(intermediateResult.getResult().getEstimate());
+  }
+
+  /**
+   * Returns the CpcSketch from the result holder or creates a new one if it does not exist.
+   */
+  protected CpcSketch getCpcSketch(AggregationResultHolder aggregationResultHolder) {
+    CpcSketch cpcSketch = aggregationResultHolder.getResult();
+    if (cpcSketch == null) {
+      cpcSketch = new CpcSketch(_lgNominalEntries);
+      aggregationResultHolder.setValue(cpcSketch);
+    }
+    return cpcSketch;
   }
 
   /**
@@ -421,18 +435,6 @@ public class DistinctCountCPCSketchAggregationFunction
       aggregationResultHolder.setValue(dictIdsWrapper);
     }
     return dictIdsWrapper._dictIdBitmap;
-  }
-
-  /**
-   * Returns the CpcSketch from the result holder or creates a new one if it does not exist.
-   */
-  protected CpcSketch getCpcSketch(AggregationResultHolder aggregationResultHolder) {
-    CpcSketch cpcSketch = aggregationResultHolder.getResult();
-    if (cpcSketch == null) {
-      cpcSketch = new CpcSketch(_lgK);
-      aggregationResultHolder.setValue(cpcSketch);
-    }
-    return cpcSketch;
   }
 
   /**
@@ -454,7 +456,7 @@ public class DistinctCountCPCSketchAggregationFunction
   protected CpcSketch getCpcSketch(GroupByResultHolder groupByResultHolder, int groupKey) {
     CpcSketch cpcSketch = groupByResultHolder.getResult(groupKey);
     if (cpcSketch == null) {
-      cpcSketch = new CpcSketch(_lgK);
+      cpcSketch = new CpcSketch(_lgNominalEntries);
       groupByResultHolder.setValueForKey(groupKey, cpcSketch);
     }
     return cpcSketch;
@@ -470,8 +472,8 @@ public class DistinctCountCPCSketchAggregationFunction
     }
   }
 
-  private CpcSketch convertToCpcSketch(DictIdsWrapper dictIdsWrapper) {
-    CpcSketch cpcSketch = new CpcSketch(_lgK);
+  private CpcSketch dictionaryToCpcSketch(DictIdsWrapper dictIdsWrapper) {
+    CpcSketch cpcSketch = new CpcSketch(_lgNominalEntries);
     Dictionary dictionary = dictIdsWrapper._dictionary;
     RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
@@ -528,6 +530,56 @@ public class DistinctCountCPCSketchAggregationFunction
     }
   }
 
+  /**
+   * Returns the accumulator from the result holder or creates a new one if it does not exist.
+   */
+  private CpcSketchAccumulator getAccumulator(AggregationResultHolder aggregationResultHolder) {
+    CpcSketchAccumulator accumulator = aggregationResultHolder.getResult();
+    if (accumulator == null) {
+      accumulator = new CpcSketchAccumulator(_lgNominalEntries, _accumulatorThreshold);
+      aggregationResultHolder.setValue(accumulator);
+    }
+    return accumulator;
+  }
+
+  /**
+   * Returns the accumulator for the given group key or creates a new one if it does not exist.
+   */
+  private CpcSketchAccumulator getAccumulator(GroupByResultHolder groupByResultHolder, int groupKey) {
+    CpcSketchAccumulator accumulator = groupByResultHolder.getResult(groupKey);
+    if (accumulator == null) {
+      accumulator = new CpcSketchAccumulator(_lgNominalEntries, _accumulatorThreshold);
+      groupByResultHolder.setValueForKey(groupKey, accumulator);
+    }
+    return accumulator;
+  }
+
+  /**
+   * Deserializes the sketches from the bytes.
+   */
+  @SuppressWarnings({"unchecked"})
+  private CpcSketch[] deserializeSketches(byte[][] serializedSketches, int length) {
+    CpcSketch[] sketches = new CpcSketch[length];
+    for (int i = 0; i < length; i++) {
+      sketches[i] = CpcSketch.heapify(Memory.wrap(serializedSketches[i]));
+    }
+    return sketches;
+  }
+
+  // This ensures backward compatibility with servers that still return sketches directly.
+  // The AggregationDataTableReducer casts intermediate results to Objects and although the code compiles,
+  // types might still be incompatible at runtime due to type erasure.
+  // Due to performance overheads of redundant casts, this should be removed at some future point.
+  protected CpcSketchAccumulator convertSketchAccumulator(Object result) {
+    if (result instanceof CpcSketch) {
+      CpcSketch sketch = (CpcSketch) result;
+      CpcSketchAccumulator accumulator = new CpcSketchAccumulator(_lgNominalEntries, _accumulatorThreshold);
+      accumulator.apply(sketch);
+      return accumulator;
+    }
+    return (CpcSketchAccumulator) result;
+  }
+
   private static final class DictIdsWrapper {
     final Dictionary _dictionary;
     final RoaringBitmap _dictIdBitmap;
@@ -535,6 +587,46 @@ public class DistinctCountCPCSketchAggregationFunction
     private DictIdsWrapper(Dictionary dictionary) {
       _dictionary = dictionary;
       _dictIdBitmap = new RoaringBitmap();
+    }
+  }
+
+  /**
+   * Helper class to wrap the CpcSketch parameters.  The initial values for the parameters are set to the
+   * same defaults in the Apache Datasketches library.
+   */
+  private static class Parameters {
+    private static final char PARAMETER_DELIMITER = ';';
+    private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
+    private static final String NOMINAL_ENTRIES_KEY = "nominalEntries";
+    private static final String ACCUMULATOR_THRESHOLD_KEY = "accumulatorThreshold";
+
+    private int _nominalEntries = (int) Math.pow(2, CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
+    private int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
+
+    Parameters(String parametersString) {
+      StringUtils.deleteWhitespace(parametersString);
+      String[] keyValuePairs = StringUtils.split(parametersString, PARAMETER_DELIMITER);
+      for (String keyValuePair : keyValuePairs) {
+        String[] keyAndValue = StringUtils.split(keyValuePair, PARAMETER_KEY_VALUE_SEPARATOR);
+        Preconditions.checkArgument(keyAndValue.length == 2, "Invalid parameter: %s", keyValuePair);
+        String key = keyAndValue[0];
+        String value = keyAndValue[1];
+        if (key.equalsIgnoreCase(NOMINAL_ENTRIES_KEY)) {
+          _nominalEntries = Integer.parseInt(value);
+        } else if (key.equalsIgnoreCase(ACCUMULATOR_THRESHOLD_KEY)) {
+          _accumulatorThreshold = Integer.parseInt(value);
+        } else {
+          throw new IllegalArgumentException("Invalid parameter key: " + key);
+        }
+      }
+    }
+
+    int getLgNominalEntries() {
+      return org.apache.datasketches.common.Util.exactLog2OfInt(_nominalEntries);
+    }
+
+    int getAccumulatorThreshold() {
+      return _accumulatorThreshold;
     }
   }
 }

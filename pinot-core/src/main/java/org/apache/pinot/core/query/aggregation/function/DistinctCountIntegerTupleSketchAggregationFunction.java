@@ -19,11 +19,10 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import org.apache.datasketches.tuple.CompactSketch;
-import org.apache.datasketches.tuple.Union;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -46,9 +45,10 @@ public class DistinctCountIntegerTupleSketchAggregationFunction extends IntegerT
   }
 
   @Override
-  public Comparable extractFinalResult(List<CompactSketch<IntegerSummary>> integerSummarySketches) {
-    Union<IntegerSummary> union = new Union<>(_entries, _setOps);
-    integerSummarySketches.forEach(union::union);
-    return Double.valueOf(union.getResult().getEstimate()).longValue();
+  public Comparable extractFinalResult(TupleIntSketchAccumulator accumulator) {
+    accumulator.setNominalEntries(_nominalEntries);
+    accumulator.setSetOperations(_setOps);
+    accumulator.setThreshold(_accumulatorThreshold);
+    return Double.valueOf(accumulator.getResult().getEstimate()).longValue();
   }
 }

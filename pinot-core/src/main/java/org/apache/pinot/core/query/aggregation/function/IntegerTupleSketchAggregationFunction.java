@@ -19,41 +19,93 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
-import org.apache.datasketches.tuple.CompactSketch;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.datasketches.memory.Memory;
 import org.apache.datasketches.tuple.Sketch;
-import org.apache.datasketches.tuple.Union;
+import org.apache.datasketches.tuple.Sketches;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
-import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-/***
- * This is the base class for all Integer Tuple Sketch aggregations
+/**
+ * The {@code IntegerTupleSketchAggregationFunction} is the base class for all integer-based Tuple Sketch aggregations.
+ * Apache Datasketches Tuple Sketches are an extension of the Apache Datasketches Theta Sketch. Tuple sketches store an
+ * additional summary value with each retained entry which makes the sketch ideal for summarizing attributes
+ * such as impressions or clicks.
  *
- * Note that it only supports BYTES columns containing serialized sketches currently, but could be expanded to more
+ * Tuple sketches are interoperable with the Theta Sketch and enable set operations over a stream of data, and can
+ * also be used for cardinality estimation.
+ *
+ * Note: The current implementation of this aggregation function is limited to binary columns that contain sketches
+ * built outside of Pinot.
+ *
+ * Usage examples:
+ * <ul>
+ *   <li>
+ *     Simple union (1 or 2 arguments): main expression to aggregate on, followed by an optional Tuple sketch size
+ *     argument. The second argument is the sketch lgK – the given log_base2 of k, and defaults to 16.
+ *     The "raw" equivalents return serialised sketches in base64-encoded strings.
+ *     <p>DISTINCT_COUNT_TUPLE_SKETCH(col)</p>
+ *     <p>DISTINCT_COUNT_TUPLE_SKETCH(col, 12)</p>
+ *     <p>DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col)</p>
+ *     <p>DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col, 12)</p>
+ *   <li>
+ *     Extracting a cardinality estimate from a CPC sketch:
+ *     <p>GET_INT_TUPLE_SKETCH_ESTIMATE(sketch_bytes)</p>
+ *     <p>GET_INT_TUPLE_SKETCH_ESTIMATE(DISTINCT_COUNT_RAW_TUPLE_SKETCH(col))</p>
+ *   </li>
+ *   <li>
+ *     Union between two sketches summaries are merged using addition for hash keys in common:
+ *     <p>
+ *       INT_SUM_TUPLE_SKETCH_UNION(
+ *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
+ *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
+ *       )
+ *     </p>
+ *   </li>
+ *   <li>
+ *     Union between two sketches summaries are merged using maximum for hash keys in common:
+ *     <p>
+ *       INT_MAX_TUPLE_SKETCH_UNION(
+ *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
+ *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
+ *       )
+ *     </p>
+ *   </li>
+ *   <li>
+ *     Union between two sketches summaries are merged using minimum for hash keys in common:
+ *     <p>
+ *       INT_MIN_TUPLE_SKETCH_UNION(
+ *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col1),
+ *         DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH(col2)
+ *       )
+ *     </p>
+ *  </li>
+ * </ul>
  */
+@SuppressWarnings({"rawtypes"})
 public class IntegerTupleSketchAggregationFunction
-    extends BaseSingleInputAggregationFunction<List<CompactSketch<IntegerSummary>>, Comparable> {
+    extends BaseSingleInputAggregationFunction<TupleIntSketchAccumulator, Comparable> {
+  private static final int DEFAULT_ACCUMULATOR_THRESHOLD = 2;
   final ExpressionContext _expressionContext;
   final IntegerSummarySetOperations _setOps;
-  final int _entries;
+  protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
+  protected int _nominalEntries;
 
   public IntegerTupleSketchAggregationFunction(List<ExpressionContext> arguments, IntegerSummary.Mode mode) {
     super(arguments.get(0));
@@ -65,11 +117,20 @@ public class IntegerTupleSketchAggregationFunction
     if (arguments.size() == 2) {
       ExpressionContext secondArgument = arguments.get(1);
       Preconditions.checkArgument(secondArgument.getType() == ExpressionContext.Type.LITERAL,
-          "Tuple Sketch Aggregation Function expects the second argument to be a literal (number of entries to keep),"
-              + " but got: ", secondArgument.getType());
-      _entries = secondArgument.getLiteral().getIntValue();
+          "Tuple Sketch Aggregation Function expects the second argument to be a literal (parameters)," + " but got: ",
+          secondArgument.getType());
+
+      if (secondArgument.getLiteral().getType() == FieldSpec.DataType.STRING) {
+        Parameters parameters = new Parameters(secondArgument.getLiteral().getStringValue());
+        // Allows the user to trade-off memory usage for merge CPU; higher values use more memory
+        _accumulatorThreshold = parameters.getAccumulatorThreshold();
+        // Nominal entries controls sketch accuracy and size
+        _nominalEntries = parameters.getNominalEntries();
+      } else {
+        _nominalEntries = secondArgument.getLiteral().getIntValue();
+      }
     } else {
-      _entries = (int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
+      _nominalEntries = (int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
     }
   }
 
@@ -99,20 +160,13 @@ public class IntegerTupleSketchAggregationFunction
     if (storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
-        List<CompactSketch<IntegerSummary>> integerSketch = aggregationResultHolder.getResult();
-        if (integerSketch != null) {
-          List<CompactSketch<IntegerSummary>> sketches =
-              Arrays.stream(bytesValues).map(ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE::deserialize)
-                  .map(Sketch::compact).collect(Collectors.toList());
-          aggregationResultHolder.setValue(merge(aggregationResultHolder.getResult(), sketches));
-        } else {
-          List<CompactSketch<IntegerSummary>> sketches =
-              Arrays.stream(bytesValues).map(ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE::deserialize)
-                  .map(Sketch::compact).collect(Collectors.toList());
-          aggregationResultHolder.setValue(sketches);
+        TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(aggregationResultHolder);
+        Sketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
+        for (Sketch<IntegerSummary> sketch : sketches) {
+          tupleIntSketchAccumulator.apply(sketch);
         }
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while merging Tuple Sketches", e);
+        throw new RuntimeException("Caught exception while aggregating Tuple Sketches", e);
       }
     } else {
       throw new IllegalStateException("Illegal data type for " + getType() + " aggregation function: " + storedType);
@@ -131,21 +185,14 @@ public class IntegerTupleSketchAggregationFunction
     if (storedType == FieldSpec.DataType.BYTES) {
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       try {
+        Sketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
         for (int i = 0; i < length; i++) {
-          byte[] value = bytesValues[i];
-          int groupKey = groupKeyArray[i];
-          CompactSketch<IntegerSummary> newSketch =
-              ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(value).compact();
-          if (groupByResultHolder.getResult(groupKey) == null) {
-            ArrayList<CompactSketch<IntegerSummary>> newList = new ArrayList<>();
-            newList.add(newSketch);
-            groupByResultHolder.setValueForKey(groupKey, newList);
-          } else {
-            groupByResultHolder.<List<CompactSketch<IntegerSummary>>>getResult(groupKey).add(newSketch);
-          }
+          TupleIntSketchAccumulator tupleIntSketchAccumulator = getAccumulator(groupByResultHolder, groupKeyArray[i]);
+          Sketch<IntegerSummary> sketch = sketches[i];
+          tupleIntSketchAccumulator.apply(sketch);
         }
       } catch (Exception e) {
-        throw new RuntimeException("Caught exception while merging Tuple Sketches", e);
+        throw new RuntimeException("Caught exception while aggregating Tuple Sketches", e);
       }
     } else {
       throw new IllegalStateException(
@@ -156,47 +203,55 @@ public class IntegerTupleSketchAggregationFunction
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    byte[][] valueArray = blockValSetMap.get(_expression).getBytesValuesSV();
-    for (int i = 0; i < length; i++) {
-      byte[] value = valueArray[i];
-      CompactSketch<IntegerSummary> newSketch =
-          ObjectSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(value).compact();
-      for (int groupKey : groupKeysArray[i]) {
-        if (groupByResultHolder.getResult(groupKey) == null) {
-          groupByResultHolder.setValueForKey(groupKey, Collections.singletonList(newSketch));
-        } else {
-          groupByResultHolder.<List<CompactSketch<IntegerSummary>>>getResult(groupKey).add(newSketch);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+
+    // Treat BYTES value as serialized Integer Tuple Sketch
+    FieldSpec.DataType storedType = blockValSet.getValueType().getStoredType();
+    boolean singleValue = blockValSet.isSingleValue();
+
+    if (singleValue && storedType == FieldSpec.DataType.BYTES) {
+      byte[][] bytesValues = blockValSetMap.get(_expression).getBytesValuesSV();
+      try {
+        Sketch<IntegerSummary>[] sketches = deserializeSketches(bytesValues, length);
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            getAccumulator(groupByResultHolder, groupKey).apply(sketches[i]);
+          }
         }
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while aggregating Tuple Sketches", e);
       }
+    } else {
+      throw new IllegalStateException(
+          "Illegal data type for INTEGER_TUPLE_SKETCH_UNION aggregation function: " + storedType);
     }
   }
 
   @Override
-  public List<CompactSketch<IntegerSummary>> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    return aggregationResultHolder.getResult();
+  public TupleIntSketchAccumulator extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+    TupleIntSketchAccumulator result = aggregationResultHolder.getResult();
+    if (result == null) {
+      return new TupleIntSketchAccumulator(_setOps, _nominalEntries, _accumulatorThreshold);
+    }
+    return result;
   }
 
   @Override
-  public List<CompactSketch<IntegerSummary>> extractGroupByResult(GroupByResultHolder groupByResultHolder,
-      int groupKey) {
+  public TupleIntSketchAccumulator extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public List<CompactSketch<IntegerSummary>> merge(List<CompactSketch<IntegerSummary>> intermediateResult1,
-      List<CompactSketch<IntegerSummary>> intermediateResult2) {
-    if (intermediateResult1 == null && intermediateResult2 != null) {
+  public TupleIntSketchAccumulator merge(TupleIntSketchAccumulator intermediateResult1,
+      TupleIntSketchAccumulator intermediateResult2) {
+    if (intermediateResult1 == null || intermediateResult1.isEmpty()) {
       return intermediateResult2;
-    } else if (intermediateResult1 != null && intermediateResult2 == null) {
-      return intermediateResult1;
-    } else if (intermediateResult1 == null && intermediateResult2 == null) {
-      return new ArrayList<>(0);
     }
-    ArrayList<CompactSketch<IntegerSummary>> merged =
-        new ArrayList<>(intermediateResult1.size() + intermediateResult2.size());
-    merged.addAll(intermediateResult1);
-    merged.addAll(intermediateResult2);
-    return merged;
+    if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
+      return intermediateResult1;
+    }
+    intermediateResult1.merge(intermediateResult2);
+    return intermediateResult1;
   }
 
   @Override
@@ -210,12 +265,86 @@ public class IntegerTupleSketchAggregationFunction
   }
 
   @Override
-  public Comparable extractFinalResult(List<CompactSketch<IntegerSummary>> integerSummarySketches) {
-    if (integerSummarySketches == null) {
-      return null;
+  public Comparable extractFinalResult(TupleIntSketchAccumulator accumulator) {
+    accumulator.setNominalEntries(_nominalEntries);
+    accumulator.setSetOperations(_setOps);
+    accumulator.setThreshold(_accumulatorThreshold);
+    return Base64.getEncoder().encodeToString(accumulator.getResult().toByteArray());
+  }
+
+  /**
+   * Returns the accumulator from the result holder or creates a new one if it does not exist.
+   */
+  private TupleIntSketchAccumulator getAccumulator(AggregationResultHolder aggregationResultHolder) {
+    TupleIntSketchAccumulator accumulator = aggregationResultHolder.getResult();
+    if (accumulator == null) {
+      accumulator = new TupleIntSketchAccumulator(_setOps, _nominalEntries, _accumulatorThreshold);
+      aggregationResultHolder.setValue(accumulator);
     }
-    Union<IntegerSummary> union = new Union<>(_entries, _setOps);
-    integerSummarySketches.forEach(union::union);
-    return Base64.getEncoder().encodeToString(union.getResult().toByteArray());
+    return accumulator;
+  }
+
+  /**
+   * Returns the accumulator for the given group key or creates a new one if it does not exist.
+   */
+  private TupleIntSketchAccumulator getAccumulator(GroupByResultHolder groupByResultHolder, int groupKey) {
+    TupleIntSketchAccumulator accumulator = groupByResultHolder.getResult(groupKey);
+    if (accumulator == null) {
+      accumulator = new TupleIntSketchAccumulator(_setOps, _nominalEntries, _accumulatorThreshold);
+      groupByResultHolder.setValueForKey(groupKey, accumulator);
+    }
+    return accumulator;
+  }
+
+  /**
+   * Deserializes the sketches from the bytes.
+   */
+  @SuppressWarnings({"unchecked"})
+  private Sketch<IntegerSummary>[] deserializeSketches(byte[][] serializedSketches, int length) {
+    Sketch<IntegerSummary>[] sketches = new Sketch[length];
+    for (int i = 0; i < length; i++) {
+      sketches[i] = Sketches.heapifySketch(Memory.wrap(serializedSketches[i]), new IntegerSummaryDeserializer());
+    }
+    return sketches;
+  }
+
+  /**
+   * Helper class to wrap the tuple-sketch parameters.  The initial values for the parameters are set to the
+   * same defaults in the Apache Datasketches library.
+   */
+  private static class Parameters {
+    private static final char PARAMETER_DELIMITER = ';';
+    private static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
+    private static final String NOMINAL_ENTRIES_KEY = "nominalEntries";
+    private static final String ACCUMULATOR_THRESHOLD_KEY = "accumulatorThreshold";
+
+    private int _nominalEntries = (int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
+    private int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
+
+    Parameters(String parametersString) {
+      StringUtils.deleteWhitespace(parametersString);
+      String[] keyValuePairs = StringUtils.split(parametersString, PARAMETER_DELIMITER);
+      for (String keyValuePair : keyValuePairs) {
+        String[] keyAndValue = StringUtils.split(keyValuePair, PARAMETER_KEY_VALUE_SEPARATOR);
+        Preconditions.checkArgument(keyAndValue.length == 2, "Invalid parameter: %s", keyValuePair);
+        String key = keyAndValue[0];
+        String value = keyAndValue[1];
+        if (key.equalsIgnoreCase(NOMINAL_ENTRIES_KEY)) {
+          _nominalEntries = Integer.parseInt(value);
+        } else if (key.equalsIgnoreCase(ACCUMULATOR_THRESHOLD_KEY)) {
+          _accumulatorThreshold = Integer.parseInt(value);
+        } else {
+          throw new IllegalArgumentException("Invalid parameter key: " + key);
+        }
+      }
+    }
+
+    int getNominalEntries() {
+      return _nominalEntries;
+    }
+
+    int getAccumulatorThreshold() {
+      return _accumulatorThreshold;
+    }
   }
 }

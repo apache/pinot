@@ -218,6 +218,7 @@
     <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
     <bouncycastle.version>1.77</bouncycastle.version>
     <airlift.version>0.26</airlift.version>
+    <pulsar.version>2.11.4</pulsar.version>
   </properties>
 
   <profiles>
@@ -1484,6 +1485,18 @@
         <version>${sslcontext.kickstart.version}</version>
       </dependency>
 
+      <!-- Pulsar -->
+      <dependency>
+        <groupId>org.apache.pulsar</groupId>
+        <artifactId>pulsar-client-original</artifactId>
+        <version>${pulsar.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pulsar</groupId>
+        <artifactId>pulsar-client-admin-original</artifactId>
+        <version>${pulsar.version}</version>
+      </dependency>
+
       <!-- bouncycastle libraries are used by Kafka and Pulsar plugins -->
       <dependency>
         <groupId>org.bouncycastle</groupId>
@@ -2172,7 +2185,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>versions-maven-plugin</artifactId>
-        <version>2.16.0</version>
+        <version>2.16.2</version>
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
