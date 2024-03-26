@@ -31,15 +31,21 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-class PipelineBreakerOperator extends MultiStageOperator {
+class PipelineBreakerOperator extends MultiStageOperator.WithBasicStats {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerOperator.class);
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
 
   private final Map<Integer, Operator<TransferableBlock>> _workerMap;
 
   private Map<Integer, List<TransferableBlock>> _resultMap;
   private TransferableBlock _errorBlock;
+  @Nullable
+  private StageStatsHolder _statsHolder = null;
 
   public PipelineBreakerOperator(OpChainExecutionContext context, Map<Integer, Operator<TransferableBlock>> workerMap) {
     super(context);
@@ -48,6 +54,26 @@ class PipelineBreakerOperator extends MultiStageOperator {
     for (int workerKey : workerMap.keySet()) {
       _resultMap.put(workerKey, new ArrayList<>());
     }
+  }
+
+  @Override
+  public List<MultiStageOperator<?>> getChildOperators() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Type getType() {
+    return Type.PIPELINE_BREAKER;
+  }
+
+  public StageStatsHolder getStatsHolder() {
+    assert _statsHolder != null : "This method should not be called before blocks have been processed";
+    return _statsHolder;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   public Map<Integer, List<TransferableBlock>> getResultMap() {
@@ -101,9 +127,19 @@ class PipelineBreakerOperator extends MultiStageOperator {
         if (block.isDataBlock()) {
           _resultMap.get(entry.getKey()).add(block);
           entries.offer(entry);
+        } else if (block.isSuccessfulEndOfStreamBlock()) {
+          StageStatsHolder statsHolder = block.getStatsHolder();
+          assert statsHolder != null;
+          if (_statsHolder == null) {
+            _statsHolder = statsHolder;
+          } else {
+            _statsHolder.merge(statsHolder);
+          }
         }
       }
     }
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    assert _statsHolder != null;
+    addStats(_statsHolder);
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(_statsHolder);
   }
 }

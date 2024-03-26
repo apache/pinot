@@ -21,6 +21,7 @@ package org.apache.pinot.common.datablock;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
@@ -62,7 +63,7 @@ public final class DataBlockUtils {
     return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
   }
 
-  public static MetadataBlock getEndOfStreamDataBlock(Map<String, String> stats) {
+  public static MetadataBlock getEndOfStreamDataBlock(List<ByteBuffer> stats) {
     return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS, stats);
   }
 

@@ -37,7 +37,6 @@ import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
-import org.apache.pinot.query.runtime.operator.utils.OperatorUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
@@ -49,7 +48,7 @@ import org.slf4j.LoggerFactory;
  *
  * TODO: Add support to sort the data prior to sending if sorting is enabled
  */
-public class MailboxSendOperator extends MultiStageOperator {
+public class MailboxSendOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
   public static final EnumSet<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
       EnumSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
           RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED);
@@ -57,13 +56,13 @@ public class MailboxSendOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxSendOperator.class);
   private static final String EXPLAIN_NAME = "MAILBOX_SEND";
 
-  private final MultiStageOperator _sourceOperator;
+  private final MultiStageOperator<?> _sourceOperator;
   private final BlockExchange _exchange;
   private final List<RexExpression> _collationKeys;
   private final List<RelFieldCollation.Direction> _collationDirections;
   private final boolean _isSortOnSender;
 
-  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
+  public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator<?> sourceOperator,
       RelDistribution.Type distributionType, @Nullable List<Integer> distributionKeys,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender, int receiverStageId) {
@@ -104,7 +103,28 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public Class<BaseStatKeys> getStatKeyClass() {
+    return BaseStatKeys.class;
+  }
+
+  @Override
+  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
+    _statMap.add(BaseStatKeys.EXECUTION_TIME_MS, executionTimeMs);
+    _statMap.add(BaseStatKeys.EMITTED_ROWS, block.getNumRows());
+  }
+
+  @Override
+  public Type getType() {
+    return Type.MAILBOX_SEND;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  @Override
+  public List<MultiStageOperator<?>> getChildOperators() {
     return Collections.singletonList(_sourceOperator);
   }
 
@@ -119,12 +139,9 @@ public class MailboxSendOperator extends MultiStageOperator {
     try {
       TransferableBlock block = _sourceOperator.nextBlock();
       if (block.isSuccessfulEndOfStreamBlock()) {
-        // Stats need to be populated here because the block is being sent to the mailbox
-        // and the receiving opChain will not be able to access the stats from the previous opChain
-        TransferableBlock eosBlockWithStats = TransferableBlockUtils.getEndOfStreamTransferableBlock(
-            OperatorUtils.getMetadataFromOperatorStats(_opChainStats.getOperatorStatsMap()));
+        updateEosBlock(block);
         // no need to check early terminate signal b/c the current block is already EOS
-        sendTransferableBlock(eosBlockWithStats);
+        sendTransferableBlock(block);
       } else {
         if (sendTransferableBlock(block)) {
           earlyTerminate();
@@ -133,7 +150,7 @@ public class MailboxSendOperator extends MultiStageOperator {
       return block;
     } catch (QueryCancelledException e) {
       LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return createLeafBlock();
     } catch (TimeoutException e) {
       LOGGER.warn("Timed out transferring data on opChain: {}", _context.getId(), e);
       return TransferableBlockUtils.getErrorTransferableBlock(e);

@@ -31,7 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
@@ -46,8 +46,11 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -64,7 +67,9 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOver
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 // TODO: Support memory size based resource limit.
-public class HashJoinOperator extends MultiStageOperator {
+public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJoinStats> {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(HashJoinOperator.class);
   private static final String EXPLAIN_NAME = "HASH_JOIN";
   private static final int INITIAL_HEURISTIC_SIZE = 16;
   private static final int DEFAULT_MAX_ROWS_IN_JOIN = 1024 * 1024; // 2^20, around 1MM rows
@@ -80,8 +85,8 @@ public class HashJoinOperator extends MultiStageOperator {
   // Only used for right join and full join to output non-matched right rows.
   private final Map<Object, BitSet> _matchedRightRows;
 
-  private final MultiStageOperator _leftTableOperator;
-  private final MultiStageOperator _rightTableOperator;
+  private final MultiStageOperator<?> _leftTableOperator;
+  private final MultiStageOperator<?> _rightTableOperator;
   private final JoinRelType _joinType;
   private final DataSchema _resultSchema;
   private final int _leftColumnSize;
@@ -112,8 +117,11 @@ public class HashJoinOperator extends MultiStageOperator {
 
   private int _currentRowsInHashTable = 0;
 
-  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftTableOperator,
-      MultiStageOperator rightTableOperator, DataSchema leftSchema, JoinNode node) {
+  @Nullable
+  private StageStatsHolder _statsHolder = null;
+
+  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator<?> leftTableOperator,
+      MultiStageOperator<?> rightTableOperator, DataSchema leftSchema, JoinNode node) {
     super(context);
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
@@ -144,6 +152,27 @@ public class HashJoinOperator extends MultiStageOperator {
     Map<String, String> metadata = context.getOpChainMetadata();
     _maxRowsInHashTable = getMaxRowInJoin(metadata, node.getJoinHints());
     _joinOverflowMode = getJoinOverflowMode(metadata, node.getJoinHints());
+  }
+
+  @Override
+  public Class<HashJoinStats> getStatKeyClass() {
+    return HashJoinStats.class;
+  }
+
+  @Override
+  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
+    _statMap.add(HashJoinStats.EXECUTION_TIME_MS, executionTimeMs);
+    _statMap.add(HashJoinStats.EMITTED_ROWS, block.getNumRows());
+  }
+
+  @Override
+  public Type getType() {
+    return Type.HASH_JOIN;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
   }
 
   private int getMaxRowInJoin(Map<String, String> opChainMetadata, @Nullable AbstractPlanNode.NodeHint nodeHint) {
@@ -177,7 +206,7 @@ public class HashJoinOperator extends MultiStageOperator {
 
   // TODO: Separate left and right table operator.
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public List<MultiStageOperator<?>> getChildOperators() {
     return ImmutableList.of(_leftTableOperator, _rightTableOperator);
   }
 
@@ -191,7 +220,8 @@ public class HashJoinOperator extends MultiStageOperator {
   protected TransferableBlock getNextBlock()
       throws ProcessingException {
     if (_isTerminated) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      assert _statsHolder != null;
+      TransferableBlockUtils.getEndOfStreamTransferableBlock(_statsHolder);
     }
     if (!_isHashTableBuilt) {
       // Build JOIN hash table
@@ -223,8 +253,7 @@ public class HashJoinOperator extends MultiStageOperator {
           // Just fill up the buffer.
           int remainingRows = _maxRowsInHashTable - _currentRowsInHashTable;
           container = container.subList(0, remainingRows);
-          OperatorStats operatorStats = _opChainStats.getOperatorStats(_context, _operatorId);
-          operatorStats.recordSingleStat(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_REACHED.getName(), "true");
+          _statMap.put(HashJoinStats.MAX_ROWS_IN_JOIN_REACHED, true);
           // setting only the rightTableOperator to be early terminated and awaits EOS block next.
           _rightTableOperator.earlyTerminate();
         }
@@ -246,6 +275,9 @@ public class HashJoinOperator extends MultiStageOperator {
       _upstreamErrorBlock = rightBlock;
     } else {
       _isHashTableBuilt = true;
+      _statsHolder = rightBlock.getStatsHolder();
+      assert _statsHolder != null;
+      addStats(_statsHolder);
     }
   }
 
@@ -255,8 +287,13 @@ public class HashJoinOperator extends MultiStageOperator {
       return _upstreamErrorBlock;
     }
     if (leftBlock.isSuccessfulEndOfStreamBlock()) {
+      assert _statsHolder != null;
+      StageStatsHolder leftStatsHolder = leftBlock.getStatsHolder();
+      assert leftStatsHolder != null;
+      _statsHolder.merge(leftStatsHolder);
+
       if (!needUnmatchedRightRows()) {
-        return leftBlock;
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_statsHolder);
       }
       // TODO: Moved to a different function.
       // Return remaining non-matched rows for non-inner join.
@@ -389,5 +426,22 @@ public class HashJoinOperator extends MultiStageOperator {
 
   private boolean needUnmatchedLeftRows() {
     return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL;
+  }
+
+  public enum HashJoinStats implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG),
+    MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN);
+
+    private final StatMap.Type _type;
+
+    HashJoinStats(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

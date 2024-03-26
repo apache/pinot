@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.plan.server;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -39,6 +40,7 @@ public class ServerPlanRequestContext {
   private final StagePlan _stagePlan;
   private final QueryExecutor _leafQueryExecutor;
   private final ExecutorService _executorService;
+  @Nullable
   private final PipelineBreakerResult _pipelineBreakerResult;
 
   private final PinotQuery _pinotQuery;
@@ -46,7 +48,7 @@ public class ServerPlanRequestContext {
   private List<ServerQueryRequest> _serverQueryRequests;
 
   public ServerPlanRequestContext(StagePlan stagePlan, QueryExecutor leafQueryExecutor,
-      ExecutorService executorService, PipelineBreakerResult pipelineBreakerResult) {
+      ExecutorService executorService, @Nullable PipelineBreakerResult pipelineBreakerResult) {
     _stagePlan = stagePlan;
     _leafQueryExecutor = leafQueryExecutor;
     _executorService = executorService;
@@ -66,6 +68,7 @@ public class ServerPlanRequestContext {
     return _executorService;
   }
 
+  @Nullable
   public PipelineBreakerResult getPipelineBreakerResult() {
     return _pipelineBreakerResult;
   }

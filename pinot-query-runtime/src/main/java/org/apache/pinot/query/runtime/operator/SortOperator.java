@@ -21,7 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nullable;
@@ -31,7 +30,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -39,11 +37,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SortOperator extends MultiStageOperator {
+public class SortOperator extends MultiStageOperator.WithBasicStats {
   private static final String EXPLAIN_NAME = "SORT";
   private static final Logger LOGGER = LoggerFactory.getLogger(SortOperator.class);
 
-  private final MultiStageOperator _upstreamOperator;
+  private final MultiStageOperator<?> _upstreamOperator;
   private final int _fetch;
   private final int _offset;
   private final DataSchema _dataSchema;
@@ -52,8 +50,10 @@ public class SortOperator extends MultiStageOperator {
   private final int _numRowsToKeep;
 
   private boolean _hasConstructedSortedBlock;
+  @Nullable
+  private TransferableBlock _eosBlock = null;
 
-  public SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator,
+  public SortOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator,
       List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
       List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
       boolean isInputSorted) {
@@ -63,8 +63,8 @@ public class SortOperator extends MultiStageOperator {
   }
 
   @VisibleForTesting
-  SortOperator(OpChainExecutionContext context, MultiStageOperator upstreamOperator, List<RexExpression> collationKeys,
-      List<RelFieldCollation.Direction> collationDirections,
+  SortOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator,
+      List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
       List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
       boolean isInputSorted, int defaultHolderCapacity, int defaultResponseLimit) {
     super(context);
@@ -92,7 +92,17 @@ public class SortOperator extends MultiStageOperator {
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public Type getType() {
+    return Type.SORT;
+  }
+
+  @Override
+  protected Logger logger() {
+    return LOGGER;
+  }
+
+  @Override
+  public List<MultiStageOperator<?>> getChildOperators() {
     return ImmutableList.of(_upstreamOperator);
   }
 
@@ -109,13 +119,15 @@ public class SortOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     if (_hasConstructedSortedBlock) {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      assert _eosBlock != null;
+      return _eosBlock;
     }
     TransferableBlock finalBlock = consumeInputBlocks();
     // returning upstream error block if finalBlock contains error.
     if (finalBlock.isErrorBlock()) {
       return finalBlock;
     }
+    _eosBlock = updateEosBlock(finalBlock);
     return produceSortedBlock();
   }
 
@@ -126,16 +138,18 @@ public class SortOperator extends MultiStageOperator {
         List<Object[]> row = _rows.subList(_offset, _rows.size());
         return new TransferableBlock(row, _dataSchema, DataBlock.Type.ROW);
       } else {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+        return _eosBlock;
       }
     } else {
-      LinkedList<Object[]> rows = new LinkedList<>();
-      while (_priorityQueue.size() > _offset) {
-        Object[] row = _priorityQueue.poll();
-        rows.addFirst(row);
+      int rowsSize = _priorityQueue.size() - _offset;
+      ArrayList<Object[]> rows = new ArrayList<>(rowsSize);
+      rows.ensureCapacity(rowsSize);
+
+      for (int i = rowsSize; i > 0; i--) {
+        rows.add(i, _priorityQueue.poll());
       }
-      if (rows.size() == 0) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      if (rows.isEmpty()) {
+        return _eosBlock;
       } else {
         return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }

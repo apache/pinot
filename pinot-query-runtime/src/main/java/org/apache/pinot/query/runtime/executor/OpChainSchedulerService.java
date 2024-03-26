@@ -51,7 +51,6 @@ public class OpChainSchedulerService {
         Throwable thrown = null;
         try {
           LOGGER.trace("({}): Executing", operatorChain);
-          operatorChain.getStats().executing();
           TransferableBlock result = operatorChain.getRoot().nextBlock();
           while (!result.isEndOfStreamBlock()) {
             result = operatorChain.getRoot().nextBlock();

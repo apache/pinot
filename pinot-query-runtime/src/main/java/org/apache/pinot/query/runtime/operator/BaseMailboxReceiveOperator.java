@@ -43,7 +43,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
  * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
-public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
+public abstract class BaseMailboxReceiveOperator extends MultiStageOperator.WithBasicStats {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
@@ -70,7 +70,8 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
         .map(mailboxId -> new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this))
         .collect(Collectors.toList());
     _multiConsumer =
-        new BlockingMultiStreamConsumer.OfTransferableBlock(context.getId(), context.getDeadlineMs(), asyncStreams);
+        new BlockingMultiStreamConsumer.OfTransferableBlock(context.getStageId(), context.getId(),
+            context.getDeadlineMs(), asyncStreams);
   }
 
   @Override
@@ -80,7 +81,12 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   @Override
-  public List<MultiStageOperator> getChildOperators() {
+  public Type getType() {
+    return Type.MAILBOX_RECEIVE;
+  }
+
+  @Override
+  public List<MultiStageOperator<?>> getChildOperators() {
     return Collections.emptyList();
   }
 
@@ -116,7 +122,6 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
       TransferableBlock block = _mailbox.poll();
       if (block != null && block.isSuccessfulEndOfStreamBlock()) {
         _operator._mailboxService.releaseReceivingMailbox(_mailbox);
-        _operator._opChainStats.getOperatorStatsMap().putAll(block.getResultMetadata());
       }
       return block;
     }

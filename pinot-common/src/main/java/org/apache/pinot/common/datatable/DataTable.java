@@ -100,7 +100,7 @@ public interface DataTable {
    *  - NEVER decrease MAX_ID
    *  Otherwise, backward compatibility will be broken.
    */
-  enum MetadataKey {
+  enum MetadataKey implements StatMap.Key {
     UNKNOWN(0, "unknown", MetadataValueType.STRING),
     TABLE(1, "table", MetadataValueType.STRING),
     NUM_DOCS_SCANNED(2, "numDocsScanned", MetadataValueType.LONG),
@@ -185,6 +185,25 @@ public interface DataTable {
     // getValueType returns the value type(int/long/String) of the enum key.
     public MetadataValueType getValueType() {
       return _valueType;
+    }
+
+    @Override
+    public String getStatName() {
+      return getName();
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      switch (_valueType) {
+        case INT:
+          return StatMap.Type.INT;
+        case LONG:
+          return StatMap.Type.LONG;
+        case STRING:
+          return StatMap.Type.STRING;
+        default:
+          throw new IllegalStateException("Unsupported value type: " + _valueType);
+      }
     }
 
     static {

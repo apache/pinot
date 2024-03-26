@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
@@ -30,7 +29,7 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.PinotHintOptions;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -649,16 +648,16 @@ public class HashJoinOperatorTest {
     OpChainExecutionContext context = OperatorTestUtil.getDefaultContext();
     HashJoinOperator join = new HashJoinOperator(context, _leftOperator, _rightOperator, leftSchema, node);
 
-    TransferableBlock result = join.nextBlock();
+    TransferableBlock firstBlock = join.nextBlock();
     Mockito.verify(_rightOperator).earlyTerminate();
-    Assert.assertFalse(result.isErrorBlock());
-    Assert.assertEquals(result.getNumRows(), 1);
+    Assert.assertTrue(firstBlock.isDataBlock(), "First block should be a data block but is " + firstBlock.getClass());
+    Assert.assertEquals(firstBlock.getNumRows(), 1);
 
-    String operatorId =
-        Joiner.on("_").join(HashJoinOperator.class.getSimpleName(), context.getStageId(), context.getServer());
-    OperatorStats operatorStats = context.getStats().getOperatorStats(context, operatorId);
-    Assert.assertEquals(
-        operatorStats.getExecutionStats().get(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_REACHED.getName()), "true");
+    TransferableBlock secondBlock = join.nextBlock();
+    StatMap<HashJoinOperator.HashJoinStats> joinStats =
+        OperatorTestUtil.getStatMap(HashJoinOperator.HashJoinStats.class, secondBlock);
+     Assert.assertTrue(joinStats.getBoolean(HashJoinOperator.HashJoinStats.MAX_ROWS_IN_JOIN_REACHED),
+        "Max rows in join should be reached");
   }
 }
 // TODO: Add more inequi join tests.

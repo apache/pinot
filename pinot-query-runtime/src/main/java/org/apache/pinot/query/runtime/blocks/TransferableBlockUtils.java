@@ -20,12 +20,15 @@ package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.query.runtime.plan.StageStatsHolder;
 
 
 public final class TransferableBlockUtils {
@@ -36,12 +39,21 @@ public final class TransferableBlockUtils {
     // do not instantiate.
   }
 
+  @Deprecated
   public static TransferableBlock getEndOfStreamTransferableBlock() {
     return EMPTY_EOS;
   }
 
-  public static TransferableBlock getEndOfStreamTransferableBlock(Map<String, String> statsMap) {
-    return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(statsMap));
+  public static TransferableBlock getEndOfStreamTransferableBlock(StageStatsHolder stats) {
+    try {
+      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(stats.serialize()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  public static TransferableBlock wrap(DataBlock dataBlock) {
+    return new TransferableBlock(dataBlock);
   }
 
   public static TransferableBlock getErrorTransferableBlock(Exception e) {
