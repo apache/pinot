@@ -168,7 +168,8 @@
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.1</stax2-api.version>
     <aws.sdk.version>2.25.3</aws.sdk.version>
-    <joda-time.version>2.12.5</joda-time.version>
+    <joda-time.version>2.12.7</joda-time.version>
+    <janino.version>3.1.12</janino.version>
     <testng.version>7.9.0</testng.version>
     <woodstox.version>6.4.0</woodstox.version>
     <sslcontext.kickstart.version>8.2.0</sslcontext.kickstart.version>
@@ -1149,14 +1150,6 @@
             <artifactId>avatica-metrics</artifactId>
           </exclusion>
           <exclusion>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpcore</artifactId>
-          </exclusion>
-          <exclusion>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-dbcp2</artifactId>
           </exclusion>
@@ -1168,32 +1161,22 @@
             <groupId>net.hydromatic</groupId>
             <artifactId>aggdesigner-algorithm</artifactId>
           </exclusion>
-          <exclusion>
-            <groupId>com.jayway.jsonpath</groupId>
-            <artifactId>json-path</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>joda-time</groupId>
-            <artifactId>joda-time</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.codehaus.janino</groupId>
-            <artifactId>janino</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>org.codehaus.janino</groupId>
-            <artifactId>commons-compiler</artifactId>
-          </exclusion>
-          <exclusion>
-            <groupId>com.google.code.findbugs</groupId>
-            <artifactId>jsr305</artifactId>
-          </exclusion>
         </exclusions>
       </dependency>
       <dependency>
         <groupId>org.apache.calcite</groupId>
         <artifactId>calcite-babel</artifactId>
         <version>${calcite.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.janino</groupId>
+        <artifactId>janino</artifactId>
+        <version>${janino.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.codehaus.janino</groupId>
+        <artifactId>commons-compiler</artifactId>
+        <version>${janino.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jcabi</groupId>
