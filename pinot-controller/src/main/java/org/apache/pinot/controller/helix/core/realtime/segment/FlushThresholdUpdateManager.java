@@ -53,11 +53,12 @@ public class FlushThresholdUpdateManager {
       return new DefaultFlushThresholdUpdater(flushThresholdRows);
     }
     if (flushThresholdSegmentRows > 0) {
+      _flushThresholdUpdaterMap.remove(realtimeTableName);
       return new FixedFlushThresholdUpdater(flushThresholdSegmentRows);
-    } 
+    }
     // Legacy behavior: when flush threshold rows is explicitly set to 0, use segment size based flush threshold
     long flushThresholdSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
-    if (flushThresholdRows == 0 || flushThresholdSegmentRows == 0 || flushThresholdSegmentSizeBytes > 0) {
+    if (flushThresholdRows == 0 || flushThresholdSegmentSizeBytes > 0) {
       return _flushThresholdUpdaterMap.computeIfAbsent(realtimeTableName,
           k -> new SegmentSizeBasedFlushThresholdUpdater());
     } else {
