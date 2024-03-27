@@ -41,10 +41,9 @@
     <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
     <jersey-container-grizzly2-http.version>2.39</jersey-container-grizzly2-http.version>
     <simpleclient_common.version>0.16.0</simpleclient_common.version>
-    <grpc-proto.version>2.29.0</grpc-proto.version>
     <grpc-context.version>1.60.1</grpc-context.version>
     <caffeine.version>2.6.2</caffeine.version>
-    <codehaus-annotations.version>1.17</codehaus-annotations.version>
+    <animal-sniffer-annotations.version>1.17</animal-sniffer-annotations.version>
     <javax.annotation-api.version>1.2</javax.annotation-api.version>
     <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
   </properties>
@@ -170,7 +169,7 @@
     <dependency>
       <groupId>org.codehaus.mojo</groupId>
       <artifactId>animal-sniffer-annotations</artifactId>
-      <version>${codehaus-annotations.version}</version>
+      <version>${animal-sniffer-annotations.version}</version>
     </dependency>
     <dependency>
       <groupId>com.github.ben-manes.caffeine</groupId>

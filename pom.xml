@@ -220,6 +220,53 @@
     <bouncycastle.version>1.77</bouncycastle.version>
     <airlift.version>0.26</airlift.version>
     <pulsar.version>2.11.4</pulsar.version>
+    <equalsverifier.version>3.15.8</equalsverifier.version>
+    <checker-qual.version>3.42.0</checker-qual.version>
+    <groovy-all.version>2.4.21</groovy-all.version>
+    <xml-apis.version>2.0.2</xml-apis.version>
+    <RoaringBitmap.version>1.0.5</RoaringBitmap.version>
+    <httpmime.version>4.5.13</httpmime.version>
+    <httpclient.version>4.5.14</httpclient.version>
+    <httpcore.version>4.4.13</httpcore.version>
+    <fastutil.version>8.2.3</fastutil.version>
+    <libthrift.version>0.15.0</libthrift.version>
+    <javax.servlet-api.version>3.0.1</javax.servlet-api.version>
+    <javax.ws.rs-api.version>2.0.1</javax.ws.rs-api.version>
+    <validation-api.version>2.0.1.Final</validation-api.version>
+    <activation.version>1.1.1</activation.version>
+    <disruptor.version>3.3.4</disruptor.version>
+    <snakeyaml.version>2.2</snakeyaml.version>
+    <larray-mmap.version>0.4.1</larray-mmap.version>
+    <paranamer.version>2.8</paranamer.version>
+    <google-api-services-storage.version>v1-rev20240209-2.0.0</google-api-services-storage.version>
+    <error_prone_annotations.version>2.25.0</error_prone_annotations.version>
+    <auto-service.version>1.1.1</auto-service.version>
+    <jsr305.version>3.0.2</jsr305.version>
+    <j2objc-annotations.version>2.8</j2objc-annotations.version>
+    <reload4j.version>1.2.25</reload4j.version>
+    <jaxb-api.version>2.3.1</jaxb-api.version>
+    <hadoop-shaded-protobuf_3_21.version>1.2.0</hadoop-shaded-protobuf_3_21.version>
+    <orc-core.version>1.5.9</orc-core.version>
+    <orc-mapreduce.version>1.5.9</orc-mapreduce.version>
+    <swagger-ui.version>5.1.0</swagger-ui.version>
+    <stream.version>2.9.8</stream.version>
+    <datasketches-java.version>5.0.1</datasketches-java.version>
+    <hash4j.version>0.13.0</hash4j.version>
+    <t-digest.version>3.2</t-digest.version>
+    <jcabi-log.version>0.24.1</jcabi-log.version>
+    <javassist.version>3.19.0-GA</javassist.version>
+    <mockito-core.version>5.11.0</mockito-core.version>
+    <h2.version>2.2.224</h2.version>
+    <jnr-posix.version>3.1.15</jnr-posix.version>
+    <jnr-constants.version>0.10.3</jnr-constants.version>
+    <picocli.version>4.7.5</picocli.version>
+    <tyrus-standalone-client.version>2.1.4</tyrus-standalone-client.version>
+    <jopt-simple.version>4.6</jopt-simple.version>
+    <ipaddress.version>5.3.4</ipaddress.version>
+    <posix.version>2.23.2</posix.version>
+    <chronicle-core.version>2.25ea10</chronicle-core.version>
+    <asm.version>9.7</asm.version>
+    <jna.version>5.5.0</jna.version>
   </properties>
 
   <profiles>
@@ -399,23 +446,23 @@
       <dependency>
         <groupId>nl.jqno.equalsverifier</groupId>
         <artifactId>equalsverifier</artifactId>
-        <version>3.15.8</version>
+        <version>${equalsverifier.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.42.0</version>
+        <version>${checker-qual.version}</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
         <artifactId>groovy-all</artifactId>
-        <version>2.4.21</version>
+        <version>${groovy-all.version}</version>
       </dependency>
       <dependency>
         <groupId>xml-apis</groupId>
         <artifactId>xml-apis</artifactId>
-        <version>2.0.2</version>
+        <version>${xml-apis.version}</version>
       </dependency>
       <dependency>
         <groupId>org.testng</groupId>
@@ -425,7 +472,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.0.5</version>
+        <version>${RoaringBitmap.version}</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -445,12 +492,12 @@
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpmime</artifactId>
-        <version>4.5.13</version>
+        <version>${httpmime.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpclient</artifactId>
-        <version>4.5.14</version>
+        <version>${httpclient.version}</version>
         <exclusions>
           <exclusion>
             <groupId>commons-logging</groupId>
@@ -461,7 +508,7 @@
       <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpcore</artifactId>
-        <version>4.4.13</version>
+        <version>${httpcore.version}</version>
       </dependency>
 
       <!-- netty BOM -->
@@ -486,7 +533,7 @@
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
-        <version>8.2.3</version>
+        <version>${fastutil.version}</version>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -521,18 +568,18 @@
       <dependency>
         <groupId>org.apache.thrift</groupId>
         <artifactId>libthrift</artifactId>
-        <version>0.15.0</version>
+        <version>${libthrift.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.servlet</groupId>
         <artifactId>javax.servlet-api</artifactId>
-        <version>3.0.1</version>
+        <version>${javax.servlet-api.version}</version>
         <scope>compile</scope>
       </dependency>
       <dependency>
         <groupId>javax.ws.rs</groupId>
         <artifactId>javax.ws.rs-api</artifactId>
-        <version>2.0.1</version>
+        <version>${javax.ws.rs-api.version}</version>
       </dependency>
       <dependency>
         <groupId>org.quartz-scheduler</groupId>
@@ -542,12 +589,12 @@
       <dependency>
         <groupId>javax.validation</groupId>
         <artifactId>validation-api</artifactId>
-        <version>2.0.1.Final</version>
+        <version>${validation-api.version}</version>
       </dependency>
       <dependency>
         <groupId>javax.activation</groupId>
         <artifactId>activation</artifactId>
-        <version>1.1.1</version>
+        <version>${activation.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.helix</groupId>
@@ -618,7 +665,7 @@
       <dependency>
         <groupId>com.lmax</groupId>
         <artifactId>disruptor</artifactId>
-        <version>3.3.4</version>
+        <version>${disruptor.version}</version>
       </dependency>
       <dependency>
         <groupId>org.asynchttpclient</groupId>
@@ -628,12 +675,12 @@
       <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
-        <version>2.2</version>
+        <version>${snakeyaml.version}</version>
       </dependency>
       <dependency>
         <groupId>org.xerial.larray</groupId>
         <artifactId>larray-mmap</artifactId>
-        <version>0.4.1</version>
+        <version>${larray-mmap.version}</version>
       </dependency>
       <!-- Transitive dependencies with inconsistent version numbers -->
       <dependency>
@@ -654,7 +701,7 @@
       <dependency>
         <groupId>com.thoughtworks.paranamer</groupId>
         <artifactId>paranamer</artifactId>
-        <version>2.8</version>
+        <version>${paranamer.version}</version>
       </dependency>
 
       <!-- Jackson -->
@@ -757,30 +804,30 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-storage</artifactId>
-        <version>v1-rev20240209-2.0.0</version>
+        <version>${google-api-services-storage.version}</version>
       </dependency>
       <!-- Solve the dependency converge issue between guava and calcite-core -->
       <dependency>
         <groupId>com.google.errorprone</groupId>
         <artifactId>error_prone_annotations</artifactId>
-        <version>2.25.0</version>
+        <version>${error_prone_annotations.version}</version>
       </dependency>
       <!-- Legacy Google Libraries -->
       <dependency>
         <groupId>com.google.auto.service</groupId>
         <artifactId>auto-service</artifactId>
-        <version>1.1.1</version>
+        <version>${auto-service.version}</version>
         <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
       </dependency>
       <dependency>
         <groupId>com.google.code.findbugs</groupId>
         <artifactId>jsr305</artifactId>
-        <version>3.0.2</version>
+        <version>${jsr305.version}</version>
       </dependency>
       <dependency>
         <groupId>com.google.j2objc</groupId>
         <artifactId>j2objc-annotations</artifactId>
-        <version>2.8</version>
+        <version>${j2objc-annotations.version}</version>
       </dependency>
 
       <!-- Hadoop -->
@@ -978,13 +1025,13 @@
       <dependency>
         <groupId>ch.qos.reload4j</groupId>
         <artifactId>reload4j</artifactId>
-        <version>1.2.25</version>
+        <version>${reload4j.version}</version>
       </dependency>
       <!-- Solve the dependency converge issue between hadoop-common and orc-core -->
       <dependency>
         <groupId>javax.xml.bind</groupId>
         <artifactId>jaxb-api</artifactId>
-        <version>2.3.1</version>
+        <version>${jaxb-api.version}</version>
       </dependency>
       <!-- The following dependencies are added to solve the vulnerabilities of the old version -->
       <dependency>
@@ -1060,7 +1107,7 @@
       <dependency>
         <groupId>org.apache.hadoop.thirdparty</groupId>
         <artifactId>hadoop-shaded-protobuf_3_21</artifactId>
-        <version>1.2.0</version>
+        <version>${hadoop-shaded-protobuf_3_21.version}</version>
       </dependency>
 
       <!-- Metrics -->
@@ -1093,7 +1140,7 @@
       <dependency>
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-core</artifactId>
-        <version>1.5.9</version>
+        <version>${orc-core.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.avro</groupId>
@@ -1103,32 +1150,32 @@
       <dependency>
         <groupId>org.apache.orc</groupId>
         <artifactId>orc-mapreduce</artifactId>
-        <version>1.5.9</version>
+        <version>${orc-mapreduce.version}</version>
       </dependency>
       <dependency>
         <groupId>org.webjars</groupId>
         <artifactId>swagger-ui</artifactId>
-        <version>5.1.0</version>
+        <version>${swagger-ui.version}</version>
       </dependency>
       <dependency>
         <groupId>com.clearspring.analytics</groupId>
         <artifactId>stream</artifactId>
-        <version>2.9.8</version>
+        <version>${stream.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>5.0.1</version>
+        <version>${datasketches-java.version}</version>
       </dependency>
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
         <artifactId>hash4j</artifactId>
-        <version>0.13.0</version>
+        <version>${hash4j.version}</version>
       </dependency>
       <dependency>
         <groupId>com.tdunning</groupId>
         <artifactId>t-digest</artifactId>
-        <version>3.2</version>
+        <version>${t-digest.version}</version>
       </dependency>
       <dependency>
         <groupId>com.jayway.jsonpath</groupId>
@@ -1181,7 +1228,7 @@
       <dependency>
         <groupId>com.jcabi</groupId>
         <artifactId>jcabi-log</artifactId>
-        <version>0.24.1</version>
+        <version>${jcabi-log.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.containers</groupId>
@@ -1207,7 +1254,7 @@
       <dependency>
         <groupId>org.javassist</groupId>
         <artifactId>javassist</artifactId>
-        <version>3.19.0-GA</version>
+        <version>${javassist.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.core</groupId>
@@ -1292,39 +1339,39 @@
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
-        <version>5.11.0</version>
+        <version>${mockito-core.version}</version>
         <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <version>2.2.224</version>
+        <version>${h2.version}</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-posix</artifactId>
-        <version>3.1.15</version>
+        <version>${jnr-posix.version}</version>
       </dependency>
       <dependency>
         <groupId>com.github.jnr</groupId>
         <artifactId>jnr-constants</artifactId>
-        <version>0.10.3</version>
+        <version>${jnr-constants.version}</version>
       </dependency>
       <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
-        <version>4.7.5</version>
+        <version>${picocli.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.tyrus.bundles</groupId>
         <artifactId>tyrus-standalone-client</artifactId>
-        <version>2.1.4</version>
+        <version>${tyrus-standalone-client.version}</version>
       </dependency>
       <!-- kafka_2.10 & jmh-core use jopt-simple -->
       <dependency>
         <groupId>net.sf.jopt-simple</groupId>
         <artifactId>jopt-simple</artifactId>
-        <version>4.6</version>
+        <version>${jopt-simple.version}</version>
       </dependency>
       <dependency>
         <groupId>org.reflections</groupId>
@@ -1345,28 +1392,28 @@
       <dependency>
         <groupId>com.github.seancfoley</groupId>
         <artifactId>ipaddress</artifactId>
-        <version>5.3.4</version>
+        <version>${ipaddress.version}</version>
       </dependency>
 
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>posix</artifactId>
-        <version>2.23.2</version>
+        <version>${posix.version}</version>
       </dependency>
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.25ea10</version>
+        <version>${chronicle-core.version}</version>
       </dependency>
       <dependency>
         <groupId>org.ow2.asm</groupId>
         <artifactId>asm</artifactId>
-        <version>9.7</version>
+        <version>${asm.version}</version>
       </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna</artifactId>
-        <version>5.5.0</version>
+        <version>${jna.version}</version>
       </dependency>
 
       <dependency>
