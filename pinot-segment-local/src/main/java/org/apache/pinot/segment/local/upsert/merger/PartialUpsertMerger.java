@@ -18,13 +18,28 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
+import java.util.Map;
+import org.apache.pinot.segment.local.segment.readers.LazyRow;
+import org.apache.pinot.spi.data.readers.GenericRow;
+
+
+/**
+ * Merger previously persisted row with the new incoming row.
+ * <p>
+ * Implement this interface to define logic to merge rows. {@link LazyRow} provides abstraction row like abstraction
+ * to read previously persisted row by lazily loading column values if needed. For automatic plugging of the
+ * interface via {@link org.apache.pinot.segment.local.upsert.merger.columnar.PartialUpsertColumnMergerFactory}
+ * implement {@link BasePartialUpsertMerger}
+ */
 public interface PartialUpsertMerger {
+
   /**
-   * Handle partial upsert merge.
-   *
-   * @param previousValue the value of given field from the last derived full record during ingestion.
-   * @param currentValue the value of given field from the new consumed record.
-   * @return a new value after merge
+   * Merge previous row with new incoming row and persist the merged results per column in the provided
+   * mergerResult map. {@link org.apache.pinot.segment.local.upsert.PartialUpsertHandler} ensures the primary key and
+   * comparison columns are not modified, comparison columns are merged and only the latest non values are stored.
+   * @param prevRecord
+   * @param newRecord
+   * @param mergerResult
    */
-  Object merge(Object previousValue, Object currentValue);
+  void merge(LazyRow prevRecord, GenericRow newRecord, Map<String, Object> mergerResult);
 }

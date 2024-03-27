@@ -16,18 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.segment.local.upsert.merger.columnar;
 
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 
 
-public class PartialUpsertMergerTest {
+public class PartialUpsertColumnMergerTest {
 
   @Test
   public void testAppendMergers() {
-    AppendMerger appendMerger = new AppendMerger();
+    AppendMerger appendMerger = (AppendMerger) PartialUpsertColumnMergerFactory.getMerger(UpsertConfig.Strategy.APPEND);
 
     Integer[] array1 = {1, 2, 3};
     Integer[] array2 = {3, 4, 6};
@@ -37,21 +38,22 @@ public class PartialUpsertMergerTest {
 
   @Test
   public void testIncrementMergers() {
-    IncrementMerger incrementMerger = new IncrementMerger();
+    IncrementMerger incrementMerger =
+        (IncrementMerger) PartialUpsertColumnMergerFactory.getMerger(UpsertConfig.Strategy.INCREMENT);
     assertEquals(3, incrementMerger.merge(1, 2));
   }
 
   @Test
   public void testIgnoreMergers() {
-    IgnoreMerger ignoreMerger = new IgnoreMerger();
+    IgnoreMerger ignoreMerger = (IgnoreMerger) PartialUpsertColumnMergerFactory.getMerger(UpsertConfig.Strategy.IGNORE);
     assertEquals(null, ignoreMerger.merge(null, 3));
     assertEquals(3, ignoreMerger.merge(3, null));
   }
 
   @Test
   public void testMaxMinMergers() {
-    MaxMerger maxMerger = new MaxMerger();
-    MinMerger minMerger = new MinMerger();
+    MaxMerger maxMerger = (MaxMerger) PartialUpsertColumnMergerFactory.getMerger(UpsertConfig.Strategy.MAX);
+    MinMerger minMerger = (MinMerger) PartialUpsertColumnMergerFactory.getMerger(UpsertConfig.Strategy.MIN);
     assertEquals(1, maxMerger.merge(0, 1));
     assertEquals(0, minMerger.merge(0, 1));
     assertEquals(1, maxMerger.merge(1, 0));
@@ -60,13 +62,14 @@ public class PartialUpsertMergerTest {
 
   @Test
   public void testOverwriteMergers() {
-    OverwriteMerger overwriteMerger = new OverwriteMerger();
+    OverwriteMerger overwriteMerger =
+        (OverwriteMerger) PartialUpsertColumnMergerFactory.getMerger(UpsertConfig.Strategy.OVERWRITE);
     assertEquals("newValue", overwriteMerger.merge("oldValue", "newValue"));
   }
 
   @Test
   public void testUnionMergers() {
-    UnionMerger unionMerger = new UnionMerger();
+    UnionMerger unionMerger = (UnionMerger) PartialUpsertColumnMergerFactory.getMerger(UpsertConfig.Strategy.UNION);
 
     String[] array1 = {"a", "b", "c"};
     String[] array2 = {"c", "d", "e"};

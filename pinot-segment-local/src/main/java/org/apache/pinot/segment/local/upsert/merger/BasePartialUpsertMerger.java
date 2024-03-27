@@ -18,16 +18,20 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-/**
- * Merges 2 records and returns the merged record.
- * Overwrite the existing value for the given field. Then return the merged record.
- */
-public class OverwriteMerger implements PartialUpsertMerger {
-  OverwriteMerger() {
-  }
+import java.util.List;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 
-  @Override
-  public Object merge(Object previousValue, Object currentValue) {
-    return currentValue;
+
+public abstract class BasePartialUpsertMerger implements PartialUpsertMerger {
+
+  protected final List<String> _primaryKeyColumns;
+  protected final List<String> _comparisonColumns;
+  protected final UpsertConfig _upsertConfig;
+
+  public BasePartialUpsertMerger(List<String> primaryKeyColumns, List<String> comparisonColumns,
+      UpsertConfig upsertConfig) {
+    _primaryKeyColumns = primaryKeyColumns;
+    _comparisonColumns = comparisonColumns;
+    _upsertConfig = upsertConfig;
   }
 }
