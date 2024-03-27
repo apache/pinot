@@ -25,52 +25,55 @@ import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
+
 /**
  * Pulsar specific implementation of {@link StreamMessageMetadata}
  * Pulsar makes many metadata values available for each message. Please see the pulsar documentation for more details.
  * @see <a href="https://pulsar.apache.org/docs/en/concepts-messaging/#message-properties">Pulsar Message Properties</a>
  */
+// TODO: Make it a util class
 public class PulsarStreamMessageMetadata extends StreamMessageMetadata {
 
-    public enum PulsarMessageMetadataValue {
-        PUBLISH_TIME("publishTime"),
-        EVENT_TIME("eventTime"),
-        BROKER_PUBLISH_TIME("brokerPublishTime"),
-        MESSAGE_KEY("key"),
-        MESSAGE_ID("messageId"),
-        MESSAGE_ID_BYTES_B64("messageIdBytes"),
-        PRODUCER_NAME("producerName"),
-        SCHEMA_VERSION("schemaVersion"),
-        SEQUENCE_ID("sequenceId"),
-        ORDERING_KEY("orderingKey"),
-        SIZE("size"),
-        TOPIC_NAME("topicName"),
-        INDEX("index"),
-        REDELIVERY_COUNT("redeliveryCount");
+  public enum PulsarMessageMetadataValue {
+    PUBLISH_TIME("publishTime"),
+    EVENT_TIME("eventTime"),
+    BROKER_PUBLISH_TIME("brokerPublishTime"),
+    MESSAGE_KEY("key"),
+    MESSAGE_ID("messageId"),
+    MESSAGE_ID_BYTES_B64("messageIdBytes"),
+    PRODUCER_NAME("producerName"),
+    SCHEMA_VERSION("schemaVersion"),
+    SEQUENCE_ID("sequenceId"),
+    ORDERING_KEY("orderingKey"),
+    SIZE("size"),
+    TOPIC_NAME("topicName"),
+    INDEX("index"),
+    REDELIVERY_COUNT("redeliveryCount");
 
-        private final String _key;
+    private final String _key;
 
-        PulsarMessageMetadataValue(String key) {
-            _key = key;
-        }
-
-        public String getKey() {
-            return _key;
-        }
-
-        public static PulsarMessageMetadataValue findByKey(final String key) {
-            EnumSet<PulsarMessageMetadataValue> values = EnumSet.allOf(PulsarMessageMetadataValue.class);
-            return values.stream().filter(value -> value.getKey().equals(key)).findFirst().orElse(null);
-        }
+    PulsarMessageMetadataValue(String key) {
+      _key = key;
     }
 
-    public PulsarStreamMessageMetadata(long recordIngestionTimeMs,
-                                        @Nullable GenericRow headers) {
-        super(recordIngestionTimeMs, headers);
+    public String getKey() {
+      return _key;
     }
 
-    public PulsarStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
-                                        Map<String, String> metadata) {
-        super(recordIngestionTimeMs, headers, metadata);
+    public static PulsarMessageMetadataValue findByKey(final String key) {
+      EnumSet<PulsarMessageMetadataValue> values = EnumSet.allOf(PulsarMessageMetadataValue.class);
+      return values.stream().filter(value -> value.getKey().equals(key)).findFirst().orElse(null);
     }
+  }
+
+  @Deprecated
+  public PulsarStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers) {
+    super(recordIngestionTimeMs, headers);
+  }
+
+  @Deprecated
+  public PulsarStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
+      Map<String, String> metadata) {
+    super(recordIngestionTimeMs, headers, metadata);
+  }
 }

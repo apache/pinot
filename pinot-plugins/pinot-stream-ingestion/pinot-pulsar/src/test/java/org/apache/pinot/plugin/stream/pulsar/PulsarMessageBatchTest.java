@@ -19,34 +19,35 @@
 package org.apache.pinot.plugin.stream.pulsar;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
-import java.util.stream.Collectors;
+import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.common.api.EncryptionContext;
-import org.junit.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+
 
 public class PulsarMessageBatchTest {
-  private Random _random = new Random();
-  private DummyPulsarMessage _msgWithKeyAndValue;
+  private static final Random RANDOM = new Random();
+
   private byte[] _expectedValueBytes;
   private byte[] _expectedKeyBytes;
-  private List<DummyPulsarMessage> _messageList;
-  private PulsarMetadataExtractor _metadataExtractor;
+  private DummyPulsarMessage _message;
 
   public static class DummyPulsarMessage implements Message<byte[]> {
     private final byte[] _keyData;
     private final byte[] _valueData;
-    private Map<String, String> _properties;
+    private final Map<String, String> _properties;
 
     public DummyPulsarMessage(byte[] key, byte[] value) {
       _keyData = key;
@@ -111,7 +112,7 @@ public class PulsarMessageBatchTest {
 
     @Override
     public boolean hasKey() {
-      return _keyData == null ? false : true;
+      return _keyData != null;
     }
 
     @Override
@@ -198,45 +199,39 @@ public class PulsarMessageBatchTest {
   public void setup() {
     _expectedValueBytes = new byte[10];
     _expectedKeyBytes = new byte[10];
-    _random.nextBytes(_expectedValueBytes);
-    _random.nextBytes(_expectedKeyBytes);
-    _msgWithKeyAndValue = new DummyPulsarMessage(_expectedKeyBytes, _expectedValueBytes);
-    _messageList = new ArrayList<>();
-    _metadataExtractor = PulsarMetadataExtractor.build(true,
-        EnumSet.allOf(PulsarStreamMessageMetadata.PulsarMessageMetadataValue.class));
-    _messageList.add(_msgWithKeyAndValue);
+    RANDOM.nextBytes(_expectedValueBytes);
+    RANDOM.nextBytes(_expectedKeyBytes);
+    _message = new DummyPulsarMessage(_expectedKeyBytes, _expectedValueBytes);
   }
 
   @Test
   public void testMessageBatchNoStitching() {
-    List<PulsarStreamMessage> streamMessages = _messageList.stream().map(message ->
-            PulsarUtils.buildPulsarStreamMessage(message, false, _metadataExtractor))
-            .collect(Collectors.toList());
-    PulsarMessageBatch messageBatch = new PulsarMessageBatch(streamMessages, false);
-    byte[] valueBytes = messageBatch.getMessageAtIndex(0).getValue();
-    Assert.assertArrayEquals(_expectedValueBytes, valueBytes);
+    PulsarConfig config = mock(PulsarConfig.class);
+    when(config.getEnableKeyValueStitch()).thenReturn(false);
+    List<BytesStreamMessage> streamMessages = List.of(PulsarUtils.buildPulsarStreamMessage(_message, config));
+    PulsarMessageBatch messageBatch = new PulsarMessageBatch(streamMessages, mock(MessageIdStreamOffset.class), false);
+    byte[] valueBytes = messageBatch.getStreamMessage(0).getValue();
+    assertEquals(valueBytes, _expectedValueBytes);
   }
 
   @Test
   public void testMessageBatchWithStitching() {
-    List<PulsarStreamMessage> streamMessages = _messageList.stream().map(message ->
-                    PulsarUtils.buildPulsarStreamMessage(message, true, _metadataExtractor))
-            .collect(Collectors.toList());
-    PulsarMessageBatch messageBatch = new PulsarMessageBatch(streamMessages, true);
-    byte[] keyValueBytes = messageBatch.getMessageAtIndex(0).getValue();
-    Assert.assertEquals(keyValueBytes.length, 8 + _expectedKeyBytes.length + _expectedValueBytes.length);
-    try {
-      ByteBuffer byteBuffer = ByteBuffer.wrap(keyValueBytes);
-      int keyLength = byteBuffer.getInt();
-      byte[] keyBytes = new byte[keyLength];
-      byteBuffer.get(keyBytes);
-      Assert.assertArrayEquals(_expectedKeyBytes, keyBytes);
-      int valueLength = byteBuffer.getInt();
-      byte[] valueBytes = new byte[valueLength];
-      byteBuffer.get(valueBytes);
-      Assert.assertArrayEquals(_expectedValueBytes, valueBytes);
-    } catch (Exception e) {
-      Assert.fail("Could not parse key and value bytes because of exception: " + e.getMessage());
-    }
+    PulsarConfig config = mock(PulsarConfig.class);
+    when(config.getEnableKeyValueStitch()).thenReturn(true);
+    List<BytesStreamMessage> streamMessages = List.of(PulsarUtils.buildPulsarStreamMessage(_message, config));
+    PulsarMessageBatch messageBatch = new PulsarMessageBatch(streamMessages, mock(MessageIdStreamOffset.class), false);
+    BytesStreamMessage streamMessage = messageBatch.getStreamMessage(0);
+    byte[] keyValueBytes = streamMessage.getValue();
+    assertNotNull(keyValueBytes);
+    assertEquals(keyValueBytes.length, 8 + _expectedKeyBytes.length + _expectedValueBytes.length);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(keyValueBytes);
+    int keyLength = byteBuffer.getInt();
+    byte[] keyBytes = new byte[keyLength];
+    byteBuffer.get(keyBytes);
+    assertEquals(keyBytes, _expectedKeyBytes);
+    int valueLength = byteBuffer.getInt();
+    byte[] valueBytes = new byte[valueLength];
+    byteBuffer.get(valueBytes);
+    assertEquals(valueBytes, _expectedValueBytes);
   }
 }

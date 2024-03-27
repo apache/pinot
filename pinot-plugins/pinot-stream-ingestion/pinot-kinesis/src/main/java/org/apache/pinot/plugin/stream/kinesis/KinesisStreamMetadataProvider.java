@@ -29,7 +29,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
-import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
@@ -108,12 +107,12 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
     for (PartitionGroupConsumptionStatus currentPartitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
       KinesisPartitionGroupOffset kinesisStartCheckpoint =
           (KinesisPartitionGroupOffset) currentPartitionGroupConsumptionStatus.getStartOffset();
-      String shardId = kinesisStartCheckpoint.getShardToStartSequenceMap().keySet().iterator().next();
+      String shardId = kinesisStartCheckpoint.getShardId();
       shardsInCurrent.add(shardId);
       Shard shard = shardIdToShardMap.get(shardId);
       if (shard == null) { // Shard has expired
         shardsEnded.add(shardId);
-        String lastConsumedSequenceID = kinesisStartCheckpoint.getShardToStartSequenceMap().get(shardId);
+        String lastConsumedSequenceID = kinesisStartCheckpoint.getSequenceNumber();
         LOGGER.warn("Kinesis shard with id: " + shardId
             + " has expired. Data has been consumed from the shard till sequence number: " + lastConsumedSequenceID
             + ". There can be potential data loss.");
@@ -145,7 +144,6 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       if (shardsInCurrent.contains(newShardId)) {
         continue;
       }
-      StreamPartitionMsgOffset newStartOffset;
       Shard newShard = entry.getValue();
       String parentShardId = newShard.parentShardId();
 
@@ -155,9 +153,10 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       // 3. Parent reached EOL and completely consumed.
       if (parentShardId == null || !shardIdToShardMap.containsKey(parentShardId) || shardsEnded.contains(
           parentShardId)) {
-        Map<String, String> shardToSequenceNumberMap = new HashMap<>();
-        shardToSequenceNumberMap.put(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
-        newStartOffset = new KinesisPartitionGroupOffset(shardToSequenceNumberMap);
+        // TODO: Revisit this. Kinesis starts consuming after the start sequence number, and we might miss the first
+        //       message.
+        StreamPartitionMsgOffset newStartOffset =
+            new KinesisPartitionGroupOffset(newShardId, newShard.sequenceNumberRange().startingSequenceNumber());
         int partitionGroupId = getPartitionGroupIdFromShardId(newShardId);
         newPartitionGroupMetadataList.add(new PartitionGroupMetadata(partitionGroupId, newStartOffset));
       }
@@ -179,30 +178,24 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   private boolean consumedEndOfShard(StreamPartitionMsgOffset startCheckpoint,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus)
       throws IOException, TimeoutException {
-    PartitionGroupConsumer partitionGroupConsumer =
-        _kinesisStreamConsumerFactory.createPartitionGroupConsumer(_clientId, partitionGroupConsumptionStatus);
-
-    MessageBatch messageBatch;
-    try {
-      messageBatch = partitionGroupConsumer.fetchMessages(startCheckpoint, null, _fetchTimeoutMs);
-    } finally {
-      partitionGroupConsumer.close();
+    try (PartitionGroupConsumer partitionGroupConsumer = _kinesisStreamConsumerFactory.createPartitionGroupConsumer(
+        _clientId, partitionGroupConsumptionStatus)) {
+      return partitionGroupConsumer.fetchMessages(startCheckpoint, _fetchTimeoutMs).isEndOfPartitionGroup();
     }
-    return messageBatch.isEndOfPartitionGroup();
   }
 
   @Override
   public Map<String, PartitionLagState> getCurrentPartitionLagState(
       Map<String, ConsumerPartitionState> currentPartitionStateMap) {
     Map<String, PartitionLagState> perPartitionLag = new HashMap<>();
-    for (Map.Entry<String, ConsumerPartitionState> entry: currentPartitionStateMap.entrySet()) {
+    for (Map.Entry<String, ConsumerPartitionState> entry : currentPartitionStateMap.entrySet()) {
       ConsumerPartitionState partitionState = entry.getValue();
       // Compute record-availability
       String recordAvailabilityLag = "UNKNOWN";
       RowMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
       if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
-        long availabilityLag = partitionState.getLastProcessedTimeMs()
-            - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
+        long availabilityLag =
+            partitionState.getLastProcessedTimeMs() - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
         recordAvailabilityLag = String.valueOf(availabilityLag);
       }
       perPartitionLag.put(entry.getKey(), new KinesisConsumerPartitionLag(recordAvailabilityLag));
@@ -211,5 +204,6 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
-  public void close() { }
+  public void close() {
+  }
 }

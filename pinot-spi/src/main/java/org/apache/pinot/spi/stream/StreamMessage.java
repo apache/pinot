@@ -25,7 +25,8 @@ import javax.annotation.Nullable;
  * Represents a Stream message which includes the following components:
  * 1. record key (optional)
  * 2. record value (required)
- * 3. StreamMessageMetadata (optional) - encapsulates record headers and metadata associated with a stream message
+ * 3. length of the record value (required)
+ * 4. StreamMessageMetadata (optional) - encapsulates record headers and metadata associated with a stream message
  *  (such as a message identifier, publish timestamp, user-provided headers etc)
  *
  * Similar to value decoder, each implementing stream plugin can have a key decoder and header extractor.
@@ -39,11 +40,27 @@ import javax.annotation.Nullable;
  * they will not materialize in the pinot table.
  */
 public class StreamMessage<T> {
-  private final byte[] _key;
-  private final T _value;
+  protected final byte[] _key;
+  protected final T _value;
+  protected final int _length;
   protected final StreamMessageMetadata _metadata;
-  int _length = -1;
 
+  public StreamMessage(@Nullable byte[] key, T value, int length, @Nullable StreamMessageMetadata metadata) {
+    _key = key;
+    _value = value;
+    _length = length;
+    _metadata = metadata;
+  }
+
+  public StreamMessage(T value, int length, @Nullable StreamMessageMetadata metadata) {
+    this(null, value, length, metadata);
+  }
+
+  public StreamMessage(T value, int length) {
+    this(value, length, null);
+  }
+
+  @Deprecated
   public StreamMessage(@Nullable byte[] key, T value, @Nullable StreamMessageMetadata metadata, int length) {
     _key = key;
     _value = value;
@@ -51,29 +68,33 @@ public class StreamMessage<T> {
     _length = length;
   }
 
-  public StreamMessage(T value, int length) {
-    this(value, length, null);
+  /**
+   * Returns the key of the message.
+   */
+  @Nullable
+  public byte[] getKey() {
+    return _key;
   }
 
-  public StreamMessage(T value, int length, @Nullable StreamMessageMetadata metadata) {
-    this(null, value, metadata, length);
-  }
-
+  /**
+   * Returns the content of the message.
+   */
   public T getValue() {
     return _value;
   }
 
+  /**
+   * Returns the length of the message content.
+   */
   public int getLength() {
     return _length;
   }
 
+  /**
+   * Returns the metadata of the message.
+   */
   @Nullable
   public StreamMessageMetadata getMetadata() {
     return _metadata;
-  }
-
-  @Nullable
-  public byte[] getKey() {
-    return _key;
   }
 }

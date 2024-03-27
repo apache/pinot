@@ -26,6 +26,7 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
 /**
  * Interface for a consumer which fetches messages at the partition level of a stream, for given offsets
  */
+@Deprecated
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface PartitionLevelConsumer extends Closeable, PartitionGroupConsumer {
@@ -41,8 +42,10 @@ public interface PartitionLevelConsumer extends Closeable, PartitionGroupConsume
    * @throws java.util.concurrent.TimeoutException
    */
   @Deprecated
-  MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
-      throws java.util.concurrent.TimeoutException;
+  default MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Fetch messages and the per-partition high watermark from Kafka between the specified offsets.
@@ -55,6 +58,7 @@ public interface PartitionLevelConsumer extends Closeable, PartitionGroupConsume
    * @return An iterable containing messages fetched from the stream partition and their offsets, as well as the
    * high watermark for this partition.
    */
+  @Deprecated
   default MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
       int timeoutMillis)
       throws java.util.concurrent.TimeoutException {

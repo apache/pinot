@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kinesis;
+package org.apache.pinot.spi.stream;
 
 import javax.annotation.Nullable;
-import org.apache.pinot.spi.stream.StreamMessage;
 
 
-public class KinesisStreamMessage extends StreamMessage<byte[]> {
-  private final String _sequenceNumber;
+public class BytesStreamMessage extends StreamMessage<byte[]> {
 
-  public KinesisStreamMessage(@Nullable byte[] key, byte[] value, String sequenceNumber,
-      @Nullable KinesisStreamMessageMetadata metadata, int length) {
-    super(key, value, metadata, length);
-    _sequenceNumber = sequenceNumber;
+  public BytesStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
+    super(key, value, value.length, metadata);
   }
 
-  public String sequenceNumber() {
-    return _sequenceNumber;
+  public BytesStreamMessage(byte[] value, @Nullable StreamMessageMetadata metadata) {
+    this(null, value, metadata);
+  }
+
+  public BytesStreamMessage(byte[] value) {
+    this(value, null);
   }
 }

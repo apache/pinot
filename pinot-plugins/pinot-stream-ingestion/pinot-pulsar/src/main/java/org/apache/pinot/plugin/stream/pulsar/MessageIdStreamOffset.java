@@ -18,35 +18,26 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
-import java.io.IOException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.MessageId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * {@link StreamPartitionMsgOffset} implementation for Pulsar {@link MessageId}
  */
 public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MessageIdStreamOffset.class);
-  private MessageId _messageId;
+  private final MessageId _messageId;
 
   public MessageIdStreamOffset(MessageId messageId) {
     _messageId = messageId;
   }
 
-  /**
-   * returns the class object from string message id in the format ledgerId:entryId:partitionId
-   * throws {@link IOException} if message if format is invalid.
-   * @param messageId
-   */
   public MessageIdStreamOffset(String messageId) {
     try {
       _messageId = MessageId.fromByteArray(Hex.decodeHex(messageId));
     } catch (Exception e) {
-      LOGGER.warn("Cannot parse message id " + messageId, e);
+      throw new IllegalArgumentException("Invalid Pulsar message id: " + messageId);
     }
   }
 
@@ -55,14 +46,8 @@ public class MessageIdStreamOffset implements StreamPartitionMsgOffset {
   }
 
   @Override
-  public StreamPartitionMsgOffset fromString(String streamPartitionMsgOffsetStr) {
-    return new MessageIdStreamOffset(streamPartitionMsgOffsetStr);
-  }
-
-  @Override
   public int compareTo(StreamPartitionMsgOffset other) {
-    MessageIdStreamOffset messageIdStreamOffset = (MessageIdStreamOffset) other;
-    return _messageId.compareTo(messageIdStreamOffset.getMessageId());
+    return _messageId.compareTo(((MessageIdStreamOffset) other).getMessageId());
   }
 
   @Override

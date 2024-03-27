@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
@@ -34,7 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
@@ -44,15 +43,14 @@ import static org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUti
 
 
 /**
- * Implementation of {@link PartitionLevelConsumer} for fake stream
+ * Implementation of {@link PartitionGroupConsumer} for fake stream
  * Unpacks tar files in /resources/data/On_Time_Performance_2014_partition_<partition>.tar.gz as source of messages
  */
-public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
+public class FakePartitionLevelConsumer implements PartitionGroupConsumer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FakePartitionLevelConsumer.class);
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(FakePartitionLevelConsumer.class.getName());
-
-  private List<Integer> _messageOffsets = new ArrayList<>();
-  private List<byte[]> _messageBytes = new ArrayList<>();
+  private final List<Integer> _messageOffsets = new ArrayList<>();
+  private final List<byte[]> _messageBytes = new ArrayList<>();
   private final int _defaultBatchSize;
 
   FakePartitionLevelConsumer(int partition, StreamConfig streamConfig, int defaultBatchSize) {
@@ -95,32 +93,15 @@ public class FakePartitionLevelConsumer implements PartitionLevelConsumer {
     }
   }
 
-  public MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
-      throws TimeoutException {
-    throw new UnsupportedOperationException("This method is deprecated");
-  }
-
   @Override
-  public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
-      int timeoutMillis)
-      throws TimeoutException {
-    if (startOffset.compareTo(FakeStreamConfigUtils.getLargestOffset()) >= 0) {
-      return new FakeStreamMessageBatch(Collections.emptyList(), Collections.emptyList());
-    }
-    if (startOffset.compareTo(FakeStreamConfigUtils.getSmallestOffset()) < 0) {
-      startOffset = FakeStreamConfigUtils.getSmallestOffset();
-    }
-    if (endOffset == null || endOffset.compareTo(FakeStreamConfigUtils.getLargestOffset()) > 0) {
-      endOffset = FakeStreamConfigUtils.getLargestOffset();
-    }
+  public MessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
     int startOffsetInt = (int) ((LongMsgOffset) startOffset).getOffset();
-    int endOffsetInt = (int) ((LongMsgOffset) endOffset).getOffset();
-    if (endOffsetInt > _messageOffsets.size() && _defaultBatchSize > 0) {
-      // Hack to get multiple batches
-      endOffsetInt = startOffsetInt + _defaultBatchSize;
+    if (startOffsetInt >= _messageOffsets.size()) {
+      return new FakeStreamMessageBatch(Collections.emptyList(), Collections.emptyList(), startOffsetInt);
     }
-    return new FakeStreamMessageBatch(_messageOffsets.subList(startOffsetInt, endOffsetInt),
-        _messageBytes.subList(startOffsetInt, endOffsetInt));
+    int endOffsetInt = Math.min(startOffsetInt + _defaultBatchSize, _messageOffsets.size());
+    return new FakeStreamMessageBatch(_messageBytes.subList(startOffsetInt, endOffsetInt),
+        _messageOffsets.subList(startOffsetInt, endOffsetInt), endOffsetInt);
   }
 
   @Override

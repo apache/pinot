@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.stream;
 
-import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -31,34 +30,39 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class StreamMessageMetadata implements RowMetadata {
   private final long _recordIngestionTimeMs;
   private final long _firstStreamRecordIngestionTimeMs;
+  private final StreamPartitionMsgOffset _offset;
+  private final StreamPartitionMsgOffset _nextOffset;
   private final GenericRow _headers;
   private final Map<String, String> _metadata;
 
+  @Deprecated
   public StreamMessageMetadata(long recordIngestionTimeMs) {
-    this(recordIngestionTimeMs, Long.MIN_VALUE, null, Collections.emptyMap());
+    this(recordIngestionTimeMs, null);
   }
 
+  @Deprecated
   public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers) {
-    this(recordIngestionTimeMs, Long.MIN_VALUE, headers, Collections.emptyMap());
+    this(recordIngestionTimeMs, headers, null);
   }
 
-  public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
-      Map<String, String> metadata) {
+  @Deprecated
+  public StreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers, Map<String, String> metadata) {
     this(recordIngestionTimeMs, Long.MIN_VALUE, headers, metadata);
   }
-  /**
-   * Construct the stream based message/row message metadata
-   *
-   * @param recordIngestionTimeMs  the time that the message was ingested by the stream provider.
-   *                         use Long.MIN_VALUE if not applicable
-   * @param firstStreamRecordIngestionTimeMs the time that the message was ingested by the first stream provider
-   *                         in the ingestion pipeline. use Long.MIN_VALUE if not applicable
-   * @param metadata
-   */
+
+  @Deprecated
   public StreamMessageMetadata(long recordIngestionTimeMs, long firstStreamRecordIngestionTimeMs,
       @Nullable GenericRow headers, Map<String, String> metadata) {
+    this(recordIngestionTimeMs, firstStreamRecordIngestionTimeMs, null, null, headers, metadata);
+  }
+
+  public StreamMessageMetadata(long recordIngestionTimeMs, long firstStreamRecordIngestionTimeMs,
+      @Nullable StreamPartitionMsgOffset offset, @Nullable StreamPartitionMsgOffset nextOffset,
+      @Nullable GenericRow headers, @Nullable Map<String, String> metadata) {
     _recordIngestionTimeMs = recordIngestionTimeMs;
     _firstStreamRecordIngestionTimeMs = firstStreamRecordIngestionTimeMs;
+    _offset = offset;
+    _nextOffset = nextOffset;
     _headers = headers;
     _metadata = metadata;
   }
@@ -73,13 +77,67 @@ public class StreamMessageMetadata implements RowMetadata {
     return _firstStreamRecordIngestionTimeMs;
   }
 
+  @Nullable
+  @Override
+  public StreamPartitionMsgOffset getOffset() {
+    return _offset;
+  }
+
+  @Nullable
+  @Override
+  public StreamPartitionMsgOffset getNextOffset() {
+    return _nextOffset;
+  }
+
+  @Nullable
   @Override
   public GenericRow getHeaders() {
     return _headers;
   }
 
+  @Nullable
   @Override
   public Map<String, String> getRecordMetadata() {
     return _metadata;
+  }
+
+  public static class Builder {
+    private long _recordIngestionTimeMs = Long.MIN_VALUE;
+    private long _firstStreamRecordIngestionTimeMs = Long.MIN_VALUE;
+    private StreamPartitionMsgOffset _offset;
+    private StreamPartitionMsgOffset _nextOffset;
+    private GenericRow _headers;
+    private Map<String, String> _metadata;
+
+    public Builder setRecordIngestionTimeMs(long recordIngestionTimeMs) {
+      _recordIngestionTimeMs = recordIngestionTimeMs;
+      return this;
+    }
+
+    public Builder setFirstStreamRecordIngestionTimeMs(long firstStreamRecordIngestionTimeMs) {
+      _firstStreamRecordIngestionTimeMs = firstStreamRecordIngestionTimeMs;
+      return this;
+    }
+
+    public Builder setOffset(StreamPartitionMsgOffset offset, StreamPartitionMsgOffset nextOffset) {
+      _offset = offset;
+      _nextOffset = nextOffset;
+      return this;
+    }
+
+    public Builder setHeaders(GenericRow headers) {
+      _headers = headers;
+      return this;
+    }
+
+    public Builder setMetadata(Map<String, String> metadata) {
+      _metadata = metadata;
+      return this;
+    }
+
+    public StreamMessageMetadata build() {
+      return new StreamMessageMetadata(_recordIngestionTimeMs, _firstStreamRecordIngestionTimeMs, _offset, _nextOffset,
+          _headers, _metadata);
+    }
   }
 }
