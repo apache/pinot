@@ -102,6 +102,13 @@ public final class FixedBitMVForwardIndexReader implements ForwardIndexReader<Fi
   }
 
   @Override
+  public void readDictIds(int[] docIds, int length, int[] dictIdBuffer, Context context) {
+    for (int i = 0; i < length; i++) {
+      dictIdBuffer[i] = _rawDataReader.readInt(docIds[i]);
+    }
+  }
+
+  @Override
   public int getDictIdMV(int docId, int[] dictIdBuffer, Context context) {
     int contextDocId = context._docId;
     int contextEndOffset = context._endOffset;
