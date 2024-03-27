@@ -42,6 +42,7 @@
         <filtering>true</filtering>
       </resource>
     </resources>
+
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -55,19 +56,21 @@
           </properties>
         </configuration>
       </plugin>
+
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
       </plugin>
+
+      <!-- Following plugins and their configurations are used to generate the custom Calcite's SQL parser -->
+      <!-- Extracts the Parser.jj from Calcite to ${project.build.directory}, where all the Freemarker templates are -->
       <plugin>
-        <!-- Extract parser grammar template from calcite-core.jar and put
-             it under ${project.build.directory} where all freemarker templates are. -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>
           <execution>
             <id>unpack-parser-template</id>
-            <phase>initialize</phase>
+            <phase>generate-sources</phase>
             <goals>
               <goal>unpack</goal>
             </goals>
@@ -76,6 +79,7 @@
                 <artifactItem>
                   <groupId>org.apache.calcite</groupId>
                   <artifactId>calcite-core</artifactId>
+                  <version>${calcite.version}</version>
                   <type>jar</type>
                   <overWrite>true</overWrite>
                   <outputDirectory>${project.build.directory}/</outputDirectory>
@@ -86,10 +90,34 @@
           </execution>
         </executions>
       </plugin>
+      <!-- Copy the templates present in the codegen directory containing custom SQL rules to
+           ${project.build.directory}/codegen -->
       <plugin>
-        <groupId>org.apache.pinot</groupId>
-        <artifactId>pinot-fmpp-maven-plugin</artifactId>
-        <version>${project.version}</version>
+        <artifactId>maven-resources-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-fmpp-resources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/codegen</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>src/main/codegen</directory>
+                  <filtering>false</filtering>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- "Plugs in" the Calcite's Parser.jj with the variables present in config.fmpp. These contain the custom rules
+           as well as the class to which the custom implementation will get generated -->
+      <plugin>
+        <groupId>com.googlecode.fmpp-maven-plugin</groupId>
+        <artifactId>fmpp-maven-plugin</artifactId>
         <executions>
           <execution>
             <id>generate-fmpp-sources</id>
@@ -98,32 +126,14 @@
               <goal>generate</goal>
             </goals>
             <configuration>
-              <config>${project.basedir}/src/main/codegen/config.fmpp</config>
-              <output>${project.build.directory}/generated-sources/fmpp</output>
-              <templates>${project.build.directory}/codegen/templates</templates>
-              <data>tdd(${project.basedir}/src/main/codegen/config.fmpp), default:tdd(${project.build.directory}/codegen/default_config.fmpp)</data>
+              <cfgFile>${project.build.directory}/codegen/config.fmpp</cfgFile>
+              <outputDirectory>${project.build.directory}/generated-sources</outputDirectory>
+              <templateDirectory>${project.build.directory}/codegen/templates</templateDirectory>
             </configuration>
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>add-generated-sources</id>
-            <phase>process-sources</phase>
-            <goals>
-              <goal>add-source</goal>
-            </goals>
-            <configuration>
-              <sources>
-                <source>${project.build.directory}/generated-sources/javacc</source>
-              </sources>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
+      <!-- Creates a Java class for the custom parser from Parser.jj -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>javacc-maven-plugin</artifactId>
@@ -135,18 +145,19 @@
               <goal>javacc</goal>
             </goals>
             <configuration>
-              <sourceDirectory>${project.build.directory}/generated-sources/fmpp</sourceDirectory>
+              <sourceDirectory>${project.build.directory}/generated-sources/javacc</sourceDirectory>
               <includes>
-                <include>**/Parser.jj</include>
+                <include>Parser.jj</include>
               </includes>
               <lookAhead>2</lookAhead>
               <isStatic>false</isStatic>
-              <outputDirectory>${project.build.directory}/generated-sources/javacc</outputDirectory>
+              <outputDirectory>${project.build.directory}/generated-sources</outputDirectory>
             </configuration>
           </execution>
         </executions>
       </plugin>
     </plugins>
+
     <pluginManagement>
       <plugins>
         <plugin>
