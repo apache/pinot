@@ -102,14 +102,17 @@ public class FlushThresholdUpdaterTest {
     assertNotSame(flushThresholdUpdater, segmentBasedflushThresholdUpdater);
   }
 
-  private StreamConfig mockStreamConfig(int flushThresholdRows, long flushThresholdSegmentSize) {
-    assertNotSame(flushThresholdUpdateManager.getFlushThresholdUpdater(autotuneStreamConfig),
-        autotuneFlushThresholdUpdater);
+    private StreamConfig mockStreamConfig(int flushThresholdRows, long flushThresholdSegmentSize) {
+    StreamConfig streamConfig = mock(StreamConfig.class);
+    when(streamConfig.getTableNameWithType()).thenReturn(REALTIME_TABLE_NAME);
+    when(streamConfig.getFlushThresholdRows()).thenReturn(flushThresholdRows);
+    when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(flushThresholdSegmentSize);
+    return streamConfig;
   }
 
   @Test
   public void testDefaultFlushThreshold() {
-    StreamConfig streamConfig = mockStreamConfig(10000);
+    StreamConfig streamConfig = mockStreamConfig(10000, 0);
     DefaultFlushThresholdUpdater flushThresholdUpdater = new DefaultFlushThresholdUpdater(10000);
     SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
     CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
@@ -135,14 +138,6 @@ public class FlushThresholdUpdaterTest {
 
     // 10000 -> 10000
     assertEquals(newSegmentZKMetadata.getSizeThresholdToFlushSegment(), 10000);
-  }
-
-  private StreamConfig mockStreamConfig(int flushThresholdRows) {
-    StreamConfig streamConfig = mock(StreamConfig.class);
-    when(streamConfig.getTableNameWithType()).thenReturn(REALTIME_TABLE_NAME);
-    when(streamConfig.getFlushThresholdRows()).thenReturn(flushThresholdRows);
-    when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(flushThresholdSegmentSize);
-    return streamConfig;
   }
 
   private StreamConfig mockSegmentRowsStreamConfig(int flushThresholdSegmentRows) {
