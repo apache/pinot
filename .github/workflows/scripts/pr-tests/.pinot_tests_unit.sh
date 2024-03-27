@@ -33,6 +33,7 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
+      -pl ':pinot-yammer' \
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
