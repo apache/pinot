@@ -72,7 +72,7 @@ public class NativeAndLuceneMutableTextIndexTest {
   public void setUp()
       throws Exception {
     TextIndexConfig config =
-        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null);
+        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
     _realtimeLuceneTextIndex =
         new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", config);
     _nativeMutableTextIndex = new NativeMutableTextIndex(TEXT_COLUMN_NAME);
