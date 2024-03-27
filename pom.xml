@@ -56,8 +56,6 @@
     <module>pinot-connectors</module>
     <module>pinot-segment-local</module>
     <module>pinot-compatibility-verifier</module>
-    <module>contrib/pinot-fmpp-maven-plugin</module>
-
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
   </modules>
@@ -1778,6 +1776,29 @@
           </configuration>
         </plugin>
         <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-remote-resources-plugin</artifactId>
+          <version>3.2.0</version>
+        </plugin>
+        <plugin>
+          <groupId>com.googlecode.fmpp-maven-plugin</groupId>
+          <artifactId>fmpp-maven-plugin</artifactId>
+          <version>1.0</version>
+        </plugin>
+        <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>javacc-maven-plugin</artifactId>
+          <version>3.1.0</version>
+          <dependencies>
+            <dependency>
+              <groupId>net.java.dev.javacc</groupId>
+              <artifactId>javacc</artifactId>
+              <!-- Higher version JavaCC throws exception when generating custom Calcite parser -->
+              <version>5.0</version>
+            </dependency>
+          </dependencies>
+        </plugin>
+        <plugin>
           <groupId>net.alchim31.maven</groupId>
           <artifactId>scala-maven-plugin</artifactId>
           <version>3.2.2</version>
@@ -2218,7 +2239,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-remote-resources-plugin</artifactId>
-        <version>1.6.0</version>
         <executions>
           <execution>
             <goals>
@@ -2234,28 +2254,6 @@
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <version>3.5.0</version>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>javacc-maven-plugin</artifactId>
-        <version>2.6</version>
-        <dependencies>
-          <dependency>
-            <groupId>net.java.dev.javacc</groupId>
-            <artifactId>javacc</artifactId>
-            <version>7.0.13</version>
-          </dependency>
-        </dependencies>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-plugin-plugin</artifactId>
-        <version>3.6.0</version>
       </plugin>
     </plugins>
   </build>

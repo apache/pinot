@@ -18,6 +18,8 @@
 #
 
 data: {
+  default: tdd("../default_config.fmpp")
+
   # Data declarations for this parser.
   #
   # Default declarations are in default_config.fmpp; if you do not include a
