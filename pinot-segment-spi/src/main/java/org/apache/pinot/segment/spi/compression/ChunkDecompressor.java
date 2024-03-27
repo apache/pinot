@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.spi.compression;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -25,7 +26,7 @@ import java.nio.ByteBuffer;
 /**
  * Interface to decompress a chunk of data.
  */
-public interface ChunkDecompressor {
+public interface ChunkDecompressor extends Closeable {
 
   /**
    * This method decompresses chunk of data that was compressed using {@link
@@ -48,4 +49,9 @@ public interface ChunkDecompressor {
    */
   int decompressedLength(ByteBuffer compressedInput)
       throws IOException;
+
+  @Override
+  default void close() throws IOException {
+    // no-op
+  }
 }

@@ -50,8 +50,7 @@ public class ChunkCompressorFactory {
    *                                size. Most formats do this anyway, but LZ4 requires a length prefix.
    * @return Compressor for the specified type.
    */
-  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType,
-      boolean upgradeToLengthPrefixed) {
+  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, boolean upgradeToLengthPrefixed) {
     switch (compressionType) {
 
       case PASS_THROUGH:
@@ -68,6 +67,9 @@ public class ChunkCompressorFactory {
 
       case LZ4_LENGTH_PREFIXED:
         return LZ4WithLengthCompressor.INSTANCE;
+
+      case GZIP:
+        return new GzipCompressor();
 
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);
@@ -96,6 +98,9 @@ public class ChunkCompressorFactory {
 
       case LZ4_LENGTH_PREFIXED:
         return LZ4WithLengthDecompressor.INSTANCE;
+
+      case GZIP:
+        return new GzipDecompressor();
 
       default:
         throw new IllegalArgumentException("Illegal compressor name " + compressionType);

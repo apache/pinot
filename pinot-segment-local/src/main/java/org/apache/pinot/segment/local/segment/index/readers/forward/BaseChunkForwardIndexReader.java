@@ -241,12 +241,10 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
 
   protected long getChunkPositionAndRecordRanges(int chunkId, List<ByteRange> ranges) {
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
-      ranges.add(
-          new ByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES));
+      ranges.add(new ByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES));
       return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
     } else {
-      ranges.add(
-          new ByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES));
+      ranges.add(new ByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES));
       return _dataHeader.getLong(chunkId * _headerEntryChunkOffsetSize);
     }
   }
@@ -446,9 +444,11 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   }
 
   @Override
-  public void close() {
+  public void close()
+      throws IOException {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
     // caller is responsible of closing the PinotDataBuffer.
+    _chunkDecompressor.close();
   }
 
   private boolean isContiguousRange(int[] docIds, int length) {

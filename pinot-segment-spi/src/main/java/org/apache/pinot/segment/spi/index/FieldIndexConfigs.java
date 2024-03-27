@@ -57,10 +57,8 @@ public class FieldIndexConfigs {
   }
 
   public Map<String, JsonNode> unwrapIndexes() {
-    Function<Map.Entry<IndexType, IndexConfig>, JsonNode> serializer =
-        entry -> entry.getValue().toJsonNode();
-    return _configMap.entrySet().stream()
-        .filter(e -> e.getValue() != null)
+    Function<Map.Entry<IndexType, IndexConfig>, JsonNode> serializer = entry -> entry.getValue().toJsonNode();
+    return _configMap.entrySet().stream().filter(e -> e.getValue() != null)
         .collect(Collectors.toMap(entry -> entry.getKey().getId(), serializer));
   }
 
