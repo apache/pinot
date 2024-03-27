@@ -51,6 +51,7 @@ import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -192,6 +193,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String crypterName = getTableConfig(tableNameWithType).getValidationConfig().getCrypterClassName();
     try {
       List<File> inputSegmentDirs = new ArrayList<>();
+      int numRecords = 0;
+
       for (int i = 0; i < downloadURLs.length; i++) {
         // Download the segment file
         _eventObserver.notifyProgress(_pinotTaskConfig, String
@@ -209,12 +212,18 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         if (!FileUtils.deleteQuietly(tarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
         }
+
+        reportSegmentDownloadMetrics(indexDir, tableNameWithType, taskType);
+        SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+        numRecords += segmentMetadata.getTotalDocs();
       }
 
       // Convert the segments
       File workingDir = new File(tempDataDir, "workingDir");
       Preconditions.checkState(workingDir.mkdir());
       List<SegmentConversionResult> segmentConversionResults = convert(pinotTaskConfig, inputSegmentDirs, workingDir);
+
+      reportTaskProcessingMetrics(tableNameWithType, taskType, numRecords);
 
       // Create a directory for converted tarred segment files
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
@@ -224,11 +233,13 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       List<File> tarredSegmentFiles = new ArrayList<>(numOutputSegments);
       int count = 1;
       for (SegmentConversionResult segmentConversionResult : segmentConversionResults) {
+        File convertedSegmentDir = segmentConversionResult.getFile();
+        reportSegmentUploadMetrics(convertedSegmentDir, tableNameWithType, taskType);
+
         // Tar the converted segment
         _eventObserver.notifyProgress(_pinotTaskConfig, String
             .format("Compressing segment: %s (%d out of %d)", segmentConversionResult.getSegmentName(), count++,
                 numOutputSegments));
-        File convertedSegmentDir = segmentConversionResult.getFile();
         File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
             segmentConversionResult.getSegmentName() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
         TarGzCompressionUtils.createTarGzFile(convertedSegmentDir, convertedSegmentTarFile);
