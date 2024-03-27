@@ -247,7 +247,7 @@ public class BenchmarkNoDictionaryIntegerCompression {
 
   public static void main(String[] args)
       throws Exception {
-    new Runner(new OptionsBuilder().include(BenchmarkNoDictionaryIntegerCompression.class.getSimpleName()).build())
-        .run();
+    new Runner(
+        new OptionsBuilder().include(BenchmarkNoDictionaryIntegerCompression.class.getSimpleName()).build()).run();
   }
 }

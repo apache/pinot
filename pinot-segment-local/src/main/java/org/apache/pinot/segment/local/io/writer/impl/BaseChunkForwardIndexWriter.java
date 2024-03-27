@@ -193,7 +193,6 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
     }
 
     _dataOffset += sizeToWrite;
-
     _chunkBuffer.clear();
   }
 }

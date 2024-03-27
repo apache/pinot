@@ -171,7 +171,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
 
     for (String indexColumn : RAW_GZIP_INDEX_COLUMNS) {
       fieldConfigs.add(new FieldConfig(indexColumn, FieldConfig.EncodingType.RAW, Collections.emptyList(),
-              FieldConfig.CompressionCodec.GZIP, null));
+          FieldConfig.CompressionCodec.GZIP, null));
     }
 
     List<String> noDictionaryColumns = new ArrayList<>();
@@ -268,14 +268,13 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
 
     for (GenericRow row : _rows) {
       expected.add(new Serializable[]{
-          String.valueOf(row.getValue(SNAPPY_STRING)), String.valueOf(row.getValue(ZSTANDARD_STRING)),
-          String.valueOf(row.getValue(PASS_THROUGH_STRING)), String.valueOf(row.getValue(LZ4_STRING)),
-          String.valueOf(row.getValue(GZIP_STRING)), (Integer) row.getValue(SNAPPY_INTEGER),
-          (Integer) row.getValue(ZSTANDARD_INTEGER), (Integer) row.getValue(PASS_THROUGH_INTEGER),
-          (Integer) row.getValue(LZ4_INTEGER), (Integer) row.getValue(GZIP_INTEGER),
-          (Long) row.getValue(SNAPPY_LONG), (Long) row.getValue(ZSTANDARD_LONG),
-          (Long) row.getValue(PASS_THROUGH_LONG), (Long) row.getValue(LZ4_LONG),
-          (Long) row.getValue(GZIP_LONG)
+          String.valueOf(row.getValue(SNAPPY_STRING)), String.valueOf(row.getValue(ZSTANDARD_STRING)), String.valueOf(
+          row.getValue(PASS_THROUGH_STRING)), String.valueOf(row.getValue(LZ4_STRING)), String.valueOf(
+          row.getValue(GZIP_STRING)), (Integer) row.getValue(SNAPPY_INTEGER), (Integer) row.getValue(
+          ZSTANDARD_INTEGER), (Integer) row.getValue(PASS_THROUGH_INTEGER), (Integer) row.getValue(
+          LZ4_INTEGER), (Integer) row.getValue(GZIP_INTEGER), (Long) row.getValue(SNAPPY_LONG), (Long) row.getValue(
+          ZSTANDARD_LONG), (Long) row.getValue(PASS_THROUGH_LONG), (Long) row.getValue(LZ4_LONG), (Long) row.getValue(
+          GZIP_LONG)
       });
     }
     testSelectQueryHelper(query, expected.size(), expected);

@@ -50,8 +50,7 @@ public class ChunkCompressorFactory {
    *                                size. Most formats do this anyway, but LZ4 requires a length prefix.
    * @return Compressor for the specified type.
    */
-  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType,
-      boolean upgradeToLengthPrefixed) {
+  public static ChunkCompressor getCompressor(ChunkCompressionType compressionType, boolean upgradeToLengthPrefixed) {
     switch (compressionType) {
 
       case PASS_THROUGH:
