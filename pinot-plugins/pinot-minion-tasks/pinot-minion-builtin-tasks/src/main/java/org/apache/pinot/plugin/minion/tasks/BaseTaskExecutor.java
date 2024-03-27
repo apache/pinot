@@ -19,6 +19,8 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -72,9 +74,31 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     return segmentZKMetadata == null ? -1 : segmentZKMetadata.getCrc();
   }
 
-  public static void addTaskMeterMetrics(MinionMeter meter, long unitCount, String tableName, String taskType) {
-    MinionMetrics.get().addMeteredGlobalValue(meter, unitCount);
-    MinionMetrics.get().addMeteredTableValue(tableName, meter, unitCount);
-    MinionMetrics.get().addMeteredTableValue(tableName, taskType, meter, unitCount);
+  protected void reportSegmentDownloadMetrics(File indexDir, String tableNameWithType, String taskType) {
+    long downloadSegmentSize = FileUtils.sizeOfDirectory(indexDir);
+    addTaskMeterMetrics(MinionMeter.SEGMENT_BYTES_DOWNLOADED, downloadSegmentSize, tableNameWithType, taskType);
+    addTaskMeterMetrics(MinionMeter.SEGMENT_DOWNLOAD_COUNT, 1L, tableNameWithType, taskType);
+  }
+
+  protected void reportSegmentUploadMetrics(File indexDir, String tableNameWithType, String taskType) {
+    long uploadSegmentSize = FileUtils.sizeOfDirectory(indexDir);
+    addTaskMeterMetrics(MinionMeter.SEGMENT_BYTES_UPLOADED, uploadSegmentSize, tableNameWithType, taskType);
+    addTaskMeterMetrics(MinionMeter.SEGMENT_UPLOAD_COUNT, 1L, tableNameWithType, taskType);
+  }
+
+  protected void reportTaskProcessingMetrics(String tableNameWithType, String taskType, int numRecordsProcessed,
+      int numRecordsPurged) {
+    reportTaskProcessingMetrics(tableNameWithType, taskType, numRecordsProcessed);
+    addTaskMeterMetrics(MinionMeter.RECORDS_PURGED_COUNT, numRecordsPurged, tableNameWithType, taskType);
+  }
+
+  protected void reportTaskProcessingMetrics(String tableNameWithType, String taskType, int numRecordsProcessed) {
+    addTaskMeterMetrics(MinionMeter.RECORDS_PROCESSED_COUNT, numRecordsProcessed, tableNameWithType, taskType);
+  }
+
+  private void addTaskMeterMetrics(MinionMeter meter, long unitCount, String tableName, String taskType) {
+    _minionMetrics.addMeteredGlobalValue(meter, unitCount);
+    _minionMetrics.addMeteredTableValue(tableName, meter, unitCount);
+    _minionMetrics.addMeteredTableValue(tableName, taskType, meter, unitCount);
   }
 }

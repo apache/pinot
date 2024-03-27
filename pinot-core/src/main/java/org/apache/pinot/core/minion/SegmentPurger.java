@@ -53,7 +53,6 @@ public class SegmentPurger {
 
   private int _numRecordsPurged;
   private int _numRecordsModified;
-  private int _totalRecordsProcessed;
 
   public SegmentPurger(File indexDir, File workingDir, TableConfig tableConfig, Schema schema,
       @Nullable RecordPurger recordPurger, @Nullable RecordModifier recordModifier) {
@@ -72,7 +71,6 @@ public class SegmentPurger {
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_indexDir);
     String segmentName = segmentMetadata.getName();
     String tableNameWithType = _tableConfig.getTableName();
-    _totalRecordsProcessed = segmentMetadata.getTotalDocs();
     LOGGER.info("Start purging table: {}, segment: {}", tableNameWithType, segmentName);
 
     try (PurgeRecordReader purgeRecordReader = new PurgeRecordReader()) {
@@ -131,11 +129,6 @@ public class SegmentPurger {
   public int getNumRecordsModified() {
     return _numRecordsModified;
   }
-
-  public int getTotalRecordsProcessed() {
-    return _totalRecordsProcessed;
-  }
-
 
   private class PurgeRecordReader implements RecordReader {
     final PinotSegmentRecordReader _pinotSegmentRecordReader;

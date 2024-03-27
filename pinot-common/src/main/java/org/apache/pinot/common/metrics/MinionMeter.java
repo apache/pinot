@@ -32,12 +32,12 @@ public enum MinionMeter implements AbstractMetrics.Meter {
   NUMBER_TASKS_FATAL_FAILED("tasks", false),
   SEGMENT_UPLOAD_FAIL_COUNT("segments", false),
   SEGMENT_DOWNLOAD_FAIL_COUNT("segments", false),
-  SEGMENTS_DOWNLOADED("segments", false),
-  SEGMENTS_UPLOADED("segments", false),
-  SEGMENT_SIZE_DOWNLOADED("bytes", false),
-  SEGMENT_SIZE_UPLOADED("bytes", false),
-  RECORDS_PER_SEGMENT("rows", false),
-  RECORDS_PURGED_PER_SEGMENT("rows", false);
+  SEGMENT_DOWNLOAD_COUNT("segments", false),
+  SEGMENT_UPLOAD_COUNT("segments", false),
+  SEGMENT_BYTES_DOWNLOADED("bytes", false),
+  SEGMENT_BYTES_UPLOADED("bytes", false),
+  RECORDS_PROCESSED_COUNT("rows", false),
+  RECORDS_PURGED_COUNT("rows", false);
 
   private final String _meterName;
   private final String _unit;

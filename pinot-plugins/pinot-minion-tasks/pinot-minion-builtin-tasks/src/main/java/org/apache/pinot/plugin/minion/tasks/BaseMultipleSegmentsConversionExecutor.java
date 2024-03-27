@@ -40,7 +40,6 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -194,6 +193,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     String crypterName = getTableConfig(tableNameWithType).getValidationConfig().getCrypterClassName();
     try {
       List<File> inputSegmentDirs = new ArrayList<>();
+      int numRecords = 0;
+
       for (int i = 0; i < downloadURLs.length; i++) {
         // Download the segment file
         _eventObserver.notifyProgress(_pinotTaskConfig, String
@@ -212,19 +213,17 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
           LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
         }
 
-        // Sizes of segments downloaded.
+        reportSegmentDownloadMetrics(indexDir, tableNameWithType, taskType);
         SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-        long downloadSegmentSize = FileUtils.sizeOfDirectory(indexDir);
-        addTaskMeterMetrics(MinionMeter.SEGMENT_SIZE_DOWNLOADED, downloadSegmentSize, tableNameWithType, taskType);
-        addTaskMeterMetrics(MinionMeter.SEGMENTS_DOWNLOADED, 1, tableNameWithType, taskType);
-        addTaskMeterMetrics(MinionMeter.RECORDS_PER_SEGMENT, segmentMetadata.getTotalDocs(), tableNameWithType,
-            taskType);
+        numRecords += segmentMetadata.getTotalDocs();
       }
 
       // Convert the segments
       File workingDir = new File(tempDataDir, "workingDir");
       Preconditions.checkState(workingDir.mkdir());
       List<SegmentConversionResult> segmentConversionResults = convert(pinotTaskConfig, inputSegmentDirs, workingDir);
+
+      reportTaskProcessingMetrics(tableNameWithType, taskType, numRecords);
 
       // Create a directory for converted tarred segment files
       File convertedTarredSegmentDir = new File(tempDataDir, "convertedTarredSegmentDir");
@@ -235,11 +234,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       int count = 1;
       for (SegmentConversionResult segmentConversionResult : segmentConversionResults) {
         File convertedSegmentDir = segmentConversionResult.getFile();
-
-        // Sizes of segments to be uploaded.
-        long uploadSegmentSize = FileUtils.sizeOfDirectory(convertedSegmentDir);
-        addTaskMeterMetrics(MinionMeter.SEGMENT_SIZE_UPLOADED, uploadSegmentSize, tableNameWithType, taskType);
-        addTaskMeterMetrics(MinionMeter.SEGMENTS_UPLOADED, 1, tableNameWithType, taskType);
+        reportSegmentUploadMetrics(convertedSegmentDir, tableNameWithType, taskType);
 
         // Tar the converted segment
         _eventObserver.notifyProgress(_pinotTaskConfig, String
