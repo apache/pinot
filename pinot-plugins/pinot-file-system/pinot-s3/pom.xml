@@ -35,10 +35,10 @@
   <url>https://pinot.apache.org</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <http.client.version>4.5.14</http.client.version>
-    <http.core.version>4.4.13</http.core.version>
+    <httpclient.version>4.5.14</httpclient.version>
+    <httpcore.version>4.4.13</httpcore.version>
     <s3mock.version>2.12.2</s3mock.version>
-    <javax.version>3.1.0</javax.version>
+    <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
     <phase.prop>package</phase.prop>
   </properties>
 
@@ -92,7 +92,7 @@
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>
-      <version>${http.client.version}</version>
+      <version>${httpclient.version}</version>
       <exclusions>
         <exclusion>
           <groupId>org.apache.httpcomponents</groupId>
@@ -107,7 +107,7 @@
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpcore</artifactId>
-      <version>${http.core.version}</version>
+      <version>${httpcore.version}</version>
     </dependency>
     <dependency>
       <groupId>org.reactivestreams</groupId>
@@ -138,7 +138,7 @@
     <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
-      <version>${javax.version}</version>
+      <version>${javax.servlet-api.version}</version>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.woodstox</groupId>
