@@ -24,11 +24,13 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -48,6 +50,31 @@ public class CommonsConfigurationUtilsTest {
   public void tearDown()
       throws IOException {
     FileUtils.deleteDirectory(TEMP_DIR);
+  }
+
+  @Test
+  public void testSegmentMetadataFromFile() {
+    // load the existing config and check the properties config instance
+    try {
+      PropertiesConfiguration config = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, false, true);
+      assertNotNull(config);
+
+      config.setProperty("testKey", "testValue");
+
+      // add the segment version header to the file and read it again
+      CommonsConfigurationUtils.saveSegmentMetadataToFile(config, CONFIG_FILE, "version1");
+
+      // reading the property with header.
+      config = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, false, true);
+      assertNotNull(config);
+      assertNotNull(config.getHeader());
+    } catch (Exception ex) {
+      Assert.fail("should not throw ConfigurationException exception with valid file");
+    }
+
+    // load the non-existing file and expect the exception
+    Assert.expectThrows(NullPointerException.class,
+        () -> CommonsConfigurationUtils.segmentMetadataFromFile(null, false, true));
   }
 
   @Test
@@ -107,14 +134,16 @@ public class CommonsConfigurationUtilsTest {
       return;
     }
 
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true);
+    PropertiesConfiguration configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true,
+        PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
     configuration.setProperty(PROPERTY_KEY, replacedValue);
     String recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);
 
     CommonsConfigurationUtils.saveToFile(configuration, CONFIG_FILE);
-    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true);
+    configuration = CommonsConfigurationUtils.fromFile(CONFIG_FILE, false, true,
+        PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory);
     recoveredValue = CommonsConfigurationUtils.recoverSpecialCharacterInPropertyValue(
         (String) configuration.getProperty(PROPERTY_KEY));
     assertEquals(recoveredValue, value);

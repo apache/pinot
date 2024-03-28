@@ -19,13 +19,26 @@
 package org.apache.pinot.spi.env;
 
 import java.io.Reader;
+import java.io.Writer;
 import org.apache.commons.configuration2.PropertiesConfiguration.DefaultIOFactory;
 import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesReader;
+import org.apache.commons.configuration2.PropertiesConfiguration.PropertiesWriter;
+import org.apache.commons.configuration2.convert.ListDelimiterHandler;
 
 
-public class ConfigFilePropertyReaderFactory extends DefaultIOFactory {
+/**
+ * SegmentMetadataPropertyIOFactory extends the DefaultIOFactory
+ * <p>
+ * Purpose: factory class for creating the custom segment metadata property reader and writer.
+ */
+class SegmentMetadataPropertyIOFactory extends DefaultIOFactory {
   @Override
-  public PropertiesReader createPropertiesReader(Reader in) {
-    return new ConfigFilePropertyReader(in);
+  public PropertiesReader createPropertiesReader(Reader reader) {
+    return new SegmentMetadataPropertyReader(reader);
+  }
+
+  @Override
+  public PropertiesWriter createPropertiesWriter(Writer out, ListDelimiterHandler handler) {
+    return new SegmentMetadataPropertyWriter(out, handler);
   }
 }
