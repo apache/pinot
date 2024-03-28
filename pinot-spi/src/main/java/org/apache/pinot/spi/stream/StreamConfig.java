@@ -38,6 +38,7 @@ public class StreamConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamConfig.class);
 
   public static final int DEFAULT_FLUSH_THRESHOLD_ROWS = 5_000_000;
+  public static final int DEFAULT_FLUSH_THRESHOLD_SEGMENT_ROWS = 5_000_000;
   public static final long DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS = TimeUnit.MILLISECONDS.convert(6, TimeUnit.HOURS);
   public static final long DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024; // 200M
   public static final int DEFAULT_FLUSH_AUTOTUNE_INITIAL_ROWS = 100_000;
@@ -66,6 +67,7 @@ public class StreamConfig {
   private final long _idleTimeoutMillis;
 
   private final int _flushThresholdRows;
+  private final int _flushThresholdSegmentRows;
   private final long _flushThresholdTimeMillis;
   private final long _flushThresholdSegmentSizeBytes;
   private final int _flushAutotuneInitialRows; // initial num rows to use for SegmentSizeBasedFlushThresholdUpdater
@@ -176,6 +178,7 @@ public class StreamConfig {
     _idleTimeoutMillis = idleTimeoutMillis;
 
     _flushThresholdRows = extractFlushThresholdRows(streamConfigMap);
+    _flushThresholdSegmentRows = extractFlushThresholdSegmentRows(streamConfigMap);
     _flushThresholdTimeMillis = extractFlushThresholdTimeMillis(streamConfigMap);
     _flushThresholdSegmentSizeBytes = extractFlushThresholdSegmentSize(streamConfigMap);
     _serverUploadToDeepStore = Boolean.parseBoolean(
@@ -264,6 +267,26 @@ public class StreamConfig {
     }
   }
 
+    protected int extractFlushThresholdSegmentRows(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_ROWS;
+    String flushThresholdSegmentRowsStr = streamConfigMap.get(key);
+    if (flushThresholdSegmentRowsStr != null) {
+      try {
+        int flushThresholdRows = Integer.parseInt(flushThresholdSegmentRowsStr);
+        // Flush threshold rows 0 means using segment size based flush threshold
+        Preconditions.checkState(flushThresholdRows >= 0);
+        return flushThresholdRows;
+      } catch (Exception e) {
+        LOGGER.warn("Invalid config {}: {}, defaulting to: {}", key, flushThresholdSegmentRowsStr,
+            DEFAULT_FLUSH_THRESHOLD_SEGMENT_ROWS);
+        return DEFAULT_FLUSH_THRESHOLD_SEGMENT_ROWS;
+      }
+    } else {
+      // when not specified, make the default value as 0.
+      return 0;
+    }
+  }
+
   protected long extractFlushThresholdTimeMillis(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME;
     String flushThresholdTimeStr = streamConfigMap.get(key);
@@ -342,6 +365,10 @@ public class StreamConfig {
     return _flushThresholdRows;
   }
 
+  public int getFlushThresholdSegmentRows() {
+    return _flushThresholdSegmentRows;
+  }
+
   public long getFlushThresholdTimeMillis() {
     return _flushThresholdTimeMillis;
   }
@@ -382,7 +409,7 @@ public class StreamConfig {
         + _flushThresholdSegmentSizeBytes + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _groupId='"
         + _groupId + '\'' + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit + ", _streamConfigMap="
         + _streamConfigMap + ", _offsetCriteria=" + _offsetCriteria + ", _serverUploadToDeepStore="
-        + _serverUploadToDeepStore + '}';
+        + _serverUploadToDeepStore + ", _flushThresholdSegmentRows=" + _flushThresholdSegmentRows + '}';
   }
 
   @Override
@@ -396,6 +423,7 @@ public class StreamConfig {
     StreamConfig that = (StreamConfig) o;
     return _connectionTimeoutMillis == that._connectionTimeoutMillis && _fetchTimeoutMillis == that._fetchTimeoutMillis
         && _idleTimeoutMillis == that._idleTimeoutMillis && _flushThresholdRows == that._flushThresholdRows
+        && _flushThresholdSegmentRows == that._flushThresholdSegmentRows
         && _flushThresholdTimeMillis == that._flushThresholdTimeMillis
         && _flushThresholdSegmentSizeBytes == that._flushThresholdSegmentSizeBytes
         && _flushAutotuneInitialRows == that._flushAutotuneInitialRows
@@ -412,7 +440,8 @@ public class StreamConfig {
   public int hashCode() {
     return Objects.hash(_type, _topicName, _tableNameWithType, _consumerFactoryClassName, _decoderClass,
         _decoderProperties, _connectionTimeoutMillis, _fetchTimeoutMillis, _idleTimeoutMillis, _flushThresholdRows,
-        _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes, _flushAutotuneInitialRows, _groupId,
-        _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria, _serverUploadToDeepStore);
+        _flushThresholdSegmentRows, _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
+        _flushAutotuneInitialRows, _groupId, _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria,
+        _serverUploadToDeepStore);
   }
 }

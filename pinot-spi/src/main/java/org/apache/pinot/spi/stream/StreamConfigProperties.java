@@ -83,6 +83,12 @@ public class StreamConfigProperties {
   public static final String SEGMENT_FLUSH_THRESHOLD_ROWS = "realtime.segment.flush.threshold.rows";
 
   /**
+   * Config is similar to {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_ROWS} but independent of
+   * partition count. This is useful when we want to flush segment exactly based on number of rows in a segment
+   */
+  public static final String SEGMENT_FLUSH_THRESHOLD_SEGMENT_ROWS = "realtime.segment.flush.threshold.segment.rows";
+
+  /**
    * @deprecated because the property key is confusing (desired size is not indicative of segment size).
    * Use {@link StreamConfigProperties#SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE}
    *
