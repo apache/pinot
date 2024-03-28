@@ -44,8 +44,7 @@ public class HashUtils {
    * Returns a byte array that is a concatenation of the binary representation of each of the passed UUID values. This
    * is done by getting a String from each value by calling {@link Object#toString()}, which is then used to create a
    * {@link UUID} object. The 16 bytes of each UUID are appended to a buffer which is then returned in the result.
-   * If any of the value is not a valid UUID, then this function appends the UTF-8 string bytes of all elements and
-   * returns that in the result.
+   * If any of the values is not a valid UUID, then we return the result of {@link #concatenate}.
    */
   public static byte[] hashUUID(Object[] values) {
     byte[] result = new byte[values.length * 16];
@@ -54,10 +53,9 @@ public class HashUtils {
       if (value == null) {
         return concatenate(values);
       }
-      String uuidString = value.toString();
       UUID uuid;
       try {
-        uuid = UUID.fromString(uuidString);
+        uuid = UUID.fromString(value.toString());
       } catch (Throwable t) {
         return concatenate(values);
       }
@@ -82,12 +80,16 @@ public class HashUtils {
     }
   }
 
+  /**
+   * Concatenates the string representation of all values into a single byte array. Each element is appended with a
+   * byte-0 delimiter.
+   */
   private static byte[] concatenate(Object[] values) {
     byte[][] allValueBytes = new byte[values.length][];
     int totalLen = 0;
     for (int j = 0; j < allValueBytes.length; j++) {
-      allValueBytes[j] = values[j] == null ? "null".getBytes(StandardCharsets.UTF_8)
-          : values[j].toString().getBytes(StandardCharsets.UTF_8);
+      allValueBytes[j] = values[j] == null ? "null\0".getBytes(StandardCharsets.UTF_8)
+          : (values[j].toString() + "\0").getBytes(StandardCharsets.UTF_8);
       totalLen += allValueBytes[j].length;
     }
     byte[] result = new byte[totalLen];

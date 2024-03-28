@@ -39,16 +39,21 @@ public class HashUtilsTest {
     testHashUUID(new UUID[]{UUID.randomUUID()});
     testHashUUID(new UUID[]{UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()});
 
-    // Test failure scenario
+    // Test failure scenario when there's a non-null invalid uuid value
     String[] invalidUUIDs = new String[]{"some-random-string"};
-    Assert.assertEquals(HashUtils.hashUUID(invalidUUIDs), invalidUUIDs[0].getBytes(StandardCharsets.UTF_8));
-    // Test scenario when one of the values is null
-    invalidUUIDs = new String[]{UUID.randomUUID().toString(), null};
     byte[] hashResult = HashUtils.hashUUID(invalidUUIDs);
+    // In case of failures, each element is appended with byte-0.
+    Assert.assertEquals(hashResult, (invalidUUIDs[0] + "\0").getBytes(StandardCharsets.UTF_8));
+    Assert.assertEquals(hashResult[hashResult.length - 1], 0);
+    // Test failure scenario when one of the values is null
+    invalidUUIDs = new String[]{UUID.randomUUID().toString(), null};
+    hashResult = HashUtils.hashUUID(invalidUUIDs);
     Assert.assertNotNull(hashResult);
-    byte[] lastFourBytes = new byte[4];
-    System.arraycopy(hashResult, hashResult.length - 4, lastFourBytes, 0, lastFourBytes.length);
-    Assert.assertEquals(new String(lastFourBytes, StandardCharsets.UTF_8), "null");
+    Assert.assertEquals(hashResult.length, 42);
+    // Last five bytes should be "null" followed by byte-0
+    byte[] lastFiveBytes = new byte[5];
+    System.arraycopy(hashResult, hashResult.length - 5, lastFiveBytes, 0, lastFiveBytes.length);
+    Assert.assertEquals(new String(lastFiveBytes, StandardCharsets.UTF_8), "null\0");
   }
 
   private void testHashUUID(UUID[] uuids) {
