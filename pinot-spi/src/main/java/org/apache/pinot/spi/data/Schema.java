@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -785,6 +786,13 @@ public final class Schema implements Serializable {
         return false;
       }
     }
+
+    List<String> primaryKeyColumns = getPrimaryKeyColumns();
+    List<String> oldPrimaryKeyColumns = oldSchema.getPrimaryKeyColumns();
+    if (!Arrays.equals(primaryKeyColumns.toArray(), oldPrimaryKeyColumns.toArray())) {
+      return false;
+    }
+
     return true;
   }
 
