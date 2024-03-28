@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -241,7 +242,7 @@ public class ValidationMetrics {
 
   @VisibleForTesting
   public static String makeGaugeName(final String resource, final String gaugeName) {
-    return "pinot.controller." + resource + "." + gaugeName;
+    return "pinot.controller." + StringUtils.replaceOnce(resource, ".", "#") + "." + gaugeName;
   }
 
   private PinotMetricName makeMetricName(final String gaugeName) {
