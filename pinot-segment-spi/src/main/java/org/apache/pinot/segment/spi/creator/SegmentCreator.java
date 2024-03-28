@@ -46,7 +46,8 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @throws Exception
    */
   void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
+      @Nullable int[] sortedDocIds)
       throws Exception;
 
   /**

@@ -106,7 +106,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   @Override
   public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
-      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir)
+      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
+      @Nullable int[] sortedDocIds)
       throws Exception {
     _docIdCounter = 0;
     _config = segmentCreationSpec;
@@ -158,6 +159,8 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .onHeap(segmentCreationSpec.isOnHeap())
           .withForwardIndexDisabled(forwardIndexDisabled)
           .withTextCommitOnClose(true)
+          .withSortedDocIds(sortedDocIds)
+          .withRealtimeConversion(true)
           .build();
       //@formatter:on
 

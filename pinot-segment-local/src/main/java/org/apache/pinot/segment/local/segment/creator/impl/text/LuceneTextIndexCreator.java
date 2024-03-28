@@ -20,8 +20,11 @@ package org.apache.pinot.segment.local.segment.creator.impl.text;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.HashSet;
+import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -29,8 +32,11 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
@@ -41,6 +47,10 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -49,12 +59,13 @@ import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCr
  * and realtime from {@link RealtimeLuceneTextIndex}
  */
 public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexCreator.class);
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
 
   private final String _textColumn;
-  private final Directory _indexDirectory;
-  private final IndexWriter _indexWriter;
-
+  private final boolean _reuseMutableIndex;
+  private Directory _indexDirectory;
+  private IndexWriter _indexWriter;
   private int _nextDocId = 0;
 
   public static HashSet<String> getDefaultEnglishStopWordsSet() {
@@ -74,7 +85,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param column column name
    * @param segmentIndexDir segment index directory
    * @param commit true if the index should be committed (at the end after all documents have
-   *               been added), false if index should not be committed
+   *               been added), false if index should not be
+   * @param sortedDocIds sortedDocIds from segment conversion
    * Note on commit:
    *               Once {@link SegmentColumnarIndexCreator}
    *               finishes indexing all documents/rows for the segment, we need to commit and close
@@ -90,14 +102,17 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    *               to offline), we close this lucene index writer to release resources but don't commit.
    * @param config the text index config
    */
-  public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, TextIndexConfig config) {
+  public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
+      @Nullable int[] sortedDocIds, TextIndexConfig config) {
     _textColumn = column;
+
+    // to reuse the mutable index, it must be (1) not the realtime index, and (2) is realtime segment conversion
+    _reuseMutableIndex = commit && realtimeConversion;
     String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       File indexFile = getV1TextIndexFile(segmentIndexDir);
-      _indexDirectory = FSDirectory.open(indexFile.toPath());
 
       Analyzer luceneAnalyzer;
       if (luceneAnalyzerClass.isEmpty() || luceneAnalyzerClass.equals(StandardAnalyzer.class.getName())) {
@@ -111,6 +126,15 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       indexWriterConfig.setRAMBufferSizeMB(config.getLuceneMaxBufferSizeMB());
       indexWriterConfig.setCommitOnClose(commit);
       indexWriterConfig.setUseCompoundFile(config.isLuceneUseCompoundFile());
+
+      if (_reuseMutableIndex) {
+        LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
+        indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.APPEND);
+        convertMutableSegment(segmentIndexDir, sortedDocIds, indexWriterConfig);
+        return;
+      }
+
+      _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (ReflectiveOperationException e) {
       throw new RuntimeException(
@@ -122,15 +146,97 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   }
 
   public LuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
-    this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(), indexConfig);
+    this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(),
+        context.isRealtimeConversion(), context.getSortedDocIds(), indexConfig);
   }
 
   public IndexWriter getIndexWriter() {
     return _indexWriter;
   }
 
+  /**
+   * Copy the mutable lucene index files to create an immutable lucene index
+   * @param segmentIndexDir segment index directory
+   * @param sortedDocIds sortedDocIds from segment conversion
+   * @param indexWriterConfig indexWriterConfig
+   */
+  private void convertMutableSegment(File segmentIndexDir, @Nullable int[] sortedDocIds,
+      IndexWriterConfig indexWriterConfig) {
+    try {
+      // Copy the mutable index to the v1 index location
+      File dest = getV1TextIndexFile(segmentIndexDir);
+      File mutableDir = getMutableIndexDir(segmentIndexDir);
+      FileUtils.copyDirectory(mutableDir, dest);
+
+      // Remove the copied write.lock file
+      File writeLock = new File(dest, "write.lock");
+      FileUtils.delete(writeLock);
+
+      // Call .forceMerge(1) on the copied index as the mutable index will likely contain many Lucene segments
+      Directory destDirectory = FSDirectory.open(dest.toPath());
+      IndexWriter indexWriter = new IndexWriter(destDirectory, indexWriterConfig);
+      indexWriter.forceMerge(1);
+      indexWriter.close();
+
+      buildMappingFile(segmentIndexDir, _textColumn, destDirectory, sortedDocIds);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to copy the mutable lucene index: " + e);
+    }
+  }
+
+  /**
+   * Generate the mapping file from mutable Pinot docId (stored within the Lucene index) to immutable Pinot docId using
+   * the sortedDocIds from segment conversion
+   * @param segmentIndexDir segment index directory
+   * @param column column name
+   * @param directory directory of the index
+   * @param sortedDocIds sortedDocIds from segment conversion
+   */
+  private void buildMappingFile(File segmentIndexDir, String column, Directory directory,
+      @Nullable int[] sortedDocIds)
+      throws IOException {
+    IndexReader indexReader = DirectoryReader.open(directory);
+    IndexSearcher indexSearcher = new IndexSearcher(indexReader);
+
+    int numDocs = indexSearcher.getIndexReader().numDocs();
+    int length = Integer.BYTES * numDocs;
+    File docIdMappingFile = new File(SegmentDirectoryPaths.findSegmentDirectory(segmentIndexDir),
+        column + V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION);
+    String desc = "Text index docId mapping buffer: " + column;
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length,
+        ByteOrder.LITTLE_ENDIAN, desc)) {
+      try {
+        // If sortedDocIds is null, then docIds should not change between the mutable and immutable segments.
+        // Therefore, the mapping file can be built without doing an additional docId conversion
+        if (sortedDocIds == null) {
+          for (int i = 0; i < numDocs; i++) {
+            Document document = indexSearcher.doc(i);
+            int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+            buffer.putInt(i * Integer.BYTES, pinotDocId);
+          }
+          return;
+        }
+
+        for (int i = 0; i < numDocs; i++) {
+          Document document = indexSearcher.doc(i);
+          int mutablePinotDocId =
+              Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
+          int immutablePinotDocId = sortedDocIds[mutablePinotDocId];
+          buffer.putInt(i * Integer.BYTES, immutablePinotDocId);
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Caught exception while building mutable to immutable doc id mapping for text index column: " + column, e);
+      }
+    }
+  }
+
   @Override
   public void add(String document) {
+    if (_reuseMutableIndex) {
+      return; // no-op
+    }
+
     // text index on SV column
     Document docToIndex = new Document();
     docToIndex.add(new TextField(_textColumn, document, Field.Store.NO));
@@ -145,6 +251,10 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   @Override
   public void add(String[] documents, int length) {
+    if (_reuseMutableIndex) {
+      return; // no-op
+    }
+
     Document docToIndex = new Document();
 
     // Whenever multiple fields with the same name appear in one document, both the
@@ -165,6 +275,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   @Override
   public void seal() {
+    if (_reuseMutableIndex) {
+      return;  // no-op
+    }
     try {
       // Do this one time operation of combining the multiple lucene index files (if any)
       // into a single index file. Based on flush threshold and size of data, Lucene
@@ -190,6 +303,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   @Override
   public void close()
       throws IOException {
+    if (_reuseMutableIndex) {
+      return;  // no-op
+    }
     try {
       // based on the commit flag set in IndexWriterConfig, this will decide to commit or not
       _indexWriter.close();
@@ -202,5 +318,14 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   private File getV1TextIndexFile(File indexDir) {
     String luceneIndexDirectory = _textColumn + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
     return new File(indexDir, luceneIndexDirectory);
+  }
+
+  private File getMutableIndexDir(File indexDir) {
+    // tmpSegmentName format: tmp-tableName__9__1__20240227T0254Z-1709002522086
+    String tmpSegmentName = indexDir.getParentFile().getName();
+    String segmentName = tmpSegmentName.substring(tmpSegmentName.indexOf("tmp-") + 4, tmpSegmentName.lastIndexOf('-'));
+    String mutableDir = indexDir.getParentFile().getParentFile().getParent() + "/consumers/" + segmentName + "/"
+        + _textColumn + V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION;
+    return new File(mutableDir);
   }
 }

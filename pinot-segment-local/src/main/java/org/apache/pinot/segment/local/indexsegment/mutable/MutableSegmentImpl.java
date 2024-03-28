@@ -932,6 +932,19 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
+  /**
+   * Calls commit() on all mutable indexes. This is used in preparation for realtime segment conversion.
+   * .commit() can be implemented per index to perform any required actions before using mutable segment
+   * artifacts to optimize imutable segment build.
+   */
+  public void commit() {
+    for (IndexContainer indexContainer : _indexContainerMap.values()) {
+      for (MutableIndex mutableIndex : indexContainer._mutableIndexes.values()) {
+        mutableIndex.commit();
+      }
+    }
+  }
+
   @Override
   public void destroy() {
     _logger.info("Trying to close RealtimeSegmentImpl : {}", _segmentName);
