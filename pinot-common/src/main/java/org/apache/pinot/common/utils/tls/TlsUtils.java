@@ -38,7 +38,7 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import nl.altindag.ssl.SSLFactory;
 import nl.altindag.ssl.exception.GenericSSLContextException;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.ssl.SSLContexts;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;

@@ -25,7 +25,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 

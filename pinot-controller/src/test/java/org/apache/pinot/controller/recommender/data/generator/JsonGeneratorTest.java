@@ -20,7 +20,7 @@ package org.apache.pinot.controller.recommender.data.generator;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;

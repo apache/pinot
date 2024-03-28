@@ -23,7 +23,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.provider.AccessControlUserCache;
 import org.apache.pinot.common.utils.BcryptUtils;

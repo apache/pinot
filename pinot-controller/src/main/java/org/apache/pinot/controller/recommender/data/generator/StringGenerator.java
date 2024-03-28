@@ -20,8 +20,8 @@ package org.apache.pinot.controller.recommender.data.generator;
 
 import com.google.common.base.Preconditions;
 import java.util.Random;
-import org.apache.commons.lang.RandomStringUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
