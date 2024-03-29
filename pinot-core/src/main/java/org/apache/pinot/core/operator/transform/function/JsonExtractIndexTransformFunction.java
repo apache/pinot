@@ -105,7 +105,9 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
         throw new IllegalArgumentException("Default value must be a literal");
       }
 
-      if (!isSingleValue) {
+      if (isSingleValue) {
+        _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
+      } else {
         try {
           JsonNode mvArray = JsonUtils.stringToJsonNode(((LiteralTransformFunction) fourthArgument).getStringLiteral());
           if (!mvArray.isArray()) {
@@ -119,8 +121,6 @@ public class JsonExtractIndexTransformFunction extends BaseTransformFunction {
         } catch (IOException e) {
           throw new IllegalArgumentException("Default value must be a valid JSON array");
         }
-      } else {
-        _defaultValue = dataType.convert(((LiteralTransformFunction) fourthArgument).getStringLiteral());
       }
     }
 
