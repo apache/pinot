@@ -131,6 +131,8 @@
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
     <maven-jar-plugin.version>3.4.0</maven-jar-plugin.version>
+    <maven-shade-plugin.version>3.5.2</maven-shade-plugin.version>
+    <shade.phase.prop>none</shade.phase.prop>
 
     <avro.version>1.11.3</avro.version>
     <parquet.version>1.13.1</parquet.version>
@@ -2302,7 +2304,15 @@
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.5.2</version>
+        <version>${maven-shade-plugin.version}</version>
+        <executions>
+          <execution>
+            <phase>${shade.phase.prop}</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
         <configuration>
           <shadedArtifactAttached>true</shadedArtifactAttached>
           <createDependencyReducedPom>false</createDependencyReducedPom>

@@ -35,7 +35,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <phase.prop>package</phase.prop>
+    <shade.phase.prop>package</shade.phase.prop>
     <reactive.version>1.0.2</reactive.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
   </properties>
@@ -133,68 +133,4 @@
     </dependency>
 
   </dependencies>
-  <profiles>
-    <profile>
-      <id>build-shaded-jar</id>
-      <activation>
-        <property>
-          <name>skipShade</name>
-          <value>!true</value>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <artifactId>maven-shade-plugin</artifactId>
-            <executions>
-              <execution>
-                <phase>${phase.prop}</phase>
-                <goals>
-                  <goal>shade</goal>
-                </goals>
-                <configuration>
-                  <!-- combine.self="override" needs to be specified as without this attribute child pom appears to merge
-                   shade plugin configurations in its parents pom.Notably the shade plugin configuration in the root pom declares a mainClass which 
-                   causes the build to fail - https://github.com/apache/pinot/blob/master/pom.xml#L1880
-                   The build will fail with the message "Unable to parse configuration of mojo org.apache.maven.plugins:maven-shade-plugin:3.2.1:shade 
-                   for parameter mainClass: Cannot find 'mainClass' in class org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" error
-                   Adding "combine.self" attribute in the child pom's configuration will allow maven to execute the shade plugin independently from the
-                   parent pom. For more details please see https://github.com/stevenschlansker/maven-configure-transformer-bug & 
-                   https://mail-archives.apache.org/mod_mbox/maven-issues/201605.mbox/%3CJIRA.12964833.1462316804000.103574.1462316952817@Atlassian.JIRA%3E
-                   -->
-                  <transformers combine.self="override">
-                    <transformer
-                        implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer"/>
-                    <transformer
-                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-                  </transformers>
-                  <!--
-                  Usually in hadoop environment, there are multiple jars with different versions.
-                  Most of the NoSuchMethodExceptions are caused by class loading conflicts.
-                  Class relocation ensures the reference of certain packages/classes in Pinot code to
-                  shaded libs, e.g. jackson or guava.
-                  Ref: https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html
-                  -->
-                  <relocations>
-                    <relocation>
-                      <pattern>com.google.common</pattern>
-                      <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
-                    </relocation>
-                    <relocation>
-                      <pattern>com.fasterxml.jackson</pattern>
-                      <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
-                    </relocation>
-                    <relocation>
-                      <pattern>software.amazon</pattern>
-                      <shadedPattern>${shade.prefix}.software.amazon</shadedPattern>
-                    </relocation>
-                  </relocations>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
 </project>
