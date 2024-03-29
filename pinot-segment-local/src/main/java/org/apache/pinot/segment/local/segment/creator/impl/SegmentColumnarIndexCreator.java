@@ -160,7 +160,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withForwardIndexDisabled(forwardIndexDisabled)
           .withTextCommitOnClose(true)
           .withSortedDocIds(sortedDocIds)
-          .withRealtimeConversion(true)
+          .withRealtimeConversion(segmentCreationSpec.isRealtimeConversion())
           .build();
       //@formatter:on
 

@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
@@ -189,6 +190,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (dataSource instanceof RecordReaderSegmentCreationDataSource) {
       ((RecordReaderSegmentCreationDataSource) dataSource).setRecordEnricherPipeline(enricherPipeline);
       ((RecordReaderSegmentCreationDataSource) dataSource).setTransformPipeline(transformPipeline);
+    }
+
+    // Optimization for realtime segment conversion
+    if (dataSource instanceof RealtimeSegmentSegmentCreationDataSource) {
+      _config.setRealtimeConversion(true);
     }
 
     // Initialize stats collection
