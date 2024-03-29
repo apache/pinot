@@ -363,7 +363,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       }
       SegmentValidationUtils.checkStorageQuota(segmentName, untarredSegmentSizeInBytes, tableConfig,
           _pinotHelixResourceManager, _controllerConf, _controllerMetrics, _connectionManager, _executor,
-          _leadControllerManager.isLeaderForTable(tableNameWithType));
+          _leadControllerManager);
 
       // Encrypt segment
       String crypterNameInTableConfig = tableConfig.getValidationConfig().getCrypterClassName();
