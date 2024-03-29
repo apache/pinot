@@ -155,7 +155,11 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // be instantiated per query. Analyzer on the other hand is stateless
       // and can be created upfront.
       QueryParser parser = new QueryParser(_column, _analyzer);
-      parser.setAllowLeadingWildcard(true);
+      // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
+      // the query parser. To support the feature, we need to explicitly set the config to be true.
+      if (_enablePrefixSuffixMatchingInPhraseQueries) {
+        parser.setAllowLeadingWildcard(true);
+      }
       if (_useANDForMultiTermQueries) {
         parser.setDefaultOperator(QueryParser.Operator.AND);
       }

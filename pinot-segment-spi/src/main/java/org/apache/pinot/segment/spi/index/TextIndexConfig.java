@@ -38,6 +38,7 @@ public class TextIndexConfig extends IndexConfig {
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
           LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, false);
+  private static final boolean LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH = false;
   private final FSTType _fstType;
   @Nullable
   private final Object _rawValueForTextIndex;
@@ -75,7 +76,8 @@ public class TextIndexConfig extends IndexConfig {
     _luceneAnalyzerClass = (luceneAnalyzerClass == null || luceneAnalyzerClass.isEmpty())
         ? FieldConfig.TEXT_INDEX_DEFAULT_LUCENE_ANALYZER_CLASS : luceneAnalyzerClass;
     _enablePrefixSuffixMatchingInPhraseQueries =
-        enablePrefixSuffixMatchingInPhraseQueries == null ? false : enablePrefixSuffixMatchingInPhraseQueries;
+        enablePrefixSuffixMatchingInPhraseQueries == null ? LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH
+            : enablePrefixSuffixMatchingInPhraseQueries;
   }
 
   public FSTType getFstType() {
