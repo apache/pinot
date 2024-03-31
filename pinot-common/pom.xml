@@ -63,35 +63,7 @@
       </plugin>
 
       <!-- Following plugins and their configurations are used to generate the custom Calcite's SQL parser -->
-      <!-- Extracts the Parser.jj from Calcite to ${project.build.directory}, where all the Freemarker templates are -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>unpack-parser-template</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>unpack</goal>
-            </goals>
-            <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>org.apache.calcite</groupId>
-                  <artifactId>calcite-core</artifactId>
-                  <version>${calcite.version}</version>
-                  <type>jar</type>
-                  <overWrite>true</overWrite>
-                  <outputDirectory>${project.build.directory}/</outputDirectory>
-                  <includes>**/Parser.jj,**/default_config.fmpp</includes>
-                </artifactItem>
-              </artifactItems>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <!-- Copy the templates present in the codegen directory containing custom SQL rules to
-           ${project.build.directory}/codegen -->
+      <!-- Copy the templates present in the codegen directory to ${project.build.directory}/codegen -->
       <plugin>
         <artifactId>maven-resources-plugin</artifactId>
         <executions>

@@ -18,6 +18,7 @@
  */
 package org.apache.calcite.sql2rel;
 
+import java.util.List;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlCall;
@@ -58,11 +59,10 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
 
     @Override
     public RexNode convertCall(SqlRexContext cx, SqlCall call) {
-      final RexBuilder rexBuilder = cx.getRexBuilder();
-      return rexBuilder.makeCall(SqlStdOperatorTable.TIMESTAMP_ADD,
-          cx.convertExpression(call.operand(0)),
-          cx.convertExpression(call.operand(1)),
-          cx.convertExpression(call.operand(2)));
+      RexBuilder rexBuilder = cx.getRexBuilder();
+      return rexBuilder.makeCall(cx.getValidator().getValidatedNodeType(call), SqlStdOperatorTable.TIMESTAMP_ADD,
+          List.of(cx.convertExpression(call.operand(0)), cx.convertExpression(call.operand(1)),
+              cx.convertExpression(call.operand(2))));
     }
   }
 
@@ -75,11 +75,10 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
 
     @Override
     public RexNode convertCall(SqlRexContext cx, SqlCall call) {
-      final RexBuilder rexBuilder = cx.getRexBuilder();
-      return rexBuilder.makeCall(SqlStdOperatorTable.TIMESTAMP_DIFF,
-          cx.convertExpression(call.operand(0)),
-          cx.convertExpression(call.operand(1)),
-          cx.convertExpression(call.operand(2)));
+      RexBuilder rexBuilder = cx.getRexBuilder();
+      return rexBuilder.makeCall(cx.getValidator().getValidatedNodeType(call), SqlStdOperatorTable.TIMESTAMP_DIFF,
+          List.of(cx.convertExpression(call.operand(0)), cx.convertExpression(call.operand(1)),
+              cx.convertExpression(call.operand(2))));
     }
   }
 }
