@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -42,18 +44,22 @@ public class HashUtilsTest {
     // Test failure scenario when there's a non-null invalid uuid value
     String[] invalidUUIDs = new String[]{"some-random-string"};
     byte[] hashResult = HashUtils.hashUUID(invalidUUIDs);
-    // In case of failures, each element is appended with byte-0.
-    Assert.assertEquals(hashResult, (invalidUUIDs[0] + "\0").getBytes(StandardCharsets.UTF_8));
-    Assert.assertEquals(hashResult[hashResult.length - 1], 0);
+    // In case of failures, each element is prepended with length
+    byte[] expectedResult = new byte[invalidUUIDs[0].length() + 4];
+    ByteBuffer tempByteBuffer = ByteBuffer.wrap(expectedResult).order(ByteOrder.BIG_ENDIAN);
+    tempByteBuffer.putInt(invalidUUIDs[0].length());
+    tempByteBuffer.put(invalidUUIDs[0].getBytes(StandardCharsets.UTF_8));
+    Assert.assertEquals(hashResult, expectedResult);
     // Test failure scenario when one of the values is null
     invalidUUIDs = new String[]{UUID.randomUUID().toString(), null};
     hashResult = HashUtils.hashUUID(invalidUUIDs);
-    Assert.assertNotNull(hashResult);
-    Assert.assertEquals(hashResult.length, 42);
-    // Last five bytes should be "null" followed by byte-0
-    byte[] lastFiveBytes = new byte[5];
-    System.arraycopy(hashResult, hashResult.length - 5, lastFiveBytes, 0, lastFiveBytes.length);
-    Assert.assertEquals(new String(lastFiveBytes, StandardCharsets.UTF_8), "null\0");
+    expectedResult = new byte[invalidUUIDs[0].length() + "null".length() + 8];
+    tempByteBuffer = ByteBuffer.wrap(expectedResult).order(ByteOrder.BIG_ENDIAN);
+    tempByteBuffer.putInt(invalidUUIDs[0].length());
+    tempByteBuffer.put(invalidUUIDs[0].getBytes(StandardCharsets.UTF_8));
+    tempByteBuffer.putInt(4);
+    tempByteBuffer.put("null".getBytes(StandardCharsets.UTF_8));
+    Assert.assertEquals(hashResult, expectedResult);
   }
 
   private void testHashUUID(UUID[] uuids) {

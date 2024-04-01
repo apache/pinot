@@ -81,21 +81,22 @@ public class HashUtils {
   }
 
   /**
-   * Concatenates the string representation of all values into a single byte array. Each element is appended with a
-   * byte-0 delimiter.
+   * Concatenates the string representation of all values into a single byte array. Each element is prepended with its
+   * 4-byte length to ensure no collisions can happen. (sacrifice space efficiency for correctness)
    */
   private static byte[] concatenate(Object[] values) {
     byte[][] allValueBytes = new byte[values.length][];
     int totalLen = 0;
     for (int j = 0; j < allValueBytes.length; j++) {
-      allValueBytes[j] = values[j] == null ? "null\0".getBytes(StandardCharsets.UTF_8)
-          : (values[j].toString() + "\0").getBytes(StandardCharsets.UTF_8);
-      totalLen += allValueBytes[j].length;
+      allValueBytes[j] = values[j] == null ? "null".getBytes(StandardCharsets.UTF_8)
+          : values[j].toString().getBytes(StandardCharsets.UTF_8);
+      totalLen += allValueBytes[j].length + Integer.BYTES;
     }
     byte[] result = new byte[totalLen];
-    for (int j = 0, offset = 0; j < allValueBytes.length; j++) {
-      System.arraycopy(allValueBytes[j], 0, result, offset, allValueBytes[j].length);
-      offset += allValueBytes[j].length;
+    ByteBuffer byteBuffer = ByteBuffer.wrap(result).order(ByteOrder.BIG_ENDIAN);
+    for (int j = 0; j < allValueBytes.length; j++) {
+      byteBuffer.putInt(allValueBytes[j].length);
+      byteBuffer.put(allValueBytes[j]);
     }
     return result;
   }
