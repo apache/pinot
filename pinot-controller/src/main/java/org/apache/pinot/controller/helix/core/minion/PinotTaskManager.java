@@ -479,11 +479,22 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   /**
-   * Public API to schedule tasks (all task types) for all tables. It might be called from the non-leader controller.
+   * Public API to schedule tasks (all task types) for all tables in default database.
+   * It might be called from the non-leader controller.
    * Returns a map from the task type to the task scheduled.
    */
+  @Deprecated
   public synchronized Map<String, String> scheduleTasks() {
-    return scheduleTasks(_pinotHelixResourceManager.getAllTables(), false);
+    return scheduleTasks(_pinotHelixResourceManager.getAllTables(CommonConstants.DEFAULT_DATABASE), false);
+  }
+
+  /**
+   * Public API to schedule tasks (all task types) for all tables in given database.
+   * It might be called from the non-leader controller.
+   * Returns a map from the task type to the task scheduled.
+   */
+  public synchronized Map<String, String> scheduleTasksForDatabase(String database) {
+    return scheduleTasks(_pinotHelixResourceManager.getAllTables(database), false);
   }
 
   /**
@@ -597,17 +608,29 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   /**
-   * Public API to schedule task for the given task type. It might be called from the non-leader controller. Returns the
-   * task name, or {@code null} if no task is scheduled.
+   * Public API to schedule task for the given task type in default database.
+   * It might be called from the non-leader controller.
+   * Returns the task name, or {@code null} if no task is scheduled.
    */
+  @Deprecated
   @Nullable
   public synchronized String scheduleTask(String taskType) {
+    return scheduleTaskForDatabase(taskType, CommonConstants.DEFAULT_DATABASE);
+  }
+
+  /**
+   * Public API to schedule task for the given task type in given database.
+   * It might be called from the non-leader controller.
+   * Returns the task name, or {@code null} if no task is scheduled.
+   */
+  @Nullable
+  public synchronized String scheduleTaskForDatabase(String taskType, String database) {
     PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
     Preconditions.checkState(taskGenerator != null, "Task type: %s is not registered", taskType);
 
     // Scan all table configs to get the tables with task enabled
     List<TableConfig> enabledTableConfigs = new ArrayList<>();
-    for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
+    for (String tableNameWithType : _pinotHelixResourceManager.getAllTables(database)) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (tableConfig != null && tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
           .isTaskTypeEnabled(taskType)) {

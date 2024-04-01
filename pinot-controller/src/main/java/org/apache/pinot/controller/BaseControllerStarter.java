@@ -587,64 +587,66 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     AtomicInteger failedToUpdateTableConfigCount = new AtomicInteger();
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixResourceManager.getPropertyStore();
 
-    List<String> allTables = _helixResourceManager.getAllTables();
-    allTables.forEach(tableNameWithType -> {
-      Pair<TableConfig, Integer> tableConfigWithVersion =
-          ZKMetadataProvider.getTableConfigWithVersion(propertyStore, tableNameWithType);
-      if (tableConfigWithVersion == null) {
-        // This might due to table deletion, just log it here.
-        LOGGER.warn("Failed to find table config for table: {}, the table likely already got deleted",
-            tableNameWithType);
-        return;
-      }
-      TableConfig tableConfig = tableConfigWithVersion.getLeft();
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      String schemaPath = ZKMetadataProvider.constructPropertyStorePathForSchema(rawTableName);
-      boolean schemaExists = propertyStore.exists(schemaPath, AccessOption.PERSISTENT);
-      String existSchemaName = tableConfig.getValidationConfig().getSchemaName();
-      if (existSchemaName == null || existSchemaName.equals(rawTableName)) {
-        // Although the table config is valid, we still need to ensure the schema exists
-        if (!schemaExists) {
-          LOGGER.warn("Failed to find schema for table: {}", tableNameWithType);
-          tableWithoutSchemaCount.getAndIncrement();
-          return;
-        }
-        // Table config is already in good status
-        return;
-      }
-      misconfiguredTableCount.getAndIncrement();
-      if (schemaExists) {
-        // If a schema named `rawTableName` already exists, then likely this is a misconfiguration.
-        // Reset schema name in table config to null to let the table point to the existing schema.
-        LOGGER.warn("Schema: {} already exists, fix the schema name in table config from {} to null", rawTableName,
-            existSchemaName);
-      } else {
-        // Copy the schema current table referring to to `rawTableName` if it does not exist
-        Schema schema = _helixResourceManager.getSchema(existSchemaName);
-        if (schema == null) {
-          LOGGER.warn("Failed to find schema: {} for table: {}", existSchemaName, tableNameWithType);
-          tableWithoutSchemaCount.getAndIncrement();
-          return;
-        }
-        schema.setSchemaName(rawTableName);
-        if (propertyStore.create(schemaPath, SchemaUtils.toZNRecord(schema), AccessOption.PERSISTENT)) {
-          LOGGER.info("Copied schema: {} to {}", existSchemaName, rawTableName);
-        } else {
-          LOGGER.warn("Failed to copy schema: {} to {}", existSchemaName, rawTableName);
-          failedToCopySchemaCount.getAndIncrement();
-          return;
-        }
-      }
-      // Update table config to remove schema name
-      tableConfig.getValidationConfig().setSchemaName(null);
-      if (ZKMetadataProvider.setTableConfig(propertyStore, tableConfig, tableConfigWithVersion.getRight())) {
-        LOGGER.info("Removed schema name from table config for table: {}", tableNameWithType);
-        fixedSchemaTableCount.getAndIncrement();
-      } else {
-        LOGGER.warn("Failed to update table config for table: {}", tableNameWithType);
-        failedToUpdateTableConfigCount.getAndIncrement();
-      }
-    });
+    _helixResourceManager.getDatabaseNames().stream()
+        .map(_helixResourceManager::getAllTables)
+        .flatMap(List::stream)
+        .forEach(tableNameWithType -> {
+          Pair<TableConfig, Integer> tableConfigWithVersion =
+              ZKMetadataProvider.getTableConfigWithVersion(propertyStore, tableNameWithType);
+          if (tableConfigWithVersion == null) {
+            // This might due to table deletion, just log it here.
+            LOGGER.warn("Failed to find table config for table: {}, the table likely already got deleted",
+                tableNameWithType);
+            return;
+          }
+          TableConfig tableConfig = tableConfigWithVersion.getLeft();
+          String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+          String schemaPath = ZKMetadataProvider.constructPropertyStorePathForSchema(rawTableName);
+          boolean schemaExists = propertyStore.exists(schemaPath, AccessOption.PERSISTENT);
+          String existSchemaName = tableConfig.getValidationConfig().getSchemaName();
+          if (existSchemaName == null || existSchemaName.equals(rawTableName)) {
+            // Although the table config is valid, we still need to ensure the schema exists
+            if (!schemaExists) {
+              LOGGER.warn("Failed to find schema for table: {}", tableNameWithType);
+              tableWithoutSchemaCount.getAndIncrement();
+              return;
+            }
+            // Table config is already in good status
+            return;
+          }
+          misconfiguredTableCount.getAndIncrement();
+          if (schemaExists) {
+            // If a schema named `rawTableName` already exists, then likely this is a misconfiguration.
+            // Reset schema name in table config to null to let the table point to the existing schema.
+            LOGGER.warn("Schema: {} already exists, fix the schema name in table config from {} to null", rawTableName,
+                existSchemaName);
+          } else {
+            // Copy the schema current table referring to to `rawTableName` if it does not exist
+            Schema schema = _helixResourceManager.getSchema(existSchemaName);
+            if (schema == null) {
+              LOGGER.warn("Failed to find schema: {} for table: {}", existSchemaName, tableNameWithType);
+              tableWithoutSchemaCount.getAndIncrement();
+              return;
+            }
+            schema.setSchemaName(rawTableName);
+            if (propertyStore.create(schemaPath, SchemaUtils.toZNRecord(schema), AccessOption.PERSISTENT)) {
+              LOGGER.info("Copied schema: {} to {}", existSchemaName, rawTableName);
+            } else {
+              LOGGER.warn("Failed to copy schema: {} to {}", existSchemaName, rawTableName);
+              failedToCopySchemaCount.getAndIncrement();
+              return;
+            }
+          }
+          // Update table config to remove schema name
+          tableConfig.getValidationConfig().setSchemaName(null);
+          if (ZKMetadataProvider.setTableConfig(propertyStore, tableConfig, tableConfigWithVersion.getRight())) {
+            LOGGER.info("Removed schema name from table config for table: {}", tableNameWithType);
+            fixedSchemaTableCount.getAndIncrement();
+          } else {
+            LOGGER.warn("Failed to update table config for table: {}", tableNameWithType);
+            failedToUpdateTableConfigCount.getAndIncrement();
+          }
+        });
     LOGGER.info(
         "Found {} tables misconfigured, {} tables without schema. Successfully fixed schema for {} tables, failed to "
             + "fix {} tables due to copy schema failure, failed to fix {} tables due to update table config failure.",
