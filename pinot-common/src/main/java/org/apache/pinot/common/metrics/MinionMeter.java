@@ -31,7 +31,13 @@ public enum MinionMeter implements AbstractMetrics.Meter {
   NUMBER_TASKS_FAILED("tasks", false),
   NUMBER_TASKS_FATAL_FAILED("tasks", false),
   SEGMENT_UPLOAD_FAIL_COUNT("segments", false),
-  SEGMENT_DOWNLOAD_FAIL_COUNT("segments", false);
+  SEGMENT_DOWNLOAD_FAIL_COUNT("segments", false),
+  SEGMENT_DOWNLOAD_COUNT("segments", false),
+  SEGMENT_UPLOAD_COUNT("segments", false),
+  SEGMENT_BYTES_DOWNLOADED("bytes", false),
+  SEGMENT_BYTES_UPLOADED("bytes", false),
+  RECORDS_PROCESSED_COUNT("rows", false),
+  RECORDS_PURGED_COUNT("rows", false);
 
   private final String _meterName;
   private final String _unit;
