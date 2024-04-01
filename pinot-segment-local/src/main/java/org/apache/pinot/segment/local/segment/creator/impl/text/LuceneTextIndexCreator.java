@@ -129,7 +129,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
       if (_reuseMutableIndex) {
         LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
-        indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.APPEND);
+        indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
         convertMutableSegment(segmentIndexDir, sortedDocIds, indexWriterConfig);
         return;
       }
