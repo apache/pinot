@@ -26,7 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.math.IntRange;
+import org.apache.commons.lang3.Range;
 import org.apache.pinot.controller.recommender.data.generator.DataGenerator;
 import org.apache.pinot.controller.recommender.data.generator.DataGeneratorSpec;
 import org.apache.pinot.controller.recommender.data.writer.AvroWriter;
@@ -90,7 +90,7 @@ public final class DataGenerationHelpers {
     final HashMap<String, TimeUnit> timeUnits = new HashMap<>();
 
     final HashMap<String, Integer> cardinality = new HashMap<>();
-    final HashMap<String, IntRange> range = new HashMap<>();
+    final HashMap<String, Range<Integer>> range = new HashMap<>();
     final HashMap<String, String> granularityMap = new HashMap<>();
     final HashMap<String, String> formatMap = new HashMap<>();
     for (final FieldSpec fs : schema.getAllFieldSpecs()) {
@@ -104,10 +104,10 @@ public final class DataGenerationHelpers {
           cardinality.putIfAbsent(col, 1000);
           break;
         case METRIC:
-          range.putIfAbsent(col, new IntRange(1, 1000));
+          range.putIfAbsent(col, Range.of(1, 1000));
           break;
         case TIME:
-          range.putIfAbsent(col, new IntRange(1, 1000));
+          range.putIfAbsent(col, Range.of(1, 1000));
           TimeFieldSpec tfs = (TimeFieldSpec) fs;
           timeUnits.put(col, tfs.getIncomingGranularitySpec().getTimeType());
           break;

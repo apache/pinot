@@ -23,7 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 

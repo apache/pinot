@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Random;
 import javax.annotation.Nullable;
 import org.apache.calcite.jdbc.CalciteSchemaBuilder;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;

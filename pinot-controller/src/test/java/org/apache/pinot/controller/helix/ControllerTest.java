@@ -31,11 +31,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.commons.lang.math.RandomUtils;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.ConfigAccessor;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
@@ -214,7 +214,7 @@ public class ControllerTest {
 
     properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
     properties.put(ControllerConf.CONTROLLER_PORT,
-        NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT + RandomUtils.nextInt(10000)));
+        NetUtils.findOpenPort(DEFAULT_CONTROLLER_PORT + RandomUtils.nextInt(0, 10000)));
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
     properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
     properties.put(ControllerConf.ZK_STR, getZkUrl());
@@ -401,7 +401,7 @@ public class ControllerTest {
       throws Exception {
     for (int i = 0; i < numInstances; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, isSingleTenant,
-          NetUtils.findOpenPort(baseAdminPort + i + RandomUtils.nextInt(10000)));
+          NetUtils.findOpenPort(baseAdminPort + i + RandomUtils.nextInt(0, 10000)));
     }
   }
 
@@ -413,7 +413,7 @@ public class ControllerTest {
   public void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant)
       throws Exception {
     addFakeServerInstanceToAutoJoinHelixCluster(instanceId, isSingleTenant,
-        NetUtils.findOpenPort(Server.DEFAULT_ADMIN_API_PORT + RandomUtils.nextInt(10000)));
+        NetUtils.findOpenPort(Server.DEFAULT_ADMIN_API_PORT + RandomUtils.nextInt(0, 10000)));
   }
 
   public void addFakeServerInstanceToAutoJoinHelixCluster(String instanceId, boolean isSingleTenant, int adminPort)
@@ -442,7 +442,7 @@ public class ControllerTest {
   public void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {
     addMoreFakeServerInstancesToAutoJoinHelixCluster(maxCount, isSingleTenant,
-        NetUtils.findOpenPort(DEFAULT_ADMIN_API_PORT + RandomUtils.nextInt(10000)));
+        NetUtils.findOpenPort(DEFAULT_ADMIN_API_PORT + RandomUtils.nextInt(0, 10000)));
   }
 
   /** Add fake server instances until total number of server instances reaches maxCount */

@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang.math.IntRange;
+import org.apache.commons.lang3.Range;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -32,7 +32,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 public class DataGeneratorSpec {
   private final List<String> _columns;
   private final Map<String, Integer> _cardinalityMap;
-  private final Map<String, IntRange> _rangeMap;
+  private final Map<String, Range<Integer>> _rangeMap;
   private final Map<String, Map<String, Object>> _patternMap;
   private final Map<String, Double> _mvCountMap; // map of column name to average number of values per entry
   private final Map<String, Integer> _lengthMap;
@@ -58,10 +58,10 @@ public class DataGeneratorSpec {
   }
 
   @Deprecated
-  public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
-      Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap,
-      Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
-      FileFormat format, String outputDir, boolean override) {
+  public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap,
+      Map<String, Range<Integer>> rangeMap, Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap,
+      Map<String, Integer> lengthMap, Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap,
+      Map<String, TimeUnit> timeUnitMap, FileFormat format, String outputDir, boolean override) {
     _columns = columns;
     _cardinalityMap = cardinalityMap;
     _rangeMap = rangeMap;
@@ -81,10 +81,11 @@ public class DataGeneratorSpec {
     _dateTimeGranularityMap = new HashMap<>();
   }
 
-  public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap, Map<String, IntRange> rangeMap,
-      Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap, Map<String, Integer> lengthMap,
-      Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap, Map<String, TimeUnit> timeUnitMap,
-      Map<String, String> dateTimeFormatMap, Map<String, String> dateTimeGranularityMap) {
+  public DataGeneratorSpec(List<String> columns, Map<String, Integer> cardinalityMap,
+      Map<String, Range<Integer>> rangeMap, Map<String, Map<String, Object>> patternMap, Map<String, Double> mvCountMap,
+      Map<String, Integer> lengthMap, Map<String, DataType> dataTypesMap, Map<String, FieldType> fieldTypesMap,
+      Map<String, TimeUnit> timeUnitMap, Map<String, String> dateTimeFormatMap,
+      Map<String, String> dateTimeGranularityMap) {
     _columns = columns;
     _cardinalityMap = cardinalityMap;
     _rangeMap = rangeMap;
@@ -123,7 +124,7 @@ public class DataGeneratorSpec {
     return _cardinalityMap;
   }
 
-  public Map<String, IntRange> getRangeMap() {
+  public Map<String, Range<Integer>> getRangeMap() {
     return _rangeMap;
   }
 
@@ -176,7 +177,7 @@ public class DataGeneratorSpec {
   public static class Builder {
     private List<String> _columns = new ArrayList<>();
     private Map<String, Integer> _cardinalityMap = new HashMap<>();
-    private Map<String, IntRange> _rangeMap = new HashMap<>();
+    private Map<String, Range<Integer>> _rangeMap = new HashMap<>();
     private Map<String, Map<String, Object>> _patternMap = new HashMap<>();
     private Map<String, Double> _mvCountMap = new HashMap<>();
     private Map<String, Integer> _lengthMap = new HashMap<>();
@@ -201,7 +202,7 @@ public class DataGeneratorSpec {
       return this;
     }
 
-    public Builder setRangeMap(Map<String, IntRange> rangeMap) {
+    public Builder setRangeMap(Map<String, Range<Integer>> rangeMap) {
       _rangeMap = rangeMap;
       return this;
     }

@@ -74,16 +74,6 @@
       <artifactId>commons-codec</artifactId>
     </dependency>
     <!-- Legacy Apache Commons Libraries -->
-    <!-- TODO: Move all usage to commons-lang3 -->
-    <dependency>
-      <groupId>commons-lang</groupId>
-      <artifactId>commons-lang</artifactId>
-    </dependency>
-    <!-- TODO: Move all usage to commons-collections4 -->
-    <dependency>
-      <groupId>commons-collections</groupId>
-      <artifactId>commons-collections</artifactId>
-    </dependency>
     <!-- TODO: Move all usage to commons-math3 -->
     <dependency>
       <groupId>org.apache.commons</groupId>

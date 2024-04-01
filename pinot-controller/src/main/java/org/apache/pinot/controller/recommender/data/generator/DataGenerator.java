@@ -26,7 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang.math.IntRange;
+import org.apache.commons.lang3.Range;
 import org.apache.pinot.controller.recommender.data.DataGenerationHelpers;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -77,8 +77,8 @@ public class DataGenerator {
             .getGeneratorFor(dataType, _genSpec.getCardinalityMap().get(column), _genSpec.getMvCountMap().get(column),
                 _genSpec.getLengthMap().get(column), _genSpec.getTimeUnitMap().get(column));
       } else if (_genSpec.getRangeMap().containsKey(column)) {
-        IntRange range = _genSpec.getRangeMap().get(column);
-        generator = GeneratorFactory.getGeneratorFor(dataType, range.getMinimumInteger(), range.getMaximumInteger());
+        Range<Integer> range = _genSpec.getRangeMap().get(column);
+        generator = GeneratorFactory.getGeneratorFor(dataType, range.getMinimum(), range.getMaximum());
       } else {
         LOGGER.error("cardinality for this column does not exist : " + column);
         throw new RuntimeException("cardinality for this column does not exist");
@@ -153,7 +153,7 @@ public class DataGenerator {
     final Map<String, TimeUnit> timeUnits = new HashMap<>();
 
     final Map<String, Integer> cardinality = new HashMap<>();
-    final Map<String, IntRange> range = new HashMap<>();
+    final Map<String, Range<Integer>> range = new HashMap<>();
     final Map<String, Map<String, Object>> template = new HashMap<>();
     Map<String, Double> mvCountMap = new HashMap<>();
     Map<String, Integer> lengthMap = new HashMap<>();

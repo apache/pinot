@@ -20,7 +20,7 @@ package org.apache.pinot.segment.local.segment.index.readerwriter;
 
 import java.io.IOException;
 import java.util.Random;
-import org.apache.commons.lang.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.segment.local.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
