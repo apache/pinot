@@ -19,12 +19,12 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import org.apache.datasketches.tuple.CompactSketch;
+import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.TupleSketchIterator;
-import org.apache.datasketches.tuple.Union;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -46,14 +46,12 @@ public class SumValuesIntegerTupleSketchAggregationFunction extends IntegerTuple
   }
 
   @Override
-  public Comparable extractFinalResult(List<CompactSketch<IntegerSummary>> integerSummarySketches) {
-    if (integerSummarySketches == null) {
-      return null;
-    }
-    Union<IntegerSummary> union = new Union<>(_entries, _setOps);
-    integerSummarySketches.forEach(union::union);
+  public Comparable extractFinalResult(TupleIntSketchAccumulator accumulator) {
     double retainedTotal = 0L;
-    CompactSketch<IntegerSummary> result = union.getResult();
+    accumulator.setNominalEntries(_nominalEntries);
+    accumulator.setSetOperations(_setOps);
+    accumulator.setThreshold(_accumulatorThreshold);
+    Sketch<IntegerSummary> result = accumulator.getResult();
     TupleSketchIterator<IntegerSummary> summaries = result.iterator();
     while (summaries.next()) {
       retainedTotal += summaries.getSummary().getValue();

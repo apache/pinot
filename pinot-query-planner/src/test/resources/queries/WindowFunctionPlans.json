@@ -10,7 +10,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -23,7 +23,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [COUNT()])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(winLiteral=[0])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -37,7 +37,7 @@
           "\n    LogicalWindow(window#0=[window(aggs [COUNT()])])",
           "\n      PinotLogicalExchange(distribution=[hash])",
           "\n        LogicalProject(winLiteral=[0])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -50,7 +50,7 @@
           "\n  LogicalWindow(window#0=[window( rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(winLiteral=[0])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -63,7 +63,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -75,7 +75,7 @@
           "\nLogicalWindow(window#0=[window( rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n  PinotLogicalExchange(distribution=[hash])",
           "\n    LogicalProject(col1=[$0])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -89,7 +89,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -103,7 +103,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -118,7 +118,7 @@
           "\n      LogicalWindow(window#0=[window(aggs [SUM($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -133,7 +133,7 @@
           "\n      LogicalWindow(window#0=[window( rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -149,7 +149,7 @@
           "\n        LogicalWindow(window#0=[window(aggs [SUM($1)])])",
           "\n          PinotLogicalExchange(distribution=[hash])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -165,7 +165,7 @@
           "\n        LogicalWindow(window#0=[window(aggs [SUM($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -178,7 +178,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -192,7 +192,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[>($2, 10)])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -205,7 +205,7 @@
           "\n  PinotLogicalExchange(distribution=[hash])",
           "\n    LogicalProject(col1=[$0])",
           "\n      LogicalFilter(condition=[>($2, 10)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -219,7 +219,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(=($0, _UTF-8'bar'), =($0, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -234,7 +234,7 @@
           "\n      LogicalAggregate(group=[{0}])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{2}])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -249,7 +249,7 @@
           "\n      LogicalAggregate(group=[{0, 1}])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalAggregate(group=[{0, 2}])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -264,7 +264,7 @@
           "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -280,7 +280,7 @@
           "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -298,7 +298,7 @@
           "\n            LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
           "\n                LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n                  LogicalTableScan(table=[[a]])",
+          "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -316,7 +316,7 @@
           "\n            LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
           "\n                LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n                  LogicalTableScan(table=[[a]])",
+          "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -329,7 +329,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -342,7 +342,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -356,7 +356,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -370,7 +370,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0), MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -385,7 +385,7 @@
           "\n      LogicalWindow(window#0=[window(aggs [SUM($2), COUNT($1)])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -401,7 +401,7 @@
           "\n        LogicalWindow(window#0=[window(aggs [SUM($2), COUNT($1)])])",
           "\n          PinotLogicalExchange(distribution=[hash])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -417,7 +417,7 @@
           "\n        LogicalWindow(window#0=[window(aggs [SUM($2), COUNT($1)])])",
           "\n          PinotLogicalExchange(distribution=[hash])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -430,7 +430,7 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0), MAX($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -444,7 +444,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[>($2, 100)])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -458,7 +458,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$2], $1=[LENGTH(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'baz'), <>($0, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -473,7 +473,7 @@
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject($0=[LENGTH(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'baz'), <>($0, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -488,7 +488,7 @@
           "\n      LogicalAggregate(group=[{0}])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{2}])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -503,7 +503,7 @@
           "\n      LogicalAggregate(group=[{0, 1}])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalAggregate(group=[{0, 2}])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -518,7 +518,7 @@
           "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -534,7 +534,7 @@
           "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -552,7 +552,7 @@
           "\n            LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
           "\n                LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n                  LogicalTableScan(table=[[a]])",
+          "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -565,7 +565,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -578,7 +578,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -592,7 +592,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -605,7 +605,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -618,7 +618,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -632,7 +632,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -646,7 +646,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -661,7 +661,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0} aggs [MIN($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -677,7 +677,7 @@
           "\n        LogicalWindow(window#0=[window(partition {1} aggs [SUM($2), COUNT($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -693,7 +693,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0} aggs [MIN($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -709,7 +709,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -722,7 +722,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} aggs [COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[SUBSTR($0, 0, 2)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -735,7 +735,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col3=[$2], $1=[SUBSTR($0, 0, 2)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -749,7 +749,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -763,7 +763,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'foo')), >=($2, 42))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -776,7 +776,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -789,7 +789,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -804,7 +804,7 @@
           "\n      LogicalAggregate(group=[{0}])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{2}])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -819,7 +819,7 @@
           "\n      LogicalAggregate(group=[{0, 1}])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalAggregate(group=[{0, 2}])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -834,7 +834,7 @@
           "\n      LogicalAggregate(group=[{0, 1}])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalAggregate(group=[{0, 2}])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -849,7 +849,7 @@
           "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -865,7 +865,7 @@
           "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -883,7 +883,7 @@
           "\n            LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
           "\n                LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n                  LogicalTableScan(table=[[a]])",
+          "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -896,7 +896,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -910,7 +910,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -923,7 +923,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -936,7 +936,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -950,7 +950,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -965,7 +965,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), MAX($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -981,7 +981,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -997,7 +997,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), MAX($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1012,7 +1012,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), MAX($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1027,7 +1027,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), COUNT($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1043,7 +1043,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0, 1} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER(), ROW_NUMBER()])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1058,7 +1058,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), SUM($2), COUNT($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1073,7 +1073,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0, 1} aggs [SUM($2), COUNT($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1086,7 +1086,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($1), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[REVERSE($0)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1100,7 +1100,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), OR(=($0, _UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\")))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1114,7 +1114,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'baz'), <>($1, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1127,7 +1127,7 @@
           "\n  LogicalWindow(window#0=[window(partition {2} aggs [SUM($1), COUNT($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[2]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1142,7 +1142,7 @@
           "\n      LogicalAggregate(group=[{0}])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{2}])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1157,7 +1157,7 @@
           "\n      LogicalAggregate(group=[{0, 1}])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalAggregate(group=[{0, 2}])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1172,7 +1172,7 @@
           "\n      LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1188,7 +1188,7 @@
           "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1206,7 +1206,7 @@
           "\n            LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
           "\n                LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
-          "\n                  LogicalTableScan(table=[[a]])",
+          "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1219,7 +1219,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1232,7 +1232,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1246,7 +1246,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1259,7 +1259,7 @@
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1272,7 +1272,7 @@
           "\n  LogicalWindow(window#0=[window(order by [1 DESC] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1285,7 +1285,7 @@
           "\n  LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1300,7 +1300,7 @@
           "\n      LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1315,7 +1315,7 @@
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1330,7 +1330,7 @@
           "\n      LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1345,7 +1345,7 @@
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [DENSE_RANK()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1360,7 +1360,7 @@
           "\n      LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1375,7 +1375,7 @@
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1390,7 +1390,7 @@
           "\n      LogicalWindow(window#0=[window(order by [1] aggs [DENSE_RANK()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1403,7 +1403,7 @@
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1417,7 +1417,7 @@
           "\n  LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1431,7 +1431,7 @@
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1444,7 +1444,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MAX($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1459,7 +1459,7 @@
           "\n      LogicalWindow(window#0=[window(order by [0 DESC] aggs [MIN($2)])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1475,7 +1475,7 @@
           "\n        LogicalWindow(window#0=[window(order by [1] aggs [SUM($2), COUNT($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1491,7 +1491,7 @@
           "\n        LogicalWindow(window#0=[window(order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1507,7 +1507,7 @@
           "\n        LogicalWindow(window#0=[window(order by [1] aggs [RANK()])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1523,7 +1523,7 @@
           "\n        LogicalWindow(window#0=[window(order by [0 DESC] aggs [MIN($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1539,7 +1539,7 @@
           "\n        LogicalWindow(window#0=[window(order by [0 DESC] aggs [DENSE_RANK()])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1552,7 +1552,7 @@
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[SUBSTR($0, 0, 2)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1565,7 +1565,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col3=[$2], $1=[SUBSTR($0, 0, 2)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1579,7 +1579,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1592,7 +1592,7 @@
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalProject(col2=[$1])",
           "\n      LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1606,7 +1606,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'foo')), >=($2, 42))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1620,7 +1620,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], $1=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'foo')), >=($2, 42))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1634,7 +1634,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], $1=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'foo')), >=($2, 42))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1647,7 +1647,7 @@
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1660,7 +1660,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1673,7 +1673,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1686,7 +1686,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1699,7 +1699,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [RANK(), DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1713,7 +1713,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1726,7 +1726,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1739,7 +1739,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK(), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1752,7 +1752,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1765,7 +1765,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK(), MIN($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1778,7 +1778,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [COUNT($1), MIN($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1791,7 +1791,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [COUNT($1), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1806,7 +1806,7 @@
           "\n      LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [SUM($2), COUNT($2)])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1821,7 +1821,7 @@
           "\n      LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [RANK(), SUM($2), COUNT($2)])])",
           "\n        PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1837,7 +1837,7 @@
           "\n        LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1853,7 +1853,7 @@
           "\n        LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [SUM($2), COUNT($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1869,7 +1869,7 @@
           "\n        LogicalWindow(window#0=[window(order by [1, 0 DESC] aggs [DENSE_RANK(), RANK()])])",
           "\n          PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1882,7 +1882,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [SUM($1), MAX($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[REVERSE($0)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1896,7 +1896,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], $1=[REVERSE($0)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1909,7 +1909,7 @@
           "\n  LogicalWindow(window#0=[window(order by [0] aggs [DENSE_RANK(), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col2=[$1], $1=[REVERSE($0)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1923,7 +1923,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), OR(=($0, _UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\")))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1937,7 +1937,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'baz'), <>($1, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1951,7 +1951,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], $1=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'baz'), <>($1, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1964,7 +1964,7 @@
           "\n  LogicalWindow(window#0=[window(order by [2] aggs [SUM($1), COUNT($1), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1977,7 +1977,7 @@
           "\n  LogicalWindow(window#0=[window(order by [1] aggs [DENSE_RANK(), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], $1=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -1990,7 +1990,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2003,7 +2003,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2017,7 +2017,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2031,7 +2031,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2044,7 +2044,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2057,7 +2057,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2070,7 +2070,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2083,7 +2083,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2097,7 +2097,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2110,7 +2110,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2125,7 +2125,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MIN($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2140,7 +2140,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0} order by [0] aggs [DENSE_RANK()])])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2156,7 +2156,7 @@
           "\n        LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($2), COUNT($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2172,7 +2172,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MIN($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2188,7 +2188,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2204,7 +2204,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0} order by [0] aggs [RANK()])])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2217,7 +2217,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[SUBSTR($0, 0, 2)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2231,7 +2231,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2244,7 +2244,7 @@
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalProject(col2=[$1])",
           "\n      LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2257,7 +2257,7 @@
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalProject(col2=[$1])",
           "\n      LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2271,7 +2271,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'foo')), >=($2, 42))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2285,7 +2285,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], $1=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'foo')), >=($2, 42))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2298,7 +2298,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1] aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2311,7 +2311,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject($0=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2324,7 +2324,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1 DESC] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2337,7 +2337,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2350,7 +2350,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1 ASC-nulls-first] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2363,7 +2363,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [1 DESC-nulls-last] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalExchange(distribution=[hash[1]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2376,7 +2376,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2389,7 +2389,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [DENSE_RANK(), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2403,7 +2403,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2416,7 +2416,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2428,7 +2428,7 @@
           "\nLogicalWindow(window#0=[window(partition {0} order by [0] aggs [RANK(), DENSE_RANK()])])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalProject(col1=[$0])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2441,7 +2441,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2454,7 +2454,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2467,7 +2467,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [COUNT($1), DENSE_RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2482,7 +2482,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0, 1} order by [1, 0] aggs [SUM($2), COUNT($2)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2497,7 +2497,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0, 1} order by [1, 0] aggs [DENSE_RANK(), RANK()])])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2513,7 +2513,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2529,7 +2529,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [1, 0] aggs [SUM($2), COUNT($2)])])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2545,7 +2545,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [1, 0] aggs [RANK(), DENSE_RANK()])])",
           "\n          PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2558,7 +2558,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [SUM($1), MAX($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col2=[$1], col3=[$2], $2=[REVERSE($0)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2572,7 +2572,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), OR(=($0, _UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\")))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2585,7 +2585,7 @@
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalProject(col1=[$0])",
           "\n      LogicalFilter(condition=[AND(>($2, 42), OR(=($0, _UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\")))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2599,7 +2599,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'baz'), <>($1, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2613,7 +2613,7 @@
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'baz'), <>($1, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2626,7 +2626,7 @@
           "\n  LogicalWindow(window#0=[window(partition {2} order by [2] aggs [SUM($1), COUNT($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[2]])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2640,7 +2640,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject($0=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2653,7 +2653,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0] aggs [RANK(), DENSE_RANK()])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject($0=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2666,7 +2666,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0 DESC] aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2679,7 +2679,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0 ASC-nulls-first] aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2692,7 +2692,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [0 DESC-nulls-last] aggs [SUM($1), COUNT($1), MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2705,7 +2705,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2718,7 +2718,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2731,7 +2731,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2744,7 +2744,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2757,7 +2757,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2770,7 +2770,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2783,7 +2783,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2796,7 +2796,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2809,7 +2809,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MAX($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2824,7 +2824,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MIN($2)])])",
           "\n        PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2839,7 +2839,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0} order by [1] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2854,7 +2854,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0} order by [1] aggs [RANK()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2870,7 +2870,7 @@
           "\n        LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), COUNT($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2886,7 +2886,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MIN($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2902,7 +2902,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0} order by [1] aggs [DENSE_RANK()])])",
           "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2915,7 +2915,7 @@
           "\n  LogicalWindow(window#0=[window(partition {2} order by [0] aggs [COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[SUBSTR($0, 0, 2)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2929,7 +2929,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2943,7 +2943,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
           "\n        LogicalFilter(condition=[AND(>($2, 10), <=($2, 500))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2957,7 +2957,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'foo')), >=($2, 42))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2971,7 +2971,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], $2=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'foo')), >=($2, 42))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2985,7 +2985,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], $2=[CONCAT($0, _UTF-8'-', $1)])",
           "\n        LogicalFilter(condition=[OR(AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'foo')), >=($2, 42))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -2998,7 +2998,7 @@
           "\n  LogicalWindow(window#0=[window(partition {2} order by [1] aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col3=[$2], $1=[REVERSE($1)], $2=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3011,7 +3011,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject($0=[REVERSE($1)], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3024,7 +3024,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject($0=[REVERSE($1)], $1=[CONCAT($0, _UTF-8'-', $1)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3037,7 +3037,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3050,7 +3050,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [MAX($1), DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3064,7 +3064,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [MAX($2), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3077,7 +3077,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2), MIN($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3090,7 +3090,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [DENSE_RANK(), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3103,7 +3103,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2), MIN($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3116,7 +3116,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [COUNT($2), MIN($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3129,7 +3129,7 @@
           "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [COUNT($2), DENSE_RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3144,7 +3144,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [SUM($2), COUNT($2)])])",
           "\n        PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3159,7 +3159,7 @@
           "\n      LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [RANK(), DENSE_RANK()])])",
           "\n        PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n          LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3175,7 +3175,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0} order by [1] aggs [SUM($2), COUNT($2), MIN($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3191,7 +3191,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [SUM($2), COUNT($2)])])",
           "\n          PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3207,7 +3207,7 @@
           "\n        LogicalWindow(window#0=[window(partition {0, 1} order by [2, 0] aggs [DENSE_RANK(), RANK()])])",
           "\n          PinotLogicalSortExchange(distribution=[hash[0, 1]], collation=[[2, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n            LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3220,7 +3220,7 @@
           "\n  LogicalWindow(window#0=[window(partition {1} order by [0] aggs [SUM($2), MAX($2)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[1]], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[REVERSE($0)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3234,7 +3234,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), OR(=($0, _UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\")))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3248,7 +3248,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), OR(=($0, _UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\")))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3262,7 +3262,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1])",
           "\n        LogicalFilter(condition=[AND(>($2, 42), OR(=($0, _UTF-8'chewbacca':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'vader':VARCHAR(9) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'yoda':VARCHAR(9) CHARACTER SET \"UTF-8\")))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3276,7 +3276,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2], $3=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'baz'), <>($1, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3290,7 +3290,7 @@
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col2=[$1], $2=[REVERSE(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($1, _UTF-8'bar'), <>($1, _UTF-8'baz'), <>($1, _UTF-8'foo'))])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3303,7 +3303,7 @@
           "\n  LogicalWindow(window#0=[window(partition {3} order by [2] aggs [SUM($1), COUNT($1), COUNT($0)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[3]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col1=[$0], col3=[$2], $2=[CONCAT($0, _UTF-8'-', $1)], $3=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3316,7 +3316,7 @@
           "\n  LogicalWindow(window#0=[window(partition {2} order by [1] aggs [SUM($0), COUNT($0), RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[2]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n      LogicalProject(col3=[$2], $1=[CONCAT($0, _UTF-8'-', $1)], $2=[REVERSE(CONCAT($0, _UTF-8'-', $1))])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3332,10 +3332,10 @@
           "\n        LogicalJoin(condition=[=($0, $3)], joinType=[inner])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
           "\n            LogicalProject(col1=[$0], col3=[$2])",
-          "\n              LogicalTableScan(table=[[a]])",
+          "\n              LogicalTableScan(table=[[default, a]])",
           "\n          PinotLogicalExchange(distribution=[hash[1]])",
           "\n            LogicalProject(col1=[$0], col2=[$1])",
-          "\n              LogicalTableScan(table=[[b]])",
+          "\n              LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -3350,7 +3350,7 @@
           "\n      LogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalAggregate(group=[{0, 2}], agg#0=[COUNT()])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3365,7 +3365,7 @@
           "\n      LogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalAggregate(group=[{0, 2}], agg#0=[COUNT()])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3380,7 +3380,7 @@
           "\n      LogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalAggregate(group=[{0, 2}], agg#0=[COUNT()])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3395,7 +3395,7 @@
           "\n      LogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalAggregate(group=[{0, 2}], agg#0=[COUNT()])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3409,7 +3409,7 @@
           "\n    LogicalWindow(window#0=[window(partition {1} order by [2] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3423,7 +3423,7 @@
           "\n    LogicalWindow(window#0=[window(partition {1} order by [2] aggs [RANK(), DENSE_RANK()])])",
           "\n      PinotLogicalSortExchange(distribution=[hash[1]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n        LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3437,7 +3437,7 @@
           "\n    LogicalWindow(window#0=[window(partition {0} order by [1 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n      PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n        LogicalProject(col2=[$1], col3=[$2])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3452,7 +3452,7 @@
           "\n      LogicalAggregate(group=[{0}], agg#0=[COUNT($1)])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalAggregate(group=[{0}], agg#0=[COUNT()])",
-          "\n            LogicalTableScan(table=[[a]])",
+          "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -3470,11 +3470,11 @@
           "\n            PinotLogicalExchange(distribution=[hash[0]])",
           "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n                LogicalFilter(condition=[>($2, 100)])",
-          "\n                  LogicalTableScan(table=[[a]])",
+          "\n                  LogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[hash[0]])",
           "\n              LogicalProject(col2=[$1])",
           "\n                LogicalFilter(condition=[OR(=($0, _UTF-8'brandon sanderson':VARCHAR(17) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'douglas adams':VARCHAR(17) CHARACTER SET \"UTF-8\"))])",
-          "\n                  LogicalTableScan(table=[[b]])",
+          "\n                  LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -3492,11 +3492,11 @@
           "\n            PinotLogicalExchange(distribution=[hash[0]])",
           "\n              LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
           "\n                LogicalFilter(condition=[>($2, 100)])",
-          "\n                  LogicalTableScan(table=[[a]])",
+          "\n                  LogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[hash[0]])",
           "\n              LogicalProject(col2=[$1])",
           "\n                LogicalFilter(condition=[OR(=($0, _UTF-8'brandon sanderson':VARCHAR(17) CHARACTER SET \"UTF-8\"), =($0, _UTF-8'douglas adams':VARCHAR(17) CHARACTER SET \"UTF-8\"))])",
-          "\n                  LogicalTableScan(table=[[b]])",
+          "\n                  LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },

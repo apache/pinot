@@ -435,6 +435,16 @@ public class ControllerRequestURLBuilder {
     return url.toString();
   }
 
+  public String forDeleteMultipleSegments(String tableName, String tableType, List<String> segments) {
+    StringBuilder fullUrl = new StringBuilder(
+        StringUtil.join("?", StringUtil.join("/", _baseUrl, "segments", tableName),
+             "type=" + tableType));
+    for (String segment : segments) {
+      fullUrl.append("&segments=").append(segment);
+    }
+    return fullUrl.toString();
+  }
+
   private void appendUrlParameter(StringBuilder url, String urlParameterKey, String urlParameterValue) {
     if (url.length() == 0) {
       url.append("?").append(urlParameterKey).append("=").append(urlParameterValue);

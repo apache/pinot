@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.customobject;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import javax.annotation.Nonnull;
 import org.apache.datasketches.theta.SetOperationBuilder;
@@ -29,19 +28,15 @@ import org.apache.datasketches.theta.Union;
 /**
  * Intermediate state used by {@code DistinctCountThetaSketchAggregationFunction} which gives
  * the end user more control over how sketches are merged for performance.
- * The end user can set parameters that trade-off more memory usage for more pre-aggregation.
- * This permits use of the Union "early-stop" optimisation where ordered sketches require no further
+ * In particular, the Theta Sketch Union "early-stop" optimisation can be used - ordered sketches require no further
  * processing beyond the minimum Theta value.
  * The union operation initialises an empty "gadget" bookkeeping sketch that is updated with hashed entries
- * that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial
- * Theta value is set to the minimum immediately, further gains can be realised.
+ * that fall below the minimum Theta value for all input sketches ("Broder Rule").  When the initial Theta value is
+ * set to the minimum immediately, further gains can be realised.
  */
-public class ThetaSketchAccumulator {
-  private ArrayList<Sketch> _accumulator;
+public class ThetaSketchAccumulator extends CustomObjectAccumulator<Sketch> {
   private SetOperationBuilder _setOperationBuilder = new SetOperationBuilder();
   private Union _union;
-  private int _threshold;
-  private int _numInputs = 0;
 
   public ThetaSketchAccumulator() {
   }
@@ -51,52 +46,18 @@ public class ThetaSketchAccumulator {
   // require re-initialisation. Since the primary use case is at query time for the Broker
   // and Server, these properties are already in memory and are re-set.
   public ThetaSketchAccumulator(SetOperationBuilder setOperationBuilder, int threshold) {
+    super(threshold);
     _setOperationBuilder = setOperationBuilder;
-    _threshold = threshold;
   }
 
   public void setSetOperationBuilder(SetOperationBuilder setOperationBuilder) {
     _setOperationBuilder = setOperationBuilder;
   }
 
-  public void setThreshold(int threshold) {
-    _threshold = threshold;
-  }
-
-  public boolean isEmpty() {
-    return _numInputs == 0;
-  }
-
   @Nonnull
+  @Override
   public Sketch getResult() {
     return unionAll();
-  }
-
-  public void apply(Sketch sketch) {
-    internalAdd(sketch);
-  }
-
-  public void merge(ThetaSketchAccumulator thetaUnion) {
-    if (thetaUnion.isEmpty()) {
-      return;
-    }
-    Sketch sketch = thetaUnion.getResult();
-    internalAdd(sketch);
-  }
-
-  private void internalAdd(Sketch sketch) {
-    if (sketch.isEmpty()) {
-      return;
-    }
-    if (_accumulator == null) {
-      _accumulator = new ArrayList<>(_threshold);
-    }
-    _accumulator.add(sketch);
-    _numInputs += 1;
-
-    if (_accumulator.size() >= _threshold) {
-      unionAll();
-    }
   }
 
   private Sketch unionAll() {
@@ -111,7 +72,7 @@ public class ThetaSketchAccumulator {
     // This single sketch might have been the result of a previously accumulated union and
     // would already have the parameters set.  The sketch is returned as-is without adjusting
     // nominal entries which requires an additional union operation.
-    if (_numInputs == 1) {
+    if (getNumInputs() == 1) {
       return _accumulator.get(0);
     }
 

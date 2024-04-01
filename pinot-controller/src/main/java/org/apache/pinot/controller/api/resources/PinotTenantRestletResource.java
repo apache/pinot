@@ -75,11 +75,11 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -104,9 +104,14 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *   }' http://localhost:1234/tenants
  * </ul>
  */
-@Api(tags = Constants.TENANT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+@Api(tags = Constants.TENANT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY),
+    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
 @Path("/")
 public class PinotTenantRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantRestletResource.class);
@@ -283,9 +288,9 @@ public class PinotTenantRestletResource {
           required = false, allowableValues = "BROKER, SERVER", defaultValue = "SERVER")
       @QueryParam("type") String tenantType, @Context HttpHeaders headers) {
     if (tenantType == null || tenantType.isEmpty() || tenantType.equalsIgnoreCase("server")) {
-      return getTablesServedFromServerTenant(tenantName, headers.getHeaderString(CommonConstants.DATABASE));
+      return getTablesServedFromServerTenant(tenantName, headers.getHeaderString(DATABASE));
     } else if (tenantType.equalsIgnoreCase("broker")) {
-      return getTablesServedFromBrokerTenant(tenantName, headers.getHeaderString(CommonConstants.DATABASE));
+      return getTablesServedFromBrokerTenant(tenantName, headers.getHeaderString(DATABASE));
     } else {
       throw new ControllerApplicationException(LOGGER, "Invalid tenant type: " + tenantType,
           Response.Status.BAD_REQUEST);

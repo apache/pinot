@@ -47,7 +47,6 @@ import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
-import org.apache.pinot.controller.api.exception.NoTaskScheduledException;
 import org.apache.pinot.controller.api.exception.TaskAlreadyExistsException;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -213,7 +212,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
               taskGenerator.getMaxAttemptsPerTask()));
     }
     if (responseMap.isEmpty()) {
-      throw new NoTaskScheduledException("No task scheduled for 'tableName': " + tableName);
+      LOGGER.warn("No task submitted for tableName: {}", tableName);
     }
     return responseMap;
   }

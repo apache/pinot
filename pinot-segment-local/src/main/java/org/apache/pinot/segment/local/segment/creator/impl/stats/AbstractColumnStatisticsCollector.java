@@ -27,6 +27,7 @@ import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -44,6 +45,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 public abstract class AbstractColumnStatisticsCollector implements ColumnStatistics {
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
   protected final FieldSpec _fieldSpec;
+  protected final FieldConfig _fieldConfig;
 
   private final Map<String, String> _partitionFunctionConfig;
   private final PartitionFunction _partitionFunction;
@@ -57,6 +59,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
 
   public AbstractColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     _fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
+    _fieldConfig = statsCollectorConfig.getFieldConfigForColumn(column);
     Preconditions.checkArgument(_fieldSpec != null, "Failed to find column: %s", column);
     if (!_fieldSpec.isSingleValueField()) {
       _sorted = false;

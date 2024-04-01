@@ -199,7 +199,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         return;
       }
       // From now on, the _isPreloading flag is true until the segments are preloaded.
+      long startTime = System.currentTimeMillis();
       doPreloadSegments(tableDataManager, indexLoadingConfig, helixManager, segmentPreloadExecutor);
+      long duration = System.currentTimeMillis() - startTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.UPSERT_PRELOAD_TIME_MS, duration,
+          TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       // Even if preloading fails, we should continue to complete the initialization, so that TableDataManager can be
       // created. Once TableDataManager is created, no more segment preloading would happen, and the normal segment
@@ -207,6 +211,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       // normal segment loading logic, the one doing more costly checks on the upsert metadata.
       _logger.warn("Failed to preload segments from partition: {} of table: {}, skipping", _partitionId,
           _tableNameWithType, e);
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.UPSERT_PRELOAD_FAILURE, 1);
       if (e instanceof InterruptedException) {
         // Restore the interrupted status in case the upper callers want to check.
         Thread.currentThread().interrupt();

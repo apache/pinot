@@ -30,7 +30,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunction {
 
   public MinMaxRangeMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "MIN_MAX_RANGE_MV"));
+    super(verifySingleArgument(arguments, "MIN_MAX_RANGE_MV"), false);
   }
 
   @Override

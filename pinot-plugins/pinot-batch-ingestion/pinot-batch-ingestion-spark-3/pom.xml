@@ -37,7 +37,6 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
     <spark.version>3.5.0</spark.version>
-    <commons-lang3.version>3.11</commons-lang3.version>
   </properties>
 
   <dependencies>
@@ -89,10 +88,6 @@
           <artifactId>jakarta.ws.rs-api</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-lang3</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>commons-logging</groupId>
           <artifactId>commons-logging</artifactId>
         </exclusion>
@@ -107,10 +102,6 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>jcl-over-slf4j</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>commons-lang</groupId>
-      <artifactId>commons-lang</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -144,30 +135,12 @@
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-lang3</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-lang3</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-      <version>${commons-lang3.version}</version>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

@@ -36,7 +36,6 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
-import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
@@ -45,6 +44,8 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.exception.TaskCancelledException;
+import org.apache.pinot.plugin.minion.tasks.purge.PurgeTaskExecutor;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -59,8 +60,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseSingleSegmentConversionExecutor.class);
-
-  protected final MinionMetrics _minionMetrics = MinionMetrics.get();
 
   // Tracking finer grained progress status.
   protected PinotTaskConfig _pinotTaskConfig;
@@ -123,6 +122,9 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
         LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
       }
 
+      // Publish metrics related to segment download
+      reportSegmentDownloadMetrics(indexDir, tableNameWithType, taskType);
+
       // Convert the segment
       File workingDir = new File(tempDataDir, "workingDir");
       Preconditions.checkState(workingDir.mkdir());
@@ -135,6 +137,20 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       if (convertedSegmentDir == null) {
         return segmentConversionResult;
       }
+
+      // Publish metrics related to segment upload
+      reportSegmentUploadMetrics(workingDir, tableNameWithType, taskType);
+
+      // Collect the task processing metrics from various single segment executors and publish them here.
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      Object numRecordsPurged = segmentConversionResult.getCustomProperty(PurgeTaskExecutor.NUM_RECORDS_PURGED_KEY);
+      if (numRecordsPurged != null) {
+        reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs(),
+            (int) numRecordsPurged);
+       } else {
+        reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs());
+      }
+
       // Tar the converted segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Compressing segment: " + segmentName);
       File convertedTarredSegmentFile =

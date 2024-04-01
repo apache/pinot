@@ -9,10 +9,10 @@
           "\nLogicalUnion(all=[true])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[a]])",
+          "\n      LogicalTableScan(table=[[default, a]])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[b]])",
+          "\n      LogicalTableScan(table=[[default, b]])",
           "\n"
         ]
       },
@@ -26,13 +26,13 @@
           "\n    LogicalUnion(all=[true])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[c]])",
+          "\n      LogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       },
@@ -49,13 +49,13 @@
           "\n          LogicalUnion(all=[true])",
           "\n            PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n              LogicalProject(col1=[$0], col2=[$1])",
-          "\n                LogicalTableScan(table=[[a]])",
+          "\n                LogicalTableScan(table=[[default, a]])",
           "\n            PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n              LogicalProject(col1=[$0], col2=[$1])",
-          "\n                LogicalTableScan(table=[[b]])",
+          "\n                LogicalTableScan(table=[[default, b]])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
-          "\n            LogicalTableScan(table=[[c]])",
+          "\n            LogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       },
@@ -69,13 +69,13 @@
           "\n    LogicalIntersect(all=[false])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[c]])",
+          "\n      LogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       },
@@ -89,13 +89,13 @@
           "\n    LogicalMinus(all=[false])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[a]])",
+          "\n          LogicalTableScan(table=[[default, a]])",
           "\n      PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n        LogicalProject(col1=[$0], col2=[$1])",
-          "\n          LogicalTableScan(table=[[b]])",
+          "\n          LogicalTableScan(table=[[default, b]])",
           "\n  PinotLogicalExchange(distribution=[hash[0, 1]])",
           "\n    LogicalProject(col1=[$0], col2=[$1])",
-          "\n      LogicalTableScan(table=[[c]])",
+          "\n      LogicalTableScan(table=[[default, c]])",
           "\n"
         ]
       }

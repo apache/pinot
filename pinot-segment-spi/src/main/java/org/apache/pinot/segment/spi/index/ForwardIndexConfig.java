@@ -58,6 +58,7 @@ public class ForwardIndexConfig extends IndexConfig {
     if (compressionCodec != null) {
       switch (compressionCodec) {
         case PASS_THROUGH:
+        case CLP:
           _chunkCompressionType = ChunkCompressionType.PASS_THROUGH;
           _dictIdCompressionType = null;
           break;
@@ -71,6 +72,10 @@ public class ForwardIndexConfig extends IndexConfig {
           break;
         case LZ4:
           _chunkCompressionType = ChunkCompressionType.LZ4;
+          _dictIdCompressionType = null;
+          break;
+        case GZIP:
+          _chunkCompressionType = ChunkCompressionType.GZIP;
           _dictIdCompressionType = null;
           break;
         case MV_ENTRY_DICT:

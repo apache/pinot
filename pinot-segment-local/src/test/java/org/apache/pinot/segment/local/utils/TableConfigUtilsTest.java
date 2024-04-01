@@ -689,28 +689,31 @@ public class TableConfigUtilsTest {
     // validate the proto decoder
     streamConfigs = getKafkaStreamConfigs();
     //test config should be valid
-    TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
     streamConfigs.remove("stream.kafka.decoder.prop.descriptorFile");
     try {
-      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+      TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
+      Assert.fail("Should fail without descriptor file");
     } catch (IllegalStateException e) {
       // expected
     }
     streamConfigs = getKafkaStreamConfigs();
     streamConfigs.remove("stream.kafka.decoder.prop.protoClassName");
     try {
-      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+      TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
+      Assert.fail("Should fail without descriptor proto class name");
     } catch (IllegalStateException e) {
       // expected
     }
     //validate the protobuf pulsar config
     streamConfigs = getPulsarStreamConfigs();
     //test config should be valid
-    TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+    TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
     //remove the descriptor file, should fail
     streamConfigs.remove("stream.pulsar.decoder.prop.descriptorFile");
     try {
-      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+      TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
+      Assert.fail("Should fail without descriptor file");
     } catch (IllegalStateException e) {
       // expected
     }
@@ -718,55 +721,31 @@ public class TableConfigUtilsTest {
     //remove the proto class name, should fail
     streamConfigs.remove("stream.pulsar.decoder.prop.protoClassName");
     try {
-      TableConfigUtils.validateDecoder(new StreamConfig("test", streamConfigs));
+      TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
+      Assert.fail("Should fail without descriptor proto class name");
     } catch (IllegalStateException e) {
       // expected
     }
 
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
-
-    // When size based threshold is specified, default rows does not work, it has to be explicitly set to 0.
+    // When size based threshold is specified, default rows should not be set
     streamConfigs = getKafkaStreamConfigs();
     streamConfigs.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE);
     streamConfigs.remove(StreamConfigProperties.DEPRECATED_SEGMENT_FLUSH_DESIRED_SIZE);
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE, "100m");
     streamConfigs.remove(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS);
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigs)));
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setIngestionConfig(ingestionConfig).build();
+    TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
 
-    try {
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("must be set to 0"));
-    }
-
-    // When size based threshold is specified, rows has to be set to 0.
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "1000");
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigs)));
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
-        .setIngestionConfig(ingestionConfig).build();
-
     try {
-      TableConfigUtils.validate(tableConfig, schema);
-      Assert.fail();
+      TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
+      Assert.fail("Should fail when both rows and size based threshold are specified");
     } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("must be set to 0"));
+      // expected
     }
 
-    // When size based threshold is specified, rows has to be set to 0.
+    // Legacy behavior: allow size based threshold to be explicitly set to 0
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "0");
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(streamConfigs)));
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
-        .setIngestionConfig(ingestionConfig).build();
-
-    try {
-      TableConfigUtils.validate(tableConfig, schema);
-    } catch (IllegalStateException e) {
-      Assert.fail(e.getMessage());
-    }
+    TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
   }
 
   @Test

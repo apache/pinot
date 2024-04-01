@@ -26,6 +26,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -732,20 +733,12 @@ public class PinotHelixResourceManager {
   public List<String> getAllTables(@Nullable String databaseName) {
     List<String> tableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
-      if (TableNameBuilder.isTableResource(resourceName) && isPartOfDatabase(resourceName, databaseName)) {
+      if (TableNameBuilder.isTableResource(resourceName)
+          && DatabaseUtils.isPartOfDatabase(resourceName, databaseName)) {
         tableNames.add(resourceName);
       }
     }
     return tableNames;
-  }
-
-  private boolean isPartOfDatabase(String tableName, @Nullable String databaseName) {
-    // assumes tableName will not have default database prefix ('default.')
-    if (StringUtils.isEmpty(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-      return StringUtils.split(tableName, '.').length == 1;
-    } else {
-      return tableName.startsWith(databaseName + ".");
-    }
   }
 
   /**
@@ -766,7 +759,8 @@ public class PinotHelixResourceManager {
   public List<String> getAllOfflineTables(@Nullable String databaseName) {
     List<String> offlineTableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
-      if (isPartOfDatabase(resourceName, databaseName) && TableNameBuilder.isOfflineTableResource(resourceName)) {
+      if (DatabaseUtils.isPartOfDatabase(resourceName, databaseName)
+          && TableNameBuilder.isOfflineTableResource(resourceName)) {
         offlineTableNames.add(resourceName);
       }
     }
@@ -790,7 +784,7 @@ public class PinotHelixResourceManager {
    */
   public List<String> getAllDimensionTables(@Nullable String databaseName) {
     return _tableCache.getAllDimensionTables().stream()
-        .filter(table -> isPartOfDatabase(table, databaseName))
+        .filter(table -> DatabaseUtils.isPartOfDatabase(table, databaseName))
         .collect(Collectors.toList());
   }
 
@@ -812,7 +806,8 @@ public class PinotHelixResourceManager {
   public List<String> getAllRealtimeTables(@Nullable String databaseName) {
     List<String> realtimeTableNames = new ArrayList<>();
     for (String resourceName : getAllResources()) {
-      if (isPartOfDatabase(resourceName, databaseName) && TableNameBuilder.isRealtimeTableResource(resourceName)) {
+      if (DatabaseUtils.isPartOfDatabase(resourceName, databaseName)
+          && TableNameBuilder.isRealtimeTableResource(resourceName)) {
         realtimeTableNames.add(resourceName);
       }
     }
@@ -837,7 +832,8 @@ public class PinotHelixResourceManager {
   public List<String> getAllRawTables(@Nullable String databaseName) {
     Set<String> rawTableNames = new HashSet<>();
     for (String resourceName : getAllResources()) {
-      if (TableNameBuilder.isTableResource(resourceName) && isPartOfDatabase(resourceName, databaseName)) {
+      if (TableNameBuilder.isTableResource(resourceName)
+          && DatabaseUtils.isPartOfDatabase(resourceName, databaseName)) {
         rawTableNames.add(TableNameBuilder.extractRawTableName(resourceName));
       }
     }
@@ -1616,7 +1612,7 @@ public class PinotHelixResourceManager {
     List<String> schemas = _propertyStore.getChildNames(
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
     if (schemas != null) {
-      return schemas.stream().filter(schemaName -> isPartOfDatabase(schemaName, databaseName))
+      return schemas.stream().filter(schemaName -> DatabaseUtils.isPartOfDatabase(schemaName, databaseName))
           .collect(Collectors.toList());
     }
     return Collections.emptyList();
@@ -3989,7 +3985,7 @@ public class PinotHelixResourceManager {
    * @return Map of tableName to list of ONLINE brokers serving the table
    */
   public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping() {
-    return getTableToLiveBrokersMapping(null);
+    return getTableToLiveBrokersMapping(null, null);
   }
 
   /**
@@ -3998,9 +3994,37 @@ public class PinotHelixResourceManager {
    * @return Map of tableName to list of ONLINE brokers serving the table
    */
   public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping(@Nullable String databaseName) {
+    return getTableToLiveBrokersMapping(databaseName, null);
+  }
+
+  /**
+   * Returns map of tableName in default database to list of live brokers
+   * @param tables table list to get the tables from
+   * @return Map of tableName to list of ONLINE brokers serving the table
+   */
+  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping(@Nullable List<String> tables) {
+    return getTableToLiveBrokersMapping(null, tables);
+  }
+
+  /**
+   * Returns map of tableName to list of live brokers
+   * @param databaseName database to get the tables from
+   * @param tables table list to get the tables from
+   * @return Map of tableName to list of ONLINE brokers serving the table
+   */
+  public Map<String, List<InstanceInfo>> getTableToLiveBrokersMapping(@Nullable String databaseName,
+      @Nullable List<String> tables) {
     ExternalView ev = _helixDataAccessor.getProperty(_keyBuilder.externalView(Helix.BROKER_RESOURCE_INSTANCE));
     if (ev == null) {
       throw new IllegalStateException("Failed to find external view for " + Helix.BROKER_RESOURCE_INSTANCE);
+    }
+
+    Set<String> tableSet = null;
+    if (CollectionUtils.isNotEmpty(tables)) {
+      tableSet = Sets.newHashSetWithExpectedSize(tables.size());
+      for (String table : tables) {
+        tableSet.add(DatabaseUtils.translateTableName(table, databaseName));
+      }
     }
 
     // Map of instanceId -> InstanceConfig
@@ -4010,8 +4034,12 @@ public class PinotHelixResourceManager {
     Map<String, List<InstanceInfo>> result = new HashMap<>();
     ZNRecord znRecord = ev.getRecord();
     for (Map.Entry<String, Map<String, String>> tableToBrokersEntry : znRecord.getMapFields().entrySet()) {
-      String tableName = tableToBrokersEntry.getKey();
-      if (!isPartOfDatabase(tableName, databaseName)) {
+      String tableNameWithType = tableToBrokersEntry.getKey();
+      if (!DatabaseUtils.isPartOfDatabase(tableNameWithType, databaseName)) {
+        continue;
+      }
+      if (tableSet != null && !tableSet.contains(tableNameWithType) && !tableSet.contains(
+          TableNameBuilder.extractRawTableName(tableNameWithType))) {
         continue;
       }
       Map<String, String> brokersToState = tableToBrokersEntry.getValue();
@@ -4024,7 +4052,7 @@ public class PinotHelixResourceManager {
         }
       }
       if (!hosts.isEmpty()) {
-        result.put(tableName, hosts);
+        result.put(tableNameWithType, hosts);
       }
     }
     return result;

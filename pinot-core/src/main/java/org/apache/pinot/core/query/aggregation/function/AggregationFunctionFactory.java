@@ -61,16 +61,16 @@ public class AggregationFunctionFactory {
       if (upperCaseFunctionName.startsWith("PERCENTILE")) {
         String remainingFunctionName = upperCaseFunctionName.substring(10);
         if (remainingFunctionName.equals("SMARTTDIGEST")) {
-          return new PercentileSmartTDigestAggregationFunction(arguments);
+          return new PercentileSmartTDigestAggregationFunction(arguments, nullHandlingEnabled);
         }
         if (remainingFunctionName.equals("KLL")) {
-          return new PercentileKLLAggregationFunction(arguments);
+          return new PercentileKLLAggregationFunction(arguments, nullHandlingEnabled);
         }
         if (remainingFunctionName.equals("KLLMV")) {
           return new PercentileKLLMVAggregationFunction(arguments);
         }
         if (remainingFunctionName.equals("RAWKLL")) {
-          return new PercentileRawKLLAggregationFunction(arguments);
+          return new PercentileRawKLLAggregationFunction(arguments, nullHandlingEnabled);
         }
         if (remainingFunctionName.equals("RAWKLLMV")) {
           return new PercentileRawKLLMVAggregationFunction(arguments);
@@ -80,23 +80,28 @@ public class AggregationFunctionFactory {
           // NOTE: This convention is deprecated. DO NOT add new functions here
           if (remainingFunctionName.matches("\\d+")) {
             // Percentile
-            return new PercentileAggregationFunction(firstArgument, parsePercentileToInt(remainingFunctionName));
+            return new PercentileAggregationFunction(firstArgument, parsePercentileToInt(remainingFunctionName),
+                nullHandlingEnabled);
           } else if (remainingFunctionName.matches("EST\\d+")) {
             // PercentileEst
             String percentileString = remainingFunctionName.substring(3);
-            return new PercentileEstAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+            return new PercentileEstAggregationFunction(firstArgument, parsePercentileToInt(percentileString),
+                nullHandlingEnabled);
           } else if (remainingFunctionName.matches("RAWEST\\d+")) {
             // PercentileRawEst
             String percentileString = remainingFunctionName.substring(6);
-            return new PercentileRawEstAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+            return new PercentileRawEstAggregationFunction(firstArgument, parsePercentileToInt(percentileString),
+                nullHandlingEnabled);
           } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
             // PercentileTDigest
             String percentileString = remainingFunctionName.substring(7);
-            return new PercentileTDigestAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+            return new PercentileTDigestAggregationFunction(firstArgument, parsePercentileToInt(percentileString),
+                nullHandlingEnabled);
           } else if (remainingFunctionName.matches("RAWTDIGEST\\d+")) {
             // PercentileRawTDigest
             String percentileString = remainingFunctionName.substring(10);
-            return new PercentileRawTDigestAggregationFunction(firstArgument, parsePercentileToInt(percentileString));
+            return new PercentileRawTDigestAggregationFunction(firstArgument, parsePercentileToInt(percentileString),
+                nullHandlingEnabled);
           } else if (remainingFunctionName.matches("\\d+MV")) {
             // PercentileMV
             String percentileString = remainingFunctionName.substring(0, remainingFunctionName.length() - 2);
@@ -125,23 +130,23 @@ public class AggregationFunctionFactory {
           Preconditions.checkArgument(percentile >= 0 && percentile <= 100, "Invalid percentile: %s", percentile);
           if (remainingFunctionName.isEmpty()) {
             // Percentile
-            return new PercentileAggregationFunction(firstArgument, percentile);
+            return new PercentileAggregationFunction(firstArgument, percentile, nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("EST")) {
             // PercentileEst
-            return new PercentileEstAggregationFunction(firstArgument, percentile);
+            return new PercentileEstAggregationFunction(firstArgument, percentile, nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("RAWEST")) {
             // PercentileRawEst
-            return new PercentileRawEstAggregationFunction(firstArgument, percentile);
+            return new PercentileRawEstAggregationFunction(firstArgument, percentile, nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("TDIGEST")) {
             // PercentileTDigest
-            return new PercentileTDigestAggregationFunction(firstArgument, percentile);
+            return new PercentileTDigestAggregationFunction(firstArgument, percentile, nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("RAWTDIGEST")) {
             // PercentileRawTDigest
-            return new PercentileRawTDigestAggregationFunction(firstArgument, percentile);
+            return new PercentileRawTDigestAggregationFunction(firstArgument, percentile, nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("MV")) {
             // PercentileMV
@@ -175,11 +180,13 @@ public class AggregationFunctionFactory {
           Preconditions.checkArgument(compressionFactor >= 0, "Invalid compressionFactor: %d", compressionFactor);
           if (remainingFunctionName.equals("TDIGEST")) {
             // PercentileTDigest
-            return new PercentileTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
+            return new PercentileTDigestAggregationFunction(firstArgument, percentile, compressionFactor,
+                nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("RAWTDIGEST")) {
             // PercentileRawTDigest
-            return new PercentileRawTDigestAggregationFunction(firstArgument, percentile, compressionFactor);
+            return new PercentileRawTDigestAggregationFunction(firstArgument, percentile, compressionFactor,
+                nullHandlingEnabled);
           }
           if (remainingFunctionName.equals("TDIGESTMV")) {
             // PercentileTDigestMV
@@ -221,17 +228,19 @@ public class AggregationFunctionFactory {
             DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
             switch (dataType) {
               case BOOLEAN:
-                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, true);
+                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled,
+                    true);
               case INT:
-                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, false);
+                return new FirstIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled,
+                    false);
               case LONG:
-                return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new FirstLongValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case FLOAT:
-                return new FirstFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new FirstFloatValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case DOUBLE:
-                return new FirstDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new FirstDoubleValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case STRING:
-                return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new FirstStringValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               default:
                 throw new IllegalArgumentException("Unsupported data type for FIRST_WITH_TIME: " + dataType);
             }
@@ -300,23 +309,23 @@ public class AggregationFunctionFactory {
             DataType dataType = DataType.valueOf(dataTypeExp.getLiteral().getStringValue().toUpperCase());
             switch (dataType) {
               case BOOLEAN:
-                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, true);
+                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled, true);
               case INT:
-                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, false);
+                return new LastIntValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled, false);
               case LONG:
-                return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new LastLongValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case FLOAT:
-                return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new LastFloatValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case DOUBLE:
-                return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new LastDoubleValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               case STRING:
-                return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol);
+                return new LastStringValueWithTimeAggregationFunction(firstArgument, timeCol, nullHandlingEnabled);
               default:
                 throw new IllegalArgumentException("Unsupported data type for LAST_WITH_TIME: " + dataType);
             }
           }
           case MINMAXRANGE:
-            return new MinMaxRangeAggregationFunction(arguments);
+            return new MinMaxRangeAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNT:
             return new DistinctCountAggregationFunction(arguments, nullHandlingEnabled);
           case DISTINCTCOUNTBITMAP:

@@ -33,14 +33,14 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFunction<MinMaxRangePair, Double> {
+public class MinMaxRangeAggregationFunction extends NullableSingleInputAggregationFunction<MinMaxRangePair, Double> {
 
-  public MinMaxRangeAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "MIN_MAX_RANGE"));
+  public MinMaxRangeAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "MIN_MAX_RANGE"), nullHandlingEnabled);
   }
 
-  protected MinMaxRangeAggregationFunction(ExpressionContext expression) {
-    super(expression);
+  protected MinMaxRangeAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
   }
 
   @Override
@@ -61,37 +61,29 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double min = Double.POSITIVE_INFINITY;
-    double max = Double.NEGATIVE_INFINITY;
 
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    MinMaxRangePair minMax = new MinMaxRangePair();
+
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        double value = doubleValues[i];
-        if (value < min) {
-          min = value;
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          double value = doubleValues[i];
+          minMax.apply(value);
         }
-        if (value > max) {
-          max = value;
-        }
-      }
+      });
     } else {
       // Serialized MinMaxRangePair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
-        double minValue = minMaxRangePair.getMin();
-        double maxValue = minMaxRangePair.getMax();
-        if (minValue < min) {
-          min = minValue;
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
+          minMax.apply(minMaxRangePair);
         }
-        if (maxValue > max) {
-          max = maxValue;
-        }
-      }
+      });
     }
-    setAggregationResult(aggregationResultHolder, min, max);
+    setAggregationResult(aggregationResultHolder, minMax.getMin(), minMax.getMax());
   }
 
   protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, double min, double max) {
@@ -109,17 +101,21 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        double value = doubleValues[i];
-        setGroupByResult(groupKeyArray[i], groupByResultHolder, value, value);
-      }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          double value = doubleValues[i];
+          setGroupByResult(groupKeyArray[i], groupByResultHolder, value, value);
+        }
+      });
     } else {
       // Serialized MinMaxRangePair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
-        setGroupByResult(groupKeyArray[i], groupByResultHolder, minMaxRangePair.getMin(), minMaxRangePair.getMax());
-      }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
+          setGroupByResult(groupKeyArray[i], groupByResultHolder, minMaxRangePair.getMin(), minMaxRangePair.getMax());
+        }
+      });
     }
   }
 
@@ -129,23 +125,27 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        double value = doubleValues[i];
-        for (int groupKey : groupKeysArray[i]) {
-          setGroupByResult(groupKey, groupByResultHolder, value, value);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          double value = doubleValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            setGroupByResult(groupKey, groupByResultHolder, value, value);
+          }
         }
-      }
+      });
     } else {
       // Serialized MinMaxRangePair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
-        double min = minMaxRangePair.getMin();
-        double max = minMaxRangePair.getMax();
-        for (int groupKey : groupKeysArray[i]) {
-          setGroupByResult(groupKey, groupByResultHolder, min, max);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          MinMaxRangePair minMaxRangePair = ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.deserialize(bytesValues[i]);
+          double min = minMaxRangePair.getMin();
+          double max = minMaxRangePair.getMax();
+          for (int groupKey : groupKeysArray[i]) {
+            setGroupByResult(groupKey, groupByResultHolder, min, max);
+          }
         }
-      }
+      });
     }
   }
 
@@ -161,8 +161,8 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
   @Override
   public MinMaxRangePair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
-    if (minMaxRangePair == null) {
-      return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+    if (minMaxRangePair == null && !_nullHandlingEnabled) {
+      return new MinMaxRangePair();
     } else {
       return minMaxRangePair;
     }
@@ -171,8 +171,8 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
   @Override
   public MinMaxRangePair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     MinMaxRangePair minMaxRangePair = groupByResultHolder.getResult(groupKey);
-    if (minMaxRangePair == null) {
-      return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+    if (minMaxRangePair == null && !_nullHandlingEnabled) {
+      return new MinMaxRangePair();
     } else {
       return minMaxRangePair;
     }
@@ -196,6 +196,9 @@ public class MinMaxRangeAggregationFunction extends BaseSingleInputAggregationFu
 
   @Override
   public Double extractFinalResult(MinMaxRangePair intermediateResult) {
+    if (intermediateResult == null) {
+      return null;
+    }
     return intermediateResult.getMax() - intermediateResult.getMin();
   }
 }

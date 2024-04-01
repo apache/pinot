@@ -103,6 +103,7 @@ import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -125,9 +126,14 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *   <li>DELETE '/tasks/{taskType}': Delete all tasks (as well as the task queue) for the given task type</li>
  * </ul>
  */
-@Api(tags = Constants.TASK_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+@Api(tags = Constants.TASK_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY),
+    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
 @Path("/")
 public class PinotTaskRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskRestletResource.class);
@@ -550,7 +556,7 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch cron scheduler job keys")
   public Map<String, Object> getCronSchedulerJobDetails(
-      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
+      @ApiParam(value = "Table name (with type suffix)", required = true) @QueryParam("tableName") String tableName,
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType, @Context HttpHeaders headers)
       throws SchedulerException {
     Scheduler scheduler = _pinotTaskManager.getScheduler();
@@ -612,16 +618,17 @@ public class PinotTaskRestletResource {
   public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
       @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (taskType != null) {
       // Schedule task for the given task type
-      List<String> taskNames = tableName != null ? _pinotTaskManager.scheduleTask(taskType, tableName)
+      List<String> taskNames = tableName != null
+          ? _pinotTaskManager.scheduleTask(taskType, DatabaseUtils.translateTableName(tableName, headers))
           : _pinotTaskManager.scheduleTask(taskType);
       return Collections.singletonMap(taskType, taskNames == null ? null : StringUtils.join(taskNames, ','));
     } else {
       // Schedule tasks for all task types
-      Map<String, List<String>> allTaskNames =
-          tableName != null ? _pinotTaskManager.scheduleTasks(tableName) : _pinotTaskManager.scheduleTasks();
+      Map<String, List<String>> allTaskNames = tableName != null 
+          ? _pinotTaskManager.scheduleTasks(DatabaseUtils.translateTableName(tableName, headers))
+          : _pinotTaskManager.scheduleTasks();
       return allTaskNames.entrySet().stream()
           .collect(Collectors.toMap(Map.Entry::getKey, entry -> String.join(",", entry.getValue())));
     }

@@ -43,9 +43,13 @@ import org.apache.datasketches.theta.SetOperationBuilder;
 import org.apache.datasketches.theta.Sketch;
 import org.apache.datasketches.theta.Sketches;
 import org.apache.datasketches.theta.UpdateSketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSketch;
+import org.apache.datasketches.tuple.aninteger.IntegerSummary;
+import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
 import org.apache.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import org.apache.pinot.segment.local.customobject.AvgPair;
+import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.IntLongPair;
@@ -54,6 +58,7 @@ import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
+import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.ValueLongPair;
 import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.testng.annotations.Test;
@@ -517,6 +522,55 @@ public class ObjectSerDeUtilsTest {
       byte[] bytes = ObjectSerDeUtils.serialize(accumulator);
       ThetaSketchAccumulator actual =
           ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.ThetaSketchAccumulator);
+
+      assertEquals(actual.getResult().getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+      assertEquals(actual.getResult().toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testTupleIntSketchAccumulator() {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int lgK = 4;
+      int size = RANDOM.nextInt(100) + 10;
+      IntegerSketch input = new IntegerSketch(lgK, IntegerSummary.Mode.Sum);
+
+      for (int j = 0; j < size; j++) {
+        input.update(j, RANDOM.nextInt(100));
+      }
+
+      IntegerSummarySetOperations setOps =
+          new IntegerSummarySetOperations(IntegerSummary.Mode.Sum, IntegerSummary.Mode.Sum);
+      TupleIntSketchAccumulator accumulator = new TupleIntSketchAccumulator(setOps, (int) Math.pow(2, lgK), 2);
+      org.apache.datasketches.tuple.Sketch<IntegerSummary> sketch = input.compact();
+      accumulator.apply(sketch);
+
+      byte[] bytes = ObjectSerDeUtils.serialize(accumulator);
+      TupleIntSketchAccumulator actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.TupleIntSketchAccumulator);
+
+      assertEquals(actual.getResult().getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
+      assertEquals(actual.getResult().toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testCpcSketchAccumulator() {
+    int lgK = 4;
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      int size = RANDOM.nextInt(100) + 10;
+      CpcSketch sketch = new CpcSketch(lgK);
+
+      for (int j = 0; j < size; j++) {
+        sketch.update(j);
+      }
+
+      CpcSketchAccumulator accumulator = new CpcSketchAccumulator(lgK, 2);
+      accumulator.apply(sketch);
+
+      byte[] bytes = ObjectSerDeUtils.serialize(accumulator);
+      CpcSketchAccumulator actual =
+          ObjectSerDeUtils.deserialize(bytes, ObjectSerDeUtils.ObjectType.CpcSketchAccumulator);
 
       assertEquals(actual.getResult().getEstimate(), sketch.getEstimate(), ERROR_MESSAGE);
       assertEquals(actual.getResult().toByteArray(), sketch.toByteArray(), ERROR_MESSAGE);

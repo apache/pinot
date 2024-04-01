@@ -26,9 +26,17 @@ public class MinMaxRangePair implements Comparable<MinMaxRangePair> {
   private double _min;
   private double _max;
 
+  public MinMaxRangePair() {
+    this(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+  }
+
   public MinMaxRangePair(double min, double max) {
     _min = min;
     _max = max;
+  }
+
+  public void apply(double value) {
+    apply(value, value);
   }
 
   public void apply(double min, double max) {

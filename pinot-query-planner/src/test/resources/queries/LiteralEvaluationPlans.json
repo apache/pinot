@@ -16,7 +16,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[30.0], EXPR$1=[11.0])",
-          "\n  LogicalTableScan(table=[[d]])",
+          "\n  LogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -26,7 +26,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[1997-02-01 00:00:00])",
-          "\n  LogicalTableScan(table=[[d]])",
+          "\n  LogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -36,7 +36,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[CAST(854755200000:BIGINT):BIGINT])",
-          "\n  LogicalTableScan(table=[[d]])",
+          "\n  LogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -46,7 +46,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($6):TIMESTAMP(0) NOT NULL, CAST(854755200000:BIGINT):TIMESTAMP(0))])",
-          "\n  LogicalTableScan(table=[[d]])",
+          "\n  LogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -56,7 +56,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalFilter(condition=[=(CAST($6):TIMESTAMP(0) NOT NULL, 2019-01-01 00:00:00)])",
-          "\n  LogicalTableScan(table=[[d]])",
+          "\n  LogicalTableScan(table=[[default, d]])",
           "\n"
         ]
       },
@@ -66,7 +66,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(day=[CAST(854755200000:BIGINT):BIGINT])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -76,7 +76,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalFilter(condition=[=(DATETRUNC(_UTF-8'MONTH', $6), 1546300800000)])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -86,7 +86,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[_UTF-8'MONTH'])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -96,7 +96,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[CAST(_UTF-8'month 1':VARCHAR CHARACTER SET \"UTF-8\"):VARCHAR CHARACTER SET \"UTF-8\"])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -106,7 +106,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[CAST(_UTF-8'nth':VARCHAR CHARACTER SET \"UTF-8\"):VARCHAR CHARACTER SET \"UTF-8\"])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -116,7 +116,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[CAST(_UTF-8'NTH':VARCHAR CHARACTER SET \"UTF-8\"):VARCHAR CHARACTER SET \"UTF-8\"])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -126,7 +126,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[599041711439609855:BIGINT])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -136,7 +136,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[X'8040340000000000004024000000000000':VARBINARY])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -146,7 +146,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[1.3416951966757335E7:DOUBLE])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -156,7 +156,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[12345678901234567890123456789.1234567890123456789:DECIMAL(1000, 0)])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -166,7 +166,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[14:BIGINT])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -176,7 +176,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[15.0:BIGINT])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -186,7 +186,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[ARRAY(1, 2, 3)])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -206,7 +206,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[ARRAY(0.1:DECIMAL(2, 1), 0.2:DECIMAL(2, 1), 0.3:DECIMAL(2, 1))])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -226,7 +226,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[ARRAY(_UTF-8'a', _UTF-8'b', _UTF-8'c')])",
-          "\n  LogicalTableScan(table=[[a]])",
+          "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },
@@ -249,7 +249,7 @@
           "\n  PinotLogicalExchange(distribution=[hash])",
           "\n    LogicalAggregate(group=[{}], agg#0=[COUNT()])",
           "\n      LogicalFilter(condition=[>(CAST($0):BIGINT NOT NULL, 14)])",
-          "\n        LogicalTableScan(table=[[a]])",
+          "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },

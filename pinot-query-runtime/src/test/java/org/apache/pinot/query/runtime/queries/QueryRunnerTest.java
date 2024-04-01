@@ -89,13 +89,13 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("b").build(), "b_REALTIME");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("c").build(), "c_OFFLINE");
     factory1.registerTable(SCHEMA_BUILDER.setSchemaName("d").build(), "d");
-    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("tbl-escape.naming").build(), "tbl-escape.naming_OFFLINE");
+    factory1.registerTable(SCHEMA_BUILDER.setSchemaName("tbl-escape-naming").build(), "tbl-escape-naming_OFFLINE");
     factory1.addSegment("a_REALTIME", buildRows("a_REALTIME"));
     factory1.addSegment("a_REALTIME", buildRows("a_REALTIME"));
     factory1.addSegment("b_REALTIME", buildRows("b_REALTIME"));
     factory1.addSegment("c_OFFLINE", buildRows("c_OFFLINE"));
     factory1.addSegment("d_OFFLINE", buildRows("d_OFFLINE"));
-    factory1.addSegment("tbl-escape.naming_OFFLINE", buildRows("tbl-escape.naming_OFFLINE"));
+    factory1.addSegment("tbl-escape-naming_OFFLINE", buildRows("tbl-escape-naming_OFFLINE"));
 
     MockInstanceDataManagerFactory factory2 = new MockInstanceDataManagerFactory("server2");
     factory2.registerTable(SCHEMA_BUILDER.setSchemaName("a").build(), "a_REALTIME");
@@ -258,7 +258,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
             + "col1, COUNT(*) FROM a GROUP BY col1", 2},
         new Object[]{"SET numGroupsLimit = 2; SELECT /*+ aggOptions(num_groups_limit='1') */ "
             + "a.col2, b.col2, COUNT(*) FROM a JOIN b USING (col1) GROUP BY a.col2, b.col2", 1},
-        new Object[]{"SELECT * FROM \"tbl-escape.naming\"", 5}
+        new Object[]{"SELECT * FROM \"default.tbl-escape-naming\"", 5}
     };
   }
 

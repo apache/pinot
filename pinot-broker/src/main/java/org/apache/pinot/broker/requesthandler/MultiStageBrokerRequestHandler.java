@@ -52,6 +52,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -70,6 +71,7 @@ import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
+import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -81,7 +83,7 @@ import org.slf4j.LoggerFactory;
 public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageBrokerRequestHandler.class);
 
-  private final QueryEnvironment _queryEnvironment;
+  private final WorkerManager _workerManager;
   private final MailboxService _mailboxService;
   private final QueryDispatcher _queryDispatcher;
 
@@ -93,9 +95,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     LOGGER.info("Using Multi-stage BrokerRequestHandler.");
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
-    _queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(tableCache)),
-        new WorkerManager(hostname, port, routingManager), _tableCache);
+    _workerManager = new WorkerManager(hostname, port, _routingManager);
     _mailboxService = new MailboxService(hostname, port, config);
     _queryDispatcher = new QueryDispatcher(_mailboxService);
 
@@ -126,11 +126,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(sqlNodeAndOptions.getOptions());
       queryTimeoutMs = timeoutMsFromQueryOption == null ? _brokerTimeoutMs : timeoutMsFromQueryOption;
+      String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
       // Compile the request
       compilationStartTimeNs = System.nanoTime();
+      QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
+          CalciteSchemaBuilder.asRootSchema(new PinotCatalog(database, _tableCache), database), _workerManager,
+          _tableCache);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          queryPlanResult = _queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
+          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           if (!hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders)) {
@@ -140,9 +144,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
         default:
-          queryPlanResult = _queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
+          queryPlanResult = queryEnvironment.planQuery(query, sqlNodeAndOptions, requestId);
           break;
       }
+    } catch (DatabaseConflictException e) {
+      LOGGER.info("{}. Request {}: {}", e.getMessage(), requestId, query);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+      requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+      return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     } catch (WebApplicationException e) {
       throw e;
     } catch (RuntimeException e) {

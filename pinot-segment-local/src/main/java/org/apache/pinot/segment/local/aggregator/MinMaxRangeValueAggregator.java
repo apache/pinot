@@ -53,7 +53,7 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
       value.apply(deserializeAggregatedValue((byte[]) rawValue));
     } else {
       double doubleValue = ((Number) rawValue).doubleValue();
-      value.apply(doubleValue, doubleValue);
+      value.apply(doubleValue);
     }
     return value;
   }

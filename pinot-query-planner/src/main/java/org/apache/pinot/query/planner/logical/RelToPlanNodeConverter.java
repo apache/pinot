@@ -49,6 +49,7 @@ import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -173,7 +174,13 @@ public final class RelToPlanNodeConverter {
   }
 
   private static PlanNode convertLogicalTableScan(LogicalTableScan node, int currentStageId) {
-    String tableName = node.getTable().getQualifiedName().get(0);
+    String tableName;
+    if (node.getTable().getQualifiedName().size() == 1) {
+      tableName = node.getTable().getQualifiedName().get(0);
+    } else {
+      tableName = DatabaseUtils.translateTableName(node.getTable().getQualifiedName().get(1),
+          node.getTable().getQualifiedName().get(0));
+    }
     List<String> columnNames =
         node.getRowType().getFieldList().stream().map(RelDataTypeField::getName).collect(Collectors.toList());
     return new TableScanNode(currentStageId, toDataSchema(node.getRowType()), node.getHints(), tableName, columnNames);
@@ -287,7 +294,12 @@ public final class RelToPlanNodeConverter {
       // Calcite encloses table and schema names in square brackets to properly quote and delimit them in SQL
       // statements, particularly to handle cases when they contain special characters or reserved keywords.
       String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
-      tableNames.add(tableName);
+      String[] split = tableName.split(", ");
+      if (split.length == 1) {
+        tableNames.add(tableName);
+      } else {
+        tableNames.add(DatabaseUtils.translateTableName(split[1], split[0]));
+      }
     }
     return tableNames;
   }

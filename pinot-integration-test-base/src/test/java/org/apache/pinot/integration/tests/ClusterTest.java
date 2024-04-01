@@ -526,6 +526,15 @@ public abstract class ClusterTest extends ControllerTest {
         getExtraQueryProperties());
   }
 
+  /**
+   * Queries the broker's sql query endpoint (/query/sql)
+   */
+  protected JsonNode postQuery(String query, Map<String, String> headers)
+      throws Exception {
+    return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), headers,
+        getExtraQueryProperties());
+  }
+
   protected Map<String, String> getExtraQueryProperties() {
     return Collections.emptyMap();
   }

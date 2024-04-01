@@ -16,40 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.fmpp;
-
-import fmpp.Engine;
-import fmpp.tdd.DataLoader;
-import java.util.List;
-import org.apache.maven.project.MavenProject;
+package org.apache.pinot.core.query.aggregation.function;
 
 
-/**
- * A data loader for Maven
- */
-public class MavenDataLoader implements DataLoader {
-  public static final class MavenData {
-    private final MavenProject project;
-
-    public MavenData(MavenProject project) {
-      this.project = project;
-    }
-
-    public MavenProject getProject() {
-      return project;
-    }
+public class PercentileKLLAggregationFunctionTest extends AbstractPercentileAggregationFunctionTest {
+  @Override
+  public String callStr(String column, int percent) {
+    return "PERCENTILEKLL(" + column + ", " + percent + ")";
   }
 
-  public static final String MAVEN_DATA_ATTRIBUTE = "maven.data";
+  @Override
+  String expectedAggrWithNull10(Scenario scenario) {
+    return "0";
+  }
 
   @Override
-  public Object load(Engine e, List args)
-      throws Exception {
-    if (!args.isEmpty()) {
-      throw new IllegalArgumentException("maven model data loader has no parameters");
-    }
+  String expectedAggrWithNull30(Scenario scenario) {
+    return "2";
+  }
 
-    MavenData data = (MavenData) e.getAttribute(MAVEN_DATA_ATTRIBUTE);
-    return data;
+  @Override
+  String expectedAggrWithNull50(Scenario scenario) {
+    return "4";
+  }
+
+  @Override
+  String expectedAggrWithNull70(Scenario scenario) {
+    return "6";
   }
 }
