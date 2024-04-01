@@ -626,7 +626,7 @@ public class PinotTaskRestletResource {
       return Collections.singletonMap(taskType, taskNames == null ? null : StringUtils.join(taskNames, ','));
     } else {
       // Schedule tasks for all task types
-      Map<String, List<String>> allTaskNames = tableName != null 
+      Map<String, List<String>> allTaskNames = tableName != null
           ? _pinotTaskManager.scheduleTasks(DatabaseUtils.translateTableName(tableName, headers))
           : _pinotTaskManager.scheduleTasks();
       return allTaskNames.entrySet().stream()
