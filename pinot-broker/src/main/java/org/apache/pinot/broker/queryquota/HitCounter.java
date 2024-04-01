@@ -83,10 +83,20 @@ public class HitCounter {
 
   @VisibleForTesting
   int getHitCount(long timestamp) {
+    return getHitCount(timestamp, _bucketCount);
+  }
+
+  /**
+   * Get the hit count within the valid number of buckets.
+   * @param timestamp the current timestamp
+   * @param validBucketCount the valid number of buckets
+   * @return the number of hits within the valid bucket count
+   */
+  int getHitCount(long timestamp, int validBucketCount) {
     long numTimeUnits = timestamp / _timeBucketWidthMs;
     int count = 0;
     for (int i = 0; i < _bucketCount; i++) {
-      if (numTimeUnits - _bucketStartTime.get(i) < _bucketCount) {
+      if (numTimeUnits - _bucketStartTime.get(i) < validBucketCount) {
         count += _bucketHitCount.get(i);
       }
     }

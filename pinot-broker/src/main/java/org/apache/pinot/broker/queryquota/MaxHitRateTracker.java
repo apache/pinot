@@ -34,6 +34,7 @@ public class MaxHitRateTracker extends HitCounter {
   private static final int ONE_SECOND_BUCKET_WIDTH_MS = 1000;
   private static final int MAX_TIME_RANGE_FACTOR = 2;
 
+  private final int _validBucketCount;
   private final long _maxTimeRangeMs;
   private final long _defaultTimeRangeMs;
   private volatile long _lastAccessTimestamp;
@@ -44,6 +45,7 @@ public class MaxHitRateTracker extends HitCounter {
 
   private MaxHitRateTracker(int defaultTimeRangeInSeconds, int maxTimeRangeInSeconds) {
     super(maxTimeRangeInSeconds, (int) (maxTimeRangeInSeconds * 1000L / ONE_SECOND_BUCKET_WIDTH_MS));
+    _validBucketCount = (int) (defaultTimeRangeInSeconds * 1000L / ONE_SECOND_BUCKET_WIDTH_MS);
     _defaultTimeRangeMs = defaultTimeRangeInSeconds * 1000L;
     _maxTimeRangeMs = maxTimeRangeInSeconds * 1000L;
   }
@@ -79,5 +81,15 @@ public class MaxHitRateTracker extends HitCounter {
     // Update the last access timestamp
     _lastAccessTimestamp = now;
     return maxCount;
+  }
+
+  @VisibleForTesting
+  @Override
+  int getHitCount(long now) {
+    return super.getHitCount(now, _validBucketCount);
+  }
+
+  public long getDefaultTimeRangeMs() {
+    return _defaultTimeRangeMs;
   }
 }
