@@ -134,124 +134,126 @@ public class ValidationMetrics {
   /**
    * Updates the missing segment count gauge.
    *
-   * @param resource The resource for which the gauge is updated
+   * @param tableNameWithType The table name with type for which the gauge is updated
    * @param missingSegmentCount The number of missing segments
    */
-  public void updateMissingSegmentCountGauge(final String resource, final int missingSegmentCount) {
-    makeGauge(resource, ValidationMetricName.MISSING_SEGMENT_COUNT, _storedValueGaugeFactory, missingSegmentCount);
+  public void updateMissingSegmentCountGauge(final String tableNameWithType, final int missingSegmentCount) {
+    makeGauge(tableNameWithType, ValidationMetricName.MISSING_SEGMENT_COUNT, _storedValueGaugeFactory,
+        missingSegmentCount);
   }
 
   /**
    * Cleans up the missing segment count gauge.
    *
-   * @param resource The resource for which the gauge is removed
+   * @param tableNameWithType The table name with type for which the gauge is removed
    */
-  public void cleanupMissingSegmentCountGauge(final String resource) {
-    removeGauge(resource, ValidationMetricName.MISSING_SEGMENT_COUNT);
+  public void cleanupMissingSegmentCountGauge(final String tableNameWithType) {
+    removeGauge(tableNameWithType, ValidationMetricName.MISSING_SEGMENT_COUNT);
   }
 
   /**
    * Updates the offline segment delay gauge.
    *
-   * @param resource The resource for which the gauge is updated
+   * @param tableNameWithType The tableNameWithType for which the gauge is updated
    * @param lastOfflineSegmentTime The last offline segment end time, in milliseconds since the epoch, or Long.MIN_VALUE
    *                               if there is no such time.
    */
-  public void updateOfflineSegmentDelayGauge(final String resource, final long lastOfflineSegmentTime) {
-    makeGauge(resource, ValidationMetricName.OFFLINE_SEGMENT_DELAY_HOURS, _currentTimeMillisDeltaGaugeHoursFactory,
-        lastOfflineSegmentTime);
+  public void updateOfflineSegmentDelayGauge(final String tableNameWithType, final long lastOfflineSegmentTime) {
+    makeGauge(tableNameWithType, ValidationMetricName.OFFLINE_SEGMENT_DELAY_HOURS,
+        _currentTimeMillisDeltaGaugeHoursFactory, lastOfflineSegmentTime);
   }
 
   /**
    * Cleans up offline segment delay gauge.
    *
-   * @param resource The resource for which the gauge is removed
+   * @param tableNameWithType The table name with type for which the gauge is removed
    */
-  public void cleanupOfflineSegmentDelayGauge(final String resource) {
-    removeGauge(resource, ValidationMetricName.OFFLINE_SEGMENT_DELAY_HOURS);
+  public void cleanupOfflineSegmentDelayGauge(final String tableNameWithType) {
+    removeGauge(tableNameWithType, ValidationMetricName.OFFLINE_SEGMENT_DELAY_HOURS);
   }
 
   /**
    * Updates the last push time gauge.
    *
-   * @param resource The resource for which the gauge is updated
+   * @param tableNameWithType The table name with type for which the gauge is updated
    * @param lastPushTimeMillis The last push time, in milliseconds since the epoch, or Long.MIN_VALUE if there is no
    *                           such time.
    */
-  public void updateLastPushTimeGauge(final String resource, final long lastPushTimeMillis) {
-    makeGauge(resource, ValidationMetricName.LAST_PUSH_TIME_DELAY_HOURS, _currentTimeMillisDeltaGaugeHoursFactory,
-        lastPushTimeMillis);
+  public void updateLastPushTimeGauge(final String tableNameWithType, final long lastPushTimeMillis) {
+    makeGauge(tableNameWithType, ValidationMetricName.LAST_PUSH_TIME_DELAY_HOURS,
+        _currentTimeMillisDeltaGaugeHoursFactory, lastPushTimeMillis);
   }
 
   /**
    * Cleans up the last push time gauge.
    *
-   * @param resource The resource for which the gauge is removed
+   * @param tableNameWithType The table name with type for which the gauge is removed
    */
-  public void cleanupLastPushTimeGauge(final String resource) {
-    removeGauge(resource, ValidationMetricName.LAST_PUSH_TIME_DELAY_HOURS);
+  public void cleanupLastPushTimeGauge(final String tableNameWithType) {
+    removeGauge(tableNameWithType, ValidationMetricName.LAST_PUSH_TIME_DELAY_HOURS);
   }
 
   /**
    * Updates the total document count gauge.
    *
-   * @param resource The resource for which the gauge is updated
-   * @param documentCount Total document count for the given resource name or table name
+   * @param tableNameWithType The table name with type for which the gauge is updated
+   * @param documentCount Total document count for the given table name with type
    */
-  public void updateTotalDocumentCountGauge(final String resource, final long documentCount) {
-    makeGauge(resource, ValidationMetricName.TOTAL_DOCUMENT_COUNT, _storedValueGaugeFactory, documentCount);
+  public void updateTotalDocumentCountGauge(final String tableNameWithType, final long documentCount) {
+    makeGauge(tableNameWithType, ValidationMetricName.TOTAL_DOCUMENT_COUNT, _storedValueGaugeFactory, documentCount);
   }
 
   /**
    * Cleans up the total document count gauge.
    *
-   * @param resource The resource for which the gauge is removed
+   * @param tableNameWithType The table name with type for which the gauge is removed
    */
-  public void cleanupTotalDocumentCountGauge(final String resource) {
-    removeGauge(resource, ValidationMetricName.TOTAL_DOCUMENT_COUNT);
+  public void cleanupTotalDocumentCountGauge(final String tableNameWithType) {
+    removeGauge(tableNameWithType, ValidationMetricName.TOTAL_DOCUMENT_COUNT);
   }
 
   /**
    * Updates the non consuming partition count metric.
    *
-   * @param resource The resource for which the gauge is updated
+   * @param tableNameWithType The table name with type for which the gauge is updated
    * @param partitionCount Number of partitions that do not have any segment in CONSUMING state.
    */
-  public void updateNonConsumingPartitionCountMetric(final String resource, final int partitionCount) {
-    makeGauge(resource, ValidationMetricName.NON_CONSUMING_PARTITION_COUNT, _storedValueGaugeFactory, partitionCount);
+  public void updateNonConsumingPartitionCountMetric(final String tableNameWithType, final int partitionCount) {
+    makeGauge(tableNameWithType, ValidationMetricName.NON_CONSUMING_PARTITION_COUNT, _storedValueGaugeFactory,
+        partitionCount);
   }
 
   /**
    * Updates the segment count gauge.
    *
-   * @param resource The resource for which the gauge is updated
-   * @param segmentCount Total segment count for the given resource name or table name
+   * @param tableNameWithType The table name with type for which the gauge is updated
+   * @param segmentCount Total segment count for the given table name with type
    */
-  public void updateSegmentCountGauge(final String resource, final long segmentCount) {
-    makeGauge(resource, ValidationMetricName.SEGMENT_COUNT, _storedValueGaugeFactory, segmentCount);
+  public void updateSegmentCountGauge(final String tableNameWithType, final long segmentCount) {
+    makeGauge(tableNameWithType, ValidationMetricName.SEGMENT_COUNT, _storedValueGaugeFactory, segmentCount);
   }
 
   /**
    * Cleans up the segment count gauge.
    *
-   * @param resource The resource for which the gauge is removed
+   * @param tableNameWithType The table name with type for which the gauge is removed
    */
-  public void cleanupSegmentCountGauge(final String resource) {
-    removeGauge(resource, ValidationMetricName.SEGMENT_COUNT);
+  public void cleanupSegmentCountGauge(final String tableNameWithType) {
+    removeGauge(tableNameWithType, ValidationMetricName.SEGMENT_COUNT);
   }
 
   @VisibleForTesting
-  public static String makeGaugeName(final String resource, final String gaugeName) {
-    return "pinot.controller." + StringUtils.replaceOnce(resource, ".", "#") + "." + gaugeName;
+  public static String makeGaugeName(final String tableNameWithType, final String gaugeName) {
+    return "pinot.controller." + StringUtils.replaceOnce(tableNameWithType, ".", "#") + "." + gaugeName;
   }
 
   private PinotMetricName makeMetricName(final String gaugeName) {
     return PinotMetricUtils.makePinotMetricName(ValidationMetrics.class, gaugeName);
   }
 
-  private void makeGauge(final String resource, final ValidationMetricName validationMetricName,
+  private void makeGauge(final String tableNameWithType, final ValidationMetricName validationMetricName,
       final GaugeFactory<?> gaugeFactory, final long value) {
-    final String fullGaugeName = makeGaugeName(resource, validationMetricName.getMetricName());
+    final String fullGaugeName = makeGaugeName(tableNameWithType, validationMetricName.getMetricName());
     PinotMetricName metricName = makeMetricName(fullGaugeName);
     if (!_gaugeValues.containsKey(fullGaugeName)) {
       _gaugeValues.put(fullGaugeName, value);
@@ -262,8 +264,8 @@ public class ValidationMetrics {
     }
   }
 
-  private void removeGauge(final String resource, final ValidationMetricName validationMetricName) {
-    final String fullGaugeName = makeGaugeName(resource, validationMetricName.getMetricName());
+  private void removeGauge(final String tableNameWithType, final ValidationMetricName validationMetricName) {
+    final String fullGaugeName = makeGaugeName(tableNameWithType, validationMetricName.getMetricName());
     PinotMetricName pinotMetricName = makeMetricName(fullGaugeName);
     PinotMetricUtils.removeMetric(_metricsRegistry, pinotMetricName);
     _metricNames.remove(pinotMetricName);
