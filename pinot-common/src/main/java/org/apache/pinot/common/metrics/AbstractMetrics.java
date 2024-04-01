@@ -809,7 +809,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected abstract G[] getGauges();
 
   protected String getTableName(String tableName) {
-    tableName = StringUtils.replaceOnce(tableName, ".", "#");
-    return _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
+    tableName = _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
+    return StringUtils.replaceOnce(tableName, ".", "#");
   }
 }
