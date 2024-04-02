@@ -810,6 +810,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   protected String getTableName(String tableName) {
     tableName = _isTableLevelMetricsEnabled || _allowedTables.contains(tableName) ? tableName : "allTables";
+    // replace the '.' with '#' in tableName which is available in the format db1.table1 to avoid breaking the
+    // metric rules which are sensitive to '.' character.
     return StringUtils.replaceOnce(tableName, ".", "#");
   }
 }
