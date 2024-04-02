@@ -164,10 +164,6 @@
           <artifactId>jersey-container-servlet-core</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>io.swagger</groupId>
-          <artifactId>swagger-annotations</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>io.grpc</groupId>
           <artifactId>grpc-protobuf-lite</artifactId>
         </exclusion>

@@ -140,9 +140,11 @@
     <jackson.version>2.12.7.20221012</jackson.version>
     <zookeeper.version>3.9.2</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
-    <jersey.version>2.39</jersey.version>
+    <jersey.version>2.42</jersey.version>
     <hk2.version>2.6.1</hk2.version>
-    <swagger.version>1.6.9</swagger.version>
+    <javassist.version>3.30.2-GA</javassist.version>
+    <swagger.version>1.6.14</swagger.version>
+    <swagger-ui.version>5.13.0</swagger-ui.version>
     <hadoop.version>3.3.6</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.0</jsonsmart.version>
@@ -191,6 +193,7 @@
 
     <!-- Jakarta Libraries -->
     <jakarta.servlet-api.version>6.0.0</jakarta.servlet-api.version>
+    <jakarta.inject-api.version>2.0.1</jakarta.inject-api.version>
     <jakarta.validation-api.version>3.0.2</jakarta.validation-api.version>
     <jakarta.annotation-api.version>2.1.1</jakarta.annotation-api.version>
     <jakarta.xml.bind-api.version>4.0.2</jakarta.xml.bind-api.version>
@@ -763,6 +766,11 @@
         <version>${jakarta.servlet-api.version}</version>
       </dependency>
       <dependency>
+        <groupId>jakarta.inject</groupId>
+        <artifactId>jakarta.inject-api</artifactId>
+        <version>${jakarta.inject-api.version}</version>
+      </dependency>
+      <dependency>
         <groupId>jakarta.validation</groupId>
         <artifactId>jakarta.validation-api</artifactId>
         <version>${jakarta.validation-api.version}</version>
@@ -1189,11 +1197,6 @@
       </dependency>
 
       <dependency>
-        <groupId>org.webjars</groupId>
-        <artifactId>swagger-ui</artifactId>
-        <version>5.1.0</version>
-      </dependency>
-      <dependency>
         <groupId>com.clearspring.analytics</groupId>
         <artifactId>stream</artifactId>
         <version>2.9.8</version>
@@ -1261,11 +1264,6 @@
         <artifactId>commons-compiler</artifactId>
         <version>${janino.version}</version>
       </dependency>
-      <dependency>
-        <groupId>org.javassist</groupId>
-        <artifactId>javassist</artifactId>
-        <version>3.19.0-GA</version>
-      </dependency>
 
       <!-- Jersey Libraries -->
       <dependency>
@@ -1318,10 +1316,27 @@
         <artifactId>hk2-metadata-generator</artifactId>
         <version>${hk2.version}</version>
       </dependency>
+      <!-- Used by HK2 and reflections -->
+      <dependency>
+        <groupId>org.javassist</groupId>
+        <artifactId>javassist</artifactId>
+        <version>${javassist.version}</version>
+      </dependency>
       <dependency>
         <groupId>io.swagger</groupId>
         <artifactId>swagger-jersey2-jaxrs</artifactId>
         <version>${swagger.version}</version>
+      </dependency>
+      <!-- Also used by pulsar-common -->
+      <dependency>
+        <groupId>io.swagger</groupId>
+        <artifactId>swagger-annotations</artifactId>
+        <version>${swagger.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.webjars</groupId>
+        <artifactId>swagger-ui</artifactId>
+        <version>${swagger-ui.version}</version>
       </dependency>
 
       <dependency>
@@ -1754,7 +1769,6 @@
                       <exclude>commons-logging:commons-logging</exclude>
                       <!-- Use org.glassfish.hk2.external:jakarta.inject -->
                       <exclude>javax.inject:javax.inject</exclude>
-                      <exclude>jakarta.inject:jakarta.inject-api</exclude>
                     </excludes>
                   </bannedDependencies>
                 </rules>
