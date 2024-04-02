@@ -6,31 +6,43 @@ import org.apache.pinot.spi.stream.MessageBatch;
 
 
 public class OnHeapMessageBatchBuffer implements MessageBatchBuffer<MessageBatch>, AutoCloseable {
-  private final List<MessageBatch> buffer; // to store elements
-  private final int capacity; // maximum number of elements in the buffer
+  private final List<MessageBatch> _buffer; // to store elements
+  private final int _capacity; // maximum number of elements in the buffer
+
+  private volatile boolean _closed = false;
 
   public OnHeapMessageBatchBuffer(int capacity) {
-    this.capacity = capacity;
-    this.buffer = new ArrayList<>(capacity);
+    this._capacity = capacity;
+    this._buffer = new ArrayList<>(capacity);
   }
 
   @Override
   public synchronized void put(MessageBatch element) throws Exception {
     // Wait until the buffer has space
-    while (buffer.size() == capacity) {
+    while (_buffer.size() == _capacity && !_closed) {
       wait();
     }
-    buffer.add(element); // Add the new element to the buffer
+
+    if (_closed) {
+      throw new IllegalStateException("Cannot put elements to a closed buffer");
+    }
+
+    _buffer.add(element); // Add the new element to the buffer
     notifyAll(); // Notify all waiting threads that an element has been added
   }
 
   @Override
   public synchronized MessageBatch get() throws Exception {
     // Wait until the buffer is not empty
-    while (buffer.isEmpty()) {
+    while (_buffer.isEmpty() && !_closed) {
       wait();
     }
-    MessageBatch element = buffer.remove(0); // Remove an element from the buffer
+
+    if (_closed) {
+      throw new IllegalStateException("Cannot get elements from a closed buffer");
+    }
+
+    MessageBatch element = _buffer.remove(0); // Remove an element from the buffer
     notifyAll(); // Notify all waiting threads that an element has been removed
     return element;
   }
@@ -39,22 +51,24 @@ public class OnHeapMessageBatchBuffer implements MessageBatchBuffer<MessageBatch
 
   @Override
   public int size() {
-    return buffer.size();
+    return _buffer.size();
   }
 
   @Override
   public boolean isEmpty() {
-    return buffer.isEmpty();
+    return _buffer.isEmpty();
   }
 
   @Override
   public boolean isFull() {
-    return buffer.size() == capacity;
+    return _buffer.size() == _capacity;
   }
 
   @Override
   public void close()
       throws Exception {
-    buffer.clear();
+    //TODO: Clearing the buffer would lead to data loss. Need to handle this case.
+    _buffer.clear();
+    _closed = true;
   }
 }

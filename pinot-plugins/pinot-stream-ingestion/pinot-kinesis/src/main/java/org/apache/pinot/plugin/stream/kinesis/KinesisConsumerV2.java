@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +30,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.buffer.MessageBatchBuffer;
@@ -102,8 +102,8 @@ public class KinesisConsumerV2 extends KinesisConnectionHandler implements Parti
   }
 
   @Override
-  public void fetchMessages(StreamPartitionMsgOffset startCheckpoint, StreamPartitionMsgOffset endCheckpoint, int timeoutMs,
-      MessageBatchBuffer emitter)
+  public void fetchMessages(StreamPartitionMsgOffset startCheckpoint, StreamPartitionMsgOffset endCheckpoint,
+      int timeoutMs, MessageBatchBuffer emitter)
       throws Exception {
     List<KinesisStreamMessage> recordList = new ArrayList<>();
     Future<KinesisRecordsBatch> kinesisFetchResultFuture =
@@ -129,6 +129,7 @@ public class KinesisConsumerV2 extends KinesisConnectionHandler implements Parti
       String shardIterator = getShardIterator(startShardToSequenceNum.getKey(), startShardToSequenceNum.getValue());
 
       String kinesisEndSequenceNumber = null;
+      AtomicInteger totalRecordsSent = new AtomicInteger();
 
       if (endOffset != null) {
         KinesisPartitionGroupOffset kinesisEndCheckpoint = (KinesisPartitionGroupOffset) endOffset;
@@ -143,95 +144,110 @@ public class KinesisConsumerV2 extends KinesisConnectionHandler implements Parti
       long currentWindow = System.currentTimeMillis() / SLEEP_TIME_BETWEEN_REQUESTS;
       int currentWindowRequests = 0;
       while (shardIterator != null) {
-        GetRecordsRequest getRecordsRequest = GetRecordsRequest.builder().shardIterator(shardIterator).build();
+        try {
+          GetRecordsRequest getRecordsRequest = GetRecordsRequest.builder().shardIterator(shardIterator).build();
 
-        long requestSentTime = System.currentTimeMillis() / 1000;
-        GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordsRequest);
-        isEndOfShard = getRecordsResponse.hasChildShards() && !getRecordsResponse.childShards().isEmpty();                                                          ;
-        if (!getRecordsResponse.records().isEmpty()) {
-          getRecordsResponse.records().forEach(record -> {
-            try {
-              List<KinesisStreamMessage> recordListSingle = Collections.singletonList(new KinesisStreamMessage(record.partitionKey().getBytes(StandardCharsets.UTF_8),
-                  record.data().asByteArray(), record.sequenceNumber(),
-                  (KinesisStreamMessageMetadata) _kinesisMetadataExtractor.extract(record),
-                  record.data().asByteArray().length));
+          long requestSentTime = System.currentTimeMillis() / 1000;
+          GetRecordsResponse getRecordsResponse = _kinesisClient.getRecords(getRecordsRequest);
+          isEndOfShard = getRecordsResponse.hasChildShards() && !getRecordsResponse.childShards().isEmpty();
+          ;
+          if (!getRecordsResponse.records().isEmpty()) {
+            List<KinesisStreamMessage> recordListBatch = new ArrayList<>();
+            getRecordsResponse.records().forEach(record -> {
+              try {
+                KinesisStreamMessage kinesisStreamMessage =
+                    new KinesisStreamMessage(record.partitionKey().getBytes(StandardCharsets.UTF_8),
+                        record.data().asByteArray(), record.sequenceNumber(),
+                        (KinesisStreamMessageMetadata) _kinesisMetadataExtractor.extract(record),
+                        record.data().asByteArray().length);
+                recordListBatch.add(kinesisStreamMessage);
+                totalRecordsSent.getAndIncrement();
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
+            });
 
-              messageBatchBuffer.put(new KinesisRecordsBatch(recordListSingle, startShardToSequenceNum.getKey(),
-                  getRecordsResponse.hasChildShards() && !getRecordsResponse.childShards().isEmpty()));
-            } catch (Exception e) {
-              throw new RuntimeException(e);
+            messageBatchBuffer.put(new KinesisRecordsBatch(recordListBatch, startShardToSequenceNum.getKey(),
+                getRecordsResponse.hasChildShards() && !getRecordsResponse.childShards().isEmpty()));
+
+            nextStartSequenceNumber =
+                getRecordsResponse.records().get(getRecordsResponse.records().size() - 1).sequenceNumber();
+
+            if (kinesisEndSequenceNumber != null && kinesisEndSequenceNumber.compareTo(nextStartSequenceNumber) <= 0) {
+              break;
             }
-          });
-          nextStartSequenceNumber = recordList.get(recordList.size() - 1).sequenceNumber();
 
-          if (kinesisEndSequenceNumber != null && kinesisEndSequenceNumber.compareTo(nextStartSequenceNumber) <= 0) {
+            //FIXME: Should this end condition be here? It can cause early termination of the fetch
+//          if (totalRecordsSent.get() >= _numMaxRecordsToFetch) {
+//            break;
+//          }
+          }
+
+          if (getRecordsResponse.hasChildShards() && !getRecordsResponse.childShards().isEmpty()) {
+            //This statement returns true only when end of current shard has reached.
+            // hasChildShards only checks if the childShard is null and is a valid instance.
+            isEndOfShard = true;
             break;
           }
 
-          if (recordList.size() >= _numMaxRecordsToFetch) {
+          shardIterator = getRecordsResponse.nextShardIterator();
+
+          if (Thread.interrupted()) {
             break;
           }
-        }
 
-        if (getRecordsResponse.hasChildShards() && !getRecordsResponse.childShards().isEmpty()) {
-          //This statement returns true only when end of current shard has reached.
-          // hasChildShards only checks if the childShard is null and is a valid instance.
-          isEndOfShard = true;
-          break;
-        }
-
-        shardIterator = getRecordsResponse.nextShardIterator();
-
-        if (Thread.interrupted()) {
-          break;
-        }
-
-        // Kinesis enforces a limit of 5 .getRecords request per second on each shard from AWS end
-        // Beyond this limit we start getting ProvisionedThroughputExceededException which affect the ingestion
-        if (requestSentTime == currentWindow) {
-          currentWindowRequests++;
-        } else if (requestSentTime > currentWindow) {
-          currentWindow = requestSentTime;
-          currentWindowRequests = 0;
-        }
-
-        if (currentWindowRequests >= _rpsLimit) {
-          try {
-            Thread.sleep(SLEEP_TIME_BETWEEN_REQUESTS);
-          } catch (InterruptedException e) {
-            LOGGER.debug("Sleep interrupted while rate limiting Kinesis requests", e);
-            break;
+          // Kinesis enforces a limit of 5 .getRecords request per second on each shard from AWS end
+          // Beyond this limit we start getting ProvisionedThroughputExceededException which affect the ingestion
+          if (requestSentTime == currentWindow) {
+            currentWindowRequests++;
+          } else if (requestSentTime > currentWindow) {
+            currentWindow = requestSentTime;
+            currentWindowRequests = 0;
           }
+
+          if (currentWindowRequests >= _rpsLimit) {
+            try {
+              Thread.sleep(SLEEP_TIME_BETWEEN_REQUESTS);
+            } catch (InterruptedException e) {
+              LOGGER.debug("Sleep interrupted while rate limiting Kinesis requests", e);
+              break;
+            }
+          }
+
+          return new KinesisRecordsBatch(recordList, startShardToSequenceNum.getKey(), isEndOfShard);
+        } catch (IllegalStateException e) {
+          debugOrLogWarning("Illegal state exception, connection is broken", e);
+          return handleException(kinesisStartCheckpoint, recordList);
+        } catch (ProvisionedThroughputExceededException e) {
+          debugOrLogWarning("The request rate for the stream is too high", e);
+          return handleException(kinesisStartCheckpoint, recordList);
+        } catch (ExpiredIteratorException e) {
+          debugOrLogWarning("ShardIterator expired while trying to fetch records", e);
+          return handleException(kinesisStartCheckpoint, recordList);
+        } catch (ResourceNotFoundException | InvalidArgumentException e) {
+          // aws errors
+          LOGGER.error("Encountered AWS error while attempting to fetch records", e);
+          return handleException(kinesisStartCheckpoint, recordList);
+        } catch (KinesisException e) {
+          debugOrLogWarning("Encountered unknown unrecoverable AWS exception", e);
+          throw new RuntimeException(e);
+        } catch (AbortedException e) {
+          if (!(e.getCause() instanceof InterruptedException)) {
+            debugOrLogWarning("Task aborted due to exception", e);
+          }
+          return handleException(kinesisStartCheckpoint, recordList);
+        } catch (Throwable e) {
+          // non transient errors
+          LOGGER.error("Unknown fetchRecords exception", e);
+          throw new RuntimeException(e);
         }
       }
-
-      return new KinesisRecordsBatch(recordList, startShardToSequenceNum.getKey(), isEndOfShard);
-    } catch (IllegalStateException e) {
-      debugOrLogWarning("Illegal state exception, connection is broken", e);
-      return handleException(kinesisStartCheckpoint, recordList);
-    } catch (ProvisionedThroughputExceededException e) {
-      debugOrLogWarning("The request rate for the stream is too high", e);
-      return handleException(kinesisStartCheckpoint, recordList);
-    } catch (ExpiredIteratorException e) {
-      debugOrLogWarning("ShardIterator expired while trying to fetch records", e);
-      return handleException(kinesisStartCheckpoint, recordList);
-    } catch (ResourceNotFoundException | InvalidArgumentException e) {
-      // aws errors
-      LOGGER.error("Encountered AWS error while attempting to fetch records", e);
-      return handleException(kinesisStartCheckpoint, recordList);
-    } catch (KinesisException e) {
-      debugOrLogWarning("Encountered unknown unrecoverable AWS exception", e);
-      throw new RuntimeException(e);
-    } catch (AbortedException e) {
-      if (!(e.getCause() instanceof InterruptedException)) {
-        debugOrLogWarning("Task aborted due to exception", e);
-      }
-      return handleException(kinesisStartCheckpoint, recordList);
-    } catch (Throwable e) {
-      // non transient errors
-      LOGGER.error("Unknown fetchRecords exception", e);
-      throw new RuntimeException(e);
+    } catch (Exception e) {
+      //TODO: Handle this effectively so that records can still be published to the buffer
+      LOGGER.error("Exception occurred in kinesis consumer, connection is broken", e);
     }
+
+    return null;
   }
 
   private KinesisRecordsBatch getResult(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset,
@@ -274,8 +290,7 @@ public class KinesisConsumerV2 extends KinesisConnectionHandler implements Parti
 
         if (!getRecordsResponse.records().isEmpty()) {
           getRecordsResponse.records().forEach(record -> {
-            recordList.add(
-            new KinesisStreamMessage(record.partitionKey().getBytes(StandardCharsets.UTF_8),
+            recordList.add(new KinesisStreamMessage(record.partitionKey().getBytes(StandardCharsets.UTF_8),
                 record.data().asByteArray(), record.sequenceNumber(),
                 (KinesisStreamMessageMetadata) _kinesisMetadataExtractor.extract(record),
                 record.data().asByteArray().length));

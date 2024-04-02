@@ -422,16 +422,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .create(_currentOffset);  // so that we always update the metric when we enter this method.
 
     _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
-    boolean consumptionStarted = false;
     boolean asyncConsumerEnabled = _streamConfig.isEnableAsyncConsumer();
+    boolean asyncConsumerRunning = false;
+
     MessageBatchBuffer<MessageBatch> messagesQueue = null;
     while (!_shouldStop && !endCriteriaReached()) {
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
-      if (!consumptionStarted && asyncConsumerEnabled) {
-        consumptionStarted = true;
+      if (!asyncConsumerRunning && asyncConsumerEnabled) {
+        asyncConsumerRunning = true;
         messagesQueue = new OnHeapMessageBatchBuffer(_streamConfig.getConsumerBufferCapacity());
         _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis(), messagesQueue);
       }
@@ -520,13 +521,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
 
       if (endCriteriaReached) {
-        // TODO: flush the queue if we are stopping
+        // TODO: do we need to flush the queue if we are stopping?
         // check this flag to avoid calling endCriteriaReached() at the beginning of the loop
         break;
       }
     }
 
-    if (_streamConfig.isEnableAsyncConsumer()) {
+    if (_streamConfig.isEnableAsyncConsumer() && messagesQueue != null) {
+      asyncConsumerRunning = false;
       messagesQueue.close();
     }
 

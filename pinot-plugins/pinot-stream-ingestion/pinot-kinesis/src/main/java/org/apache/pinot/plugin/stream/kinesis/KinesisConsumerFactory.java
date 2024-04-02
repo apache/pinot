@@ -21,6 +21,8 @@ package org.apache.pinot.plugin.stream.kinesis;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLevelConsumer;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -48,7 +50,15 @@ public class KinesisConsumerFactory extends StreamConsumerFactory {
   @Override
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
-    return new KinesisConsumerV2(new KinesisConfig(_streamConfig));
+    boolean isAsyncMode = _streamConfig.getStreamConfigsMap().get(StreamConfigProperties.ENABLE_ASYNC_CONFIG) != null
+        ? Boolean.parseBoolean(_streamConfig.getStreamConfigsMap().get(StreamConfigProperties.ENABLE_ASYNC_CONFIG))
+        : StreamConfig.DEFAULT_STREAM_CONSUMER_ENABLE_ASYNC;
+
+    if (isAsyncMode) {
+      return new KinesisConsumerV2(new KinesisConfig(_streamConfig));
+    } else {
+      return new KinesisConsumer(new KinesisConfig(_streamConfig));
+    }
   }
 
   @Override
