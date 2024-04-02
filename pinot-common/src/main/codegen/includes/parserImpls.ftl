@@ -33,7 +33,7 @@ private void DataFileDef(List<SqlNode> list) :
 SqlNodeList DataFileDefList() :
 {
     SqlParserPos pos;
-    List<SqlNode> list = Lists.newArrayList();
+    List<SqlNode> list = new ArrayList<SqlNode>();
 }
 {
     <FROM> { pos = getPos(); }
@@ -70,36 +70,6 @@ SqlInsertFromFile SqlInsertFromFile() :
     ]
     {
         return new SqlInsertFromFile(pos, dbName, tableName, fileList);
-    }
-}
-
-/**
- * define the rest of the sql into SqlStmtList
- */
-private void SqlStatementList(SqlNodeList list) :
-{
-}
-{
-    {
-        list.add(SqlStmt());
-    }
-}
-
-SqlNodeList SqlStmtsEof() :
-{
-    SqlParserPos pos;
-    SqlNodeList stmts;
-}
-{
-    {
-        pos = getPos();
-        stmts = new SqlNodeList(pos);
-        stmts.add(SqlStmt());
-    }
-    ( LOOKAHEAD(2, <SEMICOLON> SqlStmt()) <SEMICOLON> SqlStatementList(stmts) )*
-    [ <SEMICOLON> ] <EOF>
-    {
-        return stmts;
     }
 }
 

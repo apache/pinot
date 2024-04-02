@@ -254,15 +254,17 @@ public class PinotQueryResource {
     if (queryOptions != null) {
       queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
     }
-    String database = null;
+    String database;
+    try {
+      database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+    } catch (DatabaseConflictException e) {
+      return QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e).toString();
+    }
     try {
       String inputTableName =
           sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
               .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
-      database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
       tableName = _pinotHelixResourceManager.getActualTableName(inputTableName, database);
-    } catch (DatabaseConflictException e) {
-      return QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e).toString();
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
       try {
