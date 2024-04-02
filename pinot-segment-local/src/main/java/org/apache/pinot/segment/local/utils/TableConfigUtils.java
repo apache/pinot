@@ -923,10 +923,11 @@ public final class TableConfigUtils {
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
     String partialUpsertMergerClass = upsertConfig.getPartialUpsertMergerClass();
 
-    Preconditions.checkState(
-        StringUtils.isNotBlank(partialUpsertMergerClass) || MapUtils.isNotEmpty(partialUpsertStrategies),
-        "At least one of partialUpsertMergerClass or partialUpsertStrategies must be provided for partial upsert "
-            + "table");
+    // check if partialUpsertMergerClass is provided then partialUpsertStrategies should be empty
+    if (StringUtils.isNotBlank(partialUpsertMergerClass)) {
+      Preconditions.checkState(MapUtils.isEmpty(partialUpsertStrategies),
+          "If partialUpsertMergerClass is provided then partialUpsertStrategies should be empty");
+    }
 
     List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
     // skip the partial upsert strategies check if partialUpsertMergerClass is provided
