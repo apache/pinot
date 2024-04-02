@@ -250,6 +250,8 @@ public class IntegerTupleSketchAggregationFunction
     if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
+    intermediateResult1.setNominalEntries(_nominalEntries);
+    intermediateResult1.setSetOperations(_setOps);
     intermediateResult1.merge(intermediateResult2);
     return intermediateResult1;
   }
