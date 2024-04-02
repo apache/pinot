@@ -76,7 +76,7 @@ public class PinotDatabaseRestletResource {
   public DeleteDatabaseResponse deleteTablesInDatabase(
       @ApiParam(value = "Database name", required = true) @PathParam("databaseName") String databaseName,
       @ApiParam(value = "Run in dryRun mode initially to know the list of tables that will be deleted in actual run. "
-          + "No tables will be deleted when dryRun=true", required = true)
+          + "No tables will be deleted when dryRun=true", required = true, defaultValue = "true")
       @QueryParam("dryRun") boolean dryRun) {
     List<String> tablesInDatabase = _pinotHelixResourceManager.getAllTables(databaseName);
     List<String> deletedTables = new ArrayList<>(tablesInDatabase.size());
