@@ -109,11 +109,10 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
 
   @DataProvider
   public Object[][] endpointBase() {
-    return new Object[][]{
-        new Object[]{"controller", getControllerBaseApiUrl()}, new Object[]{"broker", getBrokerBaseApiUrl()},
-        new Object[]{
-        "server", "http://localhost:" + getServerAdminApiPort()
-    }
+    return new Object[][] {
+        new Object[] { "controller", getControllerBaseApiUrl() },
+        new Object[] { "broker", getBrokerBaseApiUrl() },
+        new Object[] { "server", "http://localhost:" + getServerAdminApiPort() }
     };
   }
 }
