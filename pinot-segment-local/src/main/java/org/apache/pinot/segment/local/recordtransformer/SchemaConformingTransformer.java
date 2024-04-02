@@ -518,8 +518,7 @@ class ExtraFieldsContainer {
       // If the key already exists in the indexable extras and both the existing value and the new value are maps,
       // merge the two maps
       ((Map<String, Object>) _indexableExtras.get(key)).putAll((Map<String, Object>) value);
-    }
-    else {
+    } else {
       _indexableExtras.put(key, value);
     }
   }
@@ -537,12 +536,12 @@ class ExtraFieldsContainer {
     if (key == null && value instanceof Map) {
       // If the key is null, it means that the value is a map that should be merged with the unindexable extras
       _unindexableExtras.putAll((Map<String, Object>) value);
-    } else if (_unindexableExtras.containsKey(key) && _unindexableExtras.get(key) instanceof Map && value instanceof Map) {
+    } else if (_unindexableExtras.containsKey(key) && _unindexableExtras.get(key) instanceof Map
+        && value instanceof Map) {
       // If the key already exists in the uindexable extras and both the existing value and the new value are maps,
       // merge the two maps
       ((Map<String, Object>) _unindexableExtras.get(key)).putAll((Map<String, Object>) value);
-    }
-    else {
+    } else {
       _unindexableExtras.put(key, value);
     }
   }
