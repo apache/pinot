@@ -94,9 +94,11 @@ public class PinotDatabaseRestletResourceTest {
   private void partialDatabaseDeletionCheck(int idx) {
     DeleteDatabaseResponse response = _resource.deleteTablesInDatabase(DATABASE, false);
     List<String> resultList = new ArrayList<>(TABLES);
-    resultList.remove(idx);
+    String failedTable = resultList.remove(idx);
     assertFalse(response.isDryRun());
     assertTrue(response.isPartiallyDeleted());
+    assertEquals(response.getFailedTables().size(), 1);
+    assertEquals(response.getFailedTables().get(0).getTableName(), failedTable);
     assertEquals(response.getTablesInDatabase(), TABLES);
     assertEquals(response.getDeletedTables(), resultList);
   }

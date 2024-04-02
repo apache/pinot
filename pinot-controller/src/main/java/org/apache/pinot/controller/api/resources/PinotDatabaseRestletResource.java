@@ -80,8 +80,9 @@ public class PinotDatabaseRestletResource {
       @QueryParam("dryRun") boolean dryRun) {
     List<String> tablesInDatabase = _pinotHelixResourceManager.getAllTables(databaseName);
     List<String> deletedTables = new ArrayList<>(tablesInDatabase.size());
+    List<DeletionFailureWrapper> failedTables = new ArrayList<>(tablesInDatabase.size());
     if (dryRun) {
-      deletedTables = tablesInDatabase;
+      deletedTables.addAll(tablesInDatabase);
     } else {
       for (String table : tablesInDatabase) {
         boolean isSchemaDeleted = false;
@@ -100,22 +101,26 @@ public class PinotDatabaseRestletResource {
           } else {
             LOGGER.error("Failed to delete table and schema for {}", table);
           }
+          failedTables.add(new DeletionFailureWrapper(table, e.getMessage()));
         }
       }
     }
-    return new DeleteDatabaseResponse(tablesInDatabase, deletedTables, dryRun);
+    return new DeleteDatabaseResponse(tablesInDatabase, deletedTables, failedTables, dryRun);
   }
 }
 
 class DeleteDatabaseResponse {
   private final List<String> _tablesInDatabase;
   private final List<String> _deletedTables;
+  private final List<DeletionFailureWrapper> _failedTables;
   private final boolean _partiallyDeleted;
   private final boolean _dryRun;
 
-  public DeleteDatabaseResponse(List<String> tablesInDatabase, List<String> deletedTables, boolean dryRun) {
+  public DeleteDatabaseResponse(List<String> tablesInDatabase, List<String> deletedTables,
+      List<DeletionFailureWrapper> failedTables, boolean dryRun) {
     _tablesInDatabase = tablesInDatabase;
     _deletedTables = deletedTables;
+    _failedTables = failedTables;
     _dryRun = dryRun;
     _partiallyDeleted = tablesInDatabase.size() != deletedTables.size();
   }
@@ -130,6 +135,12 @@ class DeleteDatabaseResponse {
     return _deletedTables;
   }
 
+  @JsonProperty("failedTables")
+  public List<DeletionFailureWrapper> getFailedTables() {
+    return _failedTables;
+  }
+
+  @JsonProperty("dryRun")
   public boolean isDryRun() {
     return _dryRun;
   }
@@ -137,5 +148,25 @@ class DeleteDatabaseResponse {
   @JsonProperty("partiallyDeleted")
   public boolean isPartiallyDeleted() {
     return _partiallyDeleted;
+  }
+}
+
+class DeletionFailureWrapper {
+  private final String _tableName;
+  private final String _errorMessage;
+
+  public DeletionFailureWrapper(String tableName, String errorMessage) {
+    _tableName = tableName;
+    _errorMessage = errorMessage;
+  }
+
+  @JsonProperty("tableName")
+  public String getTableName() {
+    return _tableName;
+  }
+
+  @JsonProperty("errorMessage")
+  public String getErrorMessage() {
+    return _errorMessage;
   }
 }
