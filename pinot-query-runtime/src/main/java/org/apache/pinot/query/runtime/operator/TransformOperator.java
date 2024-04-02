@@ -80,7 +80,7 @@ public class TransformOperator extends MultiStageOperator.WithBasicStats {
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.TRANSFORM;
   }
 
@@ -94,7 +94,11 @@ public class TransformOperator extends MultiStageOperator.WithBasicStats {
   protected TransferableBlock getNextBlock() {
     TransferableBlock block = _upstreamOperator.nextBlock();
     if (block.isEndOfStreamBlock()) {
-      return updateEosBlock(block);
+      if (block.isSuccessfulEndOfStreamBlock()) {
+        return updateEosBlock(block);
+      } else {
+        return block;
+      }
     }
     List<Object[]> container = block.getContainer();
     List<Object[]> resultRows = new ArrayList<>(container.size());

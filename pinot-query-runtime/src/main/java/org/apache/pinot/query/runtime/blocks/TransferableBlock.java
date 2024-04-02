@@ -19,6 +19,8 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,13 +32,11 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
-import org.apache.pinot.query.runtime.plan.StageStatsHolder;
-
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 
 /**
  * A {@code TransferableBlock} is a wrapper around {@link DataBlock} for transferring data using
@@ -52,7 +52,7 @@ public class TransferableBlock implements Block {
   private DataBlock _dataBlock;
   private Map<Integer, String> _errCodeToExceptionMap;
   @Nullable
-  private final StageStatsHolder _statsHolder;
+  private final MultiStageQueryStats _queryStats;
 
   public TransferableBlock(List<Object[]> container, @Nullable DataSchema dataSchema, DataBlock.Type type) {
     _container = container;
@@ -62,7 +62,7 @@ public class TransferableBlock implements Block {
     _type = type;
     _numRows = _container.size();
     _errCodeToExceptionMap = new HashMap<>();
-    _statsHolder = null;
+    _queryStats = null;
   }
 
   public TransferableBlock(DataBlock dataBlock) {
@@ -72,11 +72,11 @@ public class TransferableBlock implements Block {
         : dataBlock instanceof RowDataBlock ? DataBlock.Type.ROW : DataBlock.Type.METADATA;
     _numRows = _dataBlock.getNumberOfRows();
     _errCodeToExceptionMap = null;
-    _statsHolder = null;
+    _queryStats = null;
   }
 
-  public TransferableBlock(StageStatsHolder stats) {
-    _statsHolder = stats;
+  public TransferableBlock(MultiStageQueryStats stats) {
+    _queryStats = stats;
     _type = DataBlock.Type.METADATA;
     _numRows = 0;
     _dataSchema = null;
@@ -85,18 +85,29 @@ public class TransferableBlock implements Block {
 
   public List<ByteBuffer> getSerializedStatsByStage() {
     if (isSuccessfulEndOfStreamBlock()) {
-      List<ByteBuffer> statsByStage = ((MetadataBlock) _dataBlock).getStatsByStage();
-      if (statsByStage == null) {
-        return new ArrayList<>();
+      List<ByteBuffer> statsByStage;
+      if (_dataBlock instanceof MetadataBlock) {
+        statsByStage = ((MetadataBlock) _dataBlock).getStatsByStage();
+        if (statsByStage == null) {
+          return new ArrayList<>();
+        }
+      } else {
+        Preconditions.checkArgument(_queryStats != null, "QueryStats is null for a successful EOS block");
+        try {
+          statsByStage = _queryStats.serialize();
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
       }
+
       return statsByStage;
     }
     return new ArrayList<>();
   }
 
   @Nullable
-  public StageStatsHolder getStatsHolder() {
-    return _statsHolder;
+  public MultiStageQueryStats getQueryStats() {
+    return _queryStats;
   }
 
   public int getNumRows() {
@@ -140,7 +151,7 @@ public class TransferableBlock implements Block {
   /**
    * Returns whether the data block is already constructed.
    */
-  public boolean isDataBlockConstructed() {
+  boolean isDataBlockConstructed() {
     return _dataBlock != null;
   }
 
@@ -154,13 +165,23 @@ public class TransferableBlock implements Block {
   public DataBlock getDataBlock() {
     if (_dataBlock == null) {
       try {
-        if (_type == DataBlock.Type.ROW) {
-          _dataBlock = DataBlockBuilder.buildFromRows(_container, _dataSchema);
-        } else {
-          _dataBlock = DataBlockBuilder.buildFromColumns(_container, _dataSchema);
+        switch (_type) {
+          case ROW:
+            _dataBlock = DataBlockBuilder.buildFromRows(_container, _dataSchema);
+            break;
+          case COLUMNAR:
+            _dataBlock = DataBlockBuilder.buildFromColumns(_container, _dataSchema);
+            break;
+          case METADATA:
+            _dataBlock = new MetadataBlock(MetadataBlock.MetadataBlockType.EOS, getSerializedStatsByStage());
+            break;
+          default:
+            throw new UnsupportedOperationException("Unable to construct block with type: " + _type);
         }
-        _dataBlock.getExceptions().putAll(_errCodeToExceptionMap);
-        _errCodeToExceptionMap = null;
+        if (_errCodeToExceptionMap != null) {
+          _dataBlock.getExceptions().putAll(_errCodeToExceptionMap);
+          _errCodeToExceptionMap = null;
+        }
       } catch (Exception e) {
         throw new RuntimeException("Unable to create DataBlock", e);
       }
@@ -170,18 +191,6 @@ public class TransferableBlock implements Block {
 
   public Map<Integer, String> getExceptions() {
     return _dataBlock != null ? _dataBlock.getExceptions() : _errCodeToExceptionMap;
-  }
-
-  public void addException(ProcessingException processingException) {
-    addException(processingException.getErrorCode(), processingException.getMessage());
-  }
-
-  public void addException(int errCode, String errMsg) {
-    if (_dataBlock != null) {
-      _dataBlock.addException(errCode, errMsg);
-    } else {
-      _errCodeToExceptionMap.put(errCode, errMsg);
-    }
   }
 
   /**
@@ -233,6 +242,9 @@ public class TransferableBlock implements Block {
       return false;
     }
 
+    if (_queryStats != null) {
+      return MetadataBlock.MetadataBlockType.EOS == type;
+    }
     MetadataBlock metadata = (MetadataBlock) _dataBlock;
     return metadata.getType() == type;
   }

@@ -58,13 +58,13 @@ public class OpChainSchedulerService {
           isFinished = true;
           if (result.isErrorBlock()) {
             returnedErrorBlock = result;
-            LOGGER.error("({}): Completed erroneously {} {}", operatorChain, operatorChain.getStats(),
+            LOGGER.error("({}): Completed erroneously {} {}", operatorChain, result.getQueryStats(),
                 result.getExceptions());
           } else {
-            LOGGER.debug("({}): Completed {}", operatorChain, operatorChain.getStats());
+            LOGGER.debug("({}): Completed {}", operatorChain, result.getQueryStats());
           }
         } catch (Exception e) {
-          LOGGER.error("({}): Failed to execute operator chain! {}", operatorChain, operatorChain.getStats(), e);
+          LOGGER.error("({}): Failed to execute operator chain!", operatorChain, e);
           thrown = e;
         } finally {
           _submittedOpChainMap.remove(operatorChain.getId());

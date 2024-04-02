@@ -20,13 +20,11 @@ package org.apache.pinot.common.response.broker;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-import java.io.IOException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.pinot.common.response.ProcessingException;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -48,7 +46,15 @@ import org.apache.pinot.spi.utils.JsonUtils;
 })
 public class BrokerResponseNativeV2 extends BrokerResponseNative {
 
-  private final Map<Integer, BrokerResponseStats> _stageIdStats = new HashMap<>();
+  private final List<JsonNode> _stageIdStats = new ArrayList<>();
+  /**
+   * The max number of rows seen at runtime.
+   * <p>
+   * In single-stage this doesn't make sense given it is the max number of rows read from the table. But in multi-stage
+   * virtual rows can be generated. For example, in a join query, the number of rows can be more than the number of rows
+   * in the table.
+   */
+  private long _maxRows = 0;
 
   public BrokerResponseNativeV2() {
   }
@@ -61,15 +67,6 @@ public class BrokerResponseNativeV2 extends BrokerResponseNative {
     super(exceptions);
   }
 
-  /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
-  private static BrokerResponseNativeV2 getBrokerResponseExplainPlanOutput() {
-    BrokerResponseNativeV2 brokerResponse = BrokerResponseNativeV2.empty();
-    List<Object[]> rows = new ArrayList<>();
-    rows.add(new Object[]{"BROKER_EVALUATE", 0, -1});
-    brokerResponse.setResultTable(new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows));
-    return brokerResponse;
-  }
-
   /**
    * Get a new empty {@link BrokerResponseNativeV2}.
    */
@@ -77,20 +74,24 @@ public class BrokerResponseNativeV2 extends BrokerResponseNative {
     return new BrokerResponseNativeV2();
   }
 
-  public static BrokerResponseNativeV2 fromJsonString(String jsonString)
-      throws IOException {
-    return JsonUtils.stringToObject(jsonString, BrokerResponseNativeV2.class);
-  }
-
-  public void addStageStat(Integer stageId, BrokerResponseStats brokerResponseStats) {
-    // StageExecutionWallTime will always be there, other stats are optional such as OperatorStats
-    if (brokerResponseStats.getStageExecWallTimeMs() != -1) {
-      _stageIdStats.put(stageId, brokerResponseStats);
-    }
+  public void addStageStat(JsonNode stageStats) {
+    ObjectNode node = JsonUtils.newObjectNode();
+    node.put("stage", _stageIdStats.size());
+    node.set("stats", stageStats);
+    _stageIdStats.add(node);
   }
 
   @JsonProperty("stageStats")
-  public Map<Integer, BrokerResponseStats> getStageIdStats() {
+  public List<JsonNode> getStageIdStats() {
     return _stageIdStats;
+  }
+
+  @JsonProperty("maxRows")
+  public long getMaxRows() {
+    return _maxRows;
+  }
+
+  public void mergeMaxRows(long maxRows) {
+    _maxRows = Math.max(_maxRows, maxRows);
   }
 }

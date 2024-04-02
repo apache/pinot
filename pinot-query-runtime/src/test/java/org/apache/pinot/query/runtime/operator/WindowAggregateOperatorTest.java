@@ -84,7 +84,7 @@ public class WindowAggregateOperatorTest {
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
@@ -107,7 +107,7 @@ public class WindowAggregateOperatorTest {
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, INT});
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
@@ -131,7 +131,7 @@ public class WindowAggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
@@ -159,7 +159,7 @@ public class WindowAggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
             calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(),
             outSchema, inSchema);
@@ -186,7 +186,7 @@ public class WindowAggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE,
             Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
@@ -213,7 +213,7 @@ public class WindowAggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
@@ -246,7 +246,7 @@ public class WindowAggregateOperatorTest {
     Mockito.when(merger.init(Mockito.any(), Mockito.any())).thenReturn(1d);
     DataSchema outSchema = new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, INT, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema,
             ImmutableMap.of("SUM", cdt -> merger));
@@ -277,7 +277,7 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"arg", "group", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator sum0PartitionBy1 =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), upstreamOperator, group,
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), upstreamOperator, group,
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE,
             Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 
@@ -303,7 +303,7 @@ public class WindowAggregateOperatorTest {
 
     // When:
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
   }
@@ -321,7 +321,7 @@ public class WindowAggregateOperatorTest {
 
     // When:
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
   }
@@ -349,7 +349,7 @@ public class WindowAggregateOperatorTest {
 
     // When:
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, order, Collections.emptyList(),
             Collections.emptyList(), calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.RANGE,
             Collections.emptyList(), outSchema, inSchema);
 
@@ -406,7 +406,7 @@ public class WindowAggregateOperatorTest {
 
     // When:
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, order, Collections.emptyList(),
             Collections.emptyList(), calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.ROWS,
             Collections.emptyList(), outSchema, inSchema);
 
@@ -459,7 +459,7 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
             calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(),
             outSchema, inSchema);
@@ -499,7 +499,7 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.DESCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
             calls, Integer.MIN_VALUE, Integer.MAX_VALUE, WindowNode.WindowFrameType.RANGE, Collections.emptyList(),
             outSchema, inSchema);
@@ -531,7 +531,7 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.ROWS, Collections.emptyList(), outSchema, inSchema);
   }
@@ -550,7 +550,7 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, order,
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, order,
             Arrays.asList(RelFieldCollation.Direction.ASCENDING), Arrays.asList(RelFieldCollation.NullDirection.LAST),
             calls, Integer.MIN_VALUE, 0, WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema,
             inSchema);
@@ -581,7 +581,7 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, 5, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
   }
@@ -601,7 +601,7 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, 5,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
   }
@@ -622,7 +622,7 @@ public class WindowAggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "arg", "sum"}, new ColumnDataType[]{INT, STRING, DOUBLE});
     WindowAggregateOperator operator =
-        new WindowAggregateOperator(OperatorTestUtil.getDefaultContext(), _input, group, Collections.emptyList(),
+        new WindowAggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, group, Collections.emptyList(),
             Collections.emptyList(), Collections.emptyList(), calls, Integer.MIN_VALUE, Integer.MAX_VALUE,
             WindowNode.WindowFrameType.RANGE, Collections.emptyList(), outSchema, inSchema);
 

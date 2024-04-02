@@ -45,7 +45,7 @@ public class MinusOperator extends SetOperator {
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.MINUS;
   }
 

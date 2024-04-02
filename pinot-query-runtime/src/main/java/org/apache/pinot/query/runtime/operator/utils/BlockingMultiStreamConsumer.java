@@ -28,8 +28,9 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
-import org.apache.pinot.query.runtime.plan.StageStatsHolder;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -238,13 +239,13 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
   public static class OfTransferableBlock extends BlockingMultiStreamConsumer<TransferableBlock> {
 
-    private final StageStatsHolder _stageStats;
+    private final MultiStageQueryStats _stageStats;
 
     public OfTransferableBlock(int stageId, Object id, long deadlineMs,
-        List<? extends AsyncStream<TransferableBlock>> asyncProducers) {
+        List<? extends AsyncStream<TransferableBlock>> asyncProducers,
+        StatMap<BaseMailboxReceiveOperator.StatKey> stats) {
       super(id, deadlineMs, asyncProducers);
-      StatMap<MultiStageOperator.BaseStatKeys> stats = new StatMap<>(MultiStageOperator.BaseStatKeys.class);
-      _stageStats = StageStatsHolder.create(stageId, MultiStageOperator.Type.MAILBOX_RECEIVE, stats);
+      _stageStats = MultiStageQueryStats.createReceive(stageId, stats);
     }
 
     @Override
@@ -260,7 +261,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     @Override
     protected void onConsumerFinish(TransferableBlock element) {
       try {
-        _stageStats.merge(element.getSerializedStatsByStage());
+        if (element.getQueryStats() != null) {
+          _stageStats.mergeUpstream(element.getQueryStats());
+        } else {
+          _stageStats.mergeUpstream(element.getSerializedStatsByStage());
+        }
       } catch (IOException e) {
         throw new UncheckedIOException(e);
       }

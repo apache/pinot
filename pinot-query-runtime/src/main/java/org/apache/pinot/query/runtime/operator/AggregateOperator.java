@@ -129,12 +129,12 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Aggr
 
   @Override
   protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.add(AggregateStats.EXECUTION_TIME_MS, executionTimeMs);
-    _statMap.add(AggregateStats.EMITTED_ROWS, block.getNumRows());
+    _statMap.merge(AggregateStats.EXECUTION_TIME_MS, executionTimeMs);
+    _statMap.merge(AggregateStats.EMITTED_ROWS, block.getNumRows());
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.AGGREGATE;
   }
 
@@ -165,6 +165,8 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Aggr
     if (finalBlock.isErrorBlock()) {
       return finalBlock;
     }
+    assert finalBlock.isSuccessfulEndOfStreamBlock() : "Final block must be EOS block";
+    _eosBlock = updateEosBlock(finalBlock);
     return produceAggregatedBlock(finalBlock);
   }
 
@@ -174,13 +176,12 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Aggr
       return new TransferableBlock(_aggregationExecutor.getResult(), _resultSchema, DataBlock.Type.ROW);
     } else {
       List<Object[]> rows = _groupByExecutor.getResult();
-      _eosBlock = updateEosBlock(finalBlock);
       if (rows.isEmpty()) {
         return _eosBlock;
       } else {
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
-          _statMap.put(AggregateStats.NUM_GROUPS_LIMIT_REACHED, true);
+          _statMap.merge(AggregateStats.NUM_GROUPS_LIMIT_REACHED, true);
           _inputOperator.earlyTerminate();
         }
         return dataBlock;

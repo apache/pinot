@@ -34,7 +34,6 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
@@ -248,11 +247,6 @@ public class ExecutionStatsAggregator {
     if (numTotalDocsString != null) {
       _numTotalDocs += Long.parseLong(numTotalDocsString);
     }
-    _numGroupsLimitReached |=
-        Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
-
-    _maxRowsInJoinReached |=
-        Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.MAX_ROWS_IN_JOIN_REACHED.getName()));
 
     String numBlocksString = metadata.get(DataTable.MetadataKey.NUM_BLOCKS.getName());
     if (numBlocksString != null) {
@@ -316,8 +310,6 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setRealtimeSystemActivitiesCpuTimeNs(_realtimeSystemActivitiesCpuTimeNs);
     brokerResponseNative.setOfflineResponseSerializationCpuTimeNs(_offlineResponseSerializationCpuTimeNs);
     brokerResponseNative.setRealtimeResponseSerializationCpuTimeNs(_realtimeResponseSerializationCpuTimeNs);
-    brokerResponseNative.setOfflineTotalCpuTimeNs(_offlineTotalCpuTimeNs);
-    brokerResponseNative.setRealtimeTotalCpuTimeNs(_realtimeTotalCpuTimeNs);
     brokerResponseNative.setNumSegmentsPrunedByServer(_numSegmentsPrunedByServer);
     brokerResponseNative.setNumSegmentsPrunedInvalid(_numSegmentsPrunedInvalid);
     brokerResponseNative.setNumSegmentsPrunedByLimit(_numSegmentsPrunedByLimit);
@@ -361,25 +353,6 @@ public class ExecutionStatsAggregator {
         brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.FRESHNESS_LAG_MS,
             System.currentTimeMillis() - _minConsumingFreshnessTimeMs, TimeUnit.MILLISECONDS);
       }
-    }
-  }
-
-  public void setStageLevelStats(@Nullable String rawTableName, BrokerResponseStats brokerResponseStats,
-      @Nullable BrokerMetrics brokerMetrics) {
-    if (_enableTrace) {
-      setStats(rawTableName, brokerResponseStats, brokerMetrics);
-      brokerResponseStats.setOperatorStats(_operatorStats);
-    }
-
-    brokerResponseStats.setNumBlocks(_numBlocks);
-    brokerResponseStats.setNumRows(_numRows);
-    brokerResponseStats.setMaxRowsInJoinReached(_maxRowsInJoinReached);
-    brokerResponseStats.setNumGroupsLimitReached(_numGroupsLimitReached);
-    brokerResponseStats.setStageExecutionTimeMs(_stageExecutionTimeMs);
-    brokerResponseStats.setStageExecutionUnit(_stageExecutionUnit);
-    brokerResponseStats.setTableNames(new ArrayList<>(_tableNames));
-    if (_stageExecStartTimeMs >= 0 && _stageExecEndTimeMs >= 0) {
-      brokerResponseStats.setStageExecWallTimeMs(_stageExecEndTimeMs - _stageExecStartTimeMs);
     }
   }
 

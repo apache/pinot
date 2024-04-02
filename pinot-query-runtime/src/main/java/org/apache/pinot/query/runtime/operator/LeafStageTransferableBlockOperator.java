@@ -54,7 +54,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageStatsHolder;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,6 +104,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<DataT
     Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
+    String tableName = context.getLeafStageContext().getStagePlan().getStageMetadata().getTableName();
+    _statMap.merge(DataTable.MetadataKey.TABLE, tableName);
   }
 
   @Override
@@ -113,12 +115,12 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<DataT
 
   @Override
   protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.add(DataTable.MetadataKey.TIME_USED_MS, executionTimeMs);
-    _statMap.add(DataTable.MetadataKey.NUM_DOCS_SCANNED, block.getNumRows());
+    _statMap.merge(DataTable.MetadataKey.TIME_USED_MS, executionTimeMs);
+    _statMap.merge(DataTable.MetadataKey.NUM_DOCS_SCANNED, block.getNumRows());
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.LEAF;
   }
 
@@ -171,13 +173,13 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<DataT
         }
         switch (key.getValueType()) {
           case INT:
-            _statMap.add(key, Integer.parseInt(entry.getValue()));
+            _statMap.merge(key, Integer.parseInt(entry.getValue()));
             break;
           case LONG:
-            _statMap.add(key, Long.parseLong(entry.getValue()));
+            _statMap.merge(key, Long.parseLong(entry.getValue()));
             break;
           case STRING:
-            _statMap.put(key, entry.getValue());
+            _statMap.merge(key, entry.getValue());
             break;
           default:
             LOGGER.debug("Skipping unknown value type: {}", key.getValueType());
@@ -188,10 +190,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<DataT
   }
 
   private TransferableBlock constructMetadataBlock() {
-    StageStats stageStats = new StageStats();
-    stageStats.addLastOperator(Type.LEAF, _statMap);
-    StageStatsHolder stageStatsHolder = StageStatsHolder.create(_context.getStageId(), stageStats);
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(stageStatsHolder);
+    MultiStageQueryStats multiStageQueryStats = MultiStageQueryStats.createLeaf(_context.getStageId(), _statMap);
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(multiStageQueryStats);
   }
 
   private Future<Void> startExecution() {

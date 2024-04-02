@@ -39,7 +39,7 @@ public class StatMapTest {
       throw new SkipException("Skipping LONG test");
     }
     StatMap<MyStats> statMap = new StatMap<>(MyStats.class);
-    statMap.add(stat, 1);
+    statMap.merge(stat, 1);
   }
 
   @Test(dataProvider = "allTypeStats", expectedExceptions = IllegalArgumentException.class)
@@ -48,16 +48,7 @@ public class StatMapTest {
       throw new SkipException("Skipping LONG test");
     }
     StatMap<MyStats> statMap = new StatMap<>(MyStats.class);
-    statMap.add(stat, 1L);
-  }
-
-  @Test(dataProvider = "allTypeStats", expectedExceptions = IllegalArgumentException.class)
-  public void dynamicTypeCheckWhenAddDouble(MyStats stat) {
-    if (stat.getType() == StatMap.Type.DOUBLE) {
-      throw new SkipException("Skipping DOUBLE test");
-    }
-    StatMap<MyStats> statMap = new StatMap<>(MyStats.class);
-    statMap.add(stat, 1d);
+    statMap.merge(stat, 1L);
   }
 
   @Test(dataProvider = "allTypeStats", expectedExceptions = IllegalArgumentException.class)
@@ -66,7 +57,7 @@ public class StatMapTest {
       throw new SkipException("Skipping BOOLEAN test");
     }
     StatMap<MyStats> statMap = new StatMap<>(MyStats.class);
-    statMap.put(stat, true);
+    statMap.merge(stat, true);
   }
 
   @Test(dataProvider = "allTypeStats", expectedExceptions = IllegalArgumentException.class)
@@ -75,7 +66,7 @@ public class StatMapTest {
       throw new SkipException("Skipping STRING test");
     }
     StatMap<MyStats> statMap = new StatMap<>(MyStats.class);
-    statMap.put(stat, "foo");
+    statMap.merge(stat, "foo");
   }
 
   @Test(dataProvider = "allTypeStats")
@@ -84,19 +75,16 @@ public class StatMapTest {
     StatMap<MyStats> statMap = new StatMap<>(MyStats.class);
     switch (stat.getType()) {
       case BOOLEAN:
-        statMap.put(stat, true);
+        statMap.merge(stat, true);
         break;
       case INT:
-        statMap.add(stat, 1);
+        statMap.merge(stat, 1);
         break;
       case LONG:
-        statMap.add(stat, 1L);
-        break;
-      case DOUBLE:
-        statMap.add(stat, 1d);
+        statMap.merge(stat, 1L);
         break;
       case STRING:
-        statMap.put(stat, "foo");
+        statMap.merge(stat, "foo");
         break;
       default:
         throw new IllegalStateException();
@@ -111,19 +99,16 @@ public class StatMapTest {
     for (MyStats stat : MyStats.values()) {
       switch (stat.getType()) {
         case BOOLEAN:
-          statMap.put(stat, true);
+          statMap.merge(stat, true);
           break;
         case INT:
-          statMap.add(stat, 1);
+          statMap.merge(stat, 1);
           break;
         case LONG:
-          statMap.add(stat, 1L);
-          break;
-        case DOUBLE:
-          statMap.add(stat, 1d);
+          statMap.merge(stat, 1L);
           break;
         case STRING:
-          statMap.put(stat, "foo");
+          statMap.merge(stat, "foo");
           break;
         default:
           throw new IllegalStateException();
@@ -151,7 +136,6 @@ public class StatMapTest {
   public enum MyStats implements StatMap.Key {
     BOOL_KEY(StatMap.Type.BOOLEAN),
     LONG_KEY(StatMap.Type.LONG),
-    DOUBLE_KEY(StatMap.Type.DOUBLE),
     INT_KEY(StatMap.Type.INT),
     STR_KEY(StatMap.Type.STRING);
 

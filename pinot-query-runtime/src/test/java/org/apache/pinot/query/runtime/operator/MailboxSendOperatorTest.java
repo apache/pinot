@@ -30,7 +30,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageStatsHolder;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
@@ -172,8 +172,8 @@ public class MailboxSendOperatorTest {
     assertTrue(blocks.get(2).isSuccessfulEndOfStreamBlock(), "expected to send EOS block to exchange on third call");
 
     // EOS block should contain statistics
-    StageStatsHolder resultMetadata = blocks.get(2).getStatsHolder();
-    StageStats stageStats = resultMetadata.getCurrentStats();
+    MultiStageQueryStats resultMetadata = blocks.get(2).getQueryStats();
+    MultiStageQueryStats.StageStats stageStats = resultMetadata.getCurrentStats();
     assertNotNull(stageStats, "expected to have stats for sender stage");
     assertNotNull(stageStats.getOperatorStats(0));
   }

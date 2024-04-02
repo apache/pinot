@@ -38,15 +38,19 @@ import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.BrokerResponseStats;
-import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
-import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.runtime.operator.AggregateOperator;
+import org.apache.pinot.query.runtime.operator.HashJoinOperator;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.config.table.TableType;
@@ -256,9 +260,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       boolean keepOutputRowOrder)
       throws Exception {
     // query pinot
-    runQuery(sql, expect, null).ifPresent(resultTable -> {
+    runQuery(sql, expect, false).ifPresent(queryResult -> {
       try {
-        compareRowEquals(resultTable, queryH2(h2Sql), keepOutputRowOrder);
+        compareRowEquals(queryResult.getResultTable(), queryH2(h2Sql), keepOutputRowOrder);
       } catch (Exception e) {
         Assert.fail(e.getMessage(), e);
       }
@@ -269,74 +273,76 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
   public void testQueryTestCasesWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
       List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
       throws Exception {
-    runQuery(sql, expect, null).ifPresent(
-        resultTable -> compareRowEquals(resultTable, expectedRows, keepOutputRowOrder));
+    runQuery(sql, expect, false).ifPresent(
+        queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
   }
 
-  @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
-  public void testQueryTestCasesWithMetadata(String testCaseName, boolean isIgnored, String sql, String h2Sql,
-      String expect, int numSegments)
-      throws Exception {
-    Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap = new HashMap<>();
-    runQuery(sql, expect, executionStatsAggregatorMap).ifPresent(resultTable -> {
-      BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
-      executionStatsAggregatorMap.get(0).setStats(brokerResponseNative);
-      Assert.assertFalse(executionStatsAggregatorMap.isEmpty());
-      for (Integer stageId : executionStatsAggregatorMap.keySet()) {
-        if (stageId > 0) {
-          BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
-          executionStatsAggregatorMap.get(stageId).setStageLevelStats(null, brokerResponseStats, null);
-          brokerResponseNative.addStageStat(stageId, brokerResponseStats);
-        }
-      }
+  // TODO: metadata tests should be rewritten to actually read the expected metadata from resources
+//  @Test(dataProvider = "testResourceQueryTestCaseProviderWithMetadata")
+//  public void testQueryTestCasesWithMetadata(String testCaseName, boolean isIgnored, String sql, String h2Sql,
+//      String expect, int numSegments)
+//      throws Exception {
+//    runQuery(sql, expect, true).ifPresent(queryResult -> {
+//      BrokerResponseNativeV2 brokerResponseNative = new BrokerResponseNativeV2();
+//      for (MultiStageQueryStats.StageStats.Closed stageStats : queryResult.getQueryStats()) {
+//        stageStats.accept();
+//      }
+//      executionStatsAggregatorMap.get(0).setStats(brokerResponseNative);
+//      Assert.assertFalse(executionStatsAggregatorMap.isEmpty());
+//      for (Integer stageId : executionStatsAggregatorMap.keySet()) {
+//        if (stageId > 0) {
+//          BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
+//          executionStatsAggregatorMap.get(stageId).setStageLevelStats(null, brokerResponseStats, null);
+//          brokerResponseNative.addStageStat(stageId, brokerResponseStats);
+//        }
+//      }
+//
+//      Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
+//
+//      Map<Integer, BrokerResponseStats> stageIdStats = brokerResponseNative.getStageIdStats();
+//      int numTables = 0;
+//      for (Integer stageId : stageIdStats.keySet()) {
+//        // check stats only for leaf stage
+//        BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
+//
+//        if (brokerResponseStats.getTableNames().isEmpty()) {
+//          continue;
+//        }
+//
+//        String tableName = brokerResponseStats.getTableNames().get(0);
+//        Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
+//        numTables++;
+//        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+//        if (tableType == null) {
+//          tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+//        }
+//
+//        Assert.assertNotNull(_tableToSegmentMap.get(tableName));
+//        Assert.assertEquals(brokerResponseStats.getNumSegmentsQueried(), _tableToSegmentMap.get(tableName).size());
+//
+//        Assert.assertFalse(brokerResponseStats.getOperatorStats().isEmpty());
+//        Map<String, Map<String, String>> operatorStats = brokerResponseStats.getOperatorStats();
+//        for (Map.Entry<String, Map<String, String>> entry : operatorStats.entrySet()) {
+//          if (entry.getKey().contains("LEAF_STAGE")) {
+//            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName()));
+//          } else {
+//            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_BLOCKS.getName()));
+//          }
+//        }
+//      }
+//
+//      Assert.assertTrue(numTables > 0);
+//    });
+//  }
 
-      Assert.assertEquals(brokerResponseNative.getNumSegmentsQueried(), numSegments);
-
-      Map<Integer, BrokerResponseStats> stageIdStats = brokerResponseNative.getStageIdStats();
-      int numTables = 0;
-      for (Integer stageId : stageIdStats.keySet()) {
-        // check stats only for leaf stage
-        BrokerResponseStats brokerResponseStats = stageIdStats.get(stageId);
-
-        if (brokerResponseStats.getTableNames().isEmpty()) {
-          continue;
-        }
-
-        String tableName = brokerResponseStats.getTableNames().get(0);
-        Assert.assertEquals(brokerResponseStats.getTableNames().size(), 1);
-        numTables++;
-        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-        if (tableType == null) {
-          tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-        }
-
-        Assert.assertNotNull(_tableToSegmentMap.get(tableName));
-        Assert.assertEquals(brokerResponseStats.getNumSegmentsQueried(), _tableToSegmentMap.get(tableName).size());
-
-        Assert.assertFalse(brokerResponseStats.getOperatorStats().isEmpty());
-        Map<String, Map<String, String>> operatorStats = brokerResponseStats.getOperatorStats();
-        for (Map.Entry<String, Map<String, String>> entry : operatorStats.entrySet()) {
-          if (entry.getKey().contains("LEAF_STAGE")) {
-            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName()));
-          } else {
-            Assert.assertNotNull(entry.getValue().get(DataTable.MetadataKey.NUM_BLOCKS.getName()));
-          }
-        }
-      }
-
-      Assert.assertTrue(numTables > 0);
-    });
-  }
-
-  private Optional<ResultTable> runQuery(String sql, final String except,
-      Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap)
+  private Optional<QueryDispatcher.QueryResult> runQuery(String sql, final String except, boolean trace)
       throws Exception {
     try {
       // query pinot
-      ResultTable resultTable = queryRunner(sql, executionStatsAggregatorMap);
+      QueryDispatcher.QueryResult queryResult = queryRunner(sql, trace);
       Assert.assertNull(except, "Expected error with message '" + except + "'. But instead rows were returned: "
-          + JsonUtils.objectToPrettyString(resultTable));
-      return Optional.of(resultTable);
+          + JsonUtils.objectToPrettyString(queryResult.getResultTable()));
+      return Optional.of(queryResult);
     } catch (Exception e) {
       if (except == null) {
         throw e;

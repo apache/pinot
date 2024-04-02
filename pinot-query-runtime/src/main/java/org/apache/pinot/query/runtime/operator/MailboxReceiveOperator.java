@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,9 +60,18 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
       block = _multiConsumer.readBlockBlocking();
     }
     if (block.isSuccessfulEndOfStreamBlock()) {
-      // the multiConsumer has already merged stages from upstream, but doesn't know about this operator specific stats.
       updateEosBlock(block);
     }
     return block;
+  }
+
+  @Override
+  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos) {
+    assert upstreamEos.isSuccessfulEndOfStreamBlock();
+    MultiStageQueryStats queryStats = upstreamEos.getQueryStats();
+    assert queryStats != null;
+    // the multiConsumer has already merged stages from upstream and contains the stats for this operator.
+    assert queryStats.getCurrentStats().getLastOperatorStats() == _statMap;
+    return upstreamEos;
   }
 }

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
 import org.apache.pinot.query.planner.physical.MailboxIdUtils;
@@ -43,7 +44,7 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
  * When exchangeType is Singleton, we find the mapping mailbox for the mailboxService. If not found, use empty list.
  * When exchangeType is non-Singleton, we pull from each instance in round-robin way to get matched mailbox content.
  */
-public abstract class BaseMailboxReceiveOperator extends MultiStageOperator.WithBasicStats {
+public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<BaseMailboxReceiveOperator.StatKey> {
   protected final MailboxService _mailboxService;
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
@@ -71,7 +72,8 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator.With
         .collect(Collectors.toList());
     _multiConsumer =
         new BlockingMultiStreamConsumer.OfTransferableBlock(context.getStageId(), context.getId(),
-            context.getDeadlineMs(), asyncStreams);
+            context.getDeadlineMs(), asyncStreams, _statMap);
+    _statMap.merge(StatKey.FROM_STAGE, senderStageId);
   }
 
   @Override
@@ -81,7 +83,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator.With
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.MAILBOX_RECEIVE;
   }
 
@@ -100,6 +102,17 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator.With
   public void cancel(Throwable t) {
     super.cancel(t);
     _multiConsumer.cancel(t);
+  }
+
+  @Override
+  public Class<StatKey> getStatKeyClass() {
+    return StatKey.class;
+  }
+
+  @Override
+  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, executionTimeMs);
+    _statMap.merge(StatKey.EMITTED_ROWS, block.getNumRows());
   }
 
   private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
@@ -139,6 +152,36 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator.With
     @Override
     public void cancel() {
       _mailbox.cancel();
+    }
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG),
+    FROM_STAGE(StatMap.Type.INT) {
+      @Override
+      public int merge(int value1, int value2) {
+        if (value1 != value2) {
+          if (value1 == 0) {
+            return value2;
+          } else if (value2 == 0) {
+            return value1;
+          } else {
+            throw new IllegalStateException("Cannot merge non-zero values: " + value1 + " and " + value2);
+          }
+        }
+        return value1;
+      }
+    };
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
     }
   }
 }

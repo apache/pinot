@@ -61,6 +61,7 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -103,7 +104,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
    * Dispatch query to each pinot-server. The logic should mimic QueryDispatcher.submit() but does not actually make
    * ser/de dispatches.
    */
-  protected ResultTable queryRunner(String sql, Map<Integer, ExecutionStatsAggregator> executionStatsAggregatorMap) {
+  protected QueryDispatcher.QueryResult queryRunner(String sql, boolean trace) {
     long requestId = REQUEST_ID_GEN.getAndIncrement();
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sql);
     QueryEnvironment.QueryPlannerResult queryPlannerResult =
@@ -119,7 +120,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     requestMetadataMap.putAll(sqlNodeAndOptions.getOptions());
 
     // Putting trace testing here as extra options as it doesn't go along with the rest of the items.
-    if (executionStatsAggregatorMap != null) {
+    if (trace) {
       requestMetadataMap.put(CommonConstants.Broker.Request.TRACE, "true");
     }
 
@@ -129,9 +130,6 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (int stageId = 0; stageId < stagePlans.size(); stageId++) {
       if (stageId != 0) {
         submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, stageId, requestMetadataMap));
-      }
-      if (executionStatsAggregatorMap != null) {
-        executionStatsAggregatorMap.put(stageId, new ExecutionStatsAggregator(true));
       }
     }
     try {
@@ -149,7 +147,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     }
     // exception will be propagated through for assert purpose on runtime error
     return QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
-        executionStatsAggregatorMap, _mailboxService);
+        _mailboxService);
   }
 
   protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,

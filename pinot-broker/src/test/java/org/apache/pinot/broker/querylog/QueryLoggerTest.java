@@ -259,11 +259,9 @@ public class QueryLoggerTest {
     response.setExceptions(
         IntStream.range(0, numExceptions)
             .mapToObj(i -> new ProcessingException()).collect(Collectors.toList()));
-    response.setOfflineTotalCpuTimeNs(14);
     response.setOfflineThreadCpuTimeNs(15);
     response.setOfflineSystemActivitiesCpuTimeNs(16);
     response.setOfflineResponseSerializationCpuTimeNs(17);
-    response.setRealtimeTotalCpuTimeNs(18);
     response.setRealtimeThreadCpuTimeNs(19);
     response.setRealtimeSystemActivitiesCpuTimeNs(20);
     response.setRealtimeResponseSerializationCpuTimeNs(21);

@@ -19,9 +19,11 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Maps;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +42,8 @@ import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -48,7 +52,6 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
-import org.apache.pinot.common.response.broker.BrokerResponseStats;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -58,14 +61,37 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.core.query.reduce.ExecutionStatsAggregator;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
+import org.apache.pinot.query.planner.plannode.AbstractPlanNode;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.FilterNode;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
+import org.apache.pinot.query.planner.plannode.ProjectNode;
+import org.apache.pinot.query.planner.plannode.SetOpNode;
+import org.apache.pinot.query.planner.plannode.SortNode;
+import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.apache.pinot.query.planner.plannode.ValueNode;
+import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.WorkerManager;
+import org.apache.pinot.query.runtime.operator.AggregateOperator;
+import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.HashJoinOperator;
+import org.apache.pinot.query.runtime.operator.IntersectOperator;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
+import org.apache.pinot.query.runtime.operator.MinusOperator;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.UnionOperator;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.type.TypeSystem;
@@ -73,6 +99,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
@@ -183,24 +210,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
-    boolean traceEnabled = Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE));
-    Map<Integer, ExecutionStatsAggregator> stageIdStatsMap;
-    if (!traceEnabled) {
-      stageIdStatsMap = Collections.singletonMap(0, new ExecutionStatsAggregator(false));
-    } else {
-      List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
-      int numStages = stagePlans.size();
-      stageIdStatsMap = Maps.newHashMapWithExpectedSize(numStages);
-      for (int stageId = 0; stageId < numStages; stageId++) {
-        stageIdStatsMap.put(stageId, new ExecutionStatsAggregator(true));
-      }
-    }
 
     long executionStartTimeNs = System.nanoTime();
-    ResultTable queryResults;
+    QueryDispatcher.QueryResult queryResults;
     try {
-      queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimeoutMs, queryOptions,
-          stageIdStatsMap);
+      queryResults =
+          _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, queryTimeoutMs, queryOptions);
     } catch (TimeoutException e) {
       for (String table : tableNames) {
         _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS, 1);
@@ -219,7 +234,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - executionStartTimeNs);
 
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
-    brokerResponse.setResultTable(queryResults);
+    brokerResponse.setResultTable(queryResults.getResultTable());
 
     // Attach unavailable segments
     int numUnavailableSegments = 0;
@@ -231,24 +246,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
           String.format("Find unavailable segments: %s for table: %s", unavailableSegments, tableName)));
     }
 
-    for (Map.Entry<Integer, ExecutionStatsAggregator> entry : stageIdStatsMap.entrySet()) {
-      if (entry.getKey() == 0) {
-        // Root stats are aggregated and added separately to broker response for backward compatibility
-        entry.getValue().setStats(brokerResponse);
-        continue;
-      }
-
-      BrokerResponseStats brokerResponseStats = new BrokerResponseStats();
-      if (!tableNames.isEmpty()) {
-        //TODO: Only using first table to assign broker metrics
-        // find a way to split metrics in case of multiple table
-        String rawTableName = TableNameBuilder.extractRawTableName(tableNames.iterator().next());
-        entry.getValue().setStageLevelStats(rawTableName, brokerResponseStats, _brokerMetrics);
-      } else {
-        entry.getValue().setStageLevelStats(null, brokerResponseStats, null);
-      }
-      brokerResponse.addStageStat(entry.getKey(), brokerResponseStats);
-    }
+    fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan);
 
     // Set partial result flag
     brokerResponse.setPartialResult(isPartialResult(brokerResponse));
@@ -268,6 +266,145 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             null, brokerResponse, totalTimeMs, requesterIdentity));
 
     return brokerResponse;
+  }
+
+  private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
+      List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan) {
+    MultiStageStatsToBrokerResponseStats rootStatsAggregator = new MultiStageStatsToBrokerResponseStats();
+    for (int i = 0; i < queryStats.size(); i++) {
+      MultiStageQueryStats.StageStats.Closed stageStats = queryStats.get(i);
+      if (stageStats == null) {
+        brokerResponse.addStageStat(JsonUtils.newObjectNode());
+      } else {
+        stageStats.accept(rootStatsAggregator, brokerResponse);
+
+        DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(i);
+        MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(stageStats);
+        JsonNode node = dispatchablePlanFragment.getPlanFragment().getFragmentRoot().visit(treeBuilder, null);
+        brokerResponse.addStageStat(node);
+      }
+    }
+  }
+
+  public static class MultiStageStatsTreeBuilder implements PlanNodeVisitor<JsonNode, Void> {
+    private final MultiStageQueryStats.StageStats.Closed _stageStats;
+    private int _index;
+    private static final String CHILDREN_KEY = "children";
+
+    public MultiStageStatsTreeBuilder(MultiStageQueryStats.StageStats.Closed stageStats) {
+      _stageStats = stageStats;
+      _index = stageStats.getLastOperatorIndex();
+    }
+
+    private JsonNode recursiveCase(AbstractPlanNode node, MultiStageOperator.Type expectedType) {
+      MultiStageOperator.Type type = _stageStats.getOperatorType(_index);
+      if (type != expectedType) {
+        int childrenSize = node.getInputs().size();
+        switch (childrenSize) {
+          case 0:
+            LOGGER.warn("Skipping unexpected node {} when stat of type {} was found at index {}", node.getClass(), type, _index);
+            return JsonUtils.newObjectNode();
+          case 1:
+            LOGGER.warn("Skipping unexpected node {} when stat of type {} was found at index {}", node.getClass(), type, _index);
+            return node.getInputs().get(0).visit(this, null);
+          default:
+            throw new IllegalStateException("Expected operator type: " + expectedType + ", but got: " + type + " with "
+                + childrenSize + " inputs");
+        }
+      }
+      ObjectNode json = JsonUtils.newObjectNode();
+      json.put("type", type.toString());
+      Iterator<Map.Entry<String, JsonNode>> statsIt = _stageStats.getOperatorStats(_index).asJson().fields();
+      while (statsIt.hasNext()) {
+        Map.Entry<String, JsonNode> entry = statsIt.next();
+        json.set(entry.getKey(), entry.getValue());
+      }
+
+      List<PlanNode> inputs = node.getInputs();
+      ArrayNode children = JsonUtils.newArrayNode();
+      for (int i = inputs.size() - 1; i >= 0; i--) {
+        PlanNode planNode = inputs.get(i);
+        _index--;
+        JsonNode child = planNode.visit(this, null);
+        children.add(child);
+      }
+      json.set(CHILDREN_KEY, children);
+      return json;
+    }
+
+    @Override
+    public JsonNode visitAggregate(AggregateNode node, Void context) {
+      return recursiveCase(node, MultiStageOperator.Type.AGGREGATE);
+    }
+
+    @Override
+    public JsonNode visitFilter(FilterNode node, Void context) {
+      return recursiveCase(node, MultiStageOperator.Type.FILTER);
+    }
+
+    @Override
+    public JsonNode visitJoin(JoinNode node, Void context) {
+      return recursiveCase(node, MultiStageOperator.Type.HASH_JOIN);
+    }
+
+    @Override
+    public JsonNode visitMailboxReceive(MailboxReceiveNode node, Void context) {
+      return recursiveCase(node, MultiStageOperator.Type.MAILBOX_RECEIVE);
+    }
+
+    @Override
+    public JsonNode visitMailboxSend(MailboxSendNode node, Void context) {
+      return recursiveCase(node, MultiStageOperator.Type.MAILBOX_SEND);
+    }
+
+    @Override
+    public JsonNode visitProject(ProjectNode node, Void context) {
+      return recursiveCase(node, MultiStageOperator.Type.TRANSFORM);
+    }
+
+    @Override
+    public JsonNode visitSort(SortNode node, Void context) {
+      return recursiveCase(node, MultiStageOperator.Type.SORT);
+    }
+
+    @Override
+    public JsonNode visitTableScan(TableScanNode node, Void context) {
+      return recursiveCase(node, MultiStageOperator.Type.LEAF);
+    }
+
+    @Override
+    public JsonNode visitValue(ValueNode node, Void context) {
+      return recursiveCase(node, MultiStageOperator.Type.LITERAL);
+    }
+
+    @Override
+    public JsonNode visitWindow(WindowNode node, Void context) {
+      return recursiveCase(node, MultiStageOperator.Type.WINDOW);
+    }
+
+    @Override
+    public JsonNode visitSetOp(SetOpNode node, Void context) {
+      MultiStageOperator.Type type;
+      switch (node.getSetOpType()) {
+        case UNION:
+          type = MultiStageOperator.Type.UNION;
+          break;
+        case INTERSECT:
+          type = MultiStageOperator.Type.INTERSECT;
+          break;
+        case MINUS:
+          type = MultiStageOperator.Type.MINUS;
+          break;
+        default:
+          throw new IllegalStateException("Unexpected set op type: " + node.getSetOpType());
+      }
+      return recursiveCase(node, type);
+    }
+
+    @Override
+    public JsonNode visitExchange(ExchangeNode node, Void context) {
+      throw new UnsupportedOperationException("ExchangeNode should not be visited");
+    }
   }
 
   /**
@@ -343,5 +480,41 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
+  }
+
+  public static class MultiStageStatsToBrokerResponseStats
+      implements MultiStageQueryStats.StatsVisitor<BrokerResponseNativeV2> {
+    @Override
+    public void visitBase(StatMap<MultiStageOperator.BaseStatKeys> stats, BrokerResponseNativeV2 response) {
+      response.mergeMaxRows(stats.getLong(MultiStageOperator.BaseStatKeys.EMITTED_ROWS));
+    }
+
+    @Override
+    public void visitLeaf(StatMap<DataTable.MetadataKey> stats, BrokerResponseNativeV2 response) {
+      response.addServerStats(stats);
+      response.mergeMaxRows(stats.getLong(DataTable.MetadataKey.NUM_ROWS));
+    }
+
+    @Override
+    public void visitAggregate(StatMap<AggregateOperator.AggregateStats> stats, BrokerResponseNativeV2 response) {
+      response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.AggregateStats.NUM_GROUPS_LIMIT_REACHED));
+      response.mergeMaxRows(stats.getLong(AggregateOperator.AggregateStats.EMITTED_ROWS));
+    }
+
+    @Override
+    public void visitHashJoin(StatMap<HashJoinOperator.HashJoinStats> stats, BrokerResponseNativeV2 response) {
+      response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.HashJoinStats.MAX_ROWS_IN_JOIN_REACHED));
+      response.mergeMaxRows(stats.getLong(HashJoinOperator.HashJoinStats.EMITTED_ROWS));
+    }
+
+    @Override
+    public void visitMailboxReceive(StatMap<BaseMailboxReceiveOperator.StatKey> statMap, BrokerResponseNativeV2 arg) {
+
+    }
+
+    @Override
+    public void visitMailboxSend(StatMap<MailboxSendOperator.StatKey> statMap, BrokerResponseNativeV2 arg) {
+
+    }
   }
 }

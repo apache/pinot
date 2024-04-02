@@ -18,18 +18,17 @@
  */
 package org.apache.pinot.common.datablock;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
 
 public class MetadataBlockTest {
 
+  // TODO: Add more tests for MetadataBlock serialization/deserialization
   @Test
-  public void shouldEncodeContentsAsJSON()
+  public void emptyMetadataBlock()
       throws Exception {
     // Given:
     MetadataBlock.MetadataBlockType type = MetadataBlock.MetadataBlockType.EOS;
@@ -38,8 +37,10 @@ public class MetadataBlockTest {
     MetadataBlock metadataBlock = new MetadataBlock(type);
 
     // Then:
-    byte[] expected = new ObjectMapper().writeValueAsBytes(new MetadataBlock.Contents("EOS", new HashMap<>()));
-    assertEquals(metadataBlock._variableSizeDataBytes, expected);
+    byte[] expectedFixed = new byte[]{0};
+    assertEquals(metadataBlock._fixedSizeDataBytes, expectedFixed);
+    byte[] expectedVariable = new byte[]{0, 0, 0, 0};
+    assertEquals(metadataBlock._variableSizeDataBytes, expectedVariable);
   }
 
   @Test
@@ -113,11 +114,6 @@ public class MetadataBlockTest {
     @Override
     protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
       return 0;
-    }
-
-    @Override
-    public DataBlock toMetadataOnlyDataTable() {
-      return null;
     }
 
     @Override

@@ -27,15 +27,20 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public final class DataBlockUtils {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DataBlockUtils.class);
+
   private DataBlockUtils() {
   }
 
   static final int VERSION_TYPE_SHIFT = 5;
 
   public static MetadataBlock getErrorDataBlock(Exception e) {
+    LOGGER.info("Caught exception while processing query", e);
     if (e instanceof ProcessingException) {
       return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), extractErrorMsg(e)));
     } else {

@@ -41,7 +41,7 @@ public class IntersectOperator extends SetOperator {
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.INTERSECT;
   }
 

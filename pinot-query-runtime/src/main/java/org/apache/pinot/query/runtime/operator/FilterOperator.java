@@ -69,7 +69,7 @@ public class FilterOperator extends MultiStageOperator.WithBasicStats {
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.FILTER;
   }
 

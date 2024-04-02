@@ -130,8 +130,8 @@ public class PipelineBreakerExecutorTest {
     Assert.assertEquals(pipelineBreakerResult.getResultMap().values().iterator().next().size(), 2);
 
     // should collect stats from previous stage here
-    Assert.assertNotNull(pipelineBreakerResult.getStageStatsHolder());
-    Assert.assertNotNull(pipelineBreakerResult.getStageStatsHolder().getStageStats(1),
+    Assert.assertNotNull(pipelineBreakerResult.getStageQueryStats());
+    Assert.assertNotNull(pipelineBreakerResult.getStageQueryStats().getUpstreamStageStats(1),
         "Stats for stage 1 should be sent");
   }
 
@@ -174,10 +174,10 @@ public class PipelineBreakerExecutorTest {
     Assert.assertFalse(it.hasNext());
 
     // should collect stats from previous stage here
-    Assert.assertNotNull(pipelineBreakerResult.getStageStatsHolder());
-    Assert.assertNotNull(pipelineBreakerResult.getStageStatsHolder().getStageStats(1),
+    Assert.assertNotNull(pipelineBreakerResult.getStageQueryStats());
+    Assert.assertNotNull(pipelineBreakerResult.getStageQueryStats().getUpstreamStageStats(1),
         "Stats for stage 1 should be sent");
-    Assert.assertNotNull(pipelineBreakerResult.getStageStatsHolder().getStageStats(2),
+    Assert.assertNotNull(pipelineBreakerResult.getStageQueryStats().getUpstreamStageStats(2),
         "Stats for stage 2 should be sent");
   }
 
@@ -201,7 +201,7 @@ public class PipelineBreakerExecutorTest {
     List<TransferableBlock> resultBlocks = pipelineBreakerResult.getResultMap().values().iterator().next();
     Assert.assertEquals(resultBlocks.size(), 0);
 
-    Assert.assertNotNull(pipelineBreakerResult.getStageStatsHolder());
+    Assert.assertNotNull(pipelineBreakerResult.getStageQueryStats());
   }
 
   @Test
@@ -268,7 +268,7 @@ public class PipelineBreakerExecutorTest {
     Assert.assertEquals(pipelineBreakerResult.getResultMap().get(0).size(), 1);
     Assert.assertEquals(pipelineBreakerResult.getResultMap().get(1).size(), 0);
 
-    Assert.assertNotNull(pipelineBreakerResult.getStageStatsHolder());
+    Assert.assertNotNull(pipelineBreakerResult.getStageQueryStats());
   }
 
   @Test

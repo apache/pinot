@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -31,7 +32,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageStatsHolder;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +46,7 @@ class PipelineBreakerOperator extends MultiStageOperator.WithBasicStats {
   private Map<Integer, List<TransferableBlock>> _resultMap;
   private TransferableBlock _errorBlock;
   @Nullable
-  private StageStatsHolder _statsHolder = null;
+  private MultiStageQueryStats _queryStats = null;
 
   public PipelineBreakerOperator(OpChainExecutionContext context, Map<Integer, Operator<TransferableBlock>> workerMap) {
     super(context);
@@ -62,13 +63,13 @@ class PipelineBreakerOperator extends MultiStageOperator.WithBasicStats {
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.PIPELINE_BREAKER;
   }
 
-  public StageStatsHolder getStatsHolder() {
-    assert _statsHolder != null : "This method should not be called before blocks have been processed";
-    return _statsHolder;
+  public MultiStageQueryStats getQueryStats() {
+    assert _queryStats != null : "This method should not be called before blocks have been processed";
+    return _queryStats;
   }
 
   @Override
@@ -128,18 +129,21 @@ class PipelineBreakerOperator extends MultiStageOperator.WithBasicStats {
           _resultMap.get(entry.getKey()).add(block);
           entries.offer(entry);
         } else if (block.isSuccessfulEndOfStreamBlock()) {
-          StageStatsHolder statsHolder = block.getStatsHolder();
-          assert statsHolder != null;
-          if (_statsHolder == null) {
-            _statsHolder = statsHolder;
+          MultiStageQueryStats queryStats = block.getQueryStats();
+          assert queryStats != null;
+          if (_queryStats == null) {
+            Preconditions.checkArgument(queryStats.getCurrentStageId() == _context.getStageId(),
+                "The current stage id of the stats holder: %s does not match the current stage id: %s",
+                queryStats.getCurrentStageId(), _context.getStageId());
+            _queryStats = queryStats;
           } else {
-            _statsHolder.merge(statsHolder);
+            _queryStats.mergeUpstream(queryStats);
           }
         }
       }
     }
-    assert _statsHolder != null;
-    addStats(_statsHolder);
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(_statsHolder);
+    assert _queryStats != null;
+    addStats(_queryStats);
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
   }
 }

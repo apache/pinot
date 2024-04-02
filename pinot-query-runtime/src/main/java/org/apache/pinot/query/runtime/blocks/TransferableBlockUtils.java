@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
-import org.apache.pinot.query.runtime.plan.StageStatsHolder;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 
 
 public final class TransferableBlockUtils {
@@ -44,12 +44,8 @@ public final class TransferableBlockUtils {
     return EMPTY_EOS;
   }
 
-  public static TransferableBlock getEndOfStreamTransferableBlock(StageStatsHolder stats) {
-    try {
-      return new TransferableBlock(DataBlockUtils.getEndOfStreamDataBlock(stats.serialize()));
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
+  public static TransferableBlock getEndOfStreamTransferableBlock(MultiStageQueryStats stats) {
+    return new TransferableBlock(stats);
   }
 
   public static TransferableBlock wrap(DataBlock dataBlock) {

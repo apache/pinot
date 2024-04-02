@@ -31,7 +31,7 @@ import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageStatsHolder;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -54,7 +54,7 @@ public abstract class SetOperator extends MultiStageOperator.WithBasicStats {
   private boolean _isRightSetBuilt;
   private TransferableBlock _upstreamErrorBlock;
   @Nullable
-  private StageStatsHolder _rightStatsHolder = null;
+  private MultiStageQueryStats _rightQueryStats = null;
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator<?>> upstreamOperators,
       DataSchema dataSchema) {
@@ -120,8 +120,8 @@ public abstract class SetOperator extends MultiStageOperator.WithBasicStats {
       _upstreamErrorBlock = block;
     } else {
       _isRightSetBuilt = true;
-      _rightStatsHolder = block.getStatsHolder();
-      assert _rightStatsHolder != null;
+      _rightQueryStats = block.getQueryStats();
+      assert _rightQueryStats != null;
     }
   }
 
@@ -134,12 +134,11 @@ public abstract class SetOperator extends MultiStageOperator.WithBasicStats {
       return _upstreamErrorBlock;
     }
     if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-      assert _rightStatsHolder != null;
-      StageStatsHolder leftStatsHolder = leftBlock.getStatsHolder();
-      assert leftStatsHolder != null;
-      _rightStatsHolder.merge(leftStatsHolder);
-      addStats(_rightStatsHolder);
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightStatsHolder);
+      assert _rightQueryStats != null;
+      MultiStageQueryStats leftQueryStats = leftBlock.getQueryStats();
+      assert leftQueryStats != null;
+      _rightQueryStats.mergeInOrder(leftQueryStats, getOperatorType(), _statMap);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightQueryStats);
     }
     for (Object[] row : leftBlock.getContainer()) {
       if (handleRowMatched(row)) {

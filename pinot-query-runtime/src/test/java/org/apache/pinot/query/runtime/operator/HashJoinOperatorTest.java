@@ -104,7 +104,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
     HashJoinOperator joinOnString =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = joinOnString.nextBlock();
     List<Object[]> resultRows = result.getContainer();
@@ -138,7 +138,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator joinOnInt =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnInt.nextBlock();
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{2, "BB", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"});
@@ -169,7 +169,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
     HashJoinOperator joinOnInt =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnInt.nextBlock();
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows =
@@ -207,7 +207,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.LEFT,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     List<Object[]> resultRows = result.getContainer();
@@ -238,7 +238,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isEndOfStreamBlock());
@@ -266,7 +266,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.LEFT,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     List<Object[]> resultRows = result.getContainer();
@@ -298,7 +298,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     List<Object[]> resultRows = result.getContainer();
@@ -332,7 +332,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows =
@@ -370,7 +370,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(new ArrayList<>(), new ArrayList<>()), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "Aa", 2, "Aa"}, new Object[]{2, "BB", 1, "BB"});
@@ -402,7 +402,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.RIGHT,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator joinOnNum =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = joinOnNum.nextBlock();
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{2, "BB", 2, "Aa"}, new Object[]{2, "BB", 2, "BB"});
@@ -442,7 +442,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.SEMI,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows =
@@ -475,7 +475,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.FULL,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = ImmutableList.of(new Object[]{1, "Aa", null, null}, new Object[]{2, "BB", 2, "Aa"},
@@ -518,7 +518,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.ANTI,
         getJoinKeys(Arrays.asList(1), Arrays.asList(1)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
     TransferableBlock result = join.nextBlock();
     List<Object[]> resultRows = result.getContainer();
     List<Object[]> expectedRows = ImmutableList.of(new Object[]{4, "CC", null, null});
@@ -550,7 +550,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
@@ -580,7 +580,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, Collections.emptyList());
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
@@ -612,7 +612,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, getJoinHints(hintsMap));
     HashJoinOperator join =
-        new HashJoinOperator(OperatorTestUtil.getDefaultContext(), _leftOperator, _rightOperator, leftSchema, node);
+        new HashJoinOperator(OperatorTestUtil.getDefaultContextWithTracing(), _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock result = join.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
@@ -645,7 +645,7 @@ public class HashJoinOperatorTest {
     JoinNode node = new JoinNode(1, resultSchema, leftSchema, rightSchema, JoinRelType.INNER,
         getJoinKeys(Arrays.asList(0), Arrays.asList(0)), joinClauses, getJoinHints(hintsMap));
 
-    OpChainExecutionContext context = OperatorTestUtil.getDefaultContext();
+    OpChainExecutionContext context = OperatorTestUtil.getDefaultContextWithTracing();
     HashJoinOperator join = new HashJoinOperator(context, _leftOperator, _rightOperator, leftSchema, node);
 
     TransferableBlock firstBlock = join.nextBlock();

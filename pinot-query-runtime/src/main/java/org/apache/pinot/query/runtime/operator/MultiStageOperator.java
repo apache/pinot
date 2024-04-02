@@ -30,7 +30,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageStatsHolder;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -53,7 +53,7 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
 
   protected abstract Logger logger();
 
-  public abstract Type getType();
+  public abstract Type getOperatorType();
 
   /**
    * Returns the class of the stat key.
@@ -106,8 +106,8 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     }
   }
 
-  protected void addStats(StageStatsHolder holder) {
-    holder.getCurrentStats().addLastOperator(getType(), _statMap);
+  protected void addStats(MultiStageQueryStats holder) {
+    holder.getCurrentStats().addLastOperator(getOperatorType(), _statMap);
   }
 
   protected boolean shouldCollectStats() {
@@ -144,15 +144,10 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
 
   protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos) {
     assert upstreamEos.isSuccessfulEndOfStreamBlock();
-    StageStatsHolder statsHolder = upstreamEos.getStatsHolder();
-    assert statsHolder != null;
-    addStats(statsHolder);
+    MultiStageQueryStats queryStats = upstreamEos.getQueryStats();
+    assert queryStats != null;
+    addStats(queryStats);
     return upstreamEos;
-  }
-
-  protected TransferableBlock createLeafBlock() {
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(
-        StageStatsHolder.create(_context.getStageId(), getType(), _statMap));
   }
 
   public abstract static class WithBasicStats extends MultiStageOperator<BaseStatKeys> {
@@ -167,8 +162,8 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
 
     @Override
     protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-      _statMap.add(BaseStatKeys.EXECUTION_TIME_MS, executionTimeMs);
-      _statMap.add(BaseStatKeys.EMITTED_ROWS, block.getNumRows());
+      _statMap.merge(BaseStatKeys.EXECUTION_TIME_MS, executionTimeMs);
+      _statMap.merge(BaseStatKeys.EMITTED_ROWS, block.getNumRows());
     }
   }
 
@@ -179,6 +174,11 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
           throws IOException {
         return StatMap.deserialize(input, AggregateOperator.AggregateStats.class);
       }
+
+      @Override
+      public StatMap<AggregateOperator.AggregateStats> emptyStats() {
+        return new StatMap<>(AggregateOperator.AggregateStats.class);
+      }
     },
     FILTER,
     HASH_JOIN {
@@ -186,6 +186,11 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
       public StatMap<HashJoinOperator.HashJoinStats> deserializeStats(DataInput input)
           throws IOException {
         return StatMap.deserialize(input, HashJoinOperator.HashJoinStats.class);
+      }
+
+      @Override
+      public StatMap<HashJoinOperator.HashJoinStats> emptyStats() {
+        return new StatMap<>(HashJoinOperator.HashJoinStats.class);
       }
     },
     INTERSECT,
@@ -195,10 +200,37 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
           throws IOException {
         return StatMap.deserialize(input, DataTable.MetadataKey.class);
       }
+
+      @Override
+      public StatMap<DataTable.MetadataKey> emptyStats() {
+        return new StatMap<>(DataTable.MetadataKey.class);
+      }
     },
     LITERAL,
-    MAILBOX_RECEIVE,
-    MAILBOX_SEND,
+    MAILBOX_RECEIVE {
+      @Override
+      public StatMap<BaseMailboxReceiveOperator.StatKey> deserializeStats(DataInput input)
+          throws IOException {
+        return StatMap.deserialize(input, BaseMailboxReceiveOperator.StatKey.class);
+      }
+
+      @Override
+      public StatMap<BaseMailboxReceiveOperator.StatKey> emptyStats() {
+        return new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
+      }
+    },
+    MAILBOX_SEND {
+      @Override
+      public StatMap<MailboxSendOperator.StatKey> deserializeStats(DataInput input)
+          throws IOException {
+        return StatMap.deserialize(input, MailboxSendOperator.StatKey.class);
+      }
+
+      @Override
+      public StatMap<MailboxSendOperator.StatKey> emptyStats() {
+        return new StatMap<>(MailboxSendOperator.StatKey.class);
+      }
+    },
     MINUS,
     PIPELINE_BREAKER,
     SORT,
@@ -206,9 +238,13 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     UNION,
     WINDOW;
 
-    public <K extends Enum<K> & StatMap.Key> StatMap<K> deserializeStats(DataInput input)
+    public StatMap<?> deserializeStats(DataInput input)
         throws IOException {
-      return (StatMap<K>) StatMap.deserialize(input, BaseStatKeys.class);
+      return StatMap.deserialize(input, BaseStatKeys.class);
+    }
+
+    public StatMap<?> emptyStats() {
+      return new StatMap<>(BaseStatKeys.class);
     }
   }
 

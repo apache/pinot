@@ -163,7 +163,7 @@ public class WindowAggregateOperator extends MultiStageOperator.WithBasicStats {
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.WINDOW;
   }
 

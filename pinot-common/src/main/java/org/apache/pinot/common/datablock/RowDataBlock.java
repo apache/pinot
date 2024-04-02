@@ -73,14 +73,6 @@ public class RowDataBlock extends BaseDataBlock {
   }
 
   @Override
-  public RowDataBlock toMetadataOnlyDataTable() {
-    RowDataBlock metadataOnlyDataTable = new RowDataBlock();
-    metadataOnlyDataTable._metadata.putAll(_metadata);
-    metadataOnlyDataTable._errCodeToExceptionMap.putAll(_errCodeToExceptionMap);
-    return metadataOnlyDataTable;
-  }
-
-  @Override
   public RowDataBlock toDataOnlyDataTable() {
     return new RowDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
   }

@@ -134,11 +134,6 @@ public class MetadataBlock extends BaseDataBlock {
   }
 
   @Override
-  public MetadataBlock toMetadataOnlyDataTable() {
-    return this;
-  }
-
-  @Override
   public MetadataBlock toDataOnlyDataTable() {
     throw new UnsupportedOperationException();
   }

@@ -46,7 +46,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageStatsHolder;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.slf4j.Logger;
@@ -118,7 +118,7 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJo
   private int _currentRowsInHashTable = 0;
 
   @Nullable
-  private StageStatsHolder _statsHolder = null;
+  private MultiStageQueryStats _queryStats = null;
 
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator<?> leftTableOperator,
       MultiStageOperator<?> rightTableOperator, DataSchema leftSchema, JoinNode node) {
@@ -161,12 +161,12 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJo
 
   @Override
   protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.add(HashJoinStats.EXECUTION_TIME_MS, executionTimeMs);
-    _statMap.add(HashJoinStats.EMITTED_ROWS, block.getNumRows());
+    _statMap.merge(HashJoinStats.EXECUTION_TIME_MS, executionTimeMs);
+    _statMap.merge(HashJoinStats.EMITTED_ROWS, block.getNumRows());
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.HASH_JOIN;
   }
 
@@ -220,8 +220,8 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJo
   protected TransferableBlock getNextBlock()
       throws ProcessingException {
     if (_isTerminated) {
-      assert _statsHolder != null;
-      TransferableBlockUtils.getEndOfStreamTransferableBlock(_statsHolder);
+      assert _queryStats != null;
+      TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
     }
     if (!_isHashTableBuilt) {
       // Build JOIN hash table
@@ -253,7 +253,7 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJo
           // Just fill up the buffer.
           int remainingRows = _maxRowsInHashTable - _currentRowsInHashTable;
           container = container.subList(0, remainingRows);
-          _statMap.put(HashJoinStats.MAX_ROWS_IN_JOIN_REACHED, true);
+          _statMap.merge(HashJoinStats.MAX_ROWS_IN_JOIN_REACHED, true);
           // setting only the rightTableOperator to be early terminated and awaits EOS block next.
           _rightTableOperator.earlyTerminate();
         }
@@ -275,9 +275,8 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJo
       _upstreamErrorBlock = rightBlock;
     } else {
       _isHashTableBuilt = true;
-      _statsHolder = rightBlock.getStatsHolder();
-      assert _statsHolder != null;
-      addStats(_statsHolder);
+      _queryStats = rightBlock.getQueryStats();
+      assert _queryStats != null;
     }
   }
 
@@ -287,13 +286,13 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJo
       return _upstreamErrorBlock;
     }
     if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-      assert _statsHolder != null;
-      StageStatsHolder leftStatsHolder = leftBlock.getStatsHolder();
-      assert leftStatsHolder != null;
-      _statsHolder.merge(leftStatsHolder);
+      assert _queryStats != null;
+      MultiStageQueryStats leftQueryStats = leftBlock.getQueryStats();
+      assert leftQueryStats != null;
+      _queryStats.mergeInOrder(leftQueryStats, getOperatorType(), _statMap);
 
       if (!needUnmatchedRightRows()) {
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_statsHolder);
+        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
       }
       // TODO: Moved to a different function.
       // Return remaining non-matched rows for non-inner join.

@@ -79,8 +79,6 @@ public interface DataBlock {
   @Nullable
   RoaringBitmap getNullRowIds(int colId);
 
-  DataBlock toMetadataOnlyDataTable();
-
   DataBlock toDataOnlyDataTable();
 
   enum Type {

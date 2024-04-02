@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -37,6 +38,7 @@ import org.apache.pinot.query.routing.RoutingInfo;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.slf4j.Logger;
@@ -48,7 +50,7 @@ import org.slf4j.LoggerFactory;
  *
  * TODO: Add support to sort the data prior to sending if sorting is enabled
  */
-public class MailboxSendOperator extends MultiStageOperator<MultiStageOperator.BaseStatKeys> {
+public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.StatKey> {
   public static final EnumSet<RelDistribution.Type> SUPPORTED_EXCHANGE_TYPES =
       EnumSet.of(RelDistribution.Type.SINGLETON, RelDistribution.Type.RANDOM_DISTRIBUTED,
           RelDistribution.Type.BROADCAST_DISTRIBUTED, RelDistribution.Type.HASH_DISTRIBUTED);
@@ -68,6 +70,7 @@ public class MailboxSendOperator extends MultiStageOperator<MultiStageOperator.B
       boolean isSortOnSender, int receiverStageId) {
     this(context, sourceOperator, getBlockExchange(context, distributionType, distributionKeys, receiverStageId),
         collationKeys, collationDirections, isSortOnSender);
+    _statMap.merge(StatKey.TO_STAGE, receiverStageId);
   }
 
   @VisibleForTesting
@@ -103,18 +106,18 @@ public class MailboxSendOperator extends MultiStageOperator<MultiStageOperator.B
   }
 
   @Override
-  public Class<BaseStatKeys> getStatKeyClass() {
-    return BaseStatKeys.class;
+  public Class<StatKey> getStatKeyClass() {
+    return StatKey.class;
   }
 
   @Override
   protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.add(BaseStatKeys.EXECUTION_TIME_MS, executionTimeMs);
-    _statMap.add(BaseStatKeys.EMITTED_ROWS, block.getNumRows());
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, executionTimeMs);
+    _statMap.merge(StatKey.EMITTED_ROWS, block.getNumRows());
   }
 
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.MAILBOX_SEND;
   }
 
@@ -166,6 +169,11 @@ public class MailboxSendOperator extends MultiStageOperator<MultiStageOperator.B
     }
   }
 
+  protected TransferableBlock createLeafBlock() {
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(
+        MultiStageQueryStats.createCancelledSend(_context.getStageId(), _statMap));
+  }
+
   private boolean sendTransferableBlock(TransferableBlock block)
       throws Exception {
     boolean isEarlyTerminated = _exchange.send(block);
@@ -194,5 +202,40 @@ public class MailboxSendOperator extends MultiStageOperator<MultiStageOperator.B
   public void cancel(Throwable t) {
     super.cancel(t);
     _exchange.cancel(t);
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG),
+    TO_STAGE(StatMap.Type.INT) {
+      @Override
+      public int merge(int value1, int value2) {
+        if (value1 != value2) {
+          if (value1 == 0) {
+            return value2;
+          } else if (value2 == 0) {
+            return value1;
+          } else {
+            throw new IllegalStateException("Cannot merge non-zero values: " + value1 + " and " + value2);
+          }
+        }
+        return value1;
+      }
+
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    };
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

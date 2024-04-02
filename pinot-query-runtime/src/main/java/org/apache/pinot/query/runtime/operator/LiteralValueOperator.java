@@ -26,6 +26,8 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,8 +81,13 @@ public class LiteralValueOperator extends MultiStageOperator.WithBasicStats {
     }
   }
 
+  protected TransferableBlock createLeafBlock() {
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(
+        MultiStageQueryStats.createLiteral(_context.getStageId(), _statMap));
+  }
+
   @Override
-  public Type getType() {
+  public Type getOperatorType() {
     return Type.LITERAL;
   }
 

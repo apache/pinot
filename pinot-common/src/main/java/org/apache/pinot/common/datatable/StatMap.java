@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.IntPredicate;
 import java.util.stream.Collectors;
@@ -58,8 +59,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   @Nullable
   private final long[] _longValues;
   @Nullable
-  private final double[] _doubleValues;
-  @Nullable
   private final boolean[] _booleanValues;
   /**
    * In Pinot 1.1.0 this can only store String values, but it is prepared to be able to store any kind of object in
@@ -73,20 +72,17 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     _family = family;
     _intValues = family.createIntValues();
     _longValues = family.createLongValues();
-    _doubleValues = family.createDoubleValues();
     _booleanValues = family.createBooleanValues();
     _referenceValues = family.createReferenceValues();
   }
 
   private StatMap(Family<K> family, @Nullable int[] intValues, @Nullable long[] longValues,
-      @Nullable double[] doubleValues, @Nullable boolean[] booleanValues, @Nullable Object[] referenceValues) {
+      @Nullable boolean[] booleanValues, @Nullable Object[] referenceValues) {
     _family = family;
     assert intValues == null || intValues.length == family._numIntsValues;
     _intValues = intValues;
     assert longValues == null || longValues.length == family._numLongValues;
     _longValues = longValues;
-    assert doubleValues == null || doubleValues.length == family._numDoubleValues;
-    _doubleValues = doubleValues;
     assert booleanValues == null || booleanValues.length == family._numBooleanValues;
     _booleanValues = booleanValues;
     assert referenceValues == null || referenceValues.length == family._numReferenceValues;
@@ -100,43 +96,32 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return _intValues[index];
   }
 
-  public void add(K key, int value) {
-    if (key.getType() == Type.DOUBLE) {
-      add(key, (double) value);
+  public void merge(K key, int value) {
+    if (key.getType() == Type.LONG) {
+      merge(key, (long) value);
       return;
     }
     Preconditions.checkArgument(key.getType() == Type.INT);
     int index = _family.getIndex(key);
     assert _intValues != null : "Int values should not be null because " + key + " is of type INT";
-    _intValues[index] += value;
+    _intValues[index] = key.merge(_intValues[index], value);
   }
 
   public long getLong(K key) {
+    if (key.getType() == Type.INT) {
+      return getInt(key);
+    }
     Preconditions.checkArgument(key.getType() == Type.LONG);
     int index = _family.getIndex(key);
     assert _longValues != null : "Long values should not be null because " + key + " is of type LONG";
     return _longValues[index];
   }
 
-  public void add(K key, long value) {
+  public void merge(K key, long value) {
     Preconditions.checkArgument(key.getType() == Type.LONG);
     int index = _family.getIndex(key);
     assert _longValues != null : "Long values should not be null because " + key + " is of type LONG";
-    _longValues[index] += value;
-  }
-
-  public double getDouble(K key) {
-    Preconditions.checkArgument(key.getType() == Type.DOUBLE);
-    int index = _family.getIndex(key);
-    assert _doubleValues != null : "Double values should not be null because " + key + " is of type DOUBLE";
-    return _doubleValues[index];
-  }
-
-  public void add(K key, double value) {
-    Preconditions.checkArgument(key.getType() == Type.DOUBLE);
-    int index = _family.getIndex(key);
-    assert _doubleValues != null : "Double values should not be null because " + key + " is of type DOUBLE";
-    _doubleValues[index] += value;
+    _longValues[index] = key.merge(_longValues[index], value);
   }
 
   public boolean getBoolean(K key) {
@@ -146,11 +131,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return _booleanValues[index];
   }
 
-  public void put(K key, boolean value) {
+  public void merge(K key, boolean value) {
     Preconditions.checkArgument(key.getType() == Type.BOOLEAN);
     int index = _family.getIndex(key);
     assert _booleanValues != null : "Boolean values should not be null because " + key + " is of type BOOLEAN";
-    _booleanValues[index] = value;
+    _booleanValues[index] = key.merge(_booleanValues[index], value);
   }
 
   public String getString(K key) {
@@ -160,11 +145,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return (String) _referenceValues[index];
   }
 
-  public void put(K key, String value) {
+  public void merge(K key, String value) {
     Preconditions.checkArgument(key.getType() == Type.STRING);
     int index = _family.getIndex(key);
     assert _referenceValues != null : "Reference values should not be null because " + key + " is of type STRING";
-    _referenceValues[index] = value;
+    _referenceValues[index] = key.merge((String) _referenceValues[index], value);
   }
 
   /**
@@ -180,8 +165,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         return getInt(key);
       case LONG:
         return getLong(key);
-      case DOUBLE:
-        return getDouble(key);
       case STRING:
         return getString(key);
       default:
@@ -204,7 +187,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     for (int i = 0; i < _family._numIntsValues; i++) {
       assert _intValues != null : "Int values should not be null because there are int keys";
       assert other._intValues != null : "Int values should not be null because there are int keys";
-      _intValues[i] += other._intValues[i];
+      K key = _family.getKey(i, Type.INT);
+      _intValues[i] = key.merge(_intValues[i], other._intValues[i]);
     }
 
     Preconditions.checkState(_family._numLongValues == other._family._numLongValues,
@@ -212,15 +196,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     for (int i = 0; i < _family._numLongValues; i++) {
       assert _longValues != null : "Long values should not be null because there are long keys";
       assert other._longValues != null : "Long values should not be null because there are long keys";
-      _longValues[i] += other._longValues[i];
-    }
-
-    Preconditions.checkState(_family._numDoubleValues == other._family._numDoubleValues,
-        "Different number of double values");
-    for (int i = 0; i < _family._numDoubleValues; i++) {
-      assert _doubleValues != null : "Double values should not be null because there are double keys";
-      assert other._doubleValues != null : "Double values should not be null because there are double keys";
-      _doubleValues[i] += other._doubleValues[i];
+      K key = _family.getKey(i, Type.LONG);
+      _longValues[i] = key.merge(_longValues[i], other._longValues[i]);
     }
 
     Preconditions.checkState(_family._numBooleanValues == other._family._numBooleanValues,
@@ -228,7 +205,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     for (int i = 0; i < _family._numBooleanValues; i++) {
       assert _booleanValues != null : "Boolean values should not be null because there are boolean keys";
       assert other._booleanValues != null : "Boolean values should not be null because there are boolean keys";
-      _booleanValues[i] |= other._booleanValues[i];
+      K key = _family.getKey(i, Type.BOOLEAN);
+      _booleanValues[i] = key.merge(_booleanValues[i], other._booleanValues[i]);
     }
 
     Preconditions.checkState(_family._numReferenceValues == other._family._numReferenceValues,
@@ -238,6 +216,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       assert other._referenceValues != null : "Reference values should not be null because there are reference keys";
       if (_referenceValues[i] == null) {
         _referenceValues[i] = other._referenceValues[i];
+      } else {
+        K key = _family.getKey(i, Type.STRING);
+        _referenceValues[i] = key.merge((String) _referenceValues[i], (String) other._referenceValues[i]);
       }
     }
   }
@@ -258,7 +239,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       for (int intKey : keys) {
         int value = input.readInt();
         assert value != 0;
-        _intValues[intKey] += value;
+        K key = _family.getKey(intKey, Type.INT);
+        _intValues[intKey] = key.merge(_intValues[intKey], value);
       }
     }
 
@@ -268,17 +250,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       for (int longKey : keys) {
         long value = input.readLong();
         assert value != 0;
-        _longValues[longKey] += value;
-      }
-    }
-
-    keys = readKeys(input, bytesPerId, _family._numDoubleValues);
-    if (_family._numDoubleValues != 0) {
-      assert _doubleValues != null : "Double values should not be null because there are double keys";
-      for (int doubleKey : keys) {
-        double value = input.readDouble();
-        assert value != 0;
-        _doubleValues[doubleKey] += value;
+        K key = _family.getKey(longKey, Type.LONG);
+        _longValues[longKey] = key.merge(_longValues[longKey], value);
       }
     }
 
@@ -288,7 +261,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       for (int booleanKey : keys) {
         boolean value = input.readBoolean();
         assert value;
-        _booleanValues[booleanKey] = true;
+        K key = _family.getKey(booleanKey, Type.BOOLEAN);
+        _booleanValues[booleanKey] = key.merge(_booleanValues[booleanKey], true);
       }
     }
 
@@ -298,7 +272,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       for (int refKeys : keys) {
         // In case we add more reference keys, this should be changed
         String value = input.readUTF();
-        _referenceValues[refKeys] = value;
+        K key = _family.getKey(refKeys, Type.STRING);
+        _referenceValues[refKeys] = key.merge((String) _referenceValues[refKeys], value);
       }
     }
   }
@@ -310,7 +285,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       for (K key : _family.getKeysOfType(Type.INT)) {
         int index = _family.getIndex(key);
         int value = _intValues[index];
-        if (value != 0) {
+        if (value != 0 || key.includeDefaultInJson()) {
           node.put(key.getStatName(), value);
         }
       }
@@ -320,17 +295,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       for (K key : _family.getKeysOfType(Type.LONG)) {
         int index = _family.getIndex(key);
         long value = _longValues[index];
-        if (value != 0) {
-          node.put(key.getStatName(), value);
-        }
-      }
-    }
-
-    if (_doubleValues != null) {
-      for (K key : _family.getKeysOfType(Type.DOUBLE)) {
-        int index = _family.getIndex(key);
-        double value = _doubleValues[index];
-        if (value != 0) {
+        if (value != 0 || key.includeDefaultInJson()) {
           node.put(key.getStatName(), value);
         }
       }
@@ -340,7 +305,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       for (K key : _family.getKeysOfType(Type.BOOLEAN)) {
         int index = _family.getIndex(key);
         boolean value = _booleanValues[index];
-        if (value) {
+        if (value || key.includeDefaultInJson()) {
           node.put(key.getStatName(), true);
         }
       }
@@ -350,7 +315,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       for (K key : _family.getKeysOfType(Type.STRING)) {
         int index = _family.getIndex(key);
         String value = (String) _referenceValues[index];
-        if (value != null) {
+        if (value != null || key.includeDefaultInJson()) {
           node.put(key.getStatName(), value);
         }
       }
@@ -369,7 +334,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
 
     writeInts(output, bytesPerId);
     writeLongs(output, bytesPerId);
-    writeDoubles(output, bytesPerId);
     writeBooleans(output, bytesPerId);
     writeStrings(output, bytesPerId);
   }
@@ -377,14 +341,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   private void writeInts(DataOutput output, int bytesPerId)
       throws IOException {
     if (_intValues == null) {
-      writeInt(output, bytesPerId, 0); // No values to write
-    } else if (isDense(Type.INT)) {
-      output.writeBoolean(true);
-      for (int intValue : _intValues) {
-        output.writeInt(intValue);
-      }
+      writeInt(output, bytesPerId, 0);
     } else {
-      output.writeBoolean(false);
       writeValuedKeys(output, Type.INT, bytesPerId, _intValues.length, i -> _intValues[i] != 0);
       for (int intValue : _intValues) {
         if (intValue != 0) {
@@ -397,14 +355,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   private void writeLongs(DataOutput output, int bytesPerId)
       throws IOException {
     if (_longValues == null) {
-      writeInt(output, bytesPerId, 0); // No values to write
-    } else if (isDense(Type.LONG)) {
-      output.writeBoolean(true);
-      for (long longValue : _longValues) {
-        output.writeLong(longValue);
-      }
+      writeInt(output, bytesPerId, 0);
     } else {
-      output.writeBoolean(false);
       writeValuedKeys(output, Type.LONG, bytesPerId, _longValues.length, i -> _longValues[i] != 0);
       for (long longValue : _longValues) {
         if (longValue != 0) {
@@ -414,37 +366,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     }
   }
 
-  private void writeDoubles(DataOutput output, int bytesPerId)
-      throws IOException {
-    if (_doubleValues == null) {
-      writeInt(output, bytesPerId, 0); // No values to write
-    } else if (isDense(Type.DOUBLE)) {
-      output.writeBoolean(true);
-      for (double doubleValue : _doubleValues) {
-        output.writeDouble(doubleValue);
-      }
-    } else {
-      output.writeBoolean(false);
-      writeValuedKeys(output, Type.DOUBLE, bytesPerId, _doubleValues.length, i -> _doubleValues[i] != 0);
-      for (double doubleValue : _doubleValues) {
-        if (doubleValue != 0) {
-          output.writeDouble(doubleValue);
-        }
-      }
-    }
-  }
-
   private void writeBooleans(DataOutput output, int bytesPerId)
       throws IOException {
     if (_booleanValues == null) {
-      writeInt(output, bytesPerId, 0); // No values to write
-    } else if (isDense(Type.BOOLEAN)) {
-      output.writeBoolean(true);
-      for (boolean booleanValue : _booleanValues) {
-        output.writeBoolean(booleanValue);
-      }
+      writeInt(output, bytesPerId, 0);
     } else {
-      output.writeBoolean(false);
       writeValuedKeys(output, Type.BOOLEAN, bytesPerId, _booleanValues.length, i -> _booleanValues[i]);
       for (boolean booleanValue : _booleanValues) {
         if (booleanValue) {
@@ -457,73 +383,15 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   private void writeStrings(DataOutput output, int bytesPerId)
       throws IOException {
     if (_referenceValues == null) {
-      // if new ref types are added, we would need to add one 0 per ref type
-      writeInt(output, bytesPerId, 0); // No values to write
-    } else if (isDense(Type.STRING)) {
-      output.writeBoolean(true);
-      for (Object referenceValue : _referenceValues) {
-        if (referenceValue != null) { // If new ref types are added, we would need to change this to `instanceof String`
-          output.writeUTF((String) referenceValue);
-        }
-      }
+      writeInt(output, bytesPerId, 0);
     } else {
-      output.writeBoolean(false);
-      // If new ref types are added, we would need to change this to `instanceof String`
       writeValuedKeys(output, Type.STRING, bytesPerId, _referenceValues.length, i -> _referenceValues[i] != null);
       for (Object referenceValue : _referenceValues) {
-        if (referenceValue != null) { // If new ref types are added, we would need to change this to `instanceof String`
+        if (referenceValue != null) {
           output.writeUTF((String) referenceValue);
         }
       }
     }
-  }
-
-  private boolean isDense(Type type) {
-    int count;
-    int max;
-    double threshold;
-    switch (type) {
-      case INT: {
-        threshold = 0.5;
-        max = _family._numIntsValues;
-        count = _intValues == null ? 0 : (int) Arrays.stream(_intValues).filter(value -> value != 0).count();
-        break;
-      }
-      case LONG: {
-        threshold = 0.8;
-        max = _family._numLongValues;
-        count = _longValues == null ? 0 : (int) Arrays.stream(_longValues).filter(value -> value != 0).count();
-        break;
-      }
-      case DOUBLE: {
-        threshold = 0.8;
-        max = _family._numDoubleValues;
-        count = _doubleValues == null ? 0 : (int) Arrays.stream(_doubleValues).filter(value -> value != 0).count();
-        break;
-      }
-      case BOOLEAN: {
-        threshold = 0.2;
-        max = _family._numBooleanValues;
-        count = 0;
-        if (_booleanValues != null) {
-          for (boolean booleanValue : _booleanValues) {
-            if (booleanValue) {
-              count++;
-            }
-          }
-        }
-        break;
-      }
-      case STRING: {
-        threshold = 0.9;
-        max = _family._numReferenceValues;
-        count = _referenceValues == null ? 0 : (int) Arrays.stream(_referenceValues).filter(Objects::nonNull).count();
-        break;
-      }
-      default:
-        throw new IllegalArgumentException("Unsupported type: " + type);
-    }
-    return count / (double) max > threshold;
   }
 
   private void writeValuedKeys(DataOutput output, Type type, int bytesPerId, int length,
@@ -574,19 +442,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       }
     }
 
-    int[] doubleKeys = readKeys(input, bytesPerId, family._numDoubleValues);
-    double[] doubleValues;
-    if (family._numDoubleValues == 0) {
-      doubleValues = null;
-    } else {
-      doubleValues = new double[family._numDoubleValues];
-      for (int doubleKey : doubleKeys) {
-        double value = input.readDouble();
-        assert value != 0;
-        doubleValues[doubleKey] = value;
-      }
-    }
-
     int[] booleanKeys = readKeys(input, bytesPerId, family._numBooleanValues);
     boolean[] booleanValues;
     if (family._numBooleanValues == 0) {
@@ -612,7 +467,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       }
     }
 
-    return new StatMap<>(family, intValues, longValues, doubleValues, booleanValues, referenceValues);
+    return new StatMap<>(family, intValues, longValues, booleanValues, referenceValues);
   }
 
   private static int[] readKeys(DataInput input, int bytesPerId, int maxExpectedKeys)
@@ -620,21 +475,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     // sender may have more or less keys than expected.
     // In case it has less, receiver extra keys will not be populated
     // In case it has more, sender extra keys will be ignored
-
     int numKeys = Math.min(readInt(input, bytesPerId), maxExpectedKeys);
     int[] keys;
     keys = new int[numKeys];
-    boolean isDense = input.readBoolean();
-    if (isDense) {
-      // we could implement a more efficient algorithm that doesn't need to allocate keys in this case, but doesn't seem
-      // worth it for now as it would make the code even more complex.
-      for (int i = 0; i < numKeys; i++) {
-        keys[i] = i;
-      }
-    } else {
-      for (int i = 0; i < numKeys; i++) {
-        keys[i] = readInt(input, bytesPerId);
-      }
+    for (int i = 0; i < numKeys; i++) {
+      keys[i] = readInt(input, bytesPerId);
     }
     return keys;
   }
@@ -668,8 +513,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     }
     StatMap<?> statMap = (StatMap<?>) o;
     return Objects.equals(_family, statMap._family) && Arrays.equals(_intValues, statMap._intValues)
-        && Arrays.equals(_longValues, statMap._longValues) && Arrays.equals(_doubleValues, statMap._doubleValues)
-        && Arrays.equals(_booleanValues, statMap._booleanValues)
+        && Arrays.equals(_longValues, statMap._longValues) && Arrays.equals(_booleanValues, statMap._booleanValues)
         && Arrays.equals(_referenceValues, statMap._referenceValues);
   }
 
@@ -678,7 +522,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     int result = Objects.hash(_family);
     result = 31 * result + Arrays.hashCode(_intValues);
     result = 31 * result + Arrays.hashCode(_longValues);
-    result = 31 * result + Arrays.hashCode(_doubleValues);
     result = 31 * result + Arrays.hashCode(_booleanValues);
     result = 31 * result + Arrays.hashCode(_referenceValues);
     return result;
@@ -693,11 +536,42 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return _family._keyClass;
   }
 
+  public boolean isEmpty() {
+    if (_intValues != null) {
+      for (int intValue : _intValues) {
+        if (intValue != 0) {
+          return false;
+        }
+      }
+    }
+    if (_longValues != null) {
+      for (long longValue : _longValues) {
+        if (longValue != 0) {
+          return false;
+        }
+      }
+    }
+    if (_booleanValues != null) {
+      for (boolean booleanValue : _booleanValues) {
+        if (booleanValue) {
+          return false;
+        }
+      }
+    }
+    if (_referenceValues != null) {
+      for (Object referenceValue : _referenceValues) {
+        if (referenceValue != null) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   private static class Family<K extends Enum<K> & Key> {
     private final Class<K> _keyClass;
     private final int _numIntsValues;
     private final int _numLongValues;
-    private final int _numDoubleValues;
     private final int _numBooleanValues;
     private final int _numReferenceValues;
     private final int _maxIndex;
@@ -708,7 +582,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       K[] keys = keyClass.getEnumConstants();
       int numIntsValues = 0;
       int numLongValues = 0;
-      int numDoubleValues = 0;
       int numBooleanValues = 0;
       int numReferenceValues = 0;
       _keyToIndexMap = new EnumMap<>(keyClass);
@@ -723,9 +596,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
           case LONG:
             _keyToIndexMap.put(key, numLongValues++);
             break;
-          case DOUBLE:
-            _keyToIndexMap.put(key, numDoubleValues++);
-            break;
           case STRING:
             _keyToIndexMap.put(key, numReferenceValues++);
             break;
@@ -735,11 +605,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       }
       _numIntsValues = numIntsValues;
       _numLongValues = numLongValues;
-      _numDoubleValues = numDoubleValues;
       _numBooleanValues = numBooleanValues;
       _numReferenceValues = numReferenceValues;
-      _maxIndex = Math.max(numIntsValues, Math.max(numLongValues, Math.max(numDoubleValues,
-          Math.max(numBooleanValues, numReferenceValues))));
+      _maxIndex = Math.max(numIntsValues, Math.max(numLongValues, Math.max(numBooleanValues, numReferenceValues)));
     }
 
     @Nullable
@@ -759,14 +627,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     }
 
     @Nullable
-    private double[] createDoubleValues() {
-      if (_numDoubleValues == 0) {
-        return null;
-      }
-      return new double[_numDoubleValues];
-    }
-
-    @Nullable
     private boolean[] createBooleanValues() {
       if (_numBooleanValues == 0) {
         return null;
@@ -783,7 +643,20 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     }
 
     private int getIndex(K key) {
-      return _keyToIndexMap.get(key);
+      Integer i = _keyToIndexMap.get(key);
+      if (i == null) {
+        throw new IllegalArgumentException("Unknown key: " + key + " for family " + _keyClass);
+      }
+      return i;
+    }
+
+    private K getKey(int index, Type type) {
+      for (Map.Entry<K, Integer> entry : _keyToIndexMap.entrySet()) {
+        if (entry.getValue() == index && entry.getKey().getType() == type) {
+          return entry.getKey();
+        }
+      }
+      throw new IllegalArgumentException("Unknown key for index " + index + " and type " + type);
     }
 
     /**
@@ -847,17 +720,40 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       return result.toString();
     }
 
+    default int merge(int value1, int value2) {
+      return value1 + value2;
+    }
+
+    default long merge(long value1, long value2) {
+      return value1 + value2;
+    }
+
+    default double merge(double value1, double value2) {
+      return value1 + value2;
+    }
+
+    default boolean merge(boolean value1, boolean value2) {
+      return value1 || value2;
+    }
+
+    default String merge(@Nullable String value1, @Nullable String value2) {
+      return value2 != null ? value2 : value1;
+    }
+
     /**
      * The type of the values associated to this key.
      */
     Type getType();
+
+    default boolean includeDefaultInJson() {
+      return false;
+    }
   }
 
   public enum Type {
     BOOLEAN,
     INT,
     LONG,
-    DOUBLE,
     STRING
   }
 }

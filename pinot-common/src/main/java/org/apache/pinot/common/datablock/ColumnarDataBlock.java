@@ -80,14 +80,6 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   @Override
-  public ColumnarDataBlock toMetadataOnlyDataTable() {
-    ColumnarDataBlock metadataOnlyDataTable = new ColumnarDataBlock();
-    metadataOnlyDataTable._metadata.putAll(_metadata);
-    metadataOnlyDataTable._errCodeToExceptionMap.putAll(_errCodeToExceptionMap);
-    return metadataOnlyDataTable;
-  }
-
-  @Override
   public ColumnarDataBlock toDataOnlyDataTable() {
     return new ColumnarDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
   }

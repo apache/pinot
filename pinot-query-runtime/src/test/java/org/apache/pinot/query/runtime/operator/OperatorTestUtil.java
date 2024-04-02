@@ -32,7 +32,7 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.StageStatsHolder;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.testutils.MockDataBlockOperatorFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
@@ -54,8 +54,8 @@ public class OperatorTestUtil {
   public static final String OP_1 = "op1";
   public static final String OP_2 = "op2";
 
-  public static StageStatsHolder getDummyStats(int stageId) {
-    return StageStatsHolder.create(stageId, MultiStageOperator.Type.LEAF, new StatMap<>(DataTable.MetadataKey.class));
+  public static MultiStageQueryStats getDummyStats(int stageId) {
+    return MultiStageQueryStats.createLeaf(stageId, new StatMap<>(DataTable.MetadataKey.class));
   }
 
   static {
@@ -85,15 +85,15 @@ public class OperatorTestUtil {
         stageMetadata.getWorkerMetadataList().get(0), null);
   }
 
-  public static OpChainExecutionContext getDefaultContext() {
-    return getDefaultContext(ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"));
+  public static OpChainExecutionContext getDefaultContextWithTracing() {
+    return getDefaultContextWithTracing(ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"));
   }
 
   public static OpChainExecutionContext getDefaultContextWithTracingDisabled() {
-    return getDefaultContext(ImmutableMap.of());
+    return getDefaultContextWithTracing(ImmutableMap.of());
   }
 
-  private static OpChainExecutionContext getDefaultContext(Map<String, String> opChainMetadata) {
+  private static OpChainExecutionContext getDefaultContextWithTracing(Map<String, String> opChainMetadata) {
     MailboxService mailboxService = mock(MailboxService.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(1234);
@@ -108,9 +108,9 @@ public class OperatorTestUtil {
    */
   public static <K extends Enum<K> & StatMap.Key> StatMap<K> getStatMap(Class<K> keyClass, TransferableBlock block) {
     Assert.assertTrue(block.isSuccessfulEndOfStreamBlock(), "Expected EOS block but found " + block.getClass());
-    StageStatsHolder statsHolder = block.getStatsHolder();
-    Assert.assertNotNull(statsHolder, "Stats holder should not be null");
-    StageStats stageStats = statsHolder.getCurrentStats();
+    MultiStageQueryStats queryStats = block.getQueryStats();
+    Assert.assertNotNull(queryStats, "Stats holder should not be null");
+    MultiStageQueryStats.StageStats stageStats = queryStats.getCurrentStats();
     Assert.assertEquals(stageStats.getLastType(), MultiStageOperator.Type.HASH_JOIN,
         "Last operator should be hash join");
 

@@ -73,7 +73,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock())
@@ -94,7 +94,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
@@ -114,7 +114,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
@@ -139,7 +139,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, true);
 
     // Purposefully setting input as unsorted order for validation but 'isInputSorted' should only be true if actually
@@ -166,7 +166,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"ignored", "sort"}, new DataSchema.ColumnDataType[]{INT, INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 2}, new Object[]{2, 1}))
@@ -191,7 +191,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{STRING});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{"b"}, new Object[]{"a"}))
@@ -216,7 +216,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
@@ -241,7 +241,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 1,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 1,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
@@ -266,7 +266,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 1,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 1,
             schema, true);
 
     // Set input rows as sorted since input is expected to be sorted
@@ -292,7 +292,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 1, 1,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 1, 1,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
@@ -316,7 +316,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 1, 1,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 1, 1,
             schema, true);
 
     // Set input rows as sorted since input is expected to be sorted
@@ -341,7 +341,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 0, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 0, 0,
             schema, false, 10, 1);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
@@ -365,7 +365,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, -1, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, -1, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
@@ -388,7 +388,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}))
@@ -414,7 +414,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, true);
 
     // Set input rows as sorted since input is expected to be sorted
@@ -441,7 +441,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST, NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock())
@@ -468,7 +468,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST, NullDirection.FIRST);
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock())
@@ -495,7 +495,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}))
@@ -521,7 +521,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, true);
 
     // Set input rows as sorted since input is expected to be sorted
@@ -548,7 +548,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
@@ -574,7 +574,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.FIRST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
@@ -600,7 +600,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.FIRST, NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"first", "second"}, new DataSchema.ColumnDataType[]{INT, INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock())
@@ -627,7 +627,7 @@ public class SortOperatorTest {
     List<NullDirection> nullDirections = ImmutableList.of(NullDirection.LAST);
     DataSchema schema = new DataSchema(new String[]{"sort"}, new DataSchema.ColumnDataType[]{INT});
     SortOperator op =
-        new SortOperator(OperatorTestUtil.getDefaultContext(), _input, collation, directions, nullDirections, 10, 0,
+        new SortOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3},

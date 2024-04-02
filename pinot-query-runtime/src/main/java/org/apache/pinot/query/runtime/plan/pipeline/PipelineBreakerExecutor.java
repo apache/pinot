@@ -121,7 +121,7 @@ public class PipelineBreakerExecutor {
     long timeoutMs = opChainExecutionContext.getDeadlineMs() - System.currentTimeMillis();
     if (latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
       return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), pipelineBreakerOperator.getResultMap(),
-          pipelineBreakerOperator.getErrorBlock(), pipelineBreakerOperator.getStatsHolder());
+          pipelineBreakerOperator.getErrorBlock(), pipelineBreakerOperator.getQueryStats());
     } else {
       throw new TimeoutException(
           String.format("Timed out waiting for pipeline breaker results after: %dms", timeoutMs));

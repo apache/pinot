@@ -229,25 +229,19 @@ public interface BrokerResponse {
    * Get the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
    * against offline table in request handling, from the broker response.
    */
-  long getOfflineTotalCpuTimeNs();
-
-  /**
-   * Set the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
-   * against offline table in request handling, into the broker response.
-   */
-  void setOfflineTotalCpuTimeNs(long offlineTotalCpuTimeNs);
+  default long getOfflineTotalCpuTimeNs() {
+    return getOfflineThreadCpuTimeNs() + getOfflineSystemActivitiesCpuTimeNs()
+        + getOfflineResponseSerializationCpuTimeNs();
+  }
 
   /**
    * Get the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
    * against realtime table in request handling, from the broker response.
    */
-  long getRealtimeTotalCpuTimeNs();
-
-  /**
-   * Set the total cpu time(thread cpu time + system activities cpu time + response serialization cpu time) used
-   * against realtime table in request handling, into the broker response.
-   */
-  void setRealtimeTotalCpuTimeNs(long realtimeTotalCpuTimeNs);
+  default long getRealtimeTotalCpuTimeNs() {
+    return getRealtimeThreadCpuTimeNs() + getRealtimeSystemActivitiesCpuTimeNs()
+        + getRealtimeResponseSerializationCpuTimeNs();
+  }
 
   /**
    * Get the total number of segments pruned on the Broker side
