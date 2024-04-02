@@ -16,8 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-
 package org.apache.pinot.spi.config.table.ingestion;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -121,7 +119,7 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   }
 
   public String getIndexableExtrasField() {
-    return _enableIndexableExtras? _indexableExtrasField : null;
+    return _enableIndexableExtras ? _indexableExtrasField : null;
   }
 
   public SchemaConformingTransformerV2Config setIndexableExtrasField(String indexableExtrasField) {
@@ -165,8 +163,10 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
     return _columnNameToJsonKeyPathMap;
   }
 
-  public SchemaConformingTransformerV2Config setColumnNameToJsonKeyPathMap(Map<String, String> columnNameToJsonKeyPathMap) {
-    _columnNameToJsonKeyPathMap = (null == columnNameToJsonKeyPathMap) ? _columnNameToJsonKeyPathMap : columnNameToJsonKeyPathMap;
+  public SchemaConformingTransformerV2Config setColumnNameToJsonKeyPathMap(
+      Map<String, String> columnNameToJsonKeyPathMap) {
+    _columnNameToJsonKeyPathMap = (null == columnNameToJsonKeyPathMap)
+        ? _columnNameToJsonKeyPathMap : columnNameToJsonKeyPathMap;
     return this;
   }
 

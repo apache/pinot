@@ -18,11 +18,7 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.json.JsonWriteFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -52,10 +48,6 @@ import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer.getAndValidateExtrasFieldType;
-import static org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer.getAndValidateSubKeys;
-
 
 /**
  * This transformer evolves from {@link SchemaConformingTransformer} and is designed to support extra cases for
@@ -146,15 +138,41 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   private final DataType _indexableExtrasFieldType;
   private final DataType _unindexableExtrasFieldType;
   private final DimensionFieldSpec _mergedTextIndexFieldSpec;
-
-  private SchemaTreeNode _schemaTree;
-
   @Nullable
   ServerMetrics _serverMetrics = null;
-  @Nullable private PinotMeter _realtimeMergedTextIndexTruncatedTokenSizeMeter = null;
+  private SchemaTreeNode _schemaTree;
+  @Nullable
+  private PinotMeter _realtimeMergedTextIndexTruncatedTokenSizeMeter = null;
   private String _tableName;
   private long _mergedTextIndexTokenBytesCount = 0L;
   private long _mergedTextIndexTokenCount = 0L;
+
+  public SchemaConformingTransformerV2(TableConfig tableConfig, Schema schema) {
+    if (null == tableConfig.getIngestionConfig() || null == tableConfig.getIngestionConfig()
+        .getSchemaConformingTransformerV2Config()) {
+      _continueOnError = false;
+      _transformerConfig = null;
+      _indexableExtrasFieldType = null;
+      _unindexableExtrasFieldType = null;
+      _mergedTextIndexFieldSpec = null;
+      return;
+    }
+
+    _continueOnError = tableConfig.getIngestionConfig().isContinueOnError();
+    _transformerConfig = tableConfig.getIngestionConfig().getSchemaConformingTransformerV2Config();
+    String indexableExtrasFieldName = _transformerConfig.getIndexableExtrasField();
+    _indexableExtrasFieldType =
+        indexableExtrasFieldName == null ? null : SchemaConformingTransformer.getAndValidateExtrasFieldType(schema,
+            indexableExtrasFieldName);
+    String unindexableExtrasFieldName = _transformerConfig.getUnindexableExtrasField();
+    _unindexableExtrasFieldType =
+        null == unindexableExtrasFieldName ? null : SchemaConformingTransformer.getAndValidateExtrasFieldType(schema,
+            unindexableExtrasFieldName);
+    _mergedTextIndexFieldSpec = schema.getDimensionSpec(_transformerConfig.getMergedTextIndexField());
+    _tableName = tableConfig.getTableName();
+    _schemaTree = validateSchemaAndCreateTree(schema, _transformerConfig);
+    _serverMetrics = ServerMetrics.get();
+  }
 
   /**
    * Validates the schema against the given transformer's configuration.
@@ -164,10 +182,10 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     validateSchemaFieldNames(schema.getPhysicalColumnNames(), transformerConfig);
 
     String indexableExtrasFieldName = transformerConfig.getIndexableExtrasField();
-    getAndValidateExtrasFieldType(schema, indexableExtrasFieldName);
+    SchemaConformingTransformer.getAndValidateExtrasFieldType(schema, indexableExtrasFieldName);
     String unindexableExtrasFieldName = transformerConfig.getUnindexableExtrasField();
     if (null != unindexableExtrasFieldName) {
-      getAndValidateExtrasFieldType(schema, indexableExtrasFieldName);
+      SchemaConformingTransformer.getAndValidateExtrasFieldType(schema, indexableExtrasFieldName);
     }
 
     validateSchemaAndCreateTree(schema, transformerConfig);
@@ -216,7 +234,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
    *   with an empty sub-key. E.g., the field name "a..b" corresponds to the JSON {"a": {"": {"b": ...}}}</li>
    * </ul>
    */
-  private static SchemaTreeNode validateSchemaAndCreateTree(@Nonnull Schema schema, @Nonnull SchemaConformingTransformerV2Config transformerConfig)
+  private static SchemaTreeNode validateSchemaAndCreateTree(@Nonnull Schema schema,
+      @Nonnull SchemaConformingTransformerV2Config transformerConfig)
       throws IllegalArgumentException {
     Set<String> schemaFields = schema.getPhysicalColumnNames();
     Map<String, String> jsonKeyPathToColumnNameMap = new HashMap<>();
@@ -238,7 +257,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
         currentNode = rootNode.getAndCreateChild(field, schema);
       } else {
         subKeys.clear();
-        getAndValidateSubKeys(field, keySeparatorIdx, subKeys);
+        SchemaConformingTransformer.getAndValidateSubKeys(field, keySeparatorIdx, subKeys);
         for (String subKey : subKeys) {
           SchemaTreeNode childNode = currentNode.getAndCreateChild(subKey, schema);
           currentNode = childNode;
@@ -248,33 +267,6 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
 
     return rootNode;
-  }
-
-  public SchemaConformingTransformerV2(TableConfig tableConfig, Schema schema) {
-    if (null == tableConfig.getIngestionConfig() || null == tableConfig.getIngestionConfig()
-        .getSchemaConformingTransformerV2Config()) {
-      _continueOnError = false;
-      _transformerConfig = null;
-      _indexableExtrasFieldType = null;
-      _unindexableExtrasFieldType = null;
-      _mergedTextIndexFieldSpec = null;
-      return;
-    }
-
-    _continueOnError = tableConfig.getIngestionConfig().isContinueOnError();
-    _transformerConfig = tableConfig.getIngestionConfig().getSchemaConformingTransformerV2Config();
-    String indexableExtrasFieldName = _transformerConfig.getIndexableExtrasField();
-    _indexableExtrasFieldType = indexableExtrasFieldName == null ? null :
-        getAndValidateExtrasFieldType(schema,
-        indexableExtrasFieldName);
-    String unindexableExtrasFieldName = _transformerConfig.getUnindexableExtrasField();
-    _unindexableExtrasFieldType =
-        null == unindexableExtrasFieldName ? null : getAndValidateExtrasFieldType(schema,
-            unindexableExtrasFieldName);
-    _mergedTextIndexFieldSpec = schema.getDimensionSpec(_transformerConfig.getMergedTextIndexField());
-    _tableName = tableConfig.getTableName();
-    _schemaTree = validateSchemaAndCreateTree(schema, _transformerConfig);
-    _serverMetrics = ServerMetrics.get();
   }
 
   @Override
@@ -310,8 +302,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
       if (null != _mergedTextIndexFieldSpec && !mergedTextIndexMap.isEmpty()) {
         List<String> luceneTokens = getLuceneTokensFromMergedTextIndexMap(mergedTextIndexMap);
         if (_mergedTextIndexFieldSpec.isSingleValueField()) {
-          outputRecord.putValue(_transformerConfig.getMergedTextIndexField(),
-              String.join(" ", luceneTokens));
+          outputRecord.putValue(_transformerConfig.getMergedTextIndexField(), String.join(" ", luceneTokens));
         } else {
           outputRecord.putValue(_transformerConfig.getMergedTextIndexField(), luceneTokens);
         }
@@ -345,7 +336,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
    * with column "a", "b", "b.c" in schema
    * There are two types of output:
    *  - flattened keys with values, e.g.,
-   *    - keyPath as column and value as leaf node, e.g., "a": 1, "b.c": 2. However, "b" is not a leaf node, so it would be skipped
+   *    - keyPath as column and value as leaf node, e.g., "a": 1, "b.c": 2. However, "b" is not a leaf node, so it would
+   *    be skipped
    *    - __mergedTestIdx storing ["1:a", "2:b.c", "3:b.d"] as a string array
    *  - structured Json format, e.g.,
    *    - indexableFields/json_data: {"a": 1, "b": {"c": 2, "d": 3}}
@@ -414,8 +406,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     Map<String, Object> valueAsMap = (Map<String, Object>) value;
     for (Map.Entry<String, Object> entry : valueAsMap.entrySet()) {
       jsonPath.addLast(entry.getKey());
-      ExtraFieldsContainer childContainer = processField(currentNode, jsonPath, entry.getValue(), isIndexable,
-          outputRecord, mergedTextIndexMap);
+      ExtraFieldsContainer childContainer =
+          processField(currentNode, jsonPath, entry.getValue(), isIndexable, outputRecord, mergedTextIndexMap);
       extraFieldsContainer.addChild(key, childContainer);
       jsonPath.removeLast();
     }
@@ -429,9 +421,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
    * @param indexTokens                   a list to store the generated index tokens
    * @param mergedTextIndexTokenMaxLength which we enforce via truncation during token generation
    */
-  public void generateTextIndexToken(
-      Map.Entry<String, Object> kv, List<String> indexTokens, Integer mergedTextIndexTokenMaxLength
-  ) {
+  public void generateTextIndexToken(Map.Entry<String, Object> kv, List<String> indexTokens,
+      Integer mergedTextIndexTokenMaxLength) {
     String key = kv.getKey();
     String val;
     // To avoid redundant leading and tailing '"', only convert to JSON string if the value is a list or an array
@@ -454,9 +445,9 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     // The value length should be the mergedTextIndexTokenMaxLength minus ":" character (length 1) minus key length
     int valueTruncationLength = mergedTextIndexTokenMaxLength - 1 - key.length();
     if (val.length() > valueTruncationLength) {
-      _realtimeMergedTextIndexTruncatedTokenSizeMeter = _serverMetrics.addMeteredTableValue(_tableName,
-          ServerMeter.REALTIME_MERGED_TEXT_IDX_TRUNCATED_TOKEN_SIZE, key.length() + 1 + val.length(),
-          _realtimeMergedTextIndexTruncatedTokenSizeMeter);
+      _realtimeMergedTextIndexTruncatedTokenSizeMeter = _serverMetrics
+          .addMeteredTableValue(_tableName, ServerMeter.REALTIME_MERGED_TEXT_IDX_TRUNCATED_TOKEN_SIZE,
+              key.length() + 1 + val.length(), _realtimeMergedTextIndexTruncatedTokenSizeMeter);
       val = val.substring(0, valueTruncationLength);
     }
 
@@ -504,10 +495,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
    *                                  index tokens. If null, the overlap length will be defaulted to half of the max
    *                                  token length.
    */
-  public void generateShingleTextIndexToken(
-      Map.Entry<String, Object> kv, List<String> shingleIndexTokens,
-      int shingleIndexMaxLength, int shingleIndexOverlapLength
-  ) {
+  public void generateShingleTextIndexToken(Map.Entry<String, Object> kv, List<String> shingleIndexTokens,
+      int shingleIndexMaxLength, int shingleIndexOverlapLength) {
     String key = kv.getKey();
     String val;
     // To avoid redundant leading and tailing '"', only convert to JSON string if the value is a list or an array
@@ -595,24 +584,22 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
 
   private List<String> getLuceneTokensFromMergedTextIndexMap(Map<String, Object> mergedTextIndexMap) {
     final Integer mergedTextIndexTokenMaxLength = _transformerConfig.getMergedTextIndexTokenMaxLength();
-    final @Nullable Integer mergedTextIndexShinglingOverlapLength =
-        _transformerConfig.getMergedTextIndexShinglingOverlapLength();
+    final @Nullable
+    Integer mergedTextIndexShinglingOverlapLength = _transformerConfig.getMergedTextIndexShinglingOverlapLength();
     List<String> luceneTokens = new ArrayList<>();
-    mergedTextIndexMap.entrySet().stream()
-        .filter(kv -> null != kv.getKey() && null != kv.getValue())
-        .filter(kv -> !_transformerConfig.getMergedTextIndexPathToExclude().contains(kv.getKey()))
-        .filter(kv -> !base64ValueFilter(kv.getValue().toString().getBytes(),
-            _transformerConfig.getMergedTextIndexBinaryTokenDetectionMinLength()))
-        .filter(kv -> _transformerConfig.getMergedTextIndexSuffixToExclude().stream().anyMatch(suffix -> !kv.getKey().endsWith(suffix)))
-        .forEach(kv -> {
-          if (null == mergedTextIndexShinglingOverlapLength) {
-            generateTextIndexToken(kv, luceneTokens, mergedTextIndexTokenMaxLength);
-          } else {
-            generateShingleTextIndexToken(
-                kv, luceneTokens, mergedTextIndexTokenMaxLength, mergedTextIndexShinglingOverlapLength
-            );
-          }
-        });
+    mergedTextIndexMap.entrySet().stream().filter(kv -> null != kv.getKey() && null != kv.getValue())
+        .filter(kv -> !_transformerConfig.getMergedTextIndexPathToExclude().contains(kv.getKey())).filter(
+        kv -> !base64ValueFilter(kv.getValue().toString().getBytes(),
+            _transformerConfig.getMergedTextIndexBinaryTokenDetectionMinLength())).filter(
+        kv -> _transformerConfig.getMergedTextIndexSuffixToExclude().stream()
+            .anyMatch(suffix -> !kv.getKey().endsWith(suffix))).forEach(kv -> {
+      if (null == mergedTextIndexShinglingOverlapLength) {
+        generateTextIndexToken(kv, luceneTokens, mergedTextIndexTokenMaxLength);
+      } else {
+        generateShingleTextIndexToken(kv, luceneTokens, mergedTextIndexTokenMaxLength,
+            mergedTextIndexShinglingOverlapLength);
+      }
+    });
     return luceneTokens;
   }
 }
@@ -631,37 +618,41 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
  * where node with "*" could represent a valid column in the schema.
  */
 class SchemaTreeNode {
-  private boolean isColumn;
-  private Map<String, SchemaTreeNode> children;
+  private boolean _isColumn;
+  private Map<String, SchemaTreeNode> _children;
   // Taking the example of key "x.y.z", the keyName will be "z" and the parentPath will be "x.y"
   // Root node would have keyName as "" and parentPath as null
   // Root node's children will have keyName as the first level key and parentPath as ""
-  @Nonnull private String keyName;
-  @Nullable private String columnName;
-  @Nullable private String parentPath;
-  private FieldSpec fieldSpec;
+  @Nonnull
+  private String _keyName;
+  @Nullable
+  private String _columnName;
+  @Nullable
+  private String _parentPath;
+  private FieldSpec _fieldSpec;
+
   public SchemaTreeNode(String keyName, String parentPath, Schema schema) {
-    this.keyName = keyName;
-    this.parentPath = parentPath;
-    this.fieldSpec = schema.getFieldSpecFor(getJsonKeyPath());
-    this.children = new HashMap<>();
+    _keyName = keyName;
+    _parentPath = parentPath;
+    _fieldSpec = schema.getFieldSpecFor(getJsonKeyPath());
+    _children = new HashMap<>();
   }
 
   public boolean isColumn() {
-    return isColumn;
+    return _isColumn;
   }
 
   public void setColumn(String columnName) {
     if (columnName == null) {
-      this.columnName = getJsonKeyPath();
+      _columnName = getJsonKeyPath();
     } else {
-      this.columnName = columnName;
+      _columnName = columnName;
     }
-    isColumn = true;
+    _isColumn = true;
   }
 
   public boolean hasChild(String key) {
-    return children.containsKey(key);
+    return _children.containsKey(key);
   }
 
   /**
@@ -671,30 +662,30 @@ class SchemaTreeNode {
    * @return
    */
   public SchemaTreeNode getAndCreateChild(String key, Schema schema) {
-    SchemaTreeNode child = children.get(key);
+    SchemaTreeNode child = _children.get(key);
     if (child == null) {
       child = new SchemaTreeNode(key, getJsonKeyPath(), schema);
-      children.put(key, child);
+      _children.put(key, child);
     }
     return child;
   }
 
   public SchemaTreeNode getChild(String key) {
-    return children.get(key);
+    return _children.get(key);
   }
 
   public String getKeyName() {
-    return keyName;
+    return _keyName;
   }
 
   public String getColumnName() {
-    return columnName;
+    return _columnName;
   }
 
   public Object getValue(Object value) {
     // If the field is a single value string field, but value is an array of collection, serialize it
     // to prevent errors
-    if (fieldSpec != null && fieldSpec.getDataType() == DataType.STRING && fieldSpec.isSingleValueField()) {
+    if (_fieldSpec != null && _fieldSpec.getDataType() == DataType.STRING && _fieldSpec.isSingleValueField()) {
       try {
         if (value instanceof Collection) {
           return JsonUtils.objectToString(value);
@@ -710,9 +701,9 @@ class SchemaTreeNode {
   }
 
   public String getJsonKeyPath() {
-    if (parentPath == null || parentPath.isEmpty()) {
-      return keyName;
+    if (_parentPath == null || _parentPath.isEmpty()) {
+      return _keyName;
     }
-    return parentPath + JsonUtils.KEY_SEPARATOR + keyName;
+    return _parentPath + JsonUtils.KEY_SEPARATOR + _keyName;
   }
 }
