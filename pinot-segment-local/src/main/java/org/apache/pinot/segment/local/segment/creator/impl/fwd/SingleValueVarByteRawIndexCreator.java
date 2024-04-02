@@ -77,9 +77,12 @@ public class SingleValueVarByteRawIndexCreator implements ForwardIndexCreator {
       throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
     int numDocsPerChunk = deriveNumDocsPerChunk ? getNumDocsPerChunk(maxLength) : DEFAULT_NUM_DOCS_PER_CHUNK;
+
+    // For columns with very small max value, target chunk size should also be capped to reduce memory during read
+    int dynamicTargetChunkSize = Math.min(maxLength * DEFAULT_NUM_DOCS_PER_CHUNK, TARGET_MAX_CHUNK_SIZE);
     _indexWriter = writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(file,
         compressionType, totalDocs, numDocsPerChunk, maxLength, writerVersion)
-        : new VarByteChunkForwardIndexWriterV4(file, compressionType, TARGET_MAX_CHUNK_SIZE);
+        : new VarByteChunkForwardIndexWriterV4(file, compressionType, dynamicTargetChunkSize);
     _valueType = valueType;
   }
 

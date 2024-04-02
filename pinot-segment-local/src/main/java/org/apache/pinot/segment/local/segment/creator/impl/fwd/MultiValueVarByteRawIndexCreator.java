@@ -36,6 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  * BYTES).
  */
 public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
+  private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final int TARGET_MAX_CHUNK_SIZE = 1024 * 1024;
 
   private final VarByteChunkWriter _indexWriter;
@@ -81,9 +82,11 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
     int numDocsPerChunk = Math.max(
         TARGET_MAX_CHUNK_SIZE / (totalMaxLength + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE),
         1);
+    // For columns with very small max value, target chunk size should also be capped to reduce memory during read
+    int dynamicTargetChunkSize = Math.min(totalMaxLength * DEFAULT_NUM_DOCS_PER_CHUNK, TARGET_MAX_CHUNK_SIZE);
     _indexWriter = writerVersion < VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexWriter(file,
         compressionType, totalDocs, numDocsPerChunk, totalMaxLength, writerVersion)
-        : new VarByteChunkForwardIndexWriterV4(file, compressionType, TARGET_MAX_CHUNK_SIZE);
+        : new VarByteChunkForwardIndexWriterV4(file, compressionType, dynamicTargetChunkSize);
     _valueType = valueType;
   }
 
