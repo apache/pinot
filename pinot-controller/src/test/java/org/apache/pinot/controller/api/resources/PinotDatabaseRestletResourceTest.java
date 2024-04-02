@@ -70,8 +70,7 @@ public class PinotDatabaseRestletResourceTest {
   private void successfulDatabaseDeletionCheck(boolean dryRun) {
     DeleteDatabaseResponse response = _resource.deleteTablesInDatabase(DATABASE, dryRun);
     assertEquals(response.isDryRun(), dryRun);
-    assertFalse(response.isPartiallyDeleted());
-    assertEquals(response.getTablesInDatabase(), TABLES);
+    assertTrue(response.getFailedTables().isEmpty());
     assertEquals(response.getDeletedTables(), TABLES);
   }
 
@@ -96,10 +95,8 @@ public class PinotDatabaseRestletResourceTest {
     List<String> resultList = new ArrayList<>(TABLES);
     String failedTable = resultList.remove(idx);
     assertFalse(response.isDryRun());
-    assertTrue(response.isPartiallyDeleted());
     assertEquals(response.getFailedTables().size(), 1);
     assertEquals(response.getFailedTables().get(0).getTableName(), failedTable);
-    assertEquals(response.getTablesInDatabase(), TABLES);
     assertEquals(response.getDeletedTables(), resultList);
   }
 }

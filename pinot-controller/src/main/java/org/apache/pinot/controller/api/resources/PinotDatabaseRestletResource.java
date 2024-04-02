@@ -105,29 +105,19 @@ public class PinotDatabaseRestletResource {
         }
       }
     }
-    return new DeleteDatabaseResponse(tablesInDatabase, deletedTables, failedTables, dryRun);
+    return new DeleteDatabaseResponse(deletedTables, failedTables, dryRun);
   }
 }
 
 class DeleteDatabaseResponse {
-  private final List<String> _tablesInDatabase;
   private final List<String> _deletedTables;
   private final List<DeletionFailureWrapper> _failedTables;
-  private final boolean _partiallyDeleted;
   private final boolean _dryRun;
 
-  public DeleteDatabaseResponse(List<String> tablesInDatabase, List<String> deletedTables,
-      List<DeletionFailureWrapper> failedTables, boolean dryRun) {
-    _tablesInDatabase = tablesInDatabase;
+  public DeleteDatabaseResponse(List<String> deletedTables, List<DeletionFailureWrapper> failedTables, boolean dryRun) {
     _deletedTables = deletedTables;
     _failedTables = failedTables;
     _dryRun = dryRun;
-    _partiallyDeleted = tablesInDatabase.size() != deletedTables.size();
-  }
-
-  @JsonProperty("tablesInDatabase")
-  public List<String> getTablesInDatabase() {
-    return _tablesInDatabase;
   }
 
   @JsonProperty("deletedTables")
@@ -143,11 +133,6 @@ class DeleteDatabaseResponse {
   @JsonProperty("dryRun")
   public boolean isDryRun() {
     return _dryRun;
-  }
-
-  @JsonProperty("partiallyDeleted")
-  public boolean isPartiallyDeleted() {
-    return _partiallyDeleted;
   }
 }
 
