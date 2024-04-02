@@ -92,7 +92,9 @@ import org.apache.pinot.spi.stream.StreamDataDecoder;
 import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.stream.StreamDataDecoderResult;
 import org.apache.pinot.spi.stream.StreamDecoderProvider;
+import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -242,7 +244,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
   private final BooleanSupplier _isReadyToConsumeData;
   private final MutableSegmentImpl _realtimeSegment;
-  private volatile StreamPartitionMsgOffset _currentOffset;
+  private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
   private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
@@ -262,7 +264,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private volatile boolean _hasMessagesFetched = false;
   private volatile boolean _endOfPartitionGroup = false;
   private volatile boolean _forceCommitMessageReceived = false;
-  private StreamPartitionMsgOffset _finalOffset; // Used when we want to catch up to this one
+  private volatile StreamPartitionMsgOffset _finalOffset; // Exclusive, used when we want to catch up to this one
   private volatile boolean _shouldStop = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
@@ -426,8 +428,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
       try {
-        messageBatch =
-            _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
+        messageBatch = _partitionGroupConsumer.fetchMessages(_currentOffset, _streamConfig.getFetchTimeoutMillis());
         //track realtime rows fetched on a table level. This included valid + invalid rows
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FETCHED,
             messageBatch.getUnfilteredMessageCount());
@@ -519,13 +520,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   /**
-   * @param messagesAndOffsets batch of messages to process
+   * @param messageBatch batch of messages to process
    * @param idlePipeSleepTimeMillis wait time in case no messages were read
    * @return returns <code>true</code> if the process loop ended before processing the batch, <code>false</code>
    * otherwise
    */
-  private boolean processStreamEvents(MessageBatch messagesAndOffsets, long idlePipeSleepTimeMillis) {
-    int messageCount = messagesAndOffsets.getMessageCount();
+  private boolean processStreamEvents(MessageBatch messageBatch, long idlePipeSleepTimeMillis) {
+    int messageCount = messageBatch.getMessageCount();
     _partitionRateLimiter.throttle(messageCount);
     _serverRateLimiter.throttle(messageCount);
 
@@ -536,11 +537,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
     boolean canTakeMore = true;
-    boolean hasTransformedRows = false;
 
     TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     boolean prematureExit = false;
-    RowMetadata msgMetadata = null;
 
     for (int index = 0; index < messageCount; index++) {
       prematureExit = _shouldStop || endCriteriaReached();
@@ -573,9 +572,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
 
       // Decode message
-      StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(messagesAndOffsets.getStreamMessage(index));
-      msgMetadata = messagesAndOffsets.getStreamMessage(index).getMetadata();
-      StreamPartitionMsgOffset messageOffset = messagesAndOffsets.getNextStreamPartitionMsgOffsetAtIndex(index);
+      StreamMessage streamMessage = messageBatch.getStreamMessage(index);
+      StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(streamMessage);
+      StreamMessageMetadata metadata = streamMessage.getMetadata();
+      StreamPartitionMsgOffset offset = null;
+      StreamPartitionMsgOffset nextOffset = null;
+      if (metadata != null) {
+        offset = metadata.getOffset();
+        nextOffset = metadata.getNextOffset();
+      }
+      // Backward compatible
+      if (nextOffset == null) {
+        nextOffset = messageBatch.getNextStreamPartitionMsgOffsetAtIndex(index);
+      }
       if (decodedRow.getException() != null) {
         // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
         // decode error
@@ -591,15 +600,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _numRowsErrored++;
           // when exception happens we prefer abandoning the whole batch and not partially indexing some rows
           reusedResult.getTransformedRows().clear();
-          String errorMessage = String.format("Caught exception while transforming the record at offset: %s , row: %s",
-              messageOffset, decodedRow.getResult());
+          String errorMessage =
+              String.format("Caught exception while transforming the record at offset: %s , row: %s", offset,
+                  decodedRow.getResult());
           _segmentLogger.error(errorMessage, e);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         }
         if (reusedResult.getSkippedRowCount() > 0) {
-          realtimeRowsDroppedMeter =
-              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
-                  reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
+          realtimeRowsDroppedMeter = _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
+              reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
         }
         if (reusedResult.getIncompleteRowCount() > 0) {
           realtimeIncompleteRowsConsumedMeter =
@@ -607,14 +616,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   reusedResult.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
         }
         List<GenericRow> transformedRows = reusedResult.getTransformedRows();
-        if (transformedRows.size() > 0) {
-          hasTransformedRows = true;
-        }
         for (GenericRow transformedRow : transformedRows) {
           try {
-            canTakeMore = _realtimeSegment.index(transformedRow, msgMetadata);
+            canTakeMore = _realtimeSegment.index(transformedRow, metadata);
             indexedMessageCount++;
-            _lastRowMetadata = msgMetadata;
+            _lastRowMetadata = metadata;
             _lastConsumedTimestampMs = System.currentTimeMillis();
             realtimeRowsConsumedMeter =
                 _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
@@ -622,36 +628,24 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
           } catch (Exception e) {
             _numRowsErrored++;
-            String errorMessage = String.format("Caught exception while indexing the record at offset: %s , row: %s",
-                messageOffset, transformedRow);
+            String errorMessage =
+                String.format("Caught exception while indexing the record at offset: %s , row: %s", offset,
+                    transformedRow);
             _segmentLogger.error(errorMessage, e);
             _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
           }
         }
       }
-      _currentOffset = messageOffset;
+      _currentOffset = nextOffset;
       _numRowsIndexed = _realtimeSegment.getNumDocsIndexed();
       _numRowsConsumed++;
       streamMessageCount++;
     }
 
-    if (indexedMessageCount > 0) {
-      // Record Ingestion delay for this partition with metadata for last message we processed
-      updateIngestionDelay(_lastRowMetadata);
-    } else if (!hasTransformedRows && (msgMetadata != null)) {
-      // If all messages were filtered by transformation, we still attempt to update ingestion delay using
-      // the metadata for the last message we processed if any.
-      updateIngestionDelay(msgMetadata);
-    }
-
     updateCurrentDocumentCountMetrics();
-    if (messagesAndOffsets.getUnfilteredMessageCount() > 0) {
+    if (messageBatch.getUnfilteredMessageCount() > 0) {
+      updateIngestionDelay(messageBatch.getLastMessageMetadata());
       _hasMessagesFetched = true;
-      if (messageCount == 0) {
-        // If we received events from the stream but all were filtered, we attempt to estimate the ingestion
-        // delay from the metadata of the last filtered message received.
-        updateIngestionDelay(messagesAndOffsets.getLastMessageMetadata());
-      }
       if (streamMessageCount > 0 && _segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}",
             indexedMessageCount, streamMessageCount, _currentOffset);

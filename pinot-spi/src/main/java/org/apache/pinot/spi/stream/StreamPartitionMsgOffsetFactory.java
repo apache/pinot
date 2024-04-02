@@ -26,24 +26,22 @@ import org.apache.pinot.spi.annotations.InterfaceStability;
  */
 @InterfaceStability.Evolving
 public interface StreamPartitionMsgOffsetFactory {
+
   /**
    * Initialization, called once when the factory is created.
-   * @param streamConfig
    */
   void init(StreamConfig streamConfig);
 
   /**
    * Construct an offset from the string provided.
-   * @param offsetStr
-   * @return StreamPartitionMsgOffset
    */
   StreamPartitionMsgOffset create(String offsetStr);
 
   /**
-   * Construct an offset from another one provided, of the same type.
-   *
-   * @param other
-   * @return
+   * Construct an offset from another one provided, of the same type. Can be used to update metrics.
+   * TODO: Revisit this API since offset should be immutable.
    */
-  StreamPartitionMsgOffset create(StreamPartitionMsgOffset other);
+  default StreamPartitionMsgOffset create(StreamPartitionMsgOffset other) {
+    return other;
+  }
 }

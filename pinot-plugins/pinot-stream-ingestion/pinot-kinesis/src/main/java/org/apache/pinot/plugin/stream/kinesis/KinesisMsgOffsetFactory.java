@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.kinesis;
 
-import java.io.IOException;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -35,16 +34,6 @@ public class KinesisMsgOffsetFactory implements StreamPartitionMsgOffsetFactory 
 
   @Override
   public StreamPartitionMsgOffset create(String offsetStr) {
-    try {
-      return new KinesisPartitionGroupOffset(offsetStr);
-    } catch (IOException e) {
-      throw new IllegalStateException(
-          "Caught exception when creating KinesisPartitionGroupOffset from offsetStr: " + offsetStr);
-    }
-  }
-
-  @Override
-  public StreamPartitionMsgOffset create(StreamPartitionMsgOffset other) {
-    return new KinesisPartitionGroupOffset(((KinesisPartitionGroupOffset) other).getShardToStartSequenceMap());
+    return new KinesisPartitionGroupOffset(offsetStr);
   }
 }

@@ -18,51 +18,41 @@
  */
 package org.apache.pinot.plugin.stream.kafka20;
 
-import java.nio.ByteBuffer;
 import java.util.List;
+import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
-import org.apache.pinot.spi.stream.RowMetadata;
-import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
-public class KafkaMessageBatch implements MessageBatch<StreamMessage<byte[]>> {
-  private final List<StreamMessage<byte[]>> _messageList;
+public class KafkaMessageBatch implements MessageBatch<byte[]> {
+  private final List<BytesStreamMessage> _messages;
   private final int _unfilteredMessageCount;
+  private final long _offsetOfNextBatch;
   private final long _firstOffset;
-  private final long _lastOffset;
   private final StreamMessageMetadata _lastMessageMetadata;
 
   /**
+   * @param messages the messages, which may be smaller than {@see unfilteredMessageCount}
    * @param unfilteredMessageCount how many messages were received from the topic before being filtered
-   * @param firstOffset the offset of the first message in the batch
-   * @param lastOffset the offset of the last message in the batch
-   * @param batch the messages, which may be smaller than {@see unfilteredMessageCount}
-   * @param lastMessageMetadata metadata for last filtered message in the batch, useful for estimating ingestion delay
-   *                            when a batch has all messages filtered.
+   * @param offsetOfNextBatch the offset of the next batch
+   * @param firstOffset the offset of the first unfiltered message, -1 if no unfiltered messages
+   * @param lastMessageMetadata metadata for the last unfiltered message in the batch, useful for estimating ingestion
+   *                            delay when a batch has all messages filtered.
    */
-  public KafkaMessageBatch(int unfilteredMessageCount, long firstOffset, long lastOffset,
-      List<StreamMessage<byte[]>> batch, StreamMessageMetadata lastMessageMetadata) {
-    _messageList = batch;
-    _firstOffset = firstOffset;
-    _lastOffset = lastOffset;
+  public KafkaMessageBatch(List<BytesStreamMessage> messages, int unfilteredMessageCount, long offsetOfNextBatch,
+      long firstOffset, StreamMessageMetadata lastMessageMetadata) {
+    _messages = messages;
     _unfilteredMessageCount = unfilteredMessageCount;
+    _offsetOfNextBatch = offsetOfNextBatch;
+    _firstOffset = firstOffset;
     _lastMessageMetadata = lastMessageMetadata;
   }
 
   @Override
-  /**
-   * Returns the metadata for the last filtered message if any, null otherwise.
-   */
-  public StreamMessageMetadata getLastMessageMetadata() {
-    return _lastMessageMetadata;
-  }
-
-  @Override
   public int getMessageCount() {
-    return _messageList.size();
+    return _messages.size();
   }
 
   @Override
@@ -71,52 +61,22 @@ public class KafkaMessageBatch implements MessageBatch<StreamMessage<byte[]>> {
   }
 
   @Override
-  public StreamMessage getMessageAtIndex(int index) {
-    return _messageList.get(index);
-  }
-
-  @Override
-  public int getMessageOffsetAtIndex(int index) {
-    return ByteBuffer.wrap(_messageList.get(index).getValue()).arrayOffset();
-  }
-
-  @Override
-  public int getMessageLengthAtIndex(int index) {
-    return _messageList.get(index).getValue().length;
-  }
-
-  @Override
-  public long getNextStreamMessageOffsetAtIndex(int index) {
-    throw new UnsupportedOperationException("This method is deprecated");
-  }
-
-  @Override
-  public StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
-    return new LongMsgOffset(((KafkaStreamMessage) _messageList.get(index)).getNextOffset());
+  public BytesStreamMessage getStreamMessage(int index) {
+    return _messages.get(index);
   }
 
   @Override
   public StreamPartitionMsgOffset getOffsetOfNextBatch() {
-    return new LongMsgOffset(_lastOffset + 1);
-  }
-
-  @Override
-  public RowMetadata getMetadataAtIndex(int index) {
-    return _messageList.get(index).getMetadata();
-  }
-
-  @Override
-  public byte[] getMessageBytesAtIndex(int index) {
-    return _messageList.get(index).getValue();
-  }
-
-  @Override
-  public StreamMessage getStreamMessage(int index) {
-    return _messageList.get(index);
+    return new LongMsgOffset(_offsetOfNextBatch);
   }
 
   @Override
   public StreamPartitionMsgOffset getFirstMessageOffset() {
-    return new LongMsgOffset(_firstOffset);
+    return _firstOffset >= 0 ? new LongMsgOffset(_firstOffset) : null;
+  }
+
+  @Override
+  public StreamMessageMetadata getLastMessageMetadata() {
+    return _lastMessageMetadata;
   }
 }
