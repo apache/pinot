@@ -367,7 +367,6 @@ abstract class BaseInstanceSelector implements InstanceSelector {
    */
   @Override
   public void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {
-    _enabledInstances = enabledInstances;
     refreshSegmentStates();
   }
 
