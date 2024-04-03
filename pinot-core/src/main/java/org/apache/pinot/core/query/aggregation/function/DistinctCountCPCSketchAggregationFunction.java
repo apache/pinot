@@ -391,6 +391,8 @@ public class DistinctCountCPCSketchAggregationFunction
     if (intermediateResult2 == null || intermediateResult2.isEmpty()) {
       return intermediateResult1;
     }
+    intermediateResult1.setLgNominalEntries(_lgNominalEntries);
+    intermediateResult1.setThreshold(_accumulatorThreshold);
     intermediateResult1.merge(intermediateResult2);
     return intermediateResult1;
   }

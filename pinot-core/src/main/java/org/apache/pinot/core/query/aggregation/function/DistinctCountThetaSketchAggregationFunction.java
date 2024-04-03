@@ -997,6 +997,8 @@ public class DistinctCountThetaSketchAggregationFunction
         mergedAccumulators.add(thetaSketchAccumulator1);
         continue;
       }
+      thetaSketchAccumulator1.setSetOperationBuilder(_setOperationBuilder);
+      thetaSketchAccumulator1.setThreshold(_accumulatorThreshold);
       thetaSketchAccumulator1.merge(thetaSketchAccumulator2);
       mergedAccumulators.add(thetaSketchAccumulator1);
     }

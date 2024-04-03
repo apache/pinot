@@ -138,9 +138,12 @@ public class StaleInstancesCleanupTask extends BasePeriodicTask {
 
   private Set<String> getServerInstancesInUse() {
     Set<String> serverInstancesInUse = new HashSet<>();
-    _pinotHelixResourceManager.getAllTables().forEach(tableName -> serverInstancesInUse.addAll(
-        Optional.ofNullable(_pinotHelixResourceManager.getTableIdealState(tableName))
-            .map(is -> is.getInstanceSet(tableName)).orElse(Collections.emptySet())));
+    _pinotHelixResourceManager.getDatabaseNames().stream()
+        .map(_pinotHelixResourceManager::getAllTables)
+        .flatMap(List::stream)
+        .forEach(tableName -> serverInstancesInUse.addAll(
+          Optional.ofNullable(_pinotHelixResourceManager.getTableIdealState(tableName))
+              .map(is -> is.getInstanceSet(tableName)).orElse(Collections.emptySet())));
     return serverInstancesInUse;
   }
 }
