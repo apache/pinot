@@ -62,7 +62,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _aggregateMetrics;
   private boolean _nullHandlingEnabled;
-  private boolean _columnMajorSegmentBuilderEnabled = false;
+  private boolean _columnMajorSegmentBuilderEnabled = true;
 
   /**
    * If `optimizeDictionary` enabled, dictionary is not created for the high-cardinality

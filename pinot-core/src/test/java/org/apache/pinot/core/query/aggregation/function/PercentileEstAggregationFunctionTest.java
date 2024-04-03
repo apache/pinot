@@ -16,28 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.customobject;
+package org.apache.pinot.core.query.aggregation.function;
 
-import java.util.Base64;
-import org.apache.datasketches.common.ArrayOfStringsSerDe;
-import org.apache.datasketches.frequencies.ItemsSketch;
+import org.apache.pinot.spi.data.FieldSpec;
 
-public class SerializedFrequentStringsSketch implements Comparable<ItemsSketch<String>> {
-  private final ItemsSketch<String> _sketch;
 
-  public SerializedFrequentStringsSketch(ItemsSketch<String> sketch) {
-    _sketch = sketch;
+public class PercentileEstAggregationFunctionTest extends AbstractPercentileAggregationFunctionTest {
+  @Override
+  public String callStr(String column, int percent) {
+    return "PERCENTILEEST(" + column + ", " + percent + ")";
   }
 
   @Override
-  public int compareTo(ItemsSketch<String> other) {
-    // There is no well-defined ordering for these sketches
-    // numActiveItems is just a placeholder, which can be changed later
-    return _sketch.getNumActiveItems() - other.getNumActiveItems();
+  public String getFinalResultColumnType() {
+    return "LONG";
   }
 
-  @Override
-  public String toString() {
-    return Base64.getEncoder().encodeToString(_sketch.toByteArray(new ArrayOfStringsSerDe()));
+  String minValue(FieldSpec.DataType dataType) {
+    switch (dataType) {
+      case INT: return "-2147483648";
+      case LONG: return "-9223372036854775808";
+      case FLOAT: return "-9223372036854775808";
+      case DOUBLE: return "-9223372036854775808";
+      default:
+        throw new IllegalArgumentException("Unexpected type " + dataType);
+    }
   }
 }

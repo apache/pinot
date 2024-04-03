@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.util.Base64;
-import javax.validation.constraints.NotNull;
 import org.apache.datasketches.frequencies.LongsSketch;
 
 
@@ -31,7 +30,7 @@ public class SerializedFrequentLongsSketch implements Comparable<LongsSketch> {
   }
 
   @Override
-  public int compareTo(@NotNull LongsSketch other) {
+  public int compareTo(LongsSketch other) {
     // There is no well-defined ordering for these sketches
     // numActiveItems is just a placeholder, which can be changed later
     return _sketch.getNumActiveItems() - other.getNumActiveItems();

@@ -23,14 +23,16 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -68,16 +70,16 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
     JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
+    assertEquals(rows.size(), 1);
     JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 7);
-    Assert.assertEquals(row.get(0).size(), getCountStarResult());
-    Assert.assertEquals(row.get(1).size(), getCountStarResult());
-    Assert.assertEquals(row.get(2).size(), getCountStarResult());
-    Assert.assertEquals(row.get(3).size(), getCountStarResult());
-    Assert.assertEquals(row.get(4).size(), getCountStarResult());
-    Assert.assertEquals(row.get(5).size(), getCountStarResult());
-    Assert.assertEquals(row.get(6).size(), getCountStarResult());
+    assertEquals(row.size(), 7);
+    assertEquals(row.get(0).size(), getCountStarResult());
+    assertEquals(row.get(1).size(), getCountStarResult());
+    assertEquals(row.get(2).size(), getCountStarResult());
+    assertEquals(row.get(3).size(), getCountStarResult());
+    assertEquals(row.get(4).size(), getCountStarResult());
+    assertEquals(row.get(5).size(), getCountStarResult());
+    assertEquals(row.get(6).size(), getCountStarResult());
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -100,17 +102,17 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
     JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 10);
+    assertEquals(rows.size(), 10);
     for (int i = 0; i < 10; i++) {
       JsonNode row = rows.get(i);
-      Assert.assertEquals(row.size(), 8);
-      Assert.assertEquals(row.get(0).size(), getCountStarResult() / 10);
-      Assert.assertEquals(row.get(1).size(), getCountStarResult() / 10);
-      Assert.assertEquals(row.get(2).size(), getCountStarResult() / 10);
-      Assert.assertEquals(row.get(3).size(), getCountStarResult() / 10);
-      Assert.assertEquals(row.get(4).size(), getCountStarResult() / 10);
-      Assert.assertEquals(row.get(5).size(), getCountStarResult() / 10);
-      Assert.assertEquals(row.get(6).size(), getCountStarResult() / 10);
+      assertEquals(row.size(), 8);
+      assertEquals(row.get(0).size(), getCountStarResult() / 10);
+      assertEquals(row.get(1).size(), getCountStarResult() / 10);
+      assertEquals(row.get(2).size(), getCountStarResult() / 10);
+      assertEquals(row.get(3).size(), getCountStarResult() / 10);
+      assertEquals(row.get(4).size(), getCountStarResult() / 10);
+      assertEquals(row.get(5).size(), getCountStarResult() / 10);
+      assertEquals(row.get(6).size(), getCountStarResult() / 10);
     }
   }
 
@@ -132,16 +134,16 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "FROM %s LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
     JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
+    assertEquals(rows.size(), 1);
     JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 7);
-    Assert.assertEquals(row.get(0).size(), 2);
-    Assert.assertEquals(row.get(1).size(), getCountStarResult() / 10);
-    Assert.assertEquals(row.get(2).size(), getCountStarResult() / 10);
-    Assert.assertEquals(row.get(3).size(), getCountStarResult() / 10);
-    Assert.assertEquals(row.get(4).size(), getCountStarResult() / 10);
-    Assert.assertEquals(row.get(5).size(), getCountStarResult() / 10);
-    Assert.assertEquals(row.get(6).size(), getCountStarResult() / 10);
+    assertEquals(row.size(), 7);
+    assertEquals(row.get(0).size(), 2);
+    assertEquals(row.get(1).size(), getCountStarResult() / 10);
+    assertEquals(row.get(2).size(), getCountStarResult() / 10);
+    assertEquals(row.get(3).size(), getCountStarResult() / 10);
+    assertEquals(row.get(4).size(), getCountStarResult() / 10);
+    assertEquals(row.get(5).size(), getCountStarResult() / 10);
+    assertEquals(row.get(6).size(), getCountStarResult() / 10);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -165,17 +167,17 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "LIMIT %d", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
     JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 10);
+    assertEquals(rows.size(), 10);
     for (int i = 0; i < 10; i++) {
       JsonNode row = rows.get(i);
-      Assert.assertEquals(row.size(), 8);
-      Assert.assertEquals(row.get(0).size(), 2);
-      Assert.assertEquals(row.get(1).size(), getCountStarResult() / 100);
-      Assert.assertEquals(row.get(2).size(), getCountStarResult() / 100);
-      Assert.assertEquals(row.get(3).size(), getCountStarResult() / 100);
-      Assert.assertEquals(row.get(4).size(), getCountStarResult() / 100);
-      Assert.assertEquals(row.get(5).size(), getCountStarResult() / 100);
-      Assert.assertEquals(row.get(6).size(), getCountStarResult() / 100);
+      assertEquals(row.size(), 8);
+      assertEquals(row.get(0).size(), 2);
+      assertEquals(row.get(1).size(), getCountStarResult() / 100);
+      assertEquals(row.get(2).size(), getCountStarResult() / 100);
+      assertEquals(row.get(3).size(), getCountStarResult() / 100);
+      assertEquals(row.get(4).size(), getCountStarResult() / 100);
+      assertEquals(row.get(5).size(), getCountStarResult() / 100);
+      assertEquals(row.get(6).size(), getCountStarResult() / 100);
     }
   }
 
@@ -189,188 +191,123 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "FROM %s LIMIT 1", getTableName());
     JsonNode jsonNode = postQuery(query);
     JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
+    assertEquals(rows.size(), 1);
     JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asText(), "t1");
-    Assert.assertEquals(row.get(0).get(1).asText(), "t2");
-    Assert.assertEquals(row.get(0).get(2).asText(), "t3");
+    assertEquals(row.size(), 1);
+    assertEquals(row.get(0).size(), 3);
+    assertEquals(row.get(0).get(0).asText(), "t1");
+    assertEquals(row.get(0).get(1).asText(), "t2");
+    assertEquals(row.get(0).get(2).asText(), "t3");
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testIntArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query =
-        String.format("SELECT "
-            + "ARRAY[1,2,3] "
-            + "FROM %s LIMIT 1", getTableName());
-    JsonNode jsonNode = postQuery(query);
-    JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
-    JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asInt(), 1);
-    Assert.assertEquals(row.get(0).get(1).asInt(), 2);
-    Assert.assertEquals(row.get(0).get(2).asInt(), 3);
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testIntArrayLiteralWithoutFrom(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT ARRAY[1,2,3] ";
-    JsonNode jsonNode = postQuery(query);
-    JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
-    JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asInt(), 1);
-    Assert.assertEquals(row.get(0).get(1).asInt(), 2);
-    Assert.assertEquals(row.get(0).get(2).asInt(), 3);
+    for (String arrayLiteral : List.of("ARRAY[1,2,3]", "ARRAY'{1,2,3}'")) {
+      for (boolean withFrom : new boolean[]{true, false}) {
+        String query = withFrom ? String.format("SELECT %s FROM %s LIMIT 1", arrayLiteral, getTableName())
+            : "SELECT " + arrayLiteral;
+        JsonNode result = postQuery(query).get("resultTable");
+        // TODO: Check data schema
+        JsonNode rows = result.get("rows");
+        assertEquals(rows.size(), 1);
+        JsonNode row = rows.get(0);
+        assertEquals(row.size(), 1);
+        assertEquals(row.get(0).size(), 3);
+        assertEquals(row.get(0).get(0).asInt(), 1);
+        assertEquals(row.get(0).get(1).asInt(), 2);
+        assertEquals(row.get(0).get(2).asInt(), 3);
+      }
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testLongArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query =
-        String.format("SELECT "
-            + "ARRAY[2147483648,2147483649,2147483650] "
-            + "FROM %s LIMIT 1", getTableName());
-    JsonNode jsonNode = postQuery(query);
-    JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
-    JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asLong(), 2147483648L);
-    Assert.assertEquals(row.get(0).get(1).asLong(), 2147483649L);
-    Assert.assertEquals(row.get(0).get(2).asLong(), 2147483650L);
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testLongArrayLiteralWithoutFrom(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT ARRAY[2147483648,2147483649,2147483650]";
-    JsonNode jsonNode = postQuery(query);
-    JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
-    JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asLong(), 2147483648L);
-    Assert.assertEquals(row.get(0).get(1).asLong(), 2147483649L);
-    Assert.assertEquals(row.get(0).get(2).asLong(), 2147483650L);
+    for (String arrayLiteral : List.of("ARRAY[2147483648,2147483649,2147483650]",
+        "ARRAY'{2147483648,2147483649,2147483650}'")) {
+      for (boolean withFrom : new boolean[]{true, false}) {
+        String query = withFrom ? String.format("SELECT %s FROM %s LIMIT 1", arrayLiteral, getTableName())
+            : "SELECT " + arrayLiteral;
+        JsonNode result = postQuery(query).get("resultTable");
+        assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "LONG_ARRAY");
+        JsonNode rows = result.get("rows");
+        assertEquals(rows.size(), 1);
+        JsonNode row = rows.get(0);
+        assertEquals(row.size(), 1);
+        assertEquals(row.get(0).size(), 3);
+        assertEquals(row.get(0).get(0).longValue(), 2147483648L);
+        assertEquals(row.get(0).get(1).longValue(), 2147483649L);
+        assertEquals(row.get(0).get(2).longValue(), 2147483650L);
+      }
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testFloatArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query =
-        String.format("SELECT "
-            + "ARRAY[0.1, 0.2, 0.3] "
-            + "FROM %s LIMIT 1", getTableName());
-    JsonNode jsonNode = postQuery(query);
-    JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
-    JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asDouble(), 0.1);
-    Assert.assertEquals(row.get(0).get(1).asDouble(), 0.2);
-    Assert.assertEquals(row.get(0).get(2).asDouble(), 0.3);
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testFloatArrayLiteralWithoutFrom(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT ARRAY[0.1, 0.2, 0.3]";
-    JsonNode jsonNode = postQuery(query);
-    JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
-    JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asDouble(), 0.1);
-    Assert.assertEquals(row.get(0).get(1).asDouble(), 0.2);
-    Assert.assertEquals(row.get(0).get(2).asDouble(), 0.3);
+    for (String arrayLiteral : List.of("ARRAY[0.1,0.2,0.3]", "ARRAY'{0.1,0.2,0.3}'")) {
+      for (boolean withFrom : new boolean[]{true, false}) {
+        String query = withFrom ? String.format("SELECT %s FROM %s LIMIT 1", arrayLiteral, getTableName())
+            : "SELECT " + arrayLiteral;
+        JsonNode result = postQuery(query).get("resultTable");
+        // TODO: Check data schema
+        JsonNode rows = result.get("rows");
+        assertEquals(rows.size(), 1);
+        JsonNode row = rows.get(0);
+        assertEquals(row.size(), 1);
+        assertEquals(row.get(0).size(), 3);
+        assertEquals(row.get(0).get(0).asDouble(), 0.1);
+        assertEquals(row.get(0).get(1).asDouble(), 0.2);
+        assertEquals(row.get(0).get(2).asDouble(), 0.3);
+      }
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testDoubleArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query =
-        String.format("SELECT "
-            + "ARRAY[CAST(0.1 AS DOUBLE), CAST(0.2 AS DOUBLE), CAST(0.3 AS DOUBLE)] "
-            + "FROM %s LIMIT 1", getTableName());
-    JsonNode jsonNode = postQuery(query);
-    JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
-    JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asDouble(), 0.1);
-    Assert.assertEquals(row.get(0).get(1).asDouble(), 0.2);
-    Assert.assertEquals(row.get(0).get(2).asDouble(), 0.3);
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testDoubleArrayLiteralWithoutFrom(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT ARRAY[CAST(0.1 AS DOUBLE), CAST(0.2 AS DOUBLE), CAST(0.3 AS DOUBLE)]";
-    JsonNode jsonNode = postQuery(query);
-    JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
-    JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asDouble(), 0.1);
-    Assert.assertEquals(row.get(0).get(1).asDouble(), 0.2);
-    Assert.assertEquals(row.get(0).get(2).asDouble(), 0.3);
+    String arrayLiteral = "ARRAY[CAST(0.1 AS DOUBLE),CAST(0.2 AS DOUBLE),CAST(0.3 AS DOUBLE)]";
+    for (boolean withFrom : new boolean[]{true, false}) {
+      String query = withFrom ? String.format("SELECT %s FROM %s LIMIT 1", arrayLiteral, getTableName())
+          : "SELECT " + arrayLiteral;
+      JsonNode result = postQuery(query).get("resultTable");
+      // TODO: Check data schema
+      JsonNode rows = result.get("rows");
+      assertEquals(rows.size(), 1);
+      JsonNode row = rows.get(0);
+      assertEquals(row.size(), 1);
+      assertEquals(row.get(0).size(), 3);
+      assertEquals(row.get(0).get(0).asDouble(), 0.1);
+      assertEquals(row.get(0).get(1).asDouble(), 0.2);
+      assertEquals(row.get(0).get(2).asDouble(), 0.3);
+    }
   }
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testStringArrayLiteral(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query =
-        String.format("SELECT "
-            + "ARRAY['a', 'bb', 'ccc'] "
-            + "FROM %s LIMIT 1", getTableName());
-    JsonNode jsonNode = postQuery(query);
-    JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
-    JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asText(), "a");
-    Assert.assertEquals(row.get(0).get(1).asText(), "bb");
-    Assert.assertEquals(row.get(0).get(2).asText(), "ccc");
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testStringArrayLiteralWithoutFrom(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT ARRAY['a', 'bb', 'ccc']";
-    JsonNode jsonNode = postQuery(query);
-    JsonNode rows = jsonNode.get("resultTable").get("rows");
-    Assert.assertEquals(rows.size(), 1);
-    JsonNode row = rows.get(0);
-    Assert.assertEquals(row.size(), 1);
-    Assert.assertEquals(row.get(0).size(), 3);
-    Assert.assertEquals(row.get(0).get(0).asText(), "a");
-    Assert.assertEquals(row.get(0).get(1).asText(), "bb");
-    Assert.assertEquals(row.get(0).get(2).asText(), "ccc");
+    for (String arrayLiteral : List.of("ARRAY['a','bb','ccc']", "ARRAY'{\"a\",\"bb\",\"ccc\"}'")) {
+      for (boolean withFrom : new boolean[]{true, false}) {
+        String query = withFrom ? String.format("SELECT %s FROM %s LIMIT 1", arrayLiteral, getTableName())
+            : "SELECT " + arrayLiteral;
+        JsonNode result = postQuery(query).get("resultTable");
+        assertEquals(result.get("dataSchema").get("columnDataTypes").get(0).textValue(), "STRING_ARRAY");
+        JsonNode rows = result.get("rows");
+        assertEquals(rows.size(), 1);
+        JsonNode row = rows.get(0);
+        assertEquals(row.size(), 1);
+        assertEquals(row.get(0).size(), 3);
+        assertEquals(row.get(0).get(0).textValue(), "a");
+        assertEquals(row.get(0).get(1).textValue(), "bb");
+        assertEquals(row.get(0).get(2).textValue(), "ccc");
+      }
+    }
   }
 
   @Override
