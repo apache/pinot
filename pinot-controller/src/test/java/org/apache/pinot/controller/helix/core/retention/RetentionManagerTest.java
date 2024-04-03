@@ -49,6 +49,7 @@ import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_DATABASE;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -161,7 +162,9 @@ public class RetentionManagerTest {
   private void setupPinotHelixResourceManager(TableConfig tableConfig, final List<String> removedSegments,
       PinotHelixResourceManager resourceManager, LeadControllerManager leadControllerManager) {
     final String tableNameWithType = tableConfig.getTableName();
-    when(resourceManager.getAllTables()).thenReturn(Collections.singletonList(tableNameWithType));
+    when(resourceManager.getDatabaseNames())
+        .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+    when(resourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(Collections.singletonList(tableNameWithType));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);

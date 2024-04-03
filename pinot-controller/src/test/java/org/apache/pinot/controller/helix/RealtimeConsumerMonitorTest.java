@@ -46,6 +46,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_DATABASE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -92,7 +93,9 @@ public class RealtimeConsumerMonitorTest {
       ZkHelixPropertyStore<ZNRecord> helixPropertyStore = mock(ZkHelixPropertyStore.class);
       when(helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
       when(helixResourceManager.getPropertyStore()).thenReturn(helixPropertyStore);
-      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
       ZNRecord znRecord = new ZNRecord("0");
