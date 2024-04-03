@@ -96,15 +96,16 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return _intValues[index];
   }
 
-  public void merge(K key, int value) {
+  public StatMap<K> merge(K key, int value) {
     if (key.getType() == Type.LONG) {
       merge(key, (long) value);
-      return;
+      return this;
     }
     Preconditions.checkArgument(key.getType() == Type.INT);
     int index = _family.getIndex(key);
     assert _intValues != null : "Int values should not be null because " + key + " is of type INT";
     _intValues[index] = key.merge(_intValues[index], value);
+    return this;
   }
 
   public long getLong(K key) {
@@ -117,11 +118,12 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return _longValues[index];
   }
 
-  public void merge(K key, long value) {
+  public StatMap<K> merge(K key, long value) {
     Preconditions.checkArgument(key.getType() == Type.LONG);
     int index = _family.getIndex(key);
     assert _longValues != null : "Long values should not be null because " + key + " is of type LONG";
     _longValues[index] = key.merge(_longValues[index], value);
+    return this;
   }
 
   public boolean getBoolean(K key) {
@@ -131,11 +133,12 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return _booleanValues[index];
   }
 
-  public void merge(K key, boolean value) {
+  public StatMap<K> merge(K key, boolean value) {
     Preconditions.checkArgument(key.getType() == Type.BOOLEAN);
     int index = _family.getIndex(key);
     assert _booleanValues != null : "Boolean values should not be null because " + key + " is of type BOOLEAN";
     _booleanValues[index] = key.merge(_booleanValues[index], value);
+    return this;
   }
 
   public String getString(K key) {
@@ -145,11 +148,12 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return (String) _referenceValues[index];
   }
 
-  public void merge(K key, String value) {
+  public StatMap<K> merge(K key, String value) {
     Preconditions.checkArgument(key.getType() == Type.STRING);
     int index = _family.getIndex(key);
     assert _referenceValues != null : "Reference values should not be null because " + key + " is of type STRING";
     _referenceValues[index] = key.merge((String) _referenceValues[index], value);
+    return this;
   }
 
   /**
@@ -178,8 +182,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
    * Numbers will be added, booleans will be ORed, and strings will be set if they are null.
    *
    * @param other The object to merge with. This argument will not be modified.
+   * @return this object once it is modified.
    */
-  public void merge(StatMap<K> other) {
+  public StatMap<K> merge(StatMap<K> other) {
     Preconditions.checkState(_family._keyClass.equals(other._family._keyClass),
         "Different key classes %s and %s", _family._keyClass, other._family._keyClass);
     Preconditions.checkState(_family._numIntValues == other._family._numIntValues,
@@ -221,9 +226,10 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         _referenceValues[i] = key.merge((String) _referenceValues[i], (String) other._referenceValues[i]);
       }
     }
+    return this;
   }
 
-  public void merge(DataInput input)
+  public StatMap<K> merge(DataInput input)
       throws IOException {
     int bitsPerId = 32 - Integer.numberOfLeadingZeros(Math.abs(_family._maxIndex));
     int maxBytesPerId = (bitsPerId + 7) / 8;
@@ -276,6 +282,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         _referenceValues[refKeys] = key.merge((String) _referenceValues[refKeys], value);
       }
     }
+    return this;
   }
 
   public ObjectNode asJson() {

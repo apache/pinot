@@ -33,6 +33,9 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
@@ -84,6 +87,7 @@ public class MultiStageQueryStats {
    * @see #mergeInOrder(MultiStageQueryStats, MultiStageOperator.Type, StatMap)
    */
   private final ArrayList<StageStats.Closed> _closedStats;
+  private static final MultiStageOperator.Type[] ALL_TYPES = MultiStageOperator.Type.values();
 
   private MultiStageQueryStats(int stageId) {
     _currentStageId = stageId;
@@ -303,6 +307,46 @@ public class MultiStageQueryStats {
     }
   }
 
+  public JsonNode asJson() {
+    ObjectNode node = JsonUtils.newObjectNode();
+    node.put("stage", _currentStageId);
+    node.set("open", _currentStats.asJson());
+
+    ArrayNode closedStats = JsonUtils.newArrayNode();
+    for (StageStats.Closed closed : _closedStats) {
+      if (closed == null) {
+        closedStats.addNull();
+      } else {
+        closedStats.add(closed.asJson());
+      }
+    }
+    node.set("closed", closedStats);
+    return node;
+  }
+
+  @Override
+  public String toString() {
+    return asJson().toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    MultiStageQueryStats that = (MultiStageQueryStats) o;
+    return _currentStageId == that._currentStageId && Objects.equals(_currentStats, that._currentStats)
+        && Objects.equals(_closedStats, that._closedStats);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_currentStageId, _currentStats, _closedStats);
+  }
+
   /**
    * {@code StageStats} tracks execution statistics for a single stage.
    * <p>
@@ -468,6 +512,23 @@ public class MultiStageQueryStats {
     }
 
     @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      StageStats that = (StageStats) o;
+      return Objects.equals(_operatorTypes, that._operatorTypes) && Objects.equals(_operatorStats, that._operatorStats);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(_operatorTypes, _operatorStats);
+    }
+
+    @Override
     public String toString() {
       return asJson().toString();
     }
@@ -506,11 +567,23 @@ public class MultiStageQueryStats {
       public void merge(DataInputStream input)
           throws IOException {
         int numOperators = input.readInt();
-        Preconditions.checkState(numOperators == _operatorTypes.size(),
-            "Cannot merge stats from stages with different operators. Expected %s operators, got %s",
-            _operatorStats.size(), numOperators);
+        if (numOperators != _operatorTypes.size()) {
+          ArrayList<MultiStageOperator.Type> types = new ArrayList<>(numOperators);
+          for (int i = 0; i < numOperators; i++) {
+            byte typeOrdinal = input.readByte();
+            if (typeOrdinal >= 0 && typeOrdinal < ALL_TYPES.length) {
+              throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
+                  + _operatorTypes.size() + " operators, got " + numOperators + ". Type found at index " + i
+                  + " has ordinal " + typeOrdinal + " which is not a valid operator type");
+            }
+            MultiStageOperator.Type expectedType = ALL_TYPES[typeOrdinal];
+            types.add(expectedType);
+          }
+          throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
+              + _operatorTypes + " operators, got " + types);
+        }
         for (int i = 0; i < numOperators; i++) {
-          MultiStageOperator.Type expectedType = MultiStageOperator.Type.values()[input.readByte()];
+          MultiStageOperator.Type expectedType = ALL_TYPES[input.readByte()];
           Preconditions.checkState(expectedType == _operatorTypes.get(i),
               "Cannot merge stats from stages with different operators");
         }
@@ -556,11 +629,12 @@ public class MultiStageQueryStats {
         super();
       }
 
-      public void addLastOperator(MultiStageOperator.Type type, StatMap<?> statMap) {
+      public Open addLastOperator(MultiStageOperator.Type type, StatMap<?> statMap) {
         Preconditions.checkNotNull(type, "Cannot add null operator type");
         Preconditions.checkNotNull(statMap, "Cannot add null stats");
         _operatorTypes.add(type);
         _operatorStats.add(statMap);
+        return this;
       }
 
       /**
@@ -574,6 +648,34 @@ public class MultiStageQueryStats {
       public Closed close() {
         return new Closed(_operatorTypes, _operatorStats);
       }
+    }
+  }
+
+  public static class Builder {
+    private final MultiStageQueryStats _stats;
+
+    public Builder(int stageId) {
+      _stats = new MultiStageQueryStats(stageId);
+    }
+
+    public Builder customizeOpen(Consumer<StageStats.Open> customizer) {
+      customizer.accept(_stats._currentStats);
+      return this;
+    }
+
+    /**
+     * Adds a new operator to the stats.
+     * @param consumer a function that will be called with a new and empty open stats object and returns the closed stat
+     *                 to be added. The received object can be freely modified and close.
+     */
+    public Builder addLast(Function<StageStats.Open, StageStats.Closed> consumer) {
+      StageStats.Open open = new StageStats.Open();
+      _stats._closedStats.add(consumer.apply(open));
+      return this;
+    }
+
+    public MultiStageQueryStats build() {
+      return _stats;
     }
   }
 

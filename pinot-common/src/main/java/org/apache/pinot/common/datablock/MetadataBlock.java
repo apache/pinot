@@ -55,7 +55,7 @@ public class MetadataBlock extends BaseDataBlock {
   }
 
   private static byte[] serializeStats(List<ByteBuffer> stats) {
-    try (UnsynchronizedByteArrayOutputStream baos = new UnsynchronizedByteArrayOutputStream(1024);
+    try (UnsynchronizedByteArrayOutputStream baos = new UnsynchronizedByteArrayOutputStream(4096);
         DataOutputStream output = new DataOutputStream(baos)
     ) {
       int size = stats.size();

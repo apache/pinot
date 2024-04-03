@@ -22,7 +22,7 @@ import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import java.io.IOException;
-import org.locationtech.jts.util.Assert;
+import org.testng.Assert;
 import org.testng.SkipException;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -125,7 +125,49 @@ public class StatMapTest {
     ByteArrayDataInput input = ByteStreams.newDataInput(output.toByteArray());
     StatMap<MyStats> deserializedStatMap = StatMap.deserialize(input, MyStats.class);
 
-    Assert.equals(statMap, deserializedStatMap);
+    Assert.assertEquals(statMap, deserializedStatMap);
+  }
+
+  @Test(dataProvider = "complexStats")
+  public void mergeEquivalence(StatMap<?> statMap)
+      throws IOException {
+    StatMap mergedOnHeap = new StatMap<>(statMap.getKeyClass());
+    mergedOnHeap.merge(statMap);
+
+    ByteArrayDataOutput output = ByteStreams.newDataOutput();
+    statMap.serialize(output);
+
+    ByteArrayDataInput input = ByteStreams.newDataInput(output.toByteArray());
+    StatMap mergedSerialized = new StatMap<>(statMap.getKeyClass());
+    mergedSerialized.merge(input);
+
+    Assert.assertEquals(mergedOnHeap, mergedSerialized,
+        "Merging objects should be equal to merging serialized buffers");
+  }
+
+  @DataProvider(name = "complexStats")
+  static StatMap<?>[] complexStats() {
+    return new StatMap<?>[] {
+      new StatMap<>(MyStats.class)
+        .merge(MyStats.BOOL_KEY, true)
+        .merge(MyStats.LONG_KEY, 1L)
+        .merge(MyStats.INT_KEY, 1)
+        .merge(MyStats.STR_KEY, "foo"),
+      new StatMap<>(MyStats.class)
+        .merge(MyStats.BOOL_KEY, false)
+        .merge(MyStats.LONG_KEY, 2L)
+        .merge(MyStats.INT_KEY, 2)
+        .merge(MyStats.STR_KEY, "bar"),
+      new StatMap<>(DataTable.MetadataKey.class)
+        .merge(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED, 1)
+        .merge(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED, 1)
+        .merge(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED, 1)
+        .merge(DataTable.MetadataKey.NUM_DOCS_SCANNED, 10)
+        .merge(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER, 5)
+        .merge(DataTable.MetadataKey.TOTAL_DOCS, 5)
+        .merge(DataTable.MetadataKey.TIME_USED_MS, 95)
+        .merge(DataTable.MetadataKey.TABLE, "a")
+    };
   }
 
   @DataProvider(name = "allTypeStats")
