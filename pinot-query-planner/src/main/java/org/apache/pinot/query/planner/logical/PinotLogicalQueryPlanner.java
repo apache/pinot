@@ -32,7 +32,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
-import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.QueryPlanMetadata;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
@@ -43,44 +42,24 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 
 /**
  * PinotLogicalQueryPlanner walks top-down from {@link RelRoot} and construct a forest of trees with {@link PlanNode}.
- *
- * This class is non-threadsafe. Do not reuse the stage planner for multiple query plans.
  */
 public class PinotLogicalQueryPlanner {
-
-  /**
-   * planQuery achieves 2 objective:
-   *   1. convert Calcite's {@link RelNode} to Pinot's {@link PlanNode} format from the {@link RelRoot} of Calcite's
-   *   LogicalPlanner result.
-   *   2. while walking Calcite's {@link RelNode} tree, populate {@link QueryPlanMetadata}.
-   *
-   * @param relRoot relational plan root.
-   * @return dispatchable plan.
-   */
-  public QueryPlan planQuery(RelRoot relRoot) {
-    RelNode relRootNode = relRoot.rel;
-    // Walk through RelNode tree and construct a StageNode tree.
-    PlanNode globalRoot = relNodeToStageNode(relRootNode);
-    QueryPlanMetadata queryPlanMetadata =
-        new QueryPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRootNode), relRoot.fields);
-    return new QueryPlan(globalRoot, queryPlanMetadata);
+  private PinotLogicalQueryPlanner() {
   }
 
   /**
-   * Convert the Pinot plan from {@link PinotLogicalQueryPlanner#planQuery(RelRoot)} into a {@link SubPlan}.
-   *
-   * @param queryPlan relational plan root.
-   * @return dispatchable plan.
+   * Converts a Calcite {@link RelRoot} into a Pinot {@link SubPlan}.
    */
-  public SubPlan makePlan(QueryPlan queryPlan) {
-    PlanNode globalRoot = queryPlan.getPlanRoot();
+  public static SubPlan makePlan(RelRoot relRoot) {
+    PlanNode rootNode = relNodeToStageNode(relRoot.rel);
+    QueryPlanMetadata metadata =
+        new QueryPlanMetadata(RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel), relRoot.fields);
 
     // Fragment the stage tree into multiple SubPlans.
     SubPlanFragmenter.Context subPlanContext = new SubPlanFragmenter.Context();
-    subPlanContext._subPlanIdToRootNodeMap.put(0, globalRoot);
-    subPlanContext._subPlanIdToMetadataMap.put(0,
-        new SubPlanMetadata(queryPlan.getPlanMetadata().getTableNames(), queryPlan.getPlanMetadata().getFields()));
-    globalRoot.visit(SubPlanFragmenter.INSTANCE, subPlanContext);
+    subPlanContext._subPlanIdToRootNodeMap.put(0, rootNode);
+    subPlanContext._subPlanIdToMetadataMap.put(0, new SubPlanMetadata(metadata.getTableNames(), metadata.getFields()));
+    rootNode.visit(SubPlanFragmenter.INSTANCE, subPlanContext);
 
     Map<Integer, SubPlan> subPlanMap = new HashMap<>();
     for (Map.Entry<Integer, PlanNode> subPlanEntry : subPlanContext._subPlanIdToRootNodeMap.entrySet()) {
@@ -129,9 +108,8 @@ public class PinotLogicalQueryPlanner {
     return subPlanMap.get(0);
   }
 
-  // non-threadsafe
   // TODO: add dataSchema (extracted from RelNode schema) to the StageNode.
-  private PlanNode relNodeToStageNode(RelNode node) {
+  private static PlanNode relNodeToStageNode(RelNode node) {
     PlanNode planNode = RelToPlanNodeConverter.toStageNode(node, -1);
     List<RelNode> inputs = node.getInputs();
     for (RelNode input : inputs) {

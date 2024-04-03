@@ -16,40 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.fmpp;
+package org.apache.pinot.core.query.aggregation.function;
 
-import fmpp.Engine;
-import fmpp.tdd.DataLoader;
-import java.util.List;
-import org.apache.maven.project.MavenProject;
+import org.apache.pinot.spi.data.FieldSpec;
 
 
-/**
- * A data loader for Maven
- */
-public class MavenDataLoader implements DataLoader {
-  public static final class MavenData {
-    private final MavenProject project;
-
-    public MavenData(MavenProject project) {
-      this.project = project;
-    }
-
-    public MavenProject getProject() {
-      return project;
-    }
+public class PercentileEstAggregationFunctionTest extends AbstractPercentileAggregationFunctionTest {
+  @Override
+  public String callStr(String column, int percent) {
+    return "PERCENTILEEST(" + column + ", " + percent + ")";
   }
 
-  public static final String MAVEN_DATA_ATTRIBUTE = "maven.data";
-
   @Override
-  public Object load(Engine e, List args)
-      throws Exception {
-    if (!args.isEmpty()) {
-      throw new IllegalArgumentException("maven model data loader has no parameters");
-    }
+  public String getFinalResultColumnType() {
+    return "LONG";
+  }
 
-    MavenData data = (MavenData) e.getAttribute(MAVEN_DATA_ATTRIBUTE);
-    return data;
+  String minValue(FieldSpec.DataType dataType) {
+    switch (dataType) {
+      case INT: return "-2147483648";
+      case LONG: return "-9223372036854775808";
+      case FLOAT: return "-9223372036854775808";
+      case DOUBLE: return "-9223372036854775808";
+      default:
+        throw new IllegalArgumentException("Unexpected type " + dataType);
+    }
   }
 }

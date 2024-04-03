@@ -354,7 +354,11 @@ public class DateTimeFunctionsTest {
     row.putValue("epochMillis", 1612296732123L);
     List<String> arguments = Lists.newArrayList("epochMillis");
 
-    // name variations
+    // Standard SQL
+    testFunction("date_trunc(second, epochMillis)", arguments, row, 1612296732000L);
+    testFunction("DATE_TRUNC(MINUTE, epochMillis)", arguments, row, 1612296720000L);
+
+    // Name variations
     testFunction("datetrunc('millisecond', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
     testFunction("date_trunc('MILLISECOND', epochMillis, 'MILLISECONDS')", arguments, row, 1612296732123L);
     testFunction("dateTrunc('millisecond', epochMillis, 'milliseconds')", arguments, row, 1612296732123L);

@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.query.planner;
 
-import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.calcite.util.Pair;
+import org.apache.calcite.runtime.PairList;
 
 
 /**
@@ -32,10 +30,10 @@ import org.apache.calcite.util.Pair;
  */
 public class QueryPlanMetadata {
   private final Set<String> _tableNames;
-  private final List<Pair<Integer, String>> _fields;
+  private final PairList<Integer, String> _fields;
   private final Map<String, String> _customProperties;
 
-  public QueryPlanMetadata(Set<String> tableNames, ImmutableList<Pair<Integer, String>> fields) {
+  public QueryPlanMetadata(Set<String> tableNames, PairList<Integer, String> fields) {
     _tableNames = tableNames;
     _fields = fields;
     _customProperties = new HashMap<>();
@@ -57,7 +55,7 @@ public class QueryPlanMetadata {
    * Get the query result field.
    * @return query result field.
    */
-  public List<Pair<Integer, String>> getFields() {
+  public PairList<Integer, String> getFields() {
     return _fields;
   }
 }

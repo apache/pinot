@@ -37,7 +37,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
-import org.apache.calcite.util.Pair;
+import org.apache.calcite.runtime.PairList;
 import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.proto.Worker;
@@ -295,14 +295,14 @@ public class QueryDispatcher {
   }
 
   private static ResultTable getResultTable(MailboxReceiveOperator receiveOperator, DataSchema sourceDataSchema,
-      List<Pair<Integer, String>> resultFields) {
+      PairList<Integer, String> resultFields) {
     int numColumns = resultFields.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnTypes = new ColumnDataType[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      Pair<Integer, String> field = resultFields.get(i);
-      columnNames[i] = field.right;
-      columnTypes[i] = sourceDataSchema.getColumnDataType(field.left);
+      Map.Entry<Integer, String> field = resultFields.get(i);
+      columnNames[i] = field.getValue();
+      columnTypes[i] = sourceDataSchema.getColumnDataType(field.getKey());
     }
     DataSchema resultDataSchema = new DataSchema(columnNames, columnTypes);
 
@@ -317,7 +317,7 @@ public class QueryDispatcher {
         for (Object[] rawRow : rawRows) {
           Object[] row = new Object[numColumns];
           for (int i = 0; i < numColumns; i++) {
-            Object rawValue = rawRow[resultFields.get(i).left];
+            Object rawValue = rawRow[resultFields.get(i).getKey()];
             if (rawValue != null) {
               ColumnDataType dataType = columnTypes[i];
               row[i] = dataType.format(dataType.toExternal(rawValue));

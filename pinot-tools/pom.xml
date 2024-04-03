@@ -152,10 +152,6 @@
           <artifactId>error_prone_annotations</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>javax.annotation</groupId>
-          <artifactId>javax.annotation-api</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>animal-sniffer-annotations</artifactId>
         </exclusion>
@@ -168,20 +164,12 @@
           <artifactId>jersey-container-servlet-core</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>io.swagger</groupId>
-          <artifactId>swagger-annotations</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>io.grpc</groupId>
           <artifactId>grpc-protobuf-lite</artifactId>
         </exclusion>
         <exclusion>
           <groupId>io.grpc</groupId>
           <artifactId>grpc-context</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>jakarta.activation</groupId>
-          <artifactId>jakarta.activation-api</artifactId>
         </exclusion>
         <exclusion>
           <groupId>com.typesafe.netty</groupId>
@@ -228,10 +216,6 @@
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.jersey.containers</groupId>
-      <artifactId>jersey-container-grizzly2-http</artifactId>
     </dependency>
     <dependency>
       <groupId>org.glassfish.tyrus.bundles</groupId>

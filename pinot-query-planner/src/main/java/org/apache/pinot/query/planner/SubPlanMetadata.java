@@ -18,9 +18,8 @@
  */
 package org.apache.pinot.query.planner;
 
-import java.util.List;
 import java.util.Set;
-import org.apache.calcite.util.Pair;
+import org.apache.calcite.runtime.PairList;
 
 
 /**
@@ -36,14 +35,14 @@ public class SubPlanMetadata {
   /**
    * The list of fields that are surfaced by this subplan. Only valid for SubPlan Id 0.
    */
-  private List<Pair<Integer, String>> _fields;
+  private PairList<Integer, String> _fields;
 
-  public SubPlanMetadata(Set<String> tableNames, List<Pair<Integer, String>> fields) {
+  public SubPlanMetadata(Set<String> tableNames, PairList<Integer, String> fields) {
     _tableNames = tableNames;
     _fields = fields;
   }
 
-  public List<Pair<Integer, String>> getFields() {
+  public PairList<Integer, String> getFields() {
     return _fields;
   }
 

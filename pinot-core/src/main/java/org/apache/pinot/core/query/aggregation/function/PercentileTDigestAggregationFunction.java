@@ -39,7 +39,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  *       extra handling for two argument PERCENTILE functions to assess if v0 or v1. This can be revisited later if the
  *       need arises
  */
-public class PercentileTDigestAggregationFunction extends BaseSingleInputAggregationFunction<TDigest, Double> {
+public class PercentileTDigestAggregationFunction extends NullableSingleInputAggregationFunction<TDigest, Double> {
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
   // version 0 functions specified in the of form PERCENTILETDIGEST<2-digits>(column). Uses default compression of 100
@@ -48,23 +48,25 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
   protected final double _percentile;
   protected final int _compressionFactor;
 
-  public PercentileTDigestAggregationFunction(ExpressionContext expression, int percentile) {
-    super(expression);
+  public PercentileTDigestAggregationFunction(ExpressionContext expression, int percentile,
+      boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
     _version = 0;
     _percentile = percentile;
     _compressionFactor = DEFAULT_TDIGEST_COMPRESSION;
   }
 
-  public PercentileTDigestAggregationFunction(ExpressionContext expression, double percentile) {
-    super(expression);
+  public PercentileTDigestAggregationFunction(ExpressionContext expression, double percentile,
+      boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
     _version = 1;
     _percentile = percentile;
     _compressionFactor = DEFAULT_TDIGEST_COMPRESSION;
   }
 
   public PercentileTDigestAggregationFunction(ExpressionContext expression, double percentile,
-      int compressionFactor) {
-    super(expression);
+      int compressionFactor, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
     _version = 1;
     _percentile = percentile;
     _compressionFactor = compressionFactor;
@@ -104,24 +106,28 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
       TDigest tDigest = getDefaultTDigest(aggregationResultHolder, _compressionFactor);
-      for (int i = 0; i < length; i++) {
-        tDigest.add(doubleValues[i]);
-      }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          tDigest.add(doubleValues[i]);
+        }
+      });
     } else {
       // Serialized TDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      TDigest tDigest = aggregationResultHolder.getResult();
-      if (tDigest != null) {
-        for (int i = 0; i < length; i++) {
-          tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]));
+      foldNotNull(length, blockValSet, (TDigest) aggregationResultHolder.getResult(), (tDigest, from, toEx) -> {
+        if (tDigest != null) {
+          for (int i = from; i < toEx; i++) {
+            tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]));
+          }
+        } else {
+          tDigest = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[0]);
+          aggregationResultHolder.setValue(tDigest);
+          for (int i = 1; i < length; i++) {
+            tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]));
+          }
         }
-      } else {
-        tDigest = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[0]);
-        aggregationResultHolder.setValue(tDigest);
-        for (int i = 1; i < length; i++) {
-          tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]));
-        }
-      }
+        return tDigest;
+      });
     }
   }
 
@@ -131,22 +137,26 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        getDefaultTDigest(groupByResultHolder, groupKeyArray[i], _compressionFactor).add(doubleValues[i]);
-      }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          getDefaultTDigest(groupByResultHolder, groupKeyArray[i], _compressionFactor).add(doubleValues[i]);
+        }
+      });
     } else {
       // Serialized TDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]);
-        int groupKey = groupKeyArray[i];
-        TDigest tDigest = groupByResultHolder.getResult(groupKey);
-        if (tDigest != null) {
-          tDigest.add(value);
-        } else {
-          groupByResultHolder.setValueForKey(groupKey, value);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]);
+          int groupKey = groupKeyArray[i];
+          TDigest tDigest = groupByResultHolder.getResult(groupKey);
+          if (tDigest != null) {
+            tDigest.add(value);
+          } else {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
         }
-      }
+      });
     }
   }
 
@@ -156,27 +166,31 @@ public class PercentileTDigestAggregationFunction extends BaseSingleInputAggrega
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        double value = doubleValues[i];
-        for (int groupKey : groupKeysArray[i]) {
-          getDefaultTDigest(groupByResultHolder, groupKey, _compressionFactor).add(value);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          double value = doubleValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            getDefaultTDigest(groupByResultHolder, groupKey, _compressionFactor).add(value);
+          }
         }
-      }
+      });
     } else {
       // Serialized QuantileDigest
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]);
-        for (int groupKey : groupKeysArray[i]) {
-          TDigest tDigest = groupByResultHolder.getResult(groupKey);
-          if (tDigest != null) {
-            tDigest.add(value);
-          } else {
-            // Create a new TDigest for the group
-            groupByResultHolder.setValueForKey(groupKey, ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]));
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            TDigest tDigest = groupByResultHolder.getResult(groupKey);
+            if (tDigest != null) {
+              tDigest.add(value);
+            } else {
+              // Create a new TDigest for the group
+              groupByResultHolder.setValueForKey(groupKey, ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(bytesValues[i]));
+            }
           }
         }
-      }
+      });
     }
   }
 

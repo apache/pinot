@@ -16,36 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner;
-
-import org.apache.pinot.query.planner.plannode.PlanNode;
+package org.apache.pinot.core.query.aggregation.function;
 
 
-/**
- * The {@code QueryPlan} is the logical query plan from the result of
- * {@link org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner}.
- *
- */
-public class QueryPlan {
-  private final PlanNode _planRoot;
-  private final QueryPlanMetadata _queryPlanMetadata;
-
-  public QueryPlan(PlanNode queryPlanRoot, QueryPlanMetadata queryPlanMetadata) {
-    _planRoot = queryPlanRoot;
-    _queryPlanMetadata = queryPlanMetadata;
+public class PercentileKLLAggregationFunctionTest extends AbstractPercentileAggregationFunctionTest {
+  @Override
+  public String callStr(String column, int percent) {
+    return "PERCENTILEKLL(" + column + ", " + percent + ")";
   }
 
-  /**
-   * Get the root node of the query plan.
-   */
-  public PlanNode getPlanRoot() {
-    return _planRoot;
+  @Override
+  String expectedAggrWithNull10(Scenario scenario) {
+    return "0";
   }
 
-  /**
-   * Get the metadata of the query plan.
-   */
-  public QueryPlanMetadata getPlanMetadata() {
-    return _queryPlanMetadata;
+  @Override
+  String expectedAggrWithNull30(Scenario scenario) {
+    return "2";
+  }
+
+  @Override
+  String expectedAggrWithNull50(Scenario scenario) {
+    return "4";
+  }
+
+  @Override
+  String expectedAggrWithNull70(Scenario scenario) {
+    return "6";
   }
 }

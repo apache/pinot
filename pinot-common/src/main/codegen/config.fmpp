@@ -17,7 +17,11 @@
 # under the License.
 #
 
+# Copied from Calcite 1.36.0 babel and modified for Pinot syntax. Update this file when upgrading Calcite version.
+
 data: {
+  default: tdd("../default_config.fmpp")
+
   # Data declarations for this parser.
   #
   # Default declarations are in default_config.fmpp; if you do not include a
@@ -28,24 +32,28 @@ data: {
     package: "org.apache.pinot.sql.parsers.parser",
     class: "SqlParserImpl",
 
-    # List of import statements.
+    # List of additional classes and packages to import.
+    # Example: "org.apache.calcite.sql.*", "java.util.List".
     imports: [
-      "com.google.common.collect.*"
       "org.apache.pinot.sql.parsers.parser.*"
-      "java.util.*"
     ]
 
-    # List of new keywords to add
+    # List of new keywords. Example: "DATABASES", "TABLES". If the keyword is
+    # not a reserved keyword, add it to the 'nonReservedKeywords' section.
     keywords: [
       "FILE"
       "ARCHIVE"
     ]
 
-    # List of non-reserved keywords to add
+    # List of non-reserved keywords to add;
+    # items in this list become non-reserved
     nonReservedKeywordsToAdd: [
-      # customized for Pinot
       "FILE"
       "ARCHIVE"
+      # Pinot allows using DEFAULT as the catalog name
+      "DEFAULT_"
+      # Pinot allows using DATETIME as column name
+      "DATETIME"
 
       # The following keywords are reserved in core Calcite,
       # are reserved in some version of SQL,
@@ -132,6 +140,7 @@ data: {
       "CONSTRAINTS"
       "CONSTRUCTOR"
       "CONTAINS"
+      "CONTAINS_SUBSTR"
       "CONTINUE"
       "CONVERT"
       "CORR"
@@ -159,12 +168,13 @@ data: {
       "CYCLE"
       "DATA"
 #     "DATE"
+      "DATETIME_DIFF"
       "DAY"
       "DEALLOCATE"
       "DEC"
       "DECIMAL"
       "DECLARE"
-      "DEFAULT_"
+#     "DEFAULT"
       "DEFERRABLE"
       "DEFERRED"
 #     "DEFINE"
@@ -239,7 +249,6 @@ data: {
       "HOLD"
       "HOUR"
       "IDENTITY"
-#     "IF" # not a keyword in Calcite
       "ILIKE"
       "IMMEDIATE"
       "IMMEDIATELY"
@@ -466,7 +475,11 @@ data: {
       "TEMPORARY"
 #     "THEN"
 #     "TIME"
+      "TIME_DIFF"
+      "TIME_TRUNC"
 #     "TIMESTAMP"
+      "TIMESTAMP_DIFF"
+      "TIMESTAMP_TRUNC"
       "TIMEZONE_HOUR"
       "TIMEZONE_MINUTE"
       "TINYINT"
@@ -523,21 +536,99 @@ data: {
       "ZONE"
     ]
 
-    # List of extended statement syntax to add
+    # List of non-reserved keywords to remove;
+    # items in this list become reserved.
+    nonReservedKeywordsToRemove: [
+    ]
+
+    # List of additional join types. Each is a method with no arguments.
+    # Example: "LeftSemiJoin".
+    joinTypes: [
+    ]
+
+    # List of methods for parsing custom SQL statements.
+    # Return type of method implementation should be 'SqlNode'.
+    # Example: "SqlShowDatabases()", "SqlShowTables()".
     statementParserMethods: [
       "SqlInsertFromFile()"
       "SqlPhysicalExplain()"
     ]
 
-    # List of custom function syntax to add
+    # List of methods for parsing custom literals.
+    # Return type of method implementation should be "SqlNode".
+    # Example: ParseJsonLiteral().
+    literalParserMethods: [
+    ]
+
+    # List of methods for parsing custom data types.
+    # Return type of method implementation should be "SqlTypeNameSpec".
+    # Example: SqlParseTimeStampZ().
+    dataTypeParserMethods: [
+    ]
+
+    # List of methods for parsing builtin function calls.
+    # Return type of method implementation should be "SqlNode".
+    # Example: "DateTimeConstructorCall()".
+    builtinFunctionCallMethods: [
+    ]
+
+    # List of methods for parsing extensions to "ALTER <scope>" calls.
+    # Each must accept arguments "(SqlParserPos pos, String scope)".
+    # Example: "SqlAlterTable".
+    alterStatementParserMethods: [
+    ]
+
+    # List of methods for parsing extensions to "CREATE [OR REPLACE]" calls.
+    # Each must accept arguments "(SqlParserPos pos, boolean replace)".
+    # Example: "SqlCreateForeignSchema".
+    createStatementParserMethods: [
+    ]
+
+    # List of methods for parsing extensions to "DROP" calls.
+    # Each must accept arguments "(SqlParserPos pos)".
+    # Example: "SqlDropSchema".
+    dropStatementParserMethods: [
+    ]
+
+    # List of methods for parsing extensions to "TRUNCATE" calls.
+    # Each must accept arguments "(SqlParserPos pos)".
+    # Example: "SqlTruncate".
+    truncateStatementParserMethods: [
+    ]
+
+    # Binary operators tokens.
+    # Example: "< INFIX_CAST: \"::\" >".
+    binaryOperatorsTokens: [
+    ]
+
+    # Binary operators initialization.
+    # Example: "InfixCast".
     extraBinaryExpressions: [
       "SqlAtTimeZone"
     ]
 
     # List of files in @includes directory that have parser method
+    # implementations for parsing custom SQL statements, literals or types
+    # given as part of "statementParserMethods", "literalParserMethods" or
+    # "dataTypeParserMethods".
+    # Example: "parserImpls.ftl".
     implementationFiles: [
       "parserImpls.ftl"
-    ],
+    ]
+
+    # Custom identifier token.
+    #
+    # PostgreSQL allows letters with diacritical marks and non-Latin letters
+    # in the beginning of identifier and additionally dollar sign in the rest of identifier.
+    # Letters with diacritical marks and non-Latin letters
+    # are represented by character codes 128 to 255 (or in octal \200 to \377).
+    # See https://learn.microsoft.com/en-gb/office/vba/language/reference/user-interface-help/character-set-128255
+    # See https://github.com/postgres/postgres/blob/master/src/backend/parser/scan.l
+    #
+    # MySQL allows digit in the beginning of identifier
+    customIdentifierToken: "< IDENTIFIER: (<LETTER>|<DIGIT>|[\"\\200\"-\"\\377\"]) (<LETTER>|<DIGIT>|<DOLLAR>|[\"\\200\"-\"\\377\"])* >"
+
+    includeParsingStringLiteralAsArrayLiteral: true
   }
 }
 
