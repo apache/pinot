@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.blocks;
 
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.testng.Assert;
 
 
@@ -28,7 +29,7 @@ public class TransferableBlockTestUtils {
   }
 
   public static TransferableBlock getEndOfStreamTransferableBlock() {
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(0);
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(MultiStageQueryStats.emptyStats(0));
   }
 
   public static void assertSuccessEos(TransferableBlock block) {

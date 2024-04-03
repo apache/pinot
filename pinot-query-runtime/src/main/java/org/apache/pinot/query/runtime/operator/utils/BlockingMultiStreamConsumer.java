@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.utils;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -259,14 +257,10 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected void onConsumerFinish(TransferableBlock element) {
-      try {
-        if (element.getQueryStats() != null) {
-          _stageStats.mergeUpstream(element.getQueryStats());
-        } else {
-          _stageStats.mergeUpstream(element.getSerializedStatsByStage());
-        }
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
+      if (element.getQueryStats() != null) {
+        _stageStats.mergeUpstream(element.getQueryStats());
+      } else {
+        _stageStats.mergeUpstream(element.getSerializedStatsByStage());
       }
     }
 

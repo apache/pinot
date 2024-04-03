@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.response.broker;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -212,6 +213,18 @@ public class BrokerResponseNative implements BrokerResponse {
   public long getRealtimeTotalCpuTimeNs() {
     return getRealtimeThreadCpuTimeNs() + getRealtimeSystemActivitiesCpuTimeNs()
         + getRealtimeResponseSerializationCpuTimeNs();
+  }
+
+  @JsonAnySetter
+  public void setServerStats(String key, Object value) {
+    switch (key) {
+      case "offlineTotalCpuTimeNs":
+      case "realtimeTotalCpuTimeNs":
+        LOGGER.debug("Ignoring server stat key: {} with value: {}", key, value);
+        break;
+      default:
+        throw new IllegalArgumentException("JSON field " + key + " not recognized");
+    }
   }
 
   @JsonProperty("numSegmentsPrunedByBroker")

@@ -28,6 +28,7 @@ import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -255,7 +256,7 @@ public class MultiStageQueryStats {
     }
   }
 
-  public void mergeUpstream(List<ByteBuffer> otherStats) throws IOException {
+  public void mergeUpstream(List<ByteBuffer> otherStats) {
     for (int i = 0; i <= _currentStageId && i < otherStats.size(); i++) {
       if (otherStats.get(i) != null) {
         throw new IllegalArgumentException("Cannot merge stats from early stage " + i + " into stats of "
@@ -278,8 +279,24 @@ public class MultiStageQueryStats {
             myStats.merge(dis);
           }
         } catch (IOException ex) {
+          boolean assertOn = false;
+          // *assigns* true if assertions are on.
+          //CHECKSTYLE:OFF
+          assert assertOn = true;
+          if (assertOn) {
+            throw new UncheckedIOException("Error deserializing stats on stage " + i, ex);
+          }
+          //CHECKSTYLE:ON
           LOGGER.warn("Error deserializing stats on stage " + i + ". Considering the new stats empty", ex);
         } catch (IllegalArgumentException | IllegalStateException ex) {
+          boolean assertOn = false;
+          // *assigns* true if assertions are on.
+          //CHECKSTYLE:OFF
+          assert assertOn = true;
+          if (assertOn) {
+            throw ex;
+          }
+          //CHECKSTYLE:ON
           LOGGER.warn("Error merging stats on stage " + i + ". Ignoring the new stats", ex);
         }
       }
@@ -477,14 +494,6 @@ public class MultiStageQueryStats {
       // There is also a dynamic check in the StatMap.merge() method.
       @SuppressWarnings("unchecked")
       public void merge(StageStats other) {
-        if (other._operatorTypes.isEmpty()) {
-          return;
-        }
-        if (_operatorTypes.isEmpty()) {
-          _operatorTypes.addAll(other._operatorTypes);
-          _operatorStats.addAll(other._operatorStats);
-          return;
-        }
         Preconditions.checkState(_operatorTypes.equals(other._operatorTypes), "Cannot merge stats from "
             + "different stages. Found types %s and %s", _operatorTypes, other._operatorTypes);
         for (int i = 0; i < _operatorStats.size(); i++) {
@@ -497,21 +506,9 @@ public class MultiStageQueryStats {
       public void merge(DataInputStream input)
           throws IOException {
         int numOperators = input.readInt();
-        if (_operatorTypes.isEmpty()) {
-          for (int i = 0; i < numOperators; i++) {
-            _operatorTypes.add(MultiStageOperator.Type.values()[input.readByte()]);
-          }
-          for (int i = 0; i < numOperators; i++) {
-            if (input.readBoolean()) {
-              _operatorStats.add(_operatorTypes.get(i).deserializeStats(input));
-            } else {
-              _operatorStats.add(_operatorTypes.get(i).emptyStats());
-            }
-          }
-          return;
-        }
         Preconditions.checkState(numOperators == _operatorTypes.size(),
-            "Cannot merge stats from stages with different operators");
+            "Cannot merge stats from stages with different operators. Expected %s operators, got %s",
+            _operatorStats.size(), numOperators);
         for (int i = 0; i < numOperators; i++) {
           MultiStageOperator.Type expectedType = MultiStageOperator.Type.values()[input.readByte()];
           Preconditions.checkState(expectedType == _operatorTypes.get(i),

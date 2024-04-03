@@ -94,7 +94,7 @@ public abstract class BlockExchange {
       for (int i = 0; i < numMailboxes; i++) {
         SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
         TransferableBlock blockToSend =
-            i == mailboxIdToSendMetadata ? block : TransferableBlockUtils.getEndOfStreamTransferableBlock(stageId);
+            i == mailboxIdToSendMetadata ? block : TransferableBlockUtils.getEndOfStreamTransferableBlock();
         sendBlock(sendingMailbox, blockToSend);
       }
       return false;
