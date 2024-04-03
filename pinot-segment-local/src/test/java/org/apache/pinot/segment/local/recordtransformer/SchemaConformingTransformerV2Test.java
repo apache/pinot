@@ -87,6 +87,9 @@ public class SchemaConformingTransformerV2Test {
           .set(TEST_JSON_NULL_FIELD_NAME, TEST_JSON_NULL_NODE).set(TEST_JSON_STRING_FIELD_NAME, TEST_JSON_STRING_NODE)
           .set(TEST_JSON_INT_NO_IDX_FIELD_NAME, TEST_INT_NODE)
           .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE);
+  static {
+    ServerMetrics.register(mock(ServerMetrics.class));
+  }
   private static final SchemaConformingTransformerV2 _RECORD_TRANSFORMER =
       new SchemaConformingTransformerV2(createDefaultBasicTableConfig(), createDefaultSchema());
 
@@ -369,8 +372,7 @@ public class SchemaConformingTransformerV2Test {
         "[0, 1, 2, 3]:arrayField", "a:stringField",
         "[0, 1, 2, 3]:mapField.arrayField", "a:mapField.stringField",
         "[0, 1, 2, 3]:nestedFields.arrayField", "a:nestedFields.stringField",
-        "[0, 1, 2, 3]:nestedFields.mapField.arrayField", "a:nestedFields
-        .mapField.stringField",
+        "[0, 1, 2, 3]:nestedFields.mapField.arrayField", "a:nestedFields.mapField.stringField",
       ]
     }
     */
@@ -450,11 +452,10 @@ public class SchemaConformingTransformerV2Test {
         }
       },
       __mergedTextIndex: [
-        "a:stringField",
-        "[0,1,2,3]:mapField.arrayField", "a:mapField.stringField",
-        "[0,1,2,3]:nestedFields.arrayField",
-        "[0,1,2,3]:nestedFields.mapField.arrayField", "a:nestedFields
-        .mapField.stringField"
+        "[0, 1, 2, 3]:arrayField", "a:stringField",
+        "[0, 1, 2, 3]:mapField.arrayField", "a:mapField.stringField",
+        "[0, 1, 2, 3]:nestedFields.arrayField", "a:nestedFields.stringField",
+        "[0, 1, 2, 3]:nestedFields.mapField.arrayField", "a:nestedFields.mapField.stringField",
       ]
     }
     */
@@ -478,9 +479,9 @@ public class SchemaConformingTransformerV2Test {
     transformWithUnIndexableFieldsAndMergedTextIndex(schemaBuilder.build(), inputJsonNode, expectedJsonNode);
 
     expectedJsonNodeWithMergedTextIndex = expectedJsonNode.deepCopy().set(MERGED_TEXT_INDEX_FIELD_NAME,
-        N.arrayNode().add("a:stringField").add("[0,1,2,3]:mapField.arrayField").add("a:mapField.stringField")
-            .add("[0,1,2,3]:nestedFields.arrayField").add("[0,1,2,3]:nestedFields.mapField.arrayField")
-            .add("a:nestedFields.mapField.stringField"));
+        N.arrayNode().add("[0,1,2,3]:arrayField").add("a:stringField").add("[0,1,2,3]:mapField.arrayField")
+            .add("a:mapField.stringField").add("[0,1,2,3]:nestedFields.arrayField").add("a:nestedFields.stringField")
+            .add("[0,1,2,3]:nestedFields.mapField.arrayField").add("a:nestedFields.mapField.stringField"));
     transformWithUnIndexableFieldsAndMergedTextIndex(
         schemaBuilder.addMultiValueDimension(MERGED_TEXT_INDEX_FIELD_NAME, DataType.STRING).build(), inputJsonNode,
         expectedJsonNodeWithMergedTextIndex);
@@ -538,9 +539,10 @@ public class SchemaConformingTransformerV2Test {
         }
       },
       __mergedTextIndex: [
-        "[0,1,2,3]:mapField.arrayField", "a:mapField.stringField",
-        "[0,1,2,3]:nestedFields.mapField.arrayField", "a:nestedFields
-        .mapField.stringField",
+        "[0, 1, 2, 3]:arrayField", "a:stringField",
+        "[0, 1, 2, 3]:mapField.arrayField", "a:mapField.stringField",
+        "[0, 1, 2, 3]:nestedFields.arrayField", "a:nestedFields.stringField",
+        "[0, 1, 2, 3]:nestedFields.mapField.arrayField", "a:nestedFields.mapField.stringField",
       ]
     }
     */
@@ -564,7 +566,8 @@ public class SchemaConformingTransformerV2Test {
                     .set(TEST_JSON_MAP_FIELD_NAME, TEST_JSON_MAP_NO_IDX_NODE)));
     transformWithUnIndexableFieldsAndMergedTextIndex(schemaBuilder.build(), inputJsonNode, expectedJsonNode);
     expectedJsonNodeWithMergedTextIndex = expectedJsonNode.deepCopy().set(MERGED_TEXT_INDEX_FIELD_NAME,
-        N.arrayNode().add("[0,1,2,3]:mapField.arrayField").add("a:mapField.stringField")
+        N.arrayNode().add("[0,1,2,3]:arrayField").add("a:stringField").add("[0,1,2,3]:mapField.arrayField")
+            .add("a:mapField.stringField").add("[0,1,2,3]:nestedFields.arrayField").add("a:nestedFields.stringField")
             .add("[0,1,2,3]:nestedFields.mapField.arrayField").add("a:nestedFields.mapField.stringField"));
     transformWithUnIndexableFieldsAndMergedTextIndex(
         schemaBuilder.addMultiValueDimension(MERGED_TEXT_INDEX_FIELD_NAME, DataType.STRING).build(), inputJsonNode,
@@ -679,9 +682,9 @@ public class SchemaConformingTransformerV2Test {
         }
       },
       __mergedTextIndex: [
-        "a:stringField",
-        "[0,1,2,3]:mapField.arrayField", "a:mapField.stringField",
-        "[0,1,2,3]:nestedFields.arrayField",
+        "[0, 1, 2, 3]:arrayField", "a:stringField",
+        "[0, 1, 2, 3]:mapField.arrayField", "a:mapField.stringField",
+        "[0, 1, 2, 3]:nestedFields.arrayField", "a:nestedFields.stringField",
       ]
     }
     */
@@ -702,8 +705,8 @@ public class SchemaConformingTransformerV2Test {
                     .set(TEST_JSON_STRING_NO_IDX_FIELD_NAME, TEST_JSON_STRING_NO_IDX_NODE)));
 
     expectedJsonNodeWithMergedTextIndex = expectedJsonNode.deepCopy().set(MERGED_TEXT_INDEX_FIELD_NAME,
-        N.arrayNode().add("a:stringField").add("[0,1,2,3]:mapField.arrayField").add("a:mapField.stringField")
-            .add("[0,1,2,3]:nestedFields.arrayField"));
+        N.arrayNode().add("[0,1,2,3]:arrayField").add("a:stringField").add("[0,1,2,3]:mapField.arrayField")
+            .add("a:mapField.stringField").add("[0,1,2,3]:nestedFields.arrayField").add("a:nestedFields.stringField"));
     transformKeyValueTransformation(
         schemaBuilder.addMultiValueDimension(MERGED_TEXT_INDEX_FIELD_NAME, DataType.STRING).build(), keyMapping,
         pathToDrop, inputJsonNode, expectedJsonNodeWithMergedTextIndex);

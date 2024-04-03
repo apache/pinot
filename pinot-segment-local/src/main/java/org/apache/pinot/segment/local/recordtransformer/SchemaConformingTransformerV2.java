@@ -182,7 +182,9 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     validateSchemaFieldNames(schema.getPhysicalColumnNames(), transformerConfig);
 
     String indexableExtrasFieldName = transformerConfig.getIndexableExtrasField();
-    SchemaConformingTransformer.getAndValidateExtrasFieldType(schema, indexableExtrasFieldName);
+    if (null != indexableExtrasFieldName) {
+      SchemaConformingTransformer.getAndValidateExtrasFieldType(schema, indexableExtrasFieldName);
+    }
     String unindexableExtrasFieldName = transformerConfig.getUnindexableExtrasField();
     if (null != unindexableExtrasFieldName) {
       SchemaConformingTransformer.getAndValidateExtrasFieldType(schema, indexableExtrasFieldName);
@@ -364,6 +366,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   private ExtraFieldsContainer processField(SchemaTreeNode parentNode, Deque<String> jsonPath, Object value,
       boolean isIndexable, GenericRow outputRecord, Map<String, Object> mergedTextIndexMap) {
     // Common variables
+    boolean storeIndexableExtras = _transformerConfig.getIndexableExtrasField() != null;
     boolean storeUnindexableExtras = _transformerConfig.getUnindexableExtrasField() != null;
     String key = jsonPath.peekLast();
     ExtraFieldsContainer extraFieldsContainer = new ExtraFieldsContainer(storeUnindexableExtras);
@@ -394,10 +397,13 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
           if (_transformerConfig.getFieldsToDoubleIngest().contains(keyJsonPath)) {
             extraFieldsContainer.addIndexableEntry(key, value);
           }
+          mergedTextIndexMap.put(keyJsonPath, value);
         } else {
           // Out of schema
-          mergedTextIndexMap.put(keyJsonPath, value);
-          extraFieldsContainer.addIndexableEntry(key, value);
+          if (storeIndexableExtras) {
+            extraFieldsContainer.addIndexableEntry(key, value);
+            mergedTextIndexMap.put(keyJsonPath, value);
+          }
         }
       }
       return extraFieldsContainer;
