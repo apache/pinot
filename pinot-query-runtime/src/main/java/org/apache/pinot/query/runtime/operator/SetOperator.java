@@ -30,8 +30,8 @@ import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 

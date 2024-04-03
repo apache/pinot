@@ -89,7 +89,7 @@ public class AggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, outSchema, calls, group, AggType.DIRECT,
+        new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
             Collections.singletonList(-1), null);
 
     // When:
@@ -110,7 +110,7 @@ public class AggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, outSchema, calls, group, AggType.DIRECT,
+        new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
             Collections.singletonList(-1), null);
 
     // When:
@@ -133,7 +133,7 @@ public class AggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, outSchema, calls, group, AggType.DIRECT,
+        new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
             Collections.singletonList(-1), null);
 
     // When:
@@ -161,7 +161,7 @@ public class AggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, outSchema, calls, group, AggType.DIRECT,
+        new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
             Collections.singletonList(-1), null);
 
     // When:
@@ -193,7 +193,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "sum", "sumWithFilter"}, new ColumnDataType[]{INT, DOUBLE, DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, outSchema, calls, group, AggType.DIRECT,
+        new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
             filterArgIds, null);
 
     // When:
@@ -214,7 +214,7 @@ public class AggregateOperatorTest {
     RexExpression.FunctionCall agg = getSum(new RexExpression.InputRef(0));
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{STRING, DOUBLE});
     AggregateOperator sum0GroupBy1 =
-        new AggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), upstreamOperator, outSchema,
+        new AggregateOperator(OperatorTestUtil.getTracingContext(), upstreamOperator, outSchema,
             Collections.singletonList(agg), Collections.singletonList(new RexExpression.InputRef(1)), AggType.DIRECT,
             Collections.singletonList(-1), null);
     TransferableBlock result = sum0GroupBy1.getNextBlock();
@@ -238,7 +238,7 @@ public class AggregateOperatorTest {
     DataSchema outSchema = new DataSchema(new String[]{"unknown"}, new ColumnDataType[]{DOUBLE});
 
     // When:
-    new AggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, outSchema, calls, group, AggType.DIRECT,
+    new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group, AggType.DIRECT,
         Collections.singletonList(-1), null);
   }
 
@@ -257,7 +257,7 @@ public class AggregateOperatorTest {
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
-        new AggregateOperator(OperatorTestUtil.getDefaultContextWithTracing(), _input, outSchema, calls, group,
+        new AggregateOperator(OperatorTestUtil.getTracingContext(), _input, outSchema, calls, group,
             AggType.INTERMEDIATE, Collections.singletonList(-1), null);
 
     // When:
@@ -282,7 +282,7 @@ public class AggregateOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
-    OpChainExecutionContext context = OperatorTestUtil.getDefaultContextWithTracing();
+    OpChainExecutionContext context = OperatorTestUtil.getTracingContext();
     Map<String, String> hintsMap = ImmutableMap.of(PinotHintOptions.AggregateOptions.NUM_GROUPS_LIMIT, "1");
     AggregateOperator operator =
         new AggregateOperator(context, _input, outSchema, calls, group, AggType.DIRECT, Collections.singletonList(-1),
@@ -298,9 +298,9 @@ public class AggregateOperatorTest {
     // Then:
     Assert.assertEquals(block1.getNumRows(), 1, "when group limit reach it should only return that many groups");
     Assert.assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
-    StatMap<AggregateOperator.AggregateStats> aggrStats =
-        OperatorTestUtil.getStatMap(AggregateOperator.AggregateStats.class, block2);
-    Assert.assertTrue(aggrStats.getBoolean(AggregateOperator.AggregateStats.NUM_GROUPS_LIMIT_REACHED),
+    StatMap<AggregateOperator.StatKey> aggrStats =
+        OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, block2);
+    Assert.assertTrue(aggrStats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED),
         "num groups limit should be reached");
   }
 

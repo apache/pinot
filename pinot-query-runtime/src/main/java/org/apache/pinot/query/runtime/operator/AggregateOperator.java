@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
  * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
  */
-public class AggregateOperator extends MultiStageOperator<AggregateOperator.AggregateStats> {
+public class AggregateOperator extends MultiStageOperator<AggregateOperator.StatKey> {
   private static final Logger LOGGER = LoggerFactory.getLogger(AggregateOperator.class);
   private static final String EXPLAIN_NAME = "AGGREGATE_OPERATOR";
   private static final CountAggregationFunction COUNT_STAR_AGG_FUNCTION =
@@ -123,14 +123,14 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Aggr
   }
 
   @Override
-  public Class<AggregateStats> getStatKeyClass() {
-    return AggregateStats.class;
+  public Class<StatKey> getStatKeyClass() {
+    return StatKey.class;
   }
 
   @Override
   protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.merge(AggregateStats.EXECUTION_TIME_MS, executionTimeMs);
-    _statMap.merge(AggregateStats.EMITTED_ROWS, block.getNumRows());
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, executionTimeMs);
+    _statMap.merge(StatKey.EMITTED_ROWS, block.getNumRows());
   }
 
   @Override
@@ -181,7 +181,7 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Aggr
       } else {
         TransferableBlock dataBlock = new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
         if (_groupByExecutor.isNumGroupsLimitReached()) {
-          _statMap.merge(AggregateStats.NUM_GROUPS_LIMIT_REACHED, true);
+          _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, true);
           _inputOperator.earlyTerminate();
         }
         return dataBlock;
@@ -435,14 +435,14 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Aggr
     }
   }
 
-  public enum AggregateStats implements StatMap.Key {
+  public enum StatKey implements StatMap.Key {
     EXECUTION_TIME_MS(StatMap.Type.LONG),
     EMITTED_ROWS(StatMap.Type.LONG),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 
-    AggregateStats(StatMap.Type type) {
+    StatKey(StatMap.Type type) {
       _type = type;
     }
 

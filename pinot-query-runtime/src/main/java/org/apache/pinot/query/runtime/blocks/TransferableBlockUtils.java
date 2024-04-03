@@ -20,8 +20,6 @@ package org.apache.pinot.query.runtime.blocks;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;

@@ -29,7 +29,6 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
-import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

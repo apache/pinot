@@ -72,7 +72,7 @@ public class IntersectOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getDefaultContextWithTracing(), ImmutableList.of(_leftOperator, _rightOperator),
+        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
 
     TransferableBlock result = intersectOperator.nextBlock();
@@ -102,7 +102,7 @@ public class IntersectOperatorTest {
         .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
 
     IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getDefaultContextWithTracing(), ImmutableList.of(_leftOperator, _rightOperator),
+        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
 
     TransferableBlock result = intersectOperator.nextBlock();

@@ -21,7 +21,6 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -86,11 +85,8 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
-import org.apache.pinot.query.runtime.operator.IntersectOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
-import org.apache.pinot.query.runtime.operator.MinusOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
-import org.apache.pinot.query.runtime.operator.UnionOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.query.type.TypeFactory;
@@ -302,10 +298,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         int childrenSize = node.getInputs().size();
         switch (childrenSize) {
           case 0:
-            LOGGER.warn("Skipping unexpected node {} when stat of type {} was found at index {}", node.getClass(), type, _index);
+            LOGGER.warn("Skipping unexpected node {} when stat of type {} was found at index {}",
+                node.getClass(), type, _index);
             return JsonUtils.newObjectNode();
           case 1:
-            LOGGER.warn("Skipping unexpected node {} when stat of type {} was found at index {}", node.getClass(), type, _index);
+            LOGGER.warn("Skipping unexpected node {} when stat of type {} was found at index {}",
+                node.getClass(), type, _index);
             return node.getInputs().get(0).visit(this, null);
           default:
             throw new IllegalStateException("Expected operator type: " + expectedType + ", but got: " + type + " with "
@@ -496,25 +494,25 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     @Override
-    public void visitAggregate(StatMap<AggregateOperator.AggregateStats> stats, BrokerResponseNativeV2 response) {
-      response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.AggregateStats.NUM_GROUPS_LIMIT_REACHED));
-      response.mergeMaxRows(stats.getLong(AggregateOperator.AggregateStats.EMITTED_ROWS));
+    public void visitAggregate(StatMap<AggregateOperator.StatKey> stats, BrokerResponseNativeV2 response) {
+      response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
+      response.mergeMaxRows(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
     }
 
     @Override
-    public void visitHashJoin(StatMap<HashJoinOperator.HashJoinStats> stats, BrokerResponseNativeV2 response) {
-      response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.HashJoinStats.MAX_ROWS_IN_JOIN_REACHED));
-      response.mergeMaxRows(stats.getLong(HashJoinOperator.HashJoinStats.EMITTED_ROWS));
+    public void visitHashJoin(StatMap<HashJoinOperator.StatKey> stats, BrokerResponseNativeV2 response) {
+      response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
+      response.mergeMaxRows(stats.getLong(HashJoinOperator.StatKey.EMITTED_ROWS));
     }
 
     @Override
-    public void visitMailboxReceive(StatMap<BaseMailboxReceiveOperator.StatKey> statMap, BrokerResponseNativeV2 arg) {
-
+    public void visitMailboxReceive(StatMap<BaseMailboxReceiveOperator.StatKey> stats, BrokerResponseNativeV2 res) {
+      res.mergeMaxRows(stats.getLong(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS));
     }
 
     @Override
-    public void visitMailboxSend(StatMap<MailboxSendOperator.StatKey> statMap, BrokerResponseNativeV2 arg) {
-
+    public void visitMailboxSend(StatMap<MailboxSendOperator.StatKey> stats, BrokerResponseNativeV2 response) {
+      response.mergeMaxRows(stats.getLong(MailboxSendOperator.StatKey.EMITTED_ROWS));
     }
   }
 }

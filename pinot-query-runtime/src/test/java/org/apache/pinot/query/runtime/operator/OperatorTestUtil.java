@@ -31,8 +31,8 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.testutils.MockDataBlockOperatorFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
@@ -85,15 +85,15 @@ public class OperatorTestUtil {
         stageMetadata.getWorkerMetadataList().get(0), null);
   }
 
-  public static OpChainExecutionContext getDefaultContextWithTracing() {
-    return getDefaultContextWithTracing(ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"));
+  public static OpChainExecutionContext getTracingContext() {
+    return getTracingContext(ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"));
   }
 
-  public static OpChainExecutionContext getDefaultContextWithTracingDisabled() {
-    return getDefaultContextWithTracing(ImmutableMap.of());
+  public static OpChainExecutionContext getNoTracingContext() {
+    return getTracingContext(ImmutableMap.of());
   }
 
-  private static OpChainExecutionContext getDefaultContextWithTracing(Map<String, String> opChainMetadata) {
+  private static OpChainExecutionContext getTracingContext(Map<String, String> opChainMetadata) {
     MailboxService mailboxService = mock(MailboxService.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(1234);

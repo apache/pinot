@@ -69,7 +69,7 @@ public class TransformOperatorTest {
     // Output column value
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
     RexExpression.InputRef ref1 = new RexExpression.InputRef(1);
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContextWithTracing(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(ref0, ref1), upStreamSchema);
     TransferableBlock result = op.nextBlock();
 
@@ -93,7 +93,7 @@ public class TransformOperatorTest {
     // Set up literal operands
     RexExpression.Literal boolLiteral = new RexExpression.Literal(ColumnDataType.BOOLEAN, 1);
     RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContextWithTracing(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     // Literal operands should just output original literals.
@@ -122,7 +122,7 @@ public class TransformOperatorTest {
         new RexExpression.FunctionCall(MINUS, ColumnDataType.DOUBLE, "minus", functionOperands);
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContextWithTracing(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(plus01, minus01), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(!result.isErrorBlock());
@@ -150,7 +150,7 @@ public class TransformOperatorTest {
         new RexExpression.FunctionCall(MINUS, ColumnDataType.DOUBLE, "minus", functionOperands);
     DataSchema resultSchema = new DataSchema(new String[]{"plusR", "minusR"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContextWithTracing(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(plus01, minus01), upStreamSchema);
 
     TransferableBlock result = op.nextBlock();
@@ -169,7 +169,7 @@ public class TransformOperatorTest {
     RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContextWithTracing(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     Assert.assertTrue(result.isErrorBlock());
@@ -190,7 +190,7 @@ public class TransformOperatorTest {
     RexExpression.Literal strLiteral = new RexExpression.Literal(ColumnDataType.STRING, "str");
     DataSchema resultSchema = new DataSchema(new String[]{"boolCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.BOOLEAN, ColumnDataType.STRING});
-    TransformOperator op = new TransformOperator(OperatorTestUtil.getDefaultContextWithTracing(), _upstreamOp, resultSchema,
+    TransformOperator op = new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema,
         ImmutableList.of(boolLiteral, strLiteral), upStreamSchema);
     TransferableBlock result = op.nextBlock();
     // First block has two rows
@@ -219,7 +219,7 @@ public class TransformOperatorTest {
     DataSchema upStreamSchema = new DataSchema(new String[]{"string1", "string2"}, new ColumnDataType[]{
         ColumnDataType.STRING, ColumnDataType.STRING
     });
-    new TransformOperator(OperatorTestUtil.getDefaultContextWithTracing(), _upstreamOp, resultSchema, new ArrayList<>(),
+    new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema, new ArrayList<>(),
         upStreamSchema);
   }
 
@@ -232,7 +232,7 @@ public class TransformOperatorTest {
         ColumnDataType.STRING, ColumnDataType.STRING
     });
     RexExpression.InputRef ref0 = new RexExpression.InputRef(0);
-    new TransformOperator(OperatorTestUtil.getDefaultContextWithTracing(), _upstreamOp, resultSchema, ImmutableList.of(ref0),
+    new TransformOperator(OperatorTestUtil.getTracingContext(), _upstreamOp, resultSchema, ImmutableList.of(ref0),
         upStreamSchema);
   }
 };

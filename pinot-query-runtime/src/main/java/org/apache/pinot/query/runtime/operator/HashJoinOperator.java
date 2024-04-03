@@ -45,8 +45,8 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
-import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 import org.slf4j.Logger;
@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 // TODO: Support memory size based resource limit.
-public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJoinStats> {
+public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKey> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HashJoinOperator.class);
   private static final String EXPLAIN_NAME = "HASH_JOIN";
@@ -155,14 +155,14 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJo
   }
 
   @Override
-  public Class<HashJoinStats> getStatKeyClass() {
-    return HashJoinStats.class;
+  public Class<StatKey> getStatKeyClass() {
+    return StatKey.class;
   }
 
   @Override
   protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.merge(HashJoinStats.EXECUTION_TIME_MS, executionTimeMs);
-    _statMap.merge(HashJoinStats.EMITTED_ROWS, block.getNumRows());
+    _statMap.merge(StatKey.EXECUTION_TIME_MS, executionTimeMs);
+    _statMap.merge(StatKey.EMITTED_ROWS, block.getNumRows());
   }
 
   @Override
@@ -253,7 +253,7 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJo
           // Just fill up the buffer.
           int remainingRows = _maxRowsInHashTable - _currentRowsInHashTable;
           container = container.subList(0, remainingRows);
-          _statMap.merge(HashJoinStats.MAX_ROWS_IN_JOIN_REACHED, true);
+          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
           // setting only the rightTableOperator to be early terminated and awaits EOS block next.
           _rightTableOperator.earlyTerminate();
         }
@@ -427,14 +427,14 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.HashJo
     return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL;
   }
 
-  public enum HashJoinStats implements StatMap.Key {
+  public enum StatKey implements StatMap.Key {
     EXECUTION_TIME_MS(StatMap.Type.LONG),
     EMITTED_ROWS(StatMap.Type.LONG),
     MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;
 
-    HashJoinStats(StatMap.Type type) {
+    StatKey(StatMap.Type type) {
       _type = type;
     }
 

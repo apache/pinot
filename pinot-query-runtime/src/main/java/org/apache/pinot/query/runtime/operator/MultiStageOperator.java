@@ -29,8 +29,8 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -170,27 +170,27 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
   public enum Type {
     AGGREGATE {
       @Override
-      public StatMap<AggregateOperator.AggregateStats> deserializeStats(DataInput input)
+      public StatMap<AggregateOperator.StatKey> deserializeStats(DataInput input)
           throws IOException {
-        return StatMap.deserialize(input, AggregateOperator.AggregateStats.class);
+        return StatMap.deserialize(input, AggregateOperator.StatKey.class);
       }
 
       @Override
-      public StatMap<AggregateOperator.AggregateStats> emptyStats() {
-        return new StatMap<>(AggregateOperator.AggregateStats.class);
+      public StatMap<AggregateOperator.StatKey> emptyStats() {
+        return new StatMap<>(AggregateOperator.StatKey.class);
       }
     },
     FILTER,
     HASH_JOIN {
       @Override
-      public StatMap<HashJoinOperator.HashJoinStats> deserializeStats(DataInput input)
+      public StatMap<HashJoinOperator.StatKey> deserializeStats(DataInput input)
           throws IOException {
-        return StatMap.deserialize(input, HashJoinOperator.HashJoinStats.class);
+        return StatMap.deserialize(input, HashJoinOperator.StatKey.class);
       }
 
       @Override
-      public StatMap<HashJoinOperator.HashJoinStats> emptyStats() {
-        return new StatMap<>(HashJoinOperator.HashJoinStats.class);
+      public StatMap<HashJoinOperator.StatKey> emptyStats() {
+        return new StatMap<>(HashJoinOperator.StatKey.class);
       }
     },
     INTERSECT,

@@ -390,10 +390,10 @@ public class MultiStageQueryStats {
         }
         switch (type) {
           case AGGREGATE:
-            visitor.visitAggregate((StatMap<AggregateOperator.AggregateStats>) statMap, arg);
+            visitor.visitAggregate((StatMap<AggregateOperator.StatKey>) statMap, arg);
             break;
           case HASH_JOIN:
-            visitor.visitHashJoin((StatMap<HashJoinOperator.HashJoinStats>) statMap, arg);
+            visitor.visitHashJoin((StatMap<HashJoinOperator.StatKey>) statMap, arg);
             break;
           case LEAF:
             visitor.visitLeaf((StatMap<DataTable.MetadataKey>) statMap, arg);
@@ -533,8 +533,8 @@ public class MultiStageQueryStats {
   public interface StatsVisitor<A> {
     void visitBase(StatMap<MultiStageOperator.BaseStatKeys> stats, A arg);
     void visitLeaf(StatMap<DataTable.MetadataKey> stats, A arg);
-    void visitAggregate(StatMap<AggregateOperator.AggregateStats> stats, A arg);
-    void visitHashJoin(StatMap<HashJoinOperator.HashJoinStats> stats, A arg);
+    void visitAggregate(StatMap<AggregateOperator.StatKey> stats, A arg);
+    void visitHashJoin(StatMap<HashJoinOperator.StatKey> stats, A arg);
     void visitMailboxReceive(StatMap<BaseMailboxReceiveOperator.StatKey> statMap, A arg);
     void visitMailboxSend(StatMap<MailboxSendOperator.StatKey> statMap, A arg);
   }

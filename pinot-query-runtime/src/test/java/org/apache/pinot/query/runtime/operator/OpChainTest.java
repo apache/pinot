@@ -29,7 +29,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
-import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -54,7 +53,6 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.slf4j.Logger;
@@ -135,7 +133,7 @@ public class OpChainTest {
 
   @Test
   public void testStatsCollectionTracingEnabled() {
-    OpChainExecutionContext context = OperatorTestUtil.getDefaultContextWithTracing();
+    OpChainExecutionContext context = OperatorTestUtil.getTracingContext();
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
     OpChain opChain = new OpChain(context, dummyMultiStageOperator);
@@ -154,7 +152,7 @@ public class OpChainTest {
 
   @Test
   public void testStatsCollectionTracingDisabled() {
-    OpChainExecutionContext context = OperatorTestUtil.getDefaultContextWithTracingDisabled();
+    OpChainExecutionContext context = OperatorTestUtil.getNoTracingContext();
     DummyMultiStageOperator dummyMultiStageOperator = new DummyMultiStageOperator(context);
 
     OpChain opChain = new OpChain(context, dummyMultiStageOperator);
