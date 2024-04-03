@@ -30,7 +30,6 @@ import org.apache.calcite.plan.RelOptRule;
  */
 public class PinotQueryRuleSets {
   private PinotQueryRuleSets() {
-    // do not instantiate.
   }
 
   public static final Collection<RelOptRule> BASIC_RULES =
@@ -38,8 +37,6 @@ public class PinotQueryRuleSets {
           EnumerableRules.ENUMERABLE_PROJECT_RULE, EnumerableRules.ENUMERABLE_WINDOW_RULE,
           EnumerableRules.ENUMERABLE_SORT_RULE, EnumerableRules.ENUMERABLE_TABLE_SCAN_RULE,
 
-          // converts CASE-style filtered aggregates into true filtered aggregates.
-          CoreRules.AGGREGATE_CASE_TO_FILTER,
           // push a filter into a join
           CoreRules.FILTER_INTO_JOIN,
           // push filter through an aggregation
@@ -90,7 +87,11 @@ public class PinotQueryRuleSets {
           CoreRules.AGGREGATE_UNION_AGGREGATE,
 
           // reduce aggregate functions like AVG, STDDEV_POP etc.
-          CoreRules.AGGREGATE_REDUCE_FUNCTIONS
+          CoreRules.AGGREGATE_REDUCE_FUNCTIONS,
+
+          // convert CASE-style filtered aggregates into true filtered aggregates
+          // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
+          CoreRules.AGGREGATE_CASE_TO_FILTER
           );
 
   // Filter pushdown rules run using a RuleCollection since we want to push down a filter as much as possible in a

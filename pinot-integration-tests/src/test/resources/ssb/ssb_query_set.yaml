@@ -59,13 +59,13 @@ sqls:
     select C_CITY, S_CITY, D_YEAR, sum(LO_REVENUE) as revenue
     from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY
     and LO_ORDERDATE = D_DATEKEY and C_NATION = 'UNITED STATES' and S_NATION = 'UNITED STATES'
-    and D_YEAR >= 1992 and D_YEAR <= 1997group by C_CITY, S_CITY, D_YEAR order by D_YEAR asc, revenue desc;
+    and D_YEAR >= 1992 and D_YEAR <= 1997 group by C_CITY, S_CITY, D_YEAR order by D_YEAR asc, revenue desc;
   - |
     select C_CITY, S_CITY, D_YEAR, sum(LO_REVENUE) as revenue
     from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY
     and LO_ORDERDATE = D_DATEKEY and (C_CITY='UNITED KI1' or C_CITY='UNITED KI5')
     and (S_CITY='UNITED KI1' or S_CITY='UNITED KI5') and D_YEAR >= 1992 and D_YEAR <= 1997
-    group by C_CITY, S_CITY, D_YEAR order by D_YEAR asc, revenue desc;;
+    group by C_CITY, S_CITY, D_YEAR order by D_YEAR asc, revenue desc;
   - |
     select C_CITY, S_CITY, D_YEAR, sum(LO_REVENUE) as revenue
     from customer, lineorder, supplier, dates where LO_CUSTKEY = C_CUSTKEY and LO_SUPPKEY = S_SUPPKEY
@@ -91,4 +91,4 @@ sqls:
     from lineorder, dates, customer, supplier, part where LO_CUSTKEY = C_CUSTKEY
     and LO_SUPPKEY = S_SUPPKEY and LO_PARTKEY = P_PARTKEY and LO_ORDERDATE = D_DATEKEY
     and C_REGION = 'AMERICA' and S_NATION = 'UNITED STATES' and (D_YEAR = 1997 or D_YEAR = 1998)
-    and P_CATEGORY = 'MFGR#14' group by D_YEAR, S_CITY, P_BRAND1 order by D_YEAR, S_CITY, P_BRAND1 ;
+    and P_CATEGORY = 'MFGR#14' group by D_YEAR, S_CITY, P_BRAND1 order by D_YEAR, S_CITY, P_BRAND1;

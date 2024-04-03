@@ -266,6 +266,7 @@ public class VarByteChunkForwardIndexReaderV4
   @Override
   public void close()
       throws IOException {
+    _chunkDecompressor.close();
   }
 
   @Override

@@ -37,16 +37,11 @@
   <properties>
     <phase.prop>package</phase.prop>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
-    <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
-    <jersey-container-grizzly2-http.version>2.39</jersey-container-grizzly2-http.version>
     <simpleclient_common.version>0.16.0</simpleclient_common.version>
-    <grpc-proto.version>2.29.0</grpc-proto.version>
     <grpc-context.version>1.60.1</grpc-context.version>
+    <grpc-protobuf-lite.version>1.62.2</grpc-protobuf-lite.version>
     <caffeine.version>2.6.2</caffeine.version>
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
-    <javax.annotation-api.version>1.2</javax.annotation-api.version>
-    <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
   </properties>
 
   <dependencies>
@@ -60,10 +55,6 @@
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client-original</artifactId>
       <exclusions>
-        <exclusion>
-          <groupId>javax.ws.rs</groupId>
-          <artifactId>javax.ws.rs-api</artifactId>
-        </exclusion>
         <exclusion>
           <groupId>commons-configuration</groupId>
           <artifactId>commons-configuration</artifactId>
@@ -87,29 +78,16 @@
       <artifactId>pulsar-client-admin-original</artifactId>
     </dependency>
     <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
-      <version>${javax.servlet-api.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>javax.ws.rs</groupId>
-      <artifactId>javax.ws.rs-api</artifactId>
-      <version>${javax.ws.rs-api.version}</version>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-server</artifactId>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>
       <artifactId>jersey-container-grizzly2-http</artifactId>
-      <version>${jersey-container-grizzly2-http.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.jersey.core</groupId>
-      <artifactId>jersey-server</artifactId>
-      <version>${jersey-container-grizzly2-http.version}</version>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>
       <artifactId>jersey-container-servlet-core</artifactId>
-      <version>${jersey-container-grizzly2-http.version}</version>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
@@ -128,6 +106,11 @@
       <groupId>io.grpc</groupId>
       <artifactId>grpc-context</artifactId>
       <version>${grpc-context.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-protobuf-lite</artifactId>
+      <version>${grpc-protobuf-lite.version}</version>
     </dependency>
     <dependency>
       <groupId>io.prometheus</groupId>
@@ -150,22 +133,6 @@
       <groupId>io.prometheus</groupId>
       <artifactId>simpleclient_hotspot</artifactId>
       <version>${simpleclient_common.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-protobuf-lite</artifactId>
-      <version>${grpc-protobuf-lite.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>io.grpc</groupId>
-          <artifactId>grpc-context</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>javax.annotation</groupId>
-      <artifactId>javax.annotation-api</artifactId>
-      <version>${javax.annotation-api.version}</version>
     </dependency>
     <dependency>
       <groupId>org.codehaus.mojo</groupId>

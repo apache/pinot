@@ -71,9 +71,9 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
       // Process the tables that are managed by this controller
       List<String> allTables = propTableNameWithType == null
           ? _pinotHelixResourceManager.getDatabaseNames().stream()
-              .map(_pinotHelixResourceManager::getAllTables)
-              .flatMap(List::stream)
-              .collect(Collectors.toList())
+            .map(_pinotHelixResourceManager::getAllTables)
+            .flatMap(List::stream)
+            .collect(Collectors.toList())
           : Collections.singletonList(propTableNameWithType);
 
       Set<String> currentLeaderOfTables = allTables.stream()

@@ -36,6 +36,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_DATABASE;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -90,8 +91,8 @@ public class ControllerPeriodicTaskTest {
     List<String> tables = new ArrayList<>(_numTables);
     IntStream.range(0, _numTables).forEach(i -> tables.add("table_" + i + " _OFFLINE"));
     when(_resourceManager.getDatabaseNames())
-        .thenReturn(Collections.singletonList(CommonConstants.DEFAULT_DATABASE));
-    when(_resourceManager.getAllTables(CommonConstants.DEFAULT_DATABASE)).thenReturn(tables);
+        .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+    when(_resourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(tables);
     when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
   }
 

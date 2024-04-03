@@ -47,7 +47,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject($0=[$1])",
-          "\n  LogicalWindow(window#0=[window( rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\n  LogicalWindow(window#0=[window(rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(winLiteral=[0])",
           "\n        LogicalTableScan(table=[[default, a]])",
@@ -72,7 +72,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, ROW_NUMBER() OVER() FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalWindow(window#0=[window( rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\nLogicalWindow(window#0=[window(rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n  PinotLogicalExchange(distribution=[hash])",
           "\n    LogicalProject(col1=[$0])",
           "\n      LogicalTableScan(table=[[default, a]])",
@@ -130,7 +130,7 @@
           "\nLogicalSort(sort0=[$2], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$2], col2=[$1])",
-          "\n      LogicalWindow(window#0=[window( rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\n      LogicalWindow(window#0=[window(rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col1=[$0], col2=[$1])",
           "\n            LogicalTableScan(table=[[default, a]])",
@@ -201,7 +201,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, ROW_NUMBER() OVER() FROM a WHERE a.col3 > 10",
         "output": [
           "Execution Plan",
-          "\nLogicalWindow(window#0=[window( rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\nLogicalWindow(window#0=[window(rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n  PinotLogicalExchange(distribution=[hash])",
           "\n    LogicalProject(col1=[$0])",
           "\n      LogicalFilter(condition=[>($2, 10)])",
@@ -276,10 +276,10 @@
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalProject(col3=[$0], EXPR$0=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
+          "\n        LogicalAggregate(group=[{0}])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n            LogicalAggregate(group=[{2}])",
           "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -294,10 +294,10 @@
           "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], col3=[$0])",
           "\n      LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
-          "\n          LogicalProject(col3=[$0], EXPR$0=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n            LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
+          "\n            LogicalAggregate(group=[{0}])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n                LogicalAggregate(group=[{2}])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -310,12 +310,12 @@
           "\nLogicalSort(sort0=[$2], dir0=[ASC])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[$2], col3=[$0])",
-          "\n      LogicalWindow(window#0=[window( rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\n      LogicalWindow(window#0=[window(rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
-          "\n          LogicalProject(col3=[$0], EXPR$0=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n            LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
+          "\n            LogicalAggregate(group=[{0}])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n                LogicalAggregate(group=[{2}])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -469,7 +469,7 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[$0], EXPR$1=[$1], EXPR$2=[$1])",
-          "\n  LogicalWindow(window#0=[window( rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\n  LogicalWindow(window#0=[window(rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject($0=[LENGTH(CONCAT($0, _UTF-8' ', $1))])",
           "\n        LogicalFilter(condition=[AND(<>($0, _UTF-8'bar'), <>($0, _UTF-8'baz'), <>($0, _UTF-8'foo'))])",
@@ -530,10 +530,10 @@
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      LogicalProject(col3=[$0], EXPR$0=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
+          "\n        LogicalAggregate(group=[{0}])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n            LogicalAggregate(group=[{2}])",
           "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -548,10 +548,10 @@
           "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$2], col3=[$0])",
           "\n      LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
-          "\n          LogicalProject(col3=[$0], EXPR$0=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n            LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
+          "\n            LogicalAggregate(group=[{0}])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n                LogicalAggregate(group=[{2}])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -861,10 +861,10 @@
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col3=[$0], EXPR$0=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
+          "\n        LogicalAggregate(group=[{0}])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n            LogicalAggregate(group=[{2}])",
           "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -879,10 +879,10 @@
           "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], col3=[$0])",
           "\n      LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          LogicalProject(col3=[$0], EXPR$0=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n            LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
+          "\n            LogicalAggregate(group=[{0}])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n                LogicalAggregate(group=[{2}])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1184,10 +1184,10 @@
           "\nLogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0), MAX($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      LogicalProject(col3=[$0], EXPR$0=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n        LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
+          "\n        LogicalAggregate(group=[{0}])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n            LogicalAggregate(group=[{2}])",
           "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1202,10 +1202,10 @@
           "\n    LogicalProject(EXPR$0=[$1], EXPR$1=[/(CAST($2):DOUBLE NOT NULL, $3)], EXPR$2=[$4], col3=[$0])",
           "\n      LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0), MAX($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          LogicalProject(col3=[$0], EXPR$0=[/(CAST($1):DOUBLE NOT NULL, $2)])",
-          "\n            LogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], agg#1=[COUNT($2)])",
+          "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
+          "\n            LogicalAggregate(group=[{0}])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                LogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n                LogicalAggregate(group=[{2}])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3567,12 +3567,12 @@
       {
         "description": "unsupported custom frames - ORDER BY with two columns and RANGE",
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3, a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
-        "expectedException": ".*RANGE clause cannot be used with compound ORDER BY clause.*"
+        "expectedException": ".*Upper bound must be CURRENT ROW but it is: UNBOUNDED FOLLOWING.*"
       },
       {
         "description": "unsupported custom frames - PARTITION BY and ORDER BY with two columns and RANGE",
         "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3, a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
-        "expectedException": ".*RANGE clause cannot be used with compound ORDER BY clause.*"
+        "expectedException": ".*Upper bound must be CURRENT ROW but it is: UNBOUNDED FOLLOWING.*"
       },
       {
         "description": "Using aggregation inside ORDER BY within OVER",
@@ -3612,7 +3612,7 @@
       {
         "description": "Apache Calcite failures with ROW_NUMBER() window functions - default frame for ROW_NUMBER is different from aggregation window functions, resulting in multiple window groups",
         "sql": "EXPLAIN PLAN FOR SELECT ROW_NUMBER() OVER(PARTITION BY a.col1 ORDER BY a.col2), SUM(a.col1) OVER(PARTITION BY a.col1 ORDER BY a.col2) FROM a",
-        "expectedException": ".*Cannot generate a valid execution plan.*"
+        "expectedException": ".*Currently only 1 window group is supported, query has 2 groups.*"
       },
       {
         "description": "Apache Calcite failures with ROW_NUMBER() window functions - custom frames not allowed",

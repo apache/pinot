@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.query.planner.logical;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.calcite.runtime.ImmutablePairList;
 import org.apache.pinot.query.planner.SubPlanMetadata;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -133,7 +133,8 @@ public class SubPlanFragmenter implements PlanNodeVisitor<PlanNode, SubPlanFragm
       context._subPlanIdToChildrenMap.put(currentStageId, new ArrayList<>());
     }
     context._subPlanIdToChildrenMap.get(currentStageId).add(nextSubPlanId);
-    context._subPlanIdToMetadataMap.put(nextSubPlanId, new SubPlanMetadata(node.getTableNames(), ImmutableList.of()));
+    context._subPlanIdToMetadataMap.put(nextSubPlanId,
+        new SubPlanMetadata(node.getTableNames(), ImmutablePairList.of()));
     PlanNode literalValueNode = new LiteralValueNode(nextStageRoot.getDataSchema());
     return literalValueNode;
   }

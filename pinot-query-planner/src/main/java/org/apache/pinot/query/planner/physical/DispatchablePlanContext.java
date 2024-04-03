@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.calcite.util.Pair;
+import org.apache.calcite.runtime.PairList;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -40,14 +40,14 @@ public class DispatchablePlanContext {
 
   private final long _requestId;
   private final Set<String> _tableNames;
-  private final List<Pair<Integer, String>> _resultFields;
+  private final PairList<Integer, String> _resultFields;
 
   private final PlannerContext _plannerContext;
   private final Map<Integer, DispatchablePlanMetadata> _dispatchablePlanMetadataMap;
   private final Map<Integer, PlanNode> _dispatchablePlanStageRootMap;
 
   public DispatchablePlanContext(WorkerManager workerManager, long requestId, PlannerContext plannerContext,
-      List<Pair<Integer, String>> resultFields, Set<String> tableNames) {
+      PairList<Integer, String> resultFields, Set<String> tableNames) {
     _workerManager = workerManager;
     _requestId = requestId;
     _plannerContext = plannerContext;
@@ -70,7 +70,7 @@ public class DispatchablePlanContext {
     return _tableNames;
   }
 
-  public List<Pair<Integer, String>> getResultFields() {
+  public PairList<Integer, String> getResultFields() {
     return _resultFields;
   }
 

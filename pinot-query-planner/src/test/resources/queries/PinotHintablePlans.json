@@ -56,7 +56,7 @@
         ]
       },
       {
-        "description": "semi-join with multi-ple dynamic_broadcast join strategy then group-by on same key",
+        "description": "semi-join with multiple dynamic_broadcast join strategy then group-by on same key",
         "sql": "EXPLAIN PLAN FOR SELECT a.col1, a.col2 FROM a WHERE a.col1 IN (SELECT col2 FROM b WHERE b.col3 > 0) AND a.col2 IN (select col1 FROM c WHERE c.col3 > 0)",
         "output": [
           "Execution Plan",
