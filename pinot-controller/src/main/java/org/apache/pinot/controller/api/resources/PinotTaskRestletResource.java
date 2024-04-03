@@ -618,19 +618,22 @@ public class PinotTaskRestletResource {
   @ApiOperation("Schedule tasks and return a map from task type to task name scheduled")
   public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
       @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
+      @ApiParam(value = "Minion Instance tag to schedule the task explicitly on")
+      @QueryParam("minionInstanceTag") String minionInstanceTag,
       @Context HttpHeaders headers) {
     String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;
     if (taskType != null) {
       // Schedule task for the given task type
       List<String> taskNames = tableName != null
-          ? _pinotTaskManager.scheduleTask(taskType, DatabaseUtils.translateTableName(tableName, headers))
-          : _pinotTaskManager.scheduleTaskForDatabase(taskType, database);
+          ? _pinotTaskManager.scheduleTask(taskType,
+          DatabaseUtils.translateTableName(tableName, headers), minionInstanceTag)
+          : _pinotTaskManager.scheduleTaskForDatabase(taskType, database, minionInstanceTag);
       return Collections.singletonMap(taskType, taskNames == null ? null : StringUtils.join(taskNames, ','));
     } else {
       // Schedule tasks for all task types
       Map<String, List<String>> allTaskNames = tableName != null
-          ? _pinotTaskManager.scheduleTasks(DatabaseUtils.translateTableName(tableName, headers))
-          : _pinotTaskManager.scheduleTasksForDatabase(database);
+          ? _pinotTaskManager.scheduleTasks(DatabaseUtils.translateTableName(tableName, headers), minionInstanceTag)
+          : _pinotTaskManager.scheduleTasksForDatabase(database, minionInstanceTag);
       return allTaskNames.entrySet().stream()
           .collect(Collectors.toMap(Map.Entry::getKey, entry -> String.join(",", entry.getValue())));
     }
