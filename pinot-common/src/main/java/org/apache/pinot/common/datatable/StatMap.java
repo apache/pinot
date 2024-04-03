@@ -79,7 +79,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   private StatMap(Family<K> family, @Nullable int[] intValues, @Nullable long[] longValues,
       @Nullable boolean[] booleanValues, @Nullable Object[] referenceValues) {
     _family = family;
-    assert intValues == null || intValues.length == family._numIntsValues;
+    assert intValues == null || intValues.length == family._numIntValues;
     _intValues = intValues;
     assert longValues == null || longValues.length == family._numLongValues;
     _longValues = longValues;
@@ -182,9 +182,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public void merge(StatMap<K> other) {
     Preconditions.checkState(_family._keyClass.equals(other._family._keyClass),
         "Different key classes %s and %s", _family._keyClass, other._family._keyClass);
-    Preconditions.checkState(_family._numIntsValues == other._family._numIntsValues,
+    Preconditions.checkState(_family._numIntValues == other._family._numIntValues,
         "Different number of int values");
-    for (int i = 0; i < _family._numIntsValues; i++) {
+    for (int i = 0; i < _family._numIntValues; i++) {
       assert _intValues != null : "Int values should not be null because there are int keys";
       assert other._intValues != null : "Int values should not be null because there are int keys";
       K key = _family.getKey(i, Type.INT);
@@ -233,8 +233,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         bytesPerId, maxBytesPerId);
 
     int[] keys;
-    keys = readKeys(input, bytesPerId, _family._numIntsValues);
-    if (_family._numIntsValues != 0) {
+    keys = readKeys(input, bytesPerId, _family._numIntValues);
+    if (_family._numIntValues != 0) {
       assert _intValues != null : "Int values should not be null because there are int keys";
       for (int intKey : keys) {
         int value = input.readInt();
@@ -416,12 +416,12 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
 
     int bytesPerId = input.readInt();
 
-    int[] intKeys = readKeys(input, bytesPerId, family._numIntsValues);
+    int[] intKeys = readKeys(input, bytesPerId, family._numIntValues);
     int[] intValues;
-    if (family._numIntsValues == 0) {
+    if (family._numIntValues == 0) {
       intValues = null;
     } else {
-      intValues = new int[family._numIntsValues];
+      intValues = new int[family._numIntValues];
       for (int intKey : intKeys) {
         int value = input.readInt();
         assert value != 0;
@@ -570,7 +570,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
 
   private static class Family<K extends Enum<K> & Key> {
     private final Class<K> _keyClass;
-    private final int _numIntsValues;
+    private final int _numIntValues;
     private final int _numLongValues;
     private final int _numBooleanValues;
     private final int _numReferenceValues;
@@ -580,7 +580,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     private Family(Class<K> keyClass) {
       _keyClass = keyClass;
       K[] keys = keyClass.getEnumConstants();
-      int numIntsValues = 0;
+      int numIntValues = 0;
       int numLongValues = 0;
       int numBooleanValues = 0;
       int numReferenceValues = 0;
@@ -591,7 +591,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
             _keyToIndexMap.put(key, numBooleanValues++);
             break;
           case INT:
-            _keyToIndexMap.put(key, numIntsValues++);
+            _keyToIndexMap.put(key, numIntValues++);
             break;
           case LONG:
             _keyToIndexMap.put(key, numLongValues++);
@@ -603,19 +603,19 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
             throw new IllegalStateException();
         }
       }
-      _numIntsValues = numIntsValues;
+      _numIntValues = numIntValues;
       _numLongValues = numLongValues;
       _numBooleanValues = numBooleanValues;
       _numReferenceValues = numReferenceValues;
-      _maxIndex = Math.max(numIntsValues, Math.max(numLongValues, Math.max(numBooleanValues, numReferenceValues)));
+      _maxIndex = Math.max(numIntValues, Math.max(numLongValues, Math.max(numBooleanValues, numReferenceValues)));
     }
 
     @Nullable
     private int[] createIntValues() {
-      if (_numIntsValues == 0) {
+      if (_numIntValues == 0) {
         return null;
       }
-      return new int[_numIntsValues];
+      return new int[_numIntValues];
     }
 
     @Nullable
