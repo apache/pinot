@@ -93,6 +93,9 @@ public class FilterOperator extends MultiStageOperator.WithBasicStats {
   protected TransferableBlock getNextBlock() {
     TransferableBlock block = _upstreamOperator.nextBlock();
     if (block.isEndOfStreamBlock()) {
+      if (block.isErrorBlock()) {
+        return block;
+      }
       return updateEosBlock(block);
     }
     List<Object[]> resultRows = new ArrayList<>();

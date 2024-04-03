@@ -454,7 +454,7 @@ public class SortOperatorTest {
     TransferableBlock block2 = op.nextBlock(); // eos
 
     // Then:
-    Assert.assertEquals(block.getType(), DataBlock.Type.COLUMNAR, "expected columnar block");
+    Assert.assertEquals(block.getType(), DataBlock.Type.ROW, "expected columnar block");
     Assert.assertEquals(block.getNumRows(), 3);
     Assert.assertEquals(block.getContainer().get(0), new Object[]{1, 1});
     Assert.assertEquals(block.getContainer().get(1), new Object[]{1, 2});

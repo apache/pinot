@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.query.runtime.plan;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -459,8 +477,16 @@ public class MultiStageQueryStats {
       // There is also a dynamic check in the StatMap.merge() method.
       @SuppressWarnings("unchecked")
       public void merge(StageStats other) {
+        if (other._operatorTypes.isEmpty()) {
+          return;
+        }
+        if (_operatorTypes.isEmpty()) {
+          _operatorTypes.addAll(other._operatorTypes);
+          _operatorStats.addAll(other._operatorStats);
+          return;
+        }
         Preconditions.checkState(_operatorTypes.equals(other._operatorTypes), "Cannot merge stats from "
-            + "different stages");
+            + "different stages. Found types %s and %s", _operatorTypes, other._operatorTypes);
         for (int i = 0; i < _operatorStats.size(); i++) {
           StatMap otherStats = other._operatorStats.get(i);
           StatMap myStats = _operatorStats.get(i);
@@ -471,6 +497,19 @@ public class MultiStageQueryStats {
       public void merge(DataInputStream input)
           throws IOException {
         int numOperators = input.readInt();
+        if (_operatorTypes.isEmpty()) {
+          for (int i = 0; i < numOperators; i++) {
+            _operatorTypes.add(MultiStageOperator.Type.values()[input.readByte()]);
+          }
+          for (int i = 0; i < numOperators; i++) {
+            if (input.readBoolean()) {
+              _operatorStats.add(_operatorTypes.get(i).deserializeStats(input));
+            } else {
+              _operatorStats.add(_operatorTypes.get(i).emptyStats());
+            }
+          }
+          return;
+        }
         Preconditions.checkState(numOperators == _operatorTypes.size(),
             "Cannot merge stats from stages with different operators");
         for (int i = 0; i < numOperators; i++) {

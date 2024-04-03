@@ -68,7 +68,8 @@ class PipelineBreakerOperator extends MultiStageOperator.WithBasicStats {
   }
 
   public MultiStageQueryStats getQueryStats() {
-    assert _queryStats != null : "This method should not be called before blocks have been processed";
+    assert _queryStats != null || _errorBlock != null
+        : "This method should not be called before blocks have been processed";
     return _queryStats;
   }
 
@@ -111,6 +112,7 @@ class PipelineBreakerOperator extends MultiStageOperator.WithBasicStats {
         dataBlocks.add(block);
         block = operator.nextBlock();
       }
+      _queryStats = block.getQueryStats();
     } else {
       _resultMap = new HashMap<>();
       for (int workerKey : _workerMap.keySet()) {

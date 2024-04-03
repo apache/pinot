@@ -418,7 +418,7 @@ public class HashJoinOperatorTest {
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     // Third block is EOS block.
     result = joinOnNum.nextBlock();
-    Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
+    TransferableBlockTestUtils.assertSuccessEos(result);
   }
 
   @Test
@@ -490,11 +490,12 @@ public class HashJoinOperatorTest {
     result = join.nextBlock();
     resultRows = result.getContainer();
     expectedRows = ImmutableList.of(new Object[]{null, null, 3, "BB"});
+    TransferableBlockTestUtils.assertDataBlock(result);
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     Assert.assertEquals(resultRows.get(0), expectedRows.get(0));
     // Third block is EOS block.
     result = join.nextBlock();
-    Assert.assertTrue(result.isSuccessfulEndOfStreamBlock());
+    TransferableBlockTestUtils.assertSuccessEos(result);
   }
 
   @Test

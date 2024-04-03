@@ -221,7 +221,7 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
       throws ProcessingException {
     if (_isTerminated) {
       assert _queryStats != null;
-      TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
     }
     if (!_isHashTableBuilt) {
       // Build JOIN hash table
