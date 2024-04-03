@@ -789,6 +789,11 @@ public final class Schema implements Serializable {
 
     List<String> primaryKeyColumns = getPrimaryKeyColumns();
     List<String> oldPrimaryKeyColumns = oldSchema.getPrimaryKeyColumns();
+
+    if (primaryKeyColumns == null) {
+      return oldPrimaryKeyColumns == null;
+    }
+
     if (!Arrays.equals(primaryKeyColumns.toArray(), oldPrimaryKeyColumns.toArray())) {
       return false;
     }
