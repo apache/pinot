@@ -42,8 +42,9 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
   private final BaseStreamingCombineOperator<?> _streamingCombineOperator;
   private final ResultsBlockStreamer _streamer;
 
-  public StreamingInstanceResponseOperator(BaseCombineOperator<?> combinedOperator, List<SegmentContext> segmentContexts,
-      List<FetchContext> fetchContexts, ResultsBlockStreamer streamer, QueryContext queryContext) {
+  public StreamingInstanceResponseOperator(BaseCombineOperator<?> combinedOperator,
+      List<SegmentContext> segmentContexts, List<FetchContext> fetchContexts, ResultsBlockStreamer streamer,
+      QueryContext queryContext) {
     super(combinedOperator, segmentContexts, fetchContexts, queryContext);
     _streamingCombineOperator =
         combinedOperator instanceof BaseStreamingCombineOperator ? (BaseStreamingCombineOperator<?>) combinedOperator
