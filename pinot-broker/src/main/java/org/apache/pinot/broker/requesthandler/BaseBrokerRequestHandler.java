@@ -95,6 +95,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.PinotBrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -375,9 +376,16 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       boolean ignoreCase = _tableCache.isIgnoreCase();
-      String tableName =
-          getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders, ignoreCase),
-              _tableCache);
+      String tableName;
+      try {
+        tableName = getActualTableName(
+            DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders, ignoreCase), _tableCache);
+      } catch (DatabaseConflictException e) {
+        LOGGER.info("{}. Request {}: {}", e.getMessage(), requestId, query);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+        requestContext.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
+        return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
+      }
       dataSource.setTableName(tableName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       requestContext.setTableName(rawTableName);

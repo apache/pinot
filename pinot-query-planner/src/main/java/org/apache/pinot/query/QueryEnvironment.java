@@ -21,10 +21,7 @@ package org.apache.pinot.query;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -42,11 +39,9 @@ import org.apache.calcite.prepare.PinotCalciteCatalogReader;
 import org.apache.calcite.prepare.Prepare;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
-import org.apache.calcite.rel.hint.HintStrategyTable;
-import org.apache.calcite.rel.hint.PinotHintStrategyTable;
-import org.apache.calcite.rel.logical.LogicalCorrelate;
 import org.apache.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.calcite.rel.rules.PinotRelDistributionTraitRule;
+import org.apache.calcite.rel.rules.PinotRuleUtils;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
@@ -66,7 +61,6 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
-import org.apache.pinot.query.planner.QueryPlan;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
@@ -76,7 +70,6 @@ import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
@@ -89,13 +82,9 @@ import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
  */
 public class QueryEnvironment {
   // Calcite configurations
-  private final FrameworkConfig _config;
-
-  // Calcite extension/plugins
-  private final CalciteSchema _rootSchema;
-  private final Prepare.CatalogReader _catalogReader;
   private final RelDataTypeFactory _typeFactory;
-
+  private final Prepare.CatalogReader _catalogReader;
+  private final FrameworkConfig _config;
   private final HepProgram _optProgram;
   private final HepProgram _traitProgram;
 
@@ -106,16 +95,20 @@ public class QueryEnvironment {
   public QueryEnvironment(TypeFactory typeFactory, CalciteSchema rootSchema, WorkerManager workerManager,
       TableCache tableCache) {
     _typeFactory = typeFactory;
-    _rootSchema = rootSchema;
+    // Calcite extension/plugins
     _workerManager = workerManager;
     _tableCache = tableCache;
 
     // catalog & config
-    _catalogReader = getCatalog(_rootSchema.getName());
+    _catalogReader = getCatalogReader(_typeFactory, rootSchema);
     _config = getConfig(_catalogReader);
     // opt programs
     _optProgram = getOptProgram();
     _traitProgram = getTraitProgram();
+  }
+
+  private PlannerContext getPlannerContext() {
+    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, _traitProgram);
   }
 
   /**
@@ -192,10 +185,6 @@ public class QueryEnvironment {
   }
 
   public List<String> getTableNamesForQuery(String sqlQuery) {
-    return getTableNamesForQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getOptions());
-  }
-
-  public List<String> getTableNamesForQuery(String sqlQuery, Map<String, String> options) {
     try (PlannerContext plannerContext = getPlannerContext()) {
       SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
@@ -213,9 +202,9 @@ public class QueryEnvironment {
    * Results of planning a query
    */
   public static class QueryPlannerResult {
-    private DispatchableSubPlan _dispatchableSubPlan;
-    private String _explainPlan;
-    Set<String> _tableNames;
+    private final DispatchableSubPlan _dispatchableSubPlan;
+    private final String _explainPlan;
+    private final Set<String> _tableNames;
 
     QueryPlannerResult(@Nullable DispatchableSubPlan dispatchableSubPlan, @Nullable String explainPlan,
         Set<String> tableNames) {
@@ -232,7 +221,6 @@ public class QueryEnvironment {
       return _dispatchableSubPlan;
     }
 
-    // Returns all the table names in the query.
     public Set<String> getTableNames() {
       return _tableNames;
     }
@@ -242,66 +230,53 @@ public class QueryEnvironment {
   // steps
   // --------------------------------------------------------------------------
 
-  @VisibleForTesting
-  protected RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext)
-      throws Exception {
+  private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
-    RelRoot decorrelated = decorrelateIfNeeded(relation);
-    RelNode optimized = optimize(decorrelated, plannerContext);
+    RelNode optimized = optimize(relation, plannerContext);
     return relation.withRel(optimized);
   }
 
-  private RelRoot decorrelateIfNeeded(RelRoot relRoot) {
-    if (hasCorrelateNode(relRoot.rel)) {
-      try {
-        relRoot = relRoot.withRel(RelDecorrelator.decorrelateQuery(relRoot.rel, RelBuilder.create(_config)));
-      } catch (Throwable e) {
-        throw new UnsupportedOperationException(
-            "Failed to de-correlate the given query to a valid execution plan: " + RelOptUtil.toString(relRoot.rel), e);
-      }
-    }
-    return relRoot;
-  }
-
-  private static boolean hasCorrelateNode(RelNode relNode) {
-    if (relNode instanceof LogicalCorrelate) {
-      return true;
-    }
-    for (RelNode input : relNode.getInputs()) {
-      if (hasCorrelateNode(input)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private SqlNode validate(SqlNode parsed, PlannerContext plannerContext)
-      throws Exception {
-    // 2. validator to validate.
-    SqlNode validated = plannerContext.getValidator().validate(parsed);
-    if (null == validated || !validated.getKind().belongsTo(SqlKind.QUERY)) {
-      throw new IllegalArgumentException(
-          String.format("unsupported SQL query, cannot validate out a valid sql from:\n%s", parsed));
+  private SqlNode validate(SqlNode sqlNode, PlannerContext plannerContext) {
+    SqlNode validated = plannerContext.getValidator().validate(sqlNode);
+    if (!validated.getKind().belongsTo(SqlKind.QUERY)) {
+      throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
     }
     validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
     return validated;
   }
 
-  private RelRoot toRelation(SqlNode parsed, PlannerContext plannerContext) {
-    // 3. convert sqlNode to relNode.
+  private RelRoot toRelation(SqlNode sqlNode, PlannerContext plannerContext) {
     RexBuilder rexBuilder = new RexBuilder(_typeFactory);
     RelOptCluster cluster = RelOptCluster.create(plannerContext.getRelOptPlanner(), rexBuilder);
-    SqlToRelConverter sqlToRelConverter =
+    SqlToRelConverter converter =
         new SqlToRelConverter(plannerContext.getPlanner(), plannerContext.getValidator(), _catalogReader, cluster,
             PinotConvertletTable.INSTANCE, _config.getSqlToRelConverterConfig());
-    RelRoot relRoot = sqlToRelConverter.convertQuery(parsed, false, true);
-    return relRoot.withRel(sqlToRelConverter.trimUnusedFields(false, relRoot.rel));
+    RelRoot relRoot;
+    try {
+      relRoot = converter.convertQuery(sqlNode, false, true);
+    } catch (Throwable e) {
+      throw new RuntimeException("Failed to convert query to relational expression:\n" + sqlNode, e);
+    }
+    RelNode rootNode = relRoot.rel;
+    try {
+      // NOTE: DO NOT use converter.decorrelate(sqlNode, rootNode) because the converted type check can fail. This is
+      //       probably a bug in Calcite.
+      RelBuilder relBuilder = PinotRuleUtils.PINOT_REL_FACTORY.create(cluster, null);
+      rootNode = RelDecorrelator.decorrelateQuery(rootNode, relBuilder);
+    } catch (Throwable e) {
+      throw new RuntimeException("Failed to decorrelate query:\n" + RelOptUtil.toString(rootNode), e);
+    }
+    try {
+      rootNode = converter.trimUnusedFields(false, rootNode);
+    } catch (Throwable e) {
+      throw new RuntimeException("Failed to trim unused fields from query:\n" + RelOptUtil.toString(rootNode), e);
+    }
+    return relRoot.withRel(rootNode);
   }
 
   private RelNode optimize(RelRoot relRoot, PlannerContext plannerContext) {
-    // 4. optimize relNode
-    // TODO: add support for traits, cost factory.
+    // TODO: add support for cost factory
     try {
       RelOptPlanner optPlanner = plannerContext.getRelOptPlanner();
       optPlanner.setRoot(relRoot.rel);
@@ -309,62 +284,35 @@ public class QueryEnvironment {
       RelOptPlanner traitPlanner = plannerContext.getRelTraitPlanner();
       traitPlanner.setRoot(optimized);
       return traitPlanner.findBestExp();
-    } catch (Exception e) {
-      throw new UnsupportedOperationException(
-          "Cannot generate a valid execution plan for the given query: " + RelOptUtil.toString(relRoot.rel), e);
+    } catch (Throwable e) {
+      throw new RuntimeException(
+          "Failed to generate a valid execution plan for query:\n" + RelOptUtil.toString(relRoot.rel), e);
     }
   }
 
-  private SubPlan toSubPlan(RelRoot relRoot) {
-    // 5. construct a logical query plan.
-    PinotLogicalQueryPlanner pinotLogicalQueryPlanner = new PinotLogicalQueryPlanner();
-    QueryPlan queryPlan = pinotLogicalQueryPlanner.planQuery(relRoot);
-    return pinotLogicalQueryPlanner.makePlan(queryPlan);
-  }
-
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId) {
-    SubPlan subPlanRoot = toSubPlan(relRoot);
+    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot);
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
-    return pinotDispatchPlanner.createDispatchableSubPlan(subPlanRoot);
+    return pinotDispatchPlanner.createDispatchableSubPlan(plan);
   }
 
   // --------------------------------------------------------------------------
   // utils
   // --------------------------------------------------------------------------
 
-  private Prepare.CatalogReader getCatalog(@Nullable String schemaPath) {
-    Properties catalogReaderConfigProperties = new Properties();
-    catalogReaderConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
-    CalciteConnectionConfigImpl connConfig = new CalciteConnectionConfigImpl(catalogReaderConfigProperties);
-    return new PinotCalciteCatalogReader(_rootSchema,
-        Collections.singletonList(Objects.requireNonNullElse(schemaPath, CommonConstants.DEFAULT_DATABASE)),
-        _typeFactory, connConfig);
+  private static Prepare.CatalogReader getCatalogReader(RelDataTypeFactory typeFactory, CalciteSchema rootSchema) {
+    Properties properties = new Properties();
+    properties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
+    return new PinotCalciteCatalogReader(rootSchema, List.of(rootSchema.getName()), typeFactory,
+        new CalciteConnectionConfigImpl(properties));
   }
 
-  private FrameworkConfig getConfig(Prepare.CatalogReader catalogReader) {
+  private static FrameworkConfig getConfig(Prepare.CatalogReader catalogReader) {
     return Frameworks.newConfigBuilder().traitDefs()
-        .operatorTable(new PinotChainedSqlOperatorTable(Arrays.asList(
-            PinotOperatorTable.instance(),
-            catalogReader)))
+        .operatorTable(new PinotChainedSqlOperatorTable(Arrays.asList(PinotOperatorTable.instance(), catalogReader)))
         .defaultSchema(catalogReader.getRootSchema().plus())
-        .sqlToRelConverterConfig(SqlToRelConverter.config()
-            .withHintStrategyTable(getHintStrategyTable())
-            .withTrimUnusedFields(true)
-            // SUB-QUERY Threshold is useless as we are encoding all IN clause in-line anyway
-            .withInSubQueryThreshold(Integer.MAX_VALUE)
-            .addRelBuilderConfigTransform(c -> c.withPushJoinCondition(true))
-            .addRelBuilderConfigTransform(c -> c.withAggregateUnique(true))
-            .addRelBuilderConfigTransform(c -> c.withPruneInputOfAggregate(false)))
-        .build();
-  }
-
-  private PlannerContext getPlannerContext() {
-    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, _traitProgram);
-  }
-
-  private HintStrategyTable getHintStrategyTable() {
-    return PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE;
+        .sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
   }
 
   private static HepProgram getOptProgram() {

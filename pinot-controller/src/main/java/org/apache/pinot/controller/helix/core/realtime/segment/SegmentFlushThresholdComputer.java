@@ -58,9 +58,12 @@ class SegmentFlushThresholdComputer {
 
   public int computeThreshold(StreamConfig streamConfig, CommittingSegmentDescriptor committingSegmentDescriptor,
       @Nullable SegmentZKMetadata committingSegmentZKMetadata, String newSegmentName) {
-    final long desiredSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
-    final long optimalSegmentSizeBytesMin = desiredSegmentSizeBytes / 2;
-    final double optimalSegmentSizeBytesMax = desiredSegmentSizeBytes * 1.5;
+    long desiredSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
+    if (desiredSegmentSizeBytes <= 0) {
+      desiredSegmentSizeBytes = StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES;
+    }
+    long optimalSegmentSizeBytesMin = desiredSegmentSizeBytes / 2;
+    double optimalSegmentSizeBytesMax = desiredSegmentSizeBytes * 1.5;
 
     if (committingSegmentZKMetadata == null) { // first segment of the partition, hence committing segment is null
       if (_latestSegmentRowsToSizeRatio > 0) { // new partition group added case

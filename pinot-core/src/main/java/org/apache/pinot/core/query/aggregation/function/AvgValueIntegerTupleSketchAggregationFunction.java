@@ -19,12 +19,12 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import org.apache.datasketches.tuple.CompactSketch;
+import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.TupleSketchIterator;
-import org.apache.datasketches.tuple.Union;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
@@ -48,21 +48,19 @@ public class AvgValueIntegerTupleSketchAggregationFunction
   }
 
   @Override
-  public Comparable extractFinalResult(List<CompactSketch<IntegerSummary>> integerSummarySketches) {
-    if (integerSummarySketches == null) {
-      return null;
-    }
-    Union<IntegerSummary> union = new Union<>(_entries, _setOps);
-    integerSummarySketches.forEach(union::union);
-    double retainedTotal = 0L;
-    CompactSketch<IntegerSummary> result = union.getResult();
-    TupleSketchIterator<IntegerSummary> summaries = result.iterator();
-    while (summaries.next()) {
-      retainedTotal += summaries.getSummary().getValue();
-    }
-    if (result.getRetainedEntries() == 0) {
+  public Comparable extractFinalResult(TupleIntSketchAccumulator accumulator) {
+    accumulator.setNominalEntries(_nominalEntries);
+    accumulator.setSetOperations(_setOps);
+    accumulator.setThreshold(_accumulatorThreshold);
+    Sketch<IntegerSummary> result = accumulator.getResult();
+    if (result.isEmpty() || result.getRetainedEntries() == 0) {
       // there is nothing to average, return null
       return null;
+    }
+    TupleSketchIterator<IntegerSummary> summaries = result.iterator();
+    double retainedTotal = 0L;
+    while (summaries.next()) {
+      retainedTotal += summaries.getSummary().getValue();
     }
     double estimate = retainedTotal / result.getRetainedEntries();
     return Math.round(estimate);

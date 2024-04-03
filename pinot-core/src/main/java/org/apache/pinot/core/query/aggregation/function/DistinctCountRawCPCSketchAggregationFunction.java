@@ -19,9 +19,9 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
-import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.SerializedCPCSketch;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
@@ -47,7 +47,9 @@ public class DistinctCountRawCPCSketchAggregationFunction extends DistinctCountC
   }
 
   @Override
-  public SerializedCPCSketch extractFinalResult(CpcSketch sketch) {
-    return new SerializedCPCSketch(sketch);
+  public SerializedCPCSketch extractFinalResult(CpcSketchAccumulator intermediateResult) {
+    intermediateResult.setLgNominalEntries(_lgNominalEntries);
+    intermediateResult.setThreshold(_accumulatorThreshold);
+    return new SerializedCPCSketch(intermediateResult.getResult());
   }
 }

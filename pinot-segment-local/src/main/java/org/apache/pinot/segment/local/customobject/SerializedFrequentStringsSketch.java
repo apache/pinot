@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.util.Base64;
-import javax.validation.constraints.NotNull;
 import org.apache.datasketches.common.ArrayOfStringsSerDe;
 import org.apache.datasketches.frequencies.ItemsSketch;
 
@@ -31,7 +30,7 @@ public class SerializedFrequentStringsSketch implements Comparable<ItemsSketch<S
   }
 
   @Override
-  public int compareTo(@NotNull ItemsSketch<String> other) {
+  public int compareTo(ItemsSketch<String> other) {
     // There is no well-defined ordering for these sketches
     // numActiveItems is just a placeholder, which can be changed later
     return _sketch.getNumActiveItems() - other.getNumActiveItems();

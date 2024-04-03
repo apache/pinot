@@ -247,11 +247,28 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
         String.format("jsonExtractIndex(%s,'%s','STRING_ARRAY')", JSON_STRING_SV_COLUMN,
             "$.arrayField[*].arrStringField"), "$.arrayField[*].arrStringField", DataType.STRING, false
     });
+
+    // MV with filters
+    testArguments.add(new Object[]{
+        String.format(
+            "jsonExtractIndex(%s,'%s','INT_ARRAY', '[]', 'REGEXP_LIKE(\"$.arrayField[*].arrStringField\", ''.*y.*'')')",
+            JSON_STRING_SV_COLUMN,
+            "$.arrayField[*].arrIntField"), "$.arrayField[?(@.arrStringField =~ /.*y.*/)].arrIntField", DataType.INT,
+        false
+    });
+
+    testArguments.add(new Object[]{
+        String.format(
+            "jsonExtractIndex(%s,'%s','STRING_ARRAY', '[]', '\"$.arrayField[*].arrIntField\" > 2')",
+            JSON_STRING_SV_COLUMN,
+            "$.arrayField[*].arrStringField"), "$.arrayField[?(@.arrIntField > 2)].arrStringField", DataType.STRING,
+        false
+    });
   }
 
   @Test(dataProvider = "testJsonExtractIndexDefaultValue")
   public void testJsonExtractIndexDefaultValue(String expressionStr, String jsonPathString, DataType resultsDataType,
-      boolean isSingleValue) {
+      boolean isSingleValue, Object expectedDefaultValue) {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractIndexTransformFunction);
@@ -264,37 +281,72 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
         case INT:
           int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
           for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(intValues[i], 0);
+            Assert.assertEquals(intValues[i], expectedDefaultValue);
           }
           break;
         case LONG:
           long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
           for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(longValues[i], 0L);
+            Assert.assertEquals(longValues[i], expectedDefaultValue);
           }
           break;
         case FLOAT:
           float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
           for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(floatValues[i], 0f);
+            Assert.assertEquals(floatValues[i], expectedDefaultValue);
           }
           break;
         case DOUBLE:
           double[] doubleValues = transformFunction.transformToDoubleValuesSV(_projectionBlock);
           for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(doubleValues[i], 0d);
+            Assert.assertEquals(doubleValues[i], expectedDefaultValue);
           }
           break;
         case BIG_DECIMAL:
           BigDecimal[] bigDecimalValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
           for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(bigDecimalValues[i], BigDecimal.ZERO);
+            Assert.assertEquals(bigDecimalValues[i], expectedDefaultValue);
           }
           break;
         case STRING:
           String[] stringValues = transformFunction.transformToStringValuesSV(_projectionBlock);
           for (int i = 0; i < NUM_ROWS; i++) {
-            Assert.assertEquals(stringValues[i], "null");
+            Assert.assertEquals(stringValues[i], expectedDefaultValue);
+          }
+          break;
+        default:
+          throw new UnsupportedOperationException("Not support data type - " + resultsDataType);
+      }
+    } else {
+      switch (resultsDataType) {
+        case INT:
+          int[][] intValues = transformFunction.transformToIntValuesMV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(intValues[i], expectedDefaultValue);
+          }
+          break;
+        case LONG:
+          long[][] longValues = transformFunction.transformToLongValuesMV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(longValues[i], expectedDefaultValue);
+          }
+          break;
+        case FLOAT:
+          float[][] floatValues = transformFunction.transformToFloatValuesMV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(floatValues[i], expectedDefaultValue);
+          }
+          break;
+        case DOUBLE:
+          double[][] doubleValues = transformFunction.transformToDoubleValuesMV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(doubleValues[i], expectedDefaultValue);
+          }
+          break;
+        case STRING:
+          String[][] stringValues = transformFunction.transformToStringValuesMV(_projectionBlock);
+          for (int i = 0; i < NUM_ROWS; i++) {
+            Assert.assertEquals(stringValues[i], expectedDefaultValue);
           }
           break;
         default:
@@ -309,29 +361,54 @@ public class JsonExtractIndexTransformFunctionTest extends BaseTransformFunction
     // With default value
     testArguments.add(new Object[]{
         String.format("jsonExtractIndex(%s,'%s','INT',0)", JSON_STRING_SV_COLUMN,
-            "$.noField"), "$.noField", DataType.INT, true
+            "$.noField"), "$.noField", DataType.INT, true, 0
     });
     testArguments.add(new Object[]{
         String.format("jsonExtractIndex(%s,'%s','LONG',0)", JSON_STRING_SV_COLUMN,
-            "$.noField"), "$.noField", DataType.LONG, true
+            "$.noField"), "$.noField", DataType.LONG, true, 0L
     });
     testArguments.add(new Object[]{
         String.format("jsonExtractIndex(%s,'%s','FLOAT',0)", JSON_STRING_SV_COLUMN,
-            "$.noField"), "$.noField", DataType.FLOAT, true
+            "$.noField"), "$.noField", DataType.FLOAT, true, (float) 0
     });
     testArguments.add(new Object[]{
         String.format("jsonExtractIndex(%s,'%s','DOUBLE',0)", JSON_STRING_SV_COLUMN,
-            "$.noField"), "$.noField", DataType.DOUBLE, true
+            "$.noField"), "$.noField", DataType.DOUBLE, true, (double) 0
     });
     testArguments.add(new Object[]{
         String.format("jsonExtractIndex(%s,'%s','BIG_DECIMAL',0)", JSON_STRING_SV_COLUMN,
-            "$.noField"), "$.noField", DataType.BIG_DECIMAL, true
+            "$.noField"), "$.noField", DataType.BIG_DECIMAL, true, new BigDecimal(0)
     });
     testArguments.add(new Object[]{
         String.format("jsonExtractIndex(%s,'%s','STRING','null')", JSON_STRING_SV_COLUMN,
-            "$.noField"), "$.noField", DataType.STRING, true
+            "$.noField"), "$.noField", DataType.STRING, true, "null"
     });
+    addMvDefaultValueTests(testArguments);
     return testArguments.toArray(new Object[0][]);
+  }
+
+  private void addMvDefaultValueTests(List<Object[]> testArguments) {
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','INT_ARRAY', '%s')", JSON_STRING_SV_COLUMN, "$.noField",
+            "[1, 2, 3]"), "$.noField", DataType.INT, false, new Integer[]{1, 2, 3}
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','LONG_ARRAY', '%s')", JSON_STRING_SV_COLUMN, "$.noField",
+            "[1, 5, 6]"), "$.noField", DataType.LONG, false, new Long[]{1L, 5L, 6L}
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','FLOAT_ARRAY', '%s')", JSON_STRING_SV_COLUMN, "$.noField",
+            "[1.2, 3.1, 1.6]"), "$.noField", DataType.FLOAT, false, new Float[]{1.2f, 3.1f, 1.6f}
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','DOUBLE_ARRAY', '%s')", JSON_STRING_SV_COLUMN, "$.noField",
+            "[1.5, 3.4, 1.6]"), "$.noField", DataType.DOUBLE, false, new Double[]{1.5d, 3.4d, 1.6d}
+    });
+    testArguments.add(new Object[]{
+        String.format("jsonExtractIndex(%s,'%s','STRING_ARRAY', '%s')", JSON_STRING_SV_COLUMN, "$.noField",
+            "[\"randomString1\", \"randomString2\"]"), "$.noField", DataType.STRING, false,
+        new String[]{"randomString1", "randomString2"}
+    });
   }
 
   // get value for key, excluding nested

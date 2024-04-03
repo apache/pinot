@@ -16,40 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.fmpp;
 
-import fmpp.Engine;
-import fmpp.tdd.DataLoader;
-import java.util.List;
-import org.apache.maven.project.MavenProject;
+package org.apache.pinot.core.query.aggregation.function;
 
-
-/**
- * A data loader for Maven
- */
-public class MavenDataLoader implements DataLoader {
-  public static final class MavenData {
-    private final MavenProject project;
-
-    public MavenData(MavenProject project) {
-      this.project = project;
-    }
-
-    public MavenProject getProject() {
-      return project;
-    }
-  }
-
-  public static final String MAVEN_DATA_ATTRIBUTE = "maven.data";
-
+public class PercentileAggregationFunctionTest extends AbstractPercentileAggregationFunctionTest {
   @Override
-  public Object load(Engine e, List args)
-      throws Exception {
-    if (!args.isEmpty()) {
-      throw new IllegalArgumentException("maven model data loader has no parameters");
-    }
-
-    MavenData data = (MavenData) e.getAttribute(MAVEN_DATA_ATTRIBUTE);
-    return data;
+  public String callStr(String column, int percent) {
+    return "PERCENTILE(" + column + ", " + percent + ")";
   }
 }

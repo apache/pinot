@@ -80,6 +80,7 @@ import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
+import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.DoubleLongPair;
 import org.apache.pinot.segment.local.customobject.FloatLongPair;
 import org.apache.pinot.segment.local.customobject.IntLongPair;
@@ -89,6 +90,7 @@ import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.local.customobject.QuantileDigest;
 import org.apache.pinot.segment.local.customobject.StringLongPair;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
+import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -156,7 +158,9 @@ public class ObjectSerDeUtils {
     FloatArrayList(44),
     StringArrayList(45),
     UltraLogLog(46),
-    ThetaSketchAccumulator(47);
+    ThetaSketchAccumulator(47),
+    TupleIntSketchAccumulator(48),
+    CpcSketchAccumulator(49);
 
     private final int _value;
 
@@ -277,6 +281,10 @@ public class ObjectSerDeUtils {
         return ObjectType.UltraLogLog;
       } else if (value instanceof ThetaSketchAccumulator) {
         return ObjectType.ThetaSketchAccumulator;
+      } else if (value instanceof TupleIntSketchAccumulator) {
+        return ObjectType.TupleIntSketchAccumulator;
+      } else if (value instanceof CpcSketchAccumulator) {
+        return ObjectType.CpcSketchAccumulator;
       } else {
         throw new IllegalArgumentException("Unsupported type of value: " + value.getClass().getSimpleName());
       }
@@ -1587,7 +1595,7 @@ public class ObjectSerDeUtils {
     }
   };
 
-  public static final ObjectSerDe<ThetaSketchAccumulator> DATA_SKETCH_SKETCH_ACCUMULATOR_SER_DE =
+  public static final ObjectSerDe<ThetaSketchAccumulator> DATA_SKETCH_THETA_ACCUMULATOR_SER_DE =
       new ObjectSerDe<ThetaSketchAccumulator>() {
 
         @Override
@@ -1611,6 +1619,62 @@ public class ObjectSerDeUtils {
           Sketch sketch = Sketch.wrap(Memory.wrap(bytes));
           thetaSketchAccumulator.apply(sketch);
           return thetaSketchAccumulator;
+        }
+      };
+
+  public static final ObjectSerDe<TupleIntSketchAccumulator> DATA_SKETCH_INT_TUPLE_ACCUMULATOR_SER_DE =
+      new ObjectSerDe<TupleIntSketchAccumulator>() {
+
+        @Override
+        public byte[] serialize(TupleIntSketchAccumulator tupleIntSketchBuffer) {
+          org.apache.datasketches.tuple.Sketch<IntegerSummary> sketch = tupleIntSketchBuffer.getResult();
+          return sketch.toByteArray();
+        }
+
+        @Override
+        public TupleIntSketchAccumulator deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        // Note: The accumulator is designed to serialize as a sketch and should
+        // not be deserialized in practice.
+        @Override
+        public TupleIntSketchAccumulator deserialize(ByteBuffer byteBuffer) {
+          TupleIntSketchAccumulator tupleIntSketchAccumulator = new TupleIntSketchAccumulator();
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          org.apache.datasketches.tuple.Sketch<IntegerSummary> sketch =
+              org.apache.datasketches.tuple.Sketches.heapifySketch(Memory.wrap(bytes),
+                  new IntegerSummaryDeserializer());
+          tupleIntSketchAccumulator.apply(sketch);
+          return tupleIntSketchAccumulator;
+        }
+      };
+
+  public static final ObjectSerDe<CpcSketchAccumulator> DATA_SKETCH_CPC_ACCUMULATOR_SER_DE =
+      new ObjectSerDe<CpcSketchAccumulator>() {
+
+        @Override
+        public byte[] serialize(CpcSketchAccumulator cpcSketchBuffer) {
+          CpcSketch sketch = cpcSketchBuffer.getResult();
+          return sketch.toByteArray();
+        }
+
+        @Override
+        public CpcSketchAccumulator deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        // Note: The accumulator is designed to serialize as a sketch and should
+        // not be deserialized in practice.
+        @Override
+        public CpcSketchAccumulator deserialize(ByteBuffer byteBuffer) {
+          CpcSketchAccumulator cpcSketchAccumulator = new CpcSketchAccumulator();
+          byte[] bytes = new byte[byteBuffer.remaining()];
+          byteBuffer.get(bytes);
+          CpcSketch sketch = CpcSketch.heapify(Memory.wrap(bytes));
+          cpcSketchAccumulator.apply(sketch);
+          return cpcSketchAccumulator;
         }
       };
 
@@ -1664,7 +1728,9 @@ public class ObjectSerDeUtils {
       FLOAT_ARRAY_LIST_SER_DE,
       STRING_ARRAY_LIST_SER_DE,
       ULTRA_LOG_LOG_OBJECT_SER_DE,
-      DATA_SKETCH_SKETCH_ACCUMULATOR_SER_DE,
+      DATA_SKETCH_THETA_ACCUMULATOR_SER_DE,
+      DATA_SKETCH_INT_TUPLE_ACCUMULATOR_SER_DE,
+      DATA_SKETCH_CPC_ACCUMULATOR_SER_DE,
   };
   //@formatter:on
 

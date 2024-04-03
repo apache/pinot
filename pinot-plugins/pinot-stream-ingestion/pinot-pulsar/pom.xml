@@ -37,19 +37,11 @@
   <properties>
     <phase.prop>package</phase.prop>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <pulsar.version>2.11.0</pulsar.version>
-    <javax.servlet-api.version>3.1.0</javax.servlet-api.version>
-    <javax.ws.rs-api.version>2.1</javax.ws.rs-api.version>
-    <jersey-container-grizzly2-http.version>2.39</jersey-container-grizzly2-http.version>
     <simpleclient_common.version>0.16.0</simpleclient_common.version>
-    <grpc-proto.version>2.29.0</grpc-proto.version>
     <grpc-context.version>1.60.1</grpc-context.version>
-    <bouncycastle.version>1.75</bouncycastle.version>
+    <grpc-protobuf-lite.version>1.62.2</grpc-protobuf-lite.version>
     <caffeine.version>2.6.2</caffeine.version>
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
-    <javax.annotation-api.version>1.2</javax.annotation-api.version>
-    <commons-collections.version>4.4</commons-collections.version>
-    <grpc-protobuf-lite.version>1.19.0</grpc-protobuf-lite.version>
   </properties>
 
   <dependencies>
@@ -62,15 +54,10 @@
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client-original</artifactId>
-      <version>${pulsar.version}</version>
       <exclusions>
         <exclusion>
-          <groupId>javax.ws.rs</groupId>
-          <artifactId>javax.ws.rs-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>commons-codec</groupId>
-          <artifactId>commons-codec</artifactId>
+          <groupId>commons-configuration</groupId>
+          <artifactId>commons-configuration</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.bouncycastle</groupId>
@@ -89,32 +76,18 @@
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client-admin-original</artifactId>
-      <version>${pulsar.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
-      <version>${javax.servlet-api.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>javax.ws.rs</groupId>
-      <artifactId>javax.ws.rs-api</artifactId>
-      <version>${javax.ws.rs-api.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.jersey.containers</groupId>
-      <artifactId>jersey-container-grizzly2-http</artifactId>
-      <version>${jersey-container-grizzly2-http.version}</version>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.core</groupId>
       <artifactId>jersey-server</artifactId>
-      <version>${jersey-container-grizzly2-http.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.containers</groupId>
+      <artifactId>jersey-container-grizzly2-http</artifactId>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>
       <artifactId>jersey-container-servlet-core</artifactId>
-      <version>${jersey-container-grizzly2-http.version}</version>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
@@ -135,8 +108,9 @@
       <version>${grpc-context.version}</version>
     </dependency>
     <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-protobuf-lite</artifactId>
+      <version>${grpc-protobuf-lite.version}</version>
     </dependency>
     <dependency>
       <groupId>io.prometheus</groupId>
@@ -161,27 +135,6 @@
       <version>${simpleclient_common.version}</version>
     </dependency>
     <dependency>
-      <groupId>io.grpc</groupId>
-      <artifactId>grpc-protobuf-lite</artifactId>
-      <version>${grpc-protobuf-lite.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>io.grpc</groupId>
-          <artifactId>grpc-context</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-collections4</artifactId>
-      <version>${commons-collections.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>javax.annotation</groupId>
-      <artifactId>javax.annotation-api</artifactId>
-      <version>${javax.annotation-api.version}</version>
-    </dependency>
-    <dependency>
       <groupId>org.codehaus.mojo</groupId>
       <artifactId>animal-sniffer-annotations</artifactId>
       <version>${codehaus-annotations.version}</version>
@@ -198,31 +151,18 @@
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcpkix-jdk15to18</artifactId>
-      <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-ext-jdk15to18</artifactId>
-      <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
       <groupId>org.bouncycastle</groupId>
       <artifactId>bcprov-jdk15to18</artifactId>
-      <version>${bouncycastle.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>commons-codec</groupId>
-          <artifactId>commons-codec</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>commons-logging</groupId>
-          <artifactId>commons-logging</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
   </dependencies>
 </project>

@@ -556,7 +556,7 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch cron scheduler job keys")
   public Map<String, Object> getCronSchedulerJobDetails(
-      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
+      @ApiParam(value = "Table name (with type suffix)", required = true) @QueryParam("tableName") String tableName,
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType, @Context HttpHeaders headers)
       throws SchedulerException {
     Scheduler scheduler = _pinotTaskManager.getScheduler();
@@ -618,15 +618,17 @@ public class PinotTaskRestletResource {
   public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
       @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (taskType != null) {
       // Schedule task for the given task type
-      String taskName = tableName != null ? _pinotTaskManager.scheduleTask(taskType, tableName)
+      String taskName = tableName != null
+          ? _pinotTaskManager.scheduleTask(taskType, DatabaseUtils.translateTableName(tableName, headers))
           : _pinotTaskManager.scheduleTask(taskType);
       return Collections.singletonMap(taskType, taskName);
     } else {
       // Schedule tasks for all task types
-      return tableName != null ? _pinotTaskManager.scheduleTasks(tableName) : _pinotTaskManager.scheduleTasks();
+      return tableName != null
+          ? _pinotTaskManager.scheduleTasks(DatabaseUtils.translateTableName(tableName, headers))
+          : _pinotTaskManager.scheduleTasks();
     }
   }
 

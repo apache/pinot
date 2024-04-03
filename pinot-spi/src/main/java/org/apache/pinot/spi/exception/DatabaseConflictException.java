@@ -16,31 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.parser;
+package org.apache.pinot.spi.exception;
 
-import org.apache.calcite.sql.SqlNode;
-import org.apache.pinot.query.context.PlannerContext;
-
-/**
- * Rewrites query based on user option as well as built-in rules.
- */
-public class QueryRewriter {
-
-  private QueryRewriter() {
-    // do not instantiate.
-  }
-
-  /**
-   * Entrypoint to execute the query rewrite.
-   *
-   * It should be functionally identical to running {@link org.apache.pinot.sql.parsers.rewriter.QueryRewriter}.
-   * But it operates on a {@link SqlNode} tree instead of a flat pinot query object.
-   *
-   * @param sqlNodeRoot root of the sqlNode tree
-   * @param plannerContext planner context
-   * @return rewritten sqlNode.
-   */
-  public static SqlNode rewrite(SqlNode sqlNodeRoot, PlannerContext plannerContext) {
-    return sqlNodeRoot;
+public class DatabaseConflictException extends BadQueryRequestException {
+  public DatabaseConflictException(String message) {
+    super(message);
   }
 }

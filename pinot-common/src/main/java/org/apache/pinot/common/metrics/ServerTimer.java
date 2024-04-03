@@ -49,6 +49,8 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   TOTAL_CPU_TIME_NS("nanoseconds", false, "Total query cost (thread cpu time + system "
       + "activities cpu time + response serialization cpu time) for query processing on server."),
 
+  UPSERT_PRELOAD_TIME_MS("milliseconds", false,
+      "Total time taken to preload a table partition of an upsert table with upsert snapshot"),
   UPSERT_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS("milliseconds", false,
       "Total time taken to delete expired primary keys based on metadataTTL or deletedKeysTTL"),
   UPSERT_SNAPSHOT_TIME_MS("milliseconds", false, "Total time taken to take upsert table snapshot");

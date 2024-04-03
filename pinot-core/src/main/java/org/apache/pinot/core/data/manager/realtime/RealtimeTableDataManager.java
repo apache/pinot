@@ -548,10 +548,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         immutableSegment.getSegmentMetadata().getTotalDocs());
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
-    // Register the new segment after it is fully initialized by partitionUpsertMetadataManager, e.g. to fill up its
-    // validDocId bitmap. Otherwise, the query can return wrong results, if accessing the premature segment.
     if (partitionUpsertMetadataManager.isPreloading()) {
-      // Preloading segment is ensured to be handled by a single thread, so no need to take a lock.
+      // Preloading segment is ensured to be handled by a single thread, so no need to take the segment upsert lock.
+      // Besides, preloading happens before the table partition is made ready for any queries.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
       registerSegment(segmentName, newSegmentManager);
       _logger.info("Preloaded immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
@@ -574,10 +573,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     try {
       SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
       if (oldSegmentManager == null) {
-        partitionUpsertMetadataManager.addSegment(immutableSegment);
+        // When adding a new segment, we should register it 'before' it is fully initialized by
+        // partitionUpsertMetadataManager. Because when processing docs in the new segment, the docs in the other
+        // segments may be invalidated, making the queries see less valid docs than expected. We should let query
+        // access the new segment asap even though its validDocId bitmap is still being filled by
+        // partitionUpsertMetadataManager.
         registerSegment(segmentName, newSegmentManager);
+        partitionUpsertMetadataManager.addSegment(immutableSegment);
         _logger.info("Added new immutable segment: {} to upsert-enabled table: {}", segmentName, _tableNameWithType);
       } else {
+        // When replacing a segment, we should register the new segment 'after' it is fully initialized by
+        // partitionUpsertMetadataManager to fill up its validDocId bitmap. Otherwise, the queries will lose the access
+        // to the valid docs in the old segment immediately, but the validDocId bitmap of the new segment is still
+        // being filled by partitionUpsertMetadataManager, making the queries see less valid docs than expected.
+        // When replacing a segment, the new and old segments are assumed to have same set of valid docs for data
+        // consistency, otherwise the new segment should be named differently to go through the addSegment flow above.
         IndexSegment oldSegment = oldSegmentManager.getSegment();
         partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
         registerSegment(segmentName, newSegmentManager);
