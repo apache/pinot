@@ -73,7 +73,6 @@ public class ExecutionStatsAggregator {
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private boolean _numGroupsLimitReached = false;
-  private boolean _maxRowsInJoinReached = false;
   private int _numBlocks = 0;
   private int _numRows = 0;
   private long _stageExecutionTimeMs = 0;
@@ -248,6 +247,9 @@ public class ExecutionStatsAggregator {
       _numTotalDocs += Long.parseLong(numTotalDocsString);
     }
 
+    _numGroupsLimitReached |=
+        Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
+
     String numBlocksString = metadata.get(DataTable.MetadataKey.NUM_BLOCKS.getName());
     if (numBlocksString != null) {
       _numBlocks += Long.parseLong(numBlocksString);
@@ -303,7 +305,6 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setNumSegmentsMatched(_numSegmentsMatched);
     brokerResponseNative.setTotalDocs(_numTotalDocs);
     brokerResponseNative.setNumGroupsLimitReached(_numGroupsLimitReached);
-    brokerResponseNative.setMaxRowsInJoinReached(_maxRowsInJoinReached);
     brokerResponseNative.setOfflineThreadCpuTimeNs(_offlineThreadCpuTimeNs);
     brokerResponseNative.setRealtimeThreadCpuTimeNs(_realtimeThreadCpuTimeNs);
     brokerResponseNative.setOfflineSystemActivitiesCpuTimeNs(_offlineSystemActivitiesCpuTimeNs);
