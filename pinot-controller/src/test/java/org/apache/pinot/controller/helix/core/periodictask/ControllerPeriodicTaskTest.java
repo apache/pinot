@@ -32,7 +32,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
