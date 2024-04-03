@@ -37,9 +37,8 @@ public final class TransferableBlockUtils {
     // do not instantiate.
   }
 
-  @Deprecated
-  public static TransferableBlock getEndOfStreamTransferableBlock() {
-    return EMPTY_EOS;
+  public static TransferableBlock getEndOfStreamTransferableBlock(int stageId) {
+    return new TransferableBlock(MultiStageQueryStats.emptyStats(stageId));
   }
 
   public static TransferableBlock getEndOfStreamTransferableBlock(MultiStageQueryStats stats) {

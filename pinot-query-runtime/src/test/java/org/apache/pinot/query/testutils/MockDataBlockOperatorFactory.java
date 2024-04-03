@@ -25,7 +25,7 @@ import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
@@ -60,7 +60,7 @@ public class MockDataBlockOperatorFactory {
       private int _invocationCount = 0;
       public Object answer(InvocationOnMock invocation) {
         return _invocationCount >= _rowsMap.get(operatorName).size()
-            ? TransferableBlockUtils.getEndOfStreamTransferableBlock()
+            ? TransferableBlockTestUtils.getEndOfStreamTransferableBlock()
             : new TransferableBlock(_rowsMap.get(operatorName).get(_invocationCount++),
                 _operatorSchemaMap.get(operatorName), DataBlock.Type.ROW);
       }

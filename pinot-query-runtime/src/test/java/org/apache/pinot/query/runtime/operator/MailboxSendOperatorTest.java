@@ -27,6 +27,7 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -124,7 +125,7 @@ public class MailboxSendOperatorTest {
   public void shouldSendEosBlock()
       throws Exception {
     // Given:
-    TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    TransferableBlock eosBlock = TransferableBlockTestUtils.getEndOfStreamTransferableBlock();
     when(_sourceOperator.nextBlock()).thenReturn(eosBlock);
 
     // When:
@@ -145,7 +146,7 @@ public class MailboxSendOperatorTest {
         OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
     TransferableBlock dataBlock2 =
         OperatorTestUtil.block(new DataSchema(new String[]{}, new DataSchema.ColumnDataType[]{}));
-    TransferableBlock eosBlock = TransferableBlockUtils.getEndOfStreamTransferableBlock();
+    TransferableBlock eosBlock = TransferableBlockTestUtils.getEndOfStreamTransferableBlock();
     when(_sourceOperator.nextBlock()).thenReturn(dataBlock1, dataBlock2, eosBlock);
 
     // When:

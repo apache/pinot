@@ -26,6 +26,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -73,7 +74,8 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
-    Mockito.when(_upstreamOperator.nextBlock()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    Mockito.when(_upstreamOperator.nextBlock())
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     FilterOperator op =
         new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock dataBlock = op.getNextBlock();
@@ -88,7 +90,7 @@ public class FilterOperatorTest {
     });
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{0}, new Object[]{1}))
-        .thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     FilterOperator op =
         new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock dataBlock = op.getNextBlock();

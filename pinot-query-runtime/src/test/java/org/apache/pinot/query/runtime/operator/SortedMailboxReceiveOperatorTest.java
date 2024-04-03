@@ -40,6 +40,7 @@ import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.mockito.Mock;
@@ -141,7 +142,7 @@ public class SortedMailboxReceiveOperatorTest {
   @Test
   public void shouldReceiveEosDirectlyFromSender() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailbox1.poll()).thenReturn(TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_mailbox1.poll()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
     try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
@@ -156,7 +157,7 @@ public class SortedMailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
     Object[] row = new Object[]{1, 1};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadata1);
     try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
@@ -189,11 +190,11 @@ public class SortedMailboxReceiveOperatorTest {
   @Test
   public void shouldReceiveMailboxFromTwoServersOneNull() {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_1))).thenReturn(_mailbox1);
-    when(_mailbox1.poll()).thenReturn(null, TransferableBlockUtils.getEndOfStreamTransferableBlock());
+    when(_mailbox1.poll()).thenReturn(null, TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row = new Object[]{1, 1};
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
     try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
@@ -218,7 +219,7 @@ public class SortedMailboxReceiveOperatorTest {
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row = new Object[]{3, 3};
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
     try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
@@ -236,14 +237,14 @@ public class SortedMailboxReceiveOperatorTest {
     Object[] row1 = new Object[]{3, 3};
     Object[] row2 = new Object[]{1, 1};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        OperatorTestUtil.block(DATA_SCHEMA, row2), TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        OperatorTestUtil.block(DATA_SCHEMA, row2), TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row3 = new Object[]{4, 2};
     Object[] row4 = new Object[]{2, 4};
     Object[] row5 = new Object[]{-1, 95};
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row3),
         OperatorTestUtil.block(DATA_SCHEMA, row4), OperatorTestUtil.block(DATA_SCHEMA, row5),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);
     try (SortedMailboxReceiveOperator receiveOp = new SortedMailboxReceiveOperator(context,
@@ -266,14 +267,14 @@ public class SortedMailboxReceiveOperatorTest {
     Object[] row1 = new Object[]{3, 3, "queen"};
     Object[] row2 = new Object[]{1, 1, "pink floyd"};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(dataSchema, row1),
-        OperatorTestUtil.block(dataSchema, row2), TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        OperatorTestUtil.block(dataSchema, row2), TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     when(_mailboxService.getReceivingMailbox(eq(MAILBOX_ID_2))).thenReturn(_mailbox2);
     Object[] row3 = new Object[]{4, 2, "pink floyd"};
     Object[] row4 = new Object[]{2, 4, "aerosmith"};
     Object[] row5 = new Object[]{-1, 95, "foo fighters"};
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(dataSchema, row3),
         OperatorTestUtil.block(dataSchema, row4), OperatorTestUtil.block(dataSchema, row5),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
 
     OpChainExecutionContext context =
         OperatorTestUtil.getOpChainContext(_mailboxService, Long.MAX_VALUE, _stageMetadataBoth);

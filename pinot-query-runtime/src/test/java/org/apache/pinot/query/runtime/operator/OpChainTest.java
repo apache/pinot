@@ -49,6 +49,7 @@ import org.apache.pinot.query.routing.SharedMailboxInfos;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -110,7 +111,7 @@ public class OpChainTest {
       }).when(_exchange).send(any(TransferableBlock.class));
       when(_mailbox2.poll()).then(x -> {
         if (_blockList.isEmpty()) {
-          return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+          return TransferableBlockTestUtils.getEndOfStreamTransferableBlock();
         }
         return _blockList.remove(0);
       });
@@ -204,7 +205,7 @@ public class OpChainTest {
     //Mailbox Receive Operator
     try {
       when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1}),
-          TransferableBlockUtils.getEndOfStreamTransferableBlock());
+          TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     } catch (Exception e) {
       fail("Exception while mocking mailbox receive: " + e.getMessage());
     }

@@ -42,6 +42,7 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.ExecutorServiceUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
@@ -216,7 +217,7 @@ public class PipelineBreakerExecutorTest {
     CountDownLatch latch = new CountDownLatch(1);
     when(_mailbox1.poll()).thenAnswer(invocation -> {
       latch.await();
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockTestUtils.getEndOfStreamTransferableBlock();
     });
 
     PipelineBreakerResult pipelineBreakerResult =
@@ -253,9 +254,9 @@ public class PipelineBreakerExecutorTest {
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
@@ -293,7 +294,7 @@ public class PipelineBreakerExecutorTest {
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
         TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("ERROR ON 1")));
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,

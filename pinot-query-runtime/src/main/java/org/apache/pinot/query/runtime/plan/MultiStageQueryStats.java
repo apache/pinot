@@ -78,8 +78,8 @@ public class MultiStageQueryStats {
     return multiStageQueryStats;
   }
 
-  public static MultiStageQueryStats createRoot() {
-    return new MultiStageQueryStats(0);
+  public static MultiStageQueryStats emptyStats(int stageId) {
+    return new MultiStageQueryStats(stageId);
   }
 
   public static MultiStageQueryStats createLeaf(int stageId, @Nullable StatMap<DataTable.MetadataKey> opStats) {
