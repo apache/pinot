@@ -100,7 +100,7 @@ public class TableConfigBuilder {
   private Map<String, String> _streamConfigs;
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _nullHandlingEnabled;
-  private boolean _columnMajorSegmentBuilderEnabled;
+  private boolean _columnMajorSegmentBuilderEnabled = true;
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;

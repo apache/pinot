@@ -720,6 +720,7 @@ public class PinotHelixResourceManager {
    *
    * @return List of table names in default database
    */
+  @Deprecated
   public List<String> getAllTables() {
     return getAllTables(null);
   }

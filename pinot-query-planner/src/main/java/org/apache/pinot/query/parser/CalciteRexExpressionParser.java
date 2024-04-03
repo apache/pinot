@@ -37,6 +37,7 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.sql.FilterKind;
+import org.apache.pinot.sql.parsers.ParserUtils;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +51,9 @@ import org.slf4j.LoggerFactory;
  * Thrift {@link Expression} format.
  */
 public class CalciteRexExpressionParser {
+  private CalciteRexExpressionParser() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteRexExpressionParser.class);
   private static final Map<String, String> CANONICAL_NAME_TO_SPECIAL_KEY_MAP;
   private static final String ARRAY_TO_MV_FUNCTION_NAME = "arraytomv";
@@ -63,10 +67,6 @@ public class CalciteRexExpressionParser {
     }
     // adding SqlKind.OTHERS and SqlKind.OTHER_FUNCTIONS that have canonical names.
     CANONICAL_NAME_TO_SPECIAL_KEY_MAP.put("||", "concat");
-  }
-
-  private CalciteRexExpressionParser() {
-    // do not instantiate.
   }
 
   // --------------------------------------------------------------------------
@@ -248,8 +248,9 @@ public class CalciteRexExpressionParser {
     // for COUNT, add a star (*) identifier to operand list b/c V1 doesn't handle empty operand functions.
     if (functionKind == SqlKind.COUNT && operands.isEmpty()) {
       operands.add(RequestUtils.getIdentifierExpression("*"));
+    } else {
+      ParserUtils.validateFunction(functionName, operands);
     }
-    ParserUtils.validateFunction(functionName, operands);
     Expression functionExpression = getFunctionExpression(functionName);
     functionExpression.getFunctionCall().setOperands(operands);
     return functionExpression;
