@@ -71,6 +71,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * +-----------------------------------------------+
  * | VARIABLE_SIZE_DATA SECTION                    |
  * +-----------------------------------------------+
+ * | METADATA LENGTH                               |
+ * | METADATA SECTION                              |
+ * +-----------------------------------------------+
+ *
+ * Metadata is actually not used, but we keep it here for backward compatibility reasons.
  *
  * To support both row and columnar data format. the size of the data payload will be exactly the same. the only
  * difference is the data layout in FIXED_SIZE_DATA and VARIABLE_SIZE_DATA section, see each impl for details.
@@ -90,6 +95,7 @@ public abstract class BaseDataBlock implements DataBlock {
   protected ByteBuffer _fixedSizeData;
   protected byte[] _variableSizeDataBytes;
   protected ByteBuffer _variableSizeData;
+  protected Map<String, String> _metadata;
 
   /**
    * construct a base data block.
@@ -110,6 +116,7 @@ public abstract class BaseDataBlock implements DataBlock {
     _fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
     _variableSizeDataBytes = variableSizeDataBytes;
     _variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
+    _metadata = new HashMap<>();
     _errCodeToExceptionMap = new HashMap<>();
   }
 
@@ -126,6 +133,7 @@ public abstract class BaseDataBlock implements DataBlock {
     _fixedSizeData = null;
     _variableSizeDataBytes = null;
     _variableSizeData = null;
+    _metadata = new HashMap<>();
     _errCodeToExceptionMap = new HashMap<>();
   }
 
@@ -187,6 +195,12 @@ public abstract class BaseDataBlock implements DataBlock {
       byteBuffer.get(_variableSizeDataBytes);
     }
     _variableSizeData = ByteBuffer.wrap(_variableSizeDataBytes);
+
+    // Read metadata.
+    int metadataLength = byteBuffer.getInt();
+    if (metadataLength != 0) {
+      _metadata = deserializeMetadata(byteBuffer);
+    }
   }
 
   @Override
@@ -217,6 +231,11 @@ public abstract class BaseDataBlock implements DataBlock {
    * @return the length to extract from variable size buffer.
    */
   protected abstract int positionOffsetInVariableBufferAndGetLength(int rowId, int colId);
+
+  @Override
+  public Map<String, String> getMetadata() {
+    return _metadata;
+  }
 
   @Override
   public DataSchema getDataSchema() {
