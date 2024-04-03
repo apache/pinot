@@ -25,6 +25,8 @@ import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -46,6 +48,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * them with other upstream stats.
  */
 public class MultiStageQueryStats {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageQueryStats.class);
   private final int _currentStageId;
   private final StageStats.Open _currentStats;
   /**
@@ -221,11 +224,15 @@ public class MultiStageQueryStats {
       }
       int selfIdx = i + currentDiff;
       StageStats.Closed myStats = _closedStats.get(selfIdx);
-      if (myStats == null) {
-        _closedStats.set(selfIdx, otherStatsForStage);
-        assert getUpstreamStageStats(i + otherStats._currentStageId + 1) == otherStatsForStage;
-      } else {
-        myStats.merge(otherStatsForStage);
+      try {
+        if (myStats == null) {
+          _closedStats.set(selfIdx, otherStatsForStage);
+          assert getUpstreamStageStats(i + otherStats._currentStageId + 1) == otherStatsForStage;
+        } else {
+          myStats.merge(otherStatsForStage);
+        }
+      } catch (IllegalArgumentException | IllegalStateException ex) {
+        LOGGER.warn("Error merging stats on stage " + i + ". Ignoring the new stats", ex);
       }
     }
   }
@@ -250,8 +257,12 @@ public class MultiStageQueryStats {
             _closedStats.set(i - _currentStageId - 1, deserialized);
             assert getUpstreamStageStats(i) == deserialized;
           } else {
-            myStats.merge(StageStats.Closed.deserialize(dis));
+            myStats.merge(dis);
           }
+        } catch (IOException ex) {
+          LOGGER.warn("Error deserializing stats on stage " + i + ". Considering the new stats empty", ex);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+          LOGGER.warn("Error merging stats on stage " + i + ". Ignoring the new stats", ex);
         }
       }
     }
