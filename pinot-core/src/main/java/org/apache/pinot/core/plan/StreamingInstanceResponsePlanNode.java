@@ -24,21 +24,21 @@ import org.apache.pinot.core.operator.streaming.StreamingInstanceResponseOperato
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
-import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 
 
 public class StreamingInstanceResponsePlanNode extends InstanceResponsePlanNode {
   private final ResultsBlockStreamer _streamer;
 
-  public StreamingInstanceResponsePlanNode(CombinePlanNode combinePlanNode, List<IndexSegment> indexSegments,
+  public StreamingInstanceResponsePlanNode(CombinePlanNode combinePlanNode, List<SegmentContext> segmentContexts,
       List<FetchContext> fetchContexts, QueryContext queryContext, ResultsBlockStreamer streamer) {
-    super(combinePlanNode, indexSegments, fetchContexts, queryContext);
+    super(combinePlanNode, segmentContexts, fetchContexts, queryContext);
     _streamer = streamer;
   }
 
   @Override
   public InstanceResponseOperator run() {
-    return new StreamingInstanceResponseOperator(_combinePlanNode.run(), _indexSegments, _fetchContexts, _streamer,
+    return new StreamingInstanceResponseOperator(_combinePlanNode.run(), _segmentContexts, _fetchContexts, _streamer,
         _queryContext);
   }
 }

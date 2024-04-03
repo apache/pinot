@@ -381,13 +381,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-      Map<IndexSegment, SegmentContext> segmentContexts =
+      List<SegmentContext> selectedSegmentContexts =
           tableDataManager.getSegmentContexts(selectedSegments, queryContext.getQueryOptions());
       Plan queryPlan =
-          enableStreaming ? _planMaker.makeStreamingInstancePlan(selectedSegments, segmentContexts, queryContext,
-              executorService, streamer, _serverMetrics)
-              : _planMaker.makeInstancePlan(selectedSegments, segmentContexts, queryContext, executorService,
-                  _serverMetrics);
+          enableStreaming ? _planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService,
+              streamer, _serverMetrics)
+              : _planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService, _serverMetrics);
       planBuildTimer.stopAndRecord();
 
       TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);

@@ -54,7 +54,5 @@ public interface TableUpsertMetadataManager extends Closeable {
    */
   Map<Integer, Long> getPartitionToPrimaryKeyCount();
 
-  default Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments) {
-    return null;
-  }
+  List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments);
 }

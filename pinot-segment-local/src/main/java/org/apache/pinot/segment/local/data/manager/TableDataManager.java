@@ -241,6 +241,13 @@ public interface TableDataManager {
   Map<String, SegmentErrorInfo> getSegmentErrors();
 
   /**
+   * Get more context for the selected segments for query execution, e.g. getting the validDocIds bitmaps for segments
+   * in upsert tables. This method allows contexts of many segments to be obtained together, making it easier to
+   * ensure data consistency across those segments if needed.
+   */
+  List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments, Map<String, String> queryOptions);
+
+  /**
    * Interface to handle segment state transitions from CONSUMING to DROPPED
    *
    * @param segmentNameStr name of segment for which the state change is being handled
@@ -254,10 +261,5 @@ public interface TableDataManager {
    * @param segmentNameStr name of segment for which the state change is being handled
    */
   default void onConsumingToOnline(String segmentNameStr) {
-  }
-
-  default Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
-      Map<String, String> queryOptions) {
-    return null;
   }
 }

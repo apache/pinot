@@ -154,11 +154,13 @@ public class MetadataAndDictionaryAggregationPlanMakerTest {
   public void testPlanMaker(String query, Class<? extends Operator<?>> operatorClass,
       Class<? extends Operator<?>> upsertOperatorClass) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-    Operator<?> operator = PLAN_MAKER.makeSegmentPlanNode(_indexSegment, queryContext).run();
+    Operator<?> operator = PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(_indexSegment), queryContext).run();
     assertTrue(operatorClass.isInstance(operator));
-    Operator<?> upsertOperator =
-        PLAN_MAKER.makeSegmentPlanNode(_upsertIndexSegment, new SegmentContext(_upsertIndexSegment), queryContext)
-            .run();
+
+    SegmentContext segmentContext = new SegmentContext(_upsertIndexSegment);
+    segmentContext.setQueryableDocIdsSnapshot(
+        SegmentContext.getQueryableDocIdsSnapshotFromSegment(_upsertIndexSegment));
+    Operator<?> upsertOperator = PLAN_MAKER.makeSegmentPlanNode(segmentContext, queryContext).run();
     assertTrue(upsertOperatorClass.isInstance(upsertOperator));
   }
 

@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
-import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -135,42 +134,33 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         _minServerGroupTrimSize, _groupByTrimThreshold);
   }
 
-  @Override
-  public Plan makeInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
-      ExecutorService executorService, ServerMetrics serverMetrics) {
-    return makeInstancePlan(indexSegments, null, queryContext, executorService, serverMetrics);
-  }
-
-  public Plan makeInstancePlan(List<IndexSegment> indexSegments,
-      @Nullable Map<IndexSegment, SegmentContext> segmentContexts, QueryContext queryContext,
+  public Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ServerMetrics serverMetrics) {
     applyQueryOptions(queryContext);
 
-    int numSegments = indexSegments.size();
+    int numSegments = segmentContexts.size();
     List<PlanNode> planNodes = new ArrayList<>(numSegments);
     List<FetchContext> fetchContexts;
-
     if (queryContext.isEnablePrefetch()) {
       fetchContexts = new ArrayList<>(numSegments);
-      for (IndexSegment indexSegment : indexSegments) {
-        FetchContext fetchContext = _fetchPlanner.planFetchForProcessing(indexSegment, queryContext);
+      for (SegmentContext segmentContext : segmentContexts) {
+        FetchContext fetchContext =
+            _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext);
         fetchContexts.add(fetchContext);
-        SegmentContext segmentContext = segmentContexts == null ? null : segmentContexts.get(indexSegment);
         planNodes.add(
-            new AcquireReleaseColumnsSegmentPlanNode(makeSegmentPlanNode(indexSegment, segmentContext, queryContext),
-                indexSegment, fetchContext));
+            new AcquireReleaseColumnsSegmentPlanNode(makeSegmentPlanNode(segmentContext, queryContext), segmentContext,
+                fetchContext));
       }
     } else {
       fetchContexts = Collections.emptyList();
-      for (IndexSegment indexSegment : indexSegments) {
-        SegmentContext segmentContext = segmentContexts == null ? null : segmentContexts.get(indexSegment);
-        planNodes.add(makeSegmentPlanNode(indexSegment, segmentContext, queryContext));
+      for (SegmentContext segmentContext : segmentContexts) {
+        planNodes.add(makeSegmentPlanNode(segmentContext, queryContext));
       }
     }
 
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, null);
     return new GlobalPlanImplV0(
-        new InstanceResponsePlanNode(combinePlanNode, indexSegments, fetchContexts, queryContext));
+        new InstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext));
   }
 
   private void applyQueryOptions(QueryContext queryContext) {
@@ -241,66 +231,45 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   }
 
   @Override
-  public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    return makeSegmentPlanNode(indexSegment, null, queryContext);
-  }
-
-  @Override
-  public PlanNode makeSegmentPlanNode(IndexSegment indexSegment, @Nullable SegmentContext segmentContext,
-      QueryContext queryContext) {
-    rewriteQueryContextWithHints(queryContext, indexSegment);
+  public PlanNode makeSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
+    rewriteQueryContextWithHints(queryContext, segmentContext.getIndexSegment());
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Group-by query
-        return new GroupByPlanNode(indexSegment, segmentContext, queryContext);
+        return new GroupByPlanNode(segmentContext, queryContext);
       } else {
         // Aggregation query
-        return new AggregationPlanNode(indexSegment, segmentContext, queryContext);
+        return new AggregationPlanNode(segmentContext, queryContext);
       }
     } else if (QueryContextUtils.isSelectionQuery(queryContext)) {
-      return new SelectionPlanNode(indexSegment, segmentContext, queryContext);
+      return new SelectionPlanNode(segmentContext, queryContext);
     } else {
       assert QueryContextUtils.isDistinctQuery(queryContext);
-      return new DistinctPlanNode(indexSegment, segmentContext, queryContext);
+      return new DistinctPlanNode(segmentContext, queryContext);
     }
   }
 
-  @Override
-  public Plan makeStreamingInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
-      ExecutorService executorService, ResultsBlockStreamer streamer, ServerMetrics serverMetrics) {
-    return makeStreamingInstancePlan(indexSegments, null, queryContext, executorService, streamer, serverMetrics);
-  }
-
-  public Plan makeStreamingInstancePlan(List<IndexSegment> indexSegments,
-      @Nullable Map<IndexSegment, SegmentContext> segmentContexts, QueryContext queryContext,
+  public Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer, ServerMetrics serverMetrics) {
     applyQueryOptions(queryContext);
-
-    List<PlanNode> planNodes = new ArrayList<>(indexSegments.size());
-    for (IndexSegment indexSegment : indexSegments) {
-      SegmentContext segmentContext = segmentContexts == null ? null : segmentContexts.get(indexSegment);
-      planNodes.add(makeStreamingSegmentPlanNode(indexSegment, segmentContext, queryContext));
+    List<PlanNode> planNodes = new ArrayList<>(segmentContexts.size());
+    for (SegmentContext segmentContext : segmentContexts) {
+      planNodes.add(makeStreamingSegmentPlanNode(segmentContext, queryContext));
     }
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, streamer);
     return new GlobalPlanImplV0(
-        new StreamingInstanceResponsePlanNode(combinePlanNode, indexSegments, Collections.emptyList(), queryContext,
+        new StreamingInstanceResponsePlanNode(combinePlanNode, segmentContexts, Collections.emptyList(), queryContext,
             streamer));
   }
 
   @Override
-  public PlanNode makeStreamingSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    return makeStreamingSegmentPlanNode(indexSegment, null, queryContext);
-  }
-
-  @Override
-  public PlanNode makeStreamingSegmentPlanNode(IndexSegment indexSegment, @Nullable SegmentContext segmentContext,
-      QueryContext queryContext) {
+  public PlanNode makeStreamingSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
     if (QueryContextUtils.isSelectionOnlyQuery(queryContext) && queryContext.getLimit() != 0) {
       // Use streaming operator only for non-empty selection-only query
-      return new StreamingSelectionPlanNode(indexSegment, segmentContext, queryContext);
+      return new StreamingSelectionPlanNode(segmentContext, queryContext);
     } else {
-      return makeSegmentPlanNode(indexSegment, queryContext);
+      return makeSegmentPlanNode(segmentContext, queryContext);
     }
   }
 

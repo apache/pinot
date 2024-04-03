@@ -30,7 +30,7 @@ import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
-import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
@@ -42,9 +42,9 @@ public class StreamingInstanceResponseOperator extends InstanceResponseOperator 
   private final BaseStreamingCombineOperator<?> _streamingCombineOperator;
   private final ResultsBlockStreamer _streamer;
 
-  public StreamingInstanceResponseOperator(BaseCombineOperator<?> combinedOperator, List<IndexSegment> indexSegments,
+  public StreamingInstanceResponseOperator(BaseCombineOperator<?> combinedOperator, List<SegmentContext> segmentContexts,
       List<FetchContext> fetchContexts, ResultsBlockStreamer streamer, QueryContext queryContext) {
-    super(combinedOperator, indexSegments, fetchContexts, queryContext);
+    super(combinedOperator, segmentContexts, fetchContexts, queryContext);
     _streamingCombineOperator =
         combinedOperator instanceof BaseStreamingCombineOperator ? (BaseStreamingCombineOperator<?>) combinedOperator
             : null;

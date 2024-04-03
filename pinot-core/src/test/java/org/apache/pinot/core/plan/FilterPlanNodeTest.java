@@ -70,14 +70,16 @@ public class FilterPlanNodeTest {
 
     // Result should be invariant - always exactly 3 docs
     for (int i = 0; i < 10_000; i++) {
-      assertEquals(getNumberOfFilteredDocs(segment, new SegmentContext(segment), queryContext), 3);
+      SegmentContext segmentContext = new SegmentContext(segment);
+      segmentContext.setQueryableDocIdsSnapshot(SegmentContext.getQueryableDocIdsSnapshotFromSegment(segment));
+      assertEquals(getNumberOfFilteredDocs(segmentContext, queryContext), 3);
     }
 
     updater.join();
   }
 
-  private int getNumberOfFilteredDocs(IndexSegment segment, SegmentContext segmentContext, QueryContext queryContext) {
-    FilterPlanNode node = new FilterPlanNode(segment, segmentContext, queryContext, null);
+  private int getNumberOfFilteredDocs(SegmentContext segmentContext, QueryContext queryContext) {
+    FilterPlanNode node = new FilterPlanNode(segmentContext, queryContext, null);
     BaseFilterOperator op = node.run();
     int numDocsFiltered = 0;
     FilterBlock block = op.nextBlock();

@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,10 +60,9 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   }
 
   @Override
-  public Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments) {
-    Map<IndexSegment, SegmentContext> segmentContexts = new HashMap<>();
-    _partitionMetadataManagerMap.forEach(
-        (k, v) -> v.getUpsertView(selectedSegments, segmentContexts));
+  public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments) {
+    List<SegmentContext> segmentContexts = new ArrayList<>(selectedSegments.size());
+    _partitionMetadataManagerMap.forEach((k, v) -> v.getSegmentContexts(selectedSegments, segmentContexts));
     return segmentContexts;
   }
 

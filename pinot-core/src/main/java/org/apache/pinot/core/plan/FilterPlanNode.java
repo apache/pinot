@@ -73,17 +73,8 @@ public class FilterPlanNode implements PlanNode {
   // Cache the predicate evaluators
   private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators = new ArrayList<>(4);
 
-  public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    this(indexSegment, null, queryContext, null);
-  }
-
-  public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext, @Nullable FilterContext filter) {
-    this(indexSegment, null, queryContext, filter);
-  }
-
-  public FilterPlanNode(IndexSegment indexSegment, @Nullable SegmentContext segmentContext, QueryContext queryContext,
-      @Nullable FilterContext filter) {
-    _indexSegment = indexSegment;
+  public FilterPlanNode(SegmentContext segmentContext, QueryContext queryContext, @Nullable FilterContext filter) {
+    _indexSegment = segmentContext.getIndexSegment();
     _segmentContext = segmentContext;
     _queryContext = queryContext;
     _filter = filter != null ? filter : _queryContext.getFilter();
@@ -91,8 +82,7 @@ public class FilterPlanNode implements PlanNode {
 
   @Override
   public BaseFilterOperator run() {
-    MutableRoaringBitmap queryableDocIdsSnapshot =
-        _segmentContext == null ? null : _segmentContext.getQueryableDocIdsSnapshot();
+    MutableRoaringBitmap queryableDocIdsSnapshot = _segmentContext.getQueryableDocIdsSnapshot();
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
 
     if (_filter != null) {
@@ -180,16 +170,16 @@ public class FilterPlanNode implements PlanNode {
       if (arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(1).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(0).getIdentifier();
-        return _indexSegment.getDataSource(columnName).getH3Index() != null && _queryContext.isIndexUseAllowed(
-            columnName, FieldConfig.IndexType.H3);
+        return _indexSegment.getDataSource(columnName).getH3Index() != null
+            && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
       }
       return false;
     } else {
       if (arguments.get(1).getType() == ExpressionContext.Type.IDENTIFIER
           && arguments.get(0).getType() == ExpressionContext.Type.LITERAL) {
         String columnName = arguments.get(1).getIdentifier();
-        return _indexSegment.getDataSource(columnName).getH3Index() != null && _queryContext.isIndexUseAllowed(
-            columnName, FieldConfig.IndexType.H3);
+        return _indexSegment.getDataSource(columnName).getH3Index() != null
+            && _queryContext.isIndexUseAllowed(columnName, FieldConfig.IndexType.H3);
       }
       return false;
     }

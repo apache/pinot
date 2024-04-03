@@ -19,6 +19,7 @@
 package org.apache.pinot.queries;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -49,6 +50,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -91,7 +93,7 @@ public abstract class BaseQueriesTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(serverPinotQuery);
-    return (T) PLAN_MAKER.makeSegmentPlanNode(getIndexSegment(), queryContext).run();
+    return (T) PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(getIndexSegment()), queryContext).run();
   }
 
   /**
@@ -206,7 +208,8 @@ public abstract class BaseQueriesTest {
 
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    Plan plan = planMaker.makeInstancePlan(getIndexSegments(), serverQueryContext, EXECUTOR_SERVICE, null);
+    Plan plan =
+        planMaker.makeInstancePlan(getSegmentContexts(getIndexSegments()), serverQueryContext, EXECUTOR_SERVICE, null);
     InstanceResponseBlock instanceResponse;
     try {
       instanceResponse =
@@ -239,6 +242,12 @@ public abstract class BaseQueriesTest {
     brokerReduceService.shutDown();
 
     return brokerResponse;
+  }
+
+  private static List<SegmentContext> getSegmentContexts(List<IndexSegment> indexSegments) {
+    List<SegmentContext> segmentContexts = new ArrayList<>();
+    indexSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
+    return segmentContexts;
   }
 
   /**
@@ -297,8 +306,10 @@ public abstract class BaseQueriesTest {
     List<List<IndexSegment>> instances = getDistinctInstances();
     // Server side
     serverQueryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    Plan plan1 = planMaker.makeInstancePlan(instances.get(0), serverQueryContext, EXECUTOR_SERVICE, null);
-    Plan plan2 = planMaker.makeInstancePlan(instances.get(1), serverQueryContext, EXECUTOR_SERVICE, null);
+    Plan plan1 =
+        planMaker.makeInstancePlan(getSegmentContexts(instances.get(0)), serverQueryContext, EXECUTOR_SERVICE, null);
+    Plan plan2 =
+        planMaker.makeInstancePlan(getSegmentContexts(instances.get(1)), serverQueryContext, EXECUTOR_SERVICE, null);
 
     InstanceResponseBlock instanceResponse1;
     try {

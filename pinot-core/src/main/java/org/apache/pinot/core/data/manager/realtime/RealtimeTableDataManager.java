@@ -303,12 +303,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   @Override
-  public Map<IndexSegment, SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
+  public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
       Map<String, String> queryOptions) {
     if (isUpsertEnabled() && !QueryOptionsUtils.isSkipUpsert(queryOptions)) {
       return _tableUpsertMetadataManager.getSegmentContexts(selectedSegments);
     }
-    return null;
+    return super.getSegmentContexts(selectedSegments, queryOptions);
   }
 
   /**

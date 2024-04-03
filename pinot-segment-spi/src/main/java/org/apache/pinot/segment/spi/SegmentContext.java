@@ -23,13 +23,15 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class SegmentContext {
+  private IndexSegment _indexSegment;
   private MutableRoaringBitmap _queryableDocIdsSnapshot = null;
 
-  public SegmentContext() {
+  public SegmentContext(IndexSegment indexSegment) {
+    _indexSegment = indexSegment;
   }
 
-  public SegmentContext(IndexSegment segment) {
-    _queryableDocIdsSnapshot = getQueryableDocIdsSnapshotFromSegment(segment);
+  public IndexSegment getIndexSegment() {
+    return _indexSegment;
   }
 
   public MutableRoaringBitmap getQueryableDocIdsSnapshot() {
