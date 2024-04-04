@@ -111,7 +111,7 @@ public class PulsarMessageBatchTest {
 
     @Override
     public boolean hasKey() {
-      return _keyData == null ? false : true;
+      return _keyData != null;
     }
 
     @Override
