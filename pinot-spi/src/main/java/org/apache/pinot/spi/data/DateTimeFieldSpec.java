@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.EqualityUtils;
 
+
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class DateTimeFieldSpec extends FieldSpec {
@@ -74,6 +75,10 @@ public final class DateTimeFieldSpec extends FieldSpec {
       @Nullable Object sampleValue) {
     super(name, dataType, true);
 
+    // Override format to be "TIMESTAMP" for TIMESTAMP data type because the format is implicit
+    if (dataType == DataType.TIMESTAMP) {
+      format = TimeFormat.TIMESTAMP.name();
+    }
     _format = format;
     _granularity = granularity;
     _formatSpec = new DateTimeFormatSpec(format);
@@ -119,13 +124,23 @@ public final class DateTimeFieldSpec extends FieldSpec {
     Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for date time field.");
   }
 
+  @Override
+  public void setDataType(DataType dataType) {
+    super.setDataType(dataType);
+    if (dataType == DataType.TIMESTAMP) {
+      _format = TimeFormat.TIMESTAMP.name();
+    }
+  }
+
   public String getFormat() {
     return _format;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setFormat(String format) {
-    _format = format;
+    if (_dataType != DataType.TIMESTAMP) {
+      _format = format;
+    }
   }
 
   @JsonIgnore

@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +35,6 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,7 +65,7 @@ public class SegmentPrunerFactory {
         List<SegmentPruner> configuredSegmentPruners = new ArrayList<>(segmentPrunerTypes.size());
         for (String segmentPrunerType : segmentPrunerTypes) {
           if (RoutingConfig.PARTITION_SEGMENT_PRUNER_TYPE.equalsIgnoreCase(segmentPrunerType)) {
-            SegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
+            SegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig);
             if (partitionSegmentPruner != null) {
               configuredSegmentPruners.add(partitionSegmentPruner);
             }
@@ -91,7 +88,7 @@ public class SegmentPrunerFactory {
         if ((tableType == TableType.OFFLINE && LEGACY_PARTITION_AWARE_OFFLINE_ROUTING.equalsIgnoreCase(
             routingTableBuilderName)) || (tableType == TableType.REALTIME
             && LEGACY_PARTITION_AWARE_REALTIME_ROUTING.equalsIgnoreCase(routingTableBuilderName))) {
-          SegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig, propertyStore);
+          SegmentPruner partitionSegmentPruner = getPartitionSegmentPruner(tableConfig);
           if (partitionSegmentPruner != null) {
             segmentPruners.add(partitionSegmentPruner);
           }
@@ -102,8 +99,7 @@ public class SegmentPrunerFactory {
   }
 
   @Nullable
-  private static SegmentPruner getPartitionSegmentPruner(TableConfig tableConfig,
-      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  private static SegmentPruner getPartitionSegmentPruner(TableConfig tableConfig) {
     String tableNameWithType = tableConfig.getTableName();
     SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
     if (segmentPartitionConfig == null) {
@@ -137,26 +133,20 @@ public class SegmentPrunerFactory {
       LOGGER.warn("Cannot enable time range pruning without time column for table: {}", tableNameWithType);
       return null;
     }
-    return createTimeSegmentPruner(tableConfig, propertyStore);
-  }
-
-  @VisibleForTesting
-  static TimeSegmentPruner createTimeSegmentPruner(TableConfig tableConfig,
-      ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    String tableNameWithType = tableConfig.getTableName();
-    String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
-    Preconditions.checkNotNull(timeColumn, "Time column must be configured in table config for table: %s",
-        tableNameWithType);
-    Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, tableNameWithType);
-    Preconditions.checkNotNull(schema, "Failed to find schema for table: %s", tableNameWithType);
-    DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumn);
-    Preconditions.checkNotNull(dateTimeSpec, "Field spec must be specified in schema for time column: %s of table: %s",
-        timeColumn, tableNameWithType);
-    DateTimeFormatSpec timeFormatSpec = dateTimeSpec.getFormatSpec();
-
-    LOGGER.info("Using TimeRangePruner on time column: {} for table: {} with DateTimeFormatSpec: {}",
-        timeColumn, tableNameWithType, timeFormatSpec);
-    return new TimeSegmentPruner(tableConfig, timeColumn, timeFormatSpec);
+    Schema schema = ZKMetadataProvider.getTableSchema(propertyStore, tableConfig);
+    if (schema == null) {
+      LOGGER.warn("Cannot enable time range pruning without schema for table: {}", tableNameWithType);
+      return null;
+    }
+    DateTimeFieldSpec timeFieldSpec = schema.getSpecForTimeColumn(timeColumn);
+    if (timeFieldSpec == null) {
+      LOGGER.warn("Cannot enable time range pruning without field spec for table: {}, time column: {}",
+          tableNameWithType, timeColumn);
+      return null;
+    }
+    LOGGER.info("Using TimeRangePruner on time column: {} for table: {} with DateTimeFieldSpec: {}", timeColumn,
+        tableNameWithType, timeFieldSpec);
+    return new TimeSegmentPruner(tableConfig, timeFieldSpec);
   }
 
   private static List<SegmentPruner> sortSegmentPruners(List<SegmentPruner> pruners) {
