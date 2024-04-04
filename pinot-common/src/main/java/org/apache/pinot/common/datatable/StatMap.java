@@ -23,22 +23,21 @@ import com.google.common.base.Preconditions;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
  * A map that stores statistics.
- *
+ * <p>
  * Statistics must be keyed by an enum that implements {@link StatMap.Key}.
- *
+ * <p>
  * A stat map efficiently store, serialize and deserialize these statistics.
- *
+ * <p>
  * Serialization and deserialization is backward and forward compatible as long as the only change in the keys are:
  * <ul>
  *   <li>Adding new keys</li>
@@ -50,34 +49,20 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * @param <K>
  */
 public class StatMap<K extends Enum<K> & StatMap.Key> {
-  private final Family<K> _family;
-  @Nullable
-  private final int[] _intValues;
-  @Nullable
-  private final long[] _longValues;
-  @Nullable
-  private final boolean[] _booleanValues;
-  /**
-   * In Pinot 1.1.0 this can only store String values, but it is prepared to be able to store any kind of object in
-   * the future.
-   */
-  @Nullable
-  private final Object[] _referenceValues;
+  private final Class<K> _keyClass;
+  private final EnumMap<K, Object> _map;
+
+  private static final ConcurrentHashMap<Class<?>, Object[]> KEYS_BY_CLASS = new ConcurrentHashMap<>();
 
   public StatMap(Class<K> keyClass) {
-    Family<K> family = Family.getFamily(keyClass);
-    _family = family;
-    _intValues = family.createIntValues();
-    _longValues = family.createLongValues();
-    _booleanValues = family.createBooleanValues();
-    _referenceValues = family.createReferenceValues();
+    _keyClass = keyClass;
+    _map = new EnumMap<>(keyClass);
   }
 
   public int getInt(K key) {
     Preconditions.checkArgument(key.getType() == Type.INT);
-    int index = _family.getIndex(key);
-    assert _intValues != null : "Int values should not be null because " + key + " is of type INT";
-    return _intValues[index];
+    Object o = _map.get(key);
+    return o == null ? 0 : (Integer) o;
   }
 
   public StatMap<K> merge(K key, int value) {
@@ -85,10 +70,9 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       merge(key, (long) value);
       return this;
     }
-    Preconditions.checkArgument(key.getType() == Type.INT);
-    int index = _family.getIndex(key);
-    assert _intValues != null : "Int values should not be null because " + key + " is of type INT";
-    _intValues[index] = key.merge(_intValues[index], value);
+    int oldValue = getInt(key);
+    int newValue = key.merge(oldValue, value);
+    _map.put(key, newValue);
     return this;
   }
 
@@ -97,52 +81,46 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       return getInt(key);
     }
     Preconditions.checkArgument(key.getType() == Type.LONG);
-    int index = _family.getIndex(key);
-    assert _longValues != null : "Long values should not be null because " + key + " is of type LONG";
-    return _longValues[index];
+    Object o = _map.get(key);
+    return o == null ? 0L : (Long) o;
   }
 
   public StatMap<K> merge(K key, long value) {
-    Preconditions.checkArgument(key.getType() == Type.LONG);
-    int index = _family.getIndex(key);
-    assert _longValues != null : "Long values should not be null because " + key + " is of type LONG";
-    _longValues[index] = key.merge(_longValues[index], value);
+    long oldValue = getLong(key);
+    long newValue = key.merge(oldValue, value);
+    _map.put(key, newValue);
     return this;
   }
 
   public boolean getBoolean(K key) {
     Preconditions.checkArgument(key.getType() == Type.BOOLEAN);
-    int index = _family.getIndex(key);
-    assert _booleanValues != null : "Boolean values should not be null because " + key + " is of type BOOLEAN";
-    return _booleanValues[index];
+    Object o = _map.get(key);
+    return o != null && (Boolean) o;
   }
 
   public StatMap<K> merge(K key, boolean value) {
-    Preconditions.checkArgument(key.getType() == Type.BOOLEAN);
-    int index = _family.getIndex(key);
-    assert _booleanValues != null : "Boolean values should not be null because " + key + " is of type BOOLEAN";
-    _booleanValues[index] = key.merge(_booleanValues[index], value);
+    boolean oldValue = getBoolean(key);
+    boolean newValue = key.merge(oldValue, value);
+    _map.put(key, newValue);
     return this;
   }
 
   public String getString(K key) {
     Preconditions.checkArgument(key.getType() == Type.STRING);
-    int index = _family.getIndex(key);
-    assert _referenceValues != null : "Reference values should not be null because " + key + " is of type STRING";
-    return (String) _referenceValues[index];
+    Object o = _map.get(key);
+    return o == null ? null : (String) o;
   }
 
   public StatMap<K> merge(K key, String value) {
-    Preconditions.checkArgument(key.getType() == Type.STRING);
-    int index = _family.getIndex(key);
-    assert _referenceValues != null : "Reference values should not be null because " + key + " is of type STRING";
-    _referenceValues[index] = key.merge((String) _referenceValues[index], value);
+    String oldValue = getString(key);
+    String newValue = key.merge(oldValue, value);
+    _map.put(key, newValue);
     return this;
   }
 
   /**
    * Returns the value associated with the key.
-   *
+   * <p>
    * Primitives will be boxed, so it is recommended to use the specific methods for each type.
    */
   public Object getAny(K key) {
@@ -163,51 +141,33 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   /**
    * Modifies this object to merge the values of the other object.
    *
-   * Numbers will be added, booleans will be ORed, and strings will be set if they are null.
-   *
    * @param other The object to merge with. This argument will not be modified.
    * @return this object once it is modified.
    */
   public StatMap<K> merge(StatMap<K> other) {
-    Preconditions.checkState(_family._keyClass.equals(other._family._keyClass),
-        "Different key classes %s and %s", _family._keyClass, other._family._keyClass);
-    Preconditions.checkState(_family._numIntValues == other._family._numIntValues,
-        "Different number of int values");
-    for (int i = 0; i < _family._numIntValues; i++) {
-      assert _intValues != null : "Int values should not be null because there are int keys";
-      assert other._intValues != null : "Int values should not be null because there are int keys";
-      K key = _family.getKey(i, Type.INT);
-      _intValues[i] = key.merge(_intValues[i], other._intValues[i]);
-    }
-
-    Preconditions.checkState(_family._numLongValues == other._family._numLongValues,
-        "Different number of long values");
-    for (int i = 0; i < _family._numLongValues; i++) {
-      assert _longValues != null : "Long values should not be null because there are long keys";
-      assert other._longValues != null : "Long values should not be null because there are long keys";
-      K key = _family.getKey(i, Type.LONG);
-      _longValues[i] = key.merge(_longValues[i], other._longValues[i]);
-    }
-
-    Preconditions.checkState(_family._numBooleanValues == other._family._numBooleanValues,
-        "Different number of boolean values");
-    for (int i = 0; i < _family._numBooleanValues; i++) {
-      assert _booleanValues != null : "Boolean values should not be null because there are boolean keys";
-      assert other._booleanValues != null : "Boolean values should not be null because there are boolean keys";
-      K key = _family.getKey(i, Type.BOOLEAN);
-      _booleanValues[i] = key.merge(_booleanValues[i], other._booleanValues[i]);
-    }
-
-    Preconditions.checkState(_family._numReferenceValues == other._family._numReferenceValues,
-        "Different number of reference values");
-    for (int i = 0; i < _family._numReferenceValues; i++) {
-      assert _referenceValues != null : "Reference values should not be null because there are reference keys";
-      assert other._referenceValues != null : "Reference values should not be null because there are reference keys";
-      if (_referenceValues[i] == null) {
-        _referenceValues[i] = other._referenceValues[i];
-      } else {
-        K key = _family.getKey(i, Type.STRING);
-        _referenceValues[i] = key.merge((String) _referenceValues[i], (String) other._referenceValues[i]);
+    Preconditions.checkState(_keyClass.equals(other._keyClass),
+        "Different key classes %s and %s", _keyClass, other._keyClass);
+    for (Map.Entry<K, Object> entry : other._map.entrySet()) {
+      K key = entry.getKey();
+      Object value = entry.getValue();
+      if (value == null) {
+        continue;
+      }
+      switch (key.getType()) {
+        case BOOLEAN:
+          merge(key, (boolean) value);
+          break;
+        case INT:
+          merge(key, (int) value);
+          break;
+        case LONG:
+          merge(key, (long) value);
+          break;
+        case STRING:
+          merge(key, (String) value);
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported type: " + key.getType());
       }
     }
     return this;
@@ -217,25 +177,22 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       throws IOException {
     byte serializedKeys = input.readByte();
 
+    K[] keys = (K[]) KEYS_BY_CLASS.computeIfAbsent(_keyClass, k -> k.getEnumConstants());
     for (byte i = 0; i < serializedKeys; i++) {
       int ordinal = input.readByte();
-      K key = _family._keys[ordinal];
+      K key = keys[ordinal];
       switch (key.getType()) {
         case BOOLEAN:
-          assert _booleanValues != null : "Boolean values should not be null because there are boolean keys";
-          _booleanValues[ordinal] = true;
+          merge(key, true);
           break;
         case INT:
-          assert _intValues != null : "Int values should not be null because there are int keys";
-          _intValues[ordinal] = key.merge(_intValues[ordinal], input.readInt());
+          merge(key, input.readInt());
           break;
         case LONG:
-          assert _longValues != null : "Long values should not be null because there are long keys";
-          _longValues[ordinal] = key.merge(_longValues[ordinal], input.readLong());
+          merge(key, input.readLong());
           break;
         case STRING:
-          assert _referenceValues != null : "Reference values should not be null because there are reference keys";
-          _referenceValues[ordinal] = key.merge((String) _referenceValues[ordinal], input.readUTF());
+          merge(key, input.readUTF());
           break;
         default:
           throw new IllegalStateException("Unknown type " + key.getType());
@@ -247,103 +204,69 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public ObjectNode asJson() {
     ObjectNode node = JsonUtils.newObjectNode();
 
-    for (int i = 0; i < _family._keys.length; i++) {
-      K key = _family._keys[i];
+    for (Map.Entry<K, Object> entry : _map.entrySet()) {
+      K key = entry.getKey();
+      Object value = entry.getValue();
+      if (value == null) {
+        continue;
+      }
       switch (key.getType()) {
         case BOOLEAN:
-          if (_booleanValues != null && _booleanValues[i]) {
-            node.put(key.getStatName(), true);
-          }
+          node.put(key.getStatName(), (boolean) value);
           break;
         case INT:
-          if (_intValues != null && _intValues[i] != 0) {
-            node.put(key.getStatName(), _intValues[i]);
-          }
+          node.put(key.getStatName(), (int) value);
           break;
         case LONG:
-          if (_longValues != null && _longValues[i] != 0) {
-            node.put(key.getStatName(), _longValues[i]);
-          }
+          node.put(key.getStatName(), (long) value);
           break;
         case STRING:
-          if (_referenceValues != null && _referenceValues[i] != null) {
-            node.put(key.getStatName(), (String) _referenceValues[i]);
-          }
+          node.put(key.getStatName(), (String) value);
           break;
         default:
-          throw new IllegalStateException("Unknown type " + key.getType());
+          throw new IllegalArgumentException("Unsupported type: " + key.getType());
       }
     }
 
     return node;
   }
 
-  public int size() {
-    int size = 0;
-    if (_intValues != null) {
-      for (int i = 0; i < _intValues.length; i++) {
-        if (_intValues[i] != 0) {
-          size++;
-        }
-      }
-    }
-    if (_longValues != null) {
-      for (int i = 0; i < _longValues.length; i++) {
-        if (_longValues[i] != 0) {
-          size++;
-        }
-      }
-    }
-    if (_booleanValues != null) {
-      for (int i = 0; i < _booleanValues.length; i++) {
-        if (_booleanValues[i]) {
-          size++;
-        }
-      }
-    }
-    if (_referenceValues != null) {
-      for (int i = 0; i < _referenceValues.length; i++) {
-        if (_referenceValues[i] != null) {
-          size++;
-        }
-      }
-    }
-    return size;
-  }
-
   public void serialize(DataOutput output)
       throws IOException {
 
-    output.writeByte(size());
+    output.writeByte(_map.size());
 
-    for (int i = 0; i < _family._keys.length; i++) {
-      K key = _family._keys[i];
-      byte index = _family.getIndex(key);
+    K[] keys = (K[]) KEYS_BY_CLASS.computeIfAbsent(_keyClass, k -> k.getEnumConstants());
+    for (int i = 0; i < keys.length; i++) {
+      K key = keys[i];
       switch (key.getType()) {
         case BOOLEAN: {
-          if (_booleanValues != null && _booleanValues[index]) {
+          if (getBoolean(key) || key.includeDefaultInJson()) {
             output.writeByte(i);
           }
           break;
         }
         case INT: {
-          if (_intValues != null && _intValues[index] != 0) {
+          int value = getInt(key);
+          if (value != 0 || key.includeDefaultInJson()) {
             output.writeByte(i);
-            output.writeInt(_intValues[index]);
+            output.writeInt(value);
           }
           break;
         }
         case LONG: {
-          if (_longValues != null && _longValues[index] != 0) {
+          long value = getLong(key);
+          if (value != 0 || key.includeDefaultInJson()) {
             output.writeByte(i);
-            output.writeLong(_longValues[index]);
+            output.writeLong(value);
           }
           break;
         }
         case STRING: {
-          if (_referenceValues != null && _referenceValues[index] != null) {
+          String value = getString(key);
+          if (value != null || key.includeDefaultInJson()) {
             output.writeByte(i);
-            output.writeUTF((String) _referenceValues[index]);
+            output.writeUTF(value);
           }
           break;
         }
@@ -369,19 +292,12 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       return false;
     }
     StatMap<?> statMap = (StatMap<?>) o;
-    return Objects.equals(_family, statMap._family) && Arrays.equals(_intValues, statMap._intValues)
-        && Arrays.equals(_longValues, statMap._longValues) && Arrays.equals(_booleanValues, statMap._booleanValues)
-        && Arrays.equals(_referenceValues, statMap._referenceValues);
+    return Objects.equals(_map, statMap._map);
   }
 
   @Override
   public int hashCode() {
-    int result = Objects.hash(_family);
-    result = 31 * result + Arrays.hashCode(_intValues);
-    result = 31 * result + Arrays.hashCode(_longValues);
-    result = 31 * result + Arrays.hashCode(_booleanValues);
-    result = 31 * result + Arrays.hashCode(_referenceValues);
-    return result;
+    return Objects.hash(_map);
   }
 
   @Override
@@ -390,177 +306,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   }
 
   public Class<K> getKeyClass() {
-    return _family._keyClass;
+    return _keyClass;
   }
 
   public boolean isEmpty() {
-    if (_intValues != null) {
-      for (int intValue : _intValues) {
-        if (intValue != 0) {
-          return false;
-        }
-      }
-    }
-    if (_longValues != null) {
-      for (long longValue : _longValues) {
-        if (longValue != 0) {
-          return false;
-        }
-      }
-    }
-    if (_booleanValues != null) {
-      for (boolean booleanValue : _booleanValues) {
-        if (booleanValue) {
-          return false;
-        }
-      }
-    }
-    if (_referenceValues != null) {
-      for (Object referenceValue : _referenceValues) {
-        if (referenceValue != null) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  private static class Family<K extends Enum<K> & Key> {
-    private final Class<K> _keyClass;
-    private final int _numIntValues;
-    private final int _numLongValues;
-    private final int _numBooleanValues;
-    private final int _numReferenceValues;
-    private final int _maxIndex;
-    private final byte[] _keyToIndexMap;
-    private final K[] _keys;
-
-    private static final ConcurrentHashMap<Class<? extends Enum>, Family> FAMILY_MAP = new ConcurrentHashMap<>();
-
-    private Family(Class<K> keyClass) {
-      _keyClass = keyClass;
-      _keys = keyClass.getEnumConstants();
-      if (_keys.length > Byte.MAX_VALUE) {
-        // In fact, we could support up to 256 keys if we interpret the byte as unsigned
-        throw new IllegalArgumentException("Too many keys: " + _keys.length);
-      }
-      byte numIntValues = 0;
-      byte numLongValues = 0;
-      byte numBooleanValues = 0;
-      byte numReferenceValues = 0;
-      _keyToIndexMap = new byte[_keys.length];
-      for (K key : _keys) {
-        int ordinal = key.ordinal();
-        switch (key.getType()) {
-          case BOOLEAN:
-            _keyToIndexMap[ordinal] = numBooleanValues++;
-            break;
-          case INT:
-            _keyToIndexMap[ordinal] = numIntValues++;
-            break;
-          case LONG:
-            _keyToIndexMap[ordinal] = numLongValues++;
-            break;
-          case STRING:
-            _keyToIndexMap[ordinal] = numReferenceValues++;
-            break;
-          default:
-            throw new IllegalStateException();
-        }
-      }
-      _numIntValues = numIntValues;
-      _numLongValues = numLongValues;
-      _numBooleanValues = numBooleanValues;
-      _numReferenceValues = numReferenceValues;
-      _maxIndex = Math.max(numIntValues, Math.max(numLongValues, Math.max(numBooleanValues, numReferenceValues)));
-    }
-
-    @SuppressWarnings("unchecked")
-    public static <K extends Enum<K> & Key> Family<K> getFamily(Class<K> keyClass) {
-      return FAMILY_MAP.computeIfAbsent(keyClass, k -> new Family(k));
-    }
-
-    @Nullable
-    private int[] createIntValues() {
-      if (_numIntValues == 0) {
-        return null;
-      }
-      return new int[_numIntValues];
-    }
-
-    @Nullable
-    private long[] createLongValues() {
-      if (_numLongValues == 0) {
-        return null;
-      }
-      return new long[_numLongValues];
-    }
-
-    @Nullable
-    private boolean[] createBooleanValues() {
-      if (_numBooleanValues == 0) {
-        return null;
-      }
-      return new boolean[_numBooleanValues];
-    }
-
-    @Nullable
-    private Object[] createReferenceValues() {
-      if (_numReferenceValues == 0) {
-        return null;
-      }
-      return new Object[_numReferenceValues];
-    }
-
-    private byte getIndex(K key) {
-      if (key.getClass() != _keyClass) {
-        throw new IllegalArgumentException("Key " + key + " is not from family " + _keyClass);
-      }
-      return _keyToIndexMap[key.ordinal()];
-    }
-
-    private K getKey(int index, Type type) {
-      for (int i = 0; i < _keyToIndexMap.length; i++) {
-        int actualIndex = _keyToIndexMap[i];
-        if (actualIndex == index && _keys[i].getType() == type) {
-          return _keys[i];
-        }
-      }
-      throw new IllegalArgumentException("Unknown key for index " + index + " and type " + type);
-    }
-
-    /**
-     * Returns a list with the keys of a given type.
-     *
-     * The iteration order is the ascending order of calling {@code #getIndex(K)}.
-     */
-    private List<K> getKeysOfType(Type type) {
-      return Arrays.stream(_keyClass.getEnumConstants())
-          .filter(key -> key.getType() == type)
-          .collect(Collectors.toList());
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-      Family<?> family = (Family<?>) o;
-      return Objects.equals(_keyClass, family._keyClass);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(_keyClass);
-    }
-
-    @Override
-    public String toString() {
-      return "Family{" + "_keyClass=" + _keyClass + '}';
-    }
+    return _map.isEmpty();
   }
 
   public interface Key {
