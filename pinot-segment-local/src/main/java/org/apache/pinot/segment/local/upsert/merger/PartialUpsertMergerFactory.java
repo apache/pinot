@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -52,9 +51,7 @@ public class PartialUpsertMergerFactory {
         partialUpsertMerger =
             (PartialUpsertMerger) partialUpsertMergerClass.getConstructor(List.class, List.class, UpsertConfig.class)
                 .newInstance(primaryKeyColumns, comparisonColumns, upsertConfig);
-      } catch (ClassNotFoundException
-               | NoSuchMethodException | InstantiationException | IllegalAccessException
-               | InvocationTargetException e) {
+      } catch (Exception e) {
         throw new RuntimeException(
             String.format("Could not load partial upsert implementation class by name %s", customRowMerger), e);
       }

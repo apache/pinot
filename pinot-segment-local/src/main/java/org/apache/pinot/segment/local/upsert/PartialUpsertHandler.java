@@ -20,11 +20,12 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
-import org.apache.pinot.segment.local.upsert.merger.PartialUpsertColumnarMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMerger;
 import org.apache.pinot.segment.local.upsert.merger.PartialUpsertMergerFactory;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -43,51 +44,36 @@ public class PartialUpsertHandler {
   private final List<String> _comparisonColumns;
   private final List<String> _primaryKeyColumns;
   private final PartialUpsertMerger _partialUpsertMerger;
+  private final TreeMap<String, FieldSpec> _fieldSpecMap;
 
   public PartialUpsertHandler(Schema schema, List<String> comparisonColumns, UpsertConfig upsertConfig) {
     _comparisonColumns = comparisonColumns;
     _primaryKeyColumns = schema.getPrimaryKeyColumns();
+    _fieldSpecMap = schema.getFieldSpecMap();
 
     _partialUpsertMerger =
         PartialUpsertMergerFactory.getPartialUpsertMerger(_primaryKeyColumns, comparisonColumns, upsertConfig);
   }
 
   public void merge(LazyRow prevRecord, GenericRow newRecord, Map<String, Object> reuseMergerResult) {
-    reuseMergerResult.clear();
 
     // merger current row with previously indexed row
     _partialUpsertMerger.merge(prevRecord, newRecord, reuseMergerResult);
 
-    if (_partialUpsertMerger instanceof PartialUpsertColumnarMerger) {
-      // iterate over all columns in prevRecord and update newRecord with merged values
-      for (String column : prevRecord.getColumnNames()) {
-        // no merger to apply on primary key columns
-        if (_primaryKeyColumns.contains(column) || _comparisonColumns.contains(column)) {
-          continue;
-        }
-
-        // use merged column value from result map
-        if (reuseMergerResult.containsKey(column)) {
-          Object mergedValue = reuseMergerResult.get(column);
-          setMergedValue(newRecord, column, mergedValue);
-        }
+    // iterate over only merger results and update newRecord with merged values
+    for (Map.Entry<String, Object> entry : reuseMergerResult.entrySet()) {
+      // skip if primary key column
+      String column = entry.getKey();
+      if (_primaryKeyColumns.contains(column) || _comparisonColumns.contains(column)) {
+        continue;
       }
-    } else {
-      // iterate over only merger results and update newRecord with merged values
-      for (Map.Entry<String, Object> entry : reuseMergerResult.entrySet()) {
-        // skip if primary key column
-        String column = entry.getKey();
-        if (_primaryKeyColumns.contains(column) || _comparisonColumns.contains(column)) {
-          continue;
-        }
 
-        Object mergedValue = entry.getValue();
-        setMergedValue(newRecord, column, mergedValue);
-      }
+      Object mergedValue = entry.getValue();
+      setMergedValue(newRecord, column, mergedValue);
     }
 
     // handle comparison columns
-    for (String column: _comparisonColumns) {
+    for (String column : _comparisonColumns) {
       if (newRecord.isNullValue(column) && !prevRecord.isNullValue(column)) {
         newRecord.putValue(column, prevRecord.getValue(column));
         newRecord.removeNullValueField(column);
@@ -102,8 +88,7 @@ public class PartialUpsertHandler {
       newRecord.putValue(column, mergedValue);
     } else {
       // if column exists but mapped to a null value then merger result was a null value
-      newRecord.addNullValueField(column);
-      newRecord.putValue(column, null);
+      newRecord.putDefaultNullValue(column, _fieldSpecMap.get(column).getDefaultNullValue());
     }
   }
 }

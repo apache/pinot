@@ -342,6 +342,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
             int currentDocId = recordLocation.getDocId();
             if (currentQueryableDocIds == null || currentQueryableDocIds.contains(currentDocId)) {
               _reusePreviousRow.init(currentSegment, currentDocId);
+              _reuseMergerResult.clear();
               _partialUpsertHandler.merge(_reusePreviousRow, record, _reuseMergerResult);
             }
           }
