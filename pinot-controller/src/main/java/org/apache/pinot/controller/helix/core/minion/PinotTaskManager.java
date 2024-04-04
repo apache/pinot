@@ -694,7 +694,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       }
     }
     for (Map.Entry<TaskState, Integer> taskStateEntry : _taskStateToCountMap.entrySet()) {
-      _controllerMetrics.setValueOfTaskGauge(String.format("%s.%s", taskType, taskStateEntry.getKey()),
+      _controllerMetrics.setValueOfTableGauge(String.format("%s.%s", taskType, taskStateEntry.getKey()),
           ControllerGauge.TASK_STATUS, taskStateEntry.getValue());
     }
   }

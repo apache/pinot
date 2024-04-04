@@ -412,18 +412,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   /**
-   * Sets the value of a task type and it's state gauge.
-   *
-   * @param taskTypeState The resource name
-   * @param gauge The gauge to use
-   * @param value The value to set the gauge to
-   */
-  public void setValueOfTaskGauge(final String taskTypeState, final G gauge, final long value) {
-    final String fullGaugeName = composeGlobalGaugeName(taskTypeState, gauge);
-    setValueOfGauge(value, fullGaugeName);
-  }
-
-  /**
    * Sets the value of a table partition gauge.
    *
    * @param tableName The table name
