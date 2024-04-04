@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.minion;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Map;
@@ -52,9 +51,6 @@ public class MinionClient {
   private static final String ACCEPT = "accept";
   private static final String APPLICATION_JSON = "application/json";
   private static final String HTTP = "http";
-  private static final TypeReference<Map<String, String>> TYPEREF_MAP_STRING_STRING =
-      new TypeReference<Map<String, String>>() {
-      };
 
   private final String _controllerUrl;
   private final AuthProvider _authProvider;
@@ -80,7 +76,7 @@ public class MinionClient {
           String.format("Unable to schedule minion tasks. Error code %d, Error message: %s", statusCode,
               responseString));
     }
-    return JsonUtils.stringToObject(responseString, TYPEREF_MAP_STRING_STRING);
+    return JsonUtils.stringToMap(responseString);
   }
 
   public Map<String, String> getTasksStates(String taskType)
@@ -94,7 +90,7 @@ public class MinionClient {
           String.format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode,
               responseString));
     }
-    return JsonUtils.stringToObject(responseString, TYPEREF_MAP_STRING_STRING);
+    return JsonUtils.stringToMap(responseString);
   }
 
   public String getTaskState(String taskName)
@@ -127,7 +123,7 @@ public class MinionClient {
           String.format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode,
               responseString));
     }
-    return JsonUtils.stringToObject(responseString, TYPEREF_MAP_STRING_STRING);
+    return JsonUtils.stringToMap(responseString);
   }
 
   private HttpGet createHttpGetRequest(String uri) {
