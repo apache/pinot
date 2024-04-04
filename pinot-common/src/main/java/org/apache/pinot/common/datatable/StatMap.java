@@ -25,10 +25,9 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntPredicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -68,7 +67,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   private final Object[] _referenceValues;
 
   public StatMap(Class<K> keyClass) {
-    Family<K> family = new Family<>(keyClass);
+    Family<K> family = Family.getFamily(keyClass);
     _family = family;
     _intValues = family.createIntValues();
     _longValues = family.createLongValues();
@@ -582,29 +581,37 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     private final int _numBooleanValues;
     private final int _numReferenceValues;
     private final int _maxIndex;
-    private final EnumMap<K, Integer> _keyToIndexMap;
+    private final byte[] _keyToIndexMap;
+    private final K[] _keys;
+
+    private static final ConcurrentHashMap<Class<? extends Enum>, Family> FAMILY_MAP = new ConcurrentHashMap<>();
 
     private Family(Class<K> keyClass) {
       _keyClass = keyClass;
-      K[] keys = keyClass.getEnumConstants();
-      int numIntValues = 0;
-      int numLongValues = 0;
-      int numBooleanValues = 0;
-      int numReferenceValues = 0;
-      _keyToIndexMap = new EnumMap<>(keyClass);
-      for (K key : keys) {
+      _keys = keyClass.getEnumConstants();
+      if (_keys.length > Byte.MAX_VALUE) {
+        // In fact, we could support up to 256 keys if we interpret the byte as unsigned
+        throw new IllegalArgumentException("Too many keys: " + _keys.length);
+      }
+      byte numIntValues = 0;
+      byte numLongValues = 0;
+      byte numBooleanValues = 0;
+      byte numReferenceValues = 0;
+      _keyToIndexMap = new byte[_keys.length];
+      for (K key : _keys) {
+        int ordinal = key.ordinal();
         switch (key.getType()) {
           case BOOLEAN:
-            _keyToIndexMap.put(key, numBooleanValues++);
+            _keyToIndexMap[ordinal] = numBooleanValues++;
             break;
           case INT:
-            _keyToIndexMap.put(key, numIntValues++);
+            _keyToIndexMap[ordinal] = numIntValues++;
             break;
           case LONG:
-            _keyToIndexMap.put(key, numLongValues++);
+            _keyToIndexMap[ordinal] = numLongValues++;
             break;
           case STRING:
-            _keyToIndexMap.put(key, numReferenceValues++);
+            _keyToIndexMap[ordinal] = numReferenceValues++;
             break;
           default:
             throw new IllegalStateException();
@@ -615,6 +622,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       _numBooleanValues = numBooleanValues;
       _numReferenceValues = numReferenceValues;
       _maxIndex = Math.max(numIntValues, Math.max(numLongValues, Math.max(numBooleanValues, numReferenceValues)));
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <K extends Enum<K> & Key> Family<K> getFamily(Class<K> keyClass) {
+      return FAMILY_MAP.computeIfAbsent(keyClass, k -> new Family(k));
     }
 
     @Nullable
@@ -649,18 +661,18 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       return new Object[_numReferenceValues];
     }
 
-    private int getIndex(K key) {
-      Integer i = _keyToIndexMap.get(key);
-      if (i == null) {
-        throw new IllegalArgumentException("Unknown key: " + key + " for family " + _keyClass);
+    private byte getIndex(K key) {
+      if (key.getClass() != _keyClass) {
+        throw new IllegalArgumentException("Key " + key + " is not from family " + _keyClass);
       }
-      return i;
+      return _keyToIndexMap[key.ordinal()];
     }
 
     private K getKey(int index, Type type) {
-      for (Map.Entry<K, Integer> entry : _keyToIndexMap.entrySet()) {
-        if (entry.getValue() == index && entry.getKey().getType() == type) {
-          return entry.getKey();
+      for (int i = 0; i < _keyToIndexMap.length; i++) {
+        int actualIndex = _keyToIndexMap[i];
+        if (actualIndex == index && _keys[i].getType() == type) {
+          return _keys[i];
         }
       }
       throw new IllegalArgumentException("Unknown key for index " + index + " and type " + type);
