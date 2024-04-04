@@ -619,7 +619,7 @@ public class PinotTaskRestletResource {
   public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
       @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
       @ApiParam(value = "Minion Instance tag to schedule the task explicitly on")
-      @QueryParam("minionInstanceTag") String minionInstanceTag,
+      @QueryParam("minionInstanceTag") @Nullable String minionInstanceTag,
       @Context HttpHeaders headers) {
     String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;
     if (taskType != null) {

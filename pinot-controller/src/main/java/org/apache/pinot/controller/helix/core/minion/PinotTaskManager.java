@@ -494,7 +494,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Returns a map from the task type to the list of tasks scheduled.
    */
   public synchronized Map<String, List<String>> scheduleTasksForDatabase(@Nullable String database,
-      String minionInstanceTag) {
+      @Nullable String minionInstanceTag) {
     return scheduleTasks(_pinotHelixResourceManager.getAllTables(database), false, minionInstanceTag);
   }
 
@@ -503,7 +503,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * from the task type to the list of the tasks scheduled.
    */
   private synchronized Map<String, List<String>> scheduleTasks(List<String> tableNamesWithType,
-      boolean isLeader, String minionInstanceTag) {
+      boolean isLeader, @Nullable String minionInstanceTag) {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     // Scan all table configs to get the tables with tasks enabled
@@ -547,7 +547,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    */
   @Nullable
   private List<String> scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
-      boolean isLeader, String minionInstanceTagForTask) {
+      boolean isLeader, @Nullable String minionInstanceTagForTask) {
     LOGGER.info("Trying to schedule task type: {}, isLeader: {}", taskGenerator.getTaskType(), isLeader);
     Map<String, List<PinotTaskConfig>> minionInstanceTagToTaskConfigs = new HashMap<>();
     String taskType = taskGenerator.getTaskType();
@@ -634,7 +634,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Public API to schedule tasks (all task types) for the given table on a specific instance tag.
    * It might be called from the non-leader controller. Returns a map from the task type to the list of tasks scheduled.
    */
-  public synchronized Map<String, List<String>> scheduleTasks(String tableNameWithType, String minionInstanceTag) {
+  public synchronized Map<String, List<String>> scheduleTasks(String tableNameWithType,
+      @Nullable String minionInstanceTag) {
     return scheduleTasks(Collections.singletonList(tableNameWithType), false, minionInstanceTag);
   }
 
@@ -644,7 +645,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Returns the list of task names, or {@code null} if no task is scheduled.
    */
   @Nullable
-  public synchronized List<String> scheduleTask(String taskType, String minionInstanceTag) {
+  public synchronized List<String> scheduleTask(String taskType, @Nullable String minionInstanceTag) {
     return scheduleTask(taskType, _pinotHelixResourceManager.getAllTables(), minionInstanceTag);
   }
 
@@ -655,12 +656,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    */
   @Nullable
   public synchronized List<String> scheduleTaskForDatabase(String taskType, @Nullable String database,
-      String minionInstanceTag) {
+      @Nullable String minionInstanceTag) {
     return scheduleTask(taskType, _pinotHelixResourceManager.getAllTables(database), minionInstanceTag);
   }
 
   @Nullable
-  private List<String> scheduleTask(String taskType, List<String> tables, String minionInstanceTag) {
+  private List<String> scheduleTask(String taskType, List<String> tables, @Nullable String minionInstanceTag) {
     PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
     Preconditions.checkState(taskGenerator != null, "Task type: %s is not registered", taskType);
 
@@ -684,7 +685,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * controller. Returns the list of task names, or {@code null} if no task is scheduled.
    */
   @Nullable
-  public synchronized List<String> scheduleTask(String taskType, String tableNameWithType, String minionInstanceTag) {
+  public synchronized List<String> scheduleTask(String taskType, String tableNameWithType,
+      @Nullable String minionInstanceTag) {
     PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
     Preconditions.checkState(taskGenerator != null, "Task type: %s is not registered", taskType);
 
