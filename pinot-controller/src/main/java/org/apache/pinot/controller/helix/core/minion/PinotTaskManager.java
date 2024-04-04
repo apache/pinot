@@ -484,6 +484,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * It might be called from the non-leader controller.
    * Returns a map from the task type to the list of tasks scheduled.
    */
+  @Deprecated
   public synchronized Map<String, List<String>> scheduleTasks() {
     return scheduleTasks(_pinotHelixResourceManager.getAllTables(CommonConstants.DEFAULT_DATABASE), false);
   }
