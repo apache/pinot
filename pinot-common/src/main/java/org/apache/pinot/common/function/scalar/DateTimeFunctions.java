@@ -1182,8 +1182,8 @@ public class DateTimeFunctions {
   }
 
   /**
-   * Utility method to aligns a given timestamp in epoch Millis to the nearest bin defined by the specified duration string,
-   * starting from an origin timestamp in epoch Millis.
+   * Utility method to aligns a given timestamp in epoch Millis to the nearest bin defined by the specified
+   * duration string, starting from an origin timestamp in epoch Millis.
    *
    * @param binWidthStr The width of each bin as an ISO-8601 duration string (e.g., "PT15M" for 15 minutes).
    * @param sourceMillisEpoch The source time in epoch millis to be aligned.
