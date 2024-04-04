@@ -32,26 +32,27 @@ public class FlushThresholdUpdateManager {
   /**
    * Check table config for flush size.
    *
-   * If flush rows > 0, create a new DefaultFlushThresholdUpdater with given flush size,
-   * If flush rows <= 0 and segment.rows > 0, create new FixedFlushThresholdUpdater with given flush size,
-   * If flush rows <= 0 AND segment.rows <=0, create new SegmentSizeBasedFlushThresholdUpdater if not already created.
-   * Create only 1 per table because we want to maintain tuning information for the table in the updater.
+   * If flush rows > 0, create a new DefaultFlushThresholdUpdater with the given flush size.
+   * If flush segment rows > 0, create a new FixedFlushThresholdUpdater with the given flush size.
+   * If flush segment size > 0, create a new SegmentSizeBasedFlushThresholdUpdater if not already created. Create only 1
+   * per table because we want to maintain tuning information for the table in the updater.
    *
-   * realtime.segment.flush.threshold.rows -> DefaultFlushThresholdUpdater, this config considers
-   * the number of rows and total partition to determine when to flush, whereas
-   * realtime.segment.flush.threshold.segment.rows -> FixedFlushThresholdUpdater,
-   * will the flush segment based on segment.rows, independent of the number of partitions.
+   * LEGACY BEHAVIOR:
+   * If flush rows = 0, use segment size based flush threshold.
+   * If none of the above are set, create a new DefaultFlushThresholdUpdater.
+   *
+   * DefaultFlushThresholdUpdater sets the actual segment flush threshold to be flush rows divided by max number of
+   * partitions consumed by a server; FixedFlushThresholdUpdater sets the actual segment flush threshold as is.
    */
   public FlushThresholdUpdater getFlushThresholdUpdater(StreamConfig streamConfig) {
     String realtimeTableName = streamConfig.getTableNameWithType();
 
     int flushThresholdRows = streamConfig.getFlushThresholdRows();
-    int flushThresholdSegmentRows = streamConfig.getFlushThresholdSegmentRows();
-
     if (flushThresholdRows > 0) {
       _flushThresholdUpdaterMap.remove(realtimeTableName);
       return new DefaultFlushThresholdUpdater(flushThresholdRows);
     }
+    int flushThresholdSegmentRows = streamConfig.getFlushThresholdSegmentRows();
     if (flushThresholdSegmentRows > 0) {
       _flushThresholdUpdaterMap.remove(realtimeTableName);
       return new FixedFlushThresholdUpdater(flushThresholdSegmentRows);

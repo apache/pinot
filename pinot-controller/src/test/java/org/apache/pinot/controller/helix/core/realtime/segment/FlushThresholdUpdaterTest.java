@@ -53,42 +53,38 @@ public class FlushThresholdUpdaterTest {
   public void testFlushThresholdUpdateManager() {
     FlushThresholdUpdateManager flushThresholdUpdateManager = new FlushThresholdUpdateManager();
 
-    // Neither flush threshold rows nor segment size is set - DefaultFlushThresholdUpdater should be returned
+    // None of the flush threshold set - DefaultFlushThresholdUpdater should be returned
     FlushThresholdUpdater flushThresholdUpdater =
-        flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(-1, -1));
+        flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(-1, -1, -1));
     assertTrue(flushThresholdUpdater instanceof DefaultFlushThresholdUpdater);
     assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(),
         StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
 
     // Flush threshold rows larger than 0 - DefaultFlushThresholdUpdater should be returned
-    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(1234, -1));
+    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(1234, -1, -1));
     assertTrue(flushThresholdUpdater instanceof DefaultFlushThresholdUpdater);
     assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(), 1234);
 
-    // Flush threshold rows set to 0 and Segment Rows larger than 0 -
-    // FixedFlushThresholdUpdater should be returned
-    FlushThresholdUpdater segmentRowsFlushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(
-        mockSegmentRowsStreamConfig(StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS));
-    assertTrue(segmentRowsFlushThresholdUpdater instanceof FixedFlushThresholdUpdater);
-    assertEquals(((FixedFlushThresholdUpdater) segmentRowsFlushThresholdUpdater).getTableFlushSize(),
-        StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);
+    // Flush threshold segment rows larger than 0 - FixedFlushThresholdUpdater should be returned
+    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(-1, 1234, -1));
+    assertTrue(flushThresholdUpdater instanceof FixedFlushThresholdUpdater);
 
     // Flush threshold rows set to 0 - SegmentSizeBasedFlushThresholdUpdater should be returned
     FlushThresholdUpdater segmentBasedflushThresholdUpdater =
-        flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(0, -1));
+        flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(0, -1, -1));
     assertTrue(segmentBasedflushThresholdUpdater instanceof SegmentSizeBasedFlushThresholdUpdater);
 
     // Flush threshold segment size larger than 0 - SegmentSizeBasedFlushThresholdUpdater should be returned
-    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(-1, 1234));
+    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(0, -1, 1234));
     assertSame(flushThresholdUpdater, segmentBasedflushThresholdUpdater);
 
     // Flush threshold rows set larger than 0 - DefaultFlushThresholdUpdater should be returned
-    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(12345, -1));
+    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(12345, -1, -1));
     assertTrue(flushThresholdUpdater instanceof DefaultFlushThresholdUpdater);
     assertEquals(((DefaultFlushThresholdUpdater) flushThresholdUpdater).getTableFlushSize(), 12345);
 
     // Call again with flush threshold rows set to 0 - a different Object should be returned
-    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(0, -1));
+    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(0, -1, -1));
     assertTrue(flushThresholdUpdater instanceof SegmentSizeBasedFlushThresholdUpdater);
     assertNotSame(flushThresholdUpdater, segmentBasedflushThresholdUpdater);
     segmentBasedflushThresholdUpdater = flushThresholdUpdater;
@@ -97,54 +93,18 @@ public class FlushThresholdUpdaterTest {
     flushThresholdUpdateManager.clearFlushThresholdUpdater(REALTIME_TABLE_NAME);
 
     // Call again with flush threshold rows set to 0 - a different Object should be returned
-    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(0, -1));
+    flushThresholdUpdater = flushThresholdUpdateManager.getFlushThresholdUpdater(mockStreamConfig(0, -1, -1));
     assertTrue(flushThresholdUpdater instanceof SegmentSizeBasedFlushThresholdUpdater);
     assertNotSame(flushThresholdUpdater, segmentBasedflushThresholdUpdater);
   }
 
-    private StreamConfig mockStreamConfig(int flushThresholdRows, long flushThresholdSegmentSize) {
+  private StreamConfig mockStreamConfig(int flushThresholdRows, int flushThresholdSegmentRows,
+      long flushThresholdSegmentSize) {
     StreamConfig streamConfig = mock(StreamConfig.class);
     when(streamConfig.getTableNameWithType()).thenReturn(REALTIME_TABLE_NAME);
     when(streamConfig.getFlushThresholdRows()).thenReturn(flushThresholdRows);
-    when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(flushThresholdSegmentSize);
-    return streamConfig;
-  }
-
-  @Test
-  public void testDefaultFlushThreshold() {
-    StreamConfig streamConfig = mockStreamConfig(10000, 0);
-    DefaultFlushThresholdUpdater flushThresholdUpdater = new DefaultFlushThresholdUpdater(10000);
-    SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
-    CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
-    int maxNumPartitionsPerInstance = 4;
-
-    flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor, null,
-        maxNumPartitionsPerInstance);
-
-    // 10000 / 4 partition => 2500
-    assertEquals(newSegmentZKMetadata.getSizeThresholdToFlushSegment(), 2500);
-  }
-
-  @Test
-  public void testSegmentRowBasedFlushThreshold() {
-    StreamConfig streamConfig = mockSegmentRowsStreamConfig(10000);
-    FixedFlushThresholdUpdater flushThresholdUpdater = new FixedFlushThresholdUpdater(10000);
-    SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
-    CommittingSegmentDescriptor committingSegmentDescriptor = getCommittingSegmentDescriptor(0L);
-    int maxNumPartitionsPerInstance = 4;
-
-    flushThresholdUpdater.updateFlushThreshold(streamConfig, newSegmentZKMetadata, committingSegmentDescriptor, null,
-        maxNumPartitionsPerInstance);
-
-    // 10000 -> 10000
-    assertEquals(newSegmentZKMetadata.getSizeThresholdToFlushSegment(), 10000);
-  }
-
-  private StreamConfig mockSegmentRowsStreamConfig(int flushThresholdSegmentRows) {
-    StreamConfig streamConfig = mock(StreamConfig.class);
-    when(streamConfig.getTableNameWithType()).thenReturn(REALTIME_TABLE_NAME);
-    when(streamConfig.getFlushThresholdRows()).thenReturn(0);
     when(streamConfig.getFlushThresholdSegmentRows()).thenReturn(flushThresholdSegmentRows);
+    when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(flushThresholdSegmentSize);
     return streamConfig;
   }
 
@@ -177,8 +137,8 @@ public class FlushThresholdUpdaterTest {
     long segmentSizeLowerLimit = (long) (desiredSegmentSizeBytes * 0.99);
     long segmentSizeHigherLimit = (long) (desiredSegmentSizeBytes * 1.01);
 
-    for (long[] segmentSizesMB : Arrays
-        .asList(EXPONENTIAL_GROWTH_SEGMENT_SIZES_MB, LOGARITHMIC_GROWTH_SEGMENT_SIZES_MB, STEPS_SEGMENT_SIZES_MB)) {
+    for (long[] segmentSizesMB : Arrays.asList(EXPONENTIAL_GROWTH_SEGMENT_SIZES_MB, LOGARITHMIC_GROWTH_SEGMENT_SIZES_MB,
+        STEPS_SEGMENT_SIZES_MB)) {
       SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
 
       // Start consumption
@@ -214,8 +174,8 @@ public class FlushThresholdUpdaterTest {
     long segmentSizeLowerLimit = (long) (desiredSegmentSizeBytes * 0.99);
     long segmentSizeHigherLimit = (long) (desiredSegmentSizeBytes * 1.01);
 
-    for (long[] segmentSizesMB : Arrays
-        .asList(EXPONENTIAL_GROWTH_SEGMENT_SIZES_MB, LOGARITHMIC_GROWTH_SEGMENT_SIZES_MB, STEPS_SEGMENT_SIZES_MB)) {
+    for (long[] segmentSizesMB : Arrays.asList(EXPONENTIAL_GROWTH_SEGMENT_SIZES_MB, LOGARITHMIC_GROWTH_SEGMENT_SIZES_MB,
+        STEPS_SEGMENT_SIZES_MB)) {
       SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
 
       // Start consumption
