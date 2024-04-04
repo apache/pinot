@@ -72,6 +72,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     }
     int oldValue = getInt(key);
     int newValue = key.merge(oldValue, value);
+    if (newValue == 0) {
+      _map.remove(key);
+    } else {
+      _map.put(key, newValue);
+    }
     _map.put(key, newValue);
     return this;
   }
@@ -86,9 +91,14 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   }
 
   public StatMap<K> merge(K key, long value) {
+    Preconditions.checkArgument(key.getType() == Type.LONG);
     long oldValue = getLong(key);
     long newValue = key.merge(oldValue, value);
-    _map.put(key, newValue);
+    if (newValue == 0) {
+      _map.remove(key);
+    } else {
+      _map.put(key, newValue);
+    }
     return this;
   }
 
@@ -101,7 +111,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public StatMap<K> merge(K key, boolean value) {
     boolean oldValue = getBoolean(key);
     boolean newValue = key.merge(oldValue, value);
-    _map.put(key, newValue);
+    if (!newValue) {
+      _map.remove(key);
+    } else {
+      _map.put(key, Boolean.TRUE);
+    }
     return this;
   }
 
@@ -114,6 +128,11 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public StatMap<K> merge(K key, String value) {
     String oldValue = getString(key);
     String newValue = key.merge(oldValue, value);
+    if (newValue == null) {
+      _map.remove(key);
+    } else {
+      _map.put(key, newValue);
+    }
     _map.put(key, newValue);
     return this;
   }
