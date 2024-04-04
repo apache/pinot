@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.stream.kafka20;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -42,7 +43,7 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
    *                            delay when a batch has all messages filtered.
    */
   public KafkaMessageBatch(List<BytesStreamMessage> messages, int unfilteredMessageCount, long offsetOfNextBatch,
-      long firstOffset, StreamMessageMetadata lastMessageMetadata) {
+      long firstOffset, @Nullable StreamMessageMetadata lastMessageMetadata) {
     _messages = messages;
     _unfilteredMessageCount = unfilteredMessageCount;
     _offsetOfNextBatch = offsetOfNextBatch;
@@ -70,11 +71,13 @@ public class KafkaMessageBatch implements MessageBatch<byte[]> {
     return new LongMsgOffset(_offsetOfNextBatch);
   }
 
+  @Nullable
   @Override
   public StreamPartitionMsgOffset getFirstMessageOffset() {
     return _firstOffset >= 0 ? new LongMsgOffset(_firstOffset) : null;
   }
 
+  @Nullable
   @Override
   public StreamMessageMetadata getLastMessageMetadata() {
     return _lastMessageMetadata;
