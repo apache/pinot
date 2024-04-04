@@ -244,8 +244,6 @@ public class ValidationMetrics {
 
   @VisibleForTesting
   public static String makeGaugeName(final String tableNameWithType, final String gaugeName) {
-    // replace the '.' with '#' in tableNameWithType which is available in the format db1.table1_OFFLINE to
-    // avoid breaking the metric rules which are sensitive to '.' character.
     return "pinot.controller." + StringUtils.replaceOnce(tableNameWithType, ".", "#") + "." + gaugeName;
   }
 
