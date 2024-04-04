@@ -23,7 +23,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class SegmentContext {
-  private IndexSegment _indexSegment;
+  private final IndexSegment _indexSegment;
   private MutableRoaringBitmap _queryableDocIdsSnapshot = null;
 
   public SegmentContext(IndexSegment indexSegment) {
