@@ -72,6 +72,7 @@ import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.TablesList;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarGzCompressionUtils;
@@ -106,12 +107,18 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = "Table", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+@Api(tags = "Table", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY),
+    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
 @Path("/")
 public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);
@@ -153,7 +160,8 @@ public class TablesResource {
   })
   public String listTableSegments(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
-      @PathParam("tableName") String tableName) {
+      @PathParam("tableName") String tableName, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
@@ -183,8 +191,9 @@ public class TablesResource {
   public String getSegmentMetadata(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns)
+      List<String> columns, @Context HttpHeaders headers)
       throws WebApplicationException {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
 
     if (instanceDataManager == null) {
@@ -319,8 +328,9 @@ public class TablesResource {
   })
   public String getTableIndexes(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
-      @PathParam("tableName") String tableName)
+      @PathParam("tableName") String tableName, @Context HttpHeaders headers)
       throws Exception {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     List<SegmentDataManager> allSegments = tableDataManager.acquireAllSegments();
     try {
@@ -367,7 +377,8 @@ public class TablesResource {
       @PathParam("tableName") String tableName,
       @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns) {
+      List<String> columns, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     for (int i = 0; i < columns.size(); i++) {
       try {
         columns.set(i, URLDecoder.decode(columns.get(i), StandardCharsets.UTF_8.name()));
@@ -410,7 +421,8 @@ public class TablesResource {
   })
   public String getCrcMetadataForTable(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
-      @PathParam("tableName") String tableName) {
+      @PathParam("tableName") String tableName, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
@@ -441,6 +453,7 @@ public class TablesResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders)
       throws Exception {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
     LOGGER.info("Received a request to download segment {} for table {}", segmentName, tableNameWithType);
     // Validate data access
     ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
@@ -495,6 +508,7 @@ public class TablesResource {
       @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
     segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
     // Validate data access
@@ -555,6 +569,7 @@ public class TablesResource {
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Valid doc ids type")
       @QueryParam("validDocIdsType") String validDocIdsType, @Context HttpHeaders httpHeaders) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
     segmentName = URIUtils.decode(segmentName);
     LOGGER.info("Received a request to download validDocIds for segment {} table {}", segmentName, tableNameWithType);
     // Validate data access
@@ -613,7 +628,9 @@ public class TablesResource {
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc ids type")
       @QueryParam("validDocIdsType") String validDocIdsType,
-      @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames) {
+      @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames,
+      @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     return ResourceUtils.convertToJsonString(
         processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
   }
@@ -631,7 +648,9 @@ public class TablesResource {
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
       @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments) {
+      @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments,
+      @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
         processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
@@ -751,8 +770,10 @@ public class TablesResource {
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
       String realtimeTableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
-      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs)
+      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
+      @Context HttpHeaders headers)
       throws Exception {
+    realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
     LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
         realtimeTableName);
 
@@ -823,7 +844,8 @@ public class TablesResource {
           + "currentOffsetsMap")
   public List<SegmentConsumerInfo> getConsumingSegmentsInfo(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
-      String realtimeTableName) {
+      String realtimeTableName, @Context HttpHeaders headers) {
+    realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
     if (TableType.OFFLINE == tableType) {
       throw new WebApplicationException("Cannot get consuming segment info for OFFLINE table: " + realtimeTableName);
@@ -873,7 +895,8 @@ public class TablesResource {
       "Validates if the ideal state matches with the segment state on this server")
   public TableSegmentValidationInfo validateTableSegmentState(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableNameWithType")
-      String tableNameWithType) {
+      String tableNameWithType, @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     // Get table current ideal state
     IdealState tableIdealState = HelixHelper.getTableIdealState(_serverInstance.getHelixManager(), tableNameWithType);
     TableDataManager tableDataManager =
