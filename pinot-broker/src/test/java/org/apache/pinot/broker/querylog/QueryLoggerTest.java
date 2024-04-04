@@ -101,14 +101,14 @@ public class QueryLoggerTest {
         + "entries=3/4,"
         + "segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/unavailable)"
         + ":5/6/7/8/9/10/24,"
-        + "consumingFreshnessTimeMs=11,"
+        + "consumingFreshnessTimeMs=0,"
         + "servers=12/13,"
         + "groupLimitReached=false,"
         + "brokerReduceTimeMs=22,"
         + "exceptions=0,"
         + "serverStats=serverStats,"
-        + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):14/15/16/17,"
-        + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):18/19/20/21,"
+        + "offlineThreadCpuTimeNs(total/thread/sysActivity/resSer):48/15/16/17,"
+        + "realtimeThreadCpuTimeNs(total/thread/sysActivity/resSer):60/19/20/21,"
         + "clientIp=ip,"
         + "query=SELECT * FROM foo");
   }
