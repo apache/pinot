@@ -126,14 +126,15 @@ public class MultiValueVarByteRawIndexCreatorTest {
     }
 
     //read
-    final PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-    ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.STRING, false);
-    final ForwardIndexReaderContext context = reader.createContext();
-    String[] values = new String[maxElements];
-    for (int i = 0; i < numDocs; i++) {
-      int length = reader.getStringMV(i, values, context);
-      String[] readValue = Arrays.copyOf(values, length);
-      Assert.assertEquals(inputs.get(i), readValue);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
+        ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.STRING, false);
+        ForwardIndexReaderContext context = reader.createContext()) {
+      String[] values = new String[maxElements];
+      for (int i = 0; i < numDocs; i++) {
+        int length = reader.getStringMV(i, values, context);
+        String[] readValue = Arrays.copyOf(values, length);
+        Assert.assertEquals(inputs.get(i), readValue);
+      }
     }
   }
 
@@ -177,15 +178,16 @@ public class MultiValueVarByteRawIndexCreatorTest {
     }
 
     //read
-    final PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-    ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.BYTES, false);
-    final ForwardIndexReaderContext context = reader.createContext();
-    byte[][] values = new byte[maxElements][];
-    for (int i = 0; i < numDocs; i++) {
-      int length = reader.getBytesMV(i, values, context);
-      byte[][] readValue = Arrays.copyOf(values, length);
-      for (int j = 0; j < length; j++) {
-        Assert.assertTrue(Arrays.equals(inputs.get(i)[j], readValue[j]));
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
+        ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.BYTES, false);
+        ForwardIndexReaderContext context = reader.createContext()) {
+      byte[][] values = new byte[maxElements][];
+      for (int i = 0; i < numDocs; i++) {
+        int length = reader.getBytesMV(i, values, context);
+        byte[][] readValue = Arrays.copyOf(values, length);
+        for (int j = 0; j < length; j++) {
+          Assert.assertTrue(Arrays.equals(inputs.get(i)[j], readValue[j]));
+        }
       }
     }
   }
