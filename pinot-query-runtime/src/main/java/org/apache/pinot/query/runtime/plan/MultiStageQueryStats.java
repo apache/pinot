@@ -39,11 +39,11 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
+import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -105,7 +105,8 @@ public class MultiStageQueryStats {
     return new MultiStageQueryStats(stageId);
   }
 
-  public static MultiStageQueryStats createLeaf(int stageId, @Nullable StatMap<DataTable.MetadataKey> opStats) {
+  public static MultiStageQueryStats createLeaf(int stageId,
+      StatMap<LeafStageTransferableBlockOperator.StatKey> opStats) {
     return create(stageId, MultiStageOperator.Type.LEAF, opStats);
   }
 
@@ -486,7 +487,7 @@ public class MultiStageQueryStats {
             visitor.visitHashJoin((StatMap<HashJoinOperator.StatKey>) statMap, arg);
             break;
           case LEAF:
-            visitor.visitLeaf((StatMap<DataTable.MetadataKey>) statMap, arg);
+            visitor.visitLeaf((StatMap<LeafStageTransferableBlockOperator.StatKey>) statMap, arg);
             break;
           case MAILBOX_RECEIVE:
             visitor.visitMailboxReceive((StatMap<BaseMailboxReceiveOperator.StatKey>) statMap, arg);
@@ -681,7 +682,7 @@ public class MultiStageQueryStats {
 
   public interface StatsVisitor<A> {
     void visitBase(StatMap<MultiStageOperator.BaseStatKeys> stats, A arg);
-    void visitLeaf(StatMap<DataTable.MetadataKey> stats, A arg);
+    void visitLeaf(StatMap<LeafStageTransferableBlockOperator.StatKey> stats, A arg);
     void visitAggregate(StatMap<AggregateOperator.StatKey> stats, A arg);
     void visitHashJoin(StatMap<HashJoinOperator.StatKey> stats, A arg);
     void visitMailboxReceive(StatMap<BaseMailboxReceiveOperator.StatKey> statMap, A arg);

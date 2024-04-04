@@ -85,6 +85,7 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
+import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -494,9 +495,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     @Override
-    public void visitLeaf(StatMap<DataTable.MetadataKey> stats, BrokerResponseNativeV2 response) {
-      response.addServerStats(stats);
-      response.mergeMaxRows(stats.getLong(DataTable.MetadataKey.NUM_ROWS));
+    public void visitLeaf(StatMap<LeafStageTransferableBlockOperator.StatKey> stats, BrokerResponseNativeV2 response) {
+      response.mergeMaxRows(stats.getLong(LeafStageTransferableBlockOperator.StatKey.NUM_ROWS));
+
+      StatMap<DataTable.MetadataKey> v1Stats = new StatMap<>(DataTable.MetadataKey.class);
+      for (LeafStageTransferableBlockOperator.StatKey statKey : stats.keySet()) {
+        statKey.updateV1Metadata(v1Stats, stats);
+      }
+      response.addServerStats(v1Stats);
     }
 
     @Override

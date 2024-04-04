@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -57,7 +56,7 @@ public class OperatorTestUtil {
   public static final String OP_2 = "op2";
 
   public static MultiStageQueryStats getDummyStats(int stageId) {
-    return MultiStageQueryStats.createLeaf(stageId, new StatMap<>(DataTable.MetadataKey.class));
+    return MultiStageQueryStats.createLeaf(stageId, new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class));
   }
 
   static {
@@ -69,7 +68,7 @@ public class OperatorTestUtil {
   private OperatorTestUtil() {
   }
 
-  public static MultiStageOperator getOperator(String operatorName) {
+  public static MultiStageOperator<?> getOperator(String operatorName) {
     return MOCK_OPERATOR_FACTORY.buildMockOperator(operatorName);
   }
 

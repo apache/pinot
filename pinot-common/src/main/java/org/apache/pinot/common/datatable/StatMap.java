@@ -276,6 +276,27 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     }
   }
 
+  public static String getDefaultStatName(Key key) {
+    String name = key.name();
+    StringBuilder result = new StringBuilder();
+    boolean capitalizeNext = false;
+
+    for (char c : name.toCharArray()) {
+      if (c == '_') {
+        capitalizeNext = true;
+      } else {
+        if (capitalizeNext) {
+          result.append(c);
+          capitalizeNext = false;
+        } else {
+          result.append(Character.toLowerCase(c));
+        }
+      }
+    }
+
+    return result.toString();
+  }
+
   public static <K extends Enum<K> & Key> StatMap<K> deserialize(DataInput input, Class<K> keyClass)
       throws IOException {
     StatMap<K> result = new StatMap<>(keyClass);
@@ -313,6 +334,10 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     return _map.isEmpty();
   }
 
+  public Iterable<K> keySet() {
+    return _map.keySet();
+  }
+
   public interface Key {
     String name();
 
@@ -320,24 +345,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
      * The name of the stat used to report it. Names must be unique on the same key family.
      */
     default String getStatName() {
-      String name = name();
-      StringBuilder result = new StringBuilder();
-      boolean capitalizeNext = false;
-
-      for (char c : name.toCharArray()) {
-        if (c == '_') {
-          capitalizeNext = true;
-        } else {
-          if (capitalizeNext) {
-            result.append(c);
-            capitalizeNext = false;
-          } else {
-            result.append(Character.toLowerCase(c));
-          }
-        }
-      }
-
-      return result.toString();
+      return getDefaultStatName(this);
     }
 
     default int merge(int value1, int value2) {

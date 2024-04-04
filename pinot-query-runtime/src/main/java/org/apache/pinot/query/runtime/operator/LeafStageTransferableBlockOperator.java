@@ -37,6 +37,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -73,7 +74,7 @@ import org.slf4j.LoggerFactory;
  *       thus requires canonicalization.</li>
  * </ul>
  */
-public class LeafStageTransferableBlockOperator extends MultiStageOperator<DataTable.MetadataKey> {
+public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafStageTransferableBlockOperator.StatKey> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageTransferableBlockOperator.class);
   private static final String EXPLAIN_NAME = "LEAF_STAGE_TRANSFER_OPERATOR";
@@ -105,18 +106,18 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<DataT
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
     String tableName = context.getLeafStageContext().getStagePlan().getStageMetadata().getTableName();
-    _statMap.merge(DataTable.MetadataKey.TABLE, tableName);
+    _statMap.merge(StatKey.TABLE, tableName);
   }
 
   @Override
-  public Class<DataTable.MetadataKey> getStatKeyClass() {
-    return DataTable.MetadataKey.class;
+  public Class<StatKey> getStatKeyClass() {
+    return StatKey.class;
   }
 
   @Override
   protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.merge(DataTable.MetadataKey.TIME_USED_MS, executionTimeMs);
-    _statMap.merge(DataTable.MetadataKey.NUM_DOCS_SCANNED, block.getNumRows());
+    _statMap.merge(StatKey.TIME_USED_MS, executionTimeMs);
+    _statMap.merge(StatKey.NUM_DOCS_SCANNED, block.getNumRows());
   }
 
   @Override
@@ -171,19 +172,112 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<DataT
           LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
           continue;
         }
-        switch (key.getValueType()) {
-          case INT:
-            _statMap.merge(key, Integer.parseInt(entry.getValue()));
+        switch (key) {
+          case UNKNOWN:
+            LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
             break;
-          case LONG:
-            _statMap.merge(key, Long.parseLong(entry.getValue()));
+          case TABLE:
+            _statMap.merge(StatKey.TABLE, entry.getValue());
             break;
-          case STRING:
-            _statMap.merge(key, entry.getValue());
+          case NUM_DOCS_SCANNED:
+            _statMap.merge(StatKey.NUM_DOCS_SCANNED, Long.parseLong(entry.getValue()));
             break;
-          default:
-            LOGGER.debug("Skipping unknown value type: {}", key.getValueType());
+          case NUM_ENTRIES_SCANNED_IN_FILTER:
+            _statMap.merge(StatKey.NUM_ENTRIES_SCANNED_IN_FILTER, Long.parseLong(entry.getValue()));
             break;
+          case NUM_ENTRIES_SCANNED_POST_FILTER:
+            _statMap.merge(StatKey.NUM_ENTRIES_SCANNED_POST_FILTER, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_QUERIED:
+            _statMap.merge(StatKey.NUM_SEGMENTS_QUERIED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PROCESSED:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PROCESSED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_MATCHED:
+            _statMap.merge(StatKey.NUM_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_CONSUMING_SEGMENTS_QUERIED:
+            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.parseInt(entry.getValue()));
+            break;
+          case MIN_CONSUMING_FRESHNESS_TIME_MS:
+            _statMap.merge(StatKey.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case TOTAL_DOCS:
+            _statMap.merge(StatKey.TOTAL_DOCS, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_GROUPS_LIMIT_REACHED:
+            _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
+            break;
+          case TIME_USED_MS:
+            _statMap.merge(StatKey.TIME_USED_MS, Long.parseLong(entry.getValue()));
+            break;
+          case TRACE_INFO:
+            LOGGER.debug("Skipping trace info: {}", entry.getValue());
+            break;
+          case REQUEST_ID:
+            LOGGER.debug("Skipping request ID: {}", entry.getValue());
+            break;
+          case NUM_RESIZES:
+            _statMap.merge(StatKey.NUM_RESIZES, Integer.parseInt(entry.getValue()));
+            break;
+          case RESIZE_TIME_MS:
+            _statMap.merge(StatKey.RESIZE_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case THREAD_CPU_TIME_NS:
+            _statMap.merge(StatKey.THREAD_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+            break;
+          case SYSTEM_ACTIVITIES_CPU_TIME_NS:
+            _statMap.merge(StatKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+            break;
+          case RESPONSE_SER_CPU_TIME_NS:
+            _statMap.merge(StatKey.RESPONSE_SER_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_BY_SERVER:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_SERVER, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_INVALID:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_INVALID, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_BY_LIMIT:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_LIMIT, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_SEGMENTS_PRUNED_BY_VALUE:
+            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE, Integer.parseInt(entry.getValue()));
+            break;
+          case EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS:
+            LOGGER.debug("Skipping empty filter segments: {}", entry.getValue());
+            break;
+          case EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS:
+            LOGGER.debug("Skipping match all filter segments: {}", entry.getValue());
+            break;
+          case NUM_CONSUMING_SEGMENTS_PROCESSED:
+            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_CONSUMING_SEGMENTS_MATCHED:
+            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_BLOCKS:
+            _statMap.merge(StatKey.NUM_BLOCKS, Integer.parseInt(entry.getValue()));
+            break;
+          case NUM_ROWS:
+            _statMap.merge(StatKey.NUM_ROWS, Integer.parseInt(entry.getValue()));
+            break;
+          case OPERATOR_EXECUTION_TIME_MS:
+            _statMap.merge(StatKey.OPERATOR_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case OPERATOR_ID:
+            _statMap.merge(StatKey.OPERATOR_ID, entry.getValue());
+            break;
+          case OPERATOR_EXEC_START_TIME_MS:
+            _statMap.merge(StatKey.OPERATOR_EXEC_START_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          case OPERATOR_EXEC_END_TIME_MS:
+            _statMap.merge(StatKey.OPERATOR_EXEC_END_TIME_MS, Long.parseLong(entry.getValue()));
+            break;
+          default: {
+            throw new IllegalArgumentException("Unhandled V1 execution stat: " + entry.getKey());
+          }
         }
       }
     }
@@ -467,6 +561,112 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<DataT
     public void send(BaseResultsBlock block)
         throws InterruptedException, TimeoutException {
       addResultsBlock(block);
+    }
+  }
+
+  public enum StatKey implements StatMap.Key {
+    TABLE(StatMap.Type.STRING),
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG),
+    NUM_DOCS_SCANNED(StatMap.Type.LONG),
+    NUM_ENTRIES_SCANNED_IN_FILTER(StatMap.Type.LONG),
+    NUM_ENTRIES_SCANNED_POST_FILTER(StatMap.Type.LONG),
+    NUM_SEGMENTS_QUERIED(StatMap.Type.INT),
+    NUM_SEGMENTS_PROCESSED(StatMap.Type.INT),
+    NUM_SEGMENTS_MATCHED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_QUERIED(StatMap.Type.INT),
+    // the timestamp indicating the freshness of the data queried in consuming segments.
+    // This can be ingestion timestamp if provided by the stream, or the last index time
+    MIN_CONSUMING_FRESHNESS_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.min(value1, value2);
+      }
+    },
+    TOTAL_DOCS(StatMap.Type.LONG),
+    NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
+    TIME_USED_MS(StatMap.Type.LONG),
+    //TRACE_INFO(StatMap.Type.STRING),
+    //REQUEST_ID(StatMap.Type.LONG),
+    NUM_RESIZES(StatMap.Type.INT),
+    RESIZE_TIME_MS(StatMap.Type.LONG),
+    THREAD_CPU_TIME_NS(StatMap.Type.LONG),
+    SYSTEM_ACTIVITIES_CPU_TIME_NS(StatMap.Type.LONG),
+    RESPONSE_SER_CPU_TIME_NS(StatMap.Type.LONG, "responseSerializationCpuTimeNs"),
+    NUM_SEGMENTS_PRUNED_BY_SERVER(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
+    NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
+    //EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS(StatMap.Type.INT),
+    //EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_PROCESSED(StatMap.Type.INT),
+    NUM_CONSUMING_SEGMENTS_MATCHED(StatMap.Type.INT),
+    NUM_BLOCKS(StatMap.Type.INT),
+    NUM_ROWS(StatMap.Type.INT),
+    OPERATOR_EXECUTION_TIME_MS(StatMap.Type.LONG),
+    OPERATOR_ID(StatMap.Type.STRING),
+    OPERATOR_EXEC_START_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.min(value1, value2);
+      }
+    },
+    OPERATOR_EXEC_END_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public long merge(long value1, long value2) {
+        return Math.max(value1, value2);
+      }
+    },;
+    private final StatMap.Type _type;
+    @Nullable
+    private final DataTable.MetadataKey _v1Key;
+    private final String _statName;
+
+    StatKey(StatMap.Type type) {
+      this(type, null);
+    }
+
+    StatKey(StatMap.Type type, @Nullable String statName) {
+      _type = type;
+      _statName = statName == null ? StatMap.getDefaultStatName(this) : statName;
+      _v1Key = DataTable.MetadataKey.getByName(getStatName());
+    }
+
+    StatKey(StatMap.Type type, @Nullable String statName, @Nullable DataTable.MetadataKey v1Key) {
+      _type = type;
+      _statName = statName == null ? StatMap.getDefaultStatName(this) : statName;
+      _v1Key = v1Key == null ? DataTable.MetadataKey.getByName(getStatName()) : v1Key;
+    }
+
+    @Override
+    public String getStatName() {
+      return _statName;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
+
+    public void updateV1Metadata(StatMap<DataTable.MetadataKey> oldMetadata, StatMap<StatKey> stats) {
+      if (_v1Key != null) {
+        switch (_type) {
+          case LONG:
+            oldMetadata.merge(_v1Key, stats.getLong(this));
+            break;
+          case INT:
+            oldMetadata.merge(_v1Key, stats.getInt(this));
+            break;
+          case BOOLEAN:
+            oldMetadata.merge(_v1Key, stats.getBoolean(this));
+            break;
+          case STRING:
+            oldMetadata.merge(_v1Key, stats.getString(this));
+            break;
+          default:
+            throw new IllegalStateException("Unsupported type: " + _type);
+        }
+      }
     }
   }
 }
