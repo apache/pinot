@@ -155,9 +155,24 @@ public class StatMapTest {
         .merge(MyStats.STR_KEY, "foo"),
       new StatMap<>(MyStats.class)
         .merge(MyStats.BOOL_KEY, false)
-        .merge(MyStats.LONG_KEY, 2L)
-        .merge(MyStats.INT_KEY, 2)
-        .merge(MyStats.STR_KEY, "bar"),
+        .merge(MyStats.LONG_KEY, 1L)
+        .merge(MyStats.INT_KEY, 1)
+        .merge(MyStats.STR_KEY, "foo"),
+      new StatMap<>(MyStats.class)
+        .merge(MyStats.BOOL_KEY, true)
+        .merge(MyStats.LONG_KEY, 0L)
+        .merge(MyStats.INT_KEY, 1)
+        .merge(MyStats.STR_KEY, "foo"),
+      new StatMap<>(MyStats.class)
+        .merge(MyStats.BOOL_KEY, false)
+        .merge(MyStats.LONG_KEY, 1L)
+        .merge(MyStats.INT_KEY, 0)
+        .merge(MyStats.STR_KEY, "foo"),
+      new StatMap<>(MyStats.class)
+        .merge(MyStats.BOOL_KEY, false)
+        .merge(MyStats.LONG_KEY, 1L)
+        .merge(MyStats.INT_KEY, 1)
+        .merge(MyStats.STR_KEY, null),
       new StatMap<>(DataTable.MetadataKey.class)
         .merge(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED, 1)
         .merge(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED, 1)

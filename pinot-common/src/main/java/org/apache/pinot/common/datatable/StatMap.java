@@ -77,7 +77,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     } else {
       _map.put(key, newValue);
     }
-    _map.put(key, newValue);
     return this;
   }
 
@@ -133,7 +132,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     } else {
       _map.put(key, newValue);
     }
-    _map.put(key, newValue);
     return this;
   }
 
@@ -226,21 +224,42 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     for (Map.Entry<K, Object> entry : _map.entrySet()) {
       K key = entry.getKey();
       Object value = entry.getValue();
-      if (value == null) {
-        continue;
-      }
       switch (key.getType()) {
         case BOOLEAN:
-          node.put(key.getStatName(), (boolean) value);
+          if (value == null) {
+            if (key.includeDefaultInJson()) {
+              node.put(key.getStatName(), false);
+            }
+          } else {
+            node.put(key.getStatName(), (boolean) value);
+          }
           break;
         case INT:
-          node.put(key.getStatName(), (int) value);
+          if (value == null) {
+            if (key.includeDefaultInJson()) {
+              node.put(key.getStatName(), 0);
+            }
+          } else {
+            node.put(key.getStatName(), (int) value);
+          }
           break;
         case LONG:
-          node.put(key.getStatName(), (long) value);
+          if (value == null) {
+            if (key.includeDefaultInJson()) {
+              node.put(key.getStatName(), 0L);
+            }
+          } else {
+            node.put(key.getStatName(), (long) value);
+          }
           break;
         case STRING:
-          node.put(key.getStatName(), (String) value);
+          if (value == null) {
+            if (key.includeDefaultInJson()) {
+              node.put(key.getStatName(), "");
+            }
+          } else {
+            node.put(key.getStatName(), (String) value);
+          }
           break;
         default:
           throw new IllegalArgumentException("Unsupported type: " + key.getType());
@@ -253,6 +272,34 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public void serialize(DataOutput output)
       throws IOException {
 
+    for (Map.Entry<K, Object> entry : _map.entrySet()) {
+      K key = entry.getKey();
+      Object value = entry.getValue();
+      switch (key.getType()) {
+        case BOOLEAN:
+          if (value == null || !(boolean) value) {
+            throw new IllegalStateException("Boolean value must be true but " + value + " is stored for key " + key);
+          }
+          break;
+        case INT:
+          if (value == null || (int) value == 0) {
+            throw new IllegalStateException("Int value must be non-zero but " + value + " is stored for key " + key);
+          }
+          break;
+        case LONG:
+          if (value == null || (long) value == 0) {
+            throw new IllegalStateException("Long value must be non-zero but " + value + " is stored for key " + key);
+          }
+          break;
+        case STRING:
+          if (value == null) {
+            throw new IllegalStateException("String value must be non-null but null is stored for key " + key);
+          }
+          break;
+        default:
+          throw new IllegalArgumentException("Unsupported type: " + key.getType());
+      }
+    }
     output.writeByte(_map.size());
 
     K[] keys = (K[]) KEYS_BY_CLASS.computeIfAbsent(_keyClass, k -> k.getEnumConstants());
@@ -260,14 +307,14 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       K key = keys[i];
       switch (key.getType()) {
         case BOOLEAN: {
-          if (getBoolean(key) || key.includeDefaultInJson()) {
+          if (getBoolean(key)) {
             output.writeByte(i);
           }
           break;
         }
         case INT: {
           int value = getInt(key);
-          if (value != 0 || key.includeDefaultInJson()) {
+          if (value != 0) {
             output.writeByte(i);
             output.writeInt(value);
           }
@@ -275,7 +322,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         }
         case LONG: {
           long value = getLong(key);
-          if (value != 0 || key.includeDefaultInJson()) {
+          if (value != 0) {
             output.writeByte(i);
             output.writeLong(value);
           }
@@ -283,7 +330,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         }
         case STRING: {
           String value = getString(key);
-          if (value != null || key.includeDefaultInJson()) {
+          if (value != null) {
             output.writeByte(i);
             output.writeUTF(value);
           }
