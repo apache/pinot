@@ -37,6 +37,6 @@ public class SegmentMetadataPropertyWriter extends PropertiesWriter {
   @Override
   protected String escapeKey(final String key) {
     // skip the escapeKey functionality,
-    return super.escapeKey(key);
+    return key;
   }
 }

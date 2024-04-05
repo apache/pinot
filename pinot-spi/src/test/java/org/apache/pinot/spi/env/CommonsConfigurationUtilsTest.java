@@ -59,7 +59,7 @@ public class CommonsConfigurationUtilsTest {
   public void testSegmentMetadataFromFile() {
     // load the existing config and check the properties config instance
     try {
-      PropertiesConfiguration config = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, false, true);
+      PropertiesConfiguration config = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, false, true);
       assertNotNull(config);
 
       config.setProperty("testKey", "testValue");
@@ -68,7 +68,7 @@ public class CommonsConfigurationUtilsTest {
       CommonsConfigurationUtils.saveSegmentMetadataToFile(config, CONFIG_FILE, "version1");
 
       // reading the property with header.
-      config = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, false, true);
+      config = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, false, true);
       assertNotNull(config);
       assertNotNull(config.getHeader());
     } catch (Exception ex) {
@@ -77,7 +77,7 @@ public class CommonsConfigurationUtilsTest {
 
     // load the non-existing file and expect the exception
     Assert.expectThrows(NullPointerException.class,
-        () -> CommonsConfigurationUtils.segmentMetadataFromFile(null, false, true));
+        () -> CommonsConfigurationUtils.getSegmentMetadataFromFile(null, false, true));
   }
 
   @Test

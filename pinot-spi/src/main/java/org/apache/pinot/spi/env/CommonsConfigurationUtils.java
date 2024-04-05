@@ -131,18 +131,13 @@ public class CommonsConfigurationUtils {
    * @param setDefaultDelimiter representing to set the default list delimiter.
    * @return a {@link PropertiesConfiguration} instance.
    */
-  public static PropertiesConfiguration segmentMetadataFromFile(File file, boolean setIOFactory,
+  public static PropertiesConfiguration getSegmentMetadataFromFile(File file, boolean setIOFactory,
       boolean setDefaultDelimiter)
       throws ConfigurationException {
     PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory;
 
-    try {
-      if (checkHeaderExistsInSegmentMetadata(file)) {
-        ioFactoryKind = PropertyIOFactoryKind.SegmentMetadataIOFactory;
-      }
-    } catch (IOException exception) {
-      throw new ConfigurationException(
-          String.format("Error occurred while reading segment metadata file %s ", file.getName()), exception);
+    if (checkHeaderExistsInSegmentMetadata(file)) {
+      ioFactoryKind = PropertyIOFactoryKind.SegmentMetadataIOFactory;
     }
 
     return fromFile(file, setIOFactory, setDefaultDelimiter, ioFactoryKind);
@@ -175,13 +170,13 @@ public class CommonsConfigurationUtils {
 
   public static void saveSegmentMetadataToFile(PropertiesConfiguration propertiesConfiguration, File file,
       String versionHeader) {
-      if (StringUtils.isNotEmpty(versionHeader)) {
-        String header = String.format("%s=%s", SEGMENT_VERSION_IDENTIFIER, versionHeader);
-        propertiesConfiguration.setHeader(header);
+    if (StringUtils.isNotEmpty(versionHeader)) {
+      String header = String.format("%s=%s", SEGMENT_VERSION_IDENTIFIER, versionHeader);
+      propertiesConfiguration.setHeader(header);
 
-        // setIO appropriate factory
-        propertiesConfiguration.setIOFactory(createPropertyIOFactory(PropertyIOFactoryKind.SegmentMetadataIOFactory));
-      }
+      // set appropriate segment metadata IOFactory
+      propertiesConfiguration.setIOFactory(createPropertyIOFactory(PropertyIOFactoryKind.SegmentMetadataIOFactory));
+    }
     saveToFile(propertiesConfiguration, file);
   }
 
@@ -376,19 +371,21 @@ public class CommonsConfigurationUtils {
    * checks whether the segment metadata file first line is version header or not.
    * @param segmentMetadataFile segment metadata file
    * @return boolean
-   * @throws IOException exception.
+   * @throws ConfigurationException exception.
    */
-  private static boolean checkHeaderExistsInSegmentMetadata(File segmentMetadataFile) throws IOException {
-    Preconditions.checkNotNull(segmentMetadataFile,
-        "Segment Metadata file object can not be null for loading configurations");
+  private static boolean checkHeaderExistsInSegmentMetadata(File segmentMetadataFile)
+      throws ConfigurationException {
 
     if (segmentMetadataFile.exists()) {
-      BufferedReader reader = new BufferedReader(new FileReader(segmentMetadataFile));
-      String fileFirstLine = reader.readLine();
-      reader.close(); // close the reader
-
-      // check whether the segment has the version header or not
-      return StringUtils.contains(fileFirstLine, SEGMENT_VERSION_IDENTIFIER);
+      try (BufferedReader reader = new BufferedReader(new FileReader(segmentMetadataFile))) {
+        String fileFirstLine = reader.readLine();
+        // check whether the segment has the version header or not
+        return StringUtils.startsWith(fileFirstLine, SEGMENT_VERSION_IDENTIFIER);
+      } catch (IOException exception) {
+        throw new ConfigurationException(
+            String.format("Error occurred while reading segment metadata file %s ",
+                segmentMetadataFile.getName()), exception);
+      }
     }
     return false;
   }

@@ -60,8 +60,8 @@ public class SegmentMetadataPropertyConfigTest {
   @Test
   public void testSegmentMetadataPropertyConfiguration()
       throws ConfigurationException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.
-        segmentMetadataFromFile(CONFIG_FILE, true, true);
+    PropertiesConfiguration configuration =
+        CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true, true);
 
     // setting the random value of the test keys
     for (String key: TEST_PROPERTY_KEY) {
@@ -74,7 +74,7 @@ public class SegmentMetadataPropertyConfigTest {
     CommonsConfigurationUtils.saveSegmentMetadataToFile(configuration, CONFIG_FILE, null); // save the configuration.
 
     // reading the configuration from saved file.
-    configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true);
+    configuration = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true, true);
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
     testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
   }
@@ -82,8 +82,8 @@ public class SegmentMetadataPropertyConfigTest {
   @Test
   public void testSegmentMetadataPropertyConfigurationWithHeader()
       throws ConfigurationException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.
-        segmentMetadataFromFile(CONFIG_FILE, true, true);
+    PropertiesConfiguration configuration =
+        CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true, true);
 
     // setting the random value of the test keys
     for (String key: TEST_PROPERTY_KEY) {
@@ -97,7 +97,7 @@ public class SegmentMetadataPropertyConfigTest {
     CommonsConfigurationUtils.saveSegmentMetadataToFile(configuration, CONFIG_FILE, "version1");
 
     // reading the configuration from saved file.
-    configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true);
+    configuration = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true, true);
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
     testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
   }
@@ -105,7 +105,8 @@ public class SegmentMetadataPropertyConfigTest {
   @Test
   public void testSegmentMetadataReaderWithSpecialCharsPropertyKeys()
       throws ConfigurationException {
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true);
+    PropertiesConfiguration configuration =
+        CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true, true);
 
     // setting the random value of the test keys
     for (String key: TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR) {
@@ -118,7 +119,7 @@ public class SegmentMetadataPropertyConfigTest {
     CommonsConfigurationUtils.saveSegmentMetadataToFile(configuration, CONFIG_FILE, null); // save the configuration.
 
     // reading the configuration from saved file.
-    configuration = CommonsConfigurationUtils.segmentMetadataFromFile(CONFIG_FILE, true, true);
+    configuration = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true, true);
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
     testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY_WITH_SPECIAL_CHAR);
   }
@@ -131,8 +132,8 @@ public class SegmentMetadataPropertyConfigTest {
         Objects.requireNonNull(
             PropertiesConfiguration.class.getClassLoader()
                 .getResource("segment-metadata-without-version-header.properties")).getFile());
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.
-        segmentMetadataFromFile(oldSegmentProperties, true, true);
+    PropertiesConfiguration configuration =
+        CommonsConfigurationUtils.getSegmentMetadataFromFile(oldSegmentProperties, true, true);
 
     // assert that Header is null for the config.
     assertNull(configuration.getHeader());
@@ -148,8 +149,8 @@ public class SegmentMetadataPropertyConfigTest {
         Objects.requireNonNull(
             PropertiesConfiguration.class.getClassLoader()
                 .getResource("segment-metadata-with-version-header.properties")).getFile());
-    PropertiesConfiguration configuration = CommonsConfigurationUtils.
-        segmentMetadataFromFile(oldSegmentProperties, true, true);
+    PropertiesConfiguration configuration =
+        CommonsConfigurationUtils.getSegmentMetadataFromFile(oldSegmentProperties, true, true);
 
     // assert that Header is not null for the config.
     assertNotNull(configuration.getHeader());
