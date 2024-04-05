@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -305,10 +306,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
       Map<String, String> queryOptions) {
+    List<SegmentContext> segmentContexts = new ArrayList<>();
+    selectedSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
     if (isUpsertEnabled() && !QueryOptionsUtils.isSkipUpsert(queryOptions)) {
-      return _tableUpsertMetadataManager.getSegmentContexts(selectedSegments);
+      _tableUpsertMetadataManager.setSegmentContexts(segmentContexts);
     }
-    return super.getSegmentContexts(selectedSegments, queryOptions);
+    return segmentContexts;
   }
 
   /**

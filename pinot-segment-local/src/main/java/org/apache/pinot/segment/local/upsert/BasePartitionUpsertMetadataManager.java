@@ -1080,14 +1080,27 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    * Use the segmentContexts to collect the contexts for selected segments. Reuse the segmentContext object if
    * present, to avoid overwriting the contexts specified at the others places.
    */
-  public void getSegmentContexts(List<IndexSegment> selectedSegments, List<SegmentContext> segmentContexts) {
-    for (IndexSegment segment : selectedSegments) {
+  public void setSegmentContexts(List<SegmentContext> segmentContexts) {
+    for (SegmentContext segmentContext : segmentContexts) {
+      IndexSegment segment = segmentContext.getIndexSegment();
       if (_trackedSegments.contains(segment)) {
-        SegmentContext segmentContext = new SegmentContext(segment);
-        segmentContext.setQueryableDocIdsSnapshot(SegmentContext.getQueryableDocIdsSnapshotFromSegment(segment));
-        segmentContexts.add(segmentContext);
+        segmentContext.setQueryableDocIdsSnapshot(getQueryableDocIdsSnapshotFromSegment(segment));
       }
     }
+  }
+
+  private static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
+    MutableRoaringBitmap queryableDocIdsSnapshot = null;
+    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
+    if (queryableDocIds != null) {
+      queryableDocIdsSnapshot = queryableDocIds.getMutableRoaringBitmap();
+    } else {
+      ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+      if (validDocIds != null) {
+        queryableDocIdsSnapshot = validDocIds.getMutableRoaringBitmap();
+      }
+    }
+    return queryableDocIdsSnapshot;
   }
 
   protected void doClose()

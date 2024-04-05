@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -54,5 +53,6 @@ public interface TableUpsertMetadataManager extends Closeable {
    */
   Map<Integer, Long> getPartitionToPrimaryKeyCount();
 
-  List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments);
+  default void setSegmentContexts(List<SegmentContext> segmentContexts) {
+  }
 }

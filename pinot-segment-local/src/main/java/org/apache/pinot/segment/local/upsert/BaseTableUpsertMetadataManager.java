@@ -20,15 +20,12 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -104,12 +101,5 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   @Override
   public UpsertConfig.Mode getUpsertMode() {
     return _context.getPartialUpsertHandler() == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
-  }
-
-  @Override
-  public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments) {
-    List<SegmentContext> segmentContexts = new ArrayList<>();
-    selectedSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
-    return segmentContexts;
   }
 }

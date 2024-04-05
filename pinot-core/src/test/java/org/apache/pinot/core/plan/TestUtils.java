@@ -16,28 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi;
+package org.apache.pinot.core.plan;
 
+import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
-public class SegmentContext {
-  private final IndexSegment _indexSegment;
-  private MutableRoaringBitmap _queryableDocIdsSnapshot = null;
-
-  public SegmentContext(IndexSegment indexSegment) {
-    _indexSegment = indexSegment;
+public class TestUtils {
+  private TestUtils() {
   }
 
-  public IndexSegment getIndexSegment() {
-    return _indexSegment;
-  }
-
-  public MutableRoaringBitmap getQueryableDocIdsSnapshot() {
-    return _queryableDocIdsSnapshot;
-  }
-
-  public void setQueryableDocIdsSnapshot(MutableRoaringBitmap queryableDocIdsSnapshot) {
-    _queryableDocIdsSnapshot = queryableDocIdsSnapshot;
+  public static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
+    MutableRoaringBitmap queryableDocIdsSnapshot = null;
+    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
+    if (queryableDocIds != null) {
+      queryableDocIdsSnapshot = queryableDocIds.getMutableRoaringBitmap();
+    } else {
+      ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+      if (validDocIds != null) {
+        queryableDocIdsSnapshot = validDocIds.getMutableRoaringBitmap();
+      }
+    }
+    return queryableDocIdsSnapshot;
   }
 }
