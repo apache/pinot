@@ -638,6 +638,11 @@ public class MultiStageQueryStats {
       }
 
       public Open addLastOperator(MultiStageOperator.Type type, StatMap<?> statMap) {
+        if (!_operatorStats.isEmpty() && _operatorStats.get(_operatorStats.size() - 1) == statMap) {
+          // This is mostly useful to detect errors in the code.
+          // In the future we may choose to evaluate it only if asserts are enabled
+          throw new IllegalArgumentException("Cannot add the same stat map twice.");
+        }
         Preconditions.checkNotNull(type, "Cannot add null operator type");
         Preconditions.checkNotNull(statMap, "Cannot add null stats");
         _operatorTypes.add(type);
