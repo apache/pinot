@@ -302,20 +302,23 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     }
     output.writeByte(_map.size());
 
+    int writtenKeys = 0;
     K[] keys = (K[]) KEYS_BY_CLASS.computeIfAbsent(_keyClass, k -> k.getEnumConstants());
-    for (int i = 0; i < keys.length; i++) {
-      K key = keys[i];
+    for (int ordinal = 0; ordinal < keys.length; ordinal++) {
+      K key = keys[ordinal];
       switch (key.getType()) {
         case BOOLEAN: {
           if (getBoolean(key)) {
-            output.writeByte(i);
+            writtenKeys++;
+            output.writeByte(ordinal);
           }
           break;
         }
         case INT: {
           int value = getInt(key);
           if (value != 0) {
-            output.writeByte(i);
+            writtenKeys++;
+            output.writeByte(ordinal);
             output.writeInt(value);
           }
           break;
@@ -323,7 +326,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         case LONG: {
           long value = getLong(key);
           if (value != 0) {
-            output.writeByte(i);
+            writtenKeys++;
+            output.writeByte(ordinal);
             output.writeLong(value);
           }
           break;
@@ -331,7 +335,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
         case STRING: {
           String value = getString(key);
           if (value != null) {
-            output.writeByte(i);
+            writtenKeys++;
+            output.writeByte(ordinal);
             output.writeUTF(value);
           }
           break;
@@ -340,6 +345,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
           throw new IllegalStateException("Unknown type " + key.getType());
       }
     }
+    assert writtenKeys == _map.size() : "Written keys " + writtenKeys + " but map size " + _map.size();
   }
 
   public static String getDefaultStatName(Key key) {

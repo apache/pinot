@@ -193,6 +193,10 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
         throws IOException {
       return StatMap.deserialize(input, _statKeyClass);
     }
+
+    public Class getStatKeyClass() {
+      return _statKeyClass;
+    }
   }
 
   public enum BaseStatKeys implements StatMap.Key {

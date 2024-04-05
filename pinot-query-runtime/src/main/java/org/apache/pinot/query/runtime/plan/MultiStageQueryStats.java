@@ -383,7 +383,8 @@ public class MultiStageQueryStats {
 
     private StageStats(List<MultiStageOperator.Type> operatorTypes, List<StatMap<?>> operatorStats) {
       Preconditions.checkArgument(operatorTypes.size() == operatorStats.size(),
-          "Operator types and stats must have the same size");
+          "Operator types and stats must have the same size (%s != %s)",
+          operatorTypes.size(), operatorStats.size());
       for (int i = 0; i < operatorTypes.size(); i++) {
         if (operatorTypes.get(i) == null) {
           throw new IllegalArgumentException("Unexpected null operator type at index " + i);
@@ -619,10 +620,10 @@ public class MultiStageQueryStats {
         return new Closed(operatorTypes, operatorStats);
       } catch (IOException e) {
         throw new IOException("Error deserializing stats. Deserialized so far: "
-            + new Closed(operatorTypes, operatorStats), e);
+            + new Closed(operatorTypes.subList(0, operatorStats.size()), operatorStats), e);
       } catch (RuntimeException e) {
         throw new RuntimeException("Error deserializing stats. Deserialized so far: "
-            + new Closed(operatorTypes, operatorStats), e);
+            + new Closed(operatorTypes.subList(0, operatorStats.size()), operatorStats), e);
       }
     }
 
@@ -638,6 +639,8 @@ public class MultiStageQueryStats {
       }
 
       public Open addLastOperator(MultiStageOperator.Type type, StatMap<?> statMap) {
+        Preconditions.checkArgument(statMap.getKeyClass().equals(type.getStatKeyClass()),
+            "Cannot add stats of type %s to operator of type %s", statMap.getKeyClass(), type.getStatKeyClass());
         if (!_operatorStats.isEmpty() && _operatorStats.get(_operatorStats.size() - 1) == statMap) {
           // This is mostly useful to detect errors in the code.
           // In the future we may choose to evaluate it only if asserts are enabled
