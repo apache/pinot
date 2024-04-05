@@ -24,41 +24,26 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
 public class PartialUpsertMergerFactory {
-
   private PartialUpsertMergerFactory() {
   }
 
   /**
-   * Initialise the default partial upsert merger or initialise a custom implementation from a given class name in
-   * config
-   * @param primaryKeyColumns
-   * @param comparisonColumns
-   * @param upsertConfig
-   * @return
+   * Returns the default partial upsert merger or a custom implementation from a given class name in the config.
    */
   public static PartialUpsertMerger getPartialUpsertMerger(List<String> primaryKeyColumns,
       List<String> comparisonColumns, UpsertConfig upsertConfig) {
-    PartialUpsertMerger partialUpsertMerger;
-    String customRowMerger = upsertConfig.getPartialUpsertMergerClass();
+    String customMergerClassName = upsertConfig.getPartialUpsertMergerClass();
     // If a custom implementation is provided in config, initialize an implementation and return.
-    if (StringUtils.isNotBlank(customRowMerger)) {
+    if (StringUtils.isNotBlank(customMergerClassName)) {
       try {
-        Class<?> partialUpsertMergerClass = Class.forName(customRowMerger);
-        if (!BasePartialUpsertMerger.class.isAssignableFrom(partialUpsertMergerClass)) {
-          throw new RuntimeException(
-              "Provided partialUpsertMergerClass is not an implementation of BasePartialUpsertMerger.class");
-        }
-        partialUpsertMerger =
-            (PartialUpsertMerger) partialUpsertMergerClass.getConstructor(List.class, List.class, UpsertConfig.class)
-                .newInstance(primaryKeyColumns, comparisonColumns, upsertConfig);
+        Class<?> partialUpsertMergerClass = Class.forName(customMergerClassName);
+        return (PartialUpsertMerger) partialUpsertMergerClass.getConstructor(List.class, List.class, UpsertConfig.class)
+            .newInstance(primaryKeyColumns, comparisonColumns, upsertConfig);
       } catch (Exception e) {
         throw new RuntimeException(
-            String.format("Could not load partial upsert implementation class by name %s", customRowMerger), e);
+            String.format("Failed to instantiate partial upsert merger with class: %s", customMergerClassName), e);
       }
-    } else {
-      // return default implementation
-      partialUpsertMerger = new PartialUpsertColumnarMerger(primaryKeyColumns, comparisonColumns, upsertConfig);
     }
-    return partialUpsertMerger;
+    return new PartialUpsertColumnarMerger(primaryKeyColumns, comparisonColumns, upsertConfig);
   }
 }

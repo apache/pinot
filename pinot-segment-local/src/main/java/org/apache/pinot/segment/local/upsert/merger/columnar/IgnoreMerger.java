@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-
-
 /**
  * Merges 2 records and returns the merged record.
  * By default, ignore the new value from incoming row. Then return the merged record.
  */
 public class IgnoreMerger implements PartialUpsertColumnMerger {
-  IgnoreMerger() {
-  }
 
   @Override
   public Object merge(Object previousValue, Object currentValue) {

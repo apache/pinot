@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.upsert.merger.columnar;
 
 public interface PartialUpsertColumnMerger {
+
   /**
    * Handle partial upsert merge for single column between previous and new row.
    *

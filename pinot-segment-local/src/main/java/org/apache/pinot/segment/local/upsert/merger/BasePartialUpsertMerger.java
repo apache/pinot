@@ -23,12 +23,11 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
 public abstract class BasePartialUpsertMerger implements PartialUpsertMerger {
-
   protected final List<String> _primaryKeyColumns;
   protected final List<String> _comparisonColumns;
   protected final UpsertConfig _upsertConfig;
 
-  public BasePartialUpsertMerger(List<String> primaryKeyColumns, List<String> comparisonColumns,
+  protected BasePartialUpsertMerger(List<String> primaryKeyColumns, List<String> comparisonColumns,
       UpsertConfig upsertConfig) {
     _primaryKeyColumns = primaryKeyColumns;
     _comparisonColumns = comparisonColumns;

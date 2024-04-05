@@ -18,12 +18,7 @@
  */
 package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-
-
 public class MinMerger implements PartialUpsertColumnMerger {
-
-  MinMerger() {
-  }
 
   /**
    * Keep the minimal value for the given field.

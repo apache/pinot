@@ -18,12 +18,7 @@
  */
 package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-
-
 public class MaxMerger implements PartialUpsertColumnMerger {
-
-  MaxMerger() {
-  }
 
   /**
    * Keep the maximal value for the given field.

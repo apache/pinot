@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +36,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  * table config.
  */
 public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
-
   private final PartialUpsertColumnMerger _defaultColumnValueMerger;
   private final Map<String, PartialUpsertColumnMerger> _column2Mergers = new HashMap<>();
 
@@ -45,6 +45,7 @@ public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
     _defaultColumnValueMerger =
         PartialUpsertColumnMergerFactory.getMerger(upsertConfig.getDefaultPartialUpsertStrategy());
     Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
+    Preconditions.checkArgument(partialUpsertStrategies != null, "Partial upsert strategies must be configured");
     for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
       _column2Mergers.put(entry.getKey(), PartialUpsertColumnMergerFactory.getMerger(entry.getValue()));
     }
@@ -60,41 +61,36 @@ public class PartialUpsertColumnarMerger extends BasePartialUpsertMerger {
    *
    * For example, overwrite merger will only override the prev value if the new value is not null.
    * Null values will override existing values if not configured. They can be ignored by using ignoreMerger.
-   *
-   * @param previousRow the value of given field from the last derived full record during ingestion.
-   * @param currentRow the value of given field from the new consumed record.
-   * @param mergerResult merge the values from previous and current row and return as a map
    */
   @Override
-  public void merge(LazyRow previousRow, GenericRow currentRow, Map<String, Object> mergerResult) {
+  public void merge(LazyRow previousRow, GenericRow newRow, Map<String, Object> resultHolder) {
     for (String column : previousRow.getColumnNames()) {
-      // skip any mergers on these columns. PartialUpsertHandler ensures this too.
-      if (!_primaryKeyColumns.contains(column) && !_comparisonColumns.contains(column)) {
-        PartialUpsertColumnMerger merger = _column2Mergers.getOrDefault(column, _defaultColumnValueMerger);
-        /**
-         * Non-overwrite mergers
-         * (1) If the value of the previous is null value, skip merging and use the new value
-         * (2) Else If the value of new value is null, use the previous value (even for comparison columns).
-         * (3) Else If the column is not a comparison column, we applied the merged value to it.
-         */
-        if (!(merger instanceof OverwriteMerger)) {
+      // Skip primary key and comparison columns
+      if (_primaryKeyColumns.contains(column) || _comparisonColumns.contains(column)) {
+        continue;
+      }
+      PartialUpsertColumnMerger merger = _column2Mergers.getOrDefault(column, _defaultColumnValueMerger);
+      // Non-overwrite mergers
+      // (1) If the value of the previous is null value, skip merging and use the new value
+      // (2) Else If the value of new value is null, use the previous value (even for comparison columns)
+      // (3) Else If the column is not a comparison column, we applied the merged value to it
+      if (!(merger instanceof OverwriteMerger)) {
+        Object prevValue = previousRow.getValue(column);
+        if (prevValue != null) {
+          if (newRow.isNullValue(column)) {
+            resultHolder.put(column, prevValue);
+          } else {
+            resultHolder.put(column, merger.merge(prevValue, newRow.getValue(column)));
+          }
+        }
+      } else {
+        // Overwrite mergers
+        // (1) If the merge strategy is Overwrite merger and newValue is not null, skip and use the new value
+        // (2) Otherwise, use previous value if it is not null
+        if (newRow.isNullValue(column)) {
           Object prevValue = previousRow.getValue(column);
           if (prevValue != null) {
-            if (currentRow.isNullValue(column)) {
-              mergerResult.put(column, prevValue);
-            } else {
-              mergerResult.put(column, merger.merge(prevValue, currentRow.getValue(column)));
-            }
-          }
-        } else {
-          // Overwrite mergers.
-          // (1) If the merge strategy is Overwrite merger and newValue is not null, skip and use the new value
-          // (2) Otherwise, use previous value if it is not null
-          if (currentRow.isNullValue(column)) {
-            Object prevValue = previousRow.getValue(column);
-            if (prevValue != null) {
-              mergerResult.put(column, prevValue);
-            }
+            resultHolder.put(column, prevValue);
           }
         }
       }

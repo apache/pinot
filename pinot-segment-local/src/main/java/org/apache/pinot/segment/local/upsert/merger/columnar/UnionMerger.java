@@ -28,8 +28,6 @@ import java.util.TreeSet;
  * Union merger will dedup duplicated records in the multi-value field.
  */
 public class UnionMerger implements PartialUpsertColumnMerger {
-  UnionMerger() {
-  }
 
   /**
    * Union the new value from incoming row to the given multi-value field of previous record.

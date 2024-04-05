@@ -158,20 +158,17 @@ public class PartialUpsertHandlerTest {
   }
 
   public PartialUpsertMerger getCustomMerger() {
-    return new PartialUpsertMerger() {
-      @Override
-      public void merge(LazyRow prevRecord, GenericRow newRecord, Map<String, Object> mergerResult) {
-        if ((newRecord.getValue("field2")).equals("set")) {
-          // use default merger (overwrite)
-          return;
-        }
-        if ((newRecord.getValue("field2")).equals("inc")) {
-          mergerResult.put("field1", (Long) prevRecord.getValue("field1") + (Long) newRecord.getValue("field1"));
-          return;
-        }
-        if ((newRecord.getValue("field2")).equals("reset")) {
-          mergerResult.put("field1", null);
-        }
+    return (previousRow, newRow, resultHolder) -> {
+      if ((newRow.getValue("field2")).equals("set")) {
+        // use default merger (overwrite)
+        return;
+      }
+      if ((newRow.getValue("field2")).equals("inc")) {
+        resultHolder.put("field1", (Long) previousRow.getValue("field1") + (Long) newRow.getValue("field1"));
+        return;
+      }
+      if ((newRow.getValue("field2")).equals("reset")) {
+        resultHolder.put("field1", null);
       }
     };
   }

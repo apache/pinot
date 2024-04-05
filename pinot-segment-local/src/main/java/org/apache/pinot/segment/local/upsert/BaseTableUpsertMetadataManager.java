@@ -22,10 +22,8 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -61,11 +59,6 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     PartialUpsertHandler partialUpsertHandler = null;
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
-      Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
-      String rowMergerCustomImplementation = upsertConfig.getPartialUpsertMergerClass();
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(rowMergerCustomImplementation) || partialUpsertStrategies != null,
-          "Partial-upsert strategies must be configured for partial-upsert enabled table: %s", _tableNameWithType);
       partialUpsertHandler = new PartialUpsertHandler(schema, comparisonColumns, upsertConfig);
     }
 

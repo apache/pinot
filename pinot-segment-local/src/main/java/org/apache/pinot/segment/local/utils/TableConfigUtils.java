@@ -927,11 +927,8 @@ public final class TableConfigUtils {
     if (StringUtils.isNotBlank(partialUpsertMergerClass)) {
       Preconditions.checkState(MapUtils.isEmpty(partialUpsertStrategies),
           "If partialUpsertMergerClass is provided then partialUpsertStrategies should be empty");
-    }
-
-    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
-    // skip the partial upsert strategies check if partialUpsertMergerClass is provided
-    if (StringUtils.isBlank(partialUpsertMergerClass)) {
+    } else {
+      List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
       // validate partial upsert column mergers
       for (Map.Entry<String, UpsertConfig.Strategy> entry : partialUpsertStrategies.entrySet()) {
         String column = entry.getKey();

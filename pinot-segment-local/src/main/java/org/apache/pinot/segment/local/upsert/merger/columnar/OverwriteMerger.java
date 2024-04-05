@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-
-
 /**
  * Merges 2 records and returns the merged record.
  * Overwrite the existing value for the given field. Then return the merged record.
  */
 public class OverwriteMerger implements PartialUpsertColumnMerger {
-  OverwriteMerger() {
-  }
 
   @Override
   public Object merge(Object previousValue, Object currentValue) {
