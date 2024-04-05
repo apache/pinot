@@ -95,10 +95,10 @@ public class SortedMailboxReceiveOperator extends BaseMailboxReceiveOperator {
         return block;
       } else {
         assert block.isSuccessfulEndOfStreamBlock();
+        // the multiConsumer has already merged stages from upstream, but doesn't know about this operator
+        // specific stats.
+        _eosBlock = updateEosBlock(block);
         if (!_rows.isEmpty()) {
-          // the multiConsumer has already merged stages from upstream, but doesn't know about this operator
-          // specific stats.
-          _eosBlock = updateEosBlock(block);
 
           // TODO: This might not be efficient because we are sorting all the received rows. We should use a k-way merge
           //       when sender side is sorted.
