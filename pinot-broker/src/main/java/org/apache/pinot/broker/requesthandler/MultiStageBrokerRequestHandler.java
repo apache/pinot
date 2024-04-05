@@ -283,7 +283,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
         DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(i);
         MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(stageStats);
-        JsonNode node = dispatchablePlanFragment.getPlanFragment().getFragmentRoot().visit(treeBuilder, null);
+        PlanNode fragmentRoot = dispatchablePlanFragment.getPlanFragment().getFragmentRoot();
+        JsonNode node = fragmentRoot.visit(treeBuilder, null);
         brokerResponse.addStageStat(node);
       }
     }
@@ -299,9 +300,24 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       _index = stageStats.getLastOperatorIndex();
     }
 
+    private ObjectNode selfNode(MultiStageOperator.Type type) {
+      ObjectNode json = JsonUtils.newObjectNode();
+      json.put("type", type.toString());
+      Iterator<Map.Entry<String, JsonNode>> statsIt = _stageStats.getOperatorStats(_index).asJson().fields();
+      while (statsIt.hasNext()) {
+        Map.Entry<String, JsonNode> entry = statsIt.next();
+        json.set(entry.getKey(), entry.getValue());
+      }
+      return json;
+    }
+
     private JsonNode recursiveCase(AbstractPlanNode node, MultiStageOperator.Type expectedType) {
       MultiStageOperator.Type type = _stageStats.getOperatorType(_index);
       if (type != expectedType) {
+        if (type == MultiStageOperator.Type.LEAF) {
+          // Leaf nodes compile the plan node into a single operator and therefore return a single stat
+          return selfNode(type);
+        }
         int childrenSize = node.getInputs().size();
         switch (childrenSize) {
           case 0:
@@ -317,17 +333,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
                 + childrenSize + " inputs");
         }
       }
-      ObjectNode json = JsonUtils.newObjectNode();
-      json.put("type", type.toString());
-      Iterator<Map.Entry<String, JsonNode>> statsIt = _stageStats.getOperatorStats(_index).asJson().fields();
-      while (statsIt.hasNext()) {
-        Map.Entry<String, JsonNode> entry = statsIt.next();
-        json.set(entry.getKey(), entry.getValue());
-      }
+      ObjectNode json = selfNode(type);
 
       List<PlanNode> inputs = node.getInputs();
       ArrayNode children = JsonUtils.newArrayNode();
-      for (int i = inputs.size() - 1; i >= 0; i--) {
+      int size = inputs.size();
+      if (size > _index) {
+        throw new IllegalStateException("Operator " + type + " has " + size + " inputs but only "
+            + _index + " stats are left");
+      }
+      for (int i = size - 1; i >= 0; i--) {
         PlanNode planNode = inputs.get(i);
         _index--;
         JsonNode child = planNode.visit(this, null);
@@ -496,7 +511,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     @Override
     public void visitLeaf(StatMap<LeafStageTransferableBlockOperator.StatKey> stats, BrokerResponseNativeV2 response) {
-      response.mergeMaxRows(stats.getLong(LeafStageTransferableBlockOperator.StatKey.NUM_ROWS));
+      response.mergeMaxRows(stats.getLong(LeafStageTransferableBlockOperator.StatKey.EMITTED_ROWS));
 
       StatMap<DataTable.MetadataKey> v1Stats = new StatMap<>(DataTable.MetadataKey.class);
       for (LeafStageTransferableBlockOperator.StatKey statKey : stats.keySet()) {
