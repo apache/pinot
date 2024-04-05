@@ -95,7 +95,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
 
   public LeafStageTransferableBlockOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests,
       DataSchema dataSchema, QueryExecutor queryExecutor, ExecutorService executorService) {
-    super(context);
+    super(context, StatKey.class);
     int numRequests = requests.size();
     Preconditions.checkArgument(numRequests == 1 || numRequests == 2, "Expected 1 or 2 requests, got: %s", numRequests);
     _requests = requests;
@@ -110,14 +110,13 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
   }
 
   @Override
-  public Class<StatKey> getStatKeyClass() {
-    return StatKey.class;
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
   }
 
   @Override
-  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.merge(StatKey.TIME_USED_MS, executionTimeMs);
-    _statMap.merge(StatKey.NUM_DOCS_SCANNED, block.getNumRows());
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override
@@ -210,7 +209,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
             _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
             break;
           case TIME_USED_MS:
-            _statMap.merge(StatKey.TIME_USED_MS, Long.parseLong(entry.getValue()));
+            _statMap.merge(StatKey.EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
             break;
           case TRACE_INFO:
             LOGGER.debug("Skipping trace info: {}", entry.getValue());
@@ -261,7 +260,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
             _statMap.merge(StatKey.NUM_BLOCKS, Integer.parseInt(entry.getValue()));
             break;
           case NUM_ROWS:
-            _statMap.merge(StatKey.NUM_ROWS, Integer.parseInt(entry.getValue()));
+            _statMap.merge(StatKey.EMITTED_ROWS, Integer.parseInt(entry.getValue()));
             break;
           case OPERATOR_EXECUTION_TIME_MS:
             _statMap.merge(StatKey.OPERATOR_EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
@@ -566,8 +565,8 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
 
   public enum StatKey implements StatMap.Key {
     TABLE(StatMap.Type.STRING),
-    EXECUTION_TIME_MS(StatMap.Type.LONG),
-    EMITTED_ROWS(StatMap.Type.LONG),
+    EXECUTION_TIME_MS(StatMap.Type.LONG, null, DataTable.MetadataKey.TIME_USED_MS),
+    EMITTED_ROWS(StatMap.Type.LONG, null, DataTable.MetadataKey.NUM_ROWS),
     NUM_DOCS_SCANNED(StatMap.Type.LONG),
     NUM_ENTRIES_SCANNED_IN_FILTER(StatMap.Type.LONG),
     NUM_ENTRIES_SCANNED_POST_FILTER(StatMap.Type.LONG),
@@ -585,7 +584,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
     },
     TOTAL_DOCS(StatMap.Type.LONG),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
-    TIME_USED_MS(StatMap.Type.LONG),
     //TRACE_INFO(StatMap.Type.STRING),
     //REQUEST_ID(StatMap.Type.LONG),
     NUM_RESIZES(StatMap.Type.INT),
@@ -602,7 +600,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
     NUM_CONSUMING_SEGMENTS_PROCESSED(StatMap.Type.INT),
     NUM_CONSUMING_SEGMENTS_MATCHED(StatMap.Type.INT),
     NUM_BLOCKS(StatMap.Type.INT),
-    NUM_ROWS(StatMap.Type.INT),
     OPERATOR_EXECUTION_TIME_MS(StatMap.Type.LONG),
     OPERATOR_ID(StatMap.Type.STRING),
     OPERATOR_EXEC_START_TIME_MS(StatMap.Type.LONG) {
@@ -652,7 +649,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
       if (_v1Key != null) {
         switch (_type) {
           case LONG:
-            oldMetadata.merge(_v1Key, stats.getLong(this));
+            if (_v1Key.getType() == StatMap.Type.INT) {
+              oldMetadata.merge(_v1Key, (int) stats.getLong(this));
+            } else {
+              oldMetadata.merge(_v1Key, stats.getLong(this));
+            }
             break;
           case INT:
             oldMetadata.merge(_v1Key, stats.getInt(this));

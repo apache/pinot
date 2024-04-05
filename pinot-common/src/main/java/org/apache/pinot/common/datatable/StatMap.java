@@ -60,7 +60,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   }
 
   public int getInt(K key) {
-    Preconditions.checkArgument(key.getType() == Type.INT);
+    Preconditions.checkArgument(key.getType() == Type.INT, "Key %s is of type %s, not INT", key, key.getType());
     Object o = _map.get(key);
     return o == null ? 0 : (Integer) o;
   }
@@ -84,13 +84,13 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     if (key.getType() == Type.INT) {
       return getInt(key);
     }
-    Preconditions.checkArgument(key.getType() == Type.LONG);
+    Preconditions.checkArgument(key.getType() == Type.LONG, "Key %s is of type %s, not LONG", key, key.getType());
     Object o = _map.get(key);
     return o == null ? 0L : (Long) o;
   }
 
   public StatMap<K> merge(K key, long value) {
-    Preconditions.checkArgument(key.getType() == Type.LONG);
+    Preconditions.checkArgument(key.getType() == Type.LONG, "Key %s is of type %s, not LONG", key, key.getType());
     long oldValue = getLong(key);
     long newValue = key.merge(oldValue, value);
     if (newValue == 0) {
@@ -102,7 +102,8 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   }
 
   public boolean getBoolean(K key) {
-    Preconditions.checkArgument(key.getType() == Type.BOOLEAN);
+    Preconditions.checkArgument(key.getType() == Type.BOOLEAN, "Key %s is of type %s, not BOOLEAN",
+        key, key.getType());
     Object o = _map.get(key);
     return o != null && (Boolean) o;
   }
@@ -119,7 +120,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   }
 
   public String getString(K key) {
-    Preconditions.checkArgument(key.getType() == Type.STRING);
+    Preconditions.checkArgument(key.getType() == Type.STRING, "Key %s is of type %s, not STRING", key, key.getType());
     Object o = _map.get(key);
     return o == null ? null : (String) o;
   }

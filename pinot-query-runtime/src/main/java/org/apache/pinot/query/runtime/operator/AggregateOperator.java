@@ -79,7 +79,7 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Stat
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator<?> inputOperator,
       DataSchema resultSchema, List<RexExpression> aggCalls, List<RexExpression> groupSet, AggType aggType,
       List<Integer> filterArgIndices, @Nullable AbstractPlanNode.NodeHint nodeHint) {
-    super(context);
+    super(context, StatKey.class);
     _inputOperator = inputOperator;
     _resultSchema = resultSchema;
     _aggType = aggType;
@@ -123,14 +123,13 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Stat
   }
 
   @Override
-  public Class<StatKey> getStatKeyClass() {
-    return StatKey.class;
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
   }
 
   @Override
-  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.merge(StatKey.EXECUTION_TIME_MS, executionTimeMs);
-    _statMap.merge(StatKey.EMITTED_ROWS, block.getNumRows());
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override

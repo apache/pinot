@@ -77,7 +77,7 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
   MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator, BlockExchange exchange,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender) {
-    super(context);
+    super(context, MailboxSendOperator.StatKey.class);
     _sourceOperator = sourceOperator;
     _exchange = exchange;
     _collationKeys = collationKeys;
@@ -106,14 +106,13 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
   }
 
   @Override
-  public Class<StatKey> getStatKeyClass() {
-    return StatKey.class;
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
   }
 
   @Override
-  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.merge(StatKey.EXECUTION_TIME_MS, executionTimeMs);
-    _statMap.merge(StatKey.EMITTED_ROWS, block.getNumRows());
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override

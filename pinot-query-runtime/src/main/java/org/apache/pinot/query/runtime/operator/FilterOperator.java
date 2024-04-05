@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -49,7 +50,7 @@ import org.slf4j.LoggerFactory;
     3) All boolean scalar functions we have that take tranformOperand.
     Note: Scalar functions are the ones we have in v1 engine and only do function name and arg # matching.
  */
-public class FilterOperator extends MultiStageOperator.WithBasicStats {
+public class FilterOperator extends MultiStageOperator<FilterOperator.StatKey> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterOperator.class);
   private static final String EXPLAIN_NAME = "FILTER";
@@ -60,12 +61,22 @@ public class FilterOperator extends MultiStageOperator.WithBasicStats {
 
   public FilterOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator, DataSchema dataSchema,
       RexExpression filter) {
-    super(context);
+    super(context, StatKey.class);
     _upstreamOperator = upstreamOperator;
     _dataSchema = dataSchema;
     _filterOperand = TransformOperandFactory.getTransformOperand(filter, dataSchema);
     Preconditions.checkState(_filterOperand.getResultType() == ColumnDataType.BOOLEAN,
         "Filter operand must return BOOLEAN, got: %s", _filterOperand.getResultType());
+  }
+
+  @Override
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
+  }
+
+  @Override
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override
@@ -106,5 +117,20 @@ public class FilterOperator extends MultiStageOperator.WithBasicStats {
       }
     }
     return new TransferableBlock(resultRows, _dataSchema, DataBlock.Type.ROW);
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG);
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

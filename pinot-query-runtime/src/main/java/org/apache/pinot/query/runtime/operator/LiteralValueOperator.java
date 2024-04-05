@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -33,7 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class LiteralValueOperator extends MultiStageOperator.WithBasicStats {
+public class LiteralValueOperator extends MultiStageOperator<LiteralValueOperator.StatKey> {
   private static final String EXPLAIN_NAME = "LITERAL_VALUE_PROVIDER";
   private static final Logger LOGGER = LoggerFactory.getLogger(LiteralValueOperator.class);
 
@@ -43,7 +44,7 @@ public class LiteralValueOperator extends MultiStageOperator.WithBasicStats {
 
   public LiteralValueOperator(OpChainExecutionContext context, DataSchema dataSchema,
       List<List<RexExpression>> rexLiteralRows) {
-    super(context);
+    super(context, StatKey.class);
     _dataSchema = dataSchema;
     _rexLiteralBlock = constructBlock(rexLiteralRows);
     // only return a single literal block when it is the 1st virtual server. otherwise, result will be duplicated.
@@ -51,8 +52,13 @@ public class LiteralValueOperator extends MultiStageOperator.WithBasicStats {
   }
 
   @Override
-  public Class<BaseStatKeys> getStatKeyClass() {
-    return BaseStatKeys.class;
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
+  }
+
+  @Override
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override
@@ -101,5 +107,20 @@ public class LiteralValueOperator extends MultiStageOperator.WithBasicStats {
       blockContent.add(row);
     }
     return new TransferableBlock(blockContent, _dataSchema, DataBlock.Type.ROW);
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG);
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

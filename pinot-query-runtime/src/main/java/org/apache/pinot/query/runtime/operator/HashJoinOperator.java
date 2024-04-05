@@ -122,7 +122,7 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
 
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator<?> leftTableOperator,
       MultiStageOperator<?> rightTableOperator, DataSchema leftSchema, JoinNode node) {
-    super(context);
+    super(context, StatKey.class);
     Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinRelType()),
         "Join type: " + node.getJoinRelType() + " is not supported!");
     _joinType = node.getJoinRelType();
@@ -155,14 +155,13 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
   }
 
   @Override
-  public Class<StatKey> getStatKeyClass() {
-    return StatKey.class;
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
   }
 
   @Override
-  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.merge(StatKey.EXECUTION_TIME_MS, executionTimeMs);
-    _statMap.merge(StatKey.EMITTED_ROWS, block.getNumRows());
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override

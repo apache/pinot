@@ -264,11 +264,21 @@ public class OpChainTest {
     return resultBlock;
   }
 
-  static class DummyMultiStageOperator extends MultiStageOperator.WithBasicStats {
+  static class DummyMultiStageOperator extends MultiStageOperator<LiteralValueOperator.StatKey> {
     private static final Logger LOGGER = LoggerFactory.getLogger(DummyMultiStageOperator.class);
 
     public DummyMultiStageOperator(OpChainExecutionContext context) {
-      super(context);
+      super(context, LiteralValueOperator.StatKey.class);
+    }
+
+    @Override
+    public LiteralValueOperator.StatKey getExecutionTimeKey() {
+      return LiteralValueOperator.StatKey.EXECUTION_TIME_MS;
+    }
+
+    @Override
+    public LiteralValueOperator.StatKey getEmittedRowsKey() {
+      return LiteralValueOperator.StatKey.EMITTED_ROWS;
     }
 
     @Override
@@ -303,16 +313,26 @@ public class OpChainTest {
     }
   }
 
-  static class DummyMultiStageCallableOperator extends MultiStageOperator.WithBasicStats {
+  static class DummyMultiStageCallableOperator extends MultiStageOperator<TransformOperator.StatKey> {
     private static final Logger LOGGER = LoggerFactory.getLogger(DummyMultiStageCallableOperator.class);
     private final MultiStageOperator<?> _upstream;
     private final long _sleepTimeInMillis;
 
     public DummyMultiStageCallableOperator(OpChainExecutionContext context, MultiStageOperator<?> upstream,
         long sleepTimeInMillis) {
-      super(context);
+      super(context, TransformOperator.StatKey.class);
       _upstream = upstream;
       _sleepTimeInMillis = sleepTimeInMillis;
+    }
+
+    @Override
+    public TransformOperator.StatKey getExecutionTimeKey() {
+      return TransformOperator.StatKey.EXECUTION_TIME_MS;
+    }
+
+    @Override
+    public TransformOperator.StatKey getEmittedRowsKey() {
+      return TransformOperator.StatKey.EMITTED_ROWS;
     }
 
     @Override

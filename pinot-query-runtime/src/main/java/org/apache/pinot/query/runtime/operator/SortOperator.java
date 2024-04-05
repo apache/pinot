@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -27,6 +28,7 @@ import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -38,7 +40,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SortOperator extends MultiStageOperator.WithBasicStats {
+public class SortOperator extends MultiStageOperator<SortOperator.StatKey> {
   private static final String EXPLAIN_NAME = "SORT";
   private static final Logger LOGGER = LoggerFactory.getLogger(SortOperator.class);
 
@@ -68,7 +70,7 @@ public class SortOperator extends MultiStageOperator.WithBasicStats {
       List<RexExpression> collationKeys, List<RelFieldCollation.Direction> collationDirections,
       List<RelFieldCollation.NullDirection> collationNullDirections, int fetch, int offset, DataSchema dataSchema,
       boolean isInputSorted, int defaultHolderCapacity, int defaultResponseLimit) {
-    super(context);
+    super(context, StatKey.class);
     _upstreamOperator = upstreamOperator;
     _fetch = fetch;
     _offset = Math.max(offset, 0);
@@ -90,6 +92,16 @@ public class SortOperator extends MultiStageOperator.WithBasicStats {
           new SortUtils.SortComparator(collationKeys, collationDirections, collationNullDirections, dataSchema, true));
       _rows = null;
     }
+  }
+
+  @Override
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
+  }
+
+  @Override
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override
@@ -167,8 +179,13 @@ public class SortOperator extends MultiStageOperator.WithBasicStats {
             _rows.addAll(container);
           } else {
             _rows.addAll(container.subList(0, _numRowsToKeep - numRows));
-            LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", _operatorId,
-                _context.getId());
+            if (LOGGER.isDebugEnabled()) {
+              // this operatorId is an old name. It is being kept to avoid breaking changes on the log message.
+              String operatorId = Joiner.on("_")
+                  .join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
+              LOGGER.debug("Early terminate at SortOperator - operatorId={}, opChainId={}", operatorId,
+                  _context.getId());
+            }
             // setting operator to be early terminated and awaits EOS block next.
             earlyTerminate();
           }
@@ -181,5 +198,20 @@ public class SortOperator extends MultiStageOperator.WithBasicStats {
       block = _upstreamOperator.nextBlock();
     }
     return block;
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG);
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

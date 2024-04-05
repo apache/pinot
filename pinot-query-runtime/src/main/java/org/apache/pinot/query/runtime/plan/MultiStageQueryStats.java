@@ -44,6 +44,7 @@ import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
+import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -110,7 +111,7 @@ public class MultiStageQueryStats {
     return create(stageId, MultiStageOperator.Type.LEAF, opStats);
   }
 
-  public static MultiStageQueryStats createLiteral(int stageId, StatMap<MultiStageOperator.BaseStatKeys> statMap) {
+  public static MultiStageQueryStats createLiteral(int stageId, StatMap<LiteralValueOperator.StatKey> statMap) {
     return create(stageId, MultiStageOperator.Type.LITERAL, statMap);
   }
 

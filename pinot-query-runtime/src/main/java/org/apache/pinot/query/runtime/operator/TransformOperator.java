@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -44,7 +45,7 @@ import org.slf4j.LoggerFactory;
  * Note: Function transform only runs functions from v1 engine scalar function factory, which only does argument count
  * and canonicalized function name matching (lower case).
  */
-public class TransformOperator extends MultiStageOperator.WithBasicStats {
+public class TransformOperator extends MultiStageOperator<TransformOperator.StatKey> {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformOperator.class);
   private static final String EXPLAIN_NAME = "TRANSFORM";
 
@@ -56,7 +57,7 @@ public class TransformOperator extends MultiStageOperator.WithBasicStats {
 
   public TransformOperator(OpChainExecutionContext context, MultiStageOperator<?> upstreamOperator,
       DataSchema resultSchema, List<RexExpression> transforms, DataSchema upstreamDataSchema) {
-    super(context);
+    super(context, StatKey.class);
     Preconditions.checkState(!transforms.isEmpty(), "transform operand should not be empty.");
     Preconditions.checkState(resultSchema.size() == transforms.size(),
         "result schema size:" + resultSchema.size() + " doesn't match transform operand size:" + transforms.size());
@@ -67,6 +68,16 @@ public class TransformOperator extends MultiStageOperator.WithBasicStats {
       _transformOperandsList.add(TransformOperandFactory.getTransformOperand(rexExpression, upstreamDataSchema));
     }
     _resultSchema = resultSchema;
+  }
+
+  @Override
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
+  }
+
+  @Override
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override
@@ -110,5 +121,20 @@ public class TransformOperator extends MultiStageOperator.WithBasicStats {
       resultRows.add(resultRow);
     }
     return new TransferableBlock(resultRows, _resultSchema, DataBlock.Type.ROW);
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG);
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

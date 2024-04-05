@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -37,7 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-class PipelineBreakerOperator extends MultiStageOperator.WithBasicStats {
+public class PipelineBreakerOperator extends MultiStageOperator<PipelineBreakerOperator.StatKey> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerOperator.class);
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
 
@@ -49,12 +50,22 @@ class PipelineBreakerOperator extends MultiStageOperator.WithBasicStats {
   private MultiStageQueryStats _queryStats = null;
 
   public PipelineBreakerOperator(OpChainExecutionContext context, Map<Integer, Operator<TransferableBlock>> workerMap) {
-    super(context);
+    super(context, StatKey.class);
     _workerMap = workerMap;
     _resultMap = new HashMap<>();
     for (int workerKey : workerMap.keySet()) {
       _resultMap.put(workerKey, new ArrayList<>());
     }
+  }
+
+  @Override
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
+  }
+
+  @Override
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override
@@ -147,5 +158,20 @@ class PipelineBreakerOperator extends MultiStageOperator.WithBasicStats {
     assert _queryStats != null;
     addStats(_queryStats);
     return TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG);
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
   }
 }

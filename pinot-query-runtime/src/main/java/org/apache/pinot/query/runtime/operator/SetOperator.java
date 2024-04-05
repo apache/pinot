@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.data.table.Record;
@@ -42,7 +43,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * The right child operator is consumed in a blocking manner, and the left child operator is consumed in a non-blocking
  * UnionOperator: The right child operator is consumed in a blocking manner.
  */
-public abstract class SetOperator extends MultiStageOperator.WithBasicStats {
+public abstract class SetOperator extends MultiStageOperator<SetOperator.StatKey> {
   protected final Set<Record> _rightRowSet;
 
   private final List<MultiStageOperator<?>> _upstreamOperators;
@@ -58,13 +59,23 @@ public abstract class SetOperator extends MultiStageOperator.WithBasicStats {
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator<?>> upstreamOperators,
       DataSchema dataSchema) {
-    super(opChainExecutionContext);
+    super(opChainExecutionContext, StatKey.class);
     _dataSchema = dataSchema;
     _upstreamOperators = upstreamOperators;
     _leftChildOperator = getChildOperators().get(0);
     _rightChildOperator = getChildOperators().get(1);
     _rightRowSet = new HashSet<>();
     _isRightSetBuilt = false;
+  }
+
+  @Override
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
+  }
+
+  @Override
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override
@@ -155,4 +166,19 @@ public abstract class SetOperator extends MultiStageOperator.WithBasicStats {
    * @return true if the row is matched.
    */
   protected abstract boolean handleRowMatched(Object[] row);
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG);
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
+    }
+  }
 }

@@ -35,6 +35,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
@@ -78,7 +79,7 @@ import org.slf4j.LoggerFactory;
  *     4. Add support for null direction handling (even for PARTITION BY only queries with custom null direction)
  *     5. Add support for multiple window groups (each WindowAggregateOperator should still work on a single group)
  */
-public class WindowAggregateOperator extends MultiStageOperator.WithBasicStats {
+public class WindowAggregateOperator extends MultiStageOperator<WindowAggregateOperator.StatKey> {
   private static final String EXPLAIN_NAME = "WINDOW";
   private static final Logger LOGGER = LoggerFactory.getLogger(WindowAggregateOperator.class);
 
@@ -119,7 +120,7 @@ public class WindowAggregateOperator extends MultiStageOperator.WithBasicStats {
       int upperBound, WindowNode.WindowFrameType windowFrameType, List<RexExpression> constants,
       DataSchema resultSchema, DataSchema inputSchema,
       Map<String, Function<ColumnDataType, AggregationUtils.Merger>> mergers) {
-    super(context);
+    super(context, StatKey.class);
 
     _inputOperator = inputOperator;
     _groupSet = groupSet;
@@ -150,6 +151,16 @@ public class WindowAggregateOperator extends MultiStageOperator.WithBasicStats {
 
     _numRows = 0;
     _hasReturnedWindowAggregateBlock = false;
+  }
+
+  @Override
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
+  }
+
+  @Override
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   @Override
@@ -560,6 +571,21 @@ public class WindowAggregateOperator extends MultiStageOperator.WithBasicStats {
       public long getCountOfDuplicateOrderByKeys() {
         return _countOfDuplicateOrderByKeys;
       }
+    }
+  }
+
+  public enum StatKey implements StatMap.Key {
+    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EMITTED_ROWS(StatMap.Type.LONG);
+    private final StatMap.Type _type;
+
+    StatKey(StatMap.Type type) {
+      _type = type;
+    }
+
+    @Override
+    public StatMap.Type getType() {
+      return _type;
     }
   }
 }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import java.io.DataInput;
@@ -31,6 +30,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -41,29 +41,22 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     implements Operator<TransferableBlock>, AutoCloseable {
 
   protected final OpChainExecutionContext _context;
-  protected final String _operatorId;
-  protected final StatMap<K> _statMap = new StatMap<>(getStatKeyClass());
+  protected final StatMap<K> _statMap;
   protected boolean _isEarlyTerminated;
 
-  public MultiStageOperator(OpChainExecutionContext context) {
+  public MultiStageOperator(OpChainExecutionContext context, Class<K> keyStatClass) {
     _context = context;
-    _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
     _isEarlyTerminated = false;
+    _statMap = new StatMap<>(keyStatClass);
   }
 
   protected abstract Logger logger();
 
   public abstract Type getOperatorType();
 
-  /**
-   * Returns the class of the stat key.
-   *
-   * Note for implementations: This method may be called before the constructor of the implementing class is finished.
-   * Therefore must not relay on any state of the implementing class.
-   */
-  public abstract Class<K> getStatKeyClass();
+  public abstract K getExecutionTimeKey();
 
-  protected abstract void recordExecutionStats(long executionTimeMs, TransferableBlock block);
+  public abstract K getEmittedRowsKey();
 
   @Override
   public TransferableBlock nextBlock() {
@@ -79,7 +72,8 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
         } catch (Exception e) {
           nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
         }
-        recordExecutionStats(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), nextBlock);
+        _statMap.merge(getExecutionTimeKey(), executeStopwatch.elapsed(TimeUnit.MILLISECONDS));
+        _statMap.merge(getEmittedRowsKey(), nextBlock.getNumRows());
       } else {
         try {
           nextBlock = getNextBlock();
@@ -89,10 +83,6 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
       }
       return nextBlock;
     }
-  }
-
-  public String getOperatorId() {
-    return _operatorId;
   }
 
   // Make it protected because we should always call nextBlock()
@@ -169,42 +159,25 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     return upstreamEos;
   }
 
-  public abstract static class WithBasicStats extends MultiStageOperator<BaseStatKeys> {
-    public WithBasicStats(OpChainExecutionContext context) {
-      super(context);
-    }
-
-    @Override
-    public Class<BaseStatKeys> getStatKeyClass() {
-      return BaseStatKeys.class;
-    }
-
-    @Override
-    protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-      _statMap.merge(BaseStatKeys.EXECUTION_TIME_MS, executionTimeMs);
-      _statMap.merge(BaseStatKeys.EMITTED_ROWS, block.getNumRows());
-    }
-  }
-
   public enum Type {
     AGGREGATE(AggregateOperator.StatKey.class),
-    FILTER(BaseStatKeys.class),
+    FILTER(FilterOperator.StatKey.class),
     HASH_JOIN(HashJoinOperator.StatKey.class),
-    INTERSECT(BaseStatKeys.class),
+    INTERSECT(SetOperator.StatKey.class),
     LEAF(LeafStageTransferableBlockOperator.StatKey.class),
-    LITERAL(BaseStatKeys.class),
+    LITERAL(LiteralValueOperator.StatKey.class),
     MAILBOX_RECEIVE(BaseMailboxReceiveOperator.StatKey.class),
     MAILBOX_SEND(MailboxSendOperator.StatKey.class),
-    MINUS(BaseStatKeys.class),
-    PIPELINE_BREAKER(BaseStatKeys.class),
-    SORT(BaseStatKeys.class),
-    TRANSFORM(BaseStatKeys.class),
-    UNION(BaseStatKeys.class),
-    WINDOW(BaseStatKeys.class),;
+    MINUS(SetOperator.StatKey.class),
+    PIPELINE_BREAKER(PipelineBreakerOperator.StatKey.class),
+    SORT(SortOperator.StatKey.class),
+    TRANSFORM(TransformOperator.StatKey.class),
+    UNION(SetOperator.StatKey.class),
+    WINDOW(WindowAggregateOperator.StatKey.class),;
 
     private final Class _statKeyClass;
 
-    Type(Class<?> statKeyClass) {
+    Type(Class<? extends StatMap.Key> statKeyClass) {
       _statKeyClass = statKeyClass;
     }
 

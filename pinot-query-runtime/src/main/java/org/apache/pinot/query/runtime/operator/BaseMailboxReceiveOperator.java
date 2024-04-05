@@ -52,7 +52,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
 
   public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       int senderStageId) {
-    super(context);
+    super(context, StatKey.class);
     _mailboxService = context.getMailboxService();
     Preconditions.checkState(MailboxSendOperator.SUPPORTED_EXCHANGE_TYPES.contains(exchangeType),
         "Unsupported exchange type: %s", exchangeType);
@@ -103,14 +103,13 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
   }
 
   @Override
-  public Class<StatKey> getStatKeyClass() {
-    return StatKey.class;
+  public StatKey getExecutionTimeKey() {
+    return StatKey.EXECUTION_TIME_MS;
   }
 
   @Override
-  protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
-    _statMap.merge(StatKey.EXECUTION_TIME_MS, executionTimeMs);
-    _statMap.merge(StatKey.EMITTED_ROWS, block.getNumRows());
+  public StatKey getEmittedRowsKey() {
+    return StatKey.EMITTED_ROWS;
   }
 
   private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
