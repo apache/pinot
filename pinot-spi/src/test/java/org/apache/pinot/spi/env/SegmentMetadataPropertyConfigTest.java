@@ -99,6 +99,11 @@ public class SegmentMetadataPropertyConfigTest {
     // reading the configuration from saved file.
     configuration = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true, true);
     recoveredKeys = CommonsConfigurationUtils.getKeys(configuration);
+    // assert that Header is not null for the config.
+    assertNotNull(configuration.getHeader());
+
+    // assert that configuration has SegmentMetadataPropertyIOFactory
+    assertEquals(configuration.getIOFactory().getClass(), SegmentMetadataPropertyIOFactory.class);
     testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
   }
 
@@ -138,6 +143,9 @@ public class SegmentMetadataPropertyConfigTest {
     // assert that Header is null for the config.
     assertNull(configuration.getHeader());
 
+    // assert that configuration has DefaultIOFactory
+    assertEquals(configuration.getIOFactory().getClass(), PropertiesConfiguration.DefaultIOFactory.class);
+
     testSegmentMetadataContent(configuration);
   }
 
@@ -154,6 +162,9 @@ public class SegmentMetadataPropertyConfigTest {
 
     // assert that Header is not null for the config.
     assertNotNull(configuration.getHeader());
+
+    // assert that configuration has SegmentMetadataPropertyIOFactory
+    assertEquals(configuration.getIOFactory().getClass(), SegmentMetadataPropertyIOFactory.class);
 
     testSegmentMetadataContent(configuration);
   }

@@ -379,8 +379,10 @@ public class CommonsConfigurationUtils {
     if (segmentMetadataFile.exists()) {
       try (BufferedReader reader = new BufferedReader(new FileReader(segmentMetadataFile))) {
         String fileFirstLine = reader.readLine();
+        // header version is written as a comment and start with '# '
+        String versionHeaderCommentPrefix = String.format("# %s", SEGMENT_VERSION_IDENTIFIER);
         // check whether the segment has the version header or not
-        return StringUtils.startsWith(fileFirstLine, SEGMENT_VERSION_IDENTIFIER);
+        return StringUtils.startsWith(fileFirstLine, versionHeaderCommentPrefix);
       } catch (IOException exception) {
         throw new ConfigurationException(
             String.format("Error occurred while reading segment metadata file %s ",
