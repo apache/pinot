@@ -36,6 +36,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -55,13 +56,16 @@ public class TableSizeReader {
   private final HttpClientConnectionManager _connectionManager;
   private final PinotHelixResourceManager _helixResourceManager;
   private final ControllerMetrics _controllerMetrics;
+  private final LeadControllerManager _leadControllerManager;
 
   public TableSizeReader(Executor executor, HttpClientConnectionManager connectionManager,
-      ControllerMetrics controllerMetrics, PinotHelixResourceManager helixResourceManager) {
+      ControllerMetrics controllerMetrics, PinotHelixResourceManager helixResourceManager,
+      LeadControllerManager leadControllerManager) {
     _executor = executor;
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
     _helixResourceManager = helixResourceManager;
+    _leadControllerManager = leadControllerManager;
   }
 
   /**
@@ -104,11 +108,11 @@ public class TableSizeReader {
           Math.max(tableSizeDetails._realtimeSegments._reportedSizePerReplicaInBytes, 0L);
       isMissingAllRealtimeSegments =
           (tableSizeDetails._realtimeSegments._missingSegments == tableSizeDetails._realtimeSegments._segments.size());
-      _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER,
+      emitMetrics(realtimeTableName, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER,
           tableSizeDetails._realtimeSegments._estimatedSizeInBytes);
-      _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
-          tableSizeDetails._realtimeSegments._estimatedSizeInBytes / _helixResourceManager
-              .getNumReplicas(realtimeTableConfig));
+      emitMetrics(realtimeTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
+          tableSizeDetails._realtimeSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
+              realtimeTableConfig));
 
       long largestSegmentSizeOnServer = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       for (SegmentSizeDetails segmentSizeDetail : tableSizeDetails._realtimeSegments._segments.values()) {
@@ -117,8 +121,7 @@ public class TableSizeReader {
         }
       }
       if (largestSegmentSizeOnServer != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
-        _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER,
-            largestSegmentSizeOnServer);
+        emitMetrics(realtimeTableName, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER, largestSegmentSizeOnServer);
       }
     }
     if (hasOfflineTableConfig) {
@@ -131,11 +134,11 @@ public class TableSizeReader {
           Math.max(tableSizeDetails._offlineSegments._reportedSizePerReplicaInBytes, 0L);
       isMissingAllOfflineSegments =
           (tableSizeDetails._offlineSegments._missingSegments == tableSizeDetails._offlineSegments._segments.size());
-      _controllerMetrics.setValueOfTableGauge(offlineTableName, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER,
+      emitMetrics(offlineTableName, ControllerGauge.TABLE_TOTAL_SIZE_ON_SERVER,
           tableSizeDetails._offlineSegments._estimatedSizeInBytes);
-      _controllerMetrics.setValueOfTableGauge(offlineTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
-          tableSizeDetails._offlineSegments._estimatedSizeInBytes / _helixResourceManager
-              .getNumReplicas(offlineTableConfig));
+      emitMetrics(offlineTableName, ControllerGauge.TABLE_SIZE_PER_REPLICA_ON_SERVER,
+          tableSizeDetails._offlineSegments._estimatedSizeInBytes / _helixResourceManager.getNumReplicas(
+              offlineTableConfig));
 
       long largestSegmentSizeOnServer = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
       for (SegmentSizeDetails segmentSizeDetail : tableSizeDetails._offlineSegments._segments.values()) {
@@ -144,8 +147,7 @@ public class TableSizeReader {
         }
       }
       if (largestSegmentSizeOnServer != DEFAULT_SIZE_WHEN_MISSING_OR_ERROR) {
-        _controllerMetrics.setValueOfTableGauge(offlineTableName, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER,
-            largestSegmentSizeOnServer);
+        emitMetrics(offlineTableName, ControllerGauge.LARGEST_SEGMENT_SIZE_ON_SERVER, largestSegmentSizeOnServer);
       }
     }
 
@@ -158,6 +160,12 @@ public class TableSizeReader {
       tableSizeDetails._reportedSizePerReplicaInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
     }
     return tableSizeDetails;
+  }
+
+  private void emitMetrics(String tableNameWithType, ControllerGauge controllerGauge, long value) {
+    if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, controllerGauge, value);
+    }
   }
 
   //
@@ -312,9 +320,7 @@ public class TableSizeReader {
     if (subTypeSizeDetails._missingSegments > 0) {
       int numSegments = segmentToSizeDetailsMap.size();
       int missingPercent = subTypeSizeDetails._missingSegments * 100 / numSegments;
-      _controllerMetrics
-          .setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT,
-              missingPercent);
+      emitMetrics(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT, missingPercent);
       if (subTypeSizeDetails._missingSegments == numSegments) {
         LOGGER.warn("Failed to get size report for all {} segments of table: {}", numSegments, tableNameWithType);
         subTypeSizeDetails._reportedSizeInBytes = DEFAULT_SIZE_WHEN_MISSING_OR_ERROR;
@@ -325,8 +331,7 @@ public class TableSizeReader {
             numSegments, tableNameWithType);
       }
     } else {
-      _controllerMetrics
-          .setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT, 0);
+      emitMetrics(tableNameWithType, ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT, 0);
     }
 
     return subTypeSizeDetails;

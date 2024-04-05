@@ -39,6 +39,7 @@ import javax.ws.rs.core.Response;
 import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -70,6 +71,9 @@ public class TableSize {
   @Inject
   ControllerMetrics _controllerMetrics;
 
+  @Inject
+  LeadControllerManager _leadControllerManager;
+
   @GET
   @Path("/tables/{tableName}/size")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_SIZE)
@@ -84,7 +88,8 @@ public class TableSize {
       @ApiParam(value = "Table name without type", required = true, example = "myTable | myTable_OFFLINE")
       @PathParam("tableName") String tableName) {
     TableSizeReader tableSizeReader =
-        new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager);
+        new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _pinotHelixResourceManager,
+            _leadControllerManager);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;
     try {
       tableSizeDetails =

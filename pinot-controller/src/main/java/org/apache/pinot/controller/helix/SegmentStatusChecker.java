@@ -94,7 +94,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _tableSizeReader =
         new TableSizeReader(executorService, new PoolingHttpClientConnectionManager(), _controllerMetrics,
-            _pinotHelixResourceManager);
+            _pinotHelixResourceManager, leadControllerManager);
   }
 
   @Override
