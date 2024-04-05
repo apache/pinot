@@ -16,16 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.segment.local.upsert.merger.columnar;
 
 /**
  * Merges 2 records and returns the merged record.
  * Append the new value from incoming row to the existing value from multi-value field. Then return the merged record.
  * Append merger allows duplicated records in the multi-value field.
  */
-public class AppendMerger implements PartialUpsertMerger {
-  AppendMerger() {
-  }
+public class AppendMerger implements PartialUpsertColumnMerger {
 
   /**
    * Append the new value from incoming row to the given multi-value field of previous record.
