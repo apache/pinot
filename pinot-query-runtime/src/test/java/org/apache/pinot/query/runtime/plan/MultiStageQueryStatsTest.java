@@ -21,9 +21,9 @@ package org.apache.pinot.query.runtime.plan;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.testng.Assert;
@@ -80,15 +80,15 @@ public class MultiStageQueryStatsTest {
         )
         .addLast(stageStats ->
             stageStats.addLastOperator(MultiStageOperator.Type.LEAF,
-                    new StatMap<>(DataTable.MetadataKey.class)
-                        .merge(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED, 1)
-                        .merge(DataTable.MetadataKey.NUM_SEGMENTS_PROCESSED, 1)
-                        .merge(DataTable.MetadataKey.NUM_SEGMENTS_MATCHED, 1)
-                        .merge(DataTable.MetadataKey.NUM_DOCS_SCANNED, 10)
-                        .merge(DataTable.MetadataKey.NUM_ENTRIES_SCANNED_POST_FILTER, 5)
-                        .merge(DataTable.MetadataKey.TOTAL_DOCS, 5)
-                        .merge(DataTable.MetadataKey.TIME_USED_MS, 95)
-                        .merge(DataTable.MetadataKey.TABLE, "a"))
+                    new StatMap<>(LeafStageTransferableBlockOperator.StatKey.class)
+                        .merge(LeafStageTransferableBlockOperator.StatKey.NUM_SEGMENTS_QUERIED, 1)
+                        .merge(LeafStageTransferableBlockOperator.StatKey.NUM_SEGMENTS_PROCESSED, 1)
+                        .merge(LeafStageTransferableBlockOperator.StatKey.NUM_SEGMENTS_MATCHED, 1)
+                        .merge(LeafStageTransferableBlockOperator.StatKey.NUM_DOCS_SCANNED, 10)
+                        .merge(LeafStageTransferableBlockOperator.StatKey.NUM_ENTRIES_SCANNED_POST_FILTER, 5)
+                        .merge(LeafStageTransferableBlockOperator.StatKey.TOTAL_DOCS, 5)
+                        .merge(LeafStageTransferableBlockOperator.StatKey.TIME_USED_MS, 95)
+                        .merge(LeafStageTransferableBlockOperator.StatKey.TABLE, "a"))
                 .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND,
                     new StatMap<>(MailboxSendOperator.StatKey.class)
                         .merge(MailboxSendOperator.StatKey.TO_STAGE, 1)
