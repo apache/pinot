@@ -24,7 +24,6 @@ import java.io.DataInput;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -168,83 +167,31 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
   }
 
   public enum Type {
-    AGGREGATE {
-      @Override
-      public StatMap<AggregateOperator.StatKey> deserializeStats(DataInput input)
-          throws IOException {
-        return StatMap.deserialize(input, AggregateOperator.StatKey.class);
-      }
+    AGGREGATE(AggregateOperator.StatKey.class),
+    FILTER(BaseStatKeys.class),
+    HASH_JOIN(HashJoinOperator.StatKey.class),
+    INTERSECT(BaseStatKeys.class),
+    LEAF(LeafStageTransferableBlockOperator.StatKey.class),
+    LITERAL(BaseStatKeys.class),
+    MAILBOX_RECEIVE(BaseMailboxReceiveOperator.StatKey.class),
+    MAILBOX_SEND(MailboxSendOperator.StatKey.class),
+    MINUS(BaseStatKeys.class),
+    PIPELINE_BREAKER(BaseStatKeys.class),
+    SORT(BaseStatKeys.class),
+    TRANSFORM(BaseStatKeys.class),
+    UNION(BaseStatKeys.class),
+    WINDOW(BaseStatKeys.class),;
 
-      @Override
-      public StatMap<AggregateOperator.StatKey> emptyStats() {
-        return new StatMap<>(AggregateOperator.StatKey.class);
-      }
-    },
-    FILTER,
-    HASH_JOIN {
-      @Override
-      public StatMap<HashJoinOperator.StatKey> deserializeStats(DataInput input)
-          throws IOException {
-        return StatMap.deserialize(input, HashJoinOperator.StatKey.class);
-      }
+    private final Class _statKeyClass;
 
-      @Override
-      public StatMap<HashJoinOperator.StatKey> emptyStats() {
-        return new StatMap<>(HashJoinOperator.StatKey.class);
-      }
-    },
-    INTERSECT,
-    LEAF {
-      @Override
-      public StatMap<DataTable.MetadataKey> deserializeStats(DataInput input)
-          throws IOException {
-        return StatMap.deserialize(input, DataTable.MetadataKey.class);
-      }
-
-      @Override
-      public StatMap<DataTable.MetadataKey> emptyStats() {
-        return new StatMap<>(DataTable.MetadataKey.class);
-      }
-    },
-    LITERAL,
-    MAILBOX_RECEIVE {
-      @Override
-      public StatMap<BaseMailboxReceiveOperator.StatKey> deserializeStats(DataInput input)
-          throws IOException {
-        return StatMap.deserialize(input, BaseMailboxReceiveOperator.StatKey.class);
-      }
-
-      @Override
-      public StatMap<BaseMailboxReceiveOperator.StatKey> emptyStats() {
-        return new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
-      }
-    },
-    MAILBOX_SEND {
-      @Override
-      public StatMap<MailboxSendOperator.StatKey> deserializeStats(DataInput input)
-          throws IOException {
-        return StatMap.deserialize(input, MailboxSendOperator.StatKey.class);
-      }
-
-      @Override
-      public StatMap<MailboxSendOperator.StatKey> emptyStats() {
-        return new StatMap<>(MailboxSendOperator.StatKey.class);
-      }
-    },
-    MINUS,
-    PIPELINE_BREAKER,
-    SORT,
-    TRANSFORM,
-    UNION,
-    WINDOW;
-
-    public StatMap<?> deserializeStats(DataInput input)
-        throws IOException {
-      return StatMap.deserialize(input, BaseStatKeys.class);
+    Type(Class<?> statKeyClass) {
+      _statKeyClass = statKeyClass;
     }
 
-    public StatMap<?> emptyStats() {
-      return new StatMap<>(BaseStatKeys.class);
+    @SuppressWarnings("unchecked")
+    public StatMap<?> deserializeStats(DataInput input)
+        throws IOException {
+      return StatMap.deserialize(input, _statKeyClass);
     }
   }
 

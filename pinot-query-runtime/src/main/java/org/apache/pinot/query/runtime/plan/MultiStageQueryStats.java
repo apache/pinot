@@ -456,6 +456,7 @@ public class MultiStageQueryStats {
      */
     public void serialize(DataOutput output)
         throws IOException {
+      // TODO: we can serialize with short or variable size
       output.writeInt(_operatorTypes.size());
       assert MultiStageOperator.Type.values().length < Byte.MAX_VALUE : "Too many operator types. "
           + "Need to increase the number of bytes size per operator type";
