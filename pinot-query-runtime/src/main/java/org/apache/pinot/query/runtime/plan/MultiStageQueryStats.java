@@ -460,16 +460,10 @@ public class MultiStageQueryStats {
       output.writeInt(_operatorTypes.size());
       assert MultiStageOperator.Type.values().length < Byte.MAX_VALUE : "Too many operator types. "
           + "Need to increase the number of bytes size per operator type";
-      for (MultiStageOperator.Type operatorType : _operatorTypes) {
-        output.writeByte(operatorType.ordinal());
-      }
-      for (StatMap<?> stats : _operatorStats) {
-        if (stats.isEmpty()) {
-          output.writeBoolean(false);
-        } else {
-          output.writeBoolean(true);
-          stats.serialize(output);
-        }
+      for (int i = 0; i < _operatorTypes.size(); i++) {
+        output.writeByte(_operatorTypes.get(i).ordinal());
+        StatMap<?> statMap = _operatorStats.get(i);
+        statMap.serialize(output);
       }
     }
 
@@ -570,29 +564,25 @@ public class MultiStageQueryStats {
           throws IOException {
         int numOperators = input.readInt();
         if (numOperators != _operatorTypes.size()) {
-          ArrayList<MultiStageOperator.Type> types = new ArrayList<>(numOperators);
-          for (int i = 0; i < numOperators; i++) {
-            byte typeOrdinal = input.readByte();
-            if (typeOrdinal >= 0 && typeOrdinal < ALL_TYPES.length) {
-              throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
-                  + _operatorTypes.size() + " operators, got " + numOperators + ". Type found at index " + i
-                  + " has ordinal " + typeOrdinal + " which is not a valid operator type");
-            }
-            MultiStageOperator.Type expectedType = ALL_TYPES[typeOrdinal];
-            types.add(expectedType);
+          try {
+            Closed deserialized = deserialize(input, numOperators);
+            throw new RuntimeException("Cannot merge stats from stages with different operators. Expected "
+                + _operatorTypes + " operators, got " + numOperators + ". Deserialized stats: " + deserialized);
+          } catch (IOException e) {
+            throw new IOException("Cannot merge stats from stages with different operators. Expected "
+                + _operatorTypes + " operators, got " + numOperators, e);
+          } catch (RuntimeException e) {
+            throw new RuntimeException("Cannot merge stats from stages with different operators. Expected "
+                + _operatorTypes + " operators, got " + numOperators, e);
           }
-          throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
-              + _operatorTypes + " operators, got " + types);
         }
         for (int i = 0; i < numOperators; i++) {
-          MultiStageOperator.Type expectedType = ALL_TYPES[input.readByte()];
-          Preconditions.checkState(expectedType == _operatorTypes.get(i),
-              "Cannot merge stats from stages with different operators");
-        }
-        for (int i = 0; i < numOperators; i++) {
-          if (input.readBoolean()) {
-            _operatorStats.get(i).merge(input);
+          byte ordinal = input.readByte();
+          if (ordinal != _operatorTypes.get(i).ordinal()) {
+            throw new IllegalStateException("Cannot merge stats from stages with different operators. Expected "
+                + " operator " + _operatorTypes.get(i) + "at index " + i + ", got " + ordinal);
           }
+          _operatorStats.get(i).merge(input);
         }
       }
 
@@ -602,21 +592,37 @@ public class MultiStageQueryStats {
        */
       public static Closed deserialize(DataInput input)
           throws IOException {
-        int numOperators = input.readInt();
-        List<MultiStageOperator.Type> operatorTypes = new ArrayList<>(numOperators);
+        return deserialize(input, input.readInt());
+      }
+    }
+
+    public static Closed deserialize(DataInput input, int numOperators)
+        throws IOException {
+      List<MultiStageOperator.Type> operatorTypes = new ArrayList<>(numOperators);
+      List<StatMap<?>> operatorStats = new ArrayList<>(numOperators);
+
+      MultiStageOperator.Type[] allTypes = ALL_TYPES;
+      try {
         for (int i = 0; i < numOperators; i++) {
-          // This assumes the number of operator types at serialized time is the same as at deserialization time.
-          operatorTypes.add(MultiStageOperator.Type.values()[input.readByte()]);
-        }
-        List<StatMap<?>> operatorStats = new ArrayList<>(numOperators);
-        for (int i = 0; i < numOperators; i++) {
-          if (input.readBoolean()) {
-            operatorStats.add(operatorTypes.get(i).deserializeStats(input));
-          } else {
-            operatorStats.add(operatorTypes.get(i).emptyStats());
+          byte ordinal = input.readByte();
+          if (ordinal < 0 || ordinal >= allTypes.length) {
+            throw new IllegalStateException(
+                "Invalid operator type ordinal " + ordinal + " at index " + i + ". " + "Deserialized so far: "
+                    + new Closed(operatorTypes, operatorStats));
           }
+          MultiStageOperator.Type type = allTypes[ordinal];
+          operatorTypes.add(type);
+
+          StatMap<?> opStatMap = type.deserializeStats(input);
+          operatorStats.add(opStatMap);
         }
         return new Closed(operatorTypes, operatorStats);
+      } catch (IOException e) {
+        throw new IOException("Error deserializing stats. Deserialized so far: "
+            + new Closed(operatorTypes, operatorStats), e);
+      } catch (RuntimeException e) {
+        throw new RuntimeException("Error deserializing stats. Deserialized so far: "
+            + new Closed(operatorTypes, operatorStats), e);
       }
     }
 
