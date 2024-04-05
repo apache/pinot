@@ -94,10 +94,6 @@ public class JsonUtils {
       new TypeReference<HashMap<String, Object>>() {
       };
 
-  private static final TypeReference<Map<String, String>> MAP_STRING_STRING_TYPE_REFERENCE =
-      new TypeReference<Map<String, String>>() {
-      };
-
   public static <T> T stringToObject(String jsonString, Class<T> valueType)
       throws JsonProcessingException {
     return DEFAULT_READER.forType(valueType).readValue(jsonString);
@@ -151,11 +147,6 @@ public class JsonUtils {
   public static <T> T stringToObject(String jsonString, TypeReference<T> valueTypeRef)
       throws IOException {
     return DEFAULT_READER.forType(valueTypeRef).readValue(jsonString);
-  }
-
-  public static Map<String, String> stringToMap(String jsonString)
-      throws IOException {
-    return DEFAULT_READER.forType(MAP_STRING_STRING_TYPE_REFERENCE).readValue(jsonString);
   }
 
   public static JsonNode stringToJsonNode(String jsonString)
