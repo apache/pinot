@@ -18,31 +18,19 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
-/**
- * Merges 2 records and returns the merged record.
- * Add the new value from incoming row to the existing value from numeric field. Then return the merged record.
- */
-public class IncrementMerger implements PartialUpsertMerger {
-  IncrementMerger() {
-  }
+import java.util.List;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 
-  /**
-   * Increment the new value from incoming row to the given field of previous record.
-   */
-  @Override
-  public Object merge(Object previousValue, Object currentValue) {
-    return addNumbers((Number) previousValue, (Number) currentValue);
-  }
 
-  private static Number addNumbers(Number a, Number b) {
-    if (a instanceof Integer) {
-      return (Integer) a + (Integer) b;
-    } else if (a instanceof Long) {
-      return (Long) a + (Long) b;
-    } else if (a instanceof Float) {
-      return (Float) a + (Float) b;
-    } else {
-      return (Double) a + (Double) b;
-    }
+public abstract class BasePartialUpsertMerger implements PartialUpsertMerger {
+  protected final List<String> _primaryKeyColumns;
+  protected final List<String> _comparisonColumns;
+  protected final UpsertConfig _upsertConfig;
+
+  protected BasePartialUpsertMerger(List<String> primaryKeyColumns, List<String> comparisonColumns,
+      UpsertConfig upsertConfig) {
+    _primaryKeyColumns = primaryKeyColumns;
+    _comparisonColumns = comparisonColumns;
+    _upsertConfig = upsertConfig;
   }
 }

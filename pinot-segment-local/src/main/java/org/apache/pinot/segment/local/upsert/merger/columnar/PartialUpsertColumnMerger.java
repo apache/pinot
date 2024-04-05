@@ -16,22 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-import java.util.Map;
-import org.apache.pinot.segment.local.segment.readers.LazyRow;
-import org.apache.pinot.spi.data.readers.GenericRow;
-
-
-/**
- * Merger to merge previously persisted row with the new incoming row.
- * Custom implementation can be plugged by implementing this interface and add the class name to the upsert config.
- */
-public interface PartialUpsertMerger {
+public interface PartialUpsertColumnMerger {
 
   /**
-   * Merges previous row with new incoming row and persists the merged results per column in the provided resultHolder.
-   * Primary key and comparison columns should not be merged because their values are not allowed to be modified.
+   * Handle partial upsert merge for single column between previous and new row.
+   *
+   * @param previousValue the value of given field from the last derived full record during ingestion.
+   * @param currentValue the value of given field from the new consumed record.
+   * @return a new value after merge
    */
-  void merge(LazyRow previousRow, GenericRow newRow, Map<String, Object> resultHolder);
+  Object merge(Object previousValue, Object currentValue);
 }

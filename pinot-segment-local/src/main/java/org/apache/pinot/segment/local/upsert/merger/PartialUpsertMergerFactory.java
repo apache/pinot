@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.upsert.merger;
 
+import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
@@ -25,32 +27,23 @@ public class PartialUpsertMergerFactory {
   private PartialUpsertMergerFactory() {
   }
 
-  private static final AppendMerger APPEND_MERGER = new AppendMerger();
-  private static final IncrementMerger INCREMENT_MERGER = new IncrementMerger();
-  private static final IgnoreMerger IGNORE_MERGER = new IgnoreMerger();
-  private static final OverwriteMerger OVERWRITE_MERGER = new OverwriteMerger();
-  private static final MaxMerger MAX_MERGER = new MaxMerger();
-  private static final MinMerger MIN_MERGER = new MinMerger();
-  private static final UnionMerger UNION_MERGER = new UnionMerger();
-
-  public static PartialUpsertMerger getMerger(UpsertConfig.Strategy strategy) {
-    switch (strategy) {
-      case APPEND:
-        return APPEND_MERGER;
-      case INCREMENT:
-        return INCREMENT_MERGER;
-      case IGNORE:
-        return IGNORE_MERGER;
-      case MAX:
-        return MAX_MERGER;
-      case MIN:
-        return MIN_MERGER;
-      case OVERWRITE:
-        return OVERWRITE_MERGER;
-      case UNION:
-        return UNION_MERGER;
-      default:
-        throw new IllegalStateException("Unsupported partial upsert strategy: " + strategy);
+  /**
+   * Returns the default partial upsert merger or a custom implementation from a given class name in the config.
+   */
+  public static PartialUpsertMerger getPartialUpsertMerger(List<String> primaryKeyColumns,
+      List<String> comparisonColumns, UpsertConfig upsertConfig) {
+    String customMergerClassName = upsertConfig.getPartialUpsertMergerClass();
+    // If a custom implementation is provided in config, initialize an implementation and return.
+    if (StringUtils.isNotBlank(customMergerClassName)) {
+      try {
+        Class<?> partialUpsertMergerClass = Class.forName(customMergerClassName);
+        return (PartialUpsertMerger) partialUpsertMergerClass.getConstructor(List.class, List.class, UpsertConfig.class)
+            .newInstance(primaryKeyColumns, comparisonColumns, upsertConfig);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            String.format("Failed to instantiate partial upsert merger with class: %s", customMergerClassName), e);
+      }
     }
+    return new PartialUpsertColumnarMerger(primaryKeyColumns, comparisonColumns, upsertConfig);
   }
 }
