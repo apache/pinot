@@ -22,12 +22,11 @@ import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -236,13 +235,12 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
   public static class OfTransferableBlock extends BlockingMultiStreamConsumer<TransferableBlock> {
 
-    private final MultiStageQueryStats _stageStats;
+    private final MultiStageQueryStats _stats;
 
-    public OfTransferableBlock(int stageId, Object id, long deadlineMs,
-        List<? extends AsyncStream<TransferableBlock>> asyncProducers,
-        StatMap<BaseMailboxReceiveOperator.StatKey> stats) {
-      super(id, deadlineMs, asyncProducers);
-      _stageStats = MultiStageQueryStats.createReceive(stageId, stats);
+    public OfTransferableBlock(OpChainExecutionContext context,
+        List<? extends AsyncStream<TransferableBlock>> asyncProducers) {
+      super(context.getId(), context.getDeadlineMs(), asyncProducers);
+      _stats = MultiStageQueryStats.emptyStats(context.getStageId());
     }
 
     @Override
@@ -258,9 +256,9 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
     @Override
     protected void onConsumerFinish(TransferableBlock element) {
       if (element.getQueryStats() != null) {
-        _stageStats.mergeUpstream(element.getQueryStats());
+        _stats.mergeUpstream(element.getQueryStats());
       } else {
-        _stageStats.mergeUpstream(element.getSerializedStatsByStage());
+        _stats.mergeUpstream(element.getSerializedStatsByStage());
       }
     }
 
@@ -276,7 +274,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
 
     @Override
     protected TransferableBlock onEos() {
-      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_stageStats);
+      return TransferableBlockUtils.getEndOfStreamTransferableBlock(_stats);
     }
   }
 }

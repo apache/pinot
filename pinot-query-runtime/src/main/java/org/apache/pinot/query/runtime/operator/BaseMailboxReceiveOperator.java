@@ -32,7 +32,6 @@ import org.apache.pinot.query.routing.MailboxInfos;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.operator.utils.AsyncStream;
 import org.apache.pinot.query.runtime.operator.utils.BlockingMultiStreamConsumer;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
@@ -71,9 +70,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
     List<ReadMailboxAsyncStream> asyncStreams = _mailboxIds.stream()
         .map(mailboxId -> new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this))
         .collect(Collectors.toList());
-    _multiConsumer =
-        new BlockingMultiStreamConsumer.OfTransferableBlock(context.getStageId(), context.getId(),
-            context.getDeadlineMs(), asyncStreams, _statMap);
+    _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, asyncStreams);
     _statMap.merge(StatKey.FROM_STAGE, senderStageId);
   }
 
@@ -114,18 +111,6 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
   protected void recordExecutionStats(long executionTimeMs, TransferableBlock block) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, executionTimeMs);
     _statMap.merge(StatKey.EMITTED_ROWS, block.getNumRows());
-  }
-
-  @Override
-  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos) {
-    // Like the implementation in the base class, but does not add the stats to the eos block.
-    // this is needed because the stats are already added to the current stage stats by the multiConsumer
-    assert upstreamEos.isSuccessfulEndOfStreamBlock();
-    MultiStageQueryStats queryStats = upstreamEos.getQueryStats();
-    assert queryStats != null;
-    // the multiConsumer has already merged stages from upstream and contains the stats for this operator.
-    assert queryStats.getCurrentStats().getLastOperatorStats() == _statMap;
-    return upstreamEos;
   }
 
   private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {

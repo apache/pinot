@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import java.io.DataInput;
 import java.io.IOException;
@@ -105,7 +106,18 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     }
   }
 
+  /**
+   * Adds the current operator stats as the last operator in the open stats of the given holder.
+   *
+   * It is assumed that:
+   * <ol>
+   *   <li>The current stage of the holder is equal to the stage id of this operator.</li>
+   *   <li>The holder already contains the stats of the previous operators of the same stage in inorder</li>
+   * </ol>
+   */
   protected void addStats(MultiStageQueryStats holder) {
+    Preconditions.checkArgument(holder.getCurrentStageId() == _context.getStageId(),
+        "The holder's stage id should be the same as the current operator's stage id");
     holder.getCurrentStats().addLastOperator(getOperatorType(), _statMap);
   }
 
@@ -141,6 +153,14 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     }
   }
 
+  /**
+   * Receives the EOS block from upstream operator and updates the stats.
+   * <p>
+   * The fact that the EOS belongs to the upstream operator is not an actual requirement. Actual requirements are listed
+   * in {@link #addStats(MultiStageQueryStats)}
+   * @param upstreamEos
+   * @return
+   */
   protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos) {
     assert upstreamEos.isSuccessfulEndOfStreamBlock();
     MultiStageQueryStats queryStats = upstreamEos.getQueryStats();
