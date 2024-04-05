@@ -46,9 +46,8 @@ class GzipDecompressor implements ChunkDecompressor {
     } catch (DataFormatException e) {
       throw new IOException(e);
     }
-    int size = decompressedOutput.position();
     decompressedOutput.flip();
-    return size;
+    return (int) _decompressor.getBytesWritten();
   }
 
   @Override

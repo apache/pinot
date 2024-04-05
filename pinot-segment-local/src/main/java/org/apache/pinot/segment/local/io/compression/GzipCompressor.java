@@ -43,7 +43,7 @@ class GzipCompressor implements ChunkCompressor {
     _compressor.setInput(inUncompressed);
     _compressor.finish();
     _compressor.deflate(outCompressed);
-    outCompressed.putInt(inUncompressed.limit()); // append uncompressed size
+    outCompressed.putInt((int) _compressor.getBytesRead()); // append uncompressed size
     int size = outCompressed.position();
     outCompressed.flip();
     return size;
