@@ -588,10 +588,21 @@ public final class TableConfigUtils {
     Preconditions.checkState(streamConfig.getFlushThresholdTimeMillis() > 0, "Invalid flush threshold time: %s",
         streamConfig.getFlushThresholdTimeMillis());
     int flushThresholdRows = streamConfig.getFlushThresholdRows();
+    int flushThresholdSegmentRows = streamConfig.getFlushThresholdSegmentRows();
     long flushThresholdSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
-    Preconditions.checkState(!(flushThresholdRows > 0 && flushThresholdSegmentSizeBytes > 0),
-        "Flush threshold rows: %s and flush threshold segment size: %s cannot be both set", flushThresholdRows,
-        flushThresholdSegmentSizeBytes);
+    int numFlushThresholdSet = 0;
+    if (flushThresholdRows > 0) {
+      numFlushThresholdSet++;
+    }
+    if (flushThresholdSegmentRows > 0) {
+      numFlushThresholdSet++;
+    }
+    if (flushThresholdSegmentSizeBytes > 0) {
+      numFlushThresholdSet++;
+    }
+    Preconditions.checkState(numFlushThresholdSet <= 1,
+        "Only 1 of flush threshold (rows: %s, segment rows: %s, segment size: %s) can be set", flushThresholdRows,
+        flushThresholdSegmentRows, flushThresholdSegmentSizeBytes);
 
     // Validate decoder
     if (streamConfig.getDecoderClass().equals("org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder")) {

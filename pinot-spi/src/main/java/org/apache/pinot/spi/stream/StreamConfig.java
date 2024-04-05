@@ -66,6 +66,7 @@ public class StreamConfig {
   private final long _idleTimeoutMillis;
 
   private final int _flushThresholdRows;
+  private final int _flushThresholdSegmentRows;
   private final long _flushThresholdTimeMillis;
   private final long _flushThresholdSegmentSizeBytes;
   private final int _flushAutotuneInitialRows; // initial num rows to use for SegmentSizeBasedFlushThresholdUpdater
@@ -176,6 +177,7 @@ public class StreamConfig {
     _idleTimeoutMillis = idleTimeoutMillis;
 
     _flushThresholdRows = extractFlushThresholdRows(streamConfigMap);
+    _flushThresholdSegmentRows = extractFlushThresholdSegmentRows(streamConfigMap);
     _flushThresholdTimeMillis = extractFlushThresholdTimeMillis(streamConfigMap);
     _flushThresholdSegmentSizeBytes = extractFlushThresholdSegmentSize(streamConfigMap);
     _serverUploadToDeepStore = Boolean.parseBoolean(
@@ -264,6 +266,20 @@ public class StreamConfig {
     }
   }
 
+  protected int extractFlushThresholdSegmentRows(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_ROWS;
+    String flushThresholdSegmentRowsStr = streamConfigMap.get(key);
+    if (flushThresholdSegmentRowsStr != null) {
+      try {
+        return Integer.parseInt(flushThresholdSegmentRowsStr);
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid config " + key + ": " + flushThresholdSegmentRowsStr);
+      }
+    } else {
+      return -1;
+    }
+  }
+
   protected long extractFlushThresholdTimeMillis(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME;
     String flushThresholdTimeStr = streamConfigMap.get(key);
@@ -342,6 +358,10 @@ public class StreamConfig {
     return _flushThresholdRows;
   }
 
+  public int getFlushThresholdSegmentRows() {
+    return _flushThresholdSegmentRows;
+  }
+
   public long getFlushThresholdTimeMillis() {
     return _flushThresholdTimeMillis;
   }
@@ -378,11 +398,11 @@ public class StreamConfig {
         + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties=" + _decoderProperties
         + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis + ", _fetchTimeoutMillis=" + _fetchTimeoutMillis
         + ", _idleTimeoutMillis=" + _idleTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows
-        + ", _flushThresholdTimeMillis=" + _flushThresholdTimeMillis + ", _flushThresholdSegmentSizeBytes="
-        + _flushThresholdSegmentSizeBytes + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _groupId='"
-        + _groupId + '\'' + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit + ", _streamConfigMap="
-        + _streamConfigMap + ", _offsetCriteria=" + _offsetCriteria + ", _serverUploadToDeepStore="
-        + _serverUploadToDeepStore + '}';
+        + ", _flushThresholdSegmentRows=" + _flushThresholdSegmentRows + ", _flushThresholdTimeMillis="
+        + _flushThresholdTimeMillis + ", _flushThresholdSegmentSizeBytes=" + _flushThresholdSegmentSizeBytes
+        + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _groupId='" + _groupId + '\''
+        + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit + ", _streamConfigMap=" + _streamConfigMap
+        + ", _offsetCriteria=" + _offsetCriteria + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore + '}';
   }
 
   @Override
@@ -396,6 +416,7 @@ public class StreamConfig {
     StreamConfig that = (StreamConfig) o;
     return _connectionTimeoutMillis == that._connectionTimeoutMillis && _fetchTimeoutMillis == that._fetchTimeoutMillis
         && _idleTimeoutMillis == that._idleTimeoutMillis && _flushThresholdRows == that._flushThresholdRows
+        && _flushThresholdSegmentRows == that._flushThresholdSegmentRows
         && _flushThresholdTimeMillis == that._flushThresholdTimeMillis
         && _flushThresholdSegmentSizeBytes == that._flushThresholdSegmentSizeBytes
         && _flushAutotuneInitialRows == that._flushAutotuneInitialRows
@@ -412,7 +433,8 @@ public class StreamConfig {
   public int hashCode() {
     return Objects.hash(_type, _topicName, _tableNameWithType, _consumerFactoryClassName, _decoderClass,
         _decoderProperties, _connectionTimeoutMillis, _fetchTimeoutMillis, _idleTimeoutMillis, _flushThresholdRows,
-        _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes, _flushAutotuneInitialRows, _groupId,
-        _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria, _serverUploadToDeepStore);
+        _flushThresholdSegmentRows, _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
+        _flushAutotuneInitialRows, _groupId, _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria,
+        _serverUploadToDeepStore);
   }
 }
