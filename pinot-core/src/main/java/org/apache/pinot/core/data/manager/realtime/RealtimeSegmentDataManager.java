@@ -96,6 +96,8 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.stream.buffer.MessageBatchBuffer;
+import org.apache.pinot.spi.stream.buffer.OnHeapMessageBatchBuffer;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -420,17 +422,30 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .create(_currentOffset);  // so that we always update the metric when we enter this method.
 
     _segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
+    boolean asyncConsumerEnabled = _streamConfig.isEnableAsyncConsumer();
+    boolean asyncConsumerRunning = false;
+
+    MessageBatchBuffer<MessageBatch> messagesQueue = null;
     while (!_shouldStop && !endCriteriaReached()) {
       _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1);
       // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
+      if (!asyncConsumerRunning && asyncConsumerEnabled) {
+        asyncConsumerRunning = true;
+        messagesQueue = new OnHeapMessageBatchBuffer(_streamConfig.getConsumerBufferCapacity());
+        _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis(), messagesQueue);
+      }
       try {
-        messageBatch =
-            _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
-        //track realtime rows fetched on a table level. This included valid + invalid rows
+        if (!asyncConsumerEnabled) {
+          messageBatch = _partitionGroupConsumer.fetchMessages(_currentOffset, null, _streamConfig.getFetchTimeoutMillis());
+        } else {
+          messageBatch = messagesQueue.get();
+        }
+
         _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FETCHED,
             messageBatch.getUnfilteredMessageCount());
+
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("message batch received. filtered={} unfiltered={} endOfPartitionGroup={}",
               messageBatch.getMessageCount(), messageBatch.getUnfilteredMessageCount(),
@@ -506,10 +521,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
 
       if (endCriteriaReached) {
+        // TODO: do we need to flush the queue if we are stopping?
         // check this flag to avoid calling endCriteriaReached() at the beginning of the loop
         break;
       }
     }
+
+    if (_streamConfig.isEnableAsyncConsumer() && messagesQueue != null) {
+      asyncConsumerRunning = false;
+      messagesQueue.close();
+    }
+
+
 
     if (_numRowsErrored > 0) {
       _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);

@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.utils.Bytes;
@@ -32,12 +33,12 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.buffer.MessageBatchBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler
-    implements PartitionLevelConsumer {
+public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHandler implements PartitionLevelConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
   private long _lastFetchedOffset = -1;
@@ -95,5 +96,21 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       }
     }
     return new KafkaMessageBatch(messageAndOffsets.size(), firstOffset, lastOffset, filtered, rowMetadata);
+  }
+
+  @Override
+  public void fetchMessages(StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, int timeoutMillis,
+      MessageBatchBuffer emitter)
+      throws TimeoutException {
+    //TODO: Add EOS condition
+    while (true) {
+      try {
+        MessageBatch<StreamMessage<byte[]>> messageBatch = fetchMessages(startOffset, endOffset, timeoutMillis);
+        emitter.put(messageBatch);
+        return;
+      } catch (Exception e) {
+        LOGGER.warn("Timed out fetching messages, retrying", e);
+      }
+    }
   }
 }

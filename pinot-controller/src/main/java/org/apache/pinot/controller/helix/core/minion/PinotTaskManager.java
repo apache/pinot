@@ -728,4 +728,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       _taskTypeMetricsUpdaterMap.put(taskType, taskTypeMetricsUpdater);
     }
   }
+
+  public static void main(String[] args) {
+    CronScheduleBuilder cronScheduleBuilder = CronScheduleBuilder.cronSchedule("0 18 * * * ?");
+    cronScheduleBuilder.build();
+
+  }
 }
