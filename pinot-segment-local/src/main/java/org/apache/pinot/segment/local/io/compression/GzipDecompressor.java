@@ -46,13 +46,15 @@ class GzipDecompressor implements ChunkDecompressor {
     } catch (DataFormatException e) {
       throw new IOException(e);
     }
+    int size = decompressedOutput.position();
     decompressedOutput.flip();
-    return decompressedOutput.limit();
+    return size;
   }
 
   @Override
   public int decompressedLength(ByteBuffer compressedInput) {
-    return -1;
+    int offset = compressedInput.limit() - Integer.BYTES;
+    return offset > -1 ? compressedInput.getInt(offset) : -1;
   }
 
   @Override

@@ -19,7 +19,10 @@
 package org.apache.pinot.segment.local.io.compression;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
@@ -28,9 +31,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
+import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
@@ -110,7 +115,7 @@ public class TestCompression {
           // decompress
           try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(type)) {
             int size = decompressor.decompressedLength(compressed[idx]);
-            if (type == ChunkCompressionType.LZ4 || type == ChunkCompressionType.GZIP) {
+            if (type == ChunkCompressionType.LZ4) {
               size = rawInput.limit();
             }
             decompressed[idx] = ByteBuffer.allocateDirect(size);
@@ -143,16 +148,57 @@ public class TestCompression {
     }
   }
 
+  @Test
+  public void testGzipCompressedFileHasSize()
+      throws Exception {
+
+    // read file into fileContent
+    ByteBuffer fileContent;
+    int fileSize;
+    URL url = getClass().getResource("/data/words.txt");
+    try (RandomAccessFile raf = new RandomAccessFile(url.getFile(), "r"); FileChannel channel = raf.getChannel()) {
+      fileSize = (int) raf.length();
+      fileContent = ByteBuffer.allocateDirect(fileSize);
+      Assert.assertEquals(fileSize, channel.read(fileContent));
+      fileContent.flip(); // ready for consumption
+    }
+
+    // compress fileContent into compressed
+    ByteBuffer compressed;
+    int uncompressedSize; // will be retrieved from the compressed buffer, must match fileSize
+    try (GzipCompressor gzip = new GzipCompressor()) {
+      int requiredSize = gzip.maxCompressedSize(fileSize);
+      compressed = ByteBuffer.allocateDirect(requiredSize);
+      int compressedSize = gzip.compress(fileContent, compressed);
+      Assert.assertTrue(compressedSize <= requiredSize);
+      Assert.assertTrue(compressedSize <= fileSize);
+      uncompressedSize = compressed.getInt(compressedSize - Integer.BYTES);
+      Assert.assertEquals(fileSize, uncompressedSize);
+    }
+
+    // decompress compressed into decompressed, buffer content should be the same as orig file
+    ByteBuffer decompressed;
+    int decompressedSize;
+    try (GzipDecompressor gzip = new GzipDecompressor()) {
+      int requiredSize = gzip.decompressedLength(compressed);
+      Assert.assertEquals(fileSize, requiredSize);
+      decompressed = ByteBuffer.allocateDirect(requiredSize);
+      decompressedSize = gzip.decompress(compressed, decompressed);
+      Assert.assertEquals(fileSize, decompressedSize);
+      decompressed.flip();
+      Assert.assertEquals(UTF_8.decode(fileContent).toString(), UTF_8.decode(decompressed).toString());
+    }
+  }
+
   private static void roundtrip(ChunkCompressor compressor, ByteBuffer rawInput)
       throws IOException {
     ByteBuffer compressedOutput = ByteBuffer.allocateDirect(compressor.maxCompressedSize(rawInput.limit()));
     compressor.compress(rawInput.slice(), compressedOutput);
     try (ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor(compressor.compressionType())) {
       int decompressedLength = decompressor.decompressedLength(compressedOutput);
-      boolean isLz4OrGzip = compressor.compressionType() == ChunkCompressionType.LZ4
-          || compressor.compressionType() == ChunkCompressionType.GZIP;
-      assertTrue(isLz4OrGzip || decompressedLength > 0);
-      ByteBuffer decompressedOutput = ByteBuffer.allocateDirect(isLz4OrGzip ? rawInput.limit() : decompressedLength);
+      boolean isLz4 = compressor.compressionType() == ChunkCompressionType.LZ4;
+      assertTrue(isLz4 || decompressedLength > 0);
+      ByteBuffer decompressedOutput = ByteBuffer.allocateDirect(isLz4 ? rawInput.limit() : decompressedLength);
       decompressor.decompress(compressedOutput, decompressedOutput);
       byte[] expected = new byte[rawInput.limit()];
       rawInput.get(expected);
