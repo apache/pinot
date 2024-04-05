@@ -24,6 +24,7 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    open-pull-requests-limit: 20
 
   - package-ecosystem: "npm"
     directory: "/pinot-controller/src/main/resources"
