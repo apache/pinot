@@ -224,9 +224,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.debug("tempIndexDir:{}", _tempIndexDir);
   }
 
-  // input int[] can be used to map sortedDocIds[immutableId] = mutableId (based on RecordReader iteration order)
-  // output int[] should be used to map output[mutableId] = immutableId
-  private int[] convertSortedDocIds(@Nullable int[] sortedDocIds) {
+  /**
+   * Generate a mutable docId to immutable docId mapping from the sortedDocIds iteration order
+   *
+   * @param sortedDocIds used to map sortedDocIds[immutableId] = mutableId (based on RecordReader iteration order)
+   * @return int[] used to map output[mutableId] = immutableId, or null if sortedDocIds is null
+   */
+  private int[] getImmutableToMutableIdMap(@Nullable int[] sortedDocIds) {
     if (sortedDocIds == null) {
       return null;
     }
@@ -250,16 +254,17 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     try {
       // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
       //    removed from this code.
-      int[] sortedDocIds = null;
+      int[] immutableToMutableIdMap = null;
       if (_recordReader instanceof PinotSegmentRecordReader) {
-        sortedDocIds = convertSortedDocIds(((PinotSegmentRecordReader) _recordReader).getSortedDocIds());
+        immutableToMutableIdMap =
+            getImmutableToMutableIdMap(((PinotSegmentRecordReader) _recordReader).getSortedDocIds());
       }
 
       // Initialize the index creation using the per-column statistics information
       // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
       //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
-          sortedDocIds);
+          immutableToMutableIdMap);
 
       // Build the index
       _recordReader.rewind();
@@ -328,13 +333,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     try {
       // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
       //    removed from this code.
-      int[] sortedDocIds = convertSortedDocIds(((PinotSegmentRecordReader) _recordReader).getSortedDocIds());
+      int[] sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
+      int[] immutableToMutableIdMap = getImmutableToMutableIdMap(sortedDocIds);
 
       // Initialize the index creation using the per-column statistics information
       // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
       //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
-          sortedDocIds);
+          immutableToMutableIdMap);
 
       // Build the indexes
       LOGGER.info("Start building Index by column");

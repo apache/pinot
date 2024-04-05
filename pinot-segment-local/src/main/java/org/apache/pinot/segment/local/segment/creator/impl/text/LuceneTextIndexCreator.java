@@ -147,7 +147,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   public LuceneTextIndexCreator(IndexCreationContext context, TextIndexConfig indexConfig) {
     this(context.getFieldSpec().getName(), context.getIndexDir(), context.isTextCommitOnClose(),
-        context.isRealtimeConversion(), context.getSortedDocIds(), indexConfig);
+        context.isRealtimeConversion(), context.getImmutableToMutableIdMap(), indexConfig);
   }
 
   public IndexWriter getIndexWriter() {

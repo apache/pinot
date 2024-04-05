@@ -98,12 +98,13 @@ public interface IndexCreationContext {
   boolean isRealtimeConversion();
 
   /**
-   * This contains sortedDocIds ordering from {@link SegmentIndexCreationDriver}
+   * This contains immutableToMutableIdMap mapping generated in {@link SegmentIndexCreationDriver}
    *
-   * allowing for index creation to take advantage of mutable to immutable docId mapping
+   * This allows for index creation during realtime segment conversion to take advantage of mutable to immutable
+   * docId mapping
    * @return
    */
-  int[] getSortedDocIds();
+  int[] getImmutableToMutableIdMap();
 
   final class Builder {
     private ColumnStatistics _columnStatistics;
@@ -126,7 +127,7 @@ public interface IndexCreationContext {
     private boolean _fixedLength;
     private boolean _textCommitOnClose;
     private boolean _realtimeConversion = false;
-    private int[] _sortedDocIds;
+    private int[] _immutableToMutableIdMap;
 
     public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
       return withLengthOfLongestEntry(columnIndexCreationInfo.getLengthOfLongestEntry())
@@ -249,8 +250,8 @@ public interface IndexCreationContext {
       return this;
     }
 
-    public Builder withSortedDocIds(int[] sortedDocIds) {
-      _sortedDocIds = sortedDocIds;
+    public Builder withImmutableToMutableIdMap(int[] immutableToMutableIdMap) {
+      _immutableToMutableIdMap = immutableToMutableIdMap;
       return this;
     }
 
@@ -259,7 +260,7 @@ public interface IndexCreationContext {
           _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
           _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled,
           _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose, _columnStatistics,
-          _realtimeConversion, _sortedDocIds);
+          _realtimeConversion, _immutableToMutableIdMap);
     }
 
     public Builder withSortedUniqueElementsArray(Object sortedUniqueElementsArray) {
@@ -294,14 +295,15 @@ public interface IndexCreationContext {
     private final boolean _textCommitOnClose;
     private final ColumnStatistics _columnStatistics;
     private final boolean _realtimeConversion;
-    private final int[] _sortedDocIds;
+    private final int[] _immutableToMutableIdMap;
 
     public Common(File indexDir, int lengthOfLongestEntry,
         int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
         FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
         int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
         boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength,
-        boolean textCommitOnClose, ColumnStatistics columnStatistics, boolean realtimeConversion, int[] sortedDocIds) {
+        boolean textCommitOnClose, ColumnStatistics columnStatistics, boolean realtimeConversion,
+        int[] immutableToMutableIdMap) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
@@ -322,7 +324,7 @@ public interface IndexCreationContext {
       _textCommitOnClose = textCommitOnClose;
       _columnStatistics = columnStatistics;
       _realtimeConversion = realtimeConversion;
-      _sortedDocIds = sortedDocIds;
+      _immutableToMutableIdMap = immutableToMutableIdMap;
     }
 
     public FieldSpec getFieldSpec() {
@@ -415,8 +417,8 @@ public interface IndexCreationContext {
     }
 
     @Override
-    public int[] getSortedDocIds() {
-      return _sortedDocIds;
+    public int[] getImmutableToMutableIdMap() {
+      return _immutableToMutableIdMap;
     }
   }
 }
