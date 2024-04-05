@@ -28,8 +28,8 @@ public class TransferableBlockTestUtils {
     // do not instantiate.
   }
 
-  public static TransferableBlock getEndOfStreamTransferableBlock() {
-    return TransferableBlockUtils.getEndOfStreamTransferableBlock(MultiStageQueryStats.emptyStats(0));
+  public static TransferableBlock getEndOfStreamTransferableBlock(int stageId) {
+    return TransferableBlockUtils.getEndOfStreamTransferableBlock(MultiStageQueryStats.emptyStats(stageId));
   }
 
   public static void assertSuccessEos(TransferableBlock block) {

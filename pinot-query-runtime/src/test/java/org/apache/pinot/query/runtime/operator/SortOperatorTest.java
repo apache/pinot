@@ -98,7 +98,7 @@ public class SortOperatorTest {
         new SortOperator(OperatorTestUtil.getTracingContext(), _input, collation, directions, nullDirections, 10, 0,
             schema, false);
 
-    Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock();
@@ -119,7 +119,7 @@ public class SortOperatorTest {
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -146,7 +146,7 @@ public class SortOperatorTest {
     // Purposefully setting input as unsorted order for validation but 'isInputSorted' should only be true if actually
     // sorted
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -171,7 +171,7 @@ public class SortOperatorTest {
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1, 2}, new Object[]{2, 1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -196,7 +196,7 @@ public class SortOperatorTest {
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{"b"}, new Object[]{"a"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -221,7 +221,7 @@ public class SortOperatorTest {
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -246,7 +246,7 @@ public class SortOperatorTest {
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -272,7 +272,7 @@ public class SortOperatorTest {
 
     // Set input rows as sorted since input is expected to be sorted
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -297,7 +297,7 @@ public class SortOperatorTest {
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -322,7 +322,7 @@ public class SortOperatorTest {
 
     // Set input rows as sorted since input is expected to be sorted
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -346,7 +346,7 @@ public class SortOperatorTest {
             schema, false, 10, 1);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -370,7 +370,7 @@ public class SortOperatorTest {
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -394,7 +394,7 @@ public class SortOperatorTest {
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}))
         .thenReturn(block(schema, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -421,7 +421,7 @@ public class SortOperatorTest {
     // Set input rows as sorted since input is expected to be sorted
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}))
         .thenReturn(block(schema, new Object[]{2}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -447,7 +447,7 @@ public class SortOperatorTest {
 
     Mockito.when(_input.nextBlock())
         .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -475,7 +475,7 @@ public class SortOperatorTest {
 
     Mockito.when(_input.nextBlock())
         .thenReturn(block(schema, new Object[]{1, 2}, new Object[]{1, 1}, new Object[]{1, 3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -502,7 +502,7 @@ public class SortOperatorTest {
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}))
         .thenReturn(block(schema, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -529,7 +529,7 @@ public class SortOperatorTest {
     // Set input rows as sorted since input is expected to be sorted
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}))
         .thenReturn(block(schema, new Object[]{2}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -554,7 +554,7 @@ public class SortOperatorTest {
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -580,7 +580,7 @@ public class SortOperatorTest {
             schema, false);
 
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{2}, new Object[]{1}, new Object[]{null}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -607,7 +607,7 @@ public class SortOperatorTest {
 
     Mockito.when(_input.nextBlock())
         .thenReturn(block(schema, new Object[]{1, 1}, new Object[]{1, null}, new Object[]{null, 1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct
@@ -635,7 +635,7 @@ public class SortOperatorTest {
     Mockito.when(_input.nextBlock()).thenReturn(block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3},
         new Object[]{4}, new Object[]{5}, new Object[]{6}, new Object[]{7}, new Object[]{8}, new Object[]{9},
         new Object[]{10}, new Object[]{11}, new Object[]{12}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // When:
     TransferableBlock block = op.nextBlock(); // construct

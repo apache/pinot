@@ -32,17 +32,17 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.avro.util.ByteBufferInputStream;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
-import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -469,46 +469,6 @@ public class MultiStageQueryStats {
       }
     }
 
-    public <A> void accept(StatsVisitor<A> visitor, A arg) {
-      for (int i = 0; i < _operatorTypes.size(); i++) {
-        MultiStageOperator.Type type = _operatorTypes.get(i);
-        StatMap<?> statMap = _operatorStats.get(i);
-        if (statMap == null) {
-          continue;
-        }
-        switch (type) {
-          case AGGREGATE:
-            visitor.visitAggregate((StatMap<AggregateOperator.StatKey>) statMap, arg);
-            break;
-          case HASH_JOIN:
-            visitor.visitHashJoin((StatMap<HashJoinOperator.StatKey>) statMap, arg);
-            break;
-          case LEAF:
-            visitor.visitLeaf((StatMap<LeafStageTransferableBlockOperator.StatKey>) statMap, arg);
-            break;
-          case MAILBOX_RECEIVE:
-            visitor.visitMailboxReceive((StatMap<BaseMailboxReceiveOperator.StatKey>) statMap, arg);
-            break;
-          case MAILBOX_SEND:
-            visitor.visitMailboxSend((StatMap<MailboxSendOperator.StatKey>) statMap, arg);
-            break;
-          case FILTER:
-          case INTERSECT:
-          case LITERAL:
-          case MINUS:
-          case PIPELINE_BREAKER:
-          case SORT:
-          case TRANSFORM:
-          case UNION:
-          case WINDOW:
-            visitor.visitBase((StatMap<MultiStageOperator.BaseStatKeys>) statMap, arg);
-            break;
-          default:
-            throw new IllegalStateException("Unknown operator type: " + type);
-        }
-      }
-    }
-
     @Override
     public boolean equals(Object o) {
       if (this == o) {
@@ -596,6 +556,14 @@ public class MultiStageQueryStats {
           throws IOException {
         return deserialize(input, input.readInt());
       }
+
+      public void forEach(BiConsumer<MultiStageOperator.Type, StatMap<?>> consumer) {
+        Iterator<MultiStageOperator.Type> typeIterator = _operatorTypes.iterator();
+        Iterator<StatMap<?>> statIterator = _operatorStats.iterator();
+        while (typeIterator.hasNext()) {
+          consumer.accept(typeIterator.next(), statIterator.next());
+        }
+      }
     }
 
     public static Closed deserialize(DataInput input, int numOperators)
@@ -641,7 +609,8 @@ public class MultiStageQueryStats {
 
       public Open addLastOperator(MultiStageOperator.Type type, StatMap<?> statMap) {
         Preconditions.checkArgument(statMap.getKeyClass().equals(type.getStatKeyClass()),
-            "Cannot add stats of type %s to operator of type %s", statMap.getKeyClass(), type.getStatKeyClass());
+            "Expected stats of class %s for type %s but found class %s",
+            type.getStatKeyClass(), type, statMap.getKeyClass());
         if (!_operatorStats.isEmpty() && _operatorStats.get(_operatorStats.size() - 1) == statMap) {
           // This is mostly useful to detect errors in the code.
           // In the future we may choose to evaluate it only if asserts are enabled
@@ -694,14 +663,5 @@ public class MultiStageQueryStats {
     public MultiStageQueryStats build() {
       return _stats;
     }
-  }
-
-  public interface StatsVisitor<A> {
-    void visitBase(StatMap<MultiStageOperator.BaseStatKeys> stats, A arg);
-    void visitLeaf(StatMap<LeafStageTransferableBlockOperator.StatKey> stats, A arg);
-    void visitAggregate(StatMap<AggregateOperator.StatKey> stats, A arg);
-    void visitHashJoin(StatMap<HashJoinOperator.StatKey> stats, A arg);
-    void visitMailboxReceive(StatMap<BaseMailboxReceiveOperator.StatKey> statMap, A arg);
-    void visitMailboxSend(StatMap<MailboxSendOperator.StatKey> statMap, A arg);
   }
 }

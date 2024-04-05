@@ -24,7 +24,9 @@ import java.io.DataInput;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
@@ -107,7 +109,8 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
    */
   protected void addStats(MultiStageQueryStats holder) {
     Preconditions.checkArgument(holder.getCurrentStageId() == _context.getStageId(),
-        "The holder's stage id should be the same as the current operator's stage id");
+        "The holder's stage id should be the same as the current operator's stage id. Expected %s, got %s",
+        _context.getStageId(), holder.getCurrentStageId());
     holder.getCurrentStats().addLastOperator(getOperatorType(), _statMap);
   }
 
@@ -160,20 +163,125 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
   }
 
   public enum Type {
-    AGGREGATE(AggregateOperator.StatKey.class),
-    FILTER(FilterOperator.StatKey.class),
-    HASH_JOIN(HashJoinOperator.StatKey.class),
-    INTERSECT(SetOperator.StatKey.class),
-    LEAF(LeafStageTransferableBlockOperator.StatKey.class),
-    LITERAL(LiteralValueOperator.StatKey.class),
-    MAILBOX_RECEIVE(BaseMailboxReceiveOperator.StatKey.class),
-    MAILBOX_SEND(MailboxSendOperator.StatKey.class),
-    MINUS(SetOperator.StatKey.class),
-    PIPELINE_BREAKER(PipelineBreakerOperator.StatKey.class),
-    SORT(SortOperator.StatKey.class),
-    TRANSFORM(TransformOperator.StatKey.class),
-    UNION(SetOperator.StatKey.class),
-    WINDOW(WindowAggregateOperator.StatKey.class),;
+    AGGREGATE(AggregateOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
+        response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
+        response.mergeMaxRows(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    FILTER(FilterOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<FilterOperator.StatKey> stats = (StatMap<FilterOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(FilterOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    HASH_JOIN(HashJoinOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<HashJoinOperator.StatKey> stats = (StatMap<HashJoinOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(HashJoinOperator.StatKey.EMITTED_ROWS));
+        response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
+      }
+    },
+    INTERSECT(SetOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<SetOperator.StatKey> stats = (StatMap<SetOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    LEAF(LeafStageTransferableBlockOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<LeafStageTransferableBlockOperator.StatKey> stats =
+            (StatMap<LeafStageTransferableBlockOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(LeafStageTransferableBlockOperator.StatKey.EMITTED_ROWS));
+
+        StatMap<DataTable.MetadataKey> v1Stats = new StatMap<>(DataTable.MetadataKey.class);
+        for (LeafStageTransferableBlockOperator.StatKey statKey : stats.keySet()) {
+          statKey.updateV1Metadata(v1Stats, stats);
+        }
+        response.addServerStats(v1Stats);
+      }
+    },
+    LITERAL(LiteralValueOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        // Do nothing
+      }
+    },
+    MAILBOX_RECEIVE(BaseMailboxReceiveOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<BaseMailboxReceiveOperator.StatKey> stats = (StatMap<BaseMailboxReceiveOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    MAILBOX_SEND(MailboxSendOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<MailboxSendOperator.StatKey> stats = (StatMap<MailboxSendOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(MailboxSendOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    MINUS(SetOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<SetOperator.StatKey> stats = (StatMap<SetOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    PIPELINE_BREAKER(PipelineBreakerOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<PipelineBreakerOperator.StatKey> stats = (StatMap<PipelineBreakerOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(PipelineBreakerOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    SORT(SortOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<SortOperator.StatKey> stats = (StatMap<SortOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(SortOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    TRANSFORM(TransformOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<TransformOperator.StatKey> stats = (StatMap<TransformOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(TransformOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    UNION(SetOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<SetOperator.StatKey> stats = (StatMap<SetOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
+      }
+    },
+    WINDOW(WindowAggregateOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<WindowAggregateOperator.StatKey> stats = (StatMap<WindowAggregateOperator.StatKey>) map;
+        response.mergeMaxRows(stats.getLong(WindowAggregateOperator.StatKey.EMITTED_ROWS));
+      }
+    },;
 
     private final Class _statKeyClass;
 
@@ -190,20 +298,7 @@ public abstract class MultiStageOperator<K extends Enum<K> & StatMap.Key>
     public Class getStatKeyClass() {
       return _statKeyClass;
     }
-  }
 
-  public enum BaseStatKeys implements StatMap.Key {
-    EXECUTION_TIME_MS(StatMap.Type.LONG),
-    EMITTED_ROWS(StatMap.Type.LONG),;
-    private final StatMap.Type _type;
-
-    BaseStatKeys(StatMap.Type type) {
-      _type = type;
-    }
-
-    @Override
-    public StatMap.Type getType() {
-      return _type;
-    }
+    public abstract void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map);
   }
 }

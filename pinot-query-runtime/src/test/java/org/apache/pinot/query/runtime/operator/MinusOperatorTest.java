@@ -67,10 +67,10 @@ public class MinusOperatorTest {
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
             new Object[]{4, "DD"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{5, "EE"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     MinusOperator minusOperator =
         new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
@@ -97,11 +97,11 @@ public class MinusOperatorTest {
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
             new Object[]{4, "DD"}, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
             new Object[]{4, "DD"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{5, "EE"},
                 new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{5, "EE"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     MinusOperator minusOperator =
         new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),

@@ -67,7 +67,7 @@ public class BlockExchangeTest {
     BlockExchange exchange = new TestBlockExchange(destinations);
 
     // When:
-    exchange.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    exchange.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     // Then:
     ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);

@@ -75,7 +75,7 @@ public class FilterOperatorTest {
         ColumnDataType.INT
     });
     Mockito.when(_upstreamOperator.nextBlock())
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     FilterOperator op =
         new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock dataBlock = op.getNextBlock();
@@ -90,7 +90,7 @@ public class FilterOperatorTest {
     });
     Mockito.when(_upstreamOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{0}, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     FilterOperator op =
         new FilterOperator(OperatorTestUtil.getTracingContext(), _upstreamOperator, inputSchema, booleanLiteral);
     TransferableBlock dataBlock = op.getNextBlock();

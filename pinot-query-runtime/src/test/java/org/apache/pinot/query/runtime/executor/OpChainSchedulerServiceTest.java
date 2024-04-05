@@ -92,7 +92,7 @@ public class OpChainSchedulerServiceTest {
     CountDownLatch latch = new CountDownLatch(1);
     Mockito.when(_operatorA.nextBlock()).thenAnswer(inv -> {
       latch.countDown();
-      return TransferableBlockTestUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0);
     });
 
     schedulerService.register(opChain);
@@ -109,7 +109,7 @@ public class OpChainSchedulerServiceTest {
     CountDownLatch latch = new CountDownLatch(1);
     Mockito.when(_operatorA.nextBlock()).thenAnswer(inv -> {
       latch.countDown();
-      return TransferableBlockTestUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0);
     });
 
     schedulerService.register(opChain);
@@ -124,7 +124,7 @@ public class OpChainSchedulerServiceTest {
     OpChainSchedulerService schedulerService = new OpChainSchedulerService(_executor);
 
     CountDownLatch latch = new CountDownLatch(1);
-    Mockito.when(_operatorA.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    Mockito.when(_operatorA.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     Mockito.doAnswer(inv -> {
       latch.countDown();
       return null;

@@ -111,7 +111,7 @@ public class OpChainTest {
       }).when(_exchange).send(any(TransferableBlock.class));
       when(_mailbox2.poll()).then(x -> {
         if (_blockList.isEmpty()) {
-          return TransferableBlockTestUtils.getEndOfStreamTransferableBlock();
+          return TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0);
         }
         return _blockList.remove(0);
       });
@@ -145,9 +145,9 @@ public class OpChainTest {
     assertNotNull(queryStats, "Expected query stats to be non-null");
 
     @SuppressWarnings("unchecked")
-    StatMap<MultiStageOperator.BaseStatKeys> lastOperatorStats =
-        (StatMap<MultiStageOperator.BaseStatKeys>) queryStats.getCurrentStats().getLastOperatorStats();
-    assertNotEquals(lastOperatorStats.getLong(MultiStageOperator.BaseStatKeys.EXECUTION_TIME_MS), 0L,
+    StatMap<LiteralValueOperator.StatKey> lastOperatorStats =
+        (StatMap<LiteralValueOperator.StatKey>) queryStats.getCurrentStats().getLastOperatorStats();
+    assertNotEquals(lastOperatorStats.getLong(LiteralValueOperator.StatKey.EXECUTION_TIME_MS), 0L,
         "Expected execution time to be non-zero");
   }
 
@@ -164,9 +164,9 @@ public class OpChainTest {
     assertNotNull(queryStats, "Expected query stats to be non-null");
 
     @SuppressWarnings("unchecked")
-    StatMap<MultiStageOperator.BaseStatKeys> lastOperatorStats =
-        (StatMap<MultiStageOperator.BaseStatKeys>) queryStats.getCurrentStats().getLastOperatorStats();
-    assertEquals(lastOperatorStats.getLong(MultiStageOperator.BaseStatKeys.EXECUTION_TIME_MS), 0L,
+    StatMap<LiteralValueOperator.StatKey> lastOperatorStats =
+        (StatMap<LiteralValueOperator.StatKey>) queryStats.getCurrentStats().getLastOperatorStats();
+    assertEquals(lastOperatorStats.getLong(LiteralValueOperator.StatKey.EXECUTION_TIME_MS), 0L,
         "Expected execution time to be not collected");
   }
 
@@ -205,7 +205,7 @@ public class OpChainTest {
     //Mailbox Receive Operator
     try {
       when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(upStreamSchema, new Object[]{1}),
-          TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+          TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     } catch (Exception e) {
       fail("Exception while mocking mailbox receive: " + e.getMessage());
     }

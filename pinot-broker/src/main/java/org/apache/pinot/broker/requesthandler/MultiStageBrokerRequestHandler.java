@@ -41,8 +41,6 @@ import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -82,11 +80,6 @@ import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.runtime.operator.AggregateOperator;
-import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
-import org.apache.pinot.query.runtime.operator.HashJoinOperator;
-import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
-import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
@@ -273,13 +266,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
       List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan) {
-    MultiStageStatsToBrokerResponseStats rootStatsAggregator = new MultiStageStatsToBrokerResponseStats();
     for (int i = 0; i < queryStats.size(); i++) {
       MultiStageQueryStats.StageStats.Closed stageStats = queryStats.get(i);
       if (stageStats == null) {
         brokerResponse.addStageStat(JsonUtils.newObjectNode());
       } else {
-        stageStats.accept(rootStatsAggregator, brokerResponse);
+        stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
 
         DispatchablePlanFragment dispatchablePlanFragment = dispatchableSubPlan.getQueryStageList().get(i);
         MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(stageStats);
@@ -500,46 +492,5 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   public void shutDown() {
     _queryDispatcher.shutdown();
     _mailboxService.shutdown();
-  }
-
-  public static class MultiStageStatsToBrokerResponseStats
-      implements MultiStageQueryStats.StatsVisitor<BrokerResponseNativeV2> {
-    @Override
-    public void visitBase(StatMap<MultiStageOperator.BaseStatKeys> stats, BrokerResponseNativeV2 response) {
-      response.mergeMaxRows(stats.getLong(MultiStageOperator.BaseStatKeys.EMITTED_ROWS));
-    }
-
-    @Override
-    public void visitLeaf(StatMap<LeafStageTransferableBlockOperator.StatKey> stats, BrokerResponseNativeV2 response) {
-      response.mergeMaxRows(stats.getLong(LeafStageTransferableBlockOperator.StatKey.EMITTED_ROWS));
-
-      StatMap<DataTable.MetadataKey> v1Stats = new StatMap<>(DataTable.MetadataKey.class);
-      for (LeafStageTransferableBlockOperator.StatKey statKey : stats.keySet()) {
-        statKey.updateV1Metadata(v1Stats, stats);
-      }
-      response.addServerStats(v1Stats);
-    }
-
-    @Override
-    public void visitAggregate(StatMap<AggregateOperator.StatKey> stats, BrokerResponseNativeV2 response) {
-      response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
-      response.mergeMaxRows(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
-    }
-
-    @Override
-    public void visitHashJoin(StatMap<HashJoinOperator.StatKey> stats, BrokerResponseNativeV2 response) {
-      response.mergeMaxRowsInJoinReached(stats.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED));
-      response.mergeMaxRows(stats.getLong(HashJoinOperator.StatKey.EMITTED_ROWS));
-    }
-
-    @Override
-    public void visitMailboxReceive(StatMap<BaseMailboxReceiveOperator.StatKey> stats, BrokerResponseNativeV2 res) {
-      res.mergeMaxRows(stats.getLong(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS));
-    }
-
-    @Override
-    public void visitMailboxSend(StatMap<MailboxSendOperator.StatKey> stats, BrokerResponseNativeV2 response) {
-      response.mergeMaxRows(stats.getLong(MailboxSendOperator.StatKey.EMITTED_ROWS));
-    }
   }
 }

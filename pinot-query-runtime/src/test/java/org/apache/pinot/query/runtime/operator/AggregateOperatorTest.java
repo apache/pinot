@@ -107,7 +107,7 @@ public class AggregateOperatorTest {
     List<RexExpression> calls = ImmutableList.of(getSum(new RexExpression.InputRef(1)));
     List<RexExpression> group = ImmutableList.of(new RexExpression.InputRef(0));
 
-    Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    Mockito.when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
@@ -130,7 +130,7 @@ public class AggregateOperatorTest {
 
     DataSchema inSchema = new DataSchema(new String[]{"group", "arg"}, new ColumnDataType[]{INT, DOUBLE});
     Mockito.when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1.0}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
@@ -158,7 +158,7 @@ public class AggregateOperatorTest {
     Mockito.when(_input.nextBlock())
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1.0}, new Object[]{2, 2.0}))
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 3.0}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     AggregateOperator operator =
@@ -189,7 +189,7 @@ public class AggregateOperatorTest {
     Mockito.when(_input.nextBlock())
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1.0, 0}, new Object[]{2, 2.0, 1}))
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 3.0, 1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     DataSchema outSchema =
         new DataSchema(new String[]{"group", "sum", "sumWithFilter"}, new ColumnDataType[]{INT, DOUBLE, DOUBLE});
@@ -254,7 +254,7 @@ public class AggregateOperatorTest {
         // TODO: it is necessary to produce two values here, the operator only throws on second
         // (see the comment in Aggregate operator)
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, "foo"}, new Object[]{2, "foo"}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     DataSchema outSchema = new DataSchema(new String[]{"sum"}, new ColumnDataType[]{DOUBLE});
     AggregateOperator operator =
@@ -280,7 +280,7 @@ public class AggregateOperatorTest {
     Mockito.when(_input.nextBlock())
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{2, 1.0}, new Object[]{3, 2.0}))
         .thenReturn(OperatorTestUtil.block(inSchema, new Object[]{3, 3.0}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     DataSchema outSchema = new DataSchema(new String[]{"group", "sum"}, new ColumnDataType[]{INT, DOUBLE});
     OpChainExecutionContext context = OperatorTestUtil.getTracingContext();

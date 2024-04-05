@@ -78,7 +78,7 @@ public class MailboxServiceTest {
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
     }
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
     sendingMailbox.complete();
 
     ReceivingMailbox receivingMailbox = _mailboxService1.getReceivingMailbox(mailboxId);
@@ -117,7 +117,7 @@ public class MailboxServiceTest {
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
     }
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
     sendingMailbox.complete();
 
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS);
@@ -273,7 +273,7 @@ public class MailboxServiceTest {
 
     // Next send will throw exception because buffer is full
     try {
-      sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+      sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
       fail("Except exception when sending data after buffer is full");
     } catch (Exception e) {
       // Expected
@@ -313,7 +313,7 @@ public class MailboxServiceTest {
     // send another block b/c it doesn't guarantee the next block must be EOS
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
     // send a metadata block
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
 
     // sending side should early terminate
     assertTrue(sendingMailbox.isEarlyTerminated());
@@ -330,7 +330,7 @@ public class MailboxServiceTest {
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
     }
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
     sendingMailbox.complete();
 
     // Wait until all the mails are delivered
@@ -378,7 +378,7 @@ public class MailboxServiceTest {
     for (int i = 0; i < ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS - 1; i++) {
       sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{i}));
     }
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
     sendingMailbox.complete();
 
     // Wait until all the mails are delivered
@@ -567,7 +567,7 @@ public class MailboxServiceTest {
     }
 
     // Next send will be blocked on the receiver side and cause exception after timeout
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
     receiveMailLatch.await();
     assertEquals(numCallbacks.get(), ReceivingMailbox.DEFAULT_MAX_PENDING_BLOCKS + 1);
 
@@ -608,7 +608,7 @@ public class MailboxServiceTest {
     // send another block b/c it doesn't guarantee the next block must be EOS
     sendingMailbox.send(OperatorTestUtil.block(DATA_SCHEMA, new Object[]{0}));
     // send a metadata block
-    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+    sendingMailbox.send(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(SENDER_STAGE_ID));
     sendingMailbox.complete();
 
     // sending side should early terminate

@@ -217,7 +217,7 @@ public class PipelineBreakerExecutorTest {
     CountDownLatch latch = new CountDownLatch(1);
     when(_mailbox1.poll()).thenAnswer(invocation -> {
       latch.await();
-      return TransferableBlockTestUtils.getEndOfStreamTransferableBlock();
+      return TransferableBlockTestUtils.getEndOfStreamTransferableBlock(1);
     });
 
     PipelineBreakerResult pipelineBreakerResult =
@@ -254,9 +254,9 @@ public class PipelineBreakerExecutorTest {
     Object[] row1 = new Object[]{1, 1};
     Object[] row2 = new Object[]{2, 3};
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(1));
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(1));
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
@@ -294,7 +294,7 @@ public class PipelineBreakerExecutorTest {
     when(_mailbox1.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row1),
         TransferableBlockUtils.getErrorTransferableBlock(new RuntimeException("ERROR ON 1")));
     when(_mailbox2.poll()).thenReturn(OperatorTestUtil.block(DATA_SCHEMA, row2),
-        TransferableBlockTestUtils.getEndOfStreamTransferableBlock());
+        TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,

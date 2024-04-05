@@ -26,6 +26,7 @@ import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -69,9 +70,9 @@ public class MultiStageQueryStatsTest {
                       .merge(BaseMailboxReceiveOperator.StatKey.EXECUTION_TIME_MS, 100)
                       .merge(BaseMailboxReceiveOperator.StatKey.EMITTED_ROWS, 10))
               .addLastOperator(MultiStageOperator.Type.SORT,
-                  new StatMap<>(MultiStageOperator.BaseStatKeys.class)
-                      .merge(MultiStageOperator.BaseStatKeys.EXECUTION_TIME_MS, 10)
-                      .merge(MultiStageOperator.BaseStatKeys.EMITTED_ROWS, 10))
+                  new StatMap<>(SortOperator.StatKey.class)
+                      .merge(SortOperator.StatKey.EXECUTION_TIME_MS, 10)
+                      .merge(SortOperator.StatKey.EMITTED_ROWS, 10))
               .addLastOperator(MultiStageOperator.Type.MAILBOX_SEND,
                   new StatMap<>(MailboxSendOperator.StatKey.class)
                       .merge(MailboxSendOperator.StatKey.TO_STAGE, 0)
