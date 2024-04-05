@@ -42,6 +42,7 @@ import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.utils.FakeHttpServer;
@@ -79,10 +80,12 @@ public class TableSizeReaderTest {
       new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
   private final Map<String, FakeSizeServer> _serverMap = new HashMap<>();
   private PinotHelixResourceManager _helix;
+  private LeadControllerManager _leadControllerManager;
 
   @BeforeClass
   public void setUp() throws IOException {
     _helix = mock(PinotHelixResourceManager.class);
+    _leadControllerManager = mock(LeadControllerManager.class);
 
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setNumReplicas(NUM_REPLICAS).build();
@@ -103,6 +106,7 @@ public class TableSizeReaderTest {
 
     when(_helix.getPropertyStore()).thenReturn(mockPropertyStore);
     when(_helix.getNumReplicas(ArgumentMatchers.eq(tableConfig))).thenReturn(NUM_REPLICAS);
+    when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
 
     int counter = 0;
     // server0
@@ -218,8 +222,10 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testNoSuchTable() throws InvalidConfigException {
-    TableSizeReader reader = new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix);
+  public void testNoSuchTable()
+      throws InvalidConfigException {
+    TableSizeReader reader =
+        new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix, _leadControllerManager);
     assertNull(reader.getTableSizeDetails("mytable", 5000));
   }
 
@@ -239,7 +245,8 @@ public class TableSizeReaderTest {
       }
     });
 
-    TableSizeReader reader = new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix);
+    TableSizeReader reader = new TableSizeReader(_executor, _connectionManager, _controllerMetrics, _helix,
+        _leadControllerManager);
     return reader.getTableSizeDetails(table, TIMEOUT_MSEC);
   }
 

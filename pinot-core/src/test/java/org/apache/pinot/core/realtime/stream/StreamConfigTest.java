@@ -146,6 +146,7 @@ public class StreamConfigTest {
     assertEquals(streamConfig.getFetchTimeoutMillis(), StreamConfig.DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS);
     assertEquals(streamConfig.getFlushThresholdTimeMillis(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
     assertEquals(streamConfig.getFlushThresholdRows(), -1);
+    assertEquals(streamConfig.getFlushThresholdSegmentRows(), -1);
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), -1);
 
     String offsetCriteria = "smallest";
@@ -183,6 +184,7 @@ public class StreamConfigTest {
     assertEquals(streamConfig.getFlushThresholdTimeMillis(),
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTime));
     assertEquals(streamConfig.getFlushThresholdRows(), Integer.parseInt(flushThresholdRows));
+    assertEquals(streamConfig.getFlushThresholdSegmentRows(), -1);
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), DataSizeUtils.toBytes(flushSegmentSize));
 
     // Backward compatibility check for flushThresholdTime
@@ -329,6 +331,7 @@ public class StreamConfigTest {
     streamConfig = new StreamConfig(tableName, streamConfigMap);
     assertEquals(streamConfig.getFlushThresholdTimeMillis(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
     assertEquals(streamConfig.getFlushThresholdRows(), -1);
+    assertEquals(streamConfig.getFlushThresholdSegmentRows(), -1);
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), -1);
 
     // Use regular values if provided
@@ -338,6 +341,7 @@ public class StreamConfigTest {
     assertEquals(streamConfig.getFlushThresholdTimeMillis(),
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTime));
     assertEquals(streamConfig.getFlushThresholdRows(), Integer.parseInt(flushThresholdRows));
+    assertEquals(streamConfig.getFlushThresholdSegmentRows(), -1);
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), -1);
 
     // Use regular values if both regular and llc config exists
@@ -350,6 +354,7 @@ public class StreamConfigTest {
     assertEquals(streamConfig.getFlushThresholdTimeMillis(),
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTime));
     assertEquals(streamConfig.getFlushThresholdRows(), Integer.parseInt(flushThresholdRows));
+    assertEquals(streamConfig.getFlushThresholdSegmentRows(), -1);
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), -1);
 
     // Use llc values if only llc config exists
@@ -359,6 +364,7 @@ public class StreamConfigTest {
     assertEquals(streamConfig.getFlushThresholdTimeMillis(),
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTimeLLC));
     assertEquals(streamConfig.getFlushThresholdRows(), Integer.parseInt(flushThresholdRowsLLC));
+    assertEquals(streamConfig.getFlushThresholdSegmentRows(), -1);
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), -1);
   }
 

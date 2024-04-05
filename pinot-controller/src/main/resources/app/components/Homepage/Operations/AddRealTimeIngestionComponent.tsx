@@ -92,6 +92,7 @@ export default function AddRealTimeIngestionComponent({
             "stream.kafka.consumer.factory.class.name":"org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
             "stream.kafka.decoder.class.name":"org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
             "realtime.segment.flush.threshold.rows": "0",
+            "realtime.segment.flush.threshold.segment.rows": "0",
             "realtime.segment.flush.threshold.time": "24h",
             "realtime.segment.flush.threshold.segment.size": "100M"
         }
