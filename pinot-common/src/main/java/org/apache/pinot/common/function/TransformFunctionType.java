@@ -180,7 +180,7 @@ public enum TransformFunctionType {
   // string functions
   SPLIT("split", ReturnTypes.TO_ARRAY, OperandTypes.family(
       ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER),
-      ordinal -> ordinal > 1), "split"),
+      ordinal -> ordinal > 1), "split", "string_to_array"),
 
   // array functions
   // The only column accepted by "cardinality" function is multi-value array, thus putting "cardinality" as alias.
