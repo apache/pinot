@@ -18,13 +18,11 @@
  */
 package org.apache.pinot.sql.parsers;
 
-import java.io.StringReader;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -39,7 +37,6 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.ParseException;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
-import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
 import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -2987,22 +2984,11 @@ public class CalciteSqlCompilerTest {
    * Test for customized components in src/main/codegen/parserImpls.ftl file.
    */
   @Test
-  public void testParserExtensionImpl()
-      throws Exception {
+  public void testParserExtensionImpl() {
     String customSql = "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1', FILE 'file:///tmp/file2'";
-    SqlNodeAndOptions sqlNodeAndOptions = testSqlWithCustomSqlParser(customSql);
+    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(customSql);;
     Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlInsertFromFile);
     Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
-  }
-
-  private static SqlNodeAndOptions testSqlWithCustomSqlParser(String sqlString)
-      throws Exception {
-    try (StringReader inStream = new StringReader(sqlString)) {
-      SqlParserImpl sqlParser = CalciteSqlParser.newSqlParser(inStream);
-      SqlNodeList sqlNodeList = sqlParser.SqlStmtsEof();
-      // Extract OPTION statements from sql.
-      return CalciteSqlParser.extractSqlNodeAndOptions(sqlString, sqlNodeList);
-    }
   }
 
   @Test

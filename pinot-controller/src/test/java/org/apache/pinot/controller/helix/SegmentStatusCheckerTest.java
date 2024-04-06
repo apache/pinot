@@ -55,6 +55,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_DATABASE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -113,7 +114,9 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
@@ -217,7 +220,9 @@ public class SegmentStatusCheckerTest {
       _helixPropertyStore = mock(ZkHelixPropertyStore.class);
       when(_helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
       when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
       ZNRecord znRecord = new ZNRecord("0");
@@ -320,7 +325,9 @@ public class SegmentStatusCheckerTest {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
       _helixPropertyStore = mock(ZkHelixPropertyStore.class);
       when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(offlineTableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(offlineTableName)).thenReturn(externalView);
       when(_helixResourceManager.getSegmentZKMetadata(offlineTableName, "myTable_3"))
@@ -381,7 +388,9 @@ public class SegmentStatusCheckerTest {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
       _helixPropertyStore = mock(ZkHelixPropertyStore.class);
       when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
@@ -426,7 +435,9 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(null);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
@@ -516,7 +527,9 @@ public class SegmentStatusCheckerTest {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
       _helixPropertyStore = mock(ZkHelixPropertyStore.class);
       when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(offlineTableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(offlineTableName)).thenReturn(externalView);
       when(_helixResourceManager.getSegmentZKMetadata(offlineTableName, "myTable_0"))
@@ -577,7 +590,9 @@ public class SegmentStatusCheckerTest {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
       _helixPropertyStore = mock(ZkHelixPropertyStore.class);
       when(_helixResourceManager.getPropertyStore()).thenReturn(_helixPropertyStore);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
@@ -633,7 +648,9 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
@@ -676,7 +693,9 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }
@@ -738,7 +757,9 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableConfig(tableName)).thenReturn(tableConfig);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(externalView);
@@ -793,7 +814,9 @@ public class SegmentStatusCheckerTest {
 
     {
       _helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(_helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(_helixResourceManager.getDatabaseNames())
+          .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
+      when(_helixResourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(allTableNames);
       when(_helixResourceManager.getTableIdealState(tableName)).thenReturn(idealState);
       when(_helixResourceManager.getTableExternalView(tableName)).thenReturn(null);
     }

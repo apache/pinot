@@ -104,6 +104,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
+import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -556,7 +557,7 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch cron scheduler job keys")
   public Map<String, Object> getCronSchedulerJobDetails(
-      @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
+      @ApiParam(value = "Table name (with type suffix)", required = true) @QueryParam("tableName") String tableName,
       @ApiParam(value = "Task type") @QueryParam("taskType") String taskType, @Context HttpHeaders headers)
       throws SchedulerException {
     Scheduler scheduler = _pinotTaskManager.getScheduler();
@@ -618,15 +619,20 @@ public class PinotTaskRestletResource {
   public Map<String, String> scheduleTasks(@ApiParam(value = "Task type") @QueryParam("taskType") String taskType,
       @ApiParam(value = "Table name (with type suffix)") @QueryParam("tableName") String tableName,
       @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    String database = headers != null ? headers.getHeaderString(DATABASE) : DEFAULT_DATABASE;
     if (taskType != null) {
       // Schedule task for the given task type
-      String taskName = tableName != null ? _pinotTaskManager.scheduleTask(taskType, tableName)
-          : _pinotTaskManager.scheduleTask(taskType);
-      return Collections.singletonMap(taskType, taskName);
+      List<String> taskNames = tableName != null
+          ? _pinotTaskManager.scheduleTask(taskType, DatabaseUtils.translateTableName(tableName, headers))
+          : _pinotTaskManager.scheduleTaskForDatabase(taskType, database);
+      return Collections.singletonMap(taskType, taskNames == null ? null : StringUtils.join(taskNames, ','));
     } else {
       // Schedule tasks for all task types
-      return tableName != null ? _pinotTaskManager.scheduleTasks(tableName) : _pinotTaskManager.scheduleTasks();
+      Map<String, List<String>> allTaskNames = tableName != null
+          ? _pinotTaskManager.scheduleTasks(DatabaseUtils.translateTableName(tableName, headers))
+          : _pinotTaskManager.scheduleTasksForDatabase(database);
+      return allTaskNames.entrySet().stream()
+          .collect(Collectors.toMap(Map.Entry::getKey, entry -> String.join(",", entry.getValue())));
     }
   }
 

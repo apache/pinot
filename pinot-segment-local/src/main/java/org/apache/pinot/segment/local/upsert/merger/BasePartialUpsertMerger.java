@@ -16,36 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner;
+package org.apache.pinot.segment.local.upsert.merger;
 
-import org.apache.pinot.query.planner.plannode.PlanNode;
+import java.util.List;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
-/**
- * The {@code QueryPlan} is the logical query plan from the result of
- * {@link org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner}.
- *
- */
-public class QueryPlan {
-  private final PlanNode _planRoot;
-  private final QueryPlanMetadata _queryPlanMetadata;
+public abstract class BasePartialUpsertMerger implements PartialUpsertMerger {
+  protected final List<String> _primaryKeyColumns;
+  protected final List<String> _comparisonColumns;
+  protected final UpsertConfig _upsertConfig;
 
-  public QueryPlan(PlanNode queryPlanRoot, QueryPlanMetadata queryPlanMetadata) {
-    _planRoot = queryPlanRoot;
-    _queryPlanMetadata = queryPlanMetadata;
-  }
-
-  /**
-   * Get the root node of the query plan.
-   */
-  public PlanNode getPlanRoot() {
-    return _planRoot;
-  }
-
-  /**
-   * Get the metadata of the query plan.
-   */
-  public QueryPlanMetadata getPlanMetadata() {
-    return _queryPlanMetadata;
+  protected BasePartialUpsertMerger(List<String> primaryKeyColumns, List<String> comparisonColumns,
+      UpsertConfig upsertConfig) {
+    _primaryKeyColumns = primaryKeyColumns;
+    _comparisonColumns = comparisonColumns;
+    _upsertConfig = upsertConfig;
   }
 }

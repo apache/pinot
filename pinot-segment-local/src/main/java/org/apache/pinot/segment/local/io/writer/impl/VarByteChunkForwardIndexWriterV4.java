@@ -325,5 +325,6 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     CleanerUtil.cleanQuietly(_compressionBuffer);
     CleanerUtil.cleanQuietly(_chunkBuffer);
     FileUtils.deleteQuietly(_dataBuffer);
+    _chunkCompressor.close();
   }
 }

@@ -40,6 +40,7 @@ public class Actions {
     public static final String DELETE_TENANT = "DeleteTenant";
     public static final String DELETE_USER = "DeleteUser";
     public static final String DELETE_ZNODE = "DeleteZnode";
+    public static final String DELETE_DATABASE = "DeleteDatabase";
     public static final String ESTIMATE_UPSERT_MEMORY = "EstimateUpsertMemory";
     public static final String EXECUTE_TASK = "ExecuteTask";
     public static final String GET_ADMIN_INFO = "GetAdminInfo";

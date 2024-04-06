@@ -16,37 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
-
-import java.util.Set;
-import java.util.TreeSet;
-
+package org.apache.pinot.segment.local.upsert.merger.columnar;
 
 /**
  * Merges 2 records and returns the merged record.
- * Added the new value from incoming row to the existing value from multi-value field. Then return the merged record.
- * Union merger will dedup duplicated records in the multi-value field.
+ * By default, ignore the new value from incoming row. Then return the merged record.
  */
-public class UnionMerger implements PartialUpsertMerger {
-  UnionMerger() {
-  }
+public class IgnoreMerger implements PartialUpsertColumnMerger {
 
-  /**
-   * Union the new value from incoming row to the given multi-value field of previous record.
-   */
   @Override
   public Object merge(Object previousValue, Object currentValue) {
-    return union((Object[]) previousValue, (Object[]) currentValue);
-  }
-
-  private static Object union(Object[] a, Object[] b) {
-    Set<Object> union = new TreeSet<>();
-    for (Object value : a) {
-      union.add(value);
-    }
-    for (Object value : b) {
-      union.add(value);
-    }
-    return union.toArray();
+    return previousValue;
   }
 }

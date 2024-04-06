@@ -16,18 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.core.query.aggregation.function;
 
-/**
- * Merges 2 records and returns the merged record.
- * Overwrite the existing value for the given field. Then return the merged record.
- */
-public class OverwriteMerger implements PartialUpsertMerger {
-  OverwriteMerger() {
+
+public class PercentileKLLAggregationFunctionTest extends AbstractPercentileAggregationFunctionTest {
+  @Override
+  public String callStr(String column, int percent) {
+    return "PERCENTILEKLL(" + column + ", " + percent + ")";
   }
 
   @Override
-  public Object merge(Object previousValue, Object currentValue) {
-    return currentValue;
+  String expectedAggrWithNull10(Scenario scenario) {
+    return "0";
+  }
+
+  @Override
+  String expectedAggrWithNull30(Scenario scenario) {
+    return "2";
+  }
+
+  @Override
+  String expectedAggrWithNull50(Scenario scenario) {
+    return "4";
+  }
+
+  @Override
+  String expectedAggrWithNull70(Scenario scenario) {
+    return "6";
   }
 }

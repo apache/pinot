@@ -243,7 +243,7 @@ public class StringFunctions {
    * @param input
    * @return get substring starting from the first index and extending upto specified length.
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"leftSubStr", "left"})
   public static String leftSubStr(String input, int length) {
     return StringUtils.left(input, length);
   }
@@ -253,7 +253,7 @@ public class StringFunctions {
    * @param input
    * @return get substring ending at the last index with specified length
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"rightSubStr", "right"})
   public static String rightSubStr(String input, int length) {
     return StringUtils.right(input, length);
   }
@@ -565,7 +565,7 @@ public class StringFunctions {
    * @param delimiter
    * @return splits string on specified delimiter and returns an array.
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"split", "string_to_array"})
   public static String[] split(String input, String delimiter) {
     return StringUtils.splitByWholeSeparator(input, delimiter);
   }
@@ -576,7 +576,7 @@ public class StringFunctions {
    * @param limit
    * @return splits string on specified delimiter limiting the number of results till the specified limit
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"split", "string_to_array"})
   public static String[] split(String input, String delimiter, int limit) {
     return StringUtils.splitByWholeSeparator(input, delimiter, limit);
   }
@@ -588,7 +588,7 @@ public class StringFunctions {
    * @param index
    * @return splits string on specified delimiter and returns String at specified index from the split.
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"splitPart", "split_part"})
   public static String splitPart(String input, String delimiter, int index) {
     String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
     if (index < splitString.length) {

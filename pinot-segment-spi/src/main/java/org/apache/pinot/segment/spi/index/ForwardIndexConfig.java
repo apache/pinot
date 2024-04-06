@@ -74,6 +74,10 @@ public class ForwardIndexConfig extends IndexConfig {
           _chunkCompressionType = ChunkCompressionType.LZ4;
           _dictIdCompressionType = null;
           break;
+        case GZIP:
+          _chunkCompressionType = ChunkCompressionType.GZIP;
+          _dictIdCompressionType = null;
+          break;
         case MV_ENTRY_DICT:
           _dictIdCompressionType = DictIdCompressionType.MV_ENTRY_DICT;
           _chunkCompressionType = null;

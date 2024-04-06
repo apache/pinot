@@ -117,7 +117,8 @@ public enum TransformFunctionType {
       ReturnTypes.cascade(opBinding -> positionalReturnTypeInferenceFromStringLiteral(opBinding, 2,
           SqlTypeName.VARCHAR), SqlTypeTransforms.FORCE_NULLABLE),
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
-          SqlTypeFamily.CHARACTER), ordinal -> ordinal > 2), "json_extract_index"),
+          SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 2), "json_extract_index"),
+
   JSON_EXTRACT_KEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
       OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER)), "json_extract_key"),
 
@@ -179,7 +180,7 @@ public enum TransformFunctionType {
   // string functions
   SPLIT("split", ReturnTypes.TO_ARRAY, OperandTypes.family(
       ImmutableList.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER),
-      ordinal -> ordinal > 1), "split"),
+      ordinal -> ordinal > 1), "split", "string_to_array"),
 
   // array functions
   // The only column accepted by "cardinality" function is multi-value array, thus putting "cardinality" as alias.

@@ -21,7 +21,7 @@ package org.apache.pinot.query.planner.physical;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.calcite.util.Pair;
+import org.apache.calcite.runtime.PairList;
 
 
 /**
@@ -38,12 +38,12 @@ import org.apache.calcite.util.Pair;
  * </ul>
  */
 public class DispatchableSubPlan {
-  private final List<Pair<Integer, String>> _queryResultFields;
+  private final PairList<Integer, String> _queryResultFields;
   private final List<DispatchablePlanFragment> _queryStageList;
   private final Set<String> _tableNames;
   private final Map<String, Set<String>> _tableToUnavailableSegmentsMap;
 
-  public DispatchableSubPlan(List<Pair<Integer, String>> fields, List<DispatchablePlanFragment> queryStageList,
+  public DispatchableSubPlan(PairList<Integer, String> fields, List<DispatchablePlanFragment> queryStageList,
       Set<String> tableNames, Map<String, Set<String>> tableToUnavailableSegmentsMap) {
     _queryResultFields = fields;
     _queryStageList = queryStageList;
@@ -63,7 +63,7 @@ public class DispatchableSubPlan {
    * Get the query result field.
    * @return query result field.
    */
-  public List<Pair<Integer, String>> getQueryResultFields() {
+  public PairList<Integer, String> getQueryResultFields() {
     return _queryResultFields;
   }
 

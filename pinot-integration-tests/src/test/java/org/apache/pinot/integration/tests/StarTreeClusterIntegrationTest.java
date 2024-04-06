@@ -184,7 +184,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String starQuery = "SELECT DepTimeBlk, COUNT(*), COUNT(*) FILTER (WHERE CRSDepTime = 35) FROM mytable "
-        + "WHERE CRSDepTime != 35"
+        + "WHERE CRSDepTime != 35 "
         + "GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     // Don't verify that the query plan uses StarTree index, as this query results in FILTER_EMPTY in the query plan.
     // This is still a valuable test, as it caught a bug where only the subFilterContext was being preserved through
@@ -193,7 +193,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Ensure the filtered agg and unfiltered agg can co-exist in one query
     starQuery = "SELECT DepTimeBlk, COUNT(*), COUNT(*) FILTER (WHERE DivArrDelay > 20) FROM mytable "
-        + "WHERE CRSDepTime != 35"
+        + "WHERE CRSDepTime != 35 "
         + "GROUP BY DepTimeBlk ORDER BY DepTimeBlk";
     testStarQuery(starQuery, !useMultiStageQueryEngine);
 

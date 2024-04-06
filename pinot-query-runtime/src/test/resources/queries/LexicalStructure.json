@@ -185,7 +185,7 @@
     "queries": [{
       "psql": "4.1.6",
       "description": "testing operator precedence",
-      "sql": "SELECT NOT +{tbl}.data * 2 - 2 = -8 and true or false, data * 2 between 4 and 7 FROM {tbl}"
+      "sql": "SELECT NOT {tbl}.data * 2 - 2 = -8 and true or false, data * 2 between 4 and 7 FROM {tbl}"
     }]
   }
 }

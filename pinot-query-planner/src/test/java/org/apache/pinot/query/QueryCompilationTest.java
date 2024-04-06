@@ -83,10 +83,10 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
     assertEquals(explain,
         "Execution Plan\n"
-        + "LogicalProject(EXPR$0=[CAST($0):BIGINT])\n"
-        + "  LogicalAggregate(group=[{}], agg#0=[COUNT($0)])\n"
+        + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
+        + "  LogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)])\n"
         + "    PinotLogicalExchange(distribution=[hash])\n"
-        + "      LogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0])\n"
+        + "      LogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()])\n"
         + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
         + "          LogicalTableScan(table=[[default, a]])\n");
   }

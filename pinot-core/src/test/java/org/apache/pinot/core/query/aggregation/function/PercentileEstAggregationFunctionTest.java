@@ -16,18 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.core.query.aggregation.function;
 
-public class MaxMerger implements PartialUpsertMerger {
+import org.apache.pinot.spi.data.FieldSpec;
 
-  MaxMerger() {
+
+public class PercentileEstAggregationFunctionTest extends AbstractPercentileAggregationFunctionTest {
+  @Override
+  public String callStr(String column, int percent) {
+    return "PERCENTILEEST(" + column + ", " + percent + ")";
   }
 
-  /**
-   * Keep the maximal value for the given field.
-   */
   @Override
-  public Object merge(Object previousValue, Object currentValue) {
-    return ((Comparable) previousValue).compareTo((Comparable) currentValue) > 0 ? previousValue : currentValue;
+  public String getFinalResultColumnType() {
+    return "LONG";
+  }
+
+  String minValue(FieldSpec.DataType dataType) {
+    switch (dataType) {
+      case INT: return "-2147483648";
+      case LONG: return "-9223372036854775808";
+      case FLOAT: return "-9223372036854775808";
+      case DOUBLE: return "-9223372036854775808";
+      default:
+        throw new IllegalArgumentException("Unexpected type " + dataType);
+    }
   }
 }

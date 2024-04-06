@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -60,12 +59,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
 
     PartialUpsertHandler partialUpsertHandler = null;
     if (upsertConfig.getMode() == UpsertConfig.Mode.PARTIAL) {
-      Map<String, UpsertConfig.Strategy> partialUpsertStrategies = upsertConfig.getPartialUpsertStrategies();
-      Preconditions.checkArgument(partialUpsertStrategies != null,
-          "Partial-upsert strategies must be configured for partial-upsert enabled table: %s", _tableNameWithType);
-      partialUpsertHandler =
-          new PartialUpsertHandler(schema, partialUpsertStrategies, upsertConfig.getDefaultPartialUpsertStrategy(),
-              comparisonColumns);
+      partialUpsertHandler = new PartialUpsertHandler(schema, comparisonColumns, upsertConfig);
     }
 
     String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();

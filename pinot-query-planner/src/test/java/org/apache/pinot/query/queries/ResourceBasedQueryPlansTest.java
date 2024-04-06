@@ -78,11 +78,15 @@ public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
       if (expectedException == null) {
         throw e;
       } else {
+        // Get the root cause
+        Throwable cause = e;
+        while (cause.getCause() != null) {
+          cause = cause.getCause();
+        }
         Pattern pattern = Pattern.compile(expectedException + "((.|\\n)*)");
-        // always get the cause error instead of the top wrapper: those always are parsing or composing error.
-        Assert.assertTrue(pattern.matcher(e.getCause().getMessage()).matches(),
+        Assert.assertTrue(pattern.matcher(cause.getMessage()).matches(),
             String.format("Caught unexpected exception test case '%s'\nexpected pattern '%s'\nactual msg: '%s'.",
-                testCaseName, expectedException, e.getCause().getMessage()));
+                testCaseName, expectedException, cause.getMessage()));
       }
     }
   }

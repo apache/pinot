@@ -33,6 +33,7 @@ import java.util.PriorityQueue;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -367,10 +368,32 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   @Override
-  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String jsonPathKey) {
+  public Map<String, RoaringBitmap> getMatchingFlattenedDocsMap(String jsonPathKey, @Nullable String filterString) {
     Map<String, RoaringBitmap> valueToMatchingFlattenedDocIdsMap = new HashMap<>();
     _readLock.lock();
     try {
+      RoaringBitmap filteredFlattenedDocIds = null;
+      FilterContext filter;
+      if (filterString != null) {
+        filter = RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(filterString));
+        Preconditions.checkArgument(!filter.isConstant(), "Invalid json match filter: " + filterString);
+        if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
+          // Handle exclusive predicate separately because the flip can only be applied to the
+          // unflattened doc ids in order to get the correct result, and it cannot be nested
+          filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
+          filteredFlattenedDocIds.flip(0, (long) _nextFlattenedDocId);
+        } else {
+          filteredFlattenedDocIds = getMatchingFlattenedDocIds(filter);
+        }
+      }
+      // Support 2 formats:
+      // - JSONPath format (e.g. "$.a[1].b"='abc', "$[0]"=1, "$"='abc')
+      // - Legacy format (e.g. "a[1].b"='abc')
+      if (jsonPathKey.startsWith("$")) {
+        jsonPathKey = jsonPathKey.substring(1);
+      } else {
+        jsonPathKey = JsonUtils.KEY_SEPARATOR + jsonPathKey;
+      }
       Pair<String, RoaringBitmap> result = getKeyAndFlattenedDocIds(jsonPathKey);
       jsonPathKey = result.getLeft();
       RoaringBitmap arrayIndexFlattenDocIds = result.getRight();
@@ -380,6 +403,9 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       Map<String, RoaringBitmap> subMap = getMatchingKeysMap(jsonPathKey);
       for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
         RoaringBitmap flattenedDocIds = entry.getValue().clone();
+        if (filteredFlattenedDocIds != null) {
+          flattenedDocIds.and(filteredFlattenedDocIds);
+        }
         if (arrayIndexFlattenDocIds != null) {
           flattenedDocIds.and(arrayIndexFlattenDocIds);
         }

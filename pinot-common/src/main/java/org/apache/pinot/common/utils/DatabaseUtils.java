@@ -93,8 +93,9 @@ public class DatabaseUtils {
    * <br>Throws {@link DatabaseConflictException}  if {@code tableName} has database prefix,
    * and it does not match with the 'database' header
    */
-  public static String translateTableName(String tableName, HttpHeaders headers, boolean ignoreCase) {
-    return translateTableName(tableName, headers.getHeaderString(CommonConstants.DATABASE), ignoreCase);
+  public static String translateTableName(String tableName, @Nullable HttpHeaders headers, boolean ignoreCase) {
+    String database = headers != null ? headers.getHeaderString(CommonConstants.DATABASE) : null;
+    return translateTableName(tableName, database, ignoreCase);
   }
 
   /**
@@ -106,7 +107,7 @@ public class DatabaseUtils {
    * <br>Throws {@link DatabaseConflictException}  if {@code tableName} has database prefix,
    * and it does not match with the 'database' header
    */
-  public static String translateTableName(String tableName, HttpHeaders headers) {
+  public static String translateTableName(String tableName, @Nullable HttpHeaders headers) {
     return translateTableName(tableName, headers, false);
   }
 

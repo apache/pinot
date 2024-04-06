@@ -109,6 +109,7 @@ public class ConfigUtilsTest {
     assertEquals(streamConfig.getFetchTimeoutMillis(), StreamConfig.DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS);
     assertEquals(streamConfig.getFlushThresholdTimeMillis(), StreamConfig.DEFAULT_FLUSH_THRESHOLD_TIME_MILLIS);
     assertEquals(streamConfig.getFlushThresholdRows(), -1);
+    assertEquals(streamConfig.getFlushThresholdSegmentRows(), -1);
     assertEquals(streamConfig.getFlushThresholdSegmentSizeBytes(), -1);
   }
 

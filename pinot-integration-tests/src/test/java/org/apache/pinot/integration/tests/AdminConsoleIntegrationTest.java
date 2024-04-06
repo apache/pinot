@@ -26,6 +26,7 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -89,5 +90,29 @@ public class AdminConsoleIntegrationTest extends BaseClusterIntegrationTest {
     // help and api map to the same content
     response = sendGetRequest(serverBaseApiUrl + "/api");
     Assert.assertEquals(response, expected);
+  }
+
+  @Test(dataProvider = "endpointBase")
+  public void testSwaggerYaml(final String description, final String endpointBase)
+      throws Exception {
+    String response = sendGetRequest(endpointBase + "/swagger.yaml");
+    Assert.assertTrue(response.startsWith("---\nswagger: \"2.0\""));
+  }
+
+  @Test(dataProvider = "endpointBase")
+  public void testSwaggerJson(final String description, final String endpointBase)
+      throws Exception {
+    String response = sendGetRequest(endpointBase + "/swagger.json");
+    Assert.assertTrue(response.startsWith("{\"swagger\":\"2.0\""));
+    Assert.assertTrue(response.endsWith("}"));
+  }
+
+  @DataProvider
+  public Object[][] endpointBase() {
+    return new Object[][] {
+        new Object[] { "controller", getControllerBaseApiUrl() },
+        new Object[] { "broker", getBrokerBaseApiUrl() },
+        new Object[] { "server", "http://localhost:" + getServerAdminApiPort() }
+    };
   }
 }
