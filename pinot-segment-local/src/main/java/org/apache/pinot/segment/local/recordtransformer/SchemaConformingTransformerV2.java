@@ -129,8 +129,8 @@ import org.slf4j.LoggerFactory;
  */
 public class SchemaConformingTransformerV2 implements RecordTransformer {
   private static final Logger _logger = LoggerFactory.getLogger(SchemaConformingTransformerV2.class);
-  private static final int MAXIMUM_LUCENE_TOKEN_SIZE = 32766;
-  private static final String MIN_TOKEN_LENGTH_DESCRIPTION =
+  private static final int MAXIMUM_LUCENE_DOCUMENT_SIZE = 32766;
+  private static final String MIN_DOCUMENT_LENGTH_DESCRIPTION =
       "key length + `:` + shingle index overlap length + one non-overlap char";
 
   private final boolean _continueOnError;
@@ -142,10 +142,10 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   ServerMetrics _serverMetrics = null;
   private SchemaTreeNode _schemaTree;
   @Nullable
-  private PinotMeter _realtimeMergedTextIndexTruncatedTokenSizeMeter = null;
+  private PinotMeter _realtimeMergedTextIndexTruncatedDocumentSizeMeter = null;
   private String _tableName;
-  private long _mergedTextIndexTokenBytesCount = 0L;
-  private long _mergedTextIndexTokenCount = 0L;
+  private long _mergedTextIndexDocumentBytesCount = 0L;
+  private long _mergedTextIndexDocumentCount = 0L;
 
   public SchemaConformingTransformerV2(TableConfig tableConfig, Schema schema) {
     if (null == tableConfig.getIngestionConfig() || null == tableConfig.getIngestionConfig()
@@ -166,7 +166,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
             indexableExtrasFieldName);
     String unindexableExtrasFieldName = _transformerConfig.getUnindexableExtrasField();
     _unindexableExtrasFieldType =
-        null == unindexableExtrasFieldName ? null : SchemaConformingTransformer.getAndValidateExtrasFieldType(schema,
+        unindexableExtrasFieldName == null ? null : SchemaConformingTransformer.getAndValidateExtrasFieldType(schema,
             unindexableExtrasFieldName);
     _mergedTextIndexFieldSpec = schema.getDimensionSpec(_transformerConfig.getMergedTextIndexField());
     _tableName = tableConfig.getTableName();
@@ -228,8 +228,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   }
 
   /**
-   * Validates the schema with a SchemaConformingTransformerConfig instance and creates a tree representing the fields
-   * in the schema to be used when transforming input records. Refer to {@link SchemaTreeNode} for details.
+   * Validates the schema with a {@link SchemaConformingTransformerV2Config} instance and creates a tree representing
+   * the fields in the schema to be used when transforming input records. Refer to {@link SchemaTreeNode} for details.
    * @throws IllegalArgumentException if schema validation fails in:
    * <ul>
    *   <li>One of the fields in the schema has a name which when interpreted as a JSON path, corresponds to an object
@@ -302,11 +302,11 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
 
       // Generate merged text index
       if (null != _mergedTextIndexFieldSpec && !mergedTextIndexMap.isEmpty()) {
-        List<String> luceneTokens = getLuceneTokensFromMergedTextIndexMap(mergedTextIndexMap);
+        List<String> luceneDocuments = getLuceneDocumentsFromMergedTextIndexMap(mergedTextIndexMap);
         if (_mergedTextIndexFieldSpec.isSingleValueField()) {
-          outputRecord.putValue(_transformerConfig.getMergedTextIndexField(), String.join(" ", luceneTokens));
+          outputRecord.putValue(_transformerConfig.getMergedTextIndexField(), String.join(" ", luceneDocuments));
         } else {
-          outputRecord.putValue(_transformerConfig.getMergedTextIndexField(), luceneTokens);
+          outputRecord.putValue(_transformerConfig.getMergedTextIndexField(), luceneDocuments);
         }
       }
     } catch (Exception e) {
@@ -321,7 +321,9 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   }
 
   /**
-   * The class traverses the schema tree and the record accordingly to build the output record.
+   * The method traverses the record and schema tree at the same time. It would check the specs of record key/value
+   * pairs with the corresponding schema tree node and {#link SchemaConformingTransformerV2Config}. Finally drop or put
+   * them into the output record with the following logics:
    * Taking example:
    * {
    *   "a": 1,
@@ -350,6 +352,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
    *  - At leaf node (base case in recursion):
    *    - Parse keyPath and value and add as flattened result to outputRecord
    *    - Return structured fields as ExtraFieldsContainer
+   *   (leaf node is defined as node not as "Map" type. Leaf node is possible to be collection of or array of "Map". But
+   *   for simplicity, we still treat it as leaf node and do not traverse its children)
    *  - For non-leaf node
    *    - Construct ExtraFieldsContainer based on children's result and return
    *
@@ -378,6 +382,11 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
 
     String keyJsonPath = String.join(".", jsonPath);
+    if (_transformerConfig.getFieldPathsToPreserveInput().contains(keyJsonPath)) {
+      outputRecord.putValue(keyJsonPath, value);
+      return extraFieldsContainer;
+    }
+
     Set<String> fieldPathsToDrop = _transformerConfig.getFieldPathsToDrop();
     if (null != fieldPathsToDrop && fieldPathsToDrop.contains(keyJsonPath)) {
       return extraFieldsContainer;
@@ -421,14 +430,14 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   }
 
   /**
-   * Generate an index token based on the provided key-value pair.
-   * The index token follows this format: "val:key".
-   * @param kv                            used to generate text index tokens
-   * @param indexTokens                   a list to store the generated index tokens
-   * @param mergedTextIndexTokenMaxLength which we enforce via truncation during token generation
+   * Generate an Lucene document based on the provided key-value pair.
+   * The index document follows this format: "val:key".
+   * @param kv                               used to generate text index documents
+   * @param indexDocuments                   a list to store the generated index documents
+   * @param mergedTextIndexDocumentMaxLength which we enforce via truncation during document generation
    */
-  public void generateTextIndexToken(Map.Entry<String, Object> kv, List<String> indexTokens,
-      Integer mergedTextIndexTokenMaxLength) {
+  public void generateTextIndexLuceneDocument(Map.Entry<String, Object> kv, List<String> indexDocuments,
+      Integer mergedTextIndexDocumentMaxLength) {
     String key = kv.getKey();
     String val;
     // To avoid redundant leading and tailing '"', only convert to JSON string if the value is a list or an array
@@ -442,46 +451,49 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
       val = kv.getValue().toString();
     }
 
-    if (key.length() + 1 > MAXIMUM_LUCENE_TOKEN_SIZE) {
-      _logger.error("The provided key's length is too long, text index token cannot be truncated");
+    // TODO: theoretically, the key length + 1 could cause integer overflow. But in reality, upstream message size
+    //  limit usually could not reach that high. We should revisit this if we see any issue.
+    if (key.length() + 1 > MAXIMUM_LUCENE_DOCUMENT_SIZE) {
+      _logger.error("The provided key's length is too long, text index document cannot be truncated");
       return;
     }
 
-    // Truncate the value to ensure the generated index token is less or equal to mergedTextIndexTokenMaxLength
-    // The value length should be the mergedTextIndexTokenMaxLength minus ":" character (length 1) minus key length
-    int valueTruncationLength = mergedTextIndexTokenMaxLength - 1 - key.length();
+    // Truncate the value to ensure the generated index document is less or equal to mergedTextIndexDocumentMaxLength
+    // The value length should be the mergedTextIndexDocumentMaxLength minus ":" character (length 1) minus key length
+    int valueTruncationLength = mergedTextIndexDocumentMaxLength - 1 - key.length();
     if (val.length() > valueTruncationLength) {
-      _realtimeMergedTextIndexTruncatedTokenSizeMeter = _serverMetrics
-          .addMeteredTableValue(_tableName, ServerMeter.REALTIME_MERGED_TEXT_IDX_TRUNCATED_TOKEN_SIZE,
-              key.length() + 1 + val.length(), _realtimeMergedTextIndexTruncatedTokenSizeMeter);
+      _realtimeMergedTextIndexTruncatedDocumentSizeMeter = _serverMetrics
+          .addMeteredTableValue(_tableName, ServerMeter.REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE,
+              key.length() + 1 + val.length(), _realtimeMergedTextIndexTruncatedDocumentSizeMeter);
       val = val.substring(0, valueTruncationLength);
     }
 
-    _mergedTextIndexTokenBytesCount += key.length() + 1 + val.length();
-    _mergedTextIndexTokenCount += 1;
-    _serverMetrics.setValueOfTableGauge(_tableName, ServerGauge.REALTIME_MERGED_TEXT_IDX_TOKEN_AVG_LEN,
-        _mergedTextIndexTokenBytesCount / _mergedTextIndexTokenCount);
+    _mergedTextIndexDocumentBytesCount += key.length() + 1 + val.length();
+    _mergedTextIndexDocumentCount += 1;
+    _serverMetrics.setValueOfTableGauge(_tableName, ServerGauge.REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN,
+        _mergedTextIndexDocumentBytesCount / _mergedTextIndexDocumentCount);
 
-    indexTokens.add(val + ":" + key);
+    indexDocuments.add(val + ":" + key);
   }
 
   /**
    * Implement shingling for the merged text index based on the provided key-value pair.
-   * Each shingled index token retains the format of a standard index token: "val:key". However, "val" now denotes a
-   * sliding window of characters on the value. The total length of each shingled index token
+   * Each shingled index document retains the format of a standard index document: "val:key". However, "val" now
+   * denotes a sliding window of characters on the value. The total length of each shingled index document
    * (key length + shingled value length + 1）must be less than or equal to shingleIndexMaxLength. The starting index
-   * of the sliding window for the value is increased by shinglingOverlapLength for every new shingled token.
-   * All shingle index tokens, except for the last one, should have the maximum possible length. If the minimum token
-   * length (shingling overlap length + key length + 1) exceeds the maximum Lucene token size
-   * (MAXIMUM_LUCENE_TOKEN_SIZE), shingling is disabled, and the value is truncated to match the maximum Lucene token
-   * size. If shingleIndexMaxLength is lower than the required minimum token length and also lower than the maximum
-   * Lucene token size, shingleIndexMaxLength is adjusted to match the maximum Lucene token size.
+   * of the sliding window for the value is increased by shinglingOverlapLength for every new shingled document.
+   * All shingle index documents, except for the last one, should have the maximum possible length. If the minimum
+   * document length (shingling overlap length + key length + 1) exceeds the maximum Lucene document size
+   * (MAXIMUM_LUCENE_DOCUMENT_SIZE), shingling is disabled, and the value is truncated to match the maximum Lucene
+   * document size. If shingleIndexMaxLength is lower than the required minimum document length and also lower than
+   * the maximum
+   * Lucene document size, shingleIndexMaxLength is adjusted to match the maximum Lucene document size.
    *
    * Note that the most important parameter, the shingleIndexOverlapLength, is the maximum search length that will yield
    * results with 100% accuracy.
    *
    * Example: key-> "key", value-> "0123456789ABCDEF", max length: 10, shingling overlap length: 3
-   * Generated tokens:
+   * Generated documents:
    * 012345:key
    *    345678:key
    *       6789AB:key
@@ -492,16 +504,16 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
    * Any query with a length between 4 and 6 (inclusive) has indeterminate accuracy.
    * E.g. for queries with length 5, "12345", "789AB" will hit, while "23456" will miss.
    *
-   * @param kv                        used to generate shingle text index tokens
-   * @param shingleIndexTokens        a list to store the generated shingle index tokens
-   * @param shingleIndexMaxLength     the maximum length of each shingle index token. Needs to be greater than the
+   * @param kv                        used to generate shingle text index documents
+   * @param shingleIndexDocuments        a list to store the generated shingle index documents
+   * @param shingleIndexMaxLength     the maximum length of each shingle index document. Needs to be greater than the
    *                                  length of the key and shingleIndexOverlapLength + 1, and must be lower or equal
-   *                                  to MAXIMUM_LUCENE_TOKEN_SIZE.
+   *                                  to MAXIMUM_LUCENE_DOCUMENT_SIZE.
    * @param shingleIndexOverlapLength the number of characters in the kv-pair's value shared by two adjacent shingle
-   *                                  index tokens. If null, the overlap length will be defaulted to half of the max
-   *                                  token length.
+   *                                  index documents. If null, the overlap length will be defaulted to half of the max
+   *                                  document length.
    */
-  public void generateShingleTextIndexToken(Map.Entry<String, Object> kv, List<String> shingleIndexTokens,
+  public void generateShingleTextIndexDocument(Map.Entry<String, Object> kv, List<String> shingleIndexDocuments,
       int shingleIndexMaxLength, int shingleIndexOverlapLength) {
     String key = kv.getKey();
     String val;
@@ -516,51 +528,51 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
       val = kv.getValue().toString();
     }
     final int valLength = val.length();
-    final int tokenSuffixLength = key.length() + 1;
-    final int minTokenLength = tokenSuffixLength + shingleIndexOverlapLength + 1;
+    final int documentSuffixLength = key.length() + 1;
+    final int minDocumentLength = documentSuffixLength + shingleIndexOverlapLength + 1;
 
     if (shingleIndexOverlapLength >= valLength) {
       if (_logger.isDebugEnabled()) {
         _logger.warn("The shingleIndexOverlapLength " + shingleIndexOverlapLength + " is longer than the value length "
-            + valLength + ". Shingling will not be applied since only one token will be generated.");
+            + valLength + ". Shingling will not be applied since only one document will be generated.");
       }
-      generateTextIndexToken(kv, shingleIndexTokens, shingleIndexMaxLength);
+      generateTextIndexLuceneDocument(kv, shingleIndexDocuments, shingleIndexMaxLength);
       return;
     }
 
-    if (minTokenLength > MAXIMUM_LUCENE_TOKEN_SIZE) {
-      _logger.debug("The minimum token length " + minTokenLength + " (" + MIN_TOKEN_LENGTH_DESCRIPTION + ") exceeds "
-          + "the limit of maximum Lucene token size " + MAXIMUM_LUCENE_TOKEN_SIZE + ". Value will be truncated and "
-          + "shingling will not be applied.");
-      generateTextIndexToken(kv, shingleIndexTokens, shingleIndexMaxLength);
+    if (minDocumentLength > MAXIMUM_LUCENE_DOCUMENT_SIZE) {
+      _logger.debug("The minimum document length " + minDocumentLength + " (" + MIN_DOCUMENT_LENGTH_DESCRIPTION + ") "
+          + " exceeds the limit of maximum Lucene document size " + MAXIMUM_LUCENE_DOCUMENT_SIZE + ". Value will be "
+          + "truncated and shingling will not be applied.");
+      generateTextIndexLuceneDocument(kv, shingleIndexDocuments, shingleIndexMaxLength);
       return;
     }
 
     // This logging becomes expensive if user accidentally sets a very low shingleIndexMaxLength
-    if (shingleIndexMaxLength < minTokenLength) {
-      _logger.debug("The shingleIndexMaxLength " + shingleIndexMaxLength + " is smaller than the minimum token length "
-          + minTokenLength + " (" + MIN_TOKEN_LENGTH_DESCRIPTION + "). Increasing the shingleIndexMaxLength to "
-          + "maximum Lucene token size " + MAXIMUM_LUCENE_TOKEN_SIZE + ".");
-      shingleIndexMaxLength = MAXIMUM_LUCENE_TOKEN_SIZE;
+    if (shingleIndexMaxLength < minDocumentLength) {
+      _logger.debug("The shingleIndexMaxLength " + shingleIndexMaxLength + " is smaller than the minimum document "
+          + "length " + minDocumentLength + " (" + MIN_DOCUMENT_LENGTH_DESCRIPTION + "). Increasing the "
+          + "shingleIndexMaxLength to maximum Lucene document size " + MAXIMUM_LUCENE_DOCUMENT_SIZE + ".");
+      shingleIndexMaxLength = MAXIMUM_LUCENE_DOCUMENT_SIZE;
     }
 
     // Shingle window slide length is the index position on the value which we shall advance on every iteration.
-    // We ensure shingleIndexMaxLength >= minTokenLength so that shingleWindowSlideLength >= 1.
-    int shingleWindowSlideLength = shingleIndexMaxLength - shingleIndexOverlapLength - tokenSuffixLength;
+    // We ensure shingleIndexMaxLength >= minDocumentLength so that shingleWindowSlideLength >= 1.
+    int shingleWindowSlideLength = shingleIndexMaxLength - shingleIndexOverlapLength - documentSuffixLength;
 
-    // Generate shingle index tokens
+    // Generate shingle index documents
     // When starting_idx + shingleIndexOverlapLength >= valLength, there are no new characters to capture, then we stop
-    // the shingle token generation loop.
+    // the shingle document generation loop.
     // We ensure that shingleIndexOverlapLength < valLength so that this loop will be entered at lease once.
     for (int i = 0; i + shingleIndexOverlapLength < valLength; i += shingleWindowSlideLength) {
-      String tokenValStr = val.substring(i, Math.min(i + shingleIndexMaxLength - tokenSuffixLength, valLength));
-      String shingleIndexToken = tokenValStr + ":" + key;
-      shingleIndexTokens.add(shingleIndexToken);
-      _mergedTextIndexTokenBytesCount += shingleIndexToken.length();
-      ++_mergedTextIndexTokenCount;
+      String documentValStr = val.substring(i, Math.min(i + shingleIndexMaxLength - documentSuffixLength, valLength));
+      String shingleIndexDocument = documentValStr + ":" + key;
+      shingleIndexDocuments.add(shingleIndexDocument);
+      _mergedTextIndexDocumentBytesCount += shingleIndexDocument.length();
+      ++_mergedTextIndexDocumentCount;
     }
-    _serverMetrics.setValueOfTableGauge(_tableName, ServerGauge.REALTIME_MERGED_TEXT_IDX_TOKEN_AVG_LEN,
-        _mergedTextIndexTokenBytesCount / _mergedTextIndexTokenCount);
+    _serverMetrics.setValueOfTableGauge(_tableName, ServerGauge.REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN,
+        _mergedTextIndexDocumentBytesCount / _mergedTextIndexDocumentCount);
   }
 
   /**
@@ -588,25 +600,25 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
   }
 
-  private List<String> getLuceneTokensFromMergedTextIndexMap(Map<String, Object> mergedTextIndexMap) {
-    final Integer mergedTextIndexTokenMaxLength = _transformerConfig.getMergedTextIndexTokenMaxLength();
+  private List<String> getLuceneDocumentsFromMergedTextIndexMap(Map<String, Object> mergedTextIndexMap) {
+    final Integer mergedTextIndexDocumentMaxLength = _transformerConfig.getMergedTextIndexDocumentMaxLength();
     final @Nullable
     Integer mergedTextIndexShinglingOverlapLength = _transformerConfig.getMergedTextIndexShinglingOverlapLength();
-    List<String> luceneTokens = new ArrayList<>();
+    List<String> luceneDocuments = new ArrayList<>();
     mergedTextIndexMap.entrySet().stream().filter(kv -> null != kv.getKey() && null != kv.getValue())
         .filter(kv -> !_transformerConfig.getMergedTextIndexPathToExclude().contains(kv.getKey())).filter(
         kv -> !base64ValueFilter(kv.getValue().toString().getBytes(),
-            _transformerConfig.getMergedTextIndexBinaryTokenDetectionMinLength())).filter(
+            _transformerConfig.getMergedTextIndexBinaryDocumentDetectionMinLength())).filter(
         kv -> _transformerConfig.getMergedTextIndexSuffixToExclude().stream()
             .anyMatch(suffix -> !kv.getKey().endsWith(suffix))).forEach(kv -> {
       if (null == mergedTextIndexShinglingOverlapLength) {
-        generateTextIndexToken(kv, luceneTokens, mergedTextIndexTokenMaxLength);
+        generateTextIndexLuceneDocument(kv, luceneDocuments, mergedTextIndexDocumentMaxLength);
       } else {
-        generateShingleTextIndexToken(kv, luceneTokens, mergedTextIndexTokenMaxLength,
+        generateShingleTextIndexDocument(kv, luceneDocuments, mergedTextIndexDocumentMaxLength,
             mergedTextIndexShinglingOverlapLength);
       }
     });
-    return luceneTokens;
+    return luceneDocuments;
   }
 }
 
@@ -689,8 +701,8 @@ class SchemaTreeNode {
   }
 
   public Object getValue(Object value) {
-    // If the field is a single value string field, but value is an array of collection, serialize it
-    // to prevent errors
+    // In {#link DataTypeTransformer}, for a field type as SingleValueField, it does not allow the input value as a
+    // collection or array. To prevent the error, we serialize the value to a string if the field is a string type.
     if (_fieldSpec != null && _fieldSpec.getDataType() == DataType.STRING && _fieldSpec.isSingleValueField()) {
       try {
         if (value instanceof Collection) {

@@ -50,27 +50,31 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   @JsonPropertyDescription("Array of flattened (dot-delimited) object paths to drop")
   private Set<String> _fieldPathsToDrop = new HashSet<>();
 
+  @JsonPropertyDescription("Array of flattened (dot-delimited) object paths not to traverse further and keep same as "
+      + "input. This will also skip building mergedTextIndex for the field.")
+  private Set<String> _fieldPathsToPreserveInput = new HashSet<>();
+
   @JsonPropertyDescription("Map from customized meaningful column name to json key path")
   private Map<String, String> _columnNameToJsonKeyPathMap = new HashMap<>();
 
   @JsonPropertyDescription("mergedTextIndex field")
   private String _mergedTextIndexField = "__mergedTextIndex";
 
-  @JsonPropertyDescription("mergedTextIndex token max length")
-  private int _mergedTextIndexTokenMaxLength = 32766;
+  @JsonPropertyDescription("mergedTextIndex document max length")
+  private int _mergedTextIndexDocumentMaxLength = 32766;
 
   @JsonPropertyDescription(
-      "Recall that merged text index token is in the format of <value:key>. "
+      "Recall that merged text index document is in the format of <value:key>. "
           + "The mergedTextIndex shingling overlap length refers to the "
           + "maximum search length of the value that will yield results with "
           + "100% accuracy. If the value is null, shingle index will be turned off "
-          + "and the value will be truncated such that the token is equal to "
-          + "_mergedTextIndexTokenMaxLength"
+          + "and the value will be truncated such that the document is equal to "
+          + "_mergedTextIndexDocumentMaxLength"
   )
   private @Nullable Integer _mergedTextIndexShinglingOverlapLength = null;
 
-  @JsonPropertyDescription("mergedTextIndex binary token detection minimum length")
-  private Integer _mergedTextIndexBinaryTokenDetectionMinLength = 512;
+  @JsonPropertyDescription("mergedTextIndex binary document detection minimum length")
+  private Integer _mergedTextIndexBinaryDocumentDetectionMinLength = 512;
 
   @JsonPropertyDescription("Array of paths to exclude from merged text index.")
   private Set<String> _mergedTextIndexPathToExclude = new HashSet<>();
@@ -90,11 +94,12 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
       @JsonProperty("unindexableExtrasField") @Nullable String unindexableExtrasField,
       @JsonProperty("unindexableFieldSuffix") @Nullable String unindexableFieldSuffix,
       @JsonProperty("fieldPathsToDrop") @Nullable Set<String> fieldPathsToDrop,
+      @JsonProperty("fieldPathsToKeepSameAsInput") @Nullable Set<String> fieldPathsToPreserveInput,
       @JsonProperty("mergedTextIndexField") @Nullable String mergedTextIndexField,
-      @JsonProperty("mergedTextIndexTokenMaxLength") @Nullable Integer mergedTextIndexTokenMaxLength,
+      @JsonProperty("mergedTextIndexDocumentMaxLength") @Nullable Integer mergedTextIndexDocumentMaxLength,
       @JsonProperty("mergedTextIndexShinglingOverlapLength") @Nullable Integer mergedTextIndexShinglingOverlapLength,
-      @JsonProperty("mergedTextIndexBinaryTokenDetectionMinLength")
-      @Nullable Integer mergedTextIndexBinaryTokenDetectionMinLength,
+      @JsonProperty("mergedTextIndexBinaryDocumentDetectionMinLength")
+      @Nullable Integer mergedTextIndexBinaryDocumentDetectionMinLength,
       @JsonProperty("mergedTextIndexPathToExclude") @Nullable Set<String> mergedTextIndexPathToExclude,
       @JsonProperty("fieldsToDoubleIngest") @Nullable Set<String> fieldsToDoubleIngest
   ) {
@@ -104,11 +109,12 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
     setUnindexableExtrasField(unindexableExtrasField);
     setUnindexableFieldSuffix(unindexableFieldSuffix);
     setFieldPathsToDrop(fieldPathsToDrop);
+    setFieldPathsToPreserveInput(fieldPathsToPreserveInput);
 
     setMergedTextIndexField(mergedTextIndexField);
-    setMergedTextIndexTokenMaxLength(mergedTextIndexTokenMaxLength);
-    setMergedTextIndexShinglingTokenOverlapLength(mergedTextIndexShinglingOverlapLength);
-    setMergedTextIndexBinaryTokenDetectionMinLength(mergedTextIndexBinaryTokenDetectionMinLength);
+    setMergedTextIndexDocumentMaxLength(mergedTextIndexDocumentMaxLength);
+    setMergedTextIndexShinglingDocumentOverlapLength(mergedTextIndexShinglingOverlapLength);
+    setMergedTextIndexBinaryDocumentDetectionMinLength(mergedTextIndexBinaryDocumentDetectionMinLength);
     setMergedTextIndexPathToExclude(mergedTextIndexPathToExclude);
     setFieldsToDoubleIngest(fieldsToDoubleIngest);
   }
@@ -123,7 +129,7 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   }
 
   public SchemaConformingTransformerV2Config setIndexableExtrasField(String indexableExtrasField) {
-    _indexableExtrasField = (null == indexableExtrasField) ? _indexableExtrasField : indexableExtrasField;
+    _indexableExtrasField = indexableExtrasField == null ? _indexableExtrasField : indexableExtrasField;
     return this;
   }
 
@@ -137,7 +143,7 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   }
 
   public SchemaConformingTransformerV2Config setUnindexableExtrasField(String unindexableExtrasField) {
-    _unindexableExtrasField = (null == unindexableExtrasField) ? _unindexableExtrasField : unindexableExtrasField;
+    _unindexableExtrasField = unindexableExtrasField == null ? _unindexableExtrasField : unindexableExtrasField;
     return this;
   }
 
@@ -146,7 +152,7 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   }
 
   public SchemaConformingTransformerV2Config setUnindexableFieldSuffix(String unindexableFieldSuffix) {
-    _unindexableFieldSuffix = (null == unindexableFieldSuffix) ? _unindexableFieldSuffix : unindexableFieldSuffix;
+    _unindexableFieldSuffix = unindexableFieldSuffix == null ? _unindexableFieldSuffix : unindexableFieldSuffix;
     return this;
   }
 
@@ -155,7 +161,17 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   }
 
   public SchemaConformingTransformerV2Config setFieldPathsToDrop(Set<String> fieldPathsToDrop) {
-    _fieldPathsToDrop = (null == fieldPathsToDrop) ? _fieldPathsToDrop : fieldPathsToDrop;
+    _fieldPathsToDrop = fieldPathsToDrop == null ? _fieldPathsToDrop : fieldPathsToDrop;
+    return this;
+  }
+
+  public Set<String> getFieldPathsToPreserveInput() {
+    return _fieldPathsToPreserveInput;
+  }
+
+  public SchemaConformingTransformerV2Config setFieldPathsToPreserveInput(Set<String> fieldPathsToPreserveInput) {
+    _fieldPathsToPreserveInput = fieldPathsToPreserveInput == null ? _fieldPathsToPreserveInput
+        : fieldPathsToPreserveInput;
     return this;
   }
 
@@ -165,7 +181,7 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
 
   public SchemaConformingTransformerV2Config setColumnNameToJsonKeyPathMap(
       Map<String, String> columnNameToJsonKeyPathMap) {
-    _columnNameToJsonKeyPathMap = (null == columnNameToJsonKeyPathMap)
+    _columnNameToJsonKeyPathMap = columnNameToJsonKeyPathMap == null
         ? _columnNameToJsonKeyPathMap : columnNameToJsonKeyPathMap;
     return this;
   }
@@ -175,19 +191,19 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   }
 
   public SchemaConformingTransformerV2Config setMergedTextIndexField(String mergedTextIndexField) {
-    _mergedTextIndexField = (null == mergedTextIndexField) ? _mergedTextIndexField : mergedTextIndexField;
+    _mergedTextIndexField = mergedTextIndexField == null ? _mergedTextIndexField : mergedTextIndexField;
     return this;
   }
 
-  public Integer getMergedTextIndexTokenMaxLength() {
-    return _mergedTextIndexTokenMaxLength;
+  public Integer getMergedTextIndexDocumentMaxLength() {
+    return _mergedTextIndexDocumentMaxLength;
   }
 
-  public SchemaConformingTransformerV2Config setMergedTextIndexTokenMaxLength(
-      Integer mergedTextIndexTokenMaxLength
+  public SchemaConformingTransformerV2Config setMergedTextIndexDocumentMaxLength(
+      Integer mergedTextIndexDocumentMaxLength
   ) {
-    _mergedTextIndexTokenMaxLength = (null == mergedTextIndexTokenMaxLength)
-        ? _mergedTextIndexTokenMaxLength : mergedTextIndexTokenMaxLength;
+    _mergedTextIndexDocumentMaxLength = mergedTextIndexDocumentMaxLength == null
+        ? _mergedTextIndexDocumentMaxLength : mergedTextIndexDocumentMaxLength;
     return this;
   }
 
@@ -195,20 +211,20 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
     return _mergedTextIndexShinglingOverlapLength;
   }
 
-  public SchemaConformingTransformerV2Config setMergedTextIndexShinglingTokenOverlapLength(
+  public SchemaConformingTransformerV2Config setMergedTextIndexShinglingDocumentOverlapLength(
       Integer mergedTextIndexShinglingOverlapLength) {
     _mergedTextIndexShinglingOverlapLength = mergedTextIndexShinglingOverlapLength;
     return this;
   }
 
-  public Integer getMergedTextIndexBinaryTokenDetectionMinLength() {
-    return _mergedTextIndexBinaryTokenDetectionMinLength;
+  public Integer getMergedTextIndexBinaryDocumentDetectionMinLength() {
+    return _mergedTextIndexBinaryDocumentDetectionMinLength;
   }
 
-  public SchemaConformingTransformerV2Config setMergedTextIndexBinaryTokenDetectionMinLength(
-      Integer mergedTextIndexBinaryTokenDetectionMinLength) {
-    _mergedTextIndexBinaryTokenDetectionMinLength = (null == mergedTextIndexBinaryTokenDetectionMinLength)
-        ? _mergedTextIndexBinaryTokenDetectionMinLength : mergedTextIndexBinaryTokenDetectionMinLength;
+  public SchemaConformingTransformerV2Config setMergedTextIndexBinaryDocumentDetectionMinLength(
+      Integer mergedTextIndexBinaryDocumentDetectionMinLength) {
+    _mergedTextIndexBinaryDocumentDetectionMinLength = mergedTextIndexBinaryDocumentDetectionMinLength == null
+        ? _mergedTextIndexBinaryDocumentDetectionMinLength : mergedTextIndexBinaryDocumentDetectionMinLength;
     return this;
   }
 
@@ -221,7 +237,7 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   }
 
   public SchemaConformingTransformerV2Config setMergedTextIndexPathToExclude(Set<String> mergedTextIndexPathToExclude) {
-    _mergedTextIndexPathToExclude = (null == mergedTextIndexPathToExclude)
+    _mergedTextIndexPathToExclude = mergedTextIndexPathToExclude == null
         ? _mergedTextIndexPathToExclude : mergedTextIndexPathToExclude;
     return this;
   }
@@ -231,7 +247,7 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   }
 
   public SchemaConformingTransformerV2Config setFieldsToDoubleIngest(Set<String> fieldsToDoubleIngest) {
-    _fieldsToDoubleIngest = (null == fieldsToDoubleIngest) ? _fieldsToDoubleIngest : fieldsToDoubleIngest;
+    _fieldsToDoubleIngest = fieldsToDoubleIngest == null ? _fieldsToDoubleIngest : fieldsToDoubleIngest;
     return this;
   }
 }
