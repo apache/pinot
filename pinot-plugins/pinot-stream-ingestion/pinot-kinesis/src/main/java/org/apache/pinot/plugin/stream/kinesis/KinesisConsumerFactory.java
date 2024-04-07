@@ -20,7 +20,6 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -31,10 +30,6 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
  */
 public class KinesisConsumerFactory extends StreamConsumerFactory {
 
-  @Override
-  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    throw new UnsupportedOperationException();
-  }
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
     return new KinesisStreamMetadataProvider(clientId, _streamConfig);

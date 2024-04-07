@@ -16,26 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.pulsar;
+package org.apache.pinot.plugin.stream.kinesis;
 
 import java.util.List;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.MessageBatch;
+import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 
 
 /**
- * A {@link MessageBatch} for collecting messages from pulsar topic
+ * A {@link MessageBatch} for collecting records from the Kinesis stream
  */
-public class PulsarMessageBatch implements MessageBatch<byte[]> {
+public class KinesisMessageBatch implements MessageBatch<byte[]> {
   private final List<BytesStreamMessage> _messages;
-  private final MessageIdStreamOffset _offsetOfNextBatch;
-  private final boolean _endOfTopic;
+  private final KinesisPartitionGroupOffset _offsetOfNextBatch;
+  private final boolean _endOfShard;
 
-  public PulsarMessageBatch(List<BytesStreamMessage> messages, MessageIdStreamOffset offsetOfNextBatch,
-      boolean endOfTopic) {
+  public KinesisMessageBatch(List<BytesStreamMessage> messages, KinesisPartitionGroupOffset offsetOfNextBatch,
+      boolean endOfShard) {
     _messages = messages;
     _offsetOfNextBatch = offsetOfNextBatch;
-    _endOfTopic = endOfTopic;
+    _endOfShard = endOfShard;
   }
 
   @Override
@@ -49,12 +50,12 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
   }
 
   @Override
-  public MessageIdStreamOffset getOffsetOfNextBatch() {
+  public StreamPartitionMsgOffset getOffsetOfNextBatch() {
     return _offsetOfNextBatch;
   }
 
   @Override
   public boolean isEndOfPartitionGroup() {
-    return _endOfTopic;
+    return _endOfShard;
   }
 }
