@@ -34,7 +34,6 @@
 
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <localstack-utils.version>0.2.23</localstack-utils.version>
     <testcontainers.version>1.19.8</testcontainers.version>
   </properties>
 
@@ -310,12 +309,6 @@
       <groupId>org.testcontainers</groupId>
       <artifactId>kafka</artifactId>
       <version>${testcontainers.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>cloud.localstack</groupId>
-      <artifactId>localstack-utils</artifactId>
-      <version>${localstack-utils.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
