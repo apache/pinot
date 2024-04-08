@@ -56,6 +56,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
@@ -464,7 +465,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     }
 
     @Override
-    public KafkaPartitionLevelConsumer createPartitionGroupConsumer(String clientId,
+    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
         PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
       /*
        * The segment data manager is creating a consumer to consume rows into a segment.
