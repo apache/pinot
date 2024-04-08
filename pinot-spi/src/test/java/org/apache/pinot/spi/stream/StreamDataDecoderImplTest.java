@@ -35,7 +35,7 @@ public class StreamDataDecoderImplTest {
   private static final String NAME_FIELD = "name";
   private static final String AGE_HEADER_KEY = "age";
   private static final String SEQNO_RECORD_METADATA = "seqNo";
-  private final Schema _dummyTableSchema = new Schema.SchemaBuilder().setSchemaName("SampleRecord")
+  private static final Schema dummyTableSchema = new Schema.SchemaBuilder().setSchemaName("SampleRecord")
       .addSingleValueDimension("id", FieldSpec.DataType.INT)
       .addSingleValueDimension("name", FieldSpec.DataType.STRING)
       .addSingleValueDimension("email", FieldSpec.DataType.STRING)
@@ -45,7 +45,7 @@ public class StreamDataDecoderImplTest {
   public void testDecodeValueOnly()
       throws Exception {
     TestDecoder messageDecoder = new TestDecoder();
-    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "", _dummyTableSchema);
+    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "", dummyTableSchema);
     String value = "Alice";
     BytesStreamMessage message = new BytesStreamMessage(value.getBytes(StandardCharsets.UTF_8));
     StreamDataDecoderResult result = new StreamDataDecoderImpl(messageDecoder).decode(message);
@@ -62,7 +62,7 @@ public class StreamDataDecoderImplTest {
   public void testDecodeKeyAndHeaders()
       throws Exception {
     TestDecoder messageDecoder = new TestDecoder();
-    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "", _dummyTableSchema);
+    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "", dummyTableSchema);
     String value = "Alice";
     String key = "id-1";
     GenericRow headers = new GenericRow();
@@ -89,7 +89,7 @@ public class StreamDataDecoderImplTest {
   public void testNoExceptionIsThrown()
       throws Exception {
     ThrowingDecoder messageDecoder = new ThrowingDecoder();
-    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "", _dummyTableSchema);
+    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "", dummyTableSchema);
     String value = "Alice";
     BytesStreamMessage message = new BytesStreamMessage(value.getBytes(StandardCharsets.UTF_8));
     StreamDataDecoderResult result = new StreamDataDecoderImpl(messageDecoder).decode(message);
