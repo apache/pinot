@@ -48,7 +48,7 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     String topicName = _config.getPulsarTopicName();
     try {
       List<String> partitions = _pulsarClient.getPartitionsForTopic(topicName).get();
-      _reader = _pulsarClient.newReader().topic(partitions.get(partition)).startMessageId(MessageId.latest)
+      _reader = _pulsarClient.newReader().topic(partitions.get(partition)).startMessageId(MessageId.earliest)
           .startMessageIdInclusive().create();
     } catch (Exception e) {
       throw new RuntimeException(
