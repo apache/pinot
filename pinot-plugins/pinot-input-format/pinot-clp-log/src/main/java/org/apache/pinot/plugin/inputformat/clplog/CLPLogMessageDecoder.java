@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
@@ -43,7 +44,7 @@ public class CLPLogMessageDecoder implements StreamMessageDecoder<byte[]> {
   private RecordExtractor<Map<String, Object>> _recordExtractor;
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
       throws Exception {
     String recordExtractorClass = null;
     String recordExtractorConfigClass = null;

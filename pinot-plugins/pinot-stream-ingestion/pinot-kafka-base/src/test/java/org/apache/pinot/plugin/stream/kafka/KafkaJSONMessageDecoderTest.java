@@ -76,10 +76,15 @@ public class KafkaJSONMessageDecoderTest {
 
   private void testJsonDecoder(Map<String, FieldSpec.DataType> sourceFields)
       throws Exception {
+    Schema dummyTableSchema = new Schema.SchemaBuilder().setSchemaName("SampleRecord")
+        .addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("email", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("friends", FieldSpec.DataType.STRING).build();
     try (BufferedReader reader = new BufferedReader(
         new FileReader(getClass().getClassLoader().getResource("data/test_sample_data.json").getFile()))) {
       KafkaJSONMessageDecoder decoder = new KafkaJSONMessageDecoder();
-      decoder.init(new HashMap<>(), sourceFields.keySet(), "testTopic");
+      decoder.init(new HashMap<>(), sourceFields.keySet(), "testTopic", dummyTableSchema);
       GenericRow r = new GenericRow();
       String line = reader.readLine();
       while (line != null) {

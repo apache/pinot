@@ -24,6 +24,8 @@ import com.google.common.collect.ImmutableSet;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
@@ -34,12 +36,18 @@ import static org.testng.Assert.assertNull;
 
 public class CSVMessageDecoderTest {
 
+  private final Schema _dummyTableSchema = new Schema.SchemaBuilder().setSchemaName("SampleRecord")
+      .addSingleValueDimension("id", FieldSpec.DataType.INT)
+      .addSingleValueDimension("name", FieldSpec.DataType.STRING)
+      .addSingleValueDimension("email", FieldSpec.DataType.STRING)
+      .addMultiValueDimension("friends", FieldSpec.DataType.STRING).build();
+
   @Test
   public void testHappyCase()
       throws Exception {
     Map<String, String> decoderProps = getStandardDecoderProps();
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "", _dummyTableSchema);
     String incomingRecord = "Alice;18;F";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
@@ -58,7 +66,7 @@ public class CSVMessageDecoderTest {
     Map<String, String> decoderProps = getStandardDecoderProps();
     decoderProps.put("header", "name;age;gender;subjects");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "", _dummyTableSchema);
     String incomingRecord = "Alice;18;F;maths,German,history";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
@@ -81,7 +89,7 @@ public class CSVMessageDecoderTest {
     decoderProps.put("delimiter", ",");
     decoderProps.put("commentMarker", "#");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "", _dummyTableSchema);
     String incomingRecord = "#Alice,18,F";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
@@ -94,7 +102,7 @@ public class CSVMessageDecoderTest {
     decoderProps.remove("header");
     decoderProps.put("delimiter", ",");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender"), "", _dummyTableSchema);
     String incomingRecord = "name,age,gender\nAlice,18,F";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
@@ -115,7 +123,7 @@ public class CSVMessageDecoderTest {
     decoderProps.put("header", "name;age;gender;subjects");
     decoderProps.put("delimiter", ";");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "", _dummyTableSchema);
     String incomingRecord = "Alice;18;F;mat\\;hs";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
@@ -138,7 +146,7 @@ public class CSVMessageDecoderTest {
     decoderProps.put("delimiter", ";");
     decoderProps.put("nullStringValue", "null");
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "", _dummyTableSchema);
     String incomingRecord = "Alice;null;F;null";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);
@@ -156,7 +164,7 @@ public class CSVMessageDecoderTest {
       throws Exception {
     Map<String, String> decoderProps = ImmutableMap.of();
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
-    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "", _dummyTableSchema);
     String incomingRecord = "name,age,gender,subjects\nAlice,18,F,maths";
     GenericRow destination = new GenericRow();
     messageDecoder.decode(incomingRecord.getBytes(StandardCharsets.UTF_8), destination);

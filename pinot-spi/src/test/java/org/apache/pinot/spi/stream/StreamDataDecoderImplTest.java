@@ -24,6 +24,8 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -33,12 +35,17 @@ public class StreamDataDecoderImplTest {
   private static final String NAME_FIELD = "name";
   private static final String AGE_HEADER_KEY = "age";
   private static final String SEQNO_RECORD_METADATA = "seqNo";
+  private final Schema _dummyTableSchema = new Schema.SchemaBuilder().setSchemaName("SampleRecord")
+      .addSingleValueDimension("id", FieldSpec.DataType.INT)
+      .addSingleValueDimension("name", FieldSpec.DataType.STRING)
+      .addSingleValueDimension("email", FieldSpec.DataType.STRING)
+      .addMultiValueDimension("friends", FieldSpec.DataType.STRING).build();
 
   @Test
   public void testDecodeValueOnly()
       throws Exception {
     TestDecoder messageDecoder = new TestDecoder();
-    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "");
+    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "", _dummyTableSchema);
     String value = "Alice";
     BytesStreamMessage message = new BytesStreamMessage(value.getBytes(StandardCharsets.UTF_8));
     StreamDataDecoderResult result = new StreamDataDecoderImpl(messageDecoder).decode(message);
@@ -55,7 +62,7 @@ public class StreamDataDecoderImplTest {
   public void testDecodeKeyAndHeaders()
       throws Exception {
     TestDecoder messageDecoder = new TestDecoder();
-    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "");
+    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "", _dummyTableSchema);
     String value = "Alice";
     String key = "id-1";
     GenericRow headers = new GenericRow();
@@ -82,7 +89,7 @@ public class StreamDataDecoderImplTest {
   public void testNoExceptionIsThrown()
       throws Exception {
     ThrowingDecoder messageDecoder = new ThrowingDecoder();
-    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "");
+    messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "", _dummyTableSchema);
     String value = "Alice";
     BytesStreamMessage message = new BytesStreamMessage(value.getBytes(StandardCharsets.UTF_8));
     StreamDataDecoderResult result = new StreamDataDecoderImpl(messageDecoder).decode(message);
@@ -91,10 +98,18 @@ public class StreamDataDecoderImplTest {
     Assert.assertNull(result.getResult());
   }
 
+  private Schema getPinotSchema() {
+    return new Schema.SchemaBuilder().setSchemaName("SampleRecord")
+        .addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("email", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("friends", FieldSpec.DataType.STRING).build();
+  }
+
   class ThrowingDecoder implements StreamMessageDecoder<byte[]> {
 
     @Override
-    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
         throws Exception {
     }
 
@@ -113,7 +128,7 @@ public class StreamDataDecoderImplTest {
 
   class TestDecoder implements StreamMessageDecoder<byte[]> {
     @Override
-    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
         throws Exception {
     }
 
