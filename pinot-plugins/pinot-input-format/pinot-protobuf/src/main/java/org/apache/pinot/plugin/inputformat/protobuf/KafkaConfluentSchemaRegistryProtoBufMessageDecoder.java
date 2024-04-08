@@ -38,6 +38,7 @@ import org.apache.kafka.common.config.SslConfigs;
 import org.apache.kafka.common.config.types.Password;
 import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.security.ssl.DefaultSslEngineFactory;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -106,6 +107,12 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
       restService.setSslSocketFactory(sslFactory.sslContext().getSocketFactory());
     }
     return restService;
+  }
+
+  @Override
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
+      throws Exception {
+    init(props, fieldsToRead, topicName);
   }
 
   @Override

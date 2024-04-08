@@ -39,6 +39,7 @@ import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
@@ -84,6 +85,12 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final float SCHEMA_FETCH_RETRY_EXPONENTIAL_BACKOFF_FACTOR = 2.0f;
 
   private String[] _schemaRegistryUrls;
+
+  @Override
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
+      throws Exception {
+    init(props, fieldsToRead, topicName);
+  }
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)

@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.slf4j.Logger;
@@ -45,6 +46,12 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
   private ProtoBufRecordExtractor _recordExtractor;
   private String _protoClassName;
   private Message.Builder _builder;
+
+  @Override
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
+      throws Exception {
+    init(props, fieldsToRead, topicName);
+  }
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)

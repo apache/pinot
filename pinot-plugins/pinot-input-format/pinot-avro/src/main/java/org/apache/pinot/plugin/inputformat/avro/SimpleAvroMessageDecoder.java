@@ -28,6 +28,7 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
@@ -53,6 +54,11 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private BinaryDecoder _binaryDecoderToReuse;
   private GenericData.Record _avroRecordToReuse;
 
+  @Override
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
+      throws Exception {
+    init(props, fieldsToRead, topicName);
+  }
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {

@@ -21,6 +21,7 @@ package org.apache.pinot.core.realtime.impl.fakestream;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 
@@ -32,6 +33,11 @@ public class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
+  }
+
+  @Override
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
+      throws Exception {
   }
 
   @Override

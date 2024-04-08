@@ -1505,7 +1505,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
     try {
-      StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(_streamConfig, fieldsToRead);
+      StreamMessageDecoder streamMessageDecoder = StreamDecoderProvider.create(_streamConfig, fieldsToRead, _schema);
       _streamDataDecoder = new StreamDataDecoderImpl(streamMessageDecoder);
     } catch (Exception e) {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,

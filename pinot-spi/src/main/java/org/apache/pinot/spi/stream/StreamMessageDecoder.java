@@ -23,6 +23,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -46,8 +47,24 @@ public interface StreamMessageDecoder<T> {
    * @param topicName Topic name of the stream
    * @throws Exception If an error occurs
    */
+  @Deprecated
   void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception;
+
+  /**
+   * Initializes the decoder. This is the new interface that should be implemented by all decoders.
+   *
+   * @param props Decoder properties extracted from the {@link StreamConfig}
+   * @param fieldsToRead The fields to read from the source stream. If blank, reads all fields (only for AVRO/JSON
+   *                     currently)
+   * @param topicName Topic name of the stream
+   * @param tableSchema Pinot schema of the table
+   * @throws Exception If an error occurs
+   */
+  default void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
+      throws Exception{
+    throw new UnsupportedOperationException("This method is not supported.");
+  }
 
   /**
    * Decodes a row.
