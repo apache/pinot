@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.retention;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -43,15 +42,13 @@ import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.mockito.ArgumentMatchers;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_DATABASE;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class RetentionManagerTest {
@@ -60,8 +57,7 @@ public class RetentionManagerTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TEST_TABLE_NAME);
 
-  private void testDifferentTimeUnits(long pastTimeStamp, TimeUnit timeUnit, long dayAfterTomorrowTimeStamp)
-      throws Exception {
+  private void testDifferentTimeUnits(long pastTimeStamp, TimeUnit timeUnit, long dayAfterTomorrowTimeStamp) {
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
     // Create metadata for 10 segments really old, that will be removed by the retention manager.
     final int numOlderSegments = 10;
@@ -105,8 +101,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithMinutes()
-      throws Exception {
+  public void testRetentionWithMinutes() {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
     final long pastMinutesSinceEpoch = 22383360L;
@@ -114,8 +109,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithSeconds()
-      throws Exception {
+  public void testRetentionWithSeconds() {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long secondsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60;
     final long pastSecondsSinceEpoch = 1343001600L;
@@ -123,8 +117,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithMillis()
-      throws Exception {
+  public void testRetentionWithMillis() {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long millisSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60 * 1000;
     final long pastMillisSinceEpoch = 1343001600000L;
@@ -132,8 +125,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithHours()
-      throws Exception {
+  public void testRetentionWithHours() {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long hoursSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24;
     final long pastHoursSinceEpoch = 373056L;
@@ -141,8 +133,7 @@ public class RetentionManagerTest {
   }
 
   @Test
-  public void testRetentionWithDays()
-      throws Exception {
+  public void testRetentionWithDays() {
     final long daysSinceEpochTimeStamp = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long pastDaysSinceEpoch = 15544L;
     testDifferentTimeUnits(pastDaysSinceEpoch, TimeUnit.DAYS, daysSinceEpochTimeStamp);
@@ -161,10 +152,8 @@ public class RetentionManagerTest {
 
   private void setupPinotHelixResourceManager(TableConfig tableConfig, final List<String> removedSegments,
       PinotHelixResourceManager resourceManager, LeadControllerManager leadControllerManager) {
-    final String tableNameWithType = tableConfig.getTableName();
-    when(resourceManager.getDatabaseNames())
-        .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
-    when(resourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(Collections.singletonList(tableNameWithType));
+    String tableNameWithType = tableConfig.getTableName();
+    when(resourceManager.getAllTables()).thenReturn(List.of(tableNameWithType));
 
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
@@ -172,38 +161,27 @@ public class RetentionManagerTest {
     SegmentDeletionManager deletionManager = mock(SegmentDeletionManager.class);
     // Ignore the call to SegmentDeletionManager.removeAgedDeletedSegments. we only test that the call is made once per
     // run of the retention manager
-    doAnswer(new Answer() {
-      @Override
-      public Void answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
-        return null;
-      }
-    }).when(deletionManager).removeAgedDeletedSegments(leadControllerManager);
+    doAnswer(invocationOnMock -> null).when(deletionManager).removeAgedDeletedSegments(leadControllerManager);
     when(resourceManager.getSegmentDeletionManager()).thenReturn(deletionManager);
 
     // If and when PinotHelixResourceManager.deleteSegments() is invoked, make sure that the segments deleted
     // are exactly the same as the ones we expect to be deleted.
-    doAnswer(new Answer() {
-      @Override
-      public Object answer(InvocationOnMock invocationOnMock)
-          throws Throwable {
-        Object[] args = invocationOnMock.getArguments();
-        String tableNameArg = (String) args[0];
-        Assert.assertEquals(tableNameArg, tableNameWithType);
-        List<String> segmentListArg = (List<String>) args[1];
-        Assert.assertEquals(segmentListArg.size(), removedSegments.size());
-        for (String segmentName : removedSegments) {
-          Assert.assertTrue(segmentListArg.contains(segmentName));
-        }
-        return null;
+    doAnswer(invocationOnMock -> {
+      Object[] args = invocationOnMock.getArguments();
+      String tableNameArg = (String) args[0];
+      assertEquals(tableNameArg, tableNameWithType);
+      List<String> segmentListArg = (List<String>) args[1];
+      assertEquals(segmentListArg.size(), removedSegments.size());
+      for (String segmentName : removedSegments) {
+        assertTrue(segmentListArg.contains(segmentName));
       }
-    }).when(resourceManager).deleteSegments(anyString(), ArgumentMatchers.anyList());
+      return null;
+    }).when(resourceManager).deleteSegments(anyString(), anyList());
   }
 
   // This test makes sure that we clean up the segments marked OFFLINE in realtime for more than 7 days
   @Test
-  public void testRealtimeLLCCleanup()
-      throws Exception {
+  public void testRealtimeLLCCleanup() {
     final int initialNumSegments = 8;
     final long now = System.currentTimeMillis();
 
@@ -237,8 +215,7 @@ public class RetentionManagerTest {
 
   // This test makes sure that we do not clean up last llc completed segments
   @Test
-  public void testRealtimeLastLLCCleanup()
-      throws Exception {
+  public void testRealtimeLastLLCCleanup() {
     final long now = System.currentTimeMillis();
     final int replicaCount = 1;
 
