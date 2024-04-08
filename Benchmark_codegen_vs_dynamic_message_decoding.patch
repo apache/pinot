@@ -1,0 +1,833 @@
+Subject: [PATCH] Benchmark codegen vs dynamic message decoding
+---
+Index: pinot-plugins/pinot-input-format/pinot-protobuf/pom.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pinot-plugins/pinot-input-format/pinot-protobuf/pom.xml b/pinot-plugins/pinot-input-format/pinot-protobuf/pom.xml
+--- a/pinot-plugins/pinot-input-format/pinot-protobuf/pom.xml	(revision 3397986ada9b3f978c7d3fa6492986414e4a11d4)
++++ b/pinot-plugins/pinot-input-format/pinot-protobuf/pom.xml	(revision 89a7660bd04691415cc35291ff290a4cf31277cb)
+@@ -54,6 +54,11 @@
+       <groupId>com.google.protobuf</groupId>
+       <artifactId>protobuf-java</artifactId>
+     </dependency>
++    <!-- https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java-util -->
++    <dependency>
++      <groupId>com.google.protobuf</groupId>
++      <artifactId>protobuf-java-util</artifactId>
++    </dependency>
+     <dependency>
+       <groupId>com.github.os72</groupId>
+       <artifactId>protobuf-dynamic</artifactId>
+@@ -158,6 +163,24 @@
+             <goals>
+               <goal>test-compile</goal>
+             </goals>
++          </execution>
++        </executions>
++      </plugin>
++      <plugin>
++        <groupId>com.github.os72</groupId>
++        <artifactId>protoc-jar-maven-plugin</artifactId>
++        <version>3.11.4</version>
++        <executions>
++          <execution>
++            <phase>generate-sources</phase>
++            <goals>
++              <goal>run</goal>
++            </goals>
++            <configuration>
++              <optimizeCodegen>false</optimizeCodegen>
++              <protocVersion>3.23.0</protocVersion>
++              <includeStdTypes>true</includeStdTypes>
++            </configuration>
+           </execution>
+         </executions>
+       </plugin>
+Index: pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufCodeGenTestMessageDecoder.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufCodeGenTestMessageDecoder.java b/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufCodeGenTestMessageDecoder.java
+new file mode 100644
+--- /dev/null	(revision 89a7660bd04691415cc35291ff290a4cf31277cb)
++++ b/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufCodeGenTestMessageDecoder.java	(revision 89a7660bd04691415cc35291ff290a4cf31277cb)
+@@ -0,0 +1,76 @@
++package org.apache.pinot.plugin.inputformat.protobuf;
++
++import com.google.common.base.Preconditions;
++import com.google.protobuf.GeneratedMessageV3;
++import com.google.protobuf.Message;
++import java.io.File;
++import java.net.URL;
++import java.net.URLClassLoader;
++import java.util.Arrays;
++import java.util.Map;
++import java.util.Set;
++import org.apache.pinot.spi.data.readers.GenericRow;
++import org.apache.pinot.spi.stream.StreamMessageDecoder;
++import org.jetbrains.annotations.Nullable;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++
++public class ProtoBufCodeGenTestMessageDecoder implements StreamMessageDecoder<byte[]> {
++  private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufCodeGenTestMessageDecoder.class);
++
++  public static final String PROTOBUF_JAR_FILE_PATH = "descriptorFile";
++  public static final String PROTO_CLASS_NAME = "protoClassName";
++
++  private ProtobufRecorderUpdateMessageExtractor _recordExtractor;
++  private Message.Builder _builder;
++  private Set<String> _fields;
++
++  @Override
++  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
++      throws Exception {
++    Preconditions.checkState(props.containsKey(PROTOBUF_JAR_FILE_PATH),
++        "Protocol Buffer schema jar file must be provided");
++    String protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
++    String jarPath = props.getOrDefault(PROTOBUF_JAR_FILE_PATH, "");
++    Class<?> cls = loadProtobufClass(jarPath, protoClassName);
++
++    try {
++      // Check if the loaded class is a protobuf-generated class
++      Class<? extends GeneratedMessageV3> messageClass = (Class<? extends GeneratedMessageV3>) cls;
++      java.lang.reflect.Method builderMethod = messageClass.getMethod("newBuilder");
++      Object builder = builderMethod.invoke(null);
++      _builder = (Message.Builder) builder;
++    } catch (Exception e) {
++      e.printStackTrace();
++    }
++    _fields = fieldsToRead;
++    _recordExtractor = new ProtobufRecorderUpdateMessageExtractor();
++    _recordExtractor.init(fieldsToRead, null);
++  }
++
++  private static Class<?> loadProtobufClass(String jarFilePath, String className) {
++    try {
++      File file = ProtoBufUtils.getFileCopiedToLocal(jarFilePath);
++      URL url = file.toURI().toURL();
++      URL[] urls = new URL[]{url};
++      ClassLoader cl = new URLClassLoader(urls);
++      return cl.loadClass(className);
++    } catch (Exception e) {
++      throw new RuntimeException("Error loading protobuf class", e);
++    }
++  }
++
++  @Nullable
++  @Override
++  public GenericRow decode(byte[] payload, GenericRow destination) {
++    _recordExtractor.extract(payload, destination);
++    return destination;
++  }
++
++  @Nullable
++  @Override
++  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
++    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
++  }
++}
+Index: pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufJarMessageDecoder.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufJarMessageDecoder.java b/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufJarMessageDecoder.java
+new file mode 100644
+--- /dev/null	(revision 89a7660bd04691415cc35291ff290a4cf31277cb)
++++ b/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufJarMessageDecoder.java	(revision 89a7660bd04691415cc35291ff290a4cf31277cb)
+@@ -0,0 +1,84 @@
++package org.apache.pinot.plugin.inputformat.protobuf;
++
++import com.google.common.base.Preconditions;
++import com.google.protobuf.GeneratedMessageV3;
++import com.google.protobuf.Message;
++import java.io.File;
++import java.net.URL;
++import java.net.URLClassLoader;
++import java.util.Arrays;
++import java.util.Map;
++import java.util.Set;
++import org.apache.pinot.spi.data.readers.GenericRow;
++import org.apache.pinot.spi.stream.StreamMessageDecoder;
++import org.jetbrains.annotations.Nullable;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++
++public class ProtoBufJarMessageDecoder implements StreamMessageDecoder<byte[]> {
++  private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufJarMessageDecoder.class);
++
++  public static final String PROTOBUF_JAR_FILE_PATH = "descriptorFile";
++  public static final String PROTO_CLASS_NAME = "protoClassName";
++
++  private ProtoBufRecordExtractor _recordExtractor;
++  private Message.Builder _builder;
++  @Override
++  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
++      throws Exception {
++    Preconditions.checkState(props.containsKey(PROTOBUF_JAR_FILE_PATH),
++        "Protocol Buffer schema jar file must be provided");
++    String protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
++    String jarPath = props.getOrDefault(PROTOBUF_JAR_FILE_PATH, "");
++    Class<?> cls = loadProtobufClass(jarPath, protoClassName);
++
++    try {
++      // Check if the loaded class is a protobuf-generated class
++        Class<? extends GeneratedMessageV3> messageClass = (Class<? extends GeneratedMessageV3>) cls;
++        java.lang.reflect.Method builderMethod = messageClass.getMethod("newBuilder");
++        Object builder = builderMethod.invoke(null);
++        _builder = (Message.Builder) builder;
++    } catch (Exception e) {
++      e.printStackTrace();
++    }
++
++    _recordExtractor = new ProtoBufRecordExtractor();
++    _recordExtractor.init(fieldsToRead, null);
++  }
++
++  private static Class<?> loadProtobufClass(String jarFilePath, String className) {
++    try {
++      File file = ProtoBufUtils.getFileCopiedToLocal(jarFilePath);
++      URL url = file.toURI().toURL();
++      URL[] urls = new URL[]{url};
++      ClassLoader cl = new URLClassLoader(urls);
++      return cl.loadClass(className);
++    } catch (Exception e) {
++      throw new RuntimeException("Error loading protobuf class", e);
++    }
++  }
++
++  @Nullable
++  @Override
++  public GenericRow decode(byte[] payload, GenericRow destination) {
++    Message message;
++    try {
++      _builder.mergeFrom(payload);
++      message = _builder.build();
++    } catch (Exception e) {
++      LOGGER.error("Not able to decode protobuf message", e);
++      return destination;
++    } finally {
++      _builder.clear();
++    }
++    _recordExtractor.extract(message, destination);
++    return destination;
++  }
++
++  @Nullable
++  @Override
++  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
++    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
++  }
++}
+Index: pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufUtils.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufUtils.java b/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufUtils.java
+--- a/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufUtils.java	(revision 3397986ada9b3f978c7d3fa6492986414e4a11d4)
++++ b/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtoBufUtils.java	(revision 89a7660bd04691415cc35291ff290a4cf31277cb)
+@@ -37,9 +37,9 @@
+   private ProtoBufUtils() {
+   }
+ 
+-  public static InputStream getDescriptorFileInputStream(String descriptorFilePath)
++  public static File getFileCopiedToLocal(String filePath)
+       throws Exception {
+-    URI descriptorFileURI = URI.create(descriptorFilePath);
++    URI descriptorFileURI = URI.create(filePath);
+     String scheme = descriptorFileURI.getScheme();
+     if (scheme == null) {
+       scheme = PinotFSFactory.LOCAL_PINOT_FS_SCHEME;
+@@ -48,15 +48,20 @@
+       PinotFS pinotFS = PinotFSFactory.create(scheme);
+       Path localTmpDir = Files.createTempDirectory(TMP_DIR_PREFIX + System.currentTimeMillis());
+       File protoDescriptorLocalFile = createLocalFile(descriptorFileURI, localTmpDir.toFile());
+-      LOGGER.info("Copying protocol buffer descriptor file from source: {} to dst: {}", descriptorFilePath,
++      LOGGER.info("Copying protocol buffer jar/descriptor file from source: {} to dst: {}", filePath,
+           protoDescriptorLocalFile.getAbsolutePath());
+       pinotFS.copyToLocalFile(descriptorFileURI, protoDescriptorLocalFile);
+-      return new FileInputStream(protoDescriptorLocalFile);
++      return protoDescriptorLocalFile;
+     } else {
+       throw new RuntimeException(String.format("Scheme: %s not supported in PinotFSFactory"
+-          + " for protocol buffer descriptor file: %s.", scheme, descriptorFilePath));
++          + " for protocol buffer jar/descriptor file: %s.", scheme, filePath));
+     }
+   }
++
++  public static InputStream getDescriptorFileInputStream(String descriptorFilePath)
++      throws Exception {
++    return new FileInputStream(getFileCopiedToLocal(descriptorFilePath));
++  }
+ 
+   public static File createLocalFile(URI srcURI, File dstDir) {
+     String sourceURIPath = srcURI.getPath();
+Index: pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtobufRecorderUpdateMessageExtractor.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtobufRecorderUpdateMessageExtractor.java b/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtobufRecorderUpdateMessageExtractor.java
+new file mode 100644
+--- /dev/null	(revision 89a7660bd04691415cc35291ff290a4cf31277cb)
++++ b/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/java/org/apache/pinot/plugin/inputformat/protobuf/ProtobufRecorderUpdateMessageExtractor.java	(revision 89a7660bd04691415cc35291ff290a4cf31277cb)
+@@ -0,0 +1,235 @@
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements.  See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership.  The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License.  You may obtain a copy of the License at
++ *
++ *   http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing,
++ * software distributed under the License is distributed on an
++ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++ * KIND, either express or implied.  See the License for the
++ * specific language governing permissions and limitations
++ * under the License.
++ */
++package org.apache.pinot.plugin.inputformat.protobuf;
++
++import com.google.common.collect.ImmutableSet;
++import com.google.protobuf.ByteString;
++import com.google.protobuf.Descriptors;
++import com.google.protobuf.InvalidProtocolBufferException;
++import com.google.protobuf.Message;
++import common.models.generated.UpdateMessage;
++import java.util.Arrays;
++import java.util.Collection;
++import java.util.Collections;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.Set;
++import javax.annotation.Nullable;
++import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
++import org.apache.pinot.spi.data.readers.GenericRow;
++import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++
++/**
++ * Extractor for ProtoBuf records
++ */
++public class ProtobufRecorderUpdateMessageExtractor extends BaseRecordExtractor<byte[]> {
++  private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufCodeGenTestMessageDecoder.class);
++
++  private Set<String> _fields;
++  private boolean _extractAll = false;
++
++  @Override
++  public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
++    if (fields == null || fields.isEmpty()) {
++      _extractAll = true;
++      _fields = Collections.emptySet();
++    } else {
++      _fields = ImmutableSet.copyOf(fields);
++    }
++  }
++
++  /**
++   * For fields that are not set, we want to populate a null, instead of proto default.
++   */
++  private Object getFieldValue(Descriptors.FieldDescriptor fieldDescriptor, Message message) {
++    // In order to support null, the field needs to support _field presence_
++    // See https://github.com/protocolbuffers/protobuf/blob/main/docs/field_presence.md
++    // or FieldDescriptor#hasPresence()
++    if (!fieldDescriptor.hasPresence() || message.hasField(fieldDescriptor)) {
++      return message.getField(fieldDescriptor);
++    } else {
++      return null;
++    }
++  }
++
++  @Override
++  public GenericRow extract(byte[] from, GenericRow to) {
++    try {
++      UpdateMessage updateMessage = UpdateMessage.parseFrom(from);
++      to.putValue("uuid", convert(updateMessage.getUuid()));
++      to.putValue("term_updates", convert(updateMessage.getTermUpdatesList()));
++      to.putValue("stored_field_updates", convert(updateMessage.getStoredFieldUpdatesList()));
++      to.putValue("doc_values_updates", convert(updateMessage.getDocValuesUpdatesList()));
++      to.putValue("bytes_uuid", convert(updateMessage.getBytesUuid()));
++    } catch (Exception e) {
++      LOGGER.error("Could not read protobuf message {}", from);
++    }
++    return to;
++  }
++
++  /**
++   * Returns whether the object is a ProtoBuf Message.
++   */
++  @Override
++  protected boolean isRecord(Object value) {
++    return ((ProtoBufFieldInfo) value).getFieldValue() instanceof Message;
++  }
++
++  /**
++   * Returns whether the field is a multi-value type.
++   */
++  @Override
++  protected boolean isMultiValue(Object value) {
++    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
++    return protoBufFieldInfo.getFieldValue() instanceof Collection && !protoBufFieldInfo.getFieldDescriptor()
++        .isMapField();
++  }
++
++  /**
++   * Returns whether the field is a map type.
++   */
++  @Override
++  protected boolean isMap(Object value) {
++    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
++    return protoBufFieldInfo.getFieldValue() instanceof Collection && protoBufFieldInfo.getFieldDescriptor()
++        .isMapField();
++  }
++
++  /**
++   * Handles the conversion of every value in the ProtoBuf map.
++   *
++   * @param value should be verified to contain a ProtoBuf map prior to calling this method as it will be handled
++   *              as a map field without checking
++   */
++  @Override
++  @Nullable
++  protected Object convertMap(Object value) {
++    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
++    Collection<Message> messages = (Collection<Message>) protoBufFieldInfo.getFieldValue();
++    if (messages.isEmpty()) {
++      return null;
++    }
++
++    List<Descriptors.FieldDescriptor> fieldDescriptors =
++        protoBufFieldInfo.getFieldDescriptor().getMessageType().getFields();
++    Descriptors.FieldDescriptor keyFieldDescriptor = fieldDescriptors.get(0);
++    Descriptors.FieldDescriptor valueFieldDescriptor = fieldDescriptors.get(1);
++    Map<Object, Object> convertedMap = new HashMap<>();
++    for (Message message : messages) {
++      Object fieldKey = message.getField(keyFieldDescriptor);
++      Object fieldValue = message.getField(valueFieldDescriptor);
++      if (fieldKey != null) {
++        Object convertedFieldValue = null;
++        if (fieldValue != null) {
++          convertedFieldValue = convert(new ProtoBufFieldInfo(fieldValue, valueFieldDescriptor));
++        }
++
++        if (convertedFieldValue != null) {
++          convertedMap
++              .put(convertSingleValue(new ProtoBufFieldInfo(fieldKey, keyFieldDescriptor)), convertedFieldValue);
++        }
++      }
++    }
++    return convertedMap;
++  }
++
++  /**
++   * Handles the conversion of each value of the Protobuf collection. Converts the Collection to an Object array.
++   *
++   * @param value should be verified to contain a ProtoBuf collection prior to calling this method as it will
++   *              be handled as a collection field without checking
++   */
++  @Override
++  @Nullable
++  protected Object convertMultiValue(Object value) {
++    ProtoBufFieldInfo protoBufFieldInfo = (ProtoBufFieldInfo) value;
++    Collection<Object> fieldValues = (Collection<Object>) protoBufFieldInfo.getFieldValue();
++
++    if (fieldValues.isEmpty()) {
++      return null;
++    }
++    int numValues = fieldValues.size();
++    Object[] array = new Object[numValues];
++    int index = 0;
++
++    for (Object fieldValue : fieldValues) {
++      Object convertedValue = null;
++      if (fieldValue != null) {
++        convertedValue = convert(new ProtoBufFieldInfo(fieldValue, protoBufFieldInfo.getFieldDescriptor()));
++      }
++      if (convertedValue != null) {
++        array[index++] = convertedValue;
++      }
++    }
++
++    if (index == numValues) {
++      return array;
++    } else if (index == 0) {
++      return null;
++    } else {
++      return Arrays.copyOf(array, index);
++    }
++  }
++
++  /**
++   * Handles conversion of ProtoBuf single values.
++   */
++  @Override
++  protected Object convertSingleValue(Object value) {
++    Object fieldValue = ((ProtoBufFieldInfo) value).getFieldValue();
++
++    if (fieldValue instanceof ByteString) {
++      return ((ByteString) fieldValue).toByteArray();
++    } else if (fieldValue instanceof Number) {
++      return fieldValue;
++    }
++    return fieldValue.toString();
++  }
++
++  /**
++   * Handles conversion of ProtoBuf {@link Message} types
++   *
++   * @param value should be verified to contain a ProtoBuf Message prior to calling this method as it will be
++   *              handled as a Message without checking
++   */
++  @Override
++  @Nullable
++  protected Object convertRecord(Object value) {
++    ProtoBufFieldInfo record = (ProtoBufFieldInfo) value;
++    Map<Descriptors.FieldDescriptor, Object> fields = ((Message) record.getFieldValue()).getAllFields();
++    if (fields.isEmpty()) {
++      return null;
++    }
++
++    Map<Object, Object> convertedMap = new HashMap<>();
++    for (Map.Entry<Descriptors.FieldDescriptor, Object> entry : fields.entrySet()) {
++      Descriptors.FieldDescriptor fieldDescriptor = entry.getKey();
++      Object fieldValue = entry.getValue();
++      if (fieldValue != null) {
++        fieldValue = convert(new ProtoBufFieldInfo(fieldValue, fieldDescriptor));
++      }
++      convertedMap.put(fieldDescriptor.getName(), fieldValue);
++    }
++    return convertedMap;
++  }
++}
+Index: pinot-plugins/pinot-input-format/pinot-protobuf/src/main/protobuf/messages.proto
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/protobuf/messages.proto b/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/protobuf/messages.proto
+new file mode 100644
+--- /dev/null	(revision 89a7660bd04691415cc35291ff290a4cf31277cb)
++++ b/pinot-plugins/pinot-input-format/pinot-protobuf/src/main/protobuf/messages.proto	(revision 89a7660bd04691415cc35291ff290a4cf31277cb)
+@@ -0,0 +1,307 @@
++syntax = "proto3";
++
++package common.models.generated;
++
++option java_multiple_files = true;
++
++message Payload {
++  repeated string strings = 1;
++  repeated double doubles = 2;
++  repeated int32 ints = 3;
++  repeated int64 longs = 4;
++  repeated bytes bytes = 5;
++  repeated float floats = 6;
++  repeated string deleted_strings = 7;
++}
++
++message TermValues {
++  repeated string values = 1;
++}
++
++message MFVector {
++  int64 version = 1 [deprecated = true]; // use version_str instead
++  repeated double vector = 2;
++  string version_str = 3;
++}
++
++message UserFeatures {
++  repeated MFVector vectors = 1;
++  repeated MFVector vectors_dish = 2;
++  repeated MFVector vectors_tte = 3;
++  bool is_new_user = 4;
++}
++
++message QueryEmbedding {
++  repeated double embedding = 1;
++  string version = 2;
++}
++
++message XpConfig {
++  map<string, string> args = 1; // key is xp argument name, value is xp argument value.
++}
++
++enum DistanceScoreType {
++  DISTANCE_SCORE_TYPE_INVALID = 0;
++  DISTANCE_SCORE_TYPE_LINEAR = 1;
++  DISTANCE_SCORE_TYPE_EXPONENTIAL = 2;
++}
++
++message DistanceScoreConfig {
++  DistanceScoreType distance_score_type = 1;
++  double weight = 2;
++}
++
++enum Environment {
++  ENVIRONMENT_INVALID = 0;
++  ENVIRONMENT_PRODUCTION = 1;
++  ENVIRONMENT_STAGING = 2;
++  ENVIRONMENT_GATING = 3;
++}
++
++/**
++ * This is used for annotating the signature match behaviors, i.e. how the field
++ * values should be compared during signature match process. There are 4 behaviors
++ * of field value comparison:
++ *
++ * <li>SignatureMatch.ignore: do not need to compare the field values.
++ * <li>SignatureMatch.equal: the field values in query and signature should be
++ * exactly the same.
++ * <li>SignatureMatch.include: for repeated field only. The value in signature
++ * should be a subset of that in query.
++ * <li>SignatureMatch.exclude: for repeated field only. The value in signature
++ * should not exist in that in query.
++ *
++ * <p>For example, the following eats term search request signature will match
++ * any eats term search requests which contain "query", "is_orderable", and
++ * "region_id" fields, and field value of "is_orderable" field equals to true.
++ * <pre>{@code
++ * {
++ *    "query":"s",
++ *    "custom_data":{
++ *       "@type":"type.googleapis.com/uber.sia.grpcservice.protos.eats.EatsTermSearchCustomData",
++ *       "filters":{
++ *          "is_orderable": true,
++ *          "region_id":1
++ *       }
++ *     },
++ *     "signature_match": {
++ *       "equal": ["custom_data/filters/is_orderable"]
++ *     }
++ * }
++ * }</pre>
++ */
++message SignatureMatch {
++  repeated string ignore = 1;
++  repeated string equal = 2;
++  repeated string include = 3;
++  repeated string exclude = 4;
++}
++
++message ErrorMessage {
++  string message = 1;
++  string stack_trace = 2;
++  string details = 3;
++}
++
++message UpdateMessage {
++  string uuid = 1;
++  TermUpdateMessage term_updates = 2;
++  repeated StoredFieldUpdateMessage stored_field_updates = 3;
++  repeated DocValuesUpdateMessage doc_values_updates = 4;
++  bytes bytes_uuid = 5;  // uuid in binary byte array format
++
++  // Full AnalyzedDocument for updates that are not stored in sia-store.
++  // e.g. fulfillment index location updates use case. In these use cases, diffs
++  // will be computed on the search leaf. If this is provided, all updates
++  // fields are ignored.
++  AnalyzedDocument analyzed_doc = 6;
++  //Timestamp at which the message is created. This is used to emit metrics for the sia stream publish
++  //and live index update latency
++  int64 createdAt = 7;
++  // Timestamp in milliseconds at which the corresponding change event object
++  // was created in upstream services before submitting to kafka topics.
++  // This is used to emit metrics for the end to end ingestion time.
++  // Note: This is not the timestamp when the update actually happened.
++  int64 changeEventTime = 8;
++  // Flag denoting if the corresponding analyzed document is a new document.
++  bool isNewDocument = 9;
++  // Indicates fields that have to be cached on the live index. These caching
++  // hints will only be applied to values that have changed and are present in
++  // the AnalyzedDocumentDiff.
++  repeated CachingHint caching_hints = 10;
++  // New vector fields (key is field name, value is the vector value) for update. the old vector fields are not needed because the whole old vector value needs to be marked deleted and the whole new vector value needed to be inserted.
++  map<string, VectorField> vectorFields = 11;
++}
++
++message DocValuesUpdateMessage {
++  string field = 1;
++  DocValues value = 2;
++  bool is_deleted = 3;
++}
++
++message StoredFieldUpdateMessage {
++  string field = 1;
++  Payload value = 2;
++}
++
++/**
++TermUpdateMessage communicates a change to terms in the live index.
++
++If positions are indexed, each term must have the corresponding and complete
++positions update. `positions_per_term` must be synced with the terms. See
++explanation above AnalyzedField for more details.
++*/
++message TermUpdateMessage {
++  string field = 1;
++  Payload terms = 2;
++  bool range_scan_enabled = 3;
++  bool is_deleted = 4;
++  // Positions per term and type. Must match length in `terms`.
++  repeated Positions strings_positions_per_term = 5;
++  repeated Positions doubles_positions_per_term = 6;
++  repeated Positions ints_positions_per_term = 7;
++  repeated Positions longs_positions_per_term = 8;
++  repeated Positions bytes_positions_per_term = 9;
++  repeated Positions floats_positions_per_term = 10;
++  bool range_postings_list_enabled = 11;
++}
++
++/**
++AnalyzedField represents a field with a document which has passed through
++analysis.
++
++terms are represented by a single object with repeated values as follows.
++
++message Payload {
++  repeated string strings = 1;
++  repeated double doubles = 2;
++  repeated int32 ints = 3;
++  repeated int64 longs = 4;
++  repeated bytes bytes = 5;
++  repeated float floats = 6;
++}
++
++This is the most compact way of storing terms. For example using a structure
++like this is 16% - 22% bigger on the wire (measured by java protobuf
++`getSerializedSize()`)
++
++Term {
++  oneof value {
++    repeated string strings = 1;
++    repeated double doubles = 2;
++    repeated int32 ints = 3;
++    repeated int64 longs = 4;
++    repeated bytes bytes = 5;
++    repeated float floats = 6;
++  }
++}
++
++`positions_per_term` must be kept in-sync with `terms` for each corresponding
++type. For example:
++terms.strings[0] -> strings_positions_per_term[0],
++terms.strings[1] -> strings_positions_per_term[1],
++terms.doubles[0] -> doubles_positions_per_term[0] and so on.
++
++This is a little awkward, but it saves a lot of space.
++
++
++More context: https://docs.google.com/document/d/1B-EGzPaNcPlAdtpQ6jaiO1QThwhZNujsmqD9etMF4q0/edit#
++*/
++message AnalyzedField {
++  Payload terms = 1;
++  bool range_scan_enabled = 2;
++
++  // Positions per term and type. Must match length in `terms`.
++  repeated Positions strings_positions_per_term = 3;
++  repeated Positions doubles_positions_per_term = 4;
++  repeated Positions ints_positions_per_term = 5;
++  repeated Positions longs_positions_per_term = 6;
++  repeated Positions bytes_positions_per_term = 7;
++  repeated Positions floats_positions_per_term = 8;
++}
++
++// positions and offsets per term.
++message Positions {
++  repeated int32 positions = 1;
++  repeated Offset offset = 2;
++}
++
++message Offset{
++  int32 start_offset = 1;
++  int32 end_offset = 2;
++}
++
++// the input embedding vectors
++message VectorField {
++  repeated float vectors = 1;
++}
++
++message AnalyzedDocument {
++  map<string, AnalyzedField> fields = 1;
++  map<string, Payload> stored_fields = 2;
++  map<string, DocValues> doc_values = 3;
++  string uuid = 4;
++  repeated int32 shard_ids = 5;
++  double static_rank = 6;
++  bool is_deleted = 7;
++  // the time in milliseconds when the raw document is retrieved
++  int64 retrieved_at = 8;
++  bytes bytes_uuid = 9; // uuid in binary byte array format
++  double parent_static_rank = 10; // to cluster parent with children in base index
++  string parent_uuid = 11; // to cluster parent with children in base index
++  bool is_parent = 12;
++  map<string, VectorField> vector_fields = 13; // vectors field to support potential multi input embedding vectors
++  // this is optional. Most users use retrieved_at timestamp for ordering
++  // but some use cases may need to use a use-case specific version_id to do this
++  int64 version_id = 14;
++  // sortable_bytes is optional. Sortable bytes is used to sort documents in base index. Users can customize concatenated sorting bytes of multiple fields to one sortable bytes field. IntraShardComparator uses sortable_bytes to sort documents in base index when building base index.
++  bytes sortable_bytes = 15;
++  // List of caching hints indicating fields that have to be cached in the live
++  // index. This is optional. Caching hints will be ignored if the corresponding
++  // field does not exist in the document.
++  // These caching hints will only be applied to values that have changed and are
++  // present in the AnalyzedDocumentDiff.
++  repeated CachingHint caching_hints = 16;
++  // time in milliseconds when the analyzed document data expires
++  int64 expires_at_ms = 17;
++  repeated BucketShard bucket_shards = 18; // used for doc with bucket sharding
++}
++
++message BucketShard {
++  int32 shard_id = 1;
++  repeated string buckets = 2;
++}
++
++enum DocValuesType {
++  NUMERIC = 0;
++  BINARY = 1;
++  SORTED = 2;
++  SORTED_NUMERIC = 3;
++  SORTED_SET = 4;
++}
++
++message DocValues {
++  Payload payload = 1;
++  DocValuesType doc_values_type = 2;
++}
++
++// Hints the live index updater that the defined field needs to be cached in the
++// live index. Only stored field is currently supported but can be extended to
++// add docValues. This will be applied when the live index is being updated
++// while processing a diff.
++message CachingHint {
++  // An identifier for the data type that will be retrieved from the field.
++  // For example, type_id can hold the following values - string, double, proto
++  // descriptor names or any user provided string. This user-provided string
++  // will be passed back to the configured field-deserializer registry to help
++  // map the field to a deserializer.
++  string type_id = 1;
++
++  // Field name of the storedField that needs to be cached.
++  // The fieldName defined here will be used to extract the respective value
++  // (in bytes) and passed to the client for deserialization.
++  // This can be extended to support docValues in the future.
++  oneof field_name {
++    string stored_field_name = 2;
++  }
++}
