@@ -56,8 +56,12 @@ public class DirectMemory implements Memory {
   @Override
   public synchronized void close() {
     if (!_closed) {
-      Unsafer.UNSAFE.freeMemory(_address);
-      _closed = true;
+      synchronized (this) {
+        if (!_closed) {
+          Unsafer.UNSAFE.freeMemory(_address);
+          _closed = true;
+        }
+      }
     }
   }
 

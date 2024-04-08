@@ -101,8 +101,12 @@ public class MmapMemory implements Memory {
   public synchronized void close() {
     try {
       if (!_closed) {
-        _section._unmapFun.unmap();
-        _closed = true;
+        synchronized (this) {
+          if (!_closed) {
+            _section._unmapFun.unmap();
+            _closed = true;
+          }
+        }
       }
     } catch (InvocationTargetException | IllegalAccessException e) {
       throw new RuntimeException("Error while calling unmap", e);
