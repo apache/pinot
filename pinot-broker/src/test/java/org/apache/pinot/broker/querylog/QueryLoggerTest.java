@@ -101,7 +101,7 @@ public class QueryLoggerTest {
         + "entries=3/4,"
         + "segments(queried/processed/matched/consumingQueried/consumingProcessed/consumingMatched/unavailable)"
         + ":5/6/7/8/9/10/24,"
-        + "consumingFreshnessTimeMs=0,"
+        + "consumingFreshnessTimeMs=11,"
         + "servers=12/13,"
         + "groupLimitReached=false,"
         + "brokerReduceTimeMs=22,"
