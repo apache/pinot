@@ -1,0 +1,85 @@
+  public static Map<String, Object> decodeorg_apache_pinot_plugin_inputformat_protobuf_ComplexTypes_TestMessageMessage(org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage msg) {
+    Map<String, Object> msgMap = new HashMap<>();
+    msgMap.put("string_field", msg.getStringField());
+    msgMap.put("int_field", msg.getIntField());
+    msgMap.put("long_field", msg.getLongField());
+    msgMap.put("double_field", msg.getDoubleField());
+    msgMap.put("float_field", msg.getFloatField());
+    msgMap.put("bool_field", String.valueOf(msg.getBoolField()));
+    msgMap.put("bytes_field", msg.getBytesField().toByteArray());
+    if (msg.hasNestedMessage()) {
+      msgMap.put("nested_message", decodeorg_apache_pinot_plugin_inputformat_protobuf_ComplexTypes_TestMessage_NestedMessageMessage(msg.getNestedMessage()));
+    }
+    List<Object> list6 = new ArrayList<>();
+    for (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage row: msg.getRepeatedNestedMessagesList()) {
+      list6.add(decodeorg_apache_pinot_plugin_inputformat_protobuf_ComplexTypes_TestMessage_NestedMessageMessage(row));
+    }
+    if (!list6.isEmpty()) {
+      msgMap.put("repeated_nested_messages", list6.toArray());
+    }
+    Map<Object, Map<String, Object>> map6 = new HashMap<>();
+    for (Map.Entry<String, Map<String,org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage>> entry: msg.getComplexMapMap().entrySet()) {
+      map6.put(entry.getKey(), decodeorg_apache_pinot_plugin_inputformat_protobuf_ComplexTypes_TestMessage_NestedMessageMessage( (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.NestedMessage) entry.getValue()));
+    }
+    msgMap.put("complex_map", map6);
+    msgMap.put("simple_map", msg.getSimpleMapMap());
+    msgMap.put("enum_field", msg.getEnumField().name());
+    if (msg.hasNullableStringField()) {
+      msgMap.put("nullable_string_field", msg.getNullableStringField());
+    }
+    if (msg.hasNullableIntField()) {
+      msgMap.put("nullable_int_field", msg.getNullableIntField());
+    }
+    if (msg.hasNullableLongField()) {
+      msgMap.put("nullable_long_field", msg.getNullableLongField());
+    }
+    if (msg.hasNullableDoubleField()) {
+      msgMap.put("nullable_double_field", msg.getNullableDoubleField());
+    }
+    if (msg.hasNullableFloatField()) {
+      msgMap.put("nullable_float_field", msg.getNullableFloatField());
+    }
+    if (msg.hasNullableBoolField()) {
+      msgMap.put("nullable_bool_field", String.valueOf(msg.getNullableBoolField()));
+    }
+    if (msg.hasNullableBytesField()) {
+      msgMap.put("nullable_bytes_field", msg.getNullableBytesField().toByteArray());
+    }
+    if (msg.getRepeatedStringsCount() > 0) {
+      msgMap.put("repeated_strings", msg.getRepeatedStringsList().toArray());
+    }
+    if (msg.getRepeatedIntsCount() > 0) {
+      msgMap.put("repeated_ints", msg.getRepeatedIntsList().toArray());
+    }
+    if (msg.getRepeatedLongsCount() > 0) {
+      msgMap.put("repeated_longs", msg.getRepeatedLongsList().toArray());
+    }
+    if (msg.getRepeatedDoublesCount() > 0) {
+      msgMap.put("repeated_doubles", msg.getRepeatedDoublesList().toArray());
+    }
+    if (msg.getRepeatedFloatsCount() > 0) {
+      msgMap.put("repeated_floats", msg.getRepeatedFloatsList().toArray());
+    }
+    List<Object> list10 = new ArrayList<>();
+    for (String row: msg.getRepeatedBoolsList()) {
+      list10.add(String.valueOf(row));
+    }
+    if (!list10.isEmpty()) {
+      msgMap.put("repeated_bools", list10.toArray());
+    }
+    List<Object> list11 = new ArrayList<>();
+    for (com.google.protobuf.ByteString row: msg.getRepeatedBytesList()) {
+      list11.add(row.toByteArray());
+    }
+    if (!list11.isEmpty()) {
+      msgMap.put("repeated_bytes", list11.toArray());
+    }
+    List<Object> list12 = new ArrayList<>();
+    for (org.apache.pinot.plugin.inputformat.protobuf.ComplexTypes.TestMessage.TestEnum row: msg.getRepeatedEnumsList()) {
+      list12.add(row.name());
+    }
+    if (!list12.isEmpty()) {
+      msgMap.put("repeated_enums", list12.toArray());
+    }
+    return msgMap;
+  }
