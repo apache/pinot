@@ -438,7 +438,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
       Map<String, String> queryOptions) {
-    List<SegmentContext> segmentContexts = new ArrayList<>();
+    List<SegmentContext> segmentContexts = new ArrayList<>(selectedSegments.size());
     selectedSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
     return segmentContexts;
   }

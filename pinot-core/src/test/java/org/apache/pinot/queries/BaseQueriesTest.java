@@ -245,7 +245,7 @@ public abstract class BaseQueriesTest {
   }
 
   private static List<SegmentContext> getSegmentContexts(List<IndexSegment> indexSegments) {
-    List<SegmentContext> segmentContexts = new ArrayList<>();
+    List<SegmentContext> segmentContexts = new ArrayList<>(indexSegments.size());
     indexSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
     return segmentContexts;
   }
