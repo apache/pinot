@@ -472,16 +472,18 @@ public class MutableSegmentImplIngestionAggregationTest {
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(m1), VAR_LENGTH_SET,
             INVERTED_INDEX_SET, Collections.singletonList(new AggregationConfig(m1, "SUM_PRECISION(metric, 3)")));
 
-    // Make a big decimal larger than 3 precision and try to index it
-    BigDecimal large = BigDecimalUtils.generateMaximumNumberWithPrecision(5);
-    GenericRow row = getRow(random, 1);
+    try {
+      // Make a big decimal larger than 3 precision and try to index it
+      BigDecimal large = BigDecimalUtils.generateMaximumNumberWithPrecision(5);
+      GenericRow row = getRow(random, 1);
 
-    row.putValue("metric", large);
-    Assert.assertThrows(IllegalArgumentException.class, () -> {
-      mutableSegmentImpl.index(row, defaultMetadata);
-    });
-
-    mutableSegmentImpl.destroy();
+      row.putValue("metric", large);
+      Assert.assertThrows(IllegalArgumentException.class, () -> {
+        mutableSegmentImpl.index(row, defaultMetadata);
+      });
+    } finally {
+      mutableSegmentImpl.destroy();
+    }
   }
 
   private BigDecimal generateRandomBigDecimal(Random random, int maxPrecision, int scale) {
