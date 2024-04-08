@@ -47,8 +47,8 @@ public interface PartitionGroupConsumer extends Closeable {
   /**
    * Fetches messages from the stream partition from the given start offset within the specified timeout.
    *
-   * This method should return immediately if there are messages available. Otherwise, it will await the passed timeout.
-   * If the timeout expires, an empty message batch should be returned.
+   * This method should return within the timeout. If there is no message available before time runs out, an empty
+   * message batch should be returned.
    *
    * @param startOffset The offset of the first message desired, inclusive
    * @param timeoutMs Timeout in milliseconds
