@@ -158,16 +158,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
     FROM_STAGE(StatMap.Type.INT) {
       @Override
       public int merge(int value1, int value2) {
-        if (value1 != value2) {
-          if (value1 == 0) {
-            return value2;
-          } else if (value2 == 0) {
-            return value1;
-          } else {
-            throw new IllegalStateException("Cannot merge non-zero values: " + value1 + " and " + value2);
-          }
-        }
-        return value1;
+        return StatMap.Key.eqNotZero(value1, value2);
       }
     };
     private final StatMap.Type _type;

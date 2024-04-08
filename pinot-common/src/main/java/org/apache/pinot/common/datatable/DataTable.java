@@ -125,13 +125,7 @@ public interface DataTable {
     MIN_CONSUMING_FRESHNESS_TIME_MS(9, "minConsumingFreshnessTimeMs", MetadataValueType.LONG) {
       @Override
       public long merge(long value1, long value2) {
-        if (value1 == 0 && value2 >= 0) {
-          return value2;
-        }
-        if (value2 == 0 && value1 >= 0) {
-          return value1;
-        }
-        return Math.min(value1, value2);
+        return StatMap.Key.minPositive(value1, value2);
       }
     },
     TOTAL_DOCS(10, "totalDocs", MetadataValueType.LONG),
@@ -159,7 +153,7 @@ public interface DataTable {
     OPERATOR_EXEC_START_TIME_MS(32, "operatorExecStartTimeMs", MetadataValueType.LONG) {
       @Override
       public long merge(long value1, long value2) {
-        return Math.min(value1, value2);
+        return StatMap.Key.minPositive(value1, value2);
       }
     },
     OPERATOR_EXEC_END_TIME_MS(33, "operatorExecEndTimeMs", MetadataValueType.LONG) {

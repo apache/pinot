@@ -429,10 +429,6 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
       return value1 + value2;
     }
 
-    default double merge(double value1, double value2) {
-      return value1 + value2;
-    }
-
     default boolean merge(boolean value1, boolean value2) {
       return value1 || value2;
     }
@@ -448,6 +444,39 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
 
     default boolean includeDefaultInJson() {
       return false;
+    }
+
+    static int minPositive(int value1, int value2) {
+      if (value1 == 0 && value2 >= 0) {
+        return value2;
+      }
+      if (value2 == 0 && value1 >= 0) {
+        return value1;
+      }
+      return Math.min(value1, value2);
+    }
+
+    static long minPositive(long value1, long value2) {
+      if (value1 == 0 && value2 >= 0) {
+        return value2;
+      }
+      if (value2 == 0 && value1 >= 0) {
+        return value1;
+      }
+      return Math.min(value1, value2);
+    }
+
+    static int eqNotZero(int value1, int value2) {
+      if (value1 != value2) {
+        if (value1 == 0) {
+          return value2;
+        } else if (value2 == 0) {
+          return value1;
+        } else {
+          throw new IllegalStateException("Cannot merge non-zero values: " + value1 + " and " + value2);
+        }
+      }
+      return value1;
     }
   }
 

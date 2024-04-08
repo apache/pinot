@@ -579,13 +579,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
     MIN_CONSUMING_FRESHNESS_TIME_MS(StatMap.Type.LONG) {
       @Override
       public long merge(long value1, long value2) {
-        if (value1 == 0 && value2 >= 0) {
-          return value2;
-        }
-        if (value2 == 0 && value1 >= 0) {
-          return value1;
-        }
-        return Math.min(value1, value2);
+        return StatMap.Key.minPositive(value1, value2);
       }
     },
     TOTAL_DOCS(StatMap.Type.LONG),
@@ -611,7 +605,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
     OPERATOR_EXEC_START_TIME_MS(StatMap.Type.LONG) {
       @Override
       public long merge(long value1, long value2) {
-        return Math.min(value1, value2);
+        return StatMap.Key.minPositive(value1, value2);
       }
     },
     OPERATOR_EXEC_END_TIME_MS(StatMap.Type.LONG) {
