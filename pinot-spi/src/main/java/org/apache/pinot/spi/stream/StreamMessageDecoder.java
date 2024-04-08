@@ -23,6 +23,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -44,9 +45,10 @@ public interface StreamMessageDecoder<T> {
    * @param fieldsToRead The fields to read from the source stream. If blank, reads all fields (only for AVRO/JSON
    *                     currently)
    * @param topicName Topic name of the stream
+   * @param tableSchema Pinot schema of the table
    * @throws Exception If an error occurs
    */
-  void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+  void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
       throws Exception;
 
   /**

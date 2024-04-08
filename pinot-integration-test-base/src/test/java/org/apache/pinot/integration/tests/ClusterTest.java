@@ -66,6 +66,7 @@ import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -477,7 +478,7 @@ public abstract class ClusterTest extends ControllerTest {
     private DatumReader<GenericData.Record> _reader;
 
     @Override
-    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
         throws Exception {
       // Load Avro schema
       org.apache.avro.Schema avroSchema;
