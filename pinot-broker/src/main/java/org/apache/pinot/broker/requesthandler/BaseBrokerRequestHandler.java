@@ -257,7 +257,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
     requestContext.setRequestArrivalTimeMillis(System.currentTimeMillis());
 
@@ -307,7 +307,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   protected BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
-      HttpHeaders httpHeaders)
+      @Nullable HttpHeaders httpHeaders)
       throws Exception {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
@@ -378,8 +378,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       boolean ignoreCase = _tableCache.isIgnoreCase();
       String tableName;
       try {
-        tableName = getActualTableName(
-            DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders, ignoreCase), _tableCache);
+        tableName =
+            getActualTableName(DatabaseUtils.translateTableName(dataSource.getTableName(), httpHeaders, ignoreCase),
+                _tableCache);
       } catch (DatabaseConflictException e) {
         LOGGER.info("{}. Request {}: {}", e.getMessage(), requestId, query);
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
@@ -912,7 +913,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * <p>Currently only supports subquery within the filter.
    */
   private void handleSubquery(PinotQuery pinotQuery, long requestId, JsonNode jsonRequest,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
@@ -928,7 +929,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * IN_ID_SET transform function.
    */
   private void handleSubquery(Expression expression, long requestId, JsonNode jsonRequest,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
     Function function = expression.getFunctionCall();
     if (function == null) {
