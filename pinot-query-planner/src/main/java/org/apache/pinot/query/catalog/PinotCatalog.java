@@ -32,6 +32,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
+import org.apache.pinot.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -103,7 +104,7 @@ public class PinotCatalog implements Schema {
 
   /**
    * {@code PinotCatalog} doesn't need to return function collections b/c they are already registered.
-   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema, String)}
+   * see: {@link CalciteSchemaBuilder#asRootSchema(Schema, String)}
    */
   @Override
   public Collection<Function> getFunctions(String name) {
@@ -112,7 +113,7 @@ public class PinotCatalog implements Schema {
 
   /**
    * {@code PinotCatalog} doesn't need to return function name set b/c they are already registered.
-   * see: {@link org.apache.calcite.jdbc.CalciteSchemaBuilder#asRootSchema(Schema, String)}
+   * see: {@link CalciteSchemaBuilder#asRootSchema(Schema, String)}
    */
   @Override
   public Set<String> getFunctionNames() {
