@@ -53,7 +53,7 @@ public abstract class SetOperator extends MultiStageOperator<SetOperator.StatKey
   private final DataSchema _dataSchema;
 
   private boolean _isRightSetBuilt;
-  private TransferableBlock _upstreamErrorBlock;
+  protected TransferableBlock _upstreamErrorBlock;
   @Nullable
   private MultiStageQueryStats _rightQueryStats = null;
 

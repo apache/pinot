@@ -38,6 +38,7 @@ public class UnionOperator extends SetOperator {
   private static final String EXPLAIN_NAME = "UNION";
   @Nullable
   private MultiStageQueryStats _queryStats = null;
+  private int _finishedChildren = 0;
 
   public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator<?>> upstreamOperators,
       DataSchema dataSchema) {
@@ -62,26 +63,40 @@ public class UnionOperator extends SetOperator {
 
   @Override
   protected TransferableBlock getNextBlock() {
-    for (MultiStageOperator<?> upstreamOperator : getChildOperators()) {
+    if (_upstreamErrorBlock != null) {
+      return _upstreamErrorBlock;
+    }
+    List<MultiStageOperator<?>> childOperators = getChildOperators();
+    for (int i = _finishedChildren; i < childOperators.size(); i++) {
+      MultiStageOperator<?> upstreamOperator = childOperators.get(i);
       TransferableBlock block = upstreamOperator.nextBlock();
-      if (!block.isEndOfStreamBlock()) {
+      if (block.isDataBlock()) {
         return block;
+      } else if (block.isSuccessfulEndOfStreamBlock()) {
+        _finishedChildren++;
+        consumeEos(block);
       } else {
-        MultiStageQueryStats queryStats = block.getQueryStats();
-        assert queryStats != null;
-        if (_queryStats == null) {
-          Preconditions.checkArgument(queryStats.getCurrentStageId() == _context.getStageId(),
-              "The current stage id of the stats holder: %s does not match the current stage id: %s",
-              queryStats.getCurrentStageId(), _context.getStageId());
-          _queryStats = queryStats;
-        } else {
-          _queryStats.mergeUpstream(queryStats);
-        }
+        assert block.isErrorBlock();
+        _upstreamErrorBlock = block;
+        return block;
       }
     }
     assert _queryStats != null : "Should have at least one EOS block from the upstream operators";
     addStats(_queryStats);
     return TransferableBlockUtils.getEndOfStreamTransferableBlock(_queryStats);
+  }
+
+  private void consumeEos(TransferableBlock block) {
+    MultiStageQueryStats queryStats = block.getQueryStats();
+    assert queryStats != null;
+    if (_queryStats == null) {
+      Preconditions.checkArgument(queryStats.getCurrentStageId() == _context.getStageId(),
+          "The current stage id of the stats holder: %s does not match the current stage id: %s",
+          queryStats.getCurrentStageId(), _context.getStageId());
+      _queryStats = queryStats;
+    } else {
+      _queryStats.mergeUpstream(queryStats);
+    }
   }
 
   @Override
