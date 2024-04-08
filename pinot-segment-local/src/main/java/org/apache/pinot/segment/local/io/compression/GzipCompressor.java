@@ -43,14 +43,17 @@ class GzipCompressor implements ChunkCompressor {
     _compressor.setInput(inUncompressed);
     _compressor.finish();
     _compressor.deflate(outCompressed);
+    outCompressed.putInt((int) _compressor.getBytesRead()); // append uncompressed size
+    int size = outCompressed.position();
     outCompressed.flip();
-    return outCompressed.limit();
+    return size;
   }
 
   @Override
   public int maxCompressedSize(int uncompressedSize) {
     // https://github.com/luvit/zlib/blob/8de57bce969eb9dafc1f1f5c256ac608d0a73ec4/compress.c#L75
-    return uncompressedSize + (uncompressedSize >> 12) + (uncompressedSize >> 14) + (uncompressedSize >> 25) + 13;
+    return uncompressedSize + (uncompressedSize >> 12) + (uncompressedSize >> 14) + (uncompressedSize >> 25) + 13
+        + Integer.BYTES;
   }
 
   @Override

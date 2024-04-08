@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.segmentpruner;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,7 +38,9 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Range;
@@ -64,10 +67,10 @@ public class TimeSegmentPruner implements SegmentPruner {
   private volatile IntervalTree<String> _intervalTree;
   private final Map<String, Interval> _intervalMap = new HashMap<>();
 
-  public TimeSegmentPruner(TableConfig tableConfig, String timeColumn, DateTimeFormatSpec timeFormatSpec) {
+  public TimeSegmentPruner(TableConfig tableConfig, DateTimeFieldSpec timeFieldSpec) {
     _tableNameWithType = tableConfig.getTableName();
-    _timeColumn = timeColumn;
-    _timeFormatSpec = timeFormatSpec;
+    _timeColumn = timeFieldSpec.getName();
+    _timeFormatSpec = timeFieldSpec.getFormatSpec();
   }
 
   @Override
@@ -206,97 +209,53 @@ public class TimeSegmentPruner implements SegmentPruner {
         } else {
           return getComplementSortedIntervals(childIntervals);
         }
-      case EQUALS: {
-        Identifier identifier = operands.get(0).getIdentifier();
-        if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
-          return Collections.singletonList(new Interval(timeStamp, timeStamp));
-        } else {
-          return null;
+      case EQUALS:
+        if (isTimeColumn(operands.get(0))) {
+          long timestamp = toMillisSinceEpoch(operands.get(1));
+          return List.of(new Interval(timestamp, timestamp));
         }
-      }
-      case IN: {
-        Identifier identifier = operands.get(0).getIdentifier();
-        if (identifier != null && identifier.getName().equals(_timeColumn)) {
+        return null;
+      case IN:
+        if (isTimeColumn(operands.get(0))) {
           int numOperands = operands.size();
           List<Interval> intervals = new ArrayList<>(numOperands - 1);
           for (int i = 1; i < numOperands; i++) {
-            long timeStamp =
-                _timeFormatSpec.fromFormatToMillis(operands.get(i).getLiteral().getFieldValue().toString());
-            intervals.add(new Interval(timeStamp, timeStamp));
+            long timestamp = toMillisSinceEpoch(operands.get(i));
+            intervals.add(new Interval(timestamp, timestamp));
           }
           return intervals;
-        } else {
-          return null;
         }
-      }
-      case GREATER_THAN: {
-        Identifier identifier = operands.get(0).getIdentifier();
-        if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
-          return Collections.singletonList(new Interval(timeStamp + 1, MAX_END_TIME));
-        } else {
-          return null;
+        return null;
+      case GREATER_THAN:
+        if (isTimeColumn(operands.get(0))) {
+          return getInterval(toMillisSinceEpoch(operands.get(1)) + 1, MAX_END_TIME);
         }
-      }
-      case GREATER_THAN_OR_EQUAL: {
-        Identifier identifier = operands.get(0).getIdentifier();
-        if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
-          return Collections.singletonList(new Interval(timeStamp, MAX_END_TIME));
-        } else {
-          return null;
+        return null;
+      case GREATER_THAN_OR_EQUAL:
+        if (isTimeColumn(operands.get(0))) {
+          return getInterval(toMillisSinceEpoch(operands.get(1)), MAX_END_TIME);
         }
-      }
-      case LESS_THAN: {
-        Identifier identifier = operands.get(0).getIdentifier();
-        if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
-          if (timeStamp > MIN_START_TIME) {
-            return Collections.singletonList(new Interval(MIN_START_TIME, timeStamp - 1));
-          } else {
-            return Collections.emptyList();
-          }
-        } else {
-          return null;
+        return null;
+      case LESS_THAN:
+        if (isTimeColumn(operands.get(0))) {
+          return getInterval(MIN_START_TIME, toMillisSinceEpoch(operands.get(1)) - 1);
         }
-      }
-      case LESS_THAN_OR_EQUAL: {
-        Identifier identifier = operands.get(0).getIdentifier();
-        if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long timeStamp = _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
-          if (timeStamp >= MIN_START_TIME) {
-            return Collections.singletonList(new Interval(MIN_START_TIME, timeStamp));
-          } else {
-            return Collections.emptyList();
-          }
-        } else {
-          return null;
+        return null;
+      case LESS_THAN_OR_EQUAL:
+        if (isTimeColumn(operands.get(0))) {
+          return getInterval(MIN_START_TIME, toMillisSinceEpoch(operands.get(1)));
         }
-      }
-      case BETWEEN: {
-        Identifier identifier = operands.get(0).getIdentifier();
-        if (identifier != null && identifier.getName().equals(_timeColumn)) {
-          long startTimestamp =
-              _timeFormatSpec.fromFormatToMillis(operands.get(1).getLiteral().getFieldValue().toString());
-          long endTimestamp =
-              _timeFormatSpec.fromFormatToMillis(operands.get(2).getLiteral().getFieldValue().toString());
-          if (endTimestamp >= startTimestamp) {
-            return Collections.singletonList(new Interval(startTimestamp, endTimestamp));
-          } else {
-            return Collections.emptyList();
-          }
-        } else {
-          return null;
+        return null;
+      case BETWEEN:
+        if (isTimeColumn(operands.get(0))) {
+          return getInterval(toMillisSinceEpoch(operands.get(1)), toMillisSinceEpoch(operands.get(2)));
         }
-      }
-      case RANGE: {
-        Identifier identifier = operands.get(0).getIdentifier();
-        if (identifier != null && identifier.getName().equals(_timeColumn)) {
+        return null;
+      case RANGE:
+        if (isTimeColumn(operands.get(0))) {
           return parseInterval(operands.get(1).getLiteral().getFieldValue().toString());
         }
         return null;
-      }
       default:
         return null;
     }
@@ -408,6 +367,17 @@ public class TimeSegmentPruner implements SegmentPruner {
     return res;
   }
 
+  private boolean isTimeColumn(Expression expression) {
+    Identifier identifier = expression.getIdentifier();
+    return identifier != null && identifier.getName().equals(_timeColumn);
+  }
+
+  private long toMillisSinceEpoch(Expression expression) {
+    Literal literal = expression.getLiteral();
+    Preconditions.checkArgument(literal != null, "Literal is required for time column filter, got: %s", expression);
+    return _timeFormatSpec.fromFormatToMillis(literal.getFieldValue().toString());
+  }
+
   /**
    * Parse interval to millisecond as [min, max] with both sides included.
    * E.g. '(* 16311]' is parsed as [0, 16311], '(1455 16311)' is parsed as [1456, 16310]
@@ -432,10 +402,10 @@ public class TimeSegmentPruner implements SegmentPruner {
         endTime--;
       }
     }
+    return getInterval(startTime, endTime);
+  }
 
-    if (startTime > endTime) {
-      return Collections.emptyList();
-    }
-    return Collections.singletonList(new Interval(startTime, endTime));
+  private static List<Interval> getInterval(long inclusiveStart, long inclusiveEnd) {
+    return inclusiveStart <= inclusiveEnd ? List.of(new Interval(inclusiveStart, inclusiveEnd)) : List.of();
   }
 }

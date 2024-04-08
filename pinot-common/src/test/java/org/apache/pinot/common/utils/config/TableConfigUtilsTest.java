@@ -30,7 +30,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
@@ -205,10 +206,6 @@ public class TableConfigUtilsTest {
   }
 
   private class TestStreamConsumerFactory extends StreamConsumerFactory {
-    @Override
-    public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-      return null;
-    }
 
     @Override
     public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
@@ -217,6 +214,12 @@ public class TableConfigUtilsTest {
 
     @Override
     public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+      return null;
+    }
+
+    @Override
+    public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
       return null;
     }
   }

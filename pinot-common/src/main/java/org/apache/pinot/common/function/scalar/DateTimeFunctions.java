@@ -25,6 +25,7 @@ import org.apache.pinot.common.function.DateTimePatternHandler;
 import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.spi.annotations.ScalarFunction;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.chrono.ISOChronology;
@@ -1162,6 +1163,44 @@ public class DateTimeFunctions {
   }
 
   /**
+   * Aligns a given timestamp to the nearest bin defined by the specified duration string, starting from an origin
+   * timestamp.
+   *
+   * @param binWidthStr The width of each bin in Period format (e.g., "15m" for 15 minutes, "2d" for 2 days).
+   * @param sourceTimestamp The timestamp to be aligned.
+   * @param originTimestamp The origin timestamp from which binning starts.
+   * @return A java.sql.Timestamp aligned to the nearest bin.
+   */
+  @ScalarFunction(names = {"dateBin", "date_bin"})
+  public static Timestamp dateBin(String binWidthStr, Timestamp sourceTimestamp, Timestamp originTimestamp) {
+    long originMillis = originTimestamp.getTime();
+    long sourceMillis = sourceTimestamp.getTime();
+
+    // Calculate the offset from the origin and adjust to the nearest bin
+    long binnedMillis = dateBin(binWidthStr, sourceMillis, originMillis);
+    return new Timestamp(binnedMillis);
+  }
+
+  /**
+   * Utility method to aligns a given timestamp in epoch Millis to the nearest bin defined by the specified
+   * duration string, starting from an origin timestamp in epoch Millis.
+   *
+   * @param binWidthStr The width of each bin as an ISO-8601 duration string (e.g., "PT15M" for 15 minutes).
+   * @param sourceMillisEpoch The source time in epoch millis to be aligned.
+   * @param originMillisEpoch The origin time in epoch millis from which binning starts.
+   * @return A java.sql.Timestamp aligned to the nearest bin.
+   */
+  public static long dateBin(String binWidthStr, long sourceMillisEpoch, long originMillisEpoch) {
+    long binWidthMillis = TimeUtils.convertPeriodToMillis(binWidthStr);
+    //long binWidthMillis = binWidth.toMillis();
+    long offsetFromOrigin = sourceMillisEpoch - originMillisEpoch;
+    long binCount = offsetFromOrigin / binWidthMillis;
+
+    // Calculate the start of the bin for the given timestamp
+    return originMillisEpoch + binWidthMillis * binCount;
+  }
+
+  /**
    * Add a time period to the provided timestamp.
    * e.g. timestampAdd('days', 10, NOW()) will add 10 days to the current timestamp and return the value
    * @param unit the timeunit of the period to add. e.g. milliseconds, seconds, days, year
@@ -1208,8 +1247,9 @@ public class DateTimeFunctions {
     return results;
   }
 
-  @ScalarFunction(names = {"timestampDiffMVReverse", "timestamp_diff_mv_reverse", "dateDiffMVReverse",
-      "date_diff_mv_reverse"})
+  @ScalarFunction(names = {
+      "timestampDiffMVReverse", "timestamp_diff_mv_reverse", "dateDiffMVReverse", "date_diff_mv_reverse"
+  })
   public static long[] timestampDiffMVReverse(String unit, long timestamp1, long[] timestamp2) {
     long[] results = new long[timestamp2.length];
     for (int i = 0; i < timestamp2.length; i++) {

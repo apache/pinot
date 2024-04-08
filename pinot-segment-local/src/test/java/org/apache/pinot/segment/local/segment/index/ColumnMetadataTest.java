@@ -29,22 +29,20 @@ import java.util.stream.Stream;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
+import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.BoundedColumnValuePartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -140,8 +138,7 @@ public class ColumnMetadataTest {
     driver.build();
 
     // Load segment metadata.
-    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
-    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(INDEX_DIR.listFiles()[0]);
     verifySegmentAfterLoading(segmentMetadata);
 
     // Make sure we got the creator name as well.
@@ -159,8 +156,7 @@ public class ColumnMetadataTest {
     driver.build();
 
     // Load segment metadata.
-    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
-    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(INDEX_DIR.listFiles()[0]);
     verifySegmentAfterLoading(segmentMetadata);
 
     // Make sure we get null for creator name.
@@ -177,9 +173,8 @@ public class ColumnMetadataTest {
     driver.build();
 
     // Load segment metadata.
-    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
-    SegmentMetadata metadata = segment.getSegmentMetadata();
-    verifySegmentAfterLoading(metadata);
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(INDEX_DIR.listFiles()[0]);
+    verifySegmentAfterLoading(segmentMetadata);
   }
 
   @Test
@@ -198,8 +193,7 @@ public class ColumnMetadataTest {
     driver.build();
 
     // Load segment metadata.
-    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
-    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(INDEX_DIR.listFiles()[0]);
     verifySegmentAfterLoading(segmentMetadata);
     // Make sure we get null for creator name.
     Assert.assertNull(segmentMetadata.getCreatorName());

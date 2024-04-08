@@ -16,23 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
+package org.apache.pinot.segment.local.upsert.merger.columnar;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.stream.StreamMessage;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
+public class MaxMerger implements PartialUpsertColumnMerger {
 
-
-public class KafkaStreamMessage extends StreamMessage<byte[]> {
-  public KafkaStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
-    super(key, value, metadata, value.length);
-  }
-
-  public long getNextOffset() {
-    if (_metadata != null) {
-      long offset = Long.parseLong(_metadata.getRecordMetadata().get(KafkaStreamMessageMetadata.METADATA_OFFSET_KEY));
-      return offset < 0 ? -1 : offset + 1;
-    }
-    return -1;
+  /**
+   * Keep the maximal value for the given field.
+   */
+  @Override
+  public Object merge(Object previousValue, Object currentValue) {
+    return ((Comparable) previousValue).compareTo((Comparable) currentValue) > 0 ? previousValue : currentValue;
   }
 }

@@ -47,6 +47,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory;
+import org.apache.pinot.plugin.stream.kafka20.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka20.KafkaPartitionLevelConsumer;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -55,11 +56,9 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.stream.MessageBatch;
-import org.apache.pinot.spi.stream.PartitionLevelConsumer;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
-import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -463,8 +462,10 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       _helixClusterName = helixClusterName;
       _tableName = tableName;
     }
+
     @Override
-    public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
+    public KafkaPartitionLevelConsumer createPartitionGroupConsumer(String clientId,
+        PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
       /*
        * The segment data manager is creating a consumer to consume rows into a segment.
        * Check the partition and sequence number of the segment and decide whether it
@@ -473,6 +474,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
        * - Throwing exception during consumption.
        * Make sure that this still works if retries are added in RealtimeSegmentDataManager
        */
+      int partition = partitionGroupConsumptionStatus.getPartitionGroupId();
       boolean exceptionDuringConsume = false;
       int seqNum = getSegmentSeqNum(partition);
       if (partition == PARTITION_FOR_EXCEPTIONS) {
@@ -504,20 +506,21 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       return seqNum.get();
     }
 
-    public class ExceptingKafkaConsumer extends KafkaPartitionLevelConsumer {
+    public static class ExceptingKafkaConsumer extends KafkaPartitionLevelConsumer {
       private final boolean _exceptionDuringConsume;
+
       public ExceptingKafkaConsumer(String clientId, StreamConfig streamConfig, int partition,
           boolean exceptionDuringConsume) {
         super(clientId, streamConfig, partition);
         _exceptionDuringConsume = exceptionDuringConsume;
       }
+
       @Override
-      public MessageBatch<StreamMessage<byte[]>> fetchMessages(StreamPartitionMsgOffset startMsgOffset,
-          StreamPartitionMsgOffset endMsgOffset, int timeoutMillis) {
+      public KafkaMessageBatch fetchMessages(StreamPartitionMsgOffset startOffset, int timeoutMs) {
         if (_exceptionDuringConsume) {
           throw new RuntimeException("TestException during consumption");
         }
-        return super.fetchMessages(startMsgOffset, endMsgOffset, timeoutMillis);
+        return super.fetchMessages(startOffset, timeoutMs);
       }
     }
   }

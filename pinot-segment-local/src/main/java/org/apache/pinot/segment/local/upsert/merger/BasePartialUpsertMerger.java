@@ -16,22 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kinesis;
+package org.apache.pinot.segment.local.upsert.merger;
 
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.stream.StreamMessage;
+import java.util.List;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 
 
-public class KinesisStreamMessage extends StreamMessage<byte[]> {
-  private final String _sequenceNumber;
+public abstract class BasePartialUpsertMerger implements PartialUpsertMerger {
+  protected final List<String> _primaryKeyColumns;
+  protected final List<String> _comparisonColumns;
+  protected final UpsertConfig _upsertConfig;
 
-  public KinesisStreamMessage(@Nullable byte[] key, byte[] value, String sequenceNumber,
-      @Nullable KinesisStreamMessageMetadata metadata, int length) {
-    super(key, value, metadata, length);
-    _sequenceNumber = sequenceNumber;
-  }
-
-  public String sequenceNumber() {
-    return _sequenceNumber;
+  protected BasePartialUpsertMerger(List<String> primaryKeyColumns, List<String> comparisonColumns,
+      UpsertConfig upsertConfig) {
+    _primaryKeyColumns = primaryKeyColumns;
+    _comparisonColumns = comparisonColumns;
+    _upsertConfig = upsertConfig;
   }
 }

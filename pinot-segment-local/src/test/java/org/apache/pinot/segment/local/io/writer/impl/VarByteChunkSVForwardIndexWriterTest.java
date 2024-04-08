@@ -35,7 +35,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunk
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -90,8 +90,8 @@ public class VarByteChunkSVForwardIndexWriterTest {
         writer.putStringMV(array);
       }
     }
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(
-        PinotDataBuffer.loadBigEndianFile(file), FieldSpec.DataType.STRING);
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.loadBigEndianFile(file);
+        VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(dataBuffer, DataType.STRING);
         ChunkReaderContext context = reader.createContext()) {
       for (int i = 0; i < arrays.size(); i++) {
         String[] array = arrays.get(i);
@@ -125,8 +125,8 @@ public class VarByteChunkSVForwardIndexWriterTest {
         writer.putBytesMV(Arrays.stream(array).map(str -> str.getBytes(UTF_8)).toArray(byte[][]::new));
       }
     }
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(
-        PinotDataBuffer.loadBigEndianFile(file), FieldSpec.DataType.BYTES);
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.loadBigEndianFile(file);
+        VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(dataBuffer, DataType.BYTES);
         ChunkReaderContext context = reader.createContext()) {
       for (int i = 0; i < arrays.size(); i++) {
         String[] array = arrays.get(i);

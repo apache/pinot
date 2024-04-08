@@ -16,18 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.controller.helix.core.realtime.segment;
 
-public class MinMerger implements PartialUpsertMerger {
+import javax.annotation.Nullable;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.spi.stream.StreamConfig;
 
-  MinMerger() {
+
+public class FixedFlushThresholdUpdater implements FlushThresholdUpdater {
+  private final int _flushThreshold;
+
+  FixedFlushThresholdUpdater(int flushThreshold) {
+    _flushThreshold = flushThreshold;
   }
 
-  /**
-   * Keep the minimal value for the given field.
-   */
   @Override
-  public Object merge(Object previousValue, Object currentValue) {
-    return ((Comparable) previousValue).compareTo((Comparable) currentValue) < 0 ? previousValue : currentValue;
+  public void updateFlushThreshold(StreamConfig streamConfig, SegmentZKMetadata newSegmentZKMetadata,
+      CommittingSegmentDescriptor committingSegmentDescriptor, @Nullable SegmentZKMetadata committingSegmentZKMetadata,
+      int maxNumPartitionsPerInstance) {
+    newSegmentZKMetadata.setSizeThresholdToFlushSegment(_flushThreshold);
   }
 }

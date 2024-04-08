@@ -16,18 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.upsert.merger;
+package org.apache.pinot.spi.stream;
 
-/**
- * Merges 2 records and returns the merged record.
- * Overwrite the existing value for the given field. Then return the merged record.
- */
-public class OverwriteMerger implements PartialUpsertMerger {
-  OverwriteMerger() {
+import javax.annotation.Nullable;
+
+
+public class BytesStreamMessage extends StreamMessage<byte[]> {
+
+  public BytesStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
+    super(key, value, value.length, metadata);
   }
 
-  @Override
-  public Object merge(Object previousValue, Object currentValue) {
-    return currentValue;
+  public BytesStreamMessage(byte[] value, @Nullable StreamMessageMetadata metadata) {
+    this(null, value, metadata);
+  }
+
+  public BytesStreamMessage(byte[] value) {
+    this(value, null);
   }
 }

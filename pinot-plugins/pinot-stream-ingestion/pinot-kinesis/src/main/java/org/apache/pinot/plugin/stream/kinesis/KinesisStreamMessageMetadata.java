@@ -24,15 +24,17 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
+// TODO: Make it a util class
 public class KinesisStreamMessageMetadata extends StreamMessageMetadata {
   public static final String APPRX_ARRIVAL_TIMESTAMP_KEY = "apprxArrivalTimestamp";
   public static final String SEQUENCE_NUMBER_KEY = "sequenceNumber";
 
-  public KinesisStreamMessageMetadata(long recordIngestionTimeMs,
-      @Nullable GenericRow headers) {
+  @Deprecated
+  public KinesisStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers) {
     super(recordIngestionTimeMs, headers);
   }
 
+  @Deprecated
   public KinesisStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
       Map<String, String> metadata) {
     super(recordIngestionTimeMs, headers, metadata);
