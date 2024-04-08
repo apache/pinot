@@ -140,7 +140,7 @@
     <jackson.version>2.12.7.20221012</jackson.version>
     <zookeeper.version>3.9.2</zookeeper.version>
     <async-http-client.version>2.12.3</async-http-client.version>
-    <jersey.version>2.42</jersey.version>
+    <jersey.version>3.1.6</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <swagger.version>1.6.14</swagger.version>
