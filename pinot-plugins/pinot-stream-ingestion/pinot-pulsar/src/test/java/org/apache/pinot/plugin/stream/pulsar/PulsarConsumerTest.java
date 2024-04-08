@@ -64,7 +64,7 @@ import static org.testng.Assert.fail;
 public class PulsarConsumerTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarConsumerTest.class);
 
-  private static final DockerImageName PULSAR_IMAGE = DockerImageName.parse("apachepulsar/pulsar:2.7.2");
+  private static final DockerImageName PULSAR_IMAGE = DockerImageName.parse("apachepulsar/pulsar:2.11.4");
   public static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
   public static final String TEST_TOPIC = "test-topic";
   public static final String TEST_TOPIC_BATCH = "test-topic-batch";
