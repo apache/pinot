@@ -96,6 +96,7 @@ public class UnionOperator extends SetOperator {
       _queryStats = queryStats;
     } else {
       _queryStats.mergeUpstream(queryStats);
+      _queryStats.getCurrentStats().concat(queryStats.getCurrentStats());
     }
   }
 

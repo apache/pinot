@@ -149,6 +149,7 @@ public abstract class SetOperator extends MultiStageOperator<SetOperator.StatKey
       MultiStageQueryStats leftQueryStats = leftBlock.getQueryStats();
       assert leftQueryStats != null;
       _rightQueryStats.mergeInOrder(leftQueryStats, getOperatorType(), _statMap);
+      _rightQueryStats.getCurrentStats().concat(leftQueryStats.getCurrentStats());
       return TransferableBlockUtils.getEndOfStreamTransferableBlock(_rightQueryStats);
     }
     for (Object[] row : leftBlock.getContainer()) {
