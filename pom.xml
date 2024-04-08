@@ -237,7 +237,7 @@
     <jettison.version>1.5.4</jettison.version>
     <eclipse.jetty.version>9.4.54.v20240208</eclipse.jetty.version>
     <nimbus-jose-jwt.version>9.37.3</nimbus-jose-jwt.version>
-    <bouncycastle.version>1.77</bouncycastle.version>
+    <bouncycastle.version>1.78</bouncycastle.version>
     <airlift.version>0.26</airlift.version>
     <pulsar.version>2.11.4</pulsar.version>
   </properties>
