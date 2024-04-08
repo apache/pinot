@@ -29,6 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.Test;
 
@@ -54,6 +56,11 @@ public class ProtoBufMessageDecoderTest {
   private static final String ENUM_FIELD = "enum_field";
   private static final String NESTED_INT_FIELD = "nested_int_field";
   private static final String NESTED_STRING_FIELD = "nested_string_field";
+  private final Schema _dummyTableSchema = new Schema.SchemaBuilder().setSchemaName("SampleRecord")
+      .addSingleValueDimension("id", FieldSpec.DataType.INT)
+      .addSingleValueDimension("name", FieldSpec.DataType.STRING)
+      .addSingleValueDimension("email", FieldSpec.DataType.STRING)
+      .addMultiValueDimension("friends", FieldSpec.DataType.STRING).build();
 
   @Test
   public void testHappyCase()
@@ -62,7 +69,7 @@ public class ProtoBufMessageDecoderTest {
     URL descriptorFile = getClass().getClassLoader().getResource("sample.desc");
     decoderProps.put("descriptorFile", descriptorFile.toURI().toString());
     ProtoBufMessageDecoder messageDecoder = new ProtoBufMessageDecoder();
-    messageDecoder.init(decoderProps, getFieldsInSampleRecord(), "");
+    messageDecoder.init(decoderProps, getFieldsInSampleRecord(), "", _dummyTableSchema);
     Sample.SampleRecord sampleRecord = getSampleRecordMessage();
     GenericRow destination = new GenericRow();
     messageDecoder.decode(sampleRecord.toByteArray(), destination);
@@ -87,7 +94,7 @@ public class ProtoBufMessageDecoderTest {
     decoderProps.put("descriptorFile", descriptorFile.toURI().toString());
     decoderProps.put("protoClassName", "SampleRecord");
     ProtoBufMessageDecoder messageDecoder = new ProtoBufMessageDecoder();
-    messageDecoder.init(decoderProps, getFieldsInSampleRecord(), "");
+    messageDecoder.init(decoderProps, getFieldsInSampleRecord(), "", _dummyTableSchema);
     Sample.SampleRecord sampleRecord = getSampleRecordMessage();
     GenericRow destination = new GenericRow();
     messageDecoder.decode(sampleRecord.toByteArray(), destination);
@@ -112,7 +119,7 @@ public class ProtoBufMessageDecoderTest {
     URL descriptorFile = getClass().getClassLoader().getResource("complex_types.desc");
     decoderProps.put("descriptorFile", descriptorFile.toURI().toString());
     ProtoBufMessageDecoder messageDecoder = new ProtoBufMessageDecoder();
-    messageDecoder.init(decoderProps, getSourceFieldsForComplexType(), "");
+    messageDecoder.init(decoderProps, getSourceFieldsForComplexType(), "", _dummyTableSchema);
     Map<String, Object> inputRecord = createComplexTypeRecord();
     GenericRow destination = new GenericRow();
     messageDecoder.decode(getComplexTypeObject(inputRecord).toByteArray(), destination);
@@ -140,7 +147,7 @@ public class ProtoBufMessageDecoderTest {
     ComplexTypes.TestMessage.NestedMessage nestedMessage =
         ComplexTypes.TestMessage.NestedMessage.newBuilder().setNestedStringField("hello").setNestedIntField(42).build();
 
-    messageDecoder.init(decoderProps, ImmutableSet.of(NESTED_STRING_FIELD, NESTED_INT_FIELD), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of(NESTED_STRING_FIELD, NESTED_INT_FIELD), "", _dummyTableSchema);
     GenericRow destination = new GenericRow();
     messageDecoder.decode(nestedMessage.toByteArray(), destination);
 
@@ -161,7 +168,7 @@ public class ProtoBufMessageDecoderTest {
     Set<String> sourceFields = getSourceFieldsForComplexType();
     sourceFields.addAll(getFieldsInSampleRecord());
 
-    messageDecoder.init(decoderProps, ImmutableSet.of("test_message", "sample_record"), "");
+    messageDecoder.init(decoderProps, ImmutableSet.of("test_message", "sample_record"), "", _dummyTableSchema);
     Map<String, Object> inputRecord = createComplexTypeRecord();
     GenericRow destination = new GenericRow();
     ComplexTypes.TestMessage testMessage = getComplexTypeObject(inputRecord);

@@ -20,6 +20,7 @@ package org.apache.pinot.spi.stream;
 
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.plugin.PluginManager;
 
 
@@ -37,12 +38,12 @@ public class StreamDecoderProvider {
    * @param fieldsToRead The fields to read from the source stream
    * @return The initialized StreamMessageDecoder
    */
-  public static StreamMessageDecoder create(StreamConfig streamConfig, Set<String> fieldsToRead) {
+  public static StreamMessageDecoder create(StreamConfig streamConfig, Set<String> fieldsToRead, Schema tableSchema) {
     String decoderClass = streamConfig.getDecoderClass();
     Map<String, String> decoderProperties = streamConfig.getDecoderProperties();
     try {
       StreamMessageDecoder decoder = PluginManager.get().createInstance(decoderClass);
-      decoder.init(decoderProperties, fieldsToRead, streamConfig.getTopicName());
+      decoder.init(decoderProperties, fieldsToRead, streamConfig.getTopicName(), tableSchema);
       return decoder;
     } catch (Exception e) {
       throw new RuntimeException(

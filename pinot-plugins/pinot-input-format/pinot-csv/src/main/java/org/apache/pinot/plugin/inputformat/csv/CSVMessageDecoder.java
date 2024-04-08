@@ -33,6 +33,7 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.csv.QuoteMode;
 import org.apache.commons.lang.StringUtils;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.slf4j.Logger;
@@ -61,7 +62,7 @@ public class CSVMessageDecoder implements StreamMessageDecoder<byte[]> {
   private CSVRecordExtractor _recordExtractor;
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
       throws Exception {
     String csvFormat = props.get(CONFIG_FILE_FORMAT);
     CSVFormat format;

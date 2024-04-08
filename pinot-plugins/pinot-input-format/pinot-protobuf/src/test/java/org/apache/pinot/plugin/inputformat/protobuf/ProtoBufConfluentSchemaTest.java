@@ -41,6 +41,8 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.plugin.inputformat.protobuf.kafka.schemaregistry.SchemaRegistryStarter;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -111,11 +113,17 @@ public class ProtoBufConfluentSchemaTest {
       Assert.assertNull(optionalField.getRealContainingOneof(), "Received protobuf have been rewritten");
     };
 
+    Schema dummyTableSchema = new Schema.SchemaBuilder().setSchemaName("SampleRecord")
+        .addSingleValueDimension("id", FieldSpec.DataType.INT)
+        .addSingleValueDimension("name", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("email", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("friends", FieldSpec.DataType.STRING).build();
+
     KafkaConfluentSchemaRegistryProtoBufMessageDecoder decoder =
         new KafkaConfluentSchemaRegistryProtoBufMessageDecoder(onMessage);
     Map<String, String> decoderProps = new HashMap<>();
     decoderProps.put("schema.registry.rest.url", _schemaRegistry.getUrl());
-    decoder.init(decoderProps, null, TOPIC_PROTO);
+    decoder.init(decoderProps, null, TOPIC_PROTO, dummyTableSchema);
     GenericRow reuse = new GenericRow();
     List<GenericRow> result = new ArrayList<>();
     while (iter.hasNext()) {

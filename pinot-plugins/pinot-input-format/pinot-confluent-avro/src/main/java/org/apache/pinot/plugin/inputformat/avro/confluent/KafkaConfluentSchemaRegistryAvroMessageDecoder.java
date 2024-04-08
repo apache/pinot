@@ -35,6 +35,7 @@ import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.security.ssl.DefaultSslEngineFactory;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -89,7 +90,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
   }
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema tableSchema)
       throws Exception {
     checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
     String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);

@@ -29,6 +29,7 @@ import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
@@ -190,7 +191,7 @@ public class TableConfigUtilsTest {
 
   private class TestStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
     @Override
-    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, Schema schema)
         throws Exception {
     }
 
