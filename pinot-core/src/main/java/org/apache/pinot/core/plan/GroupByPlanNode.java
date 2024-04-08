@@ -56,7 +56,7 @@ public class GroupByPlanNode implements PlanNode {
   }
 
   private GroupByOperator buildNonFilteredGroupByPlan() {
-    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext, null);
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
     AggregationFunctionUtils.AggregationInfo aggregationInfo =
         AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext,

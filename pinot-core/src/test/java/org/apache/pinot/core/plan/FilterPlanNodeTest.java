@@ -79,7 +79,7 @@ public class FilterPlanNodeTest {
   }
 
   private int getNumberOfFilteredDocs(SegmentContext segmentContext, QueryContext queryContext) {
-    FilterPlanNode node = new FilterPlanNode(segmentContext, queryContext, null);
+    FilterPlanNode node = new FilterPlanNode(segmentContext, queryContext);
     BaseFilterOperator op = node.run();
     int numDocsFiltered = 0;
     FilterBlock block = op.nextBlock();

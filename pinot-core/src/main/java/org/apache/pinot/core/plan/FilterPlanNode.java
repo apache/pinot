@@ -73,6 +73,10 @@ public class FilterPlanNode implements PlanNode {
   // Cache the predicate evaluators
   private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators = new ArrayList<>(4);
 
+  public FilterPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
+    this(segmentContext, queryContext, null);
+  }
+
   public FilterPlanNode(SegmentContext segmentContext, QueryContext queryContext, @Nullable FilterContext filter) {
     _indexSegment = segmentContext.getIndexSegment();
     _segmentContext = segmentContext;

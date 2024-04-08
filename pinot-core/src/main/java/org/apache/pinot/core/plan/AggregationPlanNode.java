@@ -91,7 +91,7 @@ public class AggregationPlanNode implements PlanNode {
     assert aggregationFunctions != null;
 
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext, null);
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
     if (!_queryContext.isNullHandlingEnabled()) {

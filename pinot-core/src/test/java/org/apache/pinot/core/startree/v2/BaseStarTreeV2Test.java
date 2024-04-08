@@ -231,7 +231,7 @@ abstract class BaseStarTreeV2Test<R, A> {
 
   private void testUnsupportedFilter(String query) {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-    FilterPlanNode filterPlanNode = new FilterPlanNode(new SegmentContext(_indexSegment), queryContext, null);
+    FilterPlanNode filterPlanNode = new FilterPlanNode(new SegmentContext(_indexSegment), queryContext);
     filterPlanNode.run();
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
@@ -263,7 +263,7 @@ abstract class BaseStarTreeV2Test<R, A> {
     List<String> groupByColumns = new ArrayList<>(groupByColumnSet);
 
     // Filter
-    FilterPlanNode filterPlanNode = new FilterPlanNode(new SegmentContext(_indexSegment), queryContext, null);
+    FilterPlanNode filterPlanNode = new FilterPlanNode(new SegmentContext(_indexSegment), queryContext);
     filterPlanNode.run();
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
         StarTreeUtils.extractPredicateEvaluatorsMap(_indexSegment, queryContext.getFilter(),
@@ -286,8 +286,7 @@ abstract class BaseStarTreeV2Test<R, A> {
         computeStarTreeResult(starTreeFilterPlanNode, starTreeAggregationColumnReaders, starTreeGroupByColumnReaders);
 
     // Extract values without star-tree
-    FilterPlanNode nonStarTreeFilterPlanNode =
-        new FilterPlanNode(new SegmentContext(_indexSegment), queryContext, null);
+    FilterPlanNode nonStarTreeFilterPlanNode = new FilterPlanNode(new SegmentContext(_indexSegment), queryContext);
     List<ForwardIndexReader> nonStarTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     List<Dictionary> nonStarTreeAggregationColumnDictionaries = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {

@@ -274,7 +274,7 @@ public class AggregationFunctionUtils {
       QueryContext queryContext) {
     assert queryContext.getAggregationFunctions() != null && queryContext.getFilteredAggregationFunctions() != null;
 
-    FilterPlanNode mainFilterPlan = new FilterPlanNode(segmentContext, queryContext, null);
+    FilterPlanNode mainFilterPlan = new FilterPlanNode(segmentContext, queryContext);
     BaseFilterOperator mainFilterOperator = mainFilterPlan.run();
     List<Pair<Predicate, PredicateEvaluator>> mainPredicateEvaluators = mainFilterPlan.getPredicateEvaluators();
 
