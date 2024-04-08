@@ -51,6 +51,11 @@
       <artifactId>protobuf-java</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.codehaus.janino</groupId>
+      <artifactId>janino</artifactId>
+      <version>3.1.6</version>
+    </dependency>
+    <dependency>
       <groupId>com.github.os72</groupId>
       <artifactId>protobuf-dynamic</artifactId>
       <version>1.0.1</version>
