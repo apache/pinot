@@ -85,8 +85,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param column column name
    * @param segmentIndexDir segment index directory
    * @param commit true if the index should be committed (at the end after all documents have
-   *               been added), false if index should not be
-   * @param sortedDocIds sortedDocIds from segment conversion
+   *               been added), false if index should not be committed
+   * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
    * Note on commit:
    *               Once {@link SegmentColumnarIndexCreator}
    *               finishes indexing all documents/rows for the segment, we need to commit and close
@@ -103,7 +103,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
    * @param config the text index config
    */
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
-      @Nullable int[] sortedDocIds, TextIndexConfig config) {
+      @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
     _textColumn = column;
 
     // to reuse the mutable index, it must be (1) not the realtime index, and (2) is realtime segment conversion
@@ -130,7 +130,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       if (_reuseMutableIndex) {
         LOGGER.info("Reusing the realtime lucene index for segment {} and column {}", segmentIndexDir, column);
         indexWriterConfig.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
-        convertMutableSegment(segmentIndexDir, sortedDocIds, indexWriterConfig);
+        convertMutableSegment(segmentIndexDir, immutableToMutableIdMap, indexWriterConfig);
         return;
       }
 
@@ -157,10 +157,10 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   /**
    * Copy the mutable lucene index files to create an immutable lucene index
    * @param segmentIndexDir segment index directory
-   * @param sortedDocIds sortedDocIds from segment conversion
+   * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
    * @param indexWriterConfig indexWriterConfig
    */
-  private void convertMutableSegment(File segmentIndexDir, @Nullable int[] sortedDocIds,
+  private void convertMutableSegment(File segmentIndexDir, @Nullable int[] immutableToMutableIdMap,
       IndexWriterConfig indexWriterConfig) {
     try {
       // Copy the mutable index to the v1 index location
@@ -178,7 +178,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       indexWriter.forceMerge(1);
       indexWriter.close();
 
-      buildMappingFile(segmentIndexDir, _textColumn, destDirectory, sortedDocIds);
+      buildMappingFile(segmentIndexDir, _textColumn, destDirectory, immutableToMutableIdMap);
     } catch (IOException e) {
       throw new RuntimeException("Failed to copy the mutable lucene index: " + e);
     }
@@ -186,14 +186,14 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
 
   /**
    * Generate the mapping file from mutable Pinot docId (stored within the Lucene index) to immutable Pinot docId using
-   * the sortedDocIds from segment conversion
+   * the immutableToMutableIdMap from segment conversion
    * @param segmentIndexDir segment index directory
    * @param column column name
    * @param directory directory of the index
-   * @param sortedDocIds sortedDocIds from segment conversion
+   * @param immutableToMutableIdMap immutableToMutableIdMap from segment conversion
    */
   private void buildMappingFile(File segmentIndexDir, String column, Directory directory,
-      @Nullable int[] sortedDocIds)
+      @Nullable int[] immutableToMutableIdMap)
       throws IOException {
     IndexReader indexReader = DirectoryReader.open(directory);
     IndexSearcher indexSearcher = new IndexSearcher(indexReader);
@@ -206,9 +206,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(docIdMappingFile, /* readOnly */ false, 0, length,
         ByteOrder.LITTLE_ENDIAN, desc)) {
       try {
-        // If sortedDocIds is null, then docIds should not change between the mutable and immutable segments.
+        // If immutableToMutableIdMap is null, then docIds should not change between the mutable and immutable segments.
         // Therefore, the mapping file can be built without doing an additional docId conversion
-        if (sortedDocIds == null) {
+        if (immutableToMutableIdMap == null) {
           for (int i = 0; i < numDocs; i++) {
             Document document = indexSearcher.doc(i);
             int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
@@ -221,7 +221,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
           Document document = indexSearcher.doc(i);
           int mutablePinotDocId =
               Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
-          int immutablePinotDocId = sortedDocIds[mutablePinotDocId];
+          int immutablePinotDocId = immutableToMutableIdMap[mutablePinotDocId];
           buffer.putInt(i * Integer.BYTES, immutablePinotDocId);
         }
       } catch (Exception e) {
