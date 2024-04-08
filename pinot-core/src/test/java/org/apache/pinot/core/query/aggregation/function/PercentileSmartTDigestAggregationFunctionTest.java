@@ -78,10 +78,5 @@ public class PercentileSmartTDigestAggregationFunctionTest {
     String expectedAggrWithoutNull90(Scenario scenario) {
       return "7.100000000000001";
     }
-
-    @Override
-    String expectedAggrWithoutNull100(Scenario scenario) {
-      return super.expectedAggrWithoutNull100(scenario);
-    }
   }
 }

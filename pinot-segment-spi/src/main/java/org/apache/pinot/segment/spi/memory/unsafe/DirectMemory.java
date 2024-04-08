@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.memory.unsafe;
 
-import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,15 +54,10 @@ public class DirectMemory implements Memory {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public synchronized void close() {
     if (!_closed) {
-      synchronized (this) {
-        if (!_closed) {
-          Unsafer.UNSAFE.freeMemory(_address);
-          _closed = true;
-        }
-      }
+      Unsafer.UNSAFE.freeMemory(_address);
+      _closed = true;
     }
   }
 
@@ -71,7 +65,7 @@ public class DirectMemory implements Memory {
   protected void finalize()
       throws Throwable {
     if (!_closed) {
-      LOGGER.warn("Mmap section of " + _size + " wasn't explicitly closed");
+      LOGGER.warn("Direct memory of size: {} wasn't explicitly closed", _size);
       close();
     }
     super.finalize();
