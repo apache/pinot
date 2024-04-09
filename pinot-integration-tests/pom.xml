@@ -34,7 +34,7 @@
 
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <localstack-utils.version>0.2.19</localstack-utils.version>
+    <localstack-utils.version>0.2.23</localstack-utils.version>
     <testcontainers.version>1.19.7</testcontainers.version>
   </properties>
 
