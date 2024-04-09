@@ -31,6 +31,8 @@ import java.util.Queue;
 import java.util.Set;
 import org.apache.commons.lang.StringUtils;
 import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufCodeGenMessgeDecoder;
+import org.apache.pinot.plugin.inputformat.protobuf.ProtoBufUtils;
+
 
 public class MessageCodeGen {
 
@@ -47,7 +49,7 @@ public class MessageCodeGen {
       Set<String> fieldsToRead,
       HashMap<String, MessageDecoderMethod> msgDecodeCode)
       throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-    String fullyQualifiedMsgName = ProtobufInternalUtils.getFullJavaName(descriptor);
+    String fullyQualifiedMsgName = ProtoBufUtils.getFullJavaName(descriptor);
 
     StringBuilder code = new StringBuilder();
     code.append("package org.apache.pinot.plugin.inputformat.protobuf.decoder;\n");
@@ -64,7 +66,7 @@ public class MessageCodeGen {
         addIndent("public static GenericRow execute(byte[] from, GenericRow to) throws Exception {", indent));
     code.append(
         completeLine(String.format("Map<String, Object> msgMap = %s(%s.parseFrom(from))",
-                msgDecodeCode.get(ProtobufInternalUtils.getFullJavaName(descriptor)).getMethodName(),
+                msgDecodeCode.get(ProtoBufUtils.getFullJavaName(descriptor)).getMethodName(),
                 fullyQualifiedMsgName),
             ++indent));
 
@@ -128,12 +130,11 @@ public class MessageCodeGen {
       Queue<Descriptors.Descriptor> queue,
       Set<String> fieldsToRead) {
     Descriptors.Descriptor descriptor = queue.remove();
-    String fullyQualifiedMsgName = ProtobufInternalUtils.getFullJavaName(descriptor);
+    String fullyQualifiedMsgName = ProtoBufUtils.getFullJavaName(descriptor);
     int varNum = 1;
     if (msgDecodeCode.containsKey(fullyQualifiedMsgName)) {
       return;
     }
-    String msgInGenFuncName = ProtobufInternalUtils.underScoreToCamelCase(descriptor.getName(), true);
     StringBuilder code = new StringBuilder();
     String methodNameOfDecoder = getDecoderMethodName(fullyQualifiedMsgName);
     int indent = 1;
@@ -183,14 +184,14 @@ public class MessageCodeGen {
           code.append(codeForComplexFieldExtraction(
               desc,
               fieldNameInCode,
-              ProtobufInternalUtils.getFullJavaName(desc.getEnumType()),
+              ProtoBufUtils.getFullJavaName(desc.getEnumType()),
               indent,
               ++varNum,
               "",
               ".name()"));
           break;
         case MESSAGE:
-          String messageType = ProtobufInternalUtils.getFullJavaName(desc.getMessageType());
+          String messageType = ProtoBufUtils.getFullJavaName(desc.getMessageType());
           if (!msgDecodeCode.containsKey(messageType)) {
             queue.add(desc.getMessageType());
           }
