@@ -1209,7 +1209,7 @@
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>
         <artifactId>hash4j</artifactId>
-        <version>0.13.0</version>
+        <version>0.17.0</version>
       </dependency>
       <dependency>
         <groupId>com.tdunning</groupId>
