@@ -39,11 +39,11 @@ public interface BrokerRequestHandler {
   void shutDown();
 
   BrokerResponse handleRequest(JsonNode request, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
-      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders)
+      @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception;
 
   default BrokerResponse handleRequest(JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext, HttpHeaders httpHeaders)
+      RequestContext requestContext, @Nullable HttpHeaders httpHeaders)
       throws Exception {
     return handleRequest(request, null, requesterIdentity, requestContext, httpHeaders);
   }

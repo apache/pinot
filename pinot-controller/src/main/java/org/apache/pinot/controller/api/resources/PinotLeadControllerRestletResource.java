@@ -109,8 +109,7 @@ public class PinotLeadControllerRestletResource {
     }
 
     // Assigns all the tables to the relevant partitions.
-    List<String> tableNames = _pinotHelixResourceManager.getAllTables(
-        headers.getHeaderString(DATABASE));
+    List<String> tableNames = _pinotHelixResourceManager.getAllTables(headers.getHeaderString(DATABASE));
     for (String tableName : tableNames) {
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);

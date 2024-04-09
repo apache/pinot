@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core.periodictask;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,7 +34,6 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.spi.utils.CommonConstants.DEFAULT_DATABASE;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -89,9 +87,7 @@ public class ControllerPeriodicTaskTest {
   public void beforeTest() {
     List<String> tables = new ArrayList<>(_numTables);
     IntStream.range(0, _numTables).forEach(i -> tables.add("table_" + i + " _OFFLINE"));
-    when(_resourceManager.getDatabaseNames())
-        .thenReturn(Collections.singletonList(DEFAULT_DATABASE));
-    when(_resourceManager.getAllTables(DEFAULT_DATABASE)).thenReturn(tables);
+    when(_resourceManager.getAllTables()).thenReturn(tables);
     when(_leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
   }
 
@@ -109,7 +105,6 @@ public class ControllerPeriodicTaskTest {
         _task.getInitialDelayInSeconds() >= ControllerConf.ControllerPeriodicTasksConf.MIN_INITIAL_DELAY_IN_SECONDS);
     assertTrue(
         _task.getInitialDelayInSeconds() < ControllerConf.ControllerPeriodicTasksConf.MAX_INITIAL_DELAY_IN_SECONDS);
-
     assertEquals(_task.getIntervalInSeconds(), RUN_FREQUENCY_IN_SECONDS);
   }
 
@@ -124,7 +119,7 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_stopTaskCalled.get());
     assertTrue(_task.isStarted());
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
+        ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
 
     // Run periodic task with leadership
     resetState();
@@ -133,8 +128,7 @@ public class ControllerPeriodicTaskTest {
     assertTrue(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), _numTables);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED),
-        _numTables);
+        ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), _numTables);
     assertFalse(_stopTaskCalled.get());
     assertTrue(_task.isStarted());
 
@@ -145,7 +139,7 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), 0);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
+        ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
     assertTrue(_stopTaskCalled.get());
     assertFalse(_task.isStarted());
 
@@ -156,7 +150,7 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), 0);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
+        ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
     assertFalse(_stopTaskCalled.get());
     assertFalse(_task.isStarted());
 
@@ -169,7 +163,7 @@ public class ControllerPeriodicTaskTest {
     assertFalse(_stopTaskCalled.get());
     assertTrue(_task.isStarted());
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
+        ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), 0);
 
     // Run periodic task with leadership
     resetState();
@@ -178,7 +172,7 @@ public class ControllerPeriodicTaskTest {
     assertTrue(_processTablesCalled.get());
     assertEquals(_tablesProcessed.get(), _numTables);
     assertEquals(MetricValueUtils.getGlobalGaugeValue(_controllerMetrics, TASK_NAME,
-            ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), _numTables);
+        ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED), _numTables);
     assertFalse(_stopTaskCalled.get());
     assertTrue(_task.isStarted());
   }
