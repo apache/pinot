@@ -90,7 +90,6 @@ public abstract class BlockExchange {
       int numMailboxes = _sendingMailboxes.size();
       int mailboxIdToSendMetadata = ThreadLocalRandom.current().nextInt(numMailboxes);
       assert block.getQueryStats() != null;
-      int stageId = block.getQueryStats().getCurrentStageId();
       for (int i = 0; i < numMailboxes; i++) {
         SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
         TransferableBlock blockToSend =
