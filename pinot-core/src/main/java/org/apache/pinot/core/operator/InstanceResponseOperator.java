@@ -45,6 +45,9 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   protected final int _fetchContextSize;
   protected final QueryContext _queryContext;
 
+  protected long _threadCpuTimeNs;
+  protected long _systemActivitiesCpuTimeNs;
+
   public InstanceResponseOperator(BaseCombineOperator<?> combineOperator, List<IndexSegment> indexSegments,
       List<FetchContext> fetchContexts, QueryContext queryContext) {
     _combineOperator = combineOperator;
@@ -81,12 +84,24 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
   @Override
   protected InstanceResponseBlock getNextBlock() {
+    BaseResultsBlock baseResultsBlock = getBaseBlock();
+    return buildInstanceResponseBlock(baseResultsBlock);
+  }
+
+  protected InstanceResponseBlock buildInstanceResponseBlock(BaseResultsBlock baseResultsBlock) {
+    InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(baseResultsBlock);
+    instanceResponseBlock.addMetadata(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(_threadCpuTimeNs));
+    instanceResponseBlock.addMetadata(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
+        String.valueOf(_systemActivitiesCpuTimeNs));
+    return instanceResponseBlock;
+  }
+
+  protected BaseResultsBlock getBaseBlock() {
     if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
       long startWallClockTimeNs = System.nanoTime();
 
       ThreadResourceUsageProvider mainThreadResourceUsageProvider = new ThreadResourceUsageProvider();
       BaseResultsBlock resultsBlock = getCombinedResults();
-      InstanceResponseBlock instanceResponseBlock = new InstanceResponseBlock(resultsBlock);
       long mainThreadCpuTimeNs = mainThreadResourceUsageProvider.getThreadTimeNs();
 
       long totalWallClockTimeNs = System.nanoTime() - startWallClockTimeNs;
@@ -97,22 +112,17 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
        */
       long multipleThreadCpuTimeNs = resultsBlock.getExecutionThreadCpuTimeNs();
       int numServerThreads = resultsBlock.getNumServerThreads();
-      long systemActivitiesCpuTimeNs =
-          calSystemActivitiesCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs, mainThreadCpuTimeNs,
-              numServerThreads);
+      _systemActivitiesCpuTimeNs = calSystemActivitiesCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs,
+          mainThreadCpuTimeNs, numServerThreads);
+      _threadCpuTimeNs = mainThreadCpuTimeNs + multipleThreadCpuTimeNs;
 
-      long threadCpuTimeNs = mainThreadCpuTimeNs + multipleThreadCpuTimeNs;
-      instanceResponseBlock.addMetadata(MetadataKey.THREAD_CPU_TIME_NS.getName(), String.valueOf(threadCpuTimeNs));
-      instanceResponseBlock.addMetadata(MetadataKey.SYSTEM_ACTIVITIES_CPU_TIME_NS.getName(),
-          String.valueOf(systemActivitiesCpuTimeNs));
-
-      return instanceResponseBlock;
+      return resultsBlock;
     } else {
-      return new InstanceResponseBlock(getCombinedResults());
+      return getCombinedResults();
     }
   }
 
-  private BaseResultsBlock getCombinedResults() {
+  protected BaseResultsBlock getCombinedResults() {
     try {
       prefetchAll();
       return _combineOperator.nextBlock();
