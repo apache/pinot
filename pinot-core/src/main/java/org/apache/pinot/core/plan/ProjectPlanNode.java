@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.transform.TransformOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
@@ -42,23 +43,25 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
  */
 public class ProjectPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
+  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
   private final Collection<ExpressionContext> _expressions;
   private final int _maxDocsPerCall;
   private final BaseFilterOperator _filterOperator;
 
-  public ProjectPlanNode(IndexSegment indexSegment, QueryContext queryContext,
+  public ProjectPlanNode(SegmentContext segmentContext, QueryContext queryContext,
       Collection<ExpressionContext> expressions, int maxDocsPerCall, @Nullable BaseFilterOperator filterOperator) {
-    _indexSegment = indexSegment;
+    _indexSegment = segmentContext.getIndexSegment();
+    _segmentContext = segmentContext;
     _queryContext = queryContext;
     _expressions = expressions;
     _maxDocsPerCall = maxDocsPerCall;
     _filterOperator = filterOperator;
   }
 
-  public ProjectPlanNode(IndexSegment indexSegment, QueryContext queryContext,
+  public ProjectPlanNode(SegmentContext segmentContext, QueryContext queryContext,
       Collection<ExpressionContext> expressions, int maxDocsPerCall) {
-    this(indexSegment, queryContext, expressions, maxDocsPerCall, null);
+    this(segmentContext, queryContext, expressions, maxDocsPerCall, null);
   }
 
   @Override
@@ -75,8 +78,8 @@ public class ProjectPlanNode implements PlanNode {
     projectionColumns.forEach(column -> dataSourceMap.put(column, _indexSegment.getDataSource(column)));
     // NOTE: Skip creating DocIdSetOperator when maxDocsPerCall is 0 (for selection query with LIMIT 0)
     DocIdSetOperator docIdSetOperator =
-        _maxDocsPerCall > 0 ? new DocIdSetPlanNode(_indexSegment, _queryContext, _maxDocsPerCall, _filterOperator).run()
-            : null;
+        _maxDocsPerCall > 0 ? new DocIdSetPlanNode(_segmentContext, _queryContext, _maxDocsPerCall,
+            _filterOperator).run() : null;
     ProjectionOperator projectionOperator =
         ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator);
     return hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator, _expressions)

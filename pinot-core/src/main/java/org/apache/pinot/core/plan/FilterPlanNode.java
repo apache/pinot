@@ -53,8 +53,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -66,50 +66,40 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 public class FilterPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
+  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
   private final FilterContext _filter;
 
   // Cache the predicate evaluators
   private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators = new ArrayList<>(4);
 
-  public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    this(indexSegment, queryContext, null);
+  public FilterPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
+    this(segmentContext, queryContext, null);
   }
 
-  public FilterPlanNode(IndexSegment indexSegment, QueryContext queryContext, @Nullable FilterContext filter) {
-    _indexSegment = indexSegment;
+  public FilterPlanNode(SegmentContext segmentContext, QueryContext queryContext, @Nullable FilterContext filter) {
+    _indexSegment = segmentContext.getIndexSegment();
+    _segmentContext = segmentContext;
     _queryContext = queryContext;
     _filter = filter != null ? filter : _queryContext.getFilter();
   }
 
   @Override
   public BaseFilterOperator run() {
-    // NOTE: Snapshot the queryableDocIds before reading the numDocs to prevent the latest updates getting lost
-    MutableRoaringBitmap queryableDocIdSnapshot = null;
-    if (!_queryContext.isSkipUpsert()) {
-      ThreadSafeMutableRoaringBitmap queryableDocIds = _indexSegment.getQueryableDocIds();
-      if (queryableDocIds != null) {
-        queryableDocIdSnapshot = queryableDocIds.getMutableRoaringBitmap();
-      } else {
-        ThreadSafeMutableRoaringBitmap validDocIds = _indexSegment.getValidDocIds();
-        if (validDocIds != null) {
-          queryableDocIdSnapshot = validDocIds.getMutableRoaringBitmap();
-        }
-      }
-    }
+    MutableRoaringBitmap queryableDocIdsSnapshot = _segmentContext.getQueryableDocIdsSnapshot();
     int numDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
 
     if (_filter != null) {
       BaseFilterOperator filterOperator = constructPhysicalOperator(_filter, numDocs);
-      if (queryableDocIdSnapshot != null) {
-        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdSnapshot, false, numDocs);
+      if (queryableDocIdsSnapshot != null) {
+        BaseFilterOperator validDocFilter = new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
         return FilterOperatorUtils.getAndFilterOperator(_queryContext, Arrays.asList(filterOperator, validDocFilter),
             numDocs);
       } else {
         return filterOperator;
       }
-    } else if (queryableDocIdSnapshot != null) {
-      return new BitmapBasedFilterOperator(queryableDocIdSnapshot, false, numDocs);
+    } else if (queryableDocIdsSnapshot != null) {
+      return new BitmapBasedFilterOperator(queryableDocIdsSnapshot, false, numDocs);
     } else {
       return new MatchAllFilterOperator(numDocs);
     }

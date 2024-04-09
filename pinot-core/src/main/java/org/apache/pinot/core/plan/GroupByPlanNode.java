@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.query.GroupByOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 
 
 /**
@@ -33,10 +34,12 @@ import org.apache.pinot.segment.spi.IndexSegment;
  */
 public class GroupByPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
+  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
 
-  public GroupByPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    _indexSegment = indexSegment;
+  public GroupByPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
+    _indexSegment = segmentContext.getIndexSegment();
+    _segmentContext = segmentContext;
     _queryContext = queryContext;
   }
 
@@ -48,15 +51,15 @@ public class GroupByPlanNode implements PlanNode {
 
   private FilteredGroupByOperator buildFilteredGroupByPlan() {
     return new FilteredGroupByOperator(_queryContext,
-        AggregationFunctionUtils.buildFilteredAggregationInfos(_indexSegment, _queryContext),
+        AggregationFunctionUtils.buildFilteredAggregationInfos(_segmentContext, _queryContext),
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
   private GroupByOperator buildNonFilteredGroupByPlan() {
-    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
     AggregationFunctionUtils.AggregationInfo aggregationInfo =
-        AggregationFunctionUtils.buildAggregationInfo(_indexSegment, _queryContext,
+        AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext,
             _queryContext.getAggregationFunctions(), _queryContext.getFilter(), filterOperator,
             filterPlanNode.getPredicateEvaluators());
     return new GroupByOperator(_queryContext, aggregationInfo, _indexSegment.getSegmentMetadata().getTotalDocs());

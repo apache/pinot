@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -65,6 +66,7 @@ import org.apache.pinot.segment.local.utils.SegmentLocks;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
@@ -1037,6 +1039,68 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // the primary key count. So, we set the primary key count to 0 here.
     updatePrimaryKeyGauge(0);
     _logger.info("Closed the metadata manager");
+  }
+
+  protected void replaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, int oldDocId, int newDocId,
+      RecordInfo recordInfo) {
+    removeDocId(oldSegment, oldDocId);
+    addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
+  }
+
+  protected void replaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
+    validDocIds.replace(oldDocId, newDocId);
+    if (queryableDocIds != null) {
+      if (recordInfo.isDeleteRecord()) {
+        queryableDocIds.remove(oldDocId);
+      } else {
+        queryableDocIds.replace(oldDocId, newDocId);
+      }
+    }
+  }
+
+  protected void addDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int docId, RecordInfo recordInfo) {
+    validDocIds.add(docId);
+    if (queryableDocIds != null && !recordInfo.isDeleteRecord()) {
+      queryableDocIds.add(docId);
+    }
+  }
+
+  protected void removeDocId(IndexSegment segment, int docId) {
+    Objects.requireNonNull(segment.getValidDocIds()).remove(docId);
+    ThreadSafeMutableRoaringBitmap currentQueryableDocIds = segment.getQueryableDocIds();
+    if (currentQueryableDocIds != null) {
+      currentQueryableDocIds.remove(docId);
+    }
+  }
+
+  /**
+   * Use the segmentContexts to collect the contexts for selected segments. Reuse the segmentContext object if
+   * present, to avoid overwriting the contexts specified at the others places.
+   */
+  public void setSegmentContexts(List<SegmentContext> segmentContexts) {
+    for (SegmentContext segmentContext : segmentContexts) {
+      IndexSegment segment = segmentContext.getIndexSegment();
+      if (_trackedSegments.contains(segment)) {
+        segmentContext.setQueryableDocIdsSnapshot(getQueryableDocIdsSnapshotFromSegment(segment));
+      }
+    }
+  }
+
+  private static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
+    MutableRoaringBitmap queryableDocIdsSnapshot = null;
+    ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
+    if (queryableDocIds != null) {
+      queryableDocIdsSnapshot = queryableDocIds.getMutableRoaringBitmap();
+    } else {
+      ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+      if (validDocIds != null) {
+        queryableDocIdsSnapshot = validDocIds.getMutableRoaringBitmap();
+      }
+    }
+    return queryableDocIdsSnapshot;
   }
 
   protected void doClose()

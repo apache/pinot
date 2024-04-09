@@ -38,6 +38,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -240,7 +241,7 @@ public class SelectionCombineOperatorTest {
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
     for (IndexSegment indexSegment : _indexSegments) {
-      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(indexSegment, queryContext));
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment), queryContext));
     }
     queryContext.setEndTimeMs(System.currentTimeMillis() + Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR, null);
