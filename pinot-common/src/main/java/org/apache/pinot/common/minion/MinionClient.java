@@ -52,6 +52,9 @@ public class MinionClient {
   private static final String ACCEPT = "accept";
   private static final String APPLICATION_JSON = "application/json";
   private static final String HTTP = "http";
+  private static final TypeReference<Map<String, String>> TYPEREF_MAP_STRING_STRING =
+      new TypeReference<Map<String, String>>() {
+      };
 
   private final String _controllerUrl;
   private final AuthProvider _authProvider;
@@ -73,26 +76,25 @@ public class MinionClient {
     int statusCode = response.getStatusLine().getStatusCode();
     final String responseString = EntityUtils.toString(response.getEntity());
     if (statusCode >= 400) {
-      throw new HttpException(String
-          .format("Unable to schedule minion tasks. Error code %d, Error message: %s", statusCode, responseString));
+      throw new HttpException(
+          String.format("Unable to schedule minion tasks. Error code %d, Error message: %s", statusCode,
+              responseString));
     }
-    return JsonUtils.stringToObject(responseString, new TypeReference<Map<String, String>>() {
-    });
+    return JsonUtils.stringToObject(responseString, TYPEREF_MAP_STRING_STRING);
   }
 
   public Map<String, String> getTasksStates(String taskType)
       throws IOException, HttpException {
-    HttpGet httpGet =
-        createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTasksStates(taskType));
+    HttpGet httpGet = createHttpGetRequest(MinionRequestURLBuilder.baseUrl(_controllerUrl).forTasksStates(taskType));
     HttpResponse response = HTTP_CLIENT.execute(httpGet);
     int statusCode = response.getStatusLine().getStatusCode();
     final String responseString = IOUtils.toString(response.getEntity().getContent());
     if (statusCode >= 400) {
-      throw new HttpException(String
-          .format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode, responseString));
+      throw new HttpException(
+          String.format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode,
+              responseString));
     }
-    return JsonUtils.stringToObject(responseString, new TypeReference<Map<String, String>>() {
-    });
+    return JsonUtils.stringToObject(responseString, TYPEREF_MAP_STRING_STRING);
   }
 
   public String getTaskState(String taskName)
@@ -102,8 +104,8 @@ public class MinionClient {
     int statusCode = response.getStatusLine().getStatusCode();
     String responseString = EntityUtils.toString(response.getEntity());
     if (statusCode >= 400) {
-      throw new HttpException(String
-          .format("Unable to get state for task: %s. Error code %d, Error message: %s", taskName, statusCode,
+      throw new HttpException(
+          String.format("Unable to get state for task: %s. Error code %d, Error message: %s", taskName, statusCode,
               responseString));
     }
     return responseString;
@@ -121,11 +123,11 @@ public class MinionClient {
     int statusCode = response.getStatusLine().getStatusCode();
     final String responseString = IOUtils.toString(response.getEntity().getContent(), Charset.defaultCharset());
     if (statusCode >= 400) {
-      throw new HttpException(String
-          .format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode, responseString));
+      throw new HttpException(
+          String.format("Unable to get tasks states map. Error code %d, Error message: %s", statusCode,
+              responseString));
     }
-    return JsonUtils.stringToObject(responseString, new TypeReference<Map<String, String>>() {
-    });
+    return JsonUtils.stringToObject(responseString, TYPEREF_MAP_STRING_STRING);
   }
 
   private HttpGet createHttpGetRequest(String uri) {
