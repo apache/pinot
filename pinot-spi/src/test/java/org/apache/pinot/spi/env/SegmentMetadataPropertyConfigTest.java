@@ -94,7 +94,8 @@ public class SegmentMetadataPropertyConfigTest {
     testPropertyKeys(recoveredKeys, TEST_PROPERTY_KEY);
 
     // save the configuration.
-    CommonsConfigurationUtils.saveSegmentMetadataToFile(configuration, CONFIG_FILE, "version1");
+    CommonsConfigurationUtils.saveSegmentMetadataToFile(configuration, CONFIG_FILE,
+        PropertyIOFactoryKind.SegmentMetadataIOFactory.getVersion());
 
     // reading the configuration from saved file.
     configuration = CommonsConfigurationUtils.getSegmentMetadataFromFile(CONFIG_FILE, true, true);
@@ -147,6 +148,11 @@ public class SegmentMetadataPropertyConfigTest {
     assertEquals(configuration.getIOFactory().getClass(), PropertiesConfiguration.DefaultIOFactory.class);
 
     testSegmentMetadataContent(configuration);
+
+    // asserting escaped value ('column-ProductId-maxValue')
+    String productIDMaxValue = configuration.getString("column-ProductId-maxValue");
+    assertNotNull(productIDMaxValue);
+    assertEquals(productIDMaxValue, "B009,WVB40S");
   }
 
   @Test

@@ -47,7 +47,7 @@ import org.apache.commons.lang3.StringUtils;
  */
 public class CommonsConfigurationUtils {
   private static final Character DEFAULT_LIST_DELIMITER = ',';
-  private static final String SEGMENT_VERSION_IDENTIFIER = "segment.metadata.version";
+  private static final String VERSION_HEADER_IDENTIFIER = "version";
 
   private CommonsConfigurationUtils() {
   }
@@ -136,7 +136,7 @@ public class CommonsConfigurationUtils {
       throws ConfigurationException {
     PropertyIOFactoryKind ioFactoryKind = PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory;
 
-    if (checkHeaderExistsInSegmentMetadata(file)) {
+    if (PropertyIOFactoryKind.SegmentMetadataIOFactory.getVersion().equals(getConfigurationHeaderVersion(file))) {
       ioFactoryKind = PropertyIOFactoryKind.SegmentMetadataIOFactory;
     }
 
@@ -171,10 +171,10 @@ public class CommonsConfigurationUtils {
   public static void saveSegmentMetadataToFile(PropertiesConfiguration propertiesConfiguration, File file,
       String versionHeader) {
     if (StringUtils.isNotEmpty(versionHeader)) {
-      String header = String.format("%s=%s", SEGMENT_VERSION_IDENTIFIER, versionHeader);
+      String header = String.format("%s=%s", VERSION_HEADER_IDENTIFIER, versionHeader);
       propertiesConfiguration.setHeader(header);
 
-      // set appropriate segment metadata IOFactory
+      // set segment metadata IOFactory
       propertiesConfiguration.setIOFactory(createPropertyIOFactory(PropertyIOFactoryKind.SegmentMetadataIOFactory));
     }
     saveToFile(propertiesConfiguration, file);
@@ -368,27 +368,32 @@ public class CommonsConfigurationUtils {
   }
 
   /**
-   * checks whether the segment metadata file first line is version header or not.
-   * @param segmentMetadataFile segment metadata file
-   * @return boolean
+   * checks whether the configuration file first line is version header or not.
+   * @param file configuration file
+   * @return String
    * @throws ConfigurationException exception.
    */
-  private static boolean checkHeaderExistsInSegmentMetadata(File segmentMetadataFile)
+  private static String getConfigurationHeaderVersion(File file)
       throws ConfigurationException {
-
-    if (segmentMetadataFile.exists()) {
-      try (BufferedReader reader = new BufferedReader(new FileReader(segmentMetadataFile))) {
+    String versionValue = PropertyIOFactoryKind.DefaultPropertyConfigurationIOFactory.getVersion();
+    if (file.exists()) {
+      try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
         String fileFirstLine = reader.readLine();
         // header version is written as a comment and start with '# '
-        String versionHeaderCommentPrefix = String.format("# %s", SEGMENT_VERSION_IDENTIFIER);
+        String versionHeaderCommentPrefix = String.format("# %s", VERSION_HEADER_IDENTIFIER);
         // check whether the segment has the version header or not
-        return StringUtils.startsWith(fileFirstLine, versionHeaderCommentPrefix);
+        if (StringUtils.startsWith(fileFirstLine, versionHeaderCommentPrefix)) {
+          String[] headerKeyValue = fileFirstLine.split("=");
+          if (headerKeyValue.length == 2) {
+            versionValue = headerKeyValue[1]; // set version value
+          }
+        }
       } catch (IOException exception) {
         throw new ConfigurationException(
-            String.format("Error occurred while reading segment metadata file %s ",
-                segmentMetadataFile.getName()), exception);
+            String.format("Error occurred while reading configuration file %s ",
+                file.getName()), exception);
       }
     }
-    return false;
+    return versionValue;
   }
 }
