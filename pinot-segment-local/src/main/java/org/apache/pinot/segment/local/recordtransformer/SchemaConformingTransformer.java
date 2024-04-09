@@ -174,7 +174,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
   /**
    * @return The field type for the given extras field
    */
-  private static DataType getAndValidateExtrasFieldType(Schema schema, @Nonnull String extrasFieldName) {
+  static DataType getAndValidateExtrasFieldType(Schema schema, @Nonnull String extrasFieldName) {
     FieldSpec fieldSpec = schema.getFieldSpecFor(extrasFieldName);
     Preconditions.checkState(null != fieldSpec, "Field '%s' doesn't exist in schema", extrasFieldName);
     DataType fieldDataType = fieldSpec.getDataType();
@@ -250,7 +250,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
    * @param subKeys Returns the sub-keys
    * @throws IllegalArgumentException if any sub-key is empty
    */
-  private static void getAndValidateSubKeys(String key, int firstKeySeparatorIdx, List<String> subKeys)
+   static void getAndValidateSubKeys(String key, int firstKeySeparatorIdx, List<String> subKeys)
       throws IllegalArgumentException {
     int subKeyBeginIdx = 0;
     int subKeyEndIdx = firstKeySeparatorIdx;
@@ -511,7 +511,16 @@ class ExtraFieldsContainer {
     if (null == _indexableExtras) {
       _indexableExtras = new HashMap<>();
     }
-    _indexableExtras.put(key, value);
+    if (key == null && value instanceof Map) {
+      // If the key is null, it means that the value is a map that should be merged with the indexable extras
+      _indexableExtras.putAll((Map<String, Object>) value);
+    } else if (_indexableExtras.containsKey(key) && _indexableExtras.get(key) instanceof Map && value instanceof Map) {
+      // If the key already exists in the indexable extras and both the existing value and the new value are maps,
+      // merge the two maps
+      ((Map<String, Object>) _indexableExtras.get(key)).putAll((Map<String, Object>) value);
+    } else {
+      _indexableExtras.put(key, value);
+    }
   }
 
   /**
@@ -524,7 +533,17 @@ class ExtraFieldsContainer {
     if (null == _unindexableExtras) {
       _unindexableExtras = new HashMap<>();
     }
-    _unindexableExtras.put(key, value);
+    if (key == null && value instanceof Map) {
+      // If the key is null, it means that the value is a map that should be merged with the unindexable extras
+      _unindexableExtras.putAll((Map<String, Object>) value);
+    } else if (_unindexableExtras.containsKey(key) && _unindexableExtras.get(key) instanceof Map
+        && value instanceof Map) {
+      // If the key already exists in the uindexable extras and both the existing value and the new value are maps,
+      // merge the two maps
+      ((Map<String, Object>) _unindexableExtras.get(key)).putAll((Map<String, Object>) value);
+    } else {
+      _unindexableExtras.put(key, value);
+    }
   }
 
   /**
@@ -541,5 +560,9 @@ class ExtraFieldsContainer {
     if (null != childUnindexableFields) {
       addUnindexableEntry(key, childUnindexableFields);
     }
+  }
+
+  public void addChild(ExtraFieldsContainer child) {
+    addChild(null, child);
   }
 }
