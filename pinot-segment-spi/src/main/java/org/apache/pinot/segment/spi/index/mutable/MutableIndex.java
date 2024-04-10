@@ -63,8 +63,8 @@ public interface MutableIndex extends IndexReader {
 
   /**
    * Commits the mutable index artifacts to disk. This is used in preparation for realtime segment conversion.
-   * commit() should perform any required actions before using mutable segment artifacts to optimize immutable
-   * segment build.
+   * commit() should be implemented to perform any required actions before using mutable segment artifacts to
+   * optimize realtime segment conversion.
    */
   default void commit() {
   }

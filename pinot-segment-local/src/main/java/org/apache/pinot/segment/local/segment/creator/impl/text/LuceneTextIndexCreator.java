@@ -63,7 +63,9 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
 
   private final String _textColumn;
+  private final boolean _commitOnClose;
   private final boolean _reuseMutableIndex;
+  private final File _indexFile;
   private Directory _indexDirectory;
   private IndexWriter _indexWriter;
   private int _nextDocId = 0;
@@ -105,14 +107,16 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
   public LuceneTextIndexCreator(String column, File segmentIndexDir, boolean commit, boolean realtimeConversion,
       @Nullable int[] immutableToMutableIdMap, TextIndexConfig config) {
     _textColumn = column;
+    _commitOnClose = commit;
 
-    // to reuse the mutable index, it must be (1) not the realtime index, and (2) is realtime segment conversion
+    // to reuse the mutable index, it must be (1) not the realtime index, i.e. commit is set to false
+    // and (2) happens during realtime segment conversion
     _reuseMutableIndex = commit && realtimeConversion;
     String luceneAnalyzerClass = config.getLuceneAnalyzerClass();
     try {
       // segment generation is always in V1 and later we convert (as part of post creation processing)
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
-      File indexFile = getV1TextIndexFile(segmentIndexDir);
+      _indexFile = getV1TextIndexFile(segmentIndexDir);
 
       Analyzer luceneAnalyzer;
       if (luceneAnalyzerClass.isEmpty() || luceneAnalyzerClass.equals(StandardAnalyzer.class.getName())) {
@@ -134,7 +138,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         return;
       }
 
-      _indexDirectory = FSDirectory.open(indexFile.toPath());
+      _indexDirectory = FSDirectory.open(_indexFile.toPath());
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
     } catch (ReflectiveOperationException e) {
       throw new RuntimeException(
@@ -173,14 +177,17 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       FileUtils.delete(writeLock);
 
       // Call .forceMerge(1) on the copied index as the mutable index will likely contain many Lucene segments
-      Directory destDirectory = FSDirectory.open(dest.toPath());
-      IndexWriter indexWriter = new IndexWriter(destDirectory, indexWriterConfig);
-      indexWriter.forceMerge(1);
-      indexWriter.close();
+      try (Directory destDirectory = FSDirectory.open(dest.toPath());
+          IndexWriter indexWriter = new IndexWriter(destDirectory, indexWriterConfig)) {
+        indexWriter.forceMerge(1, true);
+        indexWriter.commit();
 
-      buildMappingFile(segmentIndexDir, _textColumn, destDirectory, immutableToMutableIdMap);
+        buildMappingFile(segmentIndexDir, _textColumn, destDirectory, immutableToMutableIdMap);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to build the mapping file during segment conversion: " + e);
+      }
     } catch (IOException e) {
-      throw new RuntimeException("Failed to copy the mutable lucene index: " + e);
+      throw new RuntimeException("Failed to convert the mutable lucene index: " + e);
     }
   }
 
@@ -228,6 +235,8 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         throw new RuntimeException(
             "Caught exception while building mutable to immutable doc id mapping for text index column: " + column, e);
       }
+    } finally {
+      indexReader.close();
     }
   }
 
@@ -312,6 +321,11 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
       _indexDirectory.close();
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while closing the Lucene index for column: " + _textColumn, e);
+    } finally {
+      // remove leftover write.lock file, as well as artifacts from .commit() being called on the realtime index
+      if (!_commitOnClose) {
+        FileUtils.deleteQuietly(_indexFile);
+      }
     }
   }
 

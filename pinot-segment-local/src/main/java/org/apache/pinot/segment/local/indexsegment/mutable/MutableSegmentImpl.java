@@ -935,7 +935,7 @@ public class MutableSegmentImpl implements MutableSegment {
   /**
    * Calls commit() on all mutable indexes. This is used in preparation for realtime segment conversion.
    * .commit() can be implemented per index to perform any required actions before using mutable segment
-   * artifacts to optimize imutable segment build.
+   * artifacts to optimize immutable segment build.
    */
   public void commit() {
     for (IndexContainer indexContainer : _indexContainerMap.values()) {
