@@ -55,6 +55,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
@@ -122,6 +123,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   private final Lock _preloadLock = new ReentrantLock();
   private volatile boolean _isPreloading;
 
+  // Below are configs to enable consistent upsert view.
+  // If enabling upsert view, the upsert threads take the WLock when the upsert involves two segments' bitmaps; and
+  // the query threads take the RLock when getting bitmaps for all its selected segments.
+  // If enabling block refresh, the query threads don't need to take lock when getting bitmaps for all its selected
+  // segments, as the query threads access a copy of bitmaps that are kept updated by upsert thread periodically. But
+  // the query thread can specify a freshness threshold query option to refresh the bitmap copies if not fresh enough.
+  private final boolean _enableUpsertView;
+  private final boolean _enableUpsertViewBatchRefresh;
+  private final long _upsertViewRefreshIntervalMs;
+  private final ReadWriteLock _upsertViewLock = new ReentrantReadWriteLock();
+  private final Set<IndexSegment> _updatedSegmentsSinceLastRefresh = ConcurrentHashMap.newKeySet();
+  private volatile long _lastUpsertViewRefreshTimeMs = 0;
+  private volatile Map<IndexSegment, MutableRoaringBitmap> _segmentQueryableDocIdsMap = new HashMap<>();
+
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
@@ -137,6 +152,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
     _tableIndexDir = context.getTableIndexDir();
+    _enableUpsertView = context.isUpsertViewEnabled();
+    _enableUpsertViewBatchRefresh = _enableUpsertView && context.isUpsertViewBatchRefreshEnabled();
+    _upsertViewRefreshIntervalMs = context.getUpsertViewRefreshIntervalMs();
     _serverMetrics = ServerMetrics.get();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
     if (_metadataTTL > 0) {
@@ -1019,27 +1037,79 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Closed the metadata manager");
   }
 
-  protected void replaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+  /**
+   * Use WLock to make updates on two segments' bitmaps atomically.
+   */
+  protected void replaceDocId(IndexSegment newSegment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, IndexSegment oldSegment, int oldDocId, int newDocId,
       RecordInfo recordInfo) {
-    removeDocId(oldSegment, oldDocId);
-    addDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
-  }
-
-  protected void replaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
-      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
-    validDocIds.replace(oldDocId, newDocId);
-    if (queryableDocIds != null) {
-      if (recordInfo.isDeleteRecord()) {
-        queryableDocIds.remove(oldDocId);
-      } else {
-        queryableDocIds.replace(oldDocId, newDocId);
+    if (_enableUpsertView) {
+      _upsertViewLock.writeLock().lock();
+    }
+    try {
+      doRemoveDocId(oldSegment, oldDocId);
+      doAddDocId(validDocIds, queryableDocIds, newDocId, recordInfo);
+      if (_enableUpsertViewBatchRefresh) {
+        _updatedSegmentsSinceLastRefresh.add(newSegment);
+        _updatedSegmentsSinceLastRefresh.add(oldSegment);
+        doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+    } finally {
+      if (_enableUpsertView) {
+        _upsertViewLock.writeLock().unlock();
       }
     }
   }
 
-  protected void addDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+  /**
+   *  There is no need to take the R/WLock to update single bitmap, as all methods to update the bitmap is synchronized.
+   *  But for upsertViewBatchRefresh to work correctly, we need to block updates on bitmaps while doing batch refresh,
+   *  which takes WLock. So wrap bitmap update logic inside RLock to allow concurrent updates but to be blocked when
+   *  there is thread doing batch refresh, i.e. to take copies of all bitmaps.
+   */
+  protected void replaceDocId(IndexSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
+    if (_enableUpsertViewBatchRefresh) {
+      _upsertViewLock.readLock().lock();
+    }
+    try {
+      validDocIds.replace(oldDocId, newDocId);
+      if (queryableDocIds != null) {
+        if (recordInfo.isDeleteRecord()) {
+          queryableDocIds.remove(oldDocId);
+        } else {
+          queryableDocIds.replace(oldDocId, newDocId);
+        }
+      }
+    } finally {
+      if (_enableUpsertViewBatchRefresh) {
+        _updatedSegmentsSinceLastRefresh.add(segment);
+        _upsertViewLock.readLock().unlock();
+        // Do batch refresh outside the RLock block.
+        doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+    }
+  }
+
+  protected void addDocId(IndexSegment segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int docId, RecordInfo recordInfo) {
+    if (_enableUpsertViewBatchRefresh) {
+      _upsertViewLock.readLock().lock();
+    }
+    try {
+      doAddDocId(validDocIds, queryableDocIds, docId, recordInfo);
+    } finally {
+      if (_enableUpsertViewBatchRefresh) {
+        _updatedSegmentsSinceLastRefresh.add(segment);
+        _upsertViewLock.readLock().unlock();
+        // Do batch refresh outside the RLock block.
+        doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+    }
+  }
+
+  private void doAddDocId(ThreadSafeMutableRoaringBitmap validDocIds, ThreadSafeMutableRoaringBitmap queryableDocIds,
+      int docId, RecordInfo recordInfo) {
     validDocIds.add(docId);
     if (queryableDocIds != null && !recordInfo.isDeleteRecord()) {
       queryableDocIds.add(docId);
@@ -1047,6 +1117,22 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void removeDocId(IndexSegment segment, int docId) {
+    if (_enableUpsertViewBatchRefresh) {
+      _upsertViewLock.readLock().lock();
+    }
+    try {
+      doRemoveDocId(segment, docId);
+    } finally {
+      if (_enableUpsertViewBatchRefresh) {
+        _updatedSegmentsSinceLastRefresh.add(segment);
+        _upsertViewLock.readLock().unlock();
+        // Do batch refresh outside the RLock block.
+        doBatchRefreshUpsertView(_upsertViewRefreshIntervalMs);
+      }
+    }
+  }
+
+  private void doRemoveDocId(IndexSegment segment, int docId) {
     Objects.requireNonNull(segment.getValidDocIds()).remove(docId);
     ThreadSafeMutableRoaringBitmap currentQueryableDocIds = segment.getQueryableDocIds();
     if (currentQueryableDocIds != null) {
@@ -1058,11 +1144,32 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
    * Use the segmentContexts to collect the contexts for selected segments. Reuse the segmentContext object if
    * present, to avoid overwriting the contexts specified at the others places.
    */
-  public void setSegmentContexts(List<SegmentContext> segmentContexts) {
+  public void setSegmentContexts(List<SegmentContext> segmentContexts, Map<String, String> queryOptions) {
+    if (!_enableUpsertView) {
+      setSegmentContexts(segmentContexts);
+      return;
+    }
+    // If not using batch refresh, get the bitmaps from segments directly but with RLock for consistency.
+    if (!_enableUpsertViewBatchRefresh) {
+      _upsertViewLock.readLock().lock();
+      try {
+        setSegmentContexts(segmentContexts);
+        return;
+      } finally {
+        _upsertViewLock.readLock().unlock();
+      }
+    }
+    // If batch refresh is enabled, the copy of bitmaps is kept updated and ready to use for a consistent view.
+    // The locking between query threads and upsert threads can be avoided when using batch refresh.
+    // Besides, queries can share the copy of bitmaps, w/o cloning the bitmaps by every single query.
+    // If query has specified a need for certain freshness, check the view and refresh it as needed.
+    // When refreshing the copy of map, we need to take the WLock so only one thread is refreshing view.
+    long upsertViewFreshnessMs = QueryOptionsUtils.getUpsertViewFreshnessMs(queryOptions);
+    doBatchRefreshUpsertView(upsertViewFreshnessMs);
     for (SegmentContext segmentContext : segmentContexts) {
       IndexSegment segment = segmentContext.getIndexSegment();
-      if (_trackedSegments.contains(segment)) {
-        segmentContext.setQueryableDocIdsSnapshot(getQueryableDocIdsSnapshotFromSegment(segment));
+      if (_segmentQueryableDocIdsMap.containsKey(segment)) {
+        segmentContext.setQueryableDocIdsSnapshot(_segmentQueryableDocIdsMap.get(segment));
       }
     }
   }
@@ -1079,6 +1186,48 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
     return queryableDocIdsSnapshot;
+  }
+
+  private void setSegmentContexts(List<SegmentContext> segmentContexts) {
+    for (SegmentContext segmentContext : segmentContexts) {
+      IndexSegment segment = segmentContext.getIndexSegment();
+      if (_trackedSegments.contains(segment)) {
+        segmentContext.setQueryableDocIdsSnapshot(getQueryableDocIdsSnapshotFromSegment(segment));
+      }
+    }
+  }
+
+  private boolean skipUpsertViewRefresh(long upsertViewFreshnessMs) {
+    long nowMs = System.currentTimeMillis();
+    if (upsertViewFreshnessMs >= 0) {
+      return _lastUpsertViewRefreshTimeMs + upsertViewFreshnessMs > nowMs;
+    }
+    return _lastUpsertViewRefreshTimeMs + _upsertViewRefreshIntervalMs > nowMs;
+  }
+
+  private void doBatchRefreshUpsertView(long upsertViewFreshnessMs) {
+    if (skipUpsertViewRefresh(upsertViewFreshnessMs)) {
+      return;
+    }
+    _upsertViewLock.writeLock().lock();
+    try {
+      if (skipUpsertViewRefresh(upsertViewFreshnessMs)) {
+        return;
+      }
+      Map<IndexSegment, MutableRoaringBitmap> updated = new HashMap<>();
+      for (IndexSegment segment : _trackedSegments) {
+        if (!_updatedSegmentsSinceLastRefresh.contains(segment)) {
+          continue;
+        }
+        updated.put(segment, getQueryableDocIdsSnapshotFromSegment(segment));
+      }
+      // Swap in the new consistent set of bitmaps.
+      _segmentQueryableDocIdsMap = updated;
+      _updatedSegmentsSinceLastRefresh.clear();
+      _lastUpsertViewRefreshTimeMs = System.currentTimeMillis();
+    } finally {
+      _upsertViewLock.writeLock().unlock();
+    }
   }
 
   protected void doClose()

@@ -75,6 +75,15 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
 
+  @JsonPropertyDescription("Whether to enable consistent view for upsert table")
+  private boolean _enableUpsertView;
+
+  @JsonPropertyDescription("Whether to enable batch refresh mode to keep consistent view for upsert table")
+  private boolean _enableUpsertViewBatchRefresh;
+
+  @JsonPropertyDescription("Refresh interval if using batch refresh mode to keep consistent view for upsert table")
+  private long _upsertViewRefreshIntervalMs;
+
   @JsonPropertyDescription("Custom class for upsert metadata manager")
   private String _metadataManagerClass;
 
@@ -145,6 +154,18 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public boolean isEnablePreload() {
     return _enablePreload;
+  }
+
+  public boolean isEnableUpsertView() {
+    return _enableUpsertView;
+  }
+
+  public boolean isEnableUpsertViewBatchRefresh() {
+    return _enableUpsertViewBatchRefresh;
+  }
+
+  public long getUpsertViewRefreshIntervalMs() {
+    return _upsertViewRefreshIntervalMs;
   }
 
   public boolean isDropOutOfOrderRecord() {
@@ -235,6 +256,18 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public void setEnablePreload(boolean enablePreload) {
     _enablePreload = enablePreload;
+  }
+
+  public void setEnableUpsertView(boolean enableUpsertView) {
+    _enableUpsertView = enableUpsertView;
+  }
+
+  public void setEnableUpsertViewBatchRefresh(boolean enableUpsertViewBatchRefresh) {
+    _enableUpsertViewBatchRefresh = enableUpsertViewBatchRefresh;
+  }
+
+  public void setUpsertViewRefreshIntervalMs(long upsertViewRefreshIntervalMs) {
+    _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
   }
 
   public void setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {

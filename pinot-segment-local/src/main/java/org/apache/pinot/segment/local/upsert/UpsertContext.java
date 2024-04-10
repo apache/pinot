@@ -41,13 +41,17 @@ public class UpsertContext {
   private final boolean _enablePreload;
   private final double _metadataTTL;
   private final double _deletedKeysTTL;
+  private final boolean _enableUpsertView;
+  private final boolean _enableUpsertViewBatchRefresh;
+  private final long _upsertViewRefreshIntervalMs;
   private final File _tableIndexDir;
   private final TableDataManager _tableDataManager;
 
   private UpsertContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
       List<String> comparisonColumns, @Nullable String deleteRecordColumn, HashFunction hashFunction,
       @Nullable PartialUpsertHandler partialUpsertHandler, boolean enableSnapshot, boolean enablePreload,
-      double metadataTTL, double deletedKeysTTL, File tableIndexDir, @Nullable TableDataManager tableDataManager) {
+      double metadataTTL, double deletedKeysTTL, boolean enableUpsertView, boolean enableUpsertViewBatchRefresh,
+      long upsertViewRefreshIntervalMs, File tableIndexDir, @Nullable TableDataManager tableDataManager) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
@@ -59,6 +63,9 @@ public class UpsertContext {
     _enablePreload = enablePreload;
     _metadataTTL = metadataTTL;
     _deletedKeysTTL = deletedKeysTTL;
+    _enableUpsertView = enableUpsertView;
+    _enableUpsertViewBatchRefresh = enableUpsertViewBatchRefresh;
+    _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
     _tableIndexDir = tableIndexDir;
     _tableDataManager = tableDataManager;
   }
@@ -107,6 +114,18 @@ public class UpsertContext {
     return _deletedKeysTTL;
   }
 
+  public boolean isUpsertViewEnabled() {
+    return _enableUpsertView;
+  }
+
+  public boolean isUpsertViewBatchRefreshEnabled() {
+    return _enableUpsertViewBatchRefresh;
+  }
+
+  public long getUpsertViewRefreshIntervalMs() {
+    return _upsertViewRefreshIntervalMs;
+  }
+
   public File getTableIndexDir() {
     return _tableIndexDir;
   }
@@ -127,6 +146,9 @@ public class UpsertContext {
     private boolean _enablePreload;
     private double _metadataTTL;
     private double _deletedKeysTTL;
+    private boolean _enableUpsertView;
+    private boolean _enableUpsertViewBatchRefresh;
+    private long _upsertViewRefreshIntervalMs;
     private File _tableIndexDir;
     private TableDataManager _tableDataManager;
 
@@ -185,6 +207,21 @@ public class UpsertContext {
       return this;
     }
 
+    public Builder setEnableUpsertView(boolean enableUpsertView) {
+      _enableUpsertView = enableUpsertView;
+      return this;
+    }
+
+    public Builder setEnableUpsertViewBatchRefresh(boolean enableUpsertViewBatchRefresh) {
+      _enableUpsertViewBatchRefresh = enableUpsertViewBatchRefresh;
+      return this;
+    }
+
+    public Builder setUpsertViewRefreshIntervalMs(long upsertViewRefreshIntervalMs) {
+      _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
+      return this;
+    }
+
     public Builder setTableIndexDir(File tableIndexDir) {
       _tableIndexDir = tableIndexDir;
       return this;
@@ -204,7 +241,8 @@ public class UpsertContext {
       Preconditions.checkState(_tableIndexDir != null, "Table index directory must be set");
       return new UpsertContext(_tableConfig, _schema, _primaryKeyColumns, _comparisonColumns, _deleteRecordColumn,
           _hashFunction, _partialUpsertHandler, _enableSnapshot, _enablePreload, _metadataTTL, _deletedKeysTTL,
-          _tableIndexDir, _tableDataManager);
+          _enableUpsertView, _enableUpsertViewBatchRefresh, _upsertViewRefreshIntervalMs, _tableIndexDir,
+          _tableDataManager);
     }
   }
 }
