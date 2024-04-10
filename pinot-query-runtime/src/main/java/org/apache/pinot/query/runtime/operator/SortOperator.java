@@ -201,7 +201,12 @@ public class SortOperator extends MultiStageOperator<SortOperator.StatKey> {
   }
 
   public enum StatKey implements StatMap.Key {
-    EXECUTION_TIME_MS(StatMap.Type.LONG),
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
     EMITTED_ROWS(StatMap.Type.LONG);
     private final StatMap.Type _type;
 

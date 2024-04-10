@@ -209,8 +209,18 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
   }
 
   public enum StatKey implements StatMap.Key {
-    EXECUTION_TIME_MS(StatMap.Type.LONG),
-    EMITTED_ROWS(StatMap.Type.LONG),
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
     TO_STAGE(StatMap.Type.INT) {
       @Override
       public int merge(int value1, int value2) {

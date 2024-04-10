@@ -120,8 +120,18 @@ public class FilterOperator extends MultiStageOperator<FilterOperator.StatKey> {
   }
 
   public enum StatKey implements StatMap.Key {
-    EXECUTION_TIME_MS(StatMap.Type.LONG),
-    EMITTED_ROWS(StatMap.Type.LONG);
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    };
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {

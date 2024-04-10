@@ -565,8 +565,18 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator<LeafS
 
   public enum StatKey implements StatMap.Key {
     TABLE(StatMap.Type.STRING),
-    EXECUTION_TIME_MS(StatMap.Type.LONG, null, DataTable.MetadataKey.TIME_USED_MS),
-    EMITTED_ROWS(StatMap.Type.LONG, null, DataTable.MetadataKey.NUM_ROWS),
+    EXECUTION_TIME_MS(StatMap.Type.LONG, null, DataTable.MetadataKey.TIME_USED_MS) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG, null, DataTable.MetadataKey.NUM_ROWS) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
     NUM_DOCS_SCANNED(StatMap.Type.LONG),
     NUM_ENTRIES_SCANNED_IN_FILTER(StatMap.Type.LONG),
     NUM_ENTRIES_SCANNED_POST_FILTER(StatMap.Type.LONG),

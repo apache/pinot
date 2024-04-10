@@ -429,8 +429,18 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
   }
 
   public enum StatKey implements StatMap.Key {
-    EXECUTION_TIME_MS(StatMap.Type.LONG),
-    EMITTED_ROWS(StatMap.Type.LONG),
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
     MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN),
     /**
      * How long (CPU time) has been spent on building the hash table.

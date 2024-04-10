@@ -435,8 +435,18 @@ public class AggregateOperator extends MultiStageOperator<AggregateOperator.Stat
   }
 
   public enum StatKey implements StatMap.Key {
-    EXECUTION_TIME_MS(StatMap.Type.LONG),
-    EMITTED_ROWS(StatMap.Type.LONG),
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN);
 
     private final StatMap.Type _type;

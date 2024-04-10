@@ -173,8 +173,18 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
   }
 
   public enum StatKey implements StatMap.Key {
-    EXECUTION_TIME_MS(StatMap.Type.LONG),
-    EMITTED_ROWS(StatMap.Type.LONG),
+    EXECUTION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    EMITTED_ROWS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
     FROM_STAGE(StatMap.Type.INT) {
       @Override
       public int merge(int value1, int value2) {
