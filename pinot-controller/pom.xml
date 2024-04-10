@@ -144,7 +144,7 @@
       <plugin>
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
-        <version>1.11.0</version>
+        <version>1.15.0</version>
 
         <!-- optional -->
         <configuration>
