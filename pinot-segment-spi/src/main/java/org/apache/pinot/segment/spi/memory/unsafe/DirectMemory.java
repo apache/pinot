@@ -54,7 +54,7 @@ public class DirectMemory implements Memory {
   }
 
   @Override
-  public synchronized void close() {
+  public void close() {
     if (!_closed) {
       synchronized (this) {
         if (!_closed) {

@@ -59,7 +59,7 @@ public class MmapMemory implements Memory {
    */
   private final long _size;
   private final MapSection _section;
-  private boolean _closed = false;
+  private volatile boolean _closed = false;
 
   static {
     try {
@@ -98,7 +98,7 @@ public class MmapMemory implements Memory {
   }
 
   @Override
-  public synchronized void close() {
+  public void close() {
     try {
       if (!_closed) {
         synchronized (this) {
