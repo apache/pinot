@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene95;
+package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99;
 
 import java.io.IOException;
-import org.apache.lucene.backward_codecs.lucene95.Lucene95HnswVectorsFormat;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
+import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.util.hnsw.HnswGraph;
@@ -41,7 +41,7 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
   public static final int DEFAULT_MAX_DIMENSIONS = 2048;
 
   private final int _maxDimensions;
-  private final Lucene95HnswVectorsFormat _delegate;
+  private final Lucene99HnswVectorsFormat _delegate;
 
   /**
    * Constructs a format using the given graph construction parameters.
@@ -51,7 +51,7 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
    * @param maxDimensions the maximum number of dimensions supported by this format
    */
   public HnswVectorsFormat(int maxConn, int beamWidth, int maxDimensions) {
-    super("Lucene95HnswVectorsFormat");
+    super("Lucene99HnswVectorsFormat");
     if (maxDimensions <= 0 || maxDimensions > DEFAULT_MAX_DIMENSIONS) {
       throw new IllegalArgumentException(
           "maxDimensions must be postive and less than or equal to"
@@ -59,7 +59,7 @@ public final class HnswVectorsFormat extends KnnVectorsFormat {
               + "; maxDimensions="
               + maxDimensions);
     }
-    _delegate = new Lucene95HnswVectorsFormat(maxConn, beamWidth);
+    _delegate = new Lucene99HnswVectorsFormat(maxConn, beamWidth);
     _maxDimensions = maxDimensions;
   }
 
