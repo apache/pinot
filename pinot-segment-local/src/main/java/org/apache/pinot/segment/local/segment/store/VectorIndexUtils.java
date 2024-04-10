@@ -20,8 +20,8 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.codecs.lucene95.Lucene95Codec;
-import org.apache.lucene.codecs.lucene95.Lucene95HnswVectorsFormat;
+import org.apache.lucene.backward_codecs.lucene95.Lucene95Codec;
+import org.apache.lucene.backward_codecs.lucene95.Lucene95HnswVectorsFormat;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.VectorSimilarityFunction;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene95.HnswCodec;

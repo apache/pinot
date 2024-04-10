@@ -19,10 +19,10 @@
 package org.apache.pinot.segment.local.segment.creator.impl.vector.lucene95;
 
 import java.io.IOException;
+import org.apache.lucene.backward_codecs.lucene95.Lucene95HnswVectorsFormat;
 import org.apache.lucene.codecs.KnnVectorsFormat;
 import org.apache.lucene.codecs.KnnVectorsReader;
 import org.apache.lucene.codecs.KnnVectorsWriter;
-import org.apache.lucene.codecs.lucene95.Lucene95HnswVectorsFormat;
 import org.apache.lucene.index.SegmentReadState;
 import org.apache.lucene.index.SegmentWriteState;
 import org.apache.lucene.util.hnsw.HnswGraph;
