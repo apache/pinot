@@ -234,7 +234,7 @@ public class OpChainTest {
 
     //Mailbox Send operator
     MailboxSendOperator sendOperator =
-        new MailboxSendOperator(context, dummyWaitOperator, _exchange, null, null, false);
+        new MailboxSendOperator(context, dummyWaitOperator, ignore -> _exchange, null, null, false);
 
     operators.push(leafOp);
     operators.push(transformOp);
