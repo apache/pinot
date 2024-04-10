@@ -21,14 +21,12 @@ package org.apache.pinot.common.datablock;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,9 +58,9 @@ public class MetadataBlock extends BaseDataBlock {
   @Override
   protected void serializeMetadata(DataOutputStream output)
       throws IOException {
-    if (_statsByStage == null || _statsByStage.isEmpty() {
+    if (_statsByStage == null || _statsByStage.isEmpty()) {
       output.writeInt(0);
-      return ;
+      return;
     }
     int size = _statsByStage.size();
     output.writeInt(size);
