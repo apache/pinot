@@ -1769,6 +1769,8 @@
                       <exclude>commons-logging:commons-logging</exclude>
                       <!-- Use org.glassfish.hk2.external:jakarta.inject -->
                       <exclude>javax.inject:javax.inject</exclude>
+                      <!-- Use mockito library instead of EasyMock -->
+                      <exclude>org.easymock:easymock</exclude>
                     </excludes>
                   </bannedDependencies>
                 </rules>
