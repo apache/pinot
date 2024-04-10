@@ -95,7 +95,6 @@ public abstract class BaseDataBlock implements DataBlock {
   protected ByteBuffer _fixedSizeData;
   protected byte[] _variableSizeDataBytes;
   protected ByteBuffer _variableSizeData;
-  protected Map<String, String> _metadata;
 
   /**
    * construct a base data block.
@@ -116,7 +115,6 @@ public abstract class BaseDataBlock implements DataBlock {
     _fixedSizeData = ByteBuffer.wrap(fixedSizeDataBytes);
     _variableSizeDataBytes = variableSizeDataBytes;
     _variableSizeData = ByteBuffer.wrap(variableSizeDataBytes);
-    _metadata = new HashMap<>();
     _errCodeToExceptionMap = new HashMap<>();
   }
 
@@ -133,7 +131,6 @@ public abstract class BaseDataBlock implements DataBlock {
     _fixedSizeData = null;
     _variableSizeDataBytes = null;
     _variableSizeData = null;
-    _metadata = new HashMap<>();
     _errCodeToExceptionMap = new HashMap<>();
   }
 
@@ -199,7 +196,7 @@ public abstract class BaseDataBlock implements DataBlock {
     // Read metadata.
     int metadataLength = byteBuffer.getInt();
     if (metadataLength != 0) {
-      _metadata = deserializeMetadata(byteBuffer);
+      deserializeMetadata(byteBuffer);
     }
   }
 
@@ -234,7 +231,7 @@ public abstract class BaseDataBlock implements DataBlock {
 
   @Override
   public Map<String, String> getMetadata() {
-    return _metadata;
+    return Collections.emptyMap();
   }
 
   @Override
@@ -446,9 +443,7 @@ public abstract class BaseDataBlock implements DataBlock {
     // Write metadata: length followed by actual metadata bytes.
     // NOTE: We ignore metadata serialization time in "responseSerializationCpuTimeNs" as it's negligible while
     // considering it will bring a lot code complexity.
-    byte[] metadataBytes = serializeMetadata();
-    dataOutputStream.writeInt(metadataBytes.length);
-    dataOutputStream.write(metadataBytes);
+    serializeMetadata(dataOutputStream);
 
     return byteArrayOutputStream.toByteArray();
   }
@@ -527,14 +522,26 @@ public abstract class BaseDataBlock implements DataBlock {
     }
   }
 
-  private byte[] serializeMetadata()
+  /**
+   * Writes the metadata section to the given data output stream.
+   * <p>
+   * <strong>Important:</strong> It is mandatory to write first an int with the number of metadata bytes and then
+   * exactly that number of bytes with the metadata.
+   */
+  protected void serializeMetadata(DataOutputStream dataOutputStream)
       throws IOException {
-    return new byte[0];
+    dataOutputStream.writeInt(0);
   }
 
-  private Map<String, String> deserializeMetadata(ByteBuffer buffer)
+  /**
+   * Deserializes the metadata section from the given byte buffer.
+   * <p>
+   * <strong>Important:</strong> This method will be called at the end of the BaseDataConstructor constructor to read
+   * the metadata section. This means that it will be called <strong>before</strong> the subclass have been constructor
+   * have been called. Therefore it is not possible to use any subclass fields in this method.
+   */
+  protected void deserializeMetadata(ByteBuffer buffer)
       throws IOException {
-    return Collections.emptyMap();
   }
 
   private byte[] serializeExceptions()
