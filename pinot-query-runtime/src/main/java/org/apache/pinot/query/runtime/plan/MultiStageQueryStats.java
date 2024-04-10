@@ -142,7 +142,7 @@ public class MultiStageQueryStats {
       serializedStats.add(null);
     }
 
-    try (UnsynchronizedByteArrayOutputStream baos = new UnsynchronizedByteArrayOutputStream();
+    try (UnsynchronizedByteArrayOutputStream baos = new UnsynchronizedByteArrayOutputStream.Builder().get();
         DataOutputStream output = new DataOutputStream(baos)) {
 
       _currentStats.serialize(output);

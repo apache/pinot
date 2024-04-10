@@ -236,6 +236,7 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
 
   private void buildBroadcastHashTable()
       throws ProcessingException {
+    long startTime = System.currentTimeMillis();
     TransferableBlock rightBlock = _rightTableOperator.nextBlock();
     while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
       List<Object[]> container = rightBlock.getContainer();
@@ -277,6 +278,7 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
       _queryStats = rightBlock.getQueryStats();
       assert _queryStats != null;
     }
+    _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
   }
 
   private TransferableBlock buildJoinedDataBlock(TransferableBlock leftBlock) {
@@ -429,7 +431,11 @@ public class HashJoinOperator extends MultiStageOperator<HashJoinOperator.StatKe
   public enum StatKey implements StatMap.Key {
     EXECUTION_TIME_MS(StatMap.Type.LONG),
     EMITTED_ROWS(StatMap.Type.LONG),
-    MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN);
+    MAX_ROWS_IN_JOIN_REACHED(StatMap.Type.BOOLEAN),
+    /**
+     * How long (CPU time) has been spent on building the hash table.
+     */
+    TIME_BUILDING_HASH_TABLE_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 

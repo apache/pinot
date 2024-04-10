@@ -203,6 +203,6 @@ public class MailboxSendOperatorTest {
     OpChainExecutionContext context =
         new OpChainExecutionContext(_mailboxService, 123L, Long.MAX_VALUE, ImmutableMap.of(), stageMetadata,
             workerMetadata, null);
-    return new MailboxSendOperator(context, _sourceOperator, _exchange, null, null, false);
+    return new MailboxSendOperator(context, _sourceOperator, statMap -> _exchange, null, null, false);
   }
 }

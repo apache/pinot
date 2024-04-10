@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -68,25 +69,28 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
       RelDistribution.Type distributionType, @Nullable List<Integer> distributionKeys,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender, int receiverStageId) {
-    this(context, sourceOperator, getBlockExchange(context, distributionType, distributionKeys, receiverStageId),
+    this(context, sourceOperator,
+        statMap -> getBlockExchange(context, distributionType, distributionKeys, receiverStageId, statMap),
         collationKeys, collationDirections, isSortOnSender);
     _statMap.merge(StatKey.TO_STAGE, receiverStageId);
+    _statMap.merge(StatKey.PARALLELISM, 1);
   }
 
   @VisibleForTesting
-  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator, BlockExchange exchange,
+  MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator sourceOperator,
+      Function<StatMap<StatKey>, BlockExchange> exchangeFactory,
       @Nullable List<RexExpression> collationKeys, @Nullable List<RelFieldCollation.Direction> collationDirections,
       boolean isSortOnSender) {
     super(context, MailboxSendOperator.StatKey.class);
     _sourceOperator = sourceOperator;
-    _exchange = exchange;
+    _exchange = exchangeFactory.apply(_statMap);
     _collationKeys = collationKeys;
     _collationDirections = collationDirections;
     _isSortOnSender = isSortOnSender;
   }
 
   private static BlockExchange getBlockExchange(OpChainExecutionContext context, RelDistribution.Type distributionType,
-      @Nullable List<Integer> distributionKeys, int receiverStageId) {
+      @Nullable List<Integer> distributionKeys, int receiverStageId, StatMap<StatKey> statMap) {
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
         distributionType);
     MailboxService mailboxService = context.getMailboxService();
@@ -99,8 +103,9 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
         MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
             mailboxInfos);
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
-        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs))
+        .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
+    statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
     return BlockExchange.getExchange(sendingMailboxes, distributionType, distributionKeys,
         TransferableBlockUtils::splitBlock);
   }
@@ -216,7 +221,54 @@ public class MailboxSendOperator extends MultiStageOperator<MailboxSendOperator.
       public boolean includeDefaultInJson() {
         return true;
       }
-    };
+    },
+    /**
+     * Number of parallelism of the stage this operator is the root of.
+     * <p>
+     * The CPU times reported by this stage will be proportional to this number.
+     */
+    PARALLELISM(StatMap.Type.INT),
+    /**
+     * How many receive mailboxes are being written by this send operator.
+     */
+    FAN_OUT(StatMap.Type.INT) {
+      @Override
+      public int merge(int value1, int value2) {
+        return Math.max(value1, value2);
+      }
+    },
+    /**
+     * How many messages have been sent in heap format by this mailbox.
+     * <p>
+     * The lower the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the more efficient the exchange is.
+     */
+    IN_MEMORY_MESSAGES(StatMap.Type.INT),
+    /**
+     * How many messages have been sent in raw format and therefore serialized by this mailbox.
+     * <p>
+     * The higher the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the less efficient the exchange is.
+     */
+    RAW_MESSAGES(StatMap.Type.INT),
+    /**
+     * How many bytes have been serialized by this mailbox.
+     * <p>
+     * A high number here indicates that the mailbox is sending a lot of data to other servers.
+     */
+    SERIALIZED_BYTES(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },
+    /**
+     * How long (in CPU time) it took to serialize the raw messages sent by this mailbox.
+     */
+    SERIALIZATION_TIME_MS(StatMap.Type.LONG) {
+      @Override
+      public boolean includeDefaultInJson() {
+        return true;
+      }
+    },;
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {

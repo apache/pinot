@@ -49,6 +49,7 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
   protected final RelDistribution.Type _exchangeType;
   protected final List<String> _mailboxIds;
   protected final BlockingMultiStreamConsumer.OfTransferableBlock _multiConsumer;
+  protected final List<StatMap<ReceivingMailbox.StatKey>> _receivingStats;
 
   public BaseMailboxReceiveOperator(OpChainExecutionContext context, RelDistribution.Type exchangeType,
       int senderStageId) {
@@ -70,8 +71,10 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
     List<ReadMailboxAsyncStream> asyncStreams = _mailboxIds.stream()
         .map(mailboxId -> new ReadMailboxAsyncStream(_mailboxService.getReceivingMailbox(mailboxId), this))
         .collect(Collectors.toList());
+    _receivingStats = asyncStreams.stream().map(stream -> stream._mailbox.getStatMap()).collect(Collectors.toList());
     _multiConsumer = new BlockingMultiStreamConsumer.OfTransferableBlock(context, asyncStreams);
     _statMap.merge(StatKey.FROM_STAGE, senderStageId);
+    _statMap.merge(StatKey.FAN_IN, _mailboxIds.size());
   }
 
   @Override
@@ -103,6 +106,14 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
   }
 
   @Override
+  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos) {
+    for (StatMap<ReceivingMailbox.StatKey> receivingStats : _receivingStats) {
+      addReceivingStats(receivingStats);
+    }
+    return super.updateEosBlock(upstreamEos);
+  }
+
+  @Override
   public StatKey getExecutionTimeKey() {
     return StatKey.EXECUTION_TIME_MS;
   }
@@ -110,6 +121,15 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
   @Override
   public StatKey getEmittedRowsKey() {
     return StatKey.EMITTED_ROWS;
+  }
+
+  private void addReceivingStats(StatMap<ReceivingMailbox.StatKey> from) {
+    _statMap.merge(StatKey.RAW_MESSAGES, from.getInt(ReceivingMailbox.StatKey.DESERIALIZED_MESSAGES));
+    _statMap.merge(StatKey.DESERIALIZED_BYTES, from.getLong(ReceivingMailbox.StatKey.DESERIALIZED_BYTES));
+    _statMap.merge(StatKey.DESERIALIZATION_TIME_MS, from.getLong(ReceivingMailbox.StatKey.DESERIALIZATION_TIME_MS));
+    _statMap.merge(StatKey.IN_MEMORY_MESSAGES, from.getInt(ReceivingMailbox.StatKey.IN_MEMORY_MESSAGES));
+    _statMap.merge(StatKey.DOWNSTREAM_WAIT_MS, from.getLong(ReceivingMailbox.StatKey.OFFER_CPU_TIME_MS));
+    _statMap.merge(StatKey.UPSTREAM_WAIT_MS, from.getLong(ReceivingMailbox.StatKey.WAIT_CPU_TIME_MS));
   }
 
   private static class ReadMailboxAsyncStream implements AsyncStream<TransferableBlock> {
@@ -160,7 +180,49 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator<Base
       public int merge(int value1, int value2) {
         return StatMap.Key.eqNotZero(value1, value2);
       }
-    };
+    },
+    /**
+     * How many send mailboxes are being read by this receive operator.
+     * <p>
+     * Clock time will be proportional to this number and the parallelism of the stage.
+     */
+    FAN_IN(StatMap.Type.INT) {
+      @Override
+      public int merge(int value1, int value2) {
+        return Math.max(value1, value2);
+      }
+    },
+    /**
+     * How many messages have been received in heap format by this mailbox.
+     * <p>
+     * The lower the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the more efficient the exchange is.
+     */
+    IN_MEMORY_MESSAGES(StatMap.Type.INT),
+    /**
+     * How many messages have been received in raw format and therefore deserialized by this mailbox.
+     * <p>
+     * The higher the relation between RAW_MESSAGES and IN_MEMORY_MESSAGES, the less efficient the exchange is.
+     */
+    RAW_MESSAGES(StatMap.Type.INT),
+    /**
+     * How many bytes have been deserialized by this mailbox.
+     * <p>
+     * A high number here indicates that the mailbox is receiving a lot of data from other servers.
+     */
+    DESERIALIZED_BYTES(StatMap.Type.LONG),
+    /**
+     * How long (in CPU time) it took to deserialize the raw messages received by this mailbox.
+     */
+    DESERIALIZATION_TIME_MS(StatMap.Type.LONG),
+    /**
+     * How long (in CPU time) it took to offer the messages to downstream operator.
+     */
+    DOWNSTREAM_WAIT_MS(StatMap.Type.LONG),
+    /**
+     * How long (in CPU time) it took to wait for the messages to be offered to downstream operator.
+     */
+    UPSTREAM_WAIT_MS(StatMap.Type.LONG);
+
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {
