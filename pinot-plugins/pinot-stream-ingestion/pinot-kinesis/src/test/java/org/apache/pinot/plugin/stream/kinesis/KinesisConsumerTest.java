@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
-import org.easymock.Capture;
+import org.mockito.ArgumentCaptor;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.core.SdkBytes;
@@ -38,10 +38,8 @@ import software.amazon.awssdk.services.kinesis.model.GetShardIteratorResponse;
 import software.amazon.awssdk.services.kinesis.model.Record;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
-import static org.easymock.EasyMock.capture;
-import static org.easymock.EasyMock.createMock;
-import static org.easymock.EasyMock.expect;
-import static org.easymock.EasyMock.replay;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -80,7 +78,7 @@ public class KinesisConsumerTest {
 
   @BeforeMethod
   public void setupTest() {
-    _kinesisClient = createMock(KinesisClient.class);
+    _kinesisClient = mock(KinesisClient.class);
     _kinesisConfig = getKinesisConfig();
     _records = new ArrayList<>(NUM_RECORDS);
     for (int i = 0; i < NUM_RECORDS; i++) {
@@ -93,19 +91,18 @@ public class KinesisConsumerTest {
 
   @Test
   public void testBasicConsumer() {
-    Capture<GetRecordsRequest> getRecordsRequestCapture = Capture.newInstance();
-    Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
+    ArgumentCaptor<GetRecordsRequest> getRecordsRequestCapture = ArgumentCaptor.forClass(GetRecordsRequest.class);
+    ArgumentCaptor<GetShardIteratorRequest> getShardIteratorRequestCapture =
+        ArgumentCaptor.forClass(GetShardIteratorRequest.class);
 
     GetRecordsResponse getRecordsResponse =
         GetRecordsResponse.builder().nextShardIterator(null).records(_records).build();
     GetShardIteratorResponse getShardIteratorResponse =
         GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
 
-    expect(_kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
-    expect(_kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
-        .anyTimes();
-
-    replay(_kinesisClient);
+    when(_kinesisClient.getRecords(getRecordsRequestCapture.capture())).thenReturn(getRecordsResponse);
+    when(_kinesisClient.getShardIterator(getShardIteratorRequestCapture.capture())).thenReturn(
+        getShardIteratorResponse);
 
     KinesisConsumer kinesisConsumer = new KinesisConsumer(_kinesisConfig, _kinesisClient);
     KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
@@ -118,6 +115,8 @@ public class KinesisConsumerTest {
     }
 
     assertFalse(kinesisMessageBatch.isEndOfPartitionGroup());
+    assertEquals(getRecordsRequestCapture.getValue().shardIterator(), "DUMMY");
+    assertEquals(getShardIteratorRequestCapture.getValue().shardId(), "0");
   }
 
   @Test
@@ -125,19 +124,18 @@ public class KinesisConsumerTest {
     List<ChildShard> shardList = new ArrayList<>();
     shardList.add(ChildShard.builder().shardId(PLACEHOLDER).parentShards("0").build());
 
-    Capture<GetRecordsRequest> getRecordsRequestCapture = Capture.newInstance();
-    Capture<GetShardIteratorRequest> getShardIteratorRequestCapture = Capture.newInstance();
+    ArgumentCaptor<GetRecordsRequest> getRecordsRequestCapture = ArgumentCaptor.forClass(GetRecordsRequest.class);
+    ArgumentCaptor<GetShardIteratorRequest> getShardIteratorRequestCapture =
+        ArgumentCaptor.forClass(GetShardIteratorRequest.class);
 
     GetRecordsResponse getRecordsResponse =
         GetRecordsResponse.builder().nextShardIterator(null).records(_records).childShards(shardList).build();
     GetShardIteratorResponse getShardIteratorResponse =
         GetShardIteratorResponse.builder().shardIterator(PLACEHOLDER).build();
 
-    expect(_kinesisClient.getRecords(capture(getRecordsRequestCapture))).andReturn(getRecordsResponse).anyTimes();
-    expect(_kinesisClient.getShardIterator(capture(getShardIteratorRequestCapture))).andReturn(getShardIteratorResponse)
-        .anyTimes();
-
-    replay(_kinesisClient);
+    when(_kinesisClient.getRecords(getRecordsRequestCapture.capture())).thenReturn(getRecordsResponse);
+    when(_kinesisClient.getShardIterator(getShardIteratorRequestCapture.capture())).thenReturn(
+        getShardIteratorResponse);
 
     KinesisConsumer kinesisConsumer = new KinesisConsumer(_kinesisConfig, _kinesisClient);
     KinesisPartitionGroupOffset startOffset = new KinesisPartitionGroupOffset("0", "1");
@@ -149,6 +147,9 @@ public class KinesisConsumerTest {
     for (int i = 0; i < NUM_RECORDS; i++) {
       assertEquals(baToString(kinesisMessageBatch.getStreamMessage(i).getValue()), DUMMY_RECORD_PREFIX + i);
     }
+
+    assertEquals(getRecordsRequestCapture.getValue().shardIterator(), "DUMMY");
+    assertEquals(getShardIteratorRequestCapture.getValue().shardId(), "0");
   }
 
   public String baToString(byte[] bytes) {

@@ -19,9 +19,11 @@
 package org.apache.pinot.segment.local.upsert;
 
 import java.io.Closeable;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -50,4 +52,7 @@ public interface TableUpsertMetadataManager extends Closeable {
    * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition
    */
   Map<Integer, Long> getPartitionToPrimaryKeyCount();
+
+  default void setSegmentContexts(List<SegmentContext> segmentContexts) {
+  }
 }

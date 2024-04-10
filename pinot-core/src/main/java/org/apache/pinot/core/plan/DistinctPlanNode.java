@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
@@ -36,10 +37,12 @@ import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
  */
 public class DistinctPlanNode implements PlanNode {
   private final IndexSegment _indexSegment;
+  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
 
-  public DistinctPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    _indexSegment = indexSegment;
+  public DistinctPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
+    _indexSegment = segmentContext.getIndexSegment();
+    _segmentContext = segmentContext;
     _queryContext = queryContext;
   }
 
@@ -70,7 +73,7 @@ public class DistinctPlanNode implements PlanNode {
     }
 
     BaseProjectOperator<?> projectOperator =
-        new ProjectPlanNode(_indexSegment, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
+        new ProjectPlanNode(_segmentContext, _queryContext, expressions, DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
     return new DistinctOperator(_indexSegment, _queryContext, projectOperator);
   }
 }

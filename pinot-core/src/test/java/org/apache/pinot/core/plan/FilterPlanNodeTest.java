@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.mockito.stubbing.Answer;
@@ -48,8 +49,8 @@ public class FilterPlanNodeTest {
     when(segment.getValidDocIds()).thenReturn(bitmap);
     AtomicInteger numDocs = new AtomicInteger(0);
     when(meta.getTotalDocs()).then((Answer<Integer>) invocationOnMock -> numDocs.get());
-    QueryContext ctx = mock(QueryContext.class);
-    when(ctx.getFilter()).thenReturn(null);
+    QueryContext queryContext = mock(QueryContext.class);
+    when(queryContext.getFilter()).thenReturn(null);
 
     numDocs.set(3);
     bitmap.add(0);
@@ -69,14 +70,16 @@ public class FilterPlanNodeTest {
 
     // Result should be invariant - always exactly 3 docs
     for (int i = 0; i < 10_000; i++) {
-      assertEquals(getNumberOfFilteredDocs(segment, ctx), 3);
+      SegmentContext segmentContext = new SegmentContext(segment);
+      segmentContext.setQueryableDocIdsSnapshot(TestUtils.getQueryableDocIdsSnapshotFromSegment(segment));
+      assertEquals(getNumberOfFilteredDocs(segmentContext, queryContext), 3);
     }
 
     updater.join();
   }
 
-  private int getNumberOfFilteredDocs(IndexSegment segment, QueryContext ctx) {
-    FilterPlanNode node = new FilterPlanNode(segment, ctx);
+  private int getNumberOfFilteredDocs(SegmentContext segmentContext, QueryContext queryContext) {
+    FilterPlanNode node = new FilterPlanNode(segmentContext, queryContext);
     BaseFilterOperator op = node.run();
     int numDocsFiltered = 0;
     FilterBlock block = op.nextBlock();

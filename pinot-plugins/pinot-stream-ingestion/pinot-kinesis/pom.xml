@@ -36,9 +36,8 @@
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <phase.prop>package</phase.prop>
-    <easymock.version>5.2.0</easymock.version>
     <reactive.version>1.0.2</reactive.version>
-    <localstack-utils.version>0.2.19</localstack-utils.version>
+    <localstack-utils.version>0.2.23</localstack-utils.version>
   </properties>
 
   <dependencyManagement>
@@ -122,9 +121,8 @@
     </dependency>
 
     <dependency>
-      <groupId>org.easymock</groupId>
-      <artifactId>easymock</artifactId>
-      <version>${easymock.version}</version>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
 

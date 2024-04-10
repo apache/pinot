@@ -54,8 +54,13 @@ public class CompositeTransformer implements RecordTransformer {
    *     records that have varying fields to a fixed schema without dropping any fields
    *   </li>
    *   <li>
-   *     {@link DataTypeTransformer} after {@link SchemaConformingTransformer} to convert values to comply with the
-   *     schema
+   *     Optional {@link SchemaConformingTransformerV2} after {@link FilterTransformer}, so that we can transform
+   *     input records that have varying fields to a fixed schema and keep or drop other fields by configuration. We
+   *     could also gain enhanced text search capabilities from it.
+   *   </li>
+   *   <li>
+   *     {@link DataTypeTransformer} after {@link SchemaConformingTransformer} or {@link SchemaConformingTransformerV2}
+   *     to convert values to comply with the schema
    *   </li>
    *   <li>
    *     Optional {@link TimeValidationTransformer} after {@link DataTypeTransformer} so that time value is converted to
@@ -78,7 +83,8 @@ public class CompositeTransformer implements RecordTransformer {
    */
   public static List<RecordTransformer> getDefaultTransformers(TableConfig tableConfig, Schema schema) {
     return Stream.of(new ExpressionTransformer(tableConfig, schema), new FilterTransformer(tableConfig),
-            new SchemaConformingTransformer(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
+            new SchemaConformingTransformer(tableConfig, schema),
+            new SchemaConformingTransformerV2(tableConfig, schema), new DataTypeTransformer(tableConfig, schema),
             new TimeValidationTransformer(tableConfig, schema), new SpecialValueTransformer(schema),
             new NullValueTransformer(tableConfig, schema), new SanitizationTransformer(schema)).filter(t -> !t.isNoOp())
         .collect(Collectors.toList());

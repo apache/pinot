@@ -26,7 +26,7 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>21</version>
+    <version>31</version>
   </parent>
 
   <groupId>org.apache.pinot</groupId>
@@ -167,7 +167,7 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.4</clp-ffi.version>
     <stax2-api.version>4.1</stax2-api.version>
-    <aws.sdk.version>2.25.17</aws.sdk.version>
+    <aws.sdk.version>2.25.27</aws.sdk.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <testng.version>7.9.0</testng.version>
@@ -859,13 +859,13 @@
       <dependency>
         <groupId>com.google.apis</groupId>
         <artifactId>google-api-services-storage</artifactId>
-        <version>v1-rev20240209-2.0.0</version>
+        <version>v1-rev20240319-2.0.0</version>
       </dependency>
       <!-- Solve the dependency converge issue between guava and calcite-core -->
       <dependency>
         <groupId>com.google.errorprone</groupId>
         <artifactId>error_prone_annotations</artifactId>
-        <version>2.25.0</version>
+        <version>2.26.1</version>
       </dependency>
       <!-- Legacy Google Libraries -->
       <dependency>
@@ -1411,7 +1411,7 @@
       <dependency>
         <groupId>net.openhft</groupId>
         <artifactId>chronicle-core</artifactId>
-        <version>2.25ea10</version>
+        <version>2.25ea13</version>
       </dependency>
       <dependency>
         <groupId>org.ow2.asm</groupId>
@@ -1656,7 +1656,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
-          <version>3.2.0</version>
+          <version>3.6.3</version>
           <configuration>
             <!-- Remove this after fixing all javadoc warnings -->
             <doclint>none</doclint>

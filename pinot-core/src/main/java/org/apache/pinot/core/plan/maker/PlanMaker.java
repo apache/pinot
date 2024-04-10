@@ -25,7 +25,7 @@ import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -44,24 +44,24 @@ public interface PlanMaker {
   /**
    * Returns an instance level {@link Plan} which contains the logical execution plan for multiple segments.
    */
-  Plan makeInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext, ExecutorService executorService,
-      ServerMetrics serverMetrics);
+  Plan makeInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
+      ExecutorService executorService, ServerMetrics serverMetrics);
 
   /**
    * Returns a segment level {@link PlanNode} which contains the logical execution plan for one segment.
    */
-  PlanNode makeSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext);
+  PlanNode makeSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext);
 
   /**
    * Returns an instance level {@link Plan} for a streaming query which contains the logical execution plan for multiple
    * segments.
    */
-  Plan makeStreamingInstancePlan(List<IndexSegment> indexSegments, QueryContext queryContext,
+  Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer, ServerMetrics serverMetrics);
 
   /**
    * Returns a segment level {@link PlanNode} for a streaming query which contains the logical execution plan for one
    * segment.
    */
-  PlanNode makeStreamingSegmentPlanNode(IndexSegment indexSegment, QueryContext queryContext);
+  PlanNode makeStreamingSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext);
 }

@@ -34,6 +34,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
@@ -56,10 +57,12 @@ public class AggregationPlanNode implements PlanNode {
       EnumSet.of(COUNT, MIN, MINMV, MAX, MAXMV, MINMAXRANGE, MINMAXRANGEMV);
 
   private final IndexSegment _indexSegment;
+  private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
 
-  public AggregationPlanNode(IndexSegment indexSegment, QueryContext queryContext) {
-    _indexSegment = indexSegment;
+  public AggregationPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
+    _indexSegment = segmentContext.getIndexSegment();
+    _segmentContext = segmentContext;
     _queryContext = queryContext;
   }
 
@@ -74,7 +77,7 @@ public class AggregationPlanNode implements PlanNode {
    */
   private FilteredAggregationOperator buildFilteredAggOperator() {
     return new FilteredAggregationOperator(_queryContext,
-        AggregationFunctionUtils.buildFilteredAggregationInfos(_indexSegment, _queryContext),
+        AggregationFunctionUtils.buildFilteredAggregationInfos(_segmentContext, _queryContext),
         _indexSegment.getSegmentMetadata().getTotalDocs());
   }
 
@@ -88,7 +91,7 @@ public class AggregationPlanNode implements PlanNode {
     assert aggregationFunctions != null;
 
     int numTotalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
-    FilterPlanNode filterPlanNode = new FilterPlanNode(_indexSegment, _queryContext);
+    FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
     if (!_queryContext.isNullHandlingEnabled()) {
@@ -110,7 +113,7 @@ public class AggregationPlanNode implements PlanNode {
     }
 
     AggregationInfo aggregationInfo =
-        AggregationFunctionUtils.buildAggregationInfo(_indexSegment, _queryContext, aggregationFunctions,
+        AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext, aggregationFunctions,
             _queryContext.getFilter(), filterOperator, filterPlanNode.getPredicateEvaluators());
     return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
   }

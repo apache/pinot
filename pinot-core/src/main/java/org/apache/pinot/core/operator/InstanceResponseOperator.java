@@ -29,7 +29,7 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.FetchContext;
-import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -40,7 +40,7 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   private static final String EXPLAIN_NAME = "INSTANCE_RESPONSE";
 
   protected final BaseCombineOperator<?> _combineOperator;
-  protected final List<IndexSegment> _indexSegments;
+  protected final List<SegmentContext> _segmentContexts;
   protected final List<FetchContext> _fetchContexts;
   protected final int _fetchContextSize;
   protected final QueryContext _queryContext;
@@ -48,10 +48,10 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
   protected long _threadCpuTimeNs;
   protected long _systemActivitiesCpuTimeNs;
 
-  public InstanceResponseOperator(BaseCombineOperator<?> combineOperator, List<IndexSegment> indexSegments,
+  public InstanceResponseOperator(BaseCombineOperator<?> combineOperator, List<SegmentContext> segmentContexts,
       List<FetchContext> fetchContexts, QueryContext queryContext) {
     _combineOperator = combineOperator;
-    _indexSegments = indexSegments;
+    _segmentContexts = segmentContexts;
     _fetchContexts = fetchContexts;
     _fetchContextSize = fetchContexts.size();
     _queryContext = queryContext;
@@ -138,13 +138,13 @@ public class InstanceResponseOperator extends BaseOperator<InstanceResponseBlock
 
   public void prefetchAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
-      _indexSegments.get(i).prefetch(_fetchContexts.get(i));
+      _segmentContexts.get(i).getIndexSegment().prefetch(_fetchContexts.get(i));
     }
   }
 
   public void releaseAll() {
     for (int i = 0; i < _fetchContextSize; i++) {
-      _indexSegments.get(i).release(_fetchContexts.get(i));
+      _segmentContexts.get(i).getIndexSegment().release(_fetchContexts.get(i));
     }
   }
 

@@ -35,6 +35,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -46,6 +47,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -155,6 +157,10 @@ public class MockInstanceDataManagerFactory {
     when(tableDataManager.acquireSegments(anyList(), eq(null), anyList())).thenAnswer(invocation -> {
       List<String> segments = invocation.getArgument(0);
       return segments.stream().map(segmentDataManagerMap::get).collect(Collectors.toList());
+    });
+    when(tableDataManager.getSegmentContexts(anyList(), anyMap())).thenAnswer(invocation -> {
+      List<IndexSegment> segments = invocation.getArgument(0);
+      return segments.stream().map(SegmentContext::new).collect(Collectors.toList());
     });
     return tableDataManager;
   }

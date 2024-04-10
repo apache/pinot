@@ -39,6 +39,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -204,7 +205,7 @@ public class BenchmarkNativeVsLuceneTextIndex {
   @Benchmark
   @CompilerControl(CompilerControl.Mode.DONT_INLINE)
   public void query(Blackhole bh) {
-    Operator<?> operator = _planMaker.makeSegmentPlanNode(_indexSegment, _queryContext).run();
+    Operator<?> operator = _planMaker.makeSegmentPlanNode(new SegmentContext(_indexSegment), _queryContext).run();
     for (int i = 0; i < _numBlocks; i++) {
       bh.consume(operator.nextBlock());
     }
