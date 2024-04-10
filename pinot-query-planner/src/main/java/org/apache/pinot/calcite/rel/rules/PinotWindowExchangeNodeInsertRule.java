@@ -65,7 +65,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   // OTHER_FUNCTION supported are: BOOL_AND, BOOL_OR
   private static final Set<SqlKind> SUPPORTED_WINDOW_FUNCTION_KIND = ImmutableSet.of(SqlKind.SUM, SqlKind.SUM0,
       SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.ROW_NUMBER, SqlKind.RANK, SqlKind.DENSE_RANK,
-      SqlKind.OTHER_FUNCTION);
+      SqlKind.LAG, SqlKind.LEAD, SqlKind.FIRST_VALUE, SqlKind.LAST_VALUE, SqlKind.OTHER_FUNCTION);
 
   public PinotWindowExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(LogicalWindow.class, any()), factory, null);

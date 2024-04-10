@@ -223,7 +223,7 @@ public class AggregationUtils {
         _literal = ((RexExpression.Literal) rexExpression).getValue();
         _dataType = rexExpression.getDataType();
       }
-      _merger = merger.get(functionName).apply(_dataType);
+      _merger = merger.containsKey(functionName) ? merger.get(functionName).apply(_dataType) : null;
     }
 
     public void accumulate(Key key, Object[] row) {
