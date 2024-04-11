@@ -90,7 +90,7 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
   @Override
   public BrokerResponseNative seal() {
     if (_dataSchema == null) {
-      return BrokerResponseNative.empty();
+      return BrokerResponseNative.EMPTY_RESULT;
     }
     Pair<DataSchema, int[]> pair =
         SelectionOperatorUtils.getResultTableDataSchemaAndColumnIndices(_queryContext, _dataSchema);

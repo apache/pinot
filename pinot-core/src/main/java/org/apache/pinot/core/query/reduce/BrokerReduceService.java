@@ -63,7 +63,7 @@ public class BrokerReduceService extends BaseReduceService {
       Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, @Nullable BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       // Empty response.
-      return BrokerResponseNative.empty();
+      return BrokerResponseNative.EMPTY_RESULT;
     }
 
     Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();

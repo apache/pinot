@@ -63,7 +63,7 @@ public class StreamingReduceService extends BaseReduceService {
       throws IOException {
     if (serverResponseMap.isEmpty()) {
       // Empty response.
-      return BrokerResponseNative.empty();
+      return BrokerResponseNative.EMPTY_RESULT;
     }
 
     // prepare contextual info for reduce.

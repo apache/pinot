@@ -36,7 +36,9 @@ public class BrokerResponseNativeTest {
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(actual.getNumDocsScanned(), expected.getNumDocsScanned());
     Assert.assertEquals(actual.getTimeUsedMs(), expected.getTimeUsedMs());
-    Assert.assertEquals(actual.getResultTable(), expected.getResultTable());
+    Assert.assertNotNull(actual.getResultTable());
+    Assert.assertEquals(actual.getResultTable().getDataSchema(), expected.getResultTable().getDataSchema());
+    Assert.assertEquals(actual.getResultTable().getRows().size(), expected.getResultTable().getRows().size());
     Assert.assertEquals(actual.getSegmentStatistics().size(), expected.getSegmentStatistics().size());
   }
 

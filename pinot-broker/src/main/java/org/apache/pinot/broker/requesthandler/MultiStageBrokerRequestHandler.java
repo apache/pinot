@@ -320,7 +320,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   private BrokerResponseNative constructMultistageExplainPlan(String sql, String plan) {
-    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+    BrokerResponseNative brokerResponse = BrokerResponseNative.EMPTY_RESULT;
     List<Object[]> rows = new ArrayList<>();
     rows.add(new Object[]{sql, plan});
     DataSchema multistageExplainResultSchema = new DataSchema(new String[]{"SQL", "PLAN"},

@@ -827,7 +827,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Send empty response since we don't need to evaluate either offline or realtime request.
-    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+    BrokerResponseNative brokerResponse = BrokerResponseNative.EMPTY_RESULT;
     // Extract source info from incoming request
     _queryLogger.log(
         new QueryLogger.QueryLogParams(requestId, query, requestContext, tableName, 0, null, brokerResponse,

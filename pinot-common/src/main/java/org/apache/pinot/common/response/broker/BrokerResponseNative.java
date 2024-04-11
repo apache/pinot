@@ -117,7 +117,7 @@ public class BrokerResponseNative implements BrokerResponse {
 
   /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
   private static BrokerResponseNative getBrokerResponseExplainPlanOutput() {
-    BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
+    BrokerResponseNative brokerResponse = BrokerResponseNative.EMPTY_RESULT;
     List<Object[]> rows = new ArrayList<>();
     rows.add(new Object[]{"BROKER_EVALUATE", 0, -1});
     brokerResponse.setResultTable(new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows));
@@ -127,7 +127,7 @@ public class BrokerResponseNative implements BrokerResponse {
   /**
    * Get a new empty {@link BrokerResponseNative}.
    */
-  public static BrokerResponseNative empty() {
+  private static BrokerResponseNative empty() {
     return new BrokerResponseNative();
   }
 
