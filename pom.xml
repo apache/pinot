@@ -220,7 +220,7 @@
     <protobuf.version>3.25.2</protobuf.version>
     <grpc.version>1.61.1</grpc.version>
 
-    <confluent.version>7.6.0</confluent.version>
+    <confluent.version>7.6.1</confluent.version>
 
     <!-- Configuration for Scala -->
     <scala.version>2.12.18</scala.version>
