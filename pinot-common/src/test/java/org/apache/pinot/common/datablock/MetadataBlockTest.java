@@ -20,6 +20,7 @@ package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -39,8 +40,12 @@ public class MetadataBlockTest {
     // Then:
     byte[] expectedFixed = new byte[]{0};
     assertEquals(metadataBlock._fixedSizeDataBytes, expectedFixed);
-    byte[] expectedVariable = new byte[]{0, 0, 0, 0};
+    byte[] expectedVariable = new byte[0];
     assertEquals(metadataBlock._variableSizeDataBytes, expectedVariable);
+
+    List<ByteBuffer> statsByStage = metadataBlock.getStatsByStage();
+    assertNotNull(statsByStage, "Expected stats by stage to be non-null");
+    assertEquals(statsByStage.size(), 0, "Expected no stats by stage");
   }
 
   @Test
