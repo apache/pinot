@@ -194,10 +194,7 @@ public abstract class BaseDataBlock implements DataBlock {
     _variableSizeData = ByteBuffer.wrap(_variableSizeDataBytes);
 
     // Read metadata.
-    int metadataLength = byteBuffer.getInt();
-    if (metadataLength != 0) {
-      deserializeMetadata(byteBuffer);
-    }
+    deserializeMetadata(byteBuffer);
   }
 
   @Override
@@ -524,9 +521,6 @@ public abstract class BaseDataBlock implements DataBlock {
 
   /**
    * Writes the metadata section to the given data output stream.
-   * <p>
-   * <strong>Important:</strong> It is mandatory to write first an int with the number of metadata bytes and then
-   * exactly that number of bytes with the metadata.
    */
   protected void serializeMetadata(DataOutputStream dataOutputStream)
       throws IOException {
@@ -535,6 +529,9 @@ public abstract class BaseDataBlock implements DataBlock {
 
   /**
    * Deserializes the metadata section from the given byte buffer.
+   * <p>
+   * This is the counterpart of {@link #serializeMetadata(DataOutputStream)} and it is guaranteed that the buffer will
+   * be positioned at the start of the metadata section when this method is called.
    * <p>
    * <strong>Important:</strong> This method will be called at the end of the BaseDataConstructor constructor to read
    * the metadata section. This means that it will be called <strong>before</strong> the subclass have been constructor

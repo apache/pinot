@@ -58,7 +58,7 @@ public class MetadataBlock extends BaseDataBlock {
   @Override
   protected void serializeMetadata(DataOutputStream output)
       throws IOException {
-    if (_statsByStage == null || _statsByStage.isEmpty()) {
+    if (_statsByStage == null) {
       output.writeInt(0);
       return;
     }
