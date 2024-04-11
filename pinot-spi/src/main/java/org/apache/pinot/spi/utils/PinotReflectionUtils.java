@@ -53,7 +53,7 @@ public class PinotReflectionUtils {
     try {
       synchronized (REFLECTION_LOCK) {
         return new Reflections(new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage(packageName))
-            .filterInputsBy(new FilterBuilder.Include(regexPattern))).getTypesAnnotatedWith(annotation);
+            .filterInputsBy(new FilterBuilder().includePattern(regexPattern))).getTypesAnnotatedWith(annotation);
       }
     } catch (Throwable t) {
       // Log an error then re-throw it because this method is usually called in a static block, where exception might
@@ -73,7 +73,7 @@ public class PinotReflectionUtils {
           urls.addAll(ClasspathHelper.forPackage(packageName));
         }
         return new Reflections(new ConfigurationBuilder().setUrls(urls)
-            .filterInputsBy(new FilterBuilder.Include(regexPattern))).getTypesAnnotatedWith(annotation);
+            .filterInputsBy(new FilterBuilder().includePattern(regexPattern))).getTypesAnnotatedWith(annotation);
       }
     } catch (Throwable t) {
       // Log an error then re-throw it because this method is usually called in a static block, where exception might
@@ -93,7 +93,7 @@ public class PinotReflectionUtils {
     try {
       synchronized (REFLECTION_LOCK) {
         return new Reflections(new ConfigurationBuilder().setUrls(ClasspathHelper.forPackage(packageName))
-            .filterInputsBy(new FilterBuilder.Include(regexPattern))
+            .filterInputsBy(new FilterBuilder().includePattern(regexPattern))
             .setScanners(new MethodAnnotationsScanner())).getMethodsAnnotatedWith(annotation);
       }
     } catch (Throwable t) {
