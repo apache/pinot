@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.util;
+package org.apache.pinot.core.util;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import org.apache.pinot.core.util.IntObjectIndexedPriorityQueue;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.spi.utils.Pairs;
 import org.testng.Assert;
