@@ -53,16 +53,6 @@ public class PulsarUtils {
     throw new IllegalArgumentException("Unsupported offset criteria: " + offsetCriteria);
   }
 
-  public static MessageId offsetCriteriaToMessageId(OffsetCriteria offsetCriteria) {
-    if (offsetCriteria.isLargest()) {
-      return MessageId.latest;
-    }
-    if (offsetCriteria.isSmallest()) {
-      return MessageId.earliest;
-    }
-    throw new IllegalArgumentException("Unsupported offset criteria: " + offsetCriteria);
-  }
-
   /**
    * Stitch key and value bytes together using a simple format:
    * 4 bytes for key length + key bytes + 4 bytes for value length + value bytes
