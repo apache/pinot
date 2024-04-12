@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.plugin.stream.pulsar;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.URL;
-import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pulsar.client.api.AuthenticationFactory;
@@ -33,7 +33,7 @@ import org.apache.pulsar.client.impl.auth.oauth2.AuthenticationFactoryOAuth2;
 /**
  * Manages the Pulsar client connection, given the partition id and {@link PulsarConfig}
  */
-public class PulsarPartitionLevelConnectionHandler {
+public class PulsarPartitionLevelConnectionHandler implements Closeable {
   protected final PulsarConfig _config;
   protected final String _clientId;
   protected final PulsarClient _pulsarClient;
@@ -41,7 +41,7 @@ public class PulsarPartitionLevelConnectionHandler {
   /**
    * Creates a new instance of {@link PulsarClient} and {@link Reader}
    */
-  public PulsarPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig) {
+  protected PulsarPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig) {
     _config = new PulsarConfig(streamConfig, clientId);
     _clientId = clientId;
     try {
@@ -70,13 +70,7 @@ public class PulsarPartitionLevelConnectionHandler {
     }
   }
 
-  protected Reader<byte[]> createReaderForPartition(int partitionId)
-      throws Exception {
-    List<String> partitions = _pulsarClient.getPartitionsForTopic(_config.getPulsarTopicName()).get();
-    return _pulsarClient.newReader().topic(partitions.get(partitionId)).startMessageId(_config.getInitialMessageId())
-        .startMessageIdInclusive().create();
-  }
-
+  @Override
   public void close()
       throws IOException {
     _pulsarClient.close();

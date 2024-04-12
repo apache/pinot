@@ -39,7 +39,7 @@
     <pinot.root>${basedir}/../../..</pinot.root>
     <simpleclient_common.version>0.16.0</simpleclient_common.version>
     <grpc-context.version>1.63.0</grpc-context.version>
-    <grpc-protobuf-lite.version>1.62.2</grpc-protobuf-lite.version>
+    <grpc-protobuf-lite.version>1.63.0</grpc-protobuf-lite.version>
     <caffeine.version>2.6.2</caffeine.version>
     <codehaus-annotations.version>1.17</codehaus-annotations.version>
   </properties>
