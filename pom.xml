@@ -153,7 +153,7 @@
     <jsonsmart.version>2.5.1</jsonsmart.version>
     <quartz.version>2.3.2</quartz.version>
     <calcite.version>1.36.0</calcite.version>
-    <lucene.version>9.8.0</lucene.version>
+    <lucene.version>9.10.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
     <dynatrace.hash4j.version>0.17.0</dynatrace.hash4j.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
