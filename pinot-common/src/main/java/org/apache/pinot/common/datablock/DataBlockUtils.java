@@ -82,7 +82,7 @@ public final class DataBlockUtils {
       case ROW:
         return new RowDataBlock(byteBuffer);
       case METADATA:
-        return new MetadataBlock(byteBuffer);
+        return MetadataBlock.deserialize(byteBuffer, version);
       default:
         throw new UnsupportedOperationException("Unsupported data table version: " + version + " with type: " + type);
     }

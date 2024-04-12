@@ -426,6 +426,11 @@ public abstract class BaseDataBlock implements DataBlock {
     return _errCodeToExceptionMap;
   }
 
+  /**
+   * Serialize this data block to a byte array.
+   * <p>
+   * In order to deserialize it, {@link DataBlockUtils#getDataBlock(ByteBuffer)} should be used.
+   */
   @Override
   public byte[] toBytes()
       throws IOException {

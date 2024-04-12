@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -40,7 +41,7 @@ public class MetadataBlock extends BaseDataBlock {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(MetadataBlock.class);
   @VisibleForTesting
-  static final int VERSION = 1;
+  static final int VERSION = 2;
   @Nullable
   private List<ByteBuffer> _statsByStage;
 
@@ -96,6 +97,29 @@ public class MetadataBlock extends BaseDataBlock {
        }
     } else {
       _type = MetadataBlockType.values()[_fixedSizeDataBytes[0]];
+    }
+  }
+
+  public static MetadataBlock deserialize(ByteBuffer byteBuffer, int version)
+      throws IOException {
+    switch (version) {
+      case 1: {
+        V1MetadataBlock decoded = new V1MetadataBlock(byteBuffer);
+        if (decoded.getType() == V1MetadataBlock.MetadataBlockType.ERROR) {
+          MetadataBlock metadataBlock = new MetadataBlock(MetadataBlockType.ERROR);
+          for (Map.Entry<Integer, String> entry : decoded.getExceptions().entrySet()) {
+            metadataBlock.addException(entry.getKey(), entry.getValue());
+          }
+          return metadataBlock;
+        } else {
+          // We just ignore the stats in this case
+          return new MetadataBlock(MetadataBlockType.EOS);
+        }
+      }
+      case 2:
+        return new MetadataBlock(byteBuffer);
+      default:
+        throw new IOException("Unsupported metadata block version: " + version);
     }
   }
 

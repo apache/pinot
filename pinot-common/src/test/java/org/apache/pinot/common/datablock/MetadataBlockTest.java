@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.common.datablock;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -62,13 +62,66 @@ public class MetadataBlockTest extends BaseDataBlockContract {
   }
 
   @Test
+  public void shouldDecodeV1MetadataBlockError()
+      throws IOException {
+    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(V1MetadataBlock.MetadataBlockType.ERROR);
+    v1MetadataBlock.addException(250, "timeout");
+    v1MetadataBlock.addException(500, "server error");
+
+    byte[] bytes = v1MetadataBlock.toBytes();
+    ByteBuffer buff = ByteBuffer.wrap(bytes);
+    DataBlock dataBlock = DataBlockUtils.getDataBlock(buff);
+
+    assertTrue(dataBlock instanceof MetadataBlock, "V1MetadataBlock should be always decoded as MetadataBlock");
+    MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
+    assertEquals(metadataBlock.getType(), MetadataBlock.MetadataBlockType.ERROR, "Expected error type");
+    assertEquals(metadataBlock.getStatsByStage(), Collections.emptyList(), "Expected no stats by stage");
+    assertEquals(metadataBlock.getExceptions().size(), v1MetadataBlock.getExceptions().size(), "Expected exceptions");
+  }
+
+  @Test
+  public void shouldDecodeV1MetadataBlockEmptyStats()
+      throws IOException {
+    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(V1MetadataBlock.MetadataBlockType.EOS, new HashMap<>());
+
+    byte[] bytes = v1MetadataBlock.toBytes();
+    ByteBuffer buff = ByteBuffer.wrap(bytes);
+    DataBlock dataBlock = DataBlockUtils.getDataBlock(buff);
+
+    assertTrue(dataBlock instanceof MetadataBlock, "V1MetadataBlock should be always decoded as MetadataBlock");
+    MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
+    assertEquals(metadataBlock.getType(), MetadataBlock.MetadataBlockType.EOS, "Expected EOS type");
+    assertEquals(metadataBlock.getStatsByStage(), Collections.emptyList(), "Expected no stats by stage");
+    assertEquals(metadataBlock.getExceptions().size(), v1MetadataBlock.getExceptions().size(), "Expected exceptions");
+  }
+
+  @Test
+  public void shouldDecodeV1MetadataBlockNotEmptyStats()
+      throws IOException {
+    HashMap<String, String> stats = new HashMap<>();
+    stats.put("foo", "bar");
+    stats.put("baz", "qux");
+    V1MetadataBlock v1MetadataBlock = new V1MetadataBlock(V1MetadataBlock.MetadataBlockType.EOS, stats);
+
+    byte[] bytes = v1MetadataBlock.toBytes();
+    ByteBuffer buff = ByteBuffer.wrap(bytes);
+    DataBlock dataBlock = DataBlockUtils.getDataBlock(buff);
+
+    assertTrue(dataBlock instanceof MetadataBlock, "V1MetadataBlock should be always decoded as MetadataBlock");
+    MetadataBlock metadataBlock = (MetadataBlock) dataBlock;
+    assertEquals(metadataBlock.getType(), MetadataBlock.MetadataBlockType.EOS, "Expected EOS type");
+    assertEquals(metadataBlock.getStatsByStage(), Collections.emptyList(), "Expected no stats by stage");
+    assertEquals(metadataBlock.getExceptions().size(), v1MetadataBlock.getExceptions().size(), "Expected exceptions");
+  }
+
+  @Test
   public void shouldDefaultToEosWithNoErrorsOnLegacyMetadataBlock()
       throws IOException {
     // Given:
     // MetadataBlock used to be encoded without any data, we should make sure that
     // during rollout or if server versions are mismatched that we can still handle
     // the old format
-    OldMetadataBlock legacyBlock = new OldMetadataBlock();
+    V0MetadataBlock legacyBlock = new V0MetadataBlock();
     byte[] bytes = legacyBlock.toBytes();
 
     // When:
@@ -87,7 +140,7 @@ public class MetadataBlockTest extends BaseDataBlockContract {
     // MetadataBlock used to be encoded without any data, we should make sure that
     // during rollout or if server versions are mismatched that we can still handle
     // the old format
-    OldMetadataBlock legacyBlock = new OldMetadataBlock();
+    V0MetadataBlock legacyBlock = new V0MetadataBlock();
     legacyBlock.addException(250, "timeout");
     byte[] bytes = legacyBlock.toBytes();
 
@@ -113,9 +166,9 @@ public class MetadataBlockTest extends BaseDataBlockContract {
   /**
    * This is mostly just used as an internal serialization tool
    */
-  private static class OldMetadataBlock extends BaseDataBlock {
+  private static class V0MetadataBlock extends BaseDataBlock {
 
-    public OldMetadataBlock() {
+    public V0MetadataBlock() {
       super(0, null, new String[0], new byte[0], new byte[0]);
     }
 
