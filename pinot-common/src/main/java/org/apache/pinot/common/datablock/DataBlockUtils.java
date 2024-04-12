@@ -67,9 +67,13 @@ public final class DataBlockUtils {
     return new MetadataBlock(MetadataBlock.MetadataBlockType.EOS);
   }
 
+  public static int readVersionType(ByteBuffer byteBuffer) {
+    return byteBuffer.getInt();
+  }
+
   public static DataBlock getDataBlock(ByteBuffer byteBuffer)
       throws IOException {
-    int versionType = byteBuffer.getInt();
+    int versionType = readVersionType(byteBuffer);
     int version = versionType & ((1 << VERSION_TYPE_SHIFT) - 1);
     DataBlock.Type type = DataBlock.Type.fromOrdinal(versionType >> VERSION_TYPE_SHIFT);
     switch (type) {

@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,6 +153,23 @@ public class MetadataBlock extends BaseDataBlock {
   @Override
   protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
     throw new UnsupportedOperationException("Metadata block uses JSON encoding for field access");
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof MetadataBlock)) {
+      return false;
+    }
+    MetadataBlock that = (MetadataBlock) o;
+    return Objects.equals(_statsByStage, that._statsByStage) && _type == that._type;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_statsByStage, _type);
   }
 
   @Override

@@ -20,6 +20,8 @@ package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -81,5 +83,21 @@ public class RowDataBlock extends BaseDataBlock {
     return _rowSizeInBytes;
   }
 
-  // TODO: add whole-row access methods.
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof RowDataBlock)) {
+      return false;
+    }
+    RowDataBlock that = (RowDataBlock) o;
+    return _rowSizeInBytes == that._rowSizeInBytes && Objects.deepEquals(_columnOffsets, that._columnOffsets);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(Arrays.hashCode(_columnOffsets), _rowSizeInBytes);
+  }
+// TODO: add whole-row access methods.
 }

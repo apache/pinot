@@ -18,14 +18,21 @@
  */
 package org.apache.pinot.common.datablock;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
 
-public class MetadataBlockTest {
+public class MetadataBlockTest extends BaseDataBlockContract {
+  @Override
+  protected BaseDataBlock deserialize(ByteBuffer byteBuffer, int versionType)
+      throws IOException {
+    return new MetadataBlock(byteBuffer);
+  }
 
   // TODO: Add more tests for MetadataBlock serialization/deserialization
   @Test
@@ -46,6 +53,12 @@ public class MetadataBlockTest {
     List<ByteBuffer> statsByStage = metadataBlock.getStatsByStage();
     assertNotNull(statsByStage, "Expected stats by stage to be non-null");
     assertEquals(statsByStage.size(), 0, "Expected no stats by stage");
+  }
+
+  @Test
+  public void emptyDataBlockCorrectness()
+      throws IOException {
+    testSerdeCorrectness(new MetadataBlock(MetadataBlock.MetadataBlockType.EOS));
   }
 
   @Test

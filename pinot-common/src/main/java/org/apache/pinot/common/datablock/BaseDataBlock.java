@@ -75,8 +75,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * | METADATA SECTION                              |
  * +-----------------------------------------------+
  *
- * Metadata is actually not used, but we keep it here for backward compatibility reasons.
- *
  * To support both row and columnar data format. the size of the data payload will be exactly the same. the only
  * difference is the data layout in FIXED_SIZE_DATA and VARIABLE_SIZE_DATA section, see each impl for details.
  */
@@ -533,12 +531,16 @@ public abstract class BaseDataBlock implements DataBlock {
    * This is the counterpart of {@link #serializeMetadata(DataOutputStream)} and it is guaranteed that the buffer will
    * be positioned at the start of the metadata section when this method is called.
    * <p>
+   * <strong>Important:</strong> It is mandatory for implementations to leave the cursor at the end of the metadata, in
+   * the exact same position as it was when {@link #serializeMetadata(DataOutputStream)} was called.
+   * <p>
    * <strong>Important:</strong> This method will be called at the end of the BaseDataConstructor constructor to read
    * the metadata section. This means that it will be called <strong>before</strong> the subclass have been constructor
    * have been called. Therefore it is not possible to use any subclass fields in this method.
    */
   protected void deserializeMetadata(ByteBuffer buffer)
       throws IOException {
+    buffer.getInt();
   }
 
   private byte[] serializeExceptions()

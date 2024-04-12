@@ -20,6 +20,8 @@ package org.apache.pinot.common.datablock;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Objects;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -84,5 +86,22 @@ public class ColumnarDataBlock extends BaseDataBlock {
     return new ColumnarDataBlock(_numRows, _dataSchema, _stringDictionary, _fixedSizeDataBytes, _variableSizeDataBytes);
   }
 
-  // TODO: add whole-column access methods.
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ColumnarDataBlock)) {
+      return false;
+    }
+    ColumnarDataBlock that = (ColumnarDataBlock) o;
+    return Objects.deepEquals(_cumulativeColumnOffsetSizeInBytes, that._cumulativeColumnOffsetSizeInBytes)
+        && Objects.deepEquals(_columnSizeInBytes, that._columnSizeInBytes);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(Arrays.hashCode(_cumulativeColumnOffsetSizeInBytes), Arrays.hashCode(_columnSizeInBytes));
+  }
+// TODO: add whole-column access methods.
 }
