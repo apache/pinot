@@ -28,6 +28,7 @@ import java.util.concurrent.Executors;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
@@ -90,7 +91,9 @@ public class PipelineBreakerExecutorTest {
     when(_mailboxService.getPort()).thenReturn(123);
 
     when(_mailbox1.getId()).thenReturn("mailbox1");
+    when(_mailbox1.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
     when(_mailbox2.getId()).thenReturn("mailbox2");
+    when(_mailbox2.getStatMap()).thenReturn(new StatMap<>(ReceivingMailbox.StatKey.class));
   }
 
   @AfterMethod
