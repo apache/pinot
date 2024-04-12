@@ -1878,7 +1878,7 @@
               <groupId>net.java.dev.javacc</groupId>
               <artifactId>javacc</artifactId>
               <!-- Higher version JavaCC throws exception when generating custom Calcite parser -->
-              <version>5.0</version>
+              <version>7.0.13</version>
             </dependency>
           </dependencies>
         </plugin>
